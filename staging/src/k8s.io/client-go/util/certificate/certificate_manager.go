@@ -114,7 +114,7 @@ type Config struct {
 	// This is intended to allow the first boot of a component to be
 	// initialized using a generic, multi-use cert/key pair which will be
 	// quickly replaced with a unique cert/key pair.
-	BootstrapKeyPEM []byte
+	BootstrapKeyPEM []byte `datapolicy:"security-key"`
 	// CertificateRotation will record a metric showing the time in seconds
 	// that certificates lived before being rotated. This metric is a histogram
 	// because there is value in keeping a history of rotation cadences. It

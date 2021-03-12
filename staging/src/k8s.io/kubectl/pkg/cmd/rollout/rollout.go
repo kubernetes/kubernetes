@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	rolloutLong = templates.LongDesc(`
-		Manage the rollout of a resource.` + rolloutValidResources)
+	rolloutLong = templates.LongDesc(i18n.T(`
+		Manage the rollout of a resource.`) + rolloutValidResources)
 
 	rolloutExample = templates.Examples(`
 		# Rollback to the previous deployment

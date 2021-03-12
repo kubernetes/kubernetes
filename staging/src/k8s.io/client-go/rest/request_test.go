@@ -338,6 +338,7 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost/some/base/url/path")
+	uriSingleSlash, _ := url.Parse("http://localhost/")
 	testCases := []struct {
 		Request          *Request
 		ExpectedFullURL  string
@@ -484,6 +485,38 @@ func TestURLTemplate(t *testing.T) {
 				Prefix("/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is a single /
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r2/name1"),
+			ExpectedFullURL:  "http://localhost/api/v1/namespaces/ns/r2/name1",
+			ExpectedFinalURL: "http://localhost/api/v1/namespaces/%7Bnamespace%7D/r2/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is 'some/base/url/path'
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r3/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r3/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r3/%7Bname%7D",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/"),
+			ExpectedFullURL:  "http://localhost/",
+			ExpectedFinalURL: "http://localhost/",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /version
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/version"),
+			ExpectedFullURL:  "http://localhost/version",
+			ExpectedFinalURL: "http://localhost/version",
 		},
 	}
 	for i, testCase := range testCases {
@@ -2195,14 +2228,18 @@ func TestRequestPreflightCheck(t *testing.T) {
 
 func TestThrottledLogger(t *testing.T) {
 	now := time.Now()
+	oldClock := globalThrottledLogger.clock
+	defer func() {
+		globalThrottledLogger.clock = oldClock
+	}()
 	clock := clock.NewFakeClock(now)
 	globalThrottledLogger.clock = clock
 
 	logMessages := 0
-	for i := 0; i < 10000; i++ {
+	for i := 0; i < 1000; i++ {
 		var wg sync.WaitGroup
-		wg.Add(100)
-		for j := 0; j < 100; j++ {
+		wg.Add(10)
+		for j := 0; j < 10; j++ {
 			go func() {
 				if _, ok := globalThrottledLogger.attemptToLog(); ok {
 					logMessages++
@@ -2215,7 +2252,7 @@ func TestThrottledLogger(t *testing.T) {
 		clock.SetTime(now)
 	}
 
-	if a, e := logMessages, 1000; a != e {
+	if a, e := logMessages, 100; a != e {
 		t.Fatalf("expected %v log messages, but got %v", e, a)
 	}
 }

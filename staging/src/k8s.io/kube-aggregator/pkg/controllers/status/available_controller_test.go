@@ -18,6 +18,7 @@ package apiserver
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -133,6 +134,8 @@ func setupAPIServices(apiServices []*apiregistration.APIService) (*AvailableCond
 			// the maximum disruption time to a minimum, but it does prevent hot loops.
 			workqueue.NewItemExponentialFailureRateLimiter(5*time.Millisecond, 30*time.Second),
 			"AvailableConditionController"),
+		tlsCache: &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
+		metrics:  newAvailabilityMetrics(),
 	}
 	for _, svc := range apiServices {
 		c.addAPIService(svc)
@@ -202,6 +205,55 @@ func TestBuildCache(t *testing.T) {
 		})
 	}
 }
+
+func TestTLSCache(t *testing.T) {
+	apiServices := []*apiregistration.APIService{newRemoteAPIService("remote.group")}
+	services := []*v1.Service{newService("foo", "bar", testServicePort, testServicePortName)}
+	c, _ := setupAPIServices(apiServices)
+	// TLS configs with customized dialers are uncacheable by the client-go
+	// TLS transport cache. The local cache will be used.
+	c.dialContext = (&net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+	for _, svc := range services {
+		c.addService(svc)
+	}
+	tests := []struct {
+		name                       string
+		proxyCurrentCertKeyContent certKeyFunc
+		expectedCacheSize          int
+	}{
+		{
+			name:              "nil certKeyFunc",
+			expectedCacheSize: 1,
+		},
+		{
+			name:                       "empty certKeyFunc",
+			proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+			// the tlsCacheKey is the same, reuse existing transport
+			expectedCacheSize: 1,
+		},
+		{
+			name:                       "different certKeyFunc",
+			proxyCurrentCertKeyContent: testCertKeyFunc,
+			// the tlsCacheKey is different, create a new transport
+			expectedCacheSize: 2,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			c.proxyCurrentCertKeyContent = tc.proxyCurrentCertKeyContent
+			for _, apiService := range apiServices {
+				c.sync(apiService.Name)
+			}
+			if len(c.tlsCache.transports) != tc.expectedCacheSize {
+				t.Fatalf("%v cache size expected %v, got %v", tc.name, tc.expectedCacheSize, len(c.tlsCache.transports))
+			}
+		})
+	}
+}
+
 func TestSync(t *testing.T) {
 	tests := []struct {
 		name string
@@ -356,6 +408,8 @@ func TestSync(t *testing.T) {
 				endpointsLister:            v1listers.NewEndpointsLister(endpointsIndexer),
 				serviceResolver:            &fakeServiceResolver{url: testServer.URL},
 				proxyCurrentCertKeyContent: func() ([]byte, []byte) { return emptyCert(), emptyCert() },
+				tlsCache:                   &tlsTransportCache{transports: make(map[tlsCacheKey]http.RoundTripper)},
+				metrics:                    newAvailabilityMetrics(),
 			}
 			c.sync(tc.apiServiceName)
 
@@ -405,13 +459,18 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 	bar := &apiregistration.APIService{Status: apiregistration.APIServiceStatus{Conditions: []apiregistration.APIServiceCondition{{Type: "bar"}}}}
 
 	fakeClient := fake.NewSimpleClientset()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, foo)
+	c := AvailableConditionController{
+		apiServiceClient: fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter),
+		metrics:          newAvailabilityMetrics(),
+	}
+
+	c.updateAPIServiceStatus(foo, foo)
 	if e, a := 0, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
 
 	fakeClient.ClearActions()
-	updateAPIServiceStatus(fakeClient.ApiregistrationV1().(apiregistrationclient.APIServicesGetter), foo, bar)
+	c.updateAPIServiceStatus(foo, bar)
 	if e, a := 1, len(fakeClient.Actions()); e != a {
 		t.Error(spew.Sdump(fakeClient.Actions()))
 	}
@@ -419,4 +478,34 @@ func TestUpdateAPIServiceStatus(t *testing.T) {
 
 func emptyCert() []byte {
 	return []byte{}
+}
+
+func testCertKeyFunc() ([]byte, []byte) {
+	return []byte(`-----BEGIN CERTIFICATE-----
+MIICBDCCAW2gAwIBAgIJAPgVBh+4xbGoMA0GCSqGSIb3DQEBCwUAMBsxGTAXBgNV
+BAMMEHdlYmhvb2tfdGVzdHNfY2EwIBcNMTcwNzI4MjMxNTI4WhgPMjI5MTA1MTMy
+MzE1MjhaMB8xHTAbBgNVBAMMFHdlYmhvb2tfdGVzdHNfY2xpZW50MIGfMA0GCSqG
+SIb3DQEBAQUAA4GNADCBiQKBgQDkGXXSm6Yun5o3Jlmx45rItcQ2pmnoDk4eZfl0
+rmPa674s2pfYo3KywkXQ1Fp3BC8GUgzPLSfJ8xXya9Lg1Wo8sHrDln0iRg5HXxGu
+uFNhRBvj2S0sIff0ZG/IatB9I6WXVOUYuQj6+A0CdULNj1vBqH9+7uWbLZ6lrD4b
+a44x/wIDAQABo0owSDAJBgNVHRMEAjAAMAsGA1UdDwQEAwIF4DAdBgNVHSUEFjAU
+BggrBgEFBQcDAgYIKwYBBQUHAwEwDwYDVR0RBAgwBocEfwAAATANBgkqhkiG9w0B
+AQsFAAOBgQCpN27uh/LjUVCaBK7Noko25iih/JSSoWzlvc8CaipvSPofNWyGx3Vu
+OdcSwNGYX/pp4ZoAzFij/Y5u0vKTVLkWXATeTMVmlPvhmpYjj9gPkCSY6j/SiKlY
+kGy0xr+0M5UQkMBcfIh9oAp9um1fZHVWAJAGP/ikZgkcUey0LmBn8w==
+-----END CERTIFICATE-----`), []byte(`-----BEGIN RSA PRIVATE KEY-----
+MIICWwIBAAKBgQDkGXXSm6Yun5o3Jlmx45rItcQ2pmnoDk4eZfl0rmPa674s2pfY
+o3KywkXQ1Fp3BC8GUgzPLSfJ8xXya9Lg1Wo8sHrDln0iRg5HXxGuuFNhRBvj2S0s
+Iff0ZG/IatB9I6WXVOUYuQj6+A0CdULNj1vBqH9+7uWbLZ6lrD4ba44x/wIDAQAB
+AoGAZbWwowvCq1GBq4vPPRI3h739Uz0bRl1ymf1woYXNguXRtCB4yyH+2BTmmrrF
+6AIWkePuUEdbUaKyK5nGu3iOWM+/i6NP3kopQANtbAYJ2ray3kwvFlhqyn1bxX4n
+gl/Cbdw1If4zrDrB66y8mYDsjzK7n/gFaDNcY4GArjvOXKkCQQD9Lgv+WD73y4RP
+yS+cRarlEeLLWVsX/pg2oEBLM50jsdUnrLSW071MjBgP37oOXzqynF9SoDbP2Y5C
+x+aGux9LAkEA5qPlQPv0cv8Wc3qTI+LixZ/86PPHKWnOnwaHm3b9vQjZAkuVQg3n
+Wgg9YDmPM87t3UFH7ZbDihUreUxwr9ZjnQJAZ9Z95shMsxbOYmbSVxafu6m1Sc+R
+M+sghK7/D5jQpzYlhUspGf8n0YBX0hLhXUmjamQGGH5LXL4Owcb4/mM6twJAEVio
+SF/qva9jv+GrKVrKFXT374lOJFY53Qn/rvifEtWUhLCslCA5kzLlctRBafMZPrfH
+Mh5RrJP1BhVysDbenQJASGcc+DiF7rB6K++ZGyC11E2AP29DcZ0pgPESSV7npOGg
++NqPRZNVCSZOiVmNuejZqmwKhZNGZnBFx1Y+ChAAgw==
+-----END RSA PRIVATE KEY-----`)
 }

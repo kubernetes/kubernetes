@@ -44,11 +44,11 @@ func verifyGCEDiskAttached(diskName string, nodeName types.NodeName) bool {
 }
 
 // initializeGCETestSpec creates a PV, PVC, and ClientPod that will run until killed by test or clean up.
-func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig e2epv.PersistentVolumeConfig, pvcConfig e2epv.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+func initializeGCETestSpec(c clientset.Interface, t *framework.TimeoutContext, ns string, pvConfig e2epv.PersistentVolumeConfig, pvcConfig e2epv.PersistentVolumeClaimConfig, isPrebound bool) (*v1.Pod, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	ginkgo.By("Creating the PV and PVC")
 	pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, isPrebound)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
+	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, t, ns, pv, pvc))
 
 	ginkgo.By("Creating the Client Pod")
 	clientPod, err := e2epod.CreateClientPod(c, ns, pvc)
@@ -103,7 +103,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
-		clientPod, pv, pvc = initializeGCETestSpec(c, ns, pvConfig, pvcConfig, false)
+		clientPod, pv, pvc = initializeGCETestSpec(c, f.Timeouts, ns, pvConfig, pvcConfig, false)
 		node = types.NodeName(clientPod.Spec.NodeName)
 	})
 

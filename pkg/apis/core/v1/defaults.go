@@ -19,7 +19,7 @@ package v1
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -27,7 +27,6 @@ import (
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	utilnet "k8s.io/utils/net"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -71,11 +70,6 @@ func SetDefaults_Volume(obj *v1.Volume) {
 		}
 	}
 }
-func SetDefaults_ContainerPort(obj *v1.ContainerPort) {
-	if obj.Protocol == "" {
-		obj.Protocol = v1.ProtocolTCP
-	}
-}
 func SetDefaults_Container(obj *v1.Container) {
 	if obj.ImagePullPolicy == "" {
 		// Ignore error and assume it has been validated elsewhere
@@ -94,6 +88,10 @@ func SetDefaults_Container(obj *v1.Container) {
 	if obj.TerminationMessagePolicy == "" {
 		obj.TerminationMessagePolicy = v1.TerminationMessageReadFile
 	}
+}
+
+func SetDefaults_EphemeralContainer(obj *v1.EphemeralContainer) {
+	SetDefaults_Container((*v1.Container)(&obj.EphemeralContainerCommon))
 }
 
 func SetDefaults_Service(obj *v1.Service) {
@@ -133,32 +131,18 @@ func SetDefaults_Service(obj *v1.Service) {
 		obj.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
-	// if dualstack feature gate is on then we need to default
-	// Spec.IPFamily correctly. This is to cover the case
-	// when an existing cluster have been converted to dualstack
-	// i.e. it already contain services with Spec.IPFamily==nil
-	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
-		obj.Spec.Type != v1.ServiceTypeExternalName &&
-		obj.Spec.ClusterIP != "" && /*has an ip already set*/
-		obj.Spec.ClusterIP != "None" && /* not converting from ExternalName to other */
-		obj.Spec.IPFamily == nil /* family was not previously set */ {
-
-		// there is a change that the ClusterIP (set by user) is unparsable.
-		// in this case, the family will be set mistakenly to ipv4 (because
-		// the util function does not parse errors *sigh*). The error
-		// will be caught in validation which asserts the validity of the
-		// IP and the service object will not be persisted with the wrong IP
-		// family
-
-		ipv6 := v1.IPv6Protocol
-		ipv4 := v1.IPv4Protocol
-		if utilnet.IsIPv6String(obj.Spec.ClusterIP) {
-			obj.Spec.IPFamily = &ipv6
-		} else {
-			obj.Spec.IPFamily = &ipv4
-		}
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) && obj.Spec.InternalTrafficPolicy == nil {
+		serviceInternalTrafficPolicyCluster := v1.ServiceInternalTrafficPolicyCluster
+		obj.Spec.InternalTrafficPolicy = &serviceInternalTrafficPolicyCluster
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
+		if obj.Spec.Type == v1.ServiceTypeLoadBalancer {
+			if obj.Spec.AllocateLoadBalancerNodePorts == nil {
+				obj.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+			}
+		}
+	}
 }
 func SetDefaults_Pod(obj *v1.Pod) {
 	// If limits are specified, but requests are not, default requests to limits
@@ -339,6 +323,26 @@ func SetDefaults_HTTPGetAction(obj *v1.HTTPGetAction) {
 		obj.Scheme = v1.URISchemeHTTP
 	}
 }
+
+// SetDefaults_Namespace adds a default label for all namespaces
+func SetDefaults_Namespace(obj *v1.Namespace) {
+	// TODO, remove the feature gate in 1.22
+	// we can't SetDefaults for nameless namespaces (generateName).
+	// This code needs to be kept in sync with the implementation that exists
+	// in Namespace Canonicalize strategy (pkg/registry/core/namespace)
+
+	// note that this can result in many calls to feature enablement in some cases, but
+	// we assume that there's no real cost there.
+	if utilfeature.DefaultFeatureGate.Enabled(features.NamespaceDefaultLabelName) {
+		if len(obj.Name) > 0 {
+			if obj.Labels == nil {
+				obj.Labels = map[string]string{}
+			}
+			obj.Labels[v1.LabelMetadataName] = obj.Name
+		}
+	}
+}
+
 func SetDefaults_NamespaceStatus(obj *v1.NamespaceStatus) {
 	if obj.Phase == "" {
 		obj.Phase = v1.NamespaceActive

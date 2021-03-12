@@ -124,12 +124,11 @@ var (
 // supported by this api will be exposed as a flag.
 type joinOptions struct {
 	cfgPath               string
-	token                 string
+	token                 string `datapolicy:"token"`
 	controlPlane          bool
 	ignorePreflightErrors []string
 	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
 	joinControlPlane      *kubeadmapiv1beta2.JoinControlPlane
-	kustomizeDir          string
 	patchesDir            string
 }
 
@@ -145,14 +144,13 @@ type joinData struct {
 	clientSet             *clientset.Clientset
 	ignorePreflightErrors sets.String
 	outputWriter          io.Writer
-	kustomizeDir          string
 	patchesDir            string
 }
 
-// NewCmdJoin returns "kubeadm join" command.
+// newCmdJoin returns "kubeadm join" command.
 // NB. joinOptions is exposed as parameter for allowing unit testing of
 //     the newJoinData method, that implements all the command options validation logic
-func NewCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
+func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 	if joinOptions == nil {
 		joinOptions = newJoinOptions()
 	}
@@ -287,7 +285,6 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 		&joinOptions.controlPlane, options.ControlPlane, joinOptions.controlPlane,
 		"Create a new control plane instance on this node",
 	)
-	options.AddKustomizePodsFlag(flagSet, &joinOptions.kustomizeDir)
 	options.AddPatchesFlag(flagSet, &joinOptions.patchesDir)
 }
 
@@ -443,7 +440,6 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 		tlsBootstrapCfg:       tlsBootstrapCfg,
 		ignorePreflightErrors: ignorePreflightErrorsSet,
 		outputWriter:          out,
-		kustomizeDir:          opt.kustomizeDir,
 		patchesDir:            opt.patchesDir,
 	}, nil
 }
@@ -508,11 +504,6 @@ func (j *joinData) IgnorePreflightErrors() sets.String {
 // OutputWriter returns the io.Writer used to write messages such as the "join done" message.
 func (j *joinData) OutputWriter() io.Writer {
 	return j.outputWriter
-}
-
-// KustomizeDir returns the folder where kustomize patches for static pod manifest are stored
-func (j *joinData) KustomizeDir() string {
-	return j.kustomizeDir
 }
 
 // PatchesDir returns the folder where patches for components are stored

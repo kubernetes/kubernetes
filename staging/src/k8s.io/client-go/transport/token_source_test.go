@@ -156,6 +156,76 @@ func TestCachingTokenSourceRace(t *testing.T) {
 	}
 }
 
+func TestTokenSourceTransportRoundTrip(t *testing.T) {
+	goodToken := &oauth2.Token{
+		AccessToken: "good",
+		Expiry:      time.Now().Add(1000 * time.Hour),
+	}
+	badToken := &oauth2.Token{
+		AccessToken: "bad",
+		Expiry:      time.Now().Add(1000 * time.Hour),
+	}
+	tests := []struct {
+		name        string
+		header      http.Header
+		token       *oauth2.Token
+		cachedToken *oauth2.Token
+		wantCalls   int
+		wantCaching bool
+	}{
+		{
+			name:   "skip oauth rt if has authorization header",
+			header: map[string][]string{"Authorization": {"Bearer TOKEN"}},
+			token:  goodToken,
+		},
+		{
+			name:        "authorized on newly acquired good token",
+			token:       goodToken,
+			wantCalls:   1,
+			wantCaching: true,
+		},
+		{
+			name:        "authorized on cached good token",
+			token:       goodToken,
+			cachedToken: goodToken,
+			wantCalls:   0,
+			wantCaching: true,
+		},
+		{
+			name:        "unauthorized on newly acquired bad token",
+			token:       badToken,
+			wantCalls:   1,
+			wantCaching: true,
+		},
+		{
+			name:        "unauthorized on cached bad token",
+			token:       badToken,
+			cachedToken: badToken,
+			wantCalls:   0,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tts := &testTokenSource{
+				tok: test.token,
+			}
+			cachedTokenSource := NewCachedTokenSource(tts)
+			cachedTokenSource.tok = test.cachedToken
+
+			rt := ResettableTokenSourceWrapTransport(cachedTokenSource)(&testTransport{})
+
+			rt.RoundTrip(&http.Request{Header: test.header})
+			if tts.calls != test.wantCalls {
+				t.Errorf("RoundTrip() called Token() = %d times, want %d", tts.calls, test.wantCalls)
+			}
+
+			if (cachedTokenSource.tok != nil) != test.wantCaching {
+				t.Errorf("Got caching %v, want caching %v", cachedTokenSource != nil, test.wantCaching)
+			}
+		})
+	}
+}
+
 type uncancellableRT struct {
 	rt http.RoundTripper
 }
@@ -164,7 +234,7 @@ func (urt *uncancellableRT) RoundTrip(req *http.Request) (*http.Response, error)
 	return urt.rt.RoundTrip(req)
 }
 
-func TestCancellation(t *testing.T) {
+func TestTokenSourceTransportCancelRequest(t *testing.T) {
 	tests := []struct {
 		name          string
 		header        http.Header
@@ -186,7 +256,7 @@ func TestCancellation(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			baseRecorder := &recordCancelRoundTripper{}
+			baseRecorder := &testTransport{}
 
 			var base http.RoundTripper = baseRecorder
 			if test.wrapTransport != nil {
@@ -211,16 +281,19 @@ func TestCancellation(t *testing.T) {
 	}
 }
 
-type recordCancelRoundTripper struct {
+type testTransport struct {
 	canceled bool
 	base     http.RoundTripper
 }
 
-func (rt *recordCancelRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rt *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header["Authorization"][0] == "Bearer bad" {
+		return &http.Response{StatusCode: 401}, nil
+	}
 	return nil, nil
 }
 
-func (rt *recordCancelRoundTripper) CancelRequest(req *http.Request) {
+func (rt *testTransport) CancelRequest(req *http.Request) {
 	rt.canceled = true
 	if rt.base != nil {
 		tryCancelRequest(rt.base, req)

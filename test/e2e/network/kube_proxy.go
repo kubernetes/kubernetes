@@ -17,7 +17,6 @@ limitations under the License.
 package network
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"net"
@@ -33,23 +32,23 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	netutils "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var kubeProxyE2eImage = imageutils.GetE2EImage(imageutils.Agnhost)
 
-var _ = SIGDescribe("Network", func() {
+var _ = common.SIGDescribe("KubeProxy", func() {
 	const (
 		testDaemonHTTPPort    = 11301
 		testDaemonTCPPort     = 11302
 		postFinTimeoutSeconds = 30
 	)
 
-	fr := framework.NewDefaultFramework("network")
+	fr := framework.NewDefaultFramework("kube-proxy")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout [Privileged]", func() {
 		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
@@ -60,13 +59,20 @@ var _ = SIGDescribe("Network", func() {
 				len(nodes.Items))
 		}
 
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-
 		type NodeInfo struct {
 			node   *v1.Node
 			name   string
 			nodeIP string
 		}
+
+		var family v1.IPFamily
+		if framework.TestContext.ClusterIsIPv6() {
+			family = v1.IPv6Protocol
+		} else {
+			family = v1.IPv4Protocol
+		}
+
+		ips := e2enode.GetAddressesByTypeAndFamily(&nodes.Items[0], v1.NodeInternalIP, family)
 
 		clientNodeInfo := NodeInfo{
 			node:   &nodes.Items[0],
@@ -74,10 +80,12 @@ var _ = SIGDescribe("Network", func() {
 			nodeIP: ips[0],
 		}
 
+		ips = e2enode.GetAddressesByTypeAndFamily(&nodes.Items[1], v1.NodeInternalIP, family)
+
 		serverNodeInfo := NodeInfo{
 			node:   &nodes.Items[1],
 			name:   nodes.Items[1].Name,
-			nodeIP: ips[1],
+			nodeIP: ips[0],
 		}
 
 		// Create a pod to check the conntrack entries on the host node
@@ -202,10 +210,10 @@ var _ = SIGDescribe("Network", func() {
 		// Obtain the corresponding conntrack entry on the host checking
 		// the nf_conntrack file from the pod e2e-net-exec.
 		// It retries in a loop if the entry is not found.
-		cmd := fmt.Sprintf("conntrack -L -f %s -d %v"+
+		cmd := fmt.Sprintf("conntrack -L -f %s -d %v "+
 			"| grep -m 1 'CLOSE_WAIT.*dport=%v' ",
 			ipFamily, ip, testDaemonTCPPort)
-		if err := wait.PollImmediate(1*time.Second, postFinTimeoutSeconds, func() (bool, error) {
+		if err := wait.PollImmediate(2*time.Second, epsilonSeconds*time.Second, func() (bool, error) {
 			result, err := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", cmd)
 			// retry if we can't obtain the conntrack entry
 			if err != nil {
@@ -227,121 +235,14 @@ var _ = SIGDescribe("Network", func() {
 			}
 			return false, fmt.Errorf("wrong TCP CLOSE_WAIT timeout: %v expected: %v", timeoutSeconds, expectedTimeoutSeconds)
 		}); err != nil {
-			framework.Failf("no conntrack entry for port %d on node %s", testDaemonTCPPort, serverNodeInfo.nodeIP)
+			// Dump all conntrack entries for debugging
+			result, err2 := framework.RunHostCmd(fr.Namespace.Name, "e2e-net-exec", "conntrack -L")
+			if err2 != nil {
+				framework.Logf("failed to obtain conntrack entry: %v %v", result, err2)
+			}
+			framework.Logf("conntrack entries for node %v:  %v", serverNodeInfo.nodeIP, result)
+			framework.Failf("no valid conntrack entry for port %d on node %s: %v", testDaemonTCPPort, serverNodeInfo.nodeIP, err)
 		}
 	})
 
-	// Regression test for #74839, where:
-	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
-	// a problem where spurious retransmits in a long-running TCP connection to a service
-	// IP could result in the connection being closed with the error "Connection reset by
-	// peer"
-	ginkgo.It("should resolve connection reset issue #74839 [Slow]", func() {
-		serverLabel := map[string]string{
-			"app": "boom-server",
-		}
-		clientLabel := map[string]string{
-			"app": "client",
-		}
-
-		serverPod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "boom-server",
-				Labels: serverLabel,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "boom-server",
-						Image: imageutils.GetE2EImage(imageutils.RegressionIssue74839),
-						Ports: []v1.ContainerPort{
-							{
-								ContainerPort: 9000, // Default port exposed by boom-server
-							},
-						},
-					},
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: clientLabel,
-								},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					},
-				},
-			},
-		}
-		_, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), serverPod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		err = e2epod.WaitForPodsRunningReady(fr.ClientSet, fr.Namespace.Name, 1, 0, framework.PodReadyBeforeTimeout, map[string]string{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Server pod created")
-
-		svc := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "boom-server",
-			},
-			Spec: v1.ServiceSpec{
-				Selector: serverLabel,
-				Ports: []v1.ServicePort{
-					{
-						Protocol: v1.ProtocolTCP,
-						Port:     9000,
-					},
-				},
-			},
-		}
-		_, err = fr.ClientSet.CoreV1().Services(fr.Namespace.Name).Create(context.TODO(), svc, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Server service created")
-
-		pod := &v1.Pod{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:   "startup-script",
-				Labels: clientLabel,
-			},
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "startup-script",
-						Image: imageutils.GetE2EImage(imageutils.BusyBox),
-						Command: []string{
-							"sh", "-c", "while true; do sleep 2; nc boom-server 9000& done",
-						},
-					},
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: serverLabel,
-								},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					},
-				},
-				RestartPolicy: v1.RestartPolicyNever,
-			},
-		}
-		_, err = fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-
-		ginkgo.By("Client pod created")
-
-		for i := 0; i < 20; i++ {
-			time.Sleep(3 * time.Second)
-			resultPod, err := fr.ClientSet.CoreV1().Pods(fr.Namespace.Name).Get(context.TODO(), serverPod.Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(resultPod.Status.ContainerStatuses[0].LastTerminationState.Terminated).Should(gomega.BeNil())
-		}
-	})
 })

@@ -151,7 +151,7 @@ func TestCreateClusterRole(t *testing.T) {
 	for name, test := range tests {
 		ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 		cmd := NewCmdCreateClusterRole(tf, ioStreams)
-		cmd.Flags().Set("dry-run", "true")
+		cmd.Flags().Set("dry-run", "client")
 		cmd.Flags().Set("output", "yaml")
 		cmd.Flags().Set("verb", test.verbs)
 		cmd.Flags().Set("resource", test.resources)
@@ -243,7 +243,7 @@ func TestClusterRoleValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		"test-nonresource-verb": {
 			clusterRoleOptions: &CreateClusterRoleOptions{
@@ -257,7 +257,7 @@ func TestClusterRoleValidate(t *testing.T) {
 					},
 				},
 			},
-			expectErr: true,
+			expectErr: false,
 		},
 		"test-special-verb": {
 			clusterRoleOptions: &CreateClusterRoleOptions{
@@ -496,6 +496,7 @@ func TestClusterRoleValidate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			test.clusterRoleOptions.IOStreams = genericclioptions.NewTestIOStreamsDiscard()
 			var err error
 			test.clusterRoleOptions.Mapper, err = tf.ToRESTMapper()
 			if err != nil {

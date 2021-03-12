@@ -81,13 +81,17 @@ func makeCPUManagerPod(podName string, ctnAttributes []ctnAttribute) *v1.Pod {
 	}
 }
 
+func deletePodSyncByName(f *framework.Framework, podName string) {
+	gp := int64(0)
+	delOpts := metav1.DeleteOptions{
+		GracePeriodSeconds: &gp,
+	}
+	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+}
+
 func deletePods(f *framework.Framework, podNames []string) {
 	for _, podName := range podNames {
-		gp := int64(0)
-		delOpts := metav1.DeleteOptions{
-			GracePeriodSeconds: &gp,
-		}
-		f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+		deletePodSyncByName(f, podName)
 	}
 }
 
@@ -206,6 +210,10 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 }
 
 func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (oldCfg *kubeletconfig.KubeletConfiguration) {
+	return configureCPUManagerInKubelet(f, cleanStateFile, cpuset.CPUSet{})
+}
+
+func configureCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool, reservedSystemCPUs cpuset.CPUSet) (oldCfg *kubeletconfig.KubeletConfiguration) {
 	// Enable CPU Manager in Kubelet with static policy.
 	oldCfg, err := getCurrentKubeletConfig()
 	framework.ExpectNoError(err)
@@ -235,15 +243,21 @@ func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (old
 	// Set the CPU Manager reconcile period to 1 second.
 	newCfg.CPUManagerReconcilePeriod = metav1.Duration{Duration: 1 * time.Second}
 
-	// The Kubelet panics if either kube-reserved or system-reserved is not set
-	// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
-	// kubelet doesn't panic.
-	if newCfg.KubeReserved == nil {
-		newCfg.KubeReserved = map[string]string{}
-	}
+	if reservedSystemCPUs.Size() > 0 {
+		cpus := reservedSystemCPUs.String()
+		framework.Logf("configureCPUManagerInKubelet: using reservedSystemCPUs=%q", cpus)
+		newCfg.ReservedSystemCPUs = cpus
+	} else {
+		// The Kubelet panics if either kube-reserved or system-reserved is not set
+		// when CPU Manager is enabled. Set cpu in kube-reserved > 0 so that
+		// kubelet doesn't panic.
+		if newCfg.KubeReserved == nil {
+			newCfg.KubeReserved = map[string]string{}
+		}
 
-	if _, ok := newCfg.KubeReserved["cpu"]; !ok {
-		newCfg.KubeReserved["cpu"] = "200m"
+		if _, ok := newCfg.KubeReserved["cpu"]; !ok {
+			newCfg.KubeReserved["cpu"] = "200m"
+		}
 	}
 	// Update the Kubelet configuration.
 	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
@@ -283,7 +297,9 @@ func runGuPodTest(f *framework.Framework) {
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1 = cpuList[1]
+		if len(cpuList) > 1 {
+			cpu1 = cpuList[1]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -313,6 +329,10 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 
 	ginkgo.By("checking if the expected cpuset was assigned")
 	expAllowedCPUsListRegex = fmt.Sprintf("^0-%d\n$", cpuCap-1)
+	// on the single CPU node the only possible value is 0
+	if cpuCap == 1 {
+		expAllowedCPUsListRegex = "^0\n$"
+	}
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
 	framework.ExpectNoError(err, "expected log not found in container [%s] of pod [%s]",
 		pod.Spec.Containers[0].Name, pod.Name)
@@ -323,7 +343,6 @@ func runNonGuPodTest(f *framework.Framework, cpuCap int64) {
 }
 
 func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64) {
-
 	var cpuListString, expAllowedCPUsListRegex string
 	var cpuList []int
 	var cpu1 int
@@ -359,7 +378,9 @@ func runMultipleGuNonGuPods(f *framework.Framework, cpuCap int64, cpuAlloc int64
 		cpu1 = cpuList[1]
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1 = cpuList[1]
+		if len(cpuList) > 1 {
+			cpu1 = cpuList[1]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -403,12 +424,13 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 	cpuListString = "1-2"
 	if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		if !isHTEnabled() {
-			cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
-		} else {
+		if len(cpuList) > 1 {
 			cset = cpuset.MustParse(getCPUSiblingList(int64(cpuList[1])))
+			if !isHTEnabled() && len(cpuList) > 2 {
+				cset = cpuset.MustParse(fmt.Sprintf("%d-%d", cpuList[1], cpuList[2]))
+			}
+			cpuListString = fmt.Sprintf("%s", cset)
 		}
-		cpuListString = fmt.Sprintf("%s", cset)
 	} else if isHTEnabled() {
 		cpuListString = "2-3"
 		cpuList = cpuset.MustParse(getCPUSiblingList(0)).ToSlice()
@@ -428,7 +450,6 @@ func runMultipleCPUGuPod(f *framework.Framework) {
 }
 
 func runMultipleCPUContainersGuPod(f *framework.Framework) {
-
 	var expAllowedCPUsListRegex string
 	var cpuList []int
 	var cpu1, cpu2 int
@@ -459,11 +480,15 @@ func runMultipleCPUContainersGuPod(f *framework.Framework) {
 		}
 		if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu2 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu2 = cpuList[1]
+			}
 		}
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1, cpu2 = cpuList[1], cpuList[2]
+		if len(cpuList) > 2 {
+			cpu1, cpu2 = cpuList[1], cpuList[2]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d|%d\n$", cpu1, cpu2)
 	err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -517,11 +542,15 @@ func runMultipleGuPods(f *framework.Framework) {
 		}
 		if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu2 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu2 = cpuList[1]
+			}
 		}
 	} else if isMultiNUMA() {
 		cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-		cpu1, cpu2 = cpuList[1], cpuList[2]
+		if len(cpuList) > 2 {
+			cpu1, cpu2 = cpuList[1], cpuList[2]
+		}
 	}
 	expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 	err = f.PodClient().MatchContainerOutput(pod1.Name, pod1.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -607,7 +636,9 @@ func runCPUManagerTests(f *framework.Framework) {
 			cpu1 = cpuList[1]
 		} else if isMultiNUMA() {
 			cpuList = cpuset.MustParse(getCoreSiblingList(0)).ToSlice()
-			cpu1 = cpuList[1]
+			if len(cpuList) > 1 {
+				cpu1 = cpuList[1]
+			}
 		}
 		expAllowedCPUsListRegex = fmt.Sprintf("^%d\n$", cpu1)
 		err = f.PodClient().MatchContainerOutput(pod.Name, pod.Spec.Containers[0].Name, expAllowedCPUsListRegex)
@@ -627,7 +658,9 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("wait for the deleted pod to be cleaned up from the state file")
 		waitForStateFileCleanedUp()
 		ginkgo.By("the deleted pod has already been deleted from the state file")
+	})
 
+	ginkgo.AfterEach(func() {
 		setOldKubeletConfig(f, oldCfg)
 	})
 }

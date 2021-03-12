@@ -91,7 +91,8 @@ func NewDesiredStateOfWorldPopulator(
 	kubeContainerRuntime kubecontainer.Runtime,
 	keepTerminatedPodVolumes bool,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator) DesiredStateOfWorldPopulator {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator,
+	volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorldPopulator {
 	return &desiredStateOfWorldPopulator{
 		kubeClient:                kubeClient,
 		loopSleepDuration:         loopSleepDuration,
@@ -108,6 +109,7 @@ func NewDesiredStateOfWorldPopulator(
 		hasAddedPodsLock:         sync.RWMutex{},
 		csiMigratedPluginManager: csiMigratedPluginManager,
 		intreeToCSITranslator:    intreeToCSITranslator,
+		volumePluginMgr:          volumePluginMgr,
 	}
 }
 
@@ -127,6 +129,7 @@ type desiredStateOfWorldPopulator struct {
 	hasAddedPodsLock          sync.RWMutex
 	csiMigratedPluginManager  csimigration.PluginManager
 	intreeToCSITranslator     csimigration.InTreeToCSITranslator
+	volumePluginMgr           *volume.VolumePluginMgr
 }
 
 type processedPods struct {
@@ -222,6 +225,20 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
+
+			// check if the attachability has changed for this volume
+			if volumeToMount.PluginIsAttachable {
+				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
+				// only this means the plugin is truly non-attachable
+				if err == nil && attachableVolumePlugin == nil {
+					// It is not possible right now for a CSI plugin to be both attachable and non-deviceMountable
+					// So the uniqueVolumeName should remain the same after the attachability change
+					dswp.desiredStateOfWorld.MarkVolumeAttachability(volumeToMount.VolumeName, false)
+					klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToMount.VolumeName)
+					continue
+				}
+			}
+
 			// Skip running pods
 			if !dswp.isPodTerminated(pod) {
 				continue
@@ -252,7 +269,11 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		runningContainers := false
 		for _, runningPod := range runningPods {
 			if runningPod.ID == volumeToMount.Pod.UID {
-				if len(runningPod.Containers) > 0 {
+				// runningPod.Containers only include containers in the running state,
+				// excluding containers in the creating process.
+				// By adding a non-empty judgment for runningPod.Sandboxes,
+				// ensure that all containers of the pod have been terminated.
+				if len(runningPod.Sandboxes) > 0 || len(runningPod.Containers) > 0 {
 					runningContainers = true
 				}
 
@@ -495,15 +516,24 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 	pvcSource := podVolume.VolumeSource.PersistentVolumeClaim
 	ephemeral := false
 	if pvcSource == nil &&
-		podVolume.VolumeSource.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+		podVolume.VolumeSource.Ephemeral != nil {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			// Provide an unambiguous error message that
+			// explains why the volume cannot be
+			// processed. If we just ignore the volume
+			// source, the error is just a vague "unknown
+			// volume source".
+			return nil, nil, "", fmt.Errorf(
+				"volume %s is a generic ephemeral volume, but that feature is disabled in kubelet",
+				podVolume.Name,
+			)
+		}
 		// Generic ephemeral inline volumes are handled the
 		// same way as a PVC reference. The only additional
 		// constraint (checked below) is that the PVC must be
 		// owned by the pod.
 		pvcSource = &v1.PersistentVolumeClaimVolumeSource{
 			ClaimName: pod.Name + "-" + podVolume.Name,
-			ReadOnly:  podVolume.VolumeSource.Ephemeral.ReadOnly,
 		}
 		ephemeral = true
 	}

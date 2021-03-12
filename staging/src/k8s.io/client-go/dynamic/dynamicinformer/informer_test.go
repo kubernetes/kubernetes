@@ -95,7 +95,12 @@ func TestFilteredDynamicSharedInformerFactory(t *testing.T) {
 			if ts.existingObj != nil {
 				objs = append(objs, ts.existingObj)
 			}
-			fakeClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			// don't adjust the scheme to include deploymentlist. This is testing whether an informer can be created against using
+			// a client that doesn't have a type registered in the scheme.
+			gvrToListKind := map[schema.GroupVersionResource]string{
+				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+			}
+			fakeClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...)
 			target := dynamicinformer.NewFilteredDynamicSharedInformerFactory(fakeClient, 0, ts.informNS, nil)
 
 			// act
@@ -214,7 +219,12 @@ func TestDynamicSharedInformerFactory(t *testing.T) {
 			if ts.existingObj != nil {
 				objs = append(objs, ts.existingObj)
 			}
-			fakeClient := fake.NewSimpleDynamicClient(scheme, objs...)
+			// don't adjust the scheme to include deploymentlist. This is testing whether an informer can be created against using
+			// a client that doesn't have a type registered in the scheme.
+			gvrToListKind := map[schema.GroupVersionResource]string{
+				{Group: "extensions", Version: "v1beta1", Resource: "deployments"}: "DeploymentList",
+			}
+			fakeClient := fake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrToListKind, objs...)
 			target := dynamicinformer.NewDynamicSharedInformerFactory(fakeClient, 0)
 
 			// act

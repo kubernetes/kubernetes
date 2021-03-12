@@ -28,6 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	"github.com/go-openapi/spec"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -204,26 +208,32 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Create a CRD that overlaps OpenAPI path with the CRD API
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "customresourcedefinitions.apiextensions.k8s.io",
 			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "apiextensions.k8s.io",
-			Version: "v1beta1",
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "apiextensions.k8s.io",
+			Scope: apiextensionsv1.ClusterScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   "customresourcedefinitions",
 				Singular: "customresourcedefinition",
 				Kind:     "CustomResourceDefinition",
 				ListKind: "CustomResourceDefinitionList",
 			},
-			Validation: &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Type: "object",
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						testApiextensionsOverlapProbeString: {Type: "boolean"},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								testApiextensionsOverlapProbeString: {Type: "boolean"},
+							},
+						},
 					},
 				},
 			},
@@ -263,26 +273,32 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Create a CRD that overlaps OpenAPI definition with the CRD API
-	crd = &apiextensionsv1beta1.CustomResourceDefinition{
+	crd = &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        "customresourcedefinitions.apiextensions.apis.pkg.apiextensions-apiserver.k8s.io",
 			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "apiextensions.apis.pkg.apiextensions-apiserver.k8s.io",
-			Version: "v1beta1",
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "apiextensions.apis.pkg.apiextensions-apiserver.k8s.io",
+			Scope: apiextensionsv1.ClusterScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   "customresourcedefinitions",
 				Singular: "customresourcedefinition",
 				Kind:     "CustomResourceDefinition",
 				ListKind: "CustomResourceDefinitionList",
 			},
-			Validation: &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Type: "object",
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						testApiextensionsOverlapProbeString: {Type: "boolean"},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1beta1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								testApiextensionsOverlapProbeString: {Type: "boolean"},
+							},
+						},
 					},
 				},
 			},
@@ -319,17 +335,24 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 	name := fmt.Sprintf("integration-test-%s-crd", suffix)
 	kind := fmt.Sprintf("Integration-test-%s-crd", suffix)
 	group := "probe.test.com"
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + group},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   group,
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: group,
+			Scope: apiextensionsv1.ClusterScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   name + "s",
 				Singular: name,
 				Kind:     kind,
 				ListKind: kind + "List",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
 			},
 		},
 	}

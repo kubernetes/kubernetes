@@ -68,6 +68,17 @@ var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|w
 // would be a blocking function with collects logs from all currently
 // running pods, but that then would have the disadvantage that
 // already deleted pods aren't covered.
+//
+// Another race occurs is when a pod shuts down. Logging stops, but if
+// then the pod is not removed from the apiserver quickly enough, logging
+// resumes and dumps the old log again. Previously, this was allowed based
+// on the assumption that it is better to log twice than miss log messages
+// of pods that started and immediately terminated or when logging temporarily
+// stopped.
+//
+// But it turned out to be rather confusing, so now a heuristic is used: if
+// log output of a container was already captured, then capturing does not
+// resume if the pod is marked for deletion.
 func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
 	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
 	if err != nil {
@@ -106,6 +117,9 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 						// there cannot be any new output and we can ignore it.
 						(pod.Status.ContainerStatuses[i].State.Terminated != nil &&
 							started[id]) ||
+						// State.Terminated might not have been updated although the container already
+						// stopped running. Also check whether the pod is deleted.
+						(pod.DeletionTimestamp != nil && started[id]) ||
 						// Don't attempt to get logs for a container unless it is running or has terminated.
 						// Trying to get a log would just end up with an error that we would have to suppress.
 						(pod.Status.ContainerStatuses[i].State.Running == nil &&

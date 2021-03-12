@@ -11,10 +11,10 @@ spec:
       - labelSelector:
           matchLabels:
             color: blue
-        topologyKey: failure-domain.beta.kubernetes.io/zone
+        topologyKey: topology.kubernetes.io/zone
         namespaces: ["sched-test", "sched-setup"]
   containers:
-  - image: k8s.gcr.io/pause:3.2
+  - image: k8s.gcr.io/pause:3.4.1
     name: pause
     ports:
     - containerPort: 80

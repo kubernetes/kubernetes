@@ -153,7 +153,7 @@ func (ims *InstanceMetadataService) GetMetadata(crt azcache.AzureCacheReadType) 
 		return nil, err
 	}
 
-	// Cache shouldn't be nil, but added a check incase something wrong.
+	// Cache shouldn't be nil, but added a check in case something is wrong.
 	if cache == nil {
 		return nil, fmt.Errorf("failure of getting instance metadata")
 	}

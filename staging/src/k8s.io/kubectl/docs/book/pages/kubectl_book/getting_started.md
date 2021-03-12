@@ -34,7 +34,6 @@ kubectl get deployments --namespace kube-system
 NAME                     DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 event-exporter-v0.2.3    1         1         1            1           14d
 fluentd-gcp-scaler       1         1         1            1           14d
-heapster-v1.6.0-beta.1   1         1         1            1           14d
 kube-dns                 2         2         2            2           14d
 kube-dns-autoscaler      1         1         1            1           14d
 l7-default-backend       1         1         1            1           14d

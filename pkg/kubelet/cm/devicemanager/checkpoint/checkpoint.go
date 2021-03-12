@@ -19,6 +19,7 @@ package checkpoint
 import (
 	"encoding/json"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )
@@ -29,12 +30,15 @@ type DeviceManagerCheckpoint interface {
 	GetData() ([]PodDevicesEntry, map[string][]string)
 }
 
+// DevicesPerNUMA represents device ids obtained from device plugin per NUMA node id
+type DevicesPerNUMA map[int64][]string
+
 // PodDevicesEntry connects pod information to devices
 type PodDevicesEntry struct {
 	PodUID        string
 	ContainerName string
 	ResourceName  string
-	DeviceIDs     []string
+	DeviceIDs     DevicesPerNUMA
 	AllocResp     []byte
 }
 
@@ -50,6 +54,22 @@ type checkpointData struct {
 type Data struct {
 	Data     checkpointData
 	Checksum checksum.Checksum
+}
+
+// NewDevicesPerNUMA is a function that creates DevicesPerNUMA map
+func NewDevicesPerNUMA() DevicesPerNUMA {
+	return make(DevicesPerNUMA)
+}
+
+// Devices is a function that returns all device ids for all NUMA nodes
+// and represent it as sets.String
+func (dev DevicesPerNUMA) Devices() sets.String {
+	result := sets.NewString()
+
+	for _, devs := range dev {
+		result.Insert(devs...)
+	}
+	return result
 }
 
 // New returns an instance of Checkpoint

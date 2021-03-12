@@ -80,9 +80,9 @@ func TestJitterWithNegativeMaxFactor(t *testing.T) {
 	// If maxFactor is 0.0 or less than 0.0, a suggested default value will be chosen.
 	// rand.Float64() returns, as a float64, a pseudo-random number in [0.0,1.0).
 	duration := time.Duration(time.Second)
-	maxFactor := float64(-3.0)
+	maxFactor := -3.0
 	res := jitter(duration, maxFactor)
-	defaultMaxFactor := float64(1.0)
+	defaultMaxFactor := 1.0
 	expected := jitter(duration, defaultMaxFactor)
 	assert.Equal(t, expected-res >= time.Duration(0.0*float64(duration)), true)
 	assert.Equal(t, expected-res < time.Duration(1.0*float64(duration)), true)
@@ -102,7 +102,7 @@ func TestDoExponentialBackoffRetry(t *testing.T) {
 
 	result, err := sender.Do(req)
 	assert.Nil(t, result)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestStep(t *testing.T) {
@@ -156,7 +156,7 @@ func TestDoBackoffRetry(t *testing.T) {
 			Path: "/api",
 		},
 	}
-	r := mocks.NewResponseWithStatus("500 InternelServerError", http.StatusInternalServerError)
+	r := mocks.NewResponseWithStatus("500 InternalServerError", http.StatusInternalServerError)
 	client := mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 3)
 
@@ -196,7 +196,7 @@ func TestDoBackoffRetry(t *testing.T) {
 	}
 
 	resp, err = doBackoffRetry(client, fakeRequest, bo)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 3, client.Attempts())
 	assert.Equal(t, expectedResp, resp)
 
@@ -205,7 +205,7 @@ func TestDoBackoffRetry(t *testing.T) {
 	client = mocks.NewSender()
 	client.AppendAndRepeatResponse(r, 1)
 	resp, err = doBackoffRetry(client, fakeRequest, &Backoff{Factor: 1.0, Steps: 3})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 1, client.Attempts())
 	assert.NotNil(t, resp)
 	assert.Equal(t, 200, resp.StatusCode)

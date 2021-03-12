@@ -11,80 +11,18 @@ new images, test the changes made, promote the newly built staging images.
 
 ## Prerequisites
 
-In order to build the docker test images, a Linux node is required. The node will require `make`
-and `docker (version 18.06.0 or newer)`. Manifest lists were introduced in 18.03.0, but 18.06.0
-is recommended in order to avoid certain issues.
+In order to build the docker test images, a Linux node is required. The node will require `make`,
+`docker (version 19.03.0 or newer)`, and ``docker buildx``, which will be used to build multiarch
+images, as well as Windows images. In order to properly build multiarch and Windows images, some
+initialization is required:
+
+```shell
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+docker buildx create --name img-builder --use
+docker buildx inspect --bootstrap
+```
 
 The node must be able to push the images to the desired container registry, make sure you are
-authenticated with the registry you're pushing to.
-
-Windows Container images are not built by default, since they cannot be built on Linux. For
-that, a Windows node with Docker installed and configured for remote management is required.
-
-
-### Windows node(s) setup
-
-In order to build the Windows container images, a node with Windows 10 or Windows Server 2019
-with the latest updates installed is required. The node will have to have Docker installed,
-preferably version 18.06.0 or newer.
-
-Keep in mind that the Windows node might not be able to build container images for newer OS versions
-than itself (even with `--isolation=hyperv`), so keeping the node up to date and / or upgrading it
-to the latest Windows Server edition is ideal.
-
-Windows test images must be built for Windows Server 2019 (1809) and Windows Server 1903, thus,
-if the node does not have Hyper-V enabled, or it is not supported, multiple Windows nodes are required,
-one per OS version.
-
-Additionally, remote management must be configured for the node's Docker daemon. Exposing the
-Docker daemon without requiring any authentication is not recommended, and thus, it must be
-configured with TLS to ensure that only authorised people can interact with it. For this, the
-following `powershell` script can be executed:
-
-```powershell
-mkdir .docker
-docker run --isolation=hyperv --user=ContainerAdministrator --rm `
-  -e SERVER_NAME=$(hostname) `
-  -e IP_ADDRESSES=127.0.0.1,YOUR_WINDOWS_BUILD_NODE_IP `
-  -v "c:\programdata\docker:c:\programdata\docker" `
-  -v "$env:USERPROFILE\.docker:c:\users\containeradministrator\.docker" stefanscherer/dockertls-windows:2.5.5
-# restart the Docker daemon.
-Restart-Service docker
-```
-
-For more information about the above commands, you can check [here](https://hub.docker.com/r/stefanscherer/dockertls-windows/).
-
-A firewall rule to allow connections to the Docker daemon is necessary:
-
-```powershell
-New-NetFirewallRule -DisplayName 'Docker SSL Inbound' -Profile @('Domain', 'Public', 'Private') -Direction Inbound -Action Allow -Protocol TCP -LocalPort 2376
-```
-
-If your Windows build node is hosted by a cloud provider, make sure the port `2376` is open for the node.
-For example, in Azure, this is done by running the following command:
-
-```console
-az vm open-port -g GROUP-NAME -n NODE-NAME --port 2376
-```
-
-The `ca.pem`, `cert.pem`, and `key.pem` files that can be found in `$env:USERPROFILE\.docker`
-will have to copied to the `~/.docker-${os_version)/` on the Linux build node, where `${os_version}`
-is `1809` or `1903`.
-
-```powershell
-scp.exe -r $env:USERPROFILE\.docker ubuntu@YOUR_LINUX_BUILD_NODE:/home/ubuntu/.docker-$os_version
-```
-
-After all this, the Linux build node should be able to connect to the Windows build node:
-
-```bash
-docker --tlsverify --tlscacert ~/.docker-${os_version}/ca.pem --tlscert ~/.docker-${os_version}/cert.pem --tlskey ~/.docker-${os_version}/key.pem -H "$REMOTE_DOCKER_URL" version
-```
-
-For more information and troubleshooting about enabling Docker remote management, see
-[here](https://docs.microsoft.com/en-us/virtualization/windowscontainers/management/manage_remotehost)
-
-Finally, the node must be able to push the images to the desired container registry, make sure you are
 authenticated with the registry you're pushing to.
 
 
@@ -116,24 +54,74 @@ to build the image and push it to your own registry first, and run some tests th
 For these steps, see the sections below.
 
 After the desired changes have been made, the affected images will have to be built and published,
-and then tested. After the pull request with those changes has been approved, the new images will be
-built and published to the `gcr.io/kubernetes-e2e-test-images` registry as well.
-
-Currently, the image building process has been automated with the Image Promoter, but *only* for the
-Conformance images (`agnhost`, `jessie-dnsutils`, `kitten`, `nautilus`, `nonewprivs`, `resource-consumer`,
-`sample-apiserver`).  After the pull request merges, a postsubmit job will be started with the new changes,
-which can be tracked [here](https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-images).
-After it passes successfully, the new image will reside in the `gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION}`
-registry, from which it will have to be promoted by adding a line for it
-[here](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml).
-For this, you will need the image manifest list's digest, which can be obtained by running:
+and then tested. After the pull request with those changes has been approved and merged, a postsubmit
+job will then be triggered which will build the images that were changed (for example, if a change was
+made in `test/images/agnhost`, then the job [post-kubernetes-push-e2e-agnhost-test-images](
+https://testgrid.k8s.io/sig-testing-images#post-kubernetes-push-e2e-agnhost-test-images)
+ will be triggered). The image will then be pushed to the `gcr.io/k8s-staging-e2e-test-images` registry,
+from which it can then promoted to the `k8s.gcr.io/e2e-test-images` registry by adding a line in
+[kubernetes/k8s.io](https://github.com/kubernetes/k8s.io/blob/master/k8s.gcr.io/images/k8s-staging-e2e-test-images/images.yaml). For this, you will need the image manifest list's digest, which can be obtained by running:
 
 ```bash
 manifest-tool inspect --raw gcr.io/k8s-staging-e2e-test-images/${IMAGE_NAME}:${VERSION} | jq '.[0].Digest'
 ```
 
+All the postsubmit jobs and their logs for all the images can be seen in
+[testgrid](https://testgrid.k8s.io/sig-testing-images).
+
 The images are built through `make`. Since some images (e.g.: `busybox`) are used as a base for
 other images, it is recommended to build them first, if needed.
+
+
+### Creating and promoting new images
+
+If you intend to add an entirely different image and have it automatically built by the Image Builder
+and used in E2E tests, you will also have to define the postsubmit prow job for it. This can easily
+be done by running [this script](https://github.com/kubernetes/test-infra/blob/master/config/jobs/image-pushing/k8s-staging-e2e-test-images.sh)
+in `kubernetes/test-infra`.
+
+
+### Windows test images considerations
+
+Ideally, the same `Dockerfile` can be used to build both Windows and Linux images. However, that isn't
+always possible. If a different `Dockerfile` is needed for an image, it should be named `Dockerfile_windows`.
+When building, `image-util.sh` will first check for this file name when building Windows images.
+
+The building process uses `docker buildx` to build both Windows and Linux images, but there are a few
+limitations when it comes to the Windows images:
+
+- The Dockerfile can have multiple stages, including Windows and Linux stages for the same image, but
+  the Windows stage cannot have any `RUN` commands (see the agnhost's `Dockerfile_windows` as an example).
+- The Windows stage cannot have any `WORKDIR` commands due to a bug (https://github.com/docker/buildx/issues/378)
+- When copying Windows symlink files to a Windows image, `docker buildx` changes the symlink target,
+  prepending `Files\` to them (https://github.com/docker/buildx/issues/373) (for example, the symlink
+  target `C:\bin\busybox.exe` becomes `Files\C:\bin\busybox.exe`). This can be avoided by having symlink
+  targets with relative paths and having the target duplicated (for example, the symlink target
+  `busybox.exe` becomes `Files\busybox.exe` when copied, so the binary `C:\bin\Files\busybox.exe`
+  should exist in order for the symlink to be used correctly). See the busybox's `Dockerfile_windows` as
+  an example.
+- `docker buildx` overwrites the image's PATH environment variable to a Linux PATH environment variable,
+  which won't work properly on Windows. See https://github.com/moby/buildkit/issues/1560
+- The base image for all the Windows images is nanoserver, which is ~10 times smaller than Windows Servercore.
+  Most binaries added to the image will work out of the box, but some will not due to missing dependencies
+  (**atention**: the image will still build successfully, even if the added binaries will not work).
+  For example, `coredns.exe` requires `netapi32.dll`, which cannot be found on a nanoserver image, but
+  we can copy it from a servercore image (see the agnhost image's `Dockerfile_windows` file as an example).
+  A good rule of thumb is to use 64-bit applications instead of 32-bit as they have fewer dependencies.
+  You can determine what dependencies are missing by running `procmon.exe` on the container's host
+  (make sure that process isolation is used, not Hyper-V isolation).
+  [This](https://stefanscherer.github.io/find-dependencies-in-windows-containers/) is a useful guide on how to use `procmon.exe`.
+
+Because of the docker buildx limitations regarding the `RUN` commands mentioned above, we need to use a
+Windows helper image in order to properly build the Windows images without requiring any Windows nodes in
+the regular image building process. This helper image can be found in at `e2eteam/powershell-helper:6.2.7`.
+It can be used by anyone, but if you need to build your own, you can read more about it [here](windows/README.md).
+
+For Windows, in order to spawn process-isolated containers, the container OS version should closely match
+the host OS version. For this reason, we build test images for different Windows OS Versions: 1809, 1903,
+1909, 2004, 20H2. In order add support for a new Windows OS version, a new entry for that OS version will have
+to be first added to the `windows-servercore-cache` and `busybox` images, followed by the rest of the images.
+These images are then used by the rest of the E2E test images as a cache / base image.
 
 
 ## Building images
@@ -160,14 +148,6 @@ registry. That can changed by running this command instead:
 REGISTRY=foo_registry make all-push WHAT=agnhost
 ```
 
-In order to also include Windows Container images into the final manifest lists, the `REMOTE_DOCKER_URL` argument
-in the form `tcp://[host]:[port][path]` (for more details, see [here]([https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option]/))
-will also have to be specified:
-
-```bash
-REMOTE_DOCKER_URL_1909=remote_docker_url_1909 REMOTE_DOCKER_URL_1903=remote_docker_url_1903 REMOTE_DOCKER_URL_1809=remote_docker_url_1809 REGISTRY=foo_registry make all-push WHAT=test-webserver
-```
-
 *NOTE* (for test `gcr.io` image publishers): Some tests (e.g.: `should serve a basic image on each replica with a private image`)
 require the `agnhost` image to be published in an authenticated repo as well:
 
@@ -175,6 +155,9 @@ require the `agnhost` image to be published in an authenticated repo as well:
 REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
+
+Additionally, `WHAT=all-conformance` can be used to build / push the images most commonly used in E2E
+Conformance tests.
 
 
 ## Testing the new image
@@ -191,8 +174,8 @@ export KUBE_TEST_REPO_LIST=/path/to/repo_list.yaml
 to pull the images from. Sample file:
 
 ```yaml
-dockerLibraryRegistry: your-awesome-registry
 e2eRegistry: your-awesome-registry
+promoterE2eRegistry: your-awesome-registry
 gcRegistry: your-awesome-registry
 sampleRegistry: your-awesome-registry
 ```
@@ -216,14 +199,8 @@ After all the above has been done, run the desired tests.
 sudo chmod o+x /etc/docker
 ```
 
-`nc` is being used by some E2E tests, which is why we are including a Linux-like `nc.exe` into the Windows `busybox` image. The image could fail to build during that step with an error that looks like this:
-
-```console
-re-exec error: exit status 1: output: time="..." level=error msg="hcsshim::ImportLayer failed in Win32: The system cannot find the path specified. (0x3) path=\\\\?\\C:\\ProgramData\\...
-```
-
-The issue is caused by the Windows Defender which is removing the `nc.exe` binary from the filesystem. For more details on this issue, see [here](https://github.com/diegocr/netcat/issues/6). To fix this, you can simply run the following powershell command to temporarily disable Windows Defender:
-
-```powershell
-Set-MpPreference -DisableRealtimeMonitoring $true
-```
+A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
+(`busybox`, `glusterdynamic-provisioner`, `httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
+the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
+which can then be pushed and promoted.

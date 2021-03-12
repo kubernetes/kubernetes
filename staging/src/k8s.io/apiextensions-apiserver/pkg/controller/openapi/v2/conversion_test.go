@@ -36,6 +36,7 @@ import (
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/utils/pointer"
 )
 
 func Test_ConvertJSONSchemaPropsToOpenAPIv2Schema(t *testing.T) {
@@ -643,6 +644,30 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 				WithExample(testStr),
 			expectDiff: true,
 		},
+		{
+			name: "preserve-unknown-fields in arrays",
+			in: &apiextensions.JSONSchemaProps{
+				XPreserveUnknownFields: pointer.BoolPtr(true),
+				Type:                   "array",
+				Items: &apiextensions.JSONSchemaPropsOrArray{Schema: &apiextensions.JSONSchemaProps{
+					Type: "string",
+				}},
+			},
+			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true),
+		},
+		{
+			name: "preserve-unknown-fields in objects",
+			in: &apiextensions.JSONSchemaProps{
+				XPreserveUnknownFields: pointer.BoolPtr(true),
+				Type:                   "object",
+				Properties: map[string]apiextensions.JSONSchemaProps{
+					"foo": {
+						Type: "string",
+					},
+				},
+			},
+			expected: withVendorExtensions(new(spec.Schema), "x-kubernetes-preserve-unknown-fields", true),
+		},
 	}
 
 	for _, test := range tests {
@@ -666,6 +691,11 @@ func Test_ConvertJSONSchemaPropsToOpenAPIv2SchemaByType(t *testing.T) {
 	}
 }
 
+func withVendorExtensions(s *spec.Schema, key string, value interface{}) *spec.Schema {
+	s.VendorExtensible.AddExtension(key, value)
+	return s
+}
+
 func refEqual(x spec.Ref, y spec.Ref) bool {
 	return x.String() == y.String()
 }
@@ -673,7 +703,8 @@ func refEqual(x spec.Ref, y spec.Ref) bool {
 // TestKubeOpenapiRejectionFiltering tests that the CRD openapi schema filtering leads to a spec that the
 // kube-openapi/pkg/util/proto model code support in version used in Kubernetes 1.13.
 func TestKubeOpenapiRejectionFiltering(t *testing.T) {
-	for i := 0; i < 10000; i++ {
+	// 1000 iterations runs for ~2 seconds with race detection enabled
+	for i := 0; i < 1000; i++ {
 		f := fuzz.New()
 		seed := time.Now().UnixNano()
 		randSource := rand.New(rand.NewSource(seed))

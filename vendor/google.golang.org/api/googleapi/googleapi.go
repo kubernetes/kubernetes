@@ -54,7 +54,7 @@ const (
 
 	// DefaultUploadChunkSize is the default chunk size to use for resumable
 	// uploads if not specified by the user.
-	DefaultUploadChunkSize = 8 * 1024 * 1024
+	DefaultUploadChunkSize = 16 * 1024 * 1024
 
 	// MinUploadChunkSize is the minimum chunk size that can be used for
 	// resumable uploads.  All user-specified chunk sizes must be multiple of

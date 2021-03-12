@@ -50,6 +50,7 @@ const (
 	HardwareProfileChange = Cmd(windows.SERVICE_CONTROL_HARDWAREPROFILECHANGE)
 	PowerEvent            = Cmd(windows.SERVICE_CONTROL_POWEREVENT)
 	SessionChange         = Cmd(windows.SERVICE_CONTROL_SESSIONCHANGE)
+	PreShutdown           = Cmd(windows.SERVICE_CONTROL_PRESHUTDOWN)
 )
 
 // Accepted is used to describe commands accepted by the service.
@@ -65,15 +66,18 @@ const (
 	AcceptHardwareProfileChange = Accepted(windows.SERVICE_ACCEPT_HARDWAREPROFILECHANGE)
 	AcceptPowerEvent            = Accepted(windows.SERVICE_ACCEPT_POWEREVENT)
 	AcceptSessionChange         = Accepted(windows.SERVICE_ACCEPT_SESSIONCHANGE)
+	AcceptPreShutdown           = Accepted(windows.SERVICE_ACCEPT_PRESHUTDOWN)
 )
 
 // Status combines State and Accepted commands to fully describe running service.
 type Status struct {
-	State      State
-	Accepts    Accepted
-	CheckPoint uint32 // used to report progress during a lengthy operation
-	WaitHint   uint32 // estimated time required for a pending operation, in milliseconds
-	ProcessId  uint32 // if the service is running, the process identifier of it, and otherwise zero
+	State                   State
+	Accepts                 Accepted
+	CheckPoint              uint32 // used to report progress during a lengthy operation
+	WaitHint                uint32 // estimated time required for a pending operation, in milliseconds
+	ProcessId               uint32 // if the service is running, the process identifier of it, and otherwise zero
+	Win32ExitCode           uint32 // set if the service has exited with a win32 exit code
+	ServiceSpecificExitCode uint32 // set if the service has exited with a service-specific exit code
 }
 
 // ChangeRequest is sent to the service Handler to request service status change.
@@ -201,6 +205,9 @@ func (s *service) updateStatus(status *Status, ec *exitCode) error {
 	}
 	if status.Accepts&AcceptSessionChange != 0 {
 		t.ControlsAccepted |= windows.SERVICE_ACCEPT_SESSIONCHANGE
+	}
+	if status.Accepts&AcceptPreShutdown != 0 {
+		t.ControlsAccepted |= windows.SERVICE_ACCEPT_PRESHUTDOWN
 	}
 	if ec.errno == 0 {
 		t.Win32ExitCode = windows.NO_ERROR

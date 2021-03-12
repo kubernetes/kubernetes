@@ -20,33 +20,32 @@ import (
 	"sync"
 
 	"github.com/golang/groupcache/lru"
-	"k8s.io/apimachinery/pkg/types"
 )
 
-// UIDCache is an LRU cache for uid.
-type UIDCache struct {
+// ReferenceCache is an LRU cache for uid.
+type ReferenceCache struct {
 	mutex sync.Mutex
 	cache *lru.Cache
 }
 
-// NewUIDCache returns a UIDCache.
-func NewUIDCache(maxCacheEntries int) *UIDCache {
-	return &UIDCache{
+// NewReferenceCache returns a ReferenceCache.
+func NewReferenceCache(maxCacheEntries int) *ReferenceCache {
+	return &ReferenceCache{
 		cache: lru.New(maxCacheEntries),
 	}
 }
 
 // Add adds a uid to the cache.
-func (c *UIDCache) Add(uid types.UID) {
+func (c *ReferenceCache) Add(reference objectReference) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.cache.Add(uid, nil)
+	c.cache.Add(reference, nil)
 }
 
 // Has returns if a uid is in the cache.
-func (c *UIDCache) Has(uid types.UID) bool {
+func (c *ReferenceCache) Has(reference objectReference) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	_, found := c.cache.Get(uid)
+	_, found := c.cache.Get(reference)
 	return found
 }

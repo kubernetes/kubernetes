@@ -29,6 +29,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -40,7 +41,7 @@ const (
 // SetVolumeOwnership modifies the given volume to be owned by
 // fsGroup, and sets SetGid so that newly created files are owned by
 // fsGroup. If fsGroup is nil nothing is done.
-func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
+func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy, completeFunc func(types.CompleteFuncParam)) error {
 	if fsGroup == nil {
 		return nil
 	}
@@ -55,7 +56,13 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 	// This code exists for legacy purposes, so as old behaviour is entirely preserved when feature gate is disabled
 	// TODO: remove this when ConfigurableFSGroupPolicy turns GA.
 	if !fsGroupPolicyEnabled {
-		return legacyOwnershipChange(mounter, fsGroup)
+		err := legacyOwnershipChange(mounter, fsGroup)
+		if completeFunc != nil {
+			completeFunc(types.CompleteFuncParam{
+				Err: &err,
+			})
+		}
+		return err
 	}
 
 	if skipPermissionChange(mounter, fsGroup, fsGroupChangePolicy) {
@@ -63,13 +70,18 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64, fsGroupChangePolicy *v1
 		return nil
 	}
 
-	return walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+	err := walkDeep(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		return changeFilePermission(path, fsGroup, mounter.GetAttributes().ReadOnly, info)
 	})
-
+	if completeFunc != nil {
+		completeFunc(types.CompleteFuncParam{
+			Err: &err,
+		})
+	}
+	return err
 }
 
 func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
@@ -82,30 +94,20 @@ func legacyOwnershipChange(mounter Mounter, fsGroup *int64) error {
 }
 
 func changeFilePermission(filename string, fsGroup *int64, readonly bool, info os.FileInfo) error {
-	// chown and chmod pass through to the underlying file for symlinks.
+	err := os.Lchown(filename, -1, int(*fsGroup))
+	if err != nil {
+		klog.Errorf("Lchown failed on %v: %v", filename, err)
+	}
+
+	// chmod passes through to the underlying file for symlinks.
 	// Symlinks have a mode of 777 but this really doesn't mean anything.
 	// The permissions of the underlying file are what matter.
 	// However, if one reads the mode of a symlink then chmods the symlink
 	// with that mode, it changes the mode of the underlying file, overridden
 	// the defaultMode and permissions initialized by the volume plugin, which
-	// is not what we want; thus, we skip chown/chmod for symlinks.
+	// is not what we want; thus, we skip chmod for symlinks.
 	if info.Mode()&os.ModeSymlink != 0 {
 		return nil
-	}
-
-	stat, ok := info.Sys().(*syscall.Stat_t)
-	if !ok {
-		return nil
-	}
-
-	if stat == nil {
-		klog.Errorf("Got nil stat_t for path %v while setting ownership of volume", filename)
-		return nil
-	}
-
-	err := os.Chown(filename, int(stat.Uid), int(*fsGroup))
-	if err != nil {
-		klog.Errorf("Chown failed on %v: %v", filename, err)
 	}
 
 	mask := rwMask

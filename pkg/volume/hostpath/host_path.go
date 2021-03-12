@@ -21,7 +21,7 @@ import (
 	"os"
 	"regexp"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -85,7 +85,7 @@ func (plugin *hostPathPlugin) CanSupport(spec *volume.Spec) bool {
 		(spec.Volume != nil && spec.Volume.HostPath != nil)
 }
 
-func (plugin *hostPathPlugin) RequiresRemount() bool {
+func (plugin *hostPathPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -160,7 +160,7 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
 	if !plugin.config.ProvisioningEnabled {
-		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
+		return nil, fmt.Errorf("provisioning in volume plugin %q is disabled", plugin.GetPluginName())
 	}
 	return newProvisioner(options, plugin.host, plugin)
 }
@@ -341,7 +341,7 @@ func getVolumeSource(spec *volume.Spec) (*v1.HostPathVolumeSource, bool, error) 
 		return spec.PersistentVolume.Spec.HostPath, spec.ReadOnly, nil
 	}
 
-	return nil, false, fmt.Errorf("Spec does not reference an HostPath volume type")
+	return nil, false, fmt.Errorf("spec does not reference an HostPath volume type")
 }
 
 type hostPathTypeChecker interface {

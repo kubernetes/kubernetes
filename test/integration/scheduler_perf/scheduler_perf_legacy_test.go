@@ -23,7 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -136,7 +136,7 @@ func BenchmarkSchedulingWaitForFirstConsumerPVs(b *testing.B) {
 	}
 	basePod := makeBasePod()
 	testStrategy := testutils.NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(gceVolumeFactory, basePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelTopologyZone, "zone1")
 	for _, test := range tests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -162,7 +162,7 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
@@ -193,7 +193,7 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 		v1.ResourceName(driverKey): fmt.Sprintf("%d", util.DefaultMaxEBSVolumes),
 	}
 	var count int32 = util.DefaultMaxEBSVolumes
-	csiAllocatable := map[string]*storagev1beta1.VolumeNodeResources{
+	csiAllocatable := map[string]*storagev1.VolumeNodeResources{
 		testCSIDriver: {
 			Count: &count,
 		},
@@ -218,7 +218,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	)
 	// The test strategy creates pods with affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
 	for _, test := range defaultTests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -278,10 +278,10 @@ func BenchmarkSchedulingPreferredPodAntiAffinity(b *testing.B) {
 // NodeAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
 func BenchmarkSchedulingNodeAffinity(b *testing.B) {
-	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
+	testBasePod := makeBasePodWithNodeAffinity(v1.LabelFailureDomainBetaZone, []string{"zone1", "zone2"})
 	// The test strategy creates pods with node-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
-	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
+	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelFailureDomainBetaZone, "zone1")
 	for _, test := range defaultTests {
 		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
 		b.Run(name, func(b *testing.B) {
@@ -392,7 +392,7 @@ func makeBasePodWithPodAffinity(podLabels, affinityZoneLabels map[string]string)
 					LabelSelector: &metav1.LabelSelector{
 						MatchLabels: affinityZoneLabels,
 					},
-					TopologyKey: v1.LabelZoneFailureDomain,
+					TopologyKey: v1.LabelFailureDomainBetaZone,
 					Namespaces:  []string{testNamespace, setupNamespace},
 				},
 			},
@@ -439,16 +439,17 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	testPodStrategy testutils.TestPodCreateStrategy,
 	b *testing.B) {
 	if b.N < minPods {
+		//lint:ignore SA3001 Set a minimum for b.N to get more meaningful results
 		b.N = minPods
 	}
-	finalFunc, podInformer, clientset := mustSetupScheduler()
+	finalFunc, podInformer, clientset, _ := mustSetupScheduler()
 	defer finalFunc()
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		clientset,
 		nodeStrategies,
 		"scheduler-perf-")
-	if err := nodePreparer.PrepareNodes(); err != nil {
+	if err := nodePreparer.PrepareNodes(0); err != nil {
 		klog.Fatalf("%v", err)
 	}
 	defer nodePreparer.CleanupNodes()
@@ -498,7 +499,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	b.StopTimer()
 }
 
-// makeBasePodWithSecrets creates a Pod object to be used as a template.
+// makeBasePodWithSecret creates a Pod object to be used as a template.
 // The pod uses a single Secrets volume.
 func makeBasePodWithSecret() *v1.Pod {
 	basePod := &v1.Pod{
@@ -587,7 +588,7 @@ func gceVolumeFactory(id int) *v1.PersistentVolume {
 						{
 							MatchExpressions: []v1.NodeSelectorRequirement{
 								{
-									Key:      v1.LabelZoneFailureDomain,
+									Key:      v1.LabelFailureDomainBetaZone,
 									Operator: v1.NodeSelectorOpIn,
 									Values:   []string{"zone1"},
 								},

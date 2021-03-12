@@ -52,7 +52,7 @@ var isSpecialElementMap = map[string]bool{
 	"iframe":     true,
 	"img":        true,
 	"input":      true,
-	"keygen":     true,
+	"keygen":     true, // "keygen" has been removed from the spec, but are kept here for backwards compatibility.
 	"li":         true,
 	"link":       true,
 	"listing":    true,

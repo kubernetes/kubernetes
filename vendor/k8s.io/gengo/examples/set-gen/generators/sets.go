@@ -187,7 +187,7 @@ type $.type|public$ map[$.type|raw$]Empty
 
 // New$.type|public$ creates a $.type|public$ from a list of values.
 func New$.type|public$(items ...$.type|raw$) $.type|public$ {
-	ss := $.type|public${}
+	ss := make($.type|public$, len(items))
 	ss.Insert(items...)
 	return ss
 }

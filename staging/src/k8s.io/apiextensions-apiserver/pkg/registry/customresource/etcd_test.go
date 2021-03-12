@@ -55,7 +55,6 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	parameterScheme := runtime.NewScheme()
 	parameterScheme.AddUnversionedTypes(schema.GroupVersion{Group: "mygroup.example.com", Version: "v1beta1"},
 		&metav1.ListOptions{},
-		&metav1.ExportOptions{},
 		&metav1.GetOptions{},
 		&metav1.DeleteOptions{},
 	)

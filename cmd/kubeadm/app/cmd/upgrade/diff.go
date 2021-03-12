@@ -54,8 +54,8 @@ var (
 	defaultSchedulerManifestPath         = constants.GetStaticPodFilepath(constants.KubeScheduler, constants.GetStaticPodDirectory())
 )
 
-// NewCmdDiff returns the cobra command for `kubeadm upgrade diff`
-func NewCmdDiff(out io.Writer) *cobra.Command {
+// newCmdDiff returns the cobra command for `kubeadm upgrade diff`
+func newCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
 		kubeConfigPath: constants.GetAdminKubeConfigPath(),
 		out:            out,

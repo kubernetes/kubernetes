@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	storageostypes "github.com/storageos/go-api/types"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -49,8 +49,12 @@ func GetAPIConfig() *storageosAPIConfig {
 }
 
 func TestClient(t *testing.T) {
-	util := storageosUtil{}
-	err := util.NewAPI(GetAPIConfig())
+	tmpDir, err := utiltesting.MkTmpdir("storageos_test")
+	if err != nil {
+		t.Fatalf("error creating tmpdir: %v", err)
+	}
+	util := storageosUtil{host: volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil)}
+	err = util.NewAPI(GetAPIConfig())
 	if err != nil {
 		t.Fatalf("error getting api config: %v", err)
 	}

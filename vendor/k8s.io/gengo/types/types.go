@@ -341,6 +341,13 @@ type Type struct {
 	// If Kind == func, this is the signature of the function.
 	Signature *Signature
 
+	// ConstValue contains a stringified constant value if
+	// Kind == DeclarationOf and this is a constant value
+	// declaration. For string constants, this field contains
+	// the entire, un-quoted value. For other types, it contains
+	// a human-readable literal.
+	ConstValue *string
+
 	// TODO: Add:
 	// * channel direction
 	// * array length

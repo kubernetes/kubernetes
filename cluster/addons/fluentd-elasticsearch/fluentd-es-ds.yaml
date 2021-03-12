@@ -45,22 +45,22 @@ roleRef:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: fluentd-es-v3.0.2
+  name: fluentd-es-v3.1.0
   namespace: kube-system
   labels:
     k8s-app: fluentd-es
-    version: v3.0.2
+    version: v3.1.0
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   selector:
     matchLabels:
       k8s-app: fluentd-es
-      version: v3.0.2
+      version: v3.1.0
   template:
     metadata:
       labels:
         k8s-app: fluentd-es
-        version: v3.0.2
+        version: v3.1.0
     spec:
       securityContext:
         seccompProfile:
@@ -69,7 +69,7 @@ spec:
       serviceAccountName: fluentd-es
       containers:
       - name: fluentd-es
-        image: quay.io/fluentd_elasticsearch/fluentd:v3.0.2
+        image: quay.io/fluentd_elasticsearch/fluentd:v3.1.0
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q

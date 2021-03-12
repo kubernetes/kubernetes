@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	goruntime "runtime"
 
 	// Enable pprof HTTP handlers.
 	_ "net/http/pprof"
@@ -179,12 +180,14 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 }
 
 func getProxyMode(proxyMode string, kcompat winkernel.KernelCompatTester) string {
-	if proxyMode == proxyModeUserspace {
-		return proxyModeUserspace
-	} else if proxyMode == proxyModeKernelspace {
+	if proxyMode == proxyModeKernelspace {
 		return tryWinKernelSpaceProxy(kcompat)
 	}
 	return proxyModeUserspace
+}
+
+func detectNumCPU() int {
+	return goruntime.NumCPU()
 }
 
 func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {

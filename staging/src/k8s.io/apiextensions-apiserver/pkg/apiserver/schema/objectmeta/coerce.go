@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 )
 
-var encodingjson = json.CaseSensitiveJsonIterator()
+var encodingjson = json.CaseSensitiveJSONIterator()
 
 // GetObjectMeta does conversion of JSON to ObjectMeta. It first tries json.Unmarshal into a metav1.ObjectMeta
 // type. If that does not work and dropMalformedFields is true, it does field-by-field best-effort conversion

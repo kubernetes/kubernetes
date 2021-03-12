@@ -44,8 +44,8 @@ type planFlags struct {
 	*applyPlanFlags
 }
 
-// NewCmdPlan returns the cobra command for `kubeadm upgrade plan`
-func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
+// newCmdPlan returns the cobra command for `kubeadm upgrade plan`
+func newCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	flags := &planFlags{
 		applyPlanFlags: apf,
 	}
@@ -90,6 +90,10 @@ func runPlan(flags *planFlags, args []string) error {
 	if err != nil {
 		return errors.WithMessage(err, "[upgrade/versions] FATAL")
 	}
+
+	// Warn if the kubelet component config is missing an explicit 'cgroupDriver'.
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2376
+	componentconfigs.WarnCgroupDriver(&cfg.ClusterConfiguration)
 
 	// No upgrades available
 	if len(availUpgrades) == 0 {
@@ -177,7 +181,6 @@ func genUpgradePlan(up *upgrade.Upgrade, isExternalEtcd bool) (*outputapi.Upgrad
 	components = append(components, newComponentUpgradePlan(constants.KubeProxy, up.Before.KubeVersion, up.After.KubeVersion))
 
 	components = appendDNSComponent(components, up, kubeadmapi.CoreDNS, constants.CoreDNS)
-	components = appendDNSComponent(components, up, kubeadmapi.KubeDNS, constants.KubeDNS)
 
 	if !isExternalEtcd {
 		components = append(components, newComponentUpgradePlan(constants.Etcd, up.Before.EtcdVersion, up.After.EtcdVersion))
@@ -224,7 +227,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 		} else if component.Name == constants.Kubelet {
 			if printManualUpgradeHeader {
 				fmt.Fprintln(w, "Components that must be upgraded manually after you have upgraded the control plane with 'kubeadm upgrade apply':")
-				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
 				fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)
 				printManualUpgradeHeader = false
 			} else {
@@ -237,7 +240,7 @@ func printUpgradePlan(up *upgrade.Upgrade, plan *outputapi.UpgradePlan, unstable
 
 				fmt.Fprintf(w, "Upgrade to the latest %s:\n", up.Description)
 				fmt.Fprintln(w, "")
-				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tAVAILABLE")
+				fmt.Fprintln(tabw, "COMPONENT\tCURRENT\tTARGET")
 				printHeader = false
 			}
 			fmt.Fprintf(tabw, "%s\t%s\t%s\n", component.Name, component.CurrentVersion, component.NewVersion)

@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/klog/v2"
@@ -118,9 +118,12 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 
 		// pick node's zone for one of the replicas
 		var ok bool
-		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelTopologyZone]
 		if !ok {
-			return nil, fmt.Errorf("%s Label for node missing", v1.LabelZoneFailureDomain)
+			zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelFailureDomainBetaZone]
+			if !ok {
+				return nil, fmt.Errorf("Either %s or %s Label for node missing", v1.LabelTopologyZone, v1.LabelFailureDomainBetaZone)
+			}
 		}
 		// if single replica volume and node with zone found, return immediately
 		if numReplicas == 1 {
@@ -135,7 +138,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	}
 
 	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
-		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomain)
+		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", v1.LabelTopologyZone, v1.LabelTopologyZone)
 	}
 
 	if allowedZones.Len() > 0 {
@@ -185,7 +188,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 	zones := make(sets.String)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
-			if exp.Key == v1.LabelZoneFailureDomain {
+			if exp.Key == v1.LabelTopologyZone || exp.Key == v1.LabelFailureDomainBetaZone {
 				for _, value := range exp.Values {
 					zones.Insert(value)
 				}

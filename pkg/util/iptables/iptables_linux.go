@@ -49,7 +49,7 @@ func (l *locker) Close() error {
 	return utilerrors.NewAggregate(errList)
 }
 
-func grabIptablesLocks(lockfilePath string) (iptablesLocker, error) {
+func grabIptablesLocks(lockfilePath14x, lockfilePath16x string) (iptablesLocker, error) {
 	var err error
 	var success bool
 
@@ -66,9 +66,9 @@ func grabIptablesLocks(lockfilePath string) (iptablesLocker, error) {
 	// can't assume which lock method it'll use.
 
 	// Roughly duplicate iptables 1.6.x xtables_lock() function.
-	l.lock16, err = os.OpenFile(lockfilePath, os.O_CREATE, 0600)
+	l.lock16, err = os.OpenFile(lockfilePath16x, os.O_CREATE, 0600)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open iptables lock %s: %v", lockfilePath, err)
+		return nil, fmt.Errorf("failed to open iptables lock %s: %v", lockfilePath16x, err)
 	}
 
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
@@ -82,7 +82,7 @@ func grabIptablesLocks(lockfilePath string) (iptablesLocker, error) {
 
 	// Roughly duplicate iptables 1.4.x xtables_lock() function.
 	if err := wait.PollImmediate(200*time.Millisecond, 2*time.Second, func() (bool, error) {
-		l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: "@xtables", Net: "unix"})
+		l.lock14, err = net.ListenUnix("unix", &net.UnixAddr{Name: lockfilePath14x, Net: "unix"})
 		if err != nil {
 			return false, nil
 		}

@@ -83,10 +83,13 @@ func (o *PathOptions) GetEnvVarFiles() []string {
 }
 
 func (o *PathOptions) GetLoadingPrecedence() []string {
+	if o.IsExplicitFile() {
+		return []string{o.GetExplicitFile()}
+	}
+
 	if envVarFiles := o.GetEnvVarFiles(); len(envVarFiles) > 0 {
 		return envVarFiles
 	}
-
 	return []string{o.GlobalFile}
 }
 
@@ -371,7 +374,7 @@ func (p *persister) Persist(config map[string]string) error {
 	authInfo, ok := newConfig.AuthInfos[p.user]
 	if ok && authInfo.AuthProvider != nil {
 		authInfo.AuthProvider.Config = config
-		ModifyConfig(p.configAccess, *newConfig, false)
+		return ModifyConfig(p.configAccess, *newConfig, false)
 	}
 	return nil
 }

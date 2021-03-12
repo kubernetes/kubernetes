@@ -33,7 +33,7 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
+var _ = SIGDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
 	f := framework.NewDefaultFramework("system-node-critical-pod-test")
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
@@ -113,10 +113,10 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 				ginkgo.By("making sure that node no longer has DiskPressure")
 				gomega.Eventually(func() error {
 					if hasNodeCondition(f, v1.NodeDiskPressure) {
-						return fmt.Errorf("Conditions havent returned to normal, node still has DiskPressure")
+						return fmt.Errorf("Conditions haven't returned to normal, node still has DiskPressure")
 					}
 					return nil
-				}, pressureDissapearTimeout, evictionPollInterval).Should(gomega.BeNil())
+				}, pressureDisappearTimeout, evictionPollInterval).Should(gomega.BeNil())
 			})
 		})
 	})

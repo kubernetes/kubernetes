@@ -266,6 +266,36 @@ func getIPFromInterface(intfName string, forFamily AddressFamily, nw networkInte
 	return nil, nil
 }
 
+// getIPFromLoopbackInterface gets the IPs on a loopback interface and returns a global unicast address, if any.
+// The loopback interface must be up, the IP must in the family requested, and the IP must be a global unicast address.
+func getIPFromLoopbackInterface(forFamily AddressFamily, nw networkInterfacer) (net.IP, error) {
+	intfs, err := nw.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, intf := range intfs {
+		if !isInterfaceUp(&intf) {
+			continue
+		}
+		if intf.Flags&(net.FlagLoopback) != 0 {
+			addrs, err := nw.Addrs(&intf)
+			if err != nil {
+				return nil, err
+			}
+			klog.V(4).Infof("Interface %q has %d addresses :%v.", intf.Name, len(addrs), addrs)
+			matchingIP, err := getMatchingGlobalIP(addrs, forFamily)
+			if err != nil {
+				return nil, err
+			}
+			if matchingIP != nil {
+				klog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intf.Name)
+				return matchingIP, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
 // memberOf tells if the IP is of the desired family. Used for checking interface addresses.
 func memberOf(ip net.IP, family AddressFamily) bool {
 	if ip.To4() != nil {
@@ -393,8 +423,9 @@ func getAllDefaultRoutes() ([]Route, error) {
 }
 
 // chooseHostInterfaceFromRoute cycles through each default route provided, looking for a
-// global IP address from the interface for the route. addressFamilies determines whether it
-// prefers IPv4 or IPv6
+// global IP address from the interface for the route. If there are routes but no global
+// address is obtained from the interfaces, it checks if the loopback interface has a global address.
+// addressFamilies determines whether it prefers IPv4 or IPv6
 func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer, addressFamilies AddressFamilyPreference) (net.IP, error) {
 	for _, family := range addressFamilies {
 		klog.V(4).Infof("Looking for default routes with IPv%d addresses", uint(family))
@@ -410,6 +441,17 @@ func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer, addressF
 			if finalIP != nil {
 				klog.V(4).Infof("Found active IP %v ", finalIP)
 				return finalIP, nil
+			}
+			// In case of network setups where default routes are present, but network
+			// interfaces use only link-local addresses (e.g. as described in RFC5549).
+			// the global IP is assigned to the loopback interface, and we should use it
+			loopbackIP, err := getIPFromLoopbackInterface(family, nw)
+			if err != nil {
+				return nil, err
+			}
+			if loopbackIP != nil {
+				klog.V(4).Infof("Found active IP %v on Loopback interface", loopbackIP)
+				return loopbackIP, nil
 			}
 		}
 	}

@@ -54,6 +54,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/internal/sync/singleflight"
 )
 
 // AnonymousCredentials is an empty Credential object that can be used as
@@ -104,6 +105,13 @@ type Provider interface {
 	// IsExpired returns if the credentials are no longer valid, and need
 	// to be retrieved.
 	IsExpired() bool
+}
+
+// ProviderWithContext is a Provider that can retrieve credentials with a Context
+type ProviderWithContext interface {
+	Provider
+
+	RetrieveWithContext(Context) (Value, error)
 }
 
 // An Expirer is an interface that Providers can implement to expose the expiration
@@ -165,7 +173,9 @@ type Expiry struct {
 // the expiration time given to ensure no requests are made with expired
 // tokens.
 func (e *Expiry) SetExpiration(expiration time.Time, window time.Duration) {
-	e.expiration = expiration
+	// Passed in expirations should have the monotonic clock values stripped.
+	// This ensures time comparisons will be based on wall-time.
+	e.expiration = expiration.Round(0)
 	if window > 0 {
 		e.expiration = e.expiration.Add(-window)
 	}
@@ -197,20 +207,82 @@ func (e *Expiry) ExpiresAt() time.Time {
 // first instance of the credentials Value. All calls to Get() after that
 // will return the cached credentials Value until IsExpired() returns true.
 type Credentials struct {
-	creds        Value
-	forceRefresh bool
+	sf singleflight.Group
 
-	m sync.RWMutex
-
+	m        sync.RWMutex
+	creds    Value
 	provider Provider
 }
 
 // NewCredentials returns a pointer to a new Credentials with the provider set.
 func NewCredentials(provider Provider) *Credentials {
-	return &Credentials{
-		provider:     provider,
-		forceRefresh: true,
+	c := &Credentials{
+		provider: provider,
 	}
+	return c
+}
+
+// GetWithContext returns the credentials value, or error if the credentials
+// Value failed to be retrieved. Will return early if the passed in context is
+// canceled.
+//
+// Will return the cached credentials Value if it has not expired. If the
+// credentials Value has expired the Provider's Retrieve() will be called
+// to refresh the credentials.
+//
+// If Credentials.Expire() was called the credentials Value will be force
+// expired, and the next call to Get() will cause them to be refreshed.
+//
+// Passed in Context is equivalent to aws.Context, and context.Context.
+func (c *Credentials) GetWithContext(ctx Context) (Value, error) {
+	// Check if credentials are cached, and not expired.
+	select {
+	case curCreds, ok := <-c.asyncIsExpired():
+		// ok will only be true, of the credentials were not expired. ok will
+		// be false and have no value if the credentials are expired.
+		if ok {
+			return curCreds, nil
+		}
+	case <-ctx.Done():
+		return Value{}, awserr.New("RequestCanceled",
+			"request context canceled", ctx.Err())
+	}
+
+	// Cannot pass context down to the actual retrieve, because the first
+	// context would cancel the whole group when there is not direct
+	// association of items in the group.
+	resCh := c.sf.DoChan("", func() (interface{}, error) {
+		return c.singleRetrieve(&suppressedContext{ctx})
+	})
+	select {
+	case res := <-resCh:
+		return res.Val.(Value), res.Err
+	case <-ctx.Done():
+		return Value{}, awserr.New("RequestCanceled",
+			"request context canceled", ctx.Err())
+	}
+}
+
+func (c *Credentials) singleRetrieve(ctx Context) (interface{}, error) {
+	c.m.Lock()
+	defer c.m.Unlock()
+
+	if curCreds := c.creds; !c.isExpiredLocked(curCreds) {
+		return curCreds, nil
+	}
+
+	var creds Value
+	var err error
+	if p, ok := c.provider.(ProviderWithContext); ok {
+		creds, err = p.RetrieveWithContext(ctx)
+	} else {
+		creds, err = c.provider.Retrieve()
+	}
+	if err == nil {
+		c.creds = creds
+	}
+
+	return creds, err
 }
 
 // Get returns the credentials value, or error if the credentials Value failed
@@ -223,30 +295,7 @@ func NewCredentials(provider Provider) *Credentials {
 // If Credentials.Expire() was called the credentials Value will be force
 // expired, and the next call to Get() will cause them to be refreshed.
 func (c *Credentials) Get() (Value, error) {
-	// Check the cached credentials first with just the read lock.
-	c.m.RLock()
-	if !c.isExpired() {
-		creds := c.creds
-		c.m.RUnlock()
-		return creds, nil
-	}
-	c.m.RUnlock()
-
-	// Credentials are expired need to retrieve the credentials taking the full
-	// lock.
-	c.m.Lock()
-	defer c.m.Unlock()
-
-	if c.isExpired() {
-		creds, err := c.provider.Retrieve()
-		if err != nil {
-			return Value{}, err
-		}
-		c.creds = creds
-		c.forceRefresh = false
-	}
-
-	return c.creds, nil
+	return c.GetWithContext(backgroundContext())
 }
 
 // Expire expires the credentials and forces them to be retrieved on the
@@ -258,7 +307,7 @@ func (c *Credentials) Expire() {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	c.forceRefresh = true
+	c.creds = Value{}
 }
 
 // IsExpired returns if the credentials are no longer valid, and need
@@ -270,12 +319,30 @@ func (c *Credentials) IsExpired() bool {
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	return c.isExpired()
+	return c.isExpiredLocked(c.creds)
 }
 
-// isExpired helper method wrapping the definition of expired credentials.
-func (c *Credentials) isExpired() bool {
-	return c.forceRefresh || c.provider.IsExpired()
+// asyncIsExpired returns a channel of credentials Value. If the channel is
+// closed the credentials are expired and credentials value are not empty.
+func (c *Credentials) asyncIsExpired() <-chan Value {
+	ch := make(chan Value, 1)
+	go func() {
+		c.m.RLock()
+		defer c.m.RUnlock()
+
+		if curCreds := c.creds; !c.isExpiredLocked(curCreds) {
+			ch <- curCreds
+		}
+
+		close(ch)
+	}()
+
+	return ch
+}
+
+// isExpiredLocked helper method wrapping the definition of expired credentials.
+func (c *Credentials) isExpiredLocked(creds interface{}) bool {
+	return creds == nil || creds.(Value) == Value{} || c.provider.IsExpired()
 }
 
 // ExpiresAt provides access to the functionality of the Expirer interface of
@@ -288,12 +355,29 @@ func (c *Credentials) ExpiresAt() (time.Time, error) {
 	expirer, ok := c.provider.(Expirer)
 	if !ok {
 		return time.Time{}, awserr.New("ProviderNotExpirer",
-			fmt.Sprintf("provider %s does not support ExpiresAt()", c.creds.ProviderName),
+			fmt.Sprintf("provider %s does not support ExpiresAt()",
+				c.creds.ProviderName),
 			nil)
 	}
-	if c.forceRefresh {
+	if c.creds == (Value{}) {
 		// set expiration time to the distant past
 		return time.Time{}, nil
 	}
 	return expirer.ExpiresAt(), nil
+}
+
+type suppressedContext struct {
+	Context
+}
+
+func (s *suppressedContext) Deadline() (deadline time.Time, ok bool) {
+	return time.Time{}, false
+}
+
+func (s *suppressedContext) Done() <-chan struct{} {
+	return nil
+}
+
+func (s *suppressedContext) Err() error {
+	return nil
 }

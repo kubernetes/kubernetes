@@ -241,7 +241,8 @@ func prefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]value.
 		case provider.Secretbox != nil:
 			transformer, err = secretboxPrefixTransformer(provider.Secretbox)
 		case provider.KMS != nil:
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
+			var envelopeService envelope.Service
+			envelopeService, err = envelopeServiceFactory(provider.KMS.Endpoint, provider.KMS.Timeout.Duration)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}

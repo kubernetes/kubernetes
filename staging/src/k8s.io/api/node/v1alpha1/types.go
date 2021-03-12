@@ -56,8 +56,8 @@ type RuntimeClassSpec struct {
 	// For example, a handler called "runc" might specify that the runc OCI
 	// runtime (using native Linux containers) will be used to run the containers
 	// in a pod.
-	// The RuntimeHandler must conform to the DNS Label (RFC 1123) requirements
-	// and is immutable.
+	// The RuntimeHandler must be lowercase, conform to the DNS Label (RFC 1123)
+	// requirements, and is immutable.
 	RuntimeHandler string `json:"runtimeHandler" protobuf:"bytes,1,opt,name=runtimeHandler"`
 
 	// Overhead represents the resource overhead associated with running a pod for a

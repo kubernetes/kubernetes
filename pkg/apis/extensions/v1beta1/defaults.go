@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"math"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,6 +57,11 @@ func SetDefaults_DaemonSet(obj *extensionsv1beta1.DaemonSet) {
 			// Set default MaxUnavailable as 1 by default.
 			maxUnavailable := intstr.FromInt(1)
 			updateStrategy.RollingUpdate.MaxUnavailable = &maxUnavailable
+		}
+		if updateStrategy.RollingUpdate.MaxSurge == nil {
+			// Set default MaxSurge as 0 by default.
+			maxSurge := intstr.FromInt(0)
+			updateStrategy.RollingUpdate.MaxSurge = &maxSurge
 		}
 	}
 	if obj.Spec.RevisionHistoryLimit == nil {

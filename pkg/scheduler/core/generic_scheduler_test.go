@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,20 +34,23 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -70,14 +75,14 @@ func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState,
 }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 	return &noPodsFilterPlugin{}, nil
 }
 
 type numericMapPlugin struct{}
 
 func newNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &numericMapPlugin{}, nil
 	}
 }
@@ -101,7 +106,7 @@ func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
 type reverseNumericMapPlugin struct{}
 
 func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &reverseNumericMapPlugin{}, nil
 	}
 }
@@ -142,7 +147,7 @@ func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framewor
 type trueMapPlugin struct{}
 
 func newTrueMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &trueMapPlugin{}, nil
 	}
 }
@@ -171,7 +176,7 @@ func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleSta
 type falseMapPlugin struct{}
 
 func newFalseMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
 		return &falseMapPlugin{}, nil
 	}
 }
@@ -181,7 +186,7 @@ func (pl *falseMapPlugin) Name() string {
 }
 
 func (pl *falseMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
-	return 0, framework.NewStatus(framework.Error, errPrioritize.Error())
+	return 0, framework.AsStatus(errPrioritize)
 }
 
 func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
@@ -268,6 +273,180 @@ func TestSelectHost(t *testing.T) {
 	}
 }
 
+func TestFindNodesThatPassExtenders(t *testing.T) {
+	tests := []struct {
+		name                  string
+		extenders             []st.FakeExtender
+		nodes                 []*v1.Node
+		filteredNodesStatuses framework.NodeToStatusMap
+		expectsErr            bool
+		expectedNodes         []*v1.Node
+		expectedStatuses      framework.NodeToStatusMap
+	}{
+		{
+			name: "error",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{st.ErrorPredicateExtender},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            true,
+		},
+		{
+			name: "success",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{st.TruePredicateExtender},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses:      make(framework.NodeToStatusMap),
+		},
+		{
+			name: "unschedulable",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+			},
+		},
+		{
+			name: "unschedulable and unresolvable",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+		{
+			name: "extender may overwrite the statuses",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes: makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"c": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeFilterPlugin: node %q failed", "c")),
+			},
+			expectsErr:    false,
+			expectedNodes: makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeFilterPlugin: node %q failed", "c"), fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+		{
+			name: "multiple extenders",
+			extenders: []st.FakeExtender{
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						if node.Name == "b" {
+							return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+						}
+						return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+				{
+					Predicates: []st.FitPredicate{func(pod *v1.Pod, node *v1.Node) *framework.Status {
+						if node.Name == "a" {
+							return framework.NewStatus(framework.Success)
+						}
+						return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
+					}},
+				},
+			},
+			nodes:                 makeNodeList([]string{"a", "b", "c"}),
+			filteredNodesStatuses: make(framework.NodeToStatusMap),
+			expectsErr:            false,
+			expectedNodes:         makeNodeList([]string{"a"}),
+			expectedStatuses: framework.NodeToStatusMap{
+				"b": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("FakeExtender: node %q failed", "b")),
+				"c": framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("FakeExtender: node %q failed and unresolvable", "c")),
+			},
+		},
+	}
+
+	cmpOpts := []cmp.Option{
+		cmp.Comparer(func(s1 framework.Status, s2 framework.Status) bool {
+			return s1.Code() == s2.Code() && reflect.DeepEqual(s1.Reasons(), s2.Reasons())
+		}),
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var extenders []framework.Extender
+			for ii := range tt.extenders {
+				extenders = append(extenders, &tt.extenders[ii])
+			}
+			scheduler := &genericScheduler{
+				extenders: extenders,
+			}
+			pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
+			got, err := scheduler.findNodesThatPassExtenders(pod, tt.nodes, tt.filteredNodesStatuses)
+			if tt.expectsErr {
+				if err == nil {
+					t.Error("Unexpected non-error")
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Unexpected error: %v", err)
+				}
+				if diff := cmp.Diff(tt.expectedNodes, got); diff != "" {
+					t.Errorf("filtered nodes (-want,+got):\n%s", diff)
+				}
+				if diff := cmp.Diff(tt.expectedStatuses, tt.filteredNodesStatuses, cmpOpts...); diff != "" {
+					t.Errorf("filtered statuses (-want,+got):\n%s", diff)
+				}
+			}
+		})
+	}
+}
+
 func TestGenericScheduler(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -288,12 +467,15 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"machine1", "machine2"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 1",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
-					"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("FalseFilter"),
 				},
 			},
 		},
@@ -373,13 +555,16 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"3", "2", "1"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			name:  "test 7",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 3,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
-					"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
-					"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("FalseFilter"),
 				},
 			},
 		},
@@ -405,12 +590,15 @@ func TestGenericScheduler(t *testing.T) {
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 			nodes: []string{"1", "2"},
 			name:  "test 8",
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
-					"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("NoPodsFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("MatchFilter", "NoPodsFilter"),
 				},
 			},
 		},
@@ -418,13 +606,19 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
+			pvcs: []v1.PersistentVolumeClaim{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
+					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
+				},
+			},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{
 						{
@@ -445,6 +639,7 @@ func TestGenericScheduler(t *testing.T) {
 			// Pod with non existing PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
@@ -464,19 +659,43 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			name: "unknown PVC",
-			wErr: fmt.Errorf("persistentvolumeclaim \"unknownPVC\" not found"),
+			wErr: &framework.FitError{
+				Pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+					Spec: v1.PodSpec{
+						Volumes: []v1.Volume{
+							{
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "unknownPVC",
+									},
+								},
+							},
+						},
+					},
+				},
+				NumAllNodes: 2,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+					},
+					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+				},
+			},
 		},
 		{
 			// Pod with deleting PVC
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			},
 			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
+			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
 			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
 				Spec: v1.PodSpec{
 					Volumes: []v1.Volume{
 						{
@@ -490,7 +709,30 @@ func TestGenericScheduler(t *testing.T) {
 				},
 			},
 			name: "deleted PVC",
-			wErr: fmt.Errorf("persistentvolumeclaim \"existingPVC\" is being deleted"),
+			wErr: &framework.FitError{
+				Pod: &v1.Pod{
+					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
+					Spec: v1.PodSpec{
+						Volumes: []v1.Volume{
+							{
+								VolumeSource: v1.VolumeSource{
+									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+										ClaimName: "existingPVC",
+									},
+								},
+							},
+						},
+					},
+				},
+				NumAllNodes: 2,
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+					},
+					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+				},
+			},
 		},
 		{
 			registerPlugins: []st.RegisterPluginFunc{
@@ -503,7 +745,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes: []string{"2", "1"},
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
 			name:  "test error with priority map",
-			wErr:  fmt.Errorf("error while running score plugin for pod \"2\": %+v", errPrioritize),
+			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
 		},
 		{
 			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
@@ -631,11 +873,14 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter"),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("FakeFilter"),
 				},
 			},
 		},
@@ -653,11 +898,14 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"3"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
 				NumAllNodes: 1,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter"),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("FakeFilter"),
 				},
 			},
 		},
@@ -690,12 +938,15 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"1", "2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 			expectedHosts: nil,
-			wErr: &FitError{
+			wErr: &framework.FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 				NumAllNodes: 2,
-				FilteredNodesStatuses: framework.NodeToStatusMap{
-					"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status"),
-					"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status"),
+				Diagnosis: framework.Diagnosis{
+					NodeToStatusMap: framework.NodeToStatusMap{
+						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
+						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
+					},
+					UnschedulablePlugins: sets.NewString("FakePreFilter"),
 				},
 			},
 		},
@@ -712,7 +963,7 @@ func TestGenericScheduler(t *testing.T) {
 			nodes:         []string{"1", "2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
 			expectedHosts: nil,
-			wErr:          fmt.Errorf(`prefilter plugin "FakePreFilter" failed for pod "test-prefilter": injected error status`),
+			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
 		},
 	}
 	for _, test := range tests {
@@ -728,33 +979,47 @@ func TestGenericScheduler(t *testing.T) {
 				cache.AddNode(node)
 			}
 
+			ctx := context.Background()
+			cs := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+			for _, pvc := range test.pvcs {
+				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "true")
+				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
+				if pvName := pvc.Spec.VolumeName; pvName != "" {
+					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
+					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
+				}
+			}
 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
 			fwk, err := st.NewFramework(
-				test.registerPlugins,
+				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
-			prof := &profile.Profile{
-				Framework: fwk,
-			}
-
-			var pvcs []v1.PersistentVolumeClaim
-			pvcs = append(pvcs, test.pvcs...)
-			pvcLister := fakeframework.PersistentVolumeClaimLister(pvcs)
 
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,
 				[]framework.Extender{},
-				pvcLister,
-				false,
-				schedulerapi.DefaultPercentageOfNodesToScore)
-			result, err := scheduler.Schedule(context.Background(), prof, framework.NewCycleState(), test.pod)
-			if !reflect.DeepEqual(err, test.wErr) {
-				t.Errorf("want: %v, got: %v", test.wErr, err)
+				schedulerapi.DefaultPercentageOfNodesToScore,
+			)
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
+
+			result, err := scheduler.Schedule(ctx, fwk, framework.NewCycleState(), test.pod)
+			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
+			if err != test.wErr {
+				gotFitErr, gotOK := err.(*framework.FitError)
+				wantFitErr, wantOK := test.wErr.(*framework.FitError)
+				if gotOK != wantOK {
+					t.Errorf("Expected err to be FitError: %v, but got %v", wantOK, gotOK)
+				} else if gotOK && !reflect.DeepEqual(gotFitErr, wantFitErr) {
+					t.Errorf("Unexpected fitError. Want %v, but got %v", wantFitErr, gotFitErr)
+				}
 			}
 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
@@ -776,7 +1041,7 @@ func makeScheduler(nodes []*v1.Node) *genericScheduler {
 	s := NewGenericScheduler(
 		cache,
 		emptySnapshot,
-		nil, nil, false,
+		nil,
 		schedulerapi.DefaultPercentageOfNodesToScore)
 	cache.UpdateSnapshot(s.(*genericScheduler).nodeInfoSnapshot)
 	return s.(*genericScheduler)
@@ -792,34 +1057,26 @@ func TestFindFitAllError(t *testing.T) {
 			st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
 
-	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(nodeToStatusMap) != len(nodes) {
-		t.Errorf("unexpected failed status map: %v", nodeToStatusMap)
+	// TODO(#94696): use cmp.Diff() to compare `diagnosis`.
+	if len(diagnosis.NodeToStatusMap) != len(nodes) {
+		t.Errorf("unexpected failed status map: %v", diagnosis.NodeToStatusMap)
 	}
 
-	for _, node := range nodes {
-		t.Run(node.Name, func(t *testing.T) {
-			status, found := nodeToStatusMap[node.Name]
-			if !found {
-				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
-			}
-			reasons := status.Reasons()
-			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
-				t.Errorf("unexpected failure reasons: %v", reasons)
-			}
-		})
+	if diff := cmp.Diff(sets.NewString("MatchFilter"), diagnosis.UnschedulablePlugins); diff != "" {
+		t.Errorf("Unexpected unschedulablePlugins: (-want, +got): %s", diagnosis.UnschedulablePlugins)
 	}
 }
 
@@ -833,22 +1090,26 @@ func TestFindFitSomeError(t *testing.T) {
 			st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, nodeToStatusMap, err := scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	if len(nodeToStatusMap) != len(nodes)-1 {
-		t.Errorf("unexpected failed status map: %v", nodeToStatusMap)
+	if len(diagnosis.NodeToStatusMap) != len(nodes)-1 {
+		t.Errorf("unexpected failed status map: %v", diagnosis.NodeToStatusMap)
+	}
+
+	if diff := cmp.Diff(sets.NewString("MatchFilter"), diagnosis.UnschedulablePlugins); diff != "" {
+		t.Errorf("Unexpected unschedulablePlugins: (-want, +got): %s", diagnosis.UnschedulablePlugins)
 	}
 
 	for _, node := range nodes {
@@ -856,9 +1117,9 @@ func TestFindFitSomeError(t *testing.T) {
 			continue
 		}
 		t.Run(node.Name, func(t *testing.T) {
-			status, found := nodeToStatusMap[node.Name]
+			status, found := diagnosis.NodeToStatusMap[node.Name]
 			if !found {
-				t.Errorf("failed to find node %v in %v", node.Name, nodeToStatusMap)
+				t.Errorf("failed to find node %v in %v", node.Name, diagnosis.NodeToStatusMap)
 			}
 			reasons := status.Reasons()
 			if len(reasons) != 1 || reasons[0] != st.ErrReasonFake {
@@ -887,43 +1148,44 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodes := makeNodeList([]string{"1"})
+		t.Run(test.name, func(t *testing.T) {
+			nodes := makeNodeList([]string{"1"})
 
-		plugin := st.FakeFilterPlugin{}
-		registerFakeFilterFunc := st.RegisterFilterPlugin(
-			"FakeFilter",
-			func(_ runtime.Object, fh framework.FrameworkHandle) (framework.Plugin, error) {
-				return &plugin, nil
-			},
-		)
-		registerPlugins := []st.RegisterPluginFunc{
-			st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-			registerFakeFilterFunc,
-			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-		}
-		fwk, err := st.NewFramework(
-			registerPlugins,
-			frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		prof := &profile.Profile{Framework: fwk}
+			plugin := st.FakeFilterPlugin{}
+			registerFakeFilterFunc := st.RegisterFilterPlugin(
+				"FakeFilter",
+				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return &plugin, nil
+				},
+			)
+			registerPlugins := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				registerFakeFilterFunc,
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			fwk, err := st.NewFramework(
+				registerPlugins, "",
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		scheduler := makeScheduler(nodes)
-		if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
-			t.Fatal(err)
-		}
-		fwk.PreemptHandle().AddNominatedPod(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
+			scheduler := makeScheduler(nodes)
+			if err := scheduler.cache.UpdateSnapshot(scheduler.nodeInfoSnapshot); err != nil {
+				t.Fatal(err)
+			}
+			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
 
-		_, _, err = scheduler.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
-		if err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		if test.expectedCount != plugin.NumFilterCalled {
-			t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
-		}
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectedCount != plugin.NumFilterCalled {
+				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
+			}
+		})
 	}
 }
 
@@ -1055,7 +1317,7 @@ func TestZeroRequest(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			}
 			fwk, err := st.NewFramework(
-				pluginRegistrations,
+				pluginRegistrations, "",
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithClientSet(client),
@@ -1064,25 +1326,22 @@ func TestZeroRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("error creating framework: %+v", err)
 			}
-			prof := &profile.Profile{Framework: fwk}
 
 			scheduler := NewGenericScheduler(
 				nil,
 				emptySnapshot,
 				[]framework.Extender{},
-				nil,
-				false,
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 			scheduler.nodeInfoSnapshot = snapshot
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, prof, state, test.pod)
+			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
-			prof.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := scheduler.prioritizeNodes(ctx, prof, state, test.pod, test.nodes)
+			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
+			list, err := scheduler.prioritizeNodes(ctx, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1164,19 +1423,20 @@ func TestFairEvaluationForNodes(t *testing.T) {
 			st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
 			st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 		},
+		"",
 		frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	prof := &profile.Profile{Framework: fwk}
+
 	// To make numAllNodes % nodesToFind != 0
 	g.percentageOfNodesToScore = 30
 	nodesToFind := int(g.numFeasibleNodesToFind(int32(numAllNodes)))
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), prof, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1186,5 +1446,90 @@ func TestFairEvaluationForNodes(t *testing.T) {
 		if g.nextStartNodeIndex != (i+1)*nodesToFind%numAllNodes {
 			t.Errorf("got %d lastProcessedNodeIndex, want %d", g.nextStartNodeIndex, (i+1)*nodesToFind%numAllNodes)
 		}
+	}
+}
+
+func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
+	tests := []struct {
+		name                  string
+		feature               bool
+		pod                   *v1.Pod
+		nodeReturnCodeMap     map[string]framework.Code
+		expectedCount         int32
+		expectedPatchRequests int
+	}{
+		{
+			name:          "Enable the feature, pod has the nominated node set, filter is called only once",
+			feature:       true,
+			pod:           st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			expectedCount: 1,
+		},
+		{
+			name:          "Disable the feature, pod has the nominated node, filter is called for each node",
+			feature:       false,
+			pod:           st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			expectedCount: 3,
+		},
+		{
+			name:          "pod without the nominated pod, filter is called for each node",
+			feature:       true,
+			pod:           st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
+			expectedCount: 3,
+		},
+		{
+			name:              "nominated pod cannot pass the filter, filter is called for each node",
+			feature:           true,
+			pod:               st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
+			nodeReturnCodeMap: map[string]framework.Code{"node1": framework.Unschedulable},
+			expectedCount:     4,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PreferNominatedNode, test.feature)()
+			// create three nodes in the cluster.
+			nodes := makeNodeList([]string{"node1", "node2", "node3"})
+			client := &clientsetfake.Clientset{}
+			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			for _, n := range nodes {
+				cache.AddNode(n)
+			}
+			plugin := st.FakeFilterPlugin{FailedNodeReturnCodeMap: test.nodeReturnCodeMap}
+			registerFakeFilterFunc := st.RegisterFilterPlugin(
+				"FakeFilter",
+				func(_ runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return &plugin, nil
+				},
+			)
+			registerPlugins := []st.RegisterPluginFunc{
+				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+				registerFakeFilterFunc,
+				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+			}
+			fwk, err := st.NewFramework(
+				registerPlugins, "",
+				frameworkruntime.WithClientSet(client),
+				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			snapshot := internalcache.NewSnapshot(nil, nodes)
+			scheduler := NewGenericScheduler(
+				cache,
+				snapshot,
+				[]framework.Extender{},
+				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
+
+			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if test.expectedCount != plugin.NumFilterCalled {
+				t.Errorf("predicate was called %d times, expected is %d", plugin.NumFilterCalled, test.expectedCount)
+			}
+		})
 	}
 }

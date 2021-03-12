@@ -38,8 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // jobStrategy implements verification logic for Replication Controllers.
@@ -72,6 +73,18 @@ func (jobStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears the status of a job before creation.
 func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
@@ -79,6 +92,14 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) {
+		job.Spec.CompletionMode = batch.NonIndexedCompletion
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
+		job.Spec.Suspend = pointer.BoolPtr(false)
 	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
@@ -94,6 +115,20 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 		newJob.Spec.TTLSecondsAfterFinished = nil
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob) && oldJob.Spec.CompletionMode == batch.NonIndexedCompletion {
+		newJob.Spec.CompletionMode = batch.NonIndexedCompletion
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
+		// There are 3 possible values (nil, true, false) for each flag, so 9
+		// combinations. We want to disallow everything except true->false and
+		// true->nil when the feature gate is disabled. Or, basically allow this
+		// only when oldJob is true.
+		if oldJob.Spec.Suspend == nil || !*oldJob.Spec.Suspend {
+			newJob.Spec.Suspend = oldJob.Spec.Suspend
+		}
+	}
+
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
 }
 
@@ -104,9 +139,8 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	if job.Spec.ManualSelector == nil || *job.Spec.ManualSelector == false {
 		generateSelector(job)
 	}
-	allErrs := validation.ValidateJob(job)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, nil)
+	return validation.ValidateJob(job, opts)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -176,9 +210,10 @@ func (jobStrategy) AllowCreateOnUpdate() bool {
 func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
-	validationErrorList := validation.ValidateJob(job)
-	updateErrorList := validation.ValidateJobUpdate(job, oldJob)
-	updateErrorList = append(updateErrorList, corevalidation.ValidateConditionalPodTemplate(&job.Spec.Template, &oldJob.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, &oldJob.Spec.Template)
+	validationErrorList := validation.ValidateJob(job, opts)
+	updateErrorList := validation.ValidateJobUpdate(job, oldJob, opts)
 	return append(validationErrorList, updateErrorList...)
 }
 
@@ -187,6 +222,16 @@ type jobStatusStrategy struct {
 }
 
 var StatusStrategy = jobStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (jobStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"batch/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)

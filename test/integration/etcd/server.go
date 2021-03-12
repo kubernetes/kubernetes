@@ -30,7 +30,7 @@ import (
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/clientv3/concurrency"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -50,7 +50,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 
 	// install all APIs
-	_ "k8s.io/kubernetes/pkg/master"
+	_ "k8s.io/kubernetes/pkg/controlplane"
 )
 
 // StartRealMasterOrDie starts an API master that is appropriate for use in tests that require one of every resource
@@ -71,7 +71,6 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	}
 
 	kubeAPIServerOptions := options.NewServerRunOptions()
-	kubeAPIServerOptions.InsecureServing.BindPort = 0
 	kubeAPIServerOptions.SecureServing.Listener = listener
 	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
@@ -304,14 +303,14 @@ func JSONToUnstructured(stub, namespace string, mapping *meta.RESTMapping, dynam
 // CreateTestCRDs creates the given CRDs, any failure causes the test to Fatal.
 // If skipCrdExistsInDiscovery is true, the CRDs are only checked for the Established condition via their Status.
 // If skipCrdExistsInDiscovery is false, the CRDs are checked via discovery, see CrdExistsInDiscovery.
-func CreateTestCRDs(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crds ...*apiextensionsv1beta1.CustomResourceDefinition) {
+func CreateTestCRDs(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crds ...*apiextensionsv1.CustomResourceDefinition) {
 	for _, crd := range crds {
 		createTestCRD(t, client, skipCrdExistsInDiscovery, crd)
 	}
 }
 
-func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crd *apiextensionsv1beta1.CustomResourceDefinition) {
-	if _, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
+func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCrdExistsInDiscovery bool, crd *apiextensionsv1.CustomResourceDefinition) {
+	if _, err := client.ApiextensionsV1().CustomResourceDefinitions().Create(context.TODO(), crd, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to create %s CRD; %v", crd.Name, err)
 	}
 	if skipCrdExistsInDiscovery {
@@ -329,14 +328,14 @@ func createTestCRD(t *testing.T, client apiextensionsclientset.Interface, skipCr
 
 func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string) error {
 	return wait.PollImmediate(500*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		crd, err := client.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
+		crd, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 		for _, cond := range crd.Status.Conditions {
 			switch cond.Type {
-			case apiextensionsv1beta1.Established:
-				if cond.Status == apiextensionsv1beta1.ConditionTrue {
+			case apiextensionsv1.Established:
+				if cond.Status == apiextensionsv1.ConditionTrue {
 					return true, nil
 				}
 			}
@@ -346,11 +345,8 @@ func waitForEstablishedCRD(client apiextensionsclientset.Interface, name string)
 }
 
 // CrdExistsInDiscovery checks to see if the given CRD exists in discovery at all served versions.
-func CrdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition) bool {
+func CrdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1.CustomResourceDefinition) bool {
 	var versions []string
-	if len(crd.Spec.Version) != 0 {
-		versions = append(versions, crd.Spec.Version)
-	}
 	for _, v := range crd.Spec.Versions {
 		if v.Served {
 			versions = append(versions, v.Name)
@@ -364,7 +360,7 @@ func CrdExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiexten
 	return true
 }
 
-func crdVersionExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1beta1.CustomResourceDefinition, version string) bool {
+func crdVersionExistsInDiscovery(client apiextensionsclientset.Interface, crd *apiextensionsv1.CustomResourceDefinition, version string) bool {
 	resourceList, err := client.Discovery().ServerResourcesForGroupVersion(crd.Spec.Group + "/" + version)
 	if err != nil {
 		return false

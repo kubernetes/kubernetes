@@ -102,8 +102,8 @@ type DeleteOptions struct {
 	FieldSelector       string
 	DeleteAll           bool
 	DeleteAllNamespaces bool
+	CascadingStrategy   metav1.DeletionPropagation
 	IgnoreNotFound      bool
-	Cascade             bool
 	DeleteNow           bool
 	ForceDeletion       bool
 	WaitForDeletion     bool
@@ -136,7 +136,8 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Long:                  deleteLong,
 		Example:               deleteExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			o := deleteFlags.ToOptions(nil, streams)
+			o, err := deleteFlags.ToOptions(nil, streams)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunDelete(f))
@@ -187,11 +188,7 @@ func (o *DeleteOptions) Complete(f cmdutil.Factory, args []string, cmd *cobra.Co
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	if len(o.Raw) == 0 {
 		r := f.NewBuilder().
@@ -301,11 +298,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		if o.GracePeriod >= 0 {
 			options = metav1.NewDeleteOptions(int64(o.GracePeriod))
 		}
-		policy := metav1.DeletePropagationBackground
-		if !o.Cascade {
-			policy = metav1.DeletePropagationOrphan
-		}
-		options.PropagationPolicy = &policy
+		options.PropagationPolicy = &o.CascadingStrategy
 
 		if warnClusterScope && info.Mapping.Scope.Name() == meta.RESTScopeNameRoot {
 			fmt.Fprintf(o.ErrOut, "warning: deleting cluster-scoped resources, not scoped to the provided namespace\n")

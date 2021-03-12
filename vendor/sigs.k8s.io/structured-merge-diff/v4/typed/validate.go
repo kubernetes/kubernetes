@@ -92,7 +92,7 @@ func validateScalar(t *schema.Scalar, v value.Value, prefix string) (errs Valida
 	case schema.Numeric:
 		if !v.IsFloat() && !v.IsInt() {
 			// TODO: should the schema separate int and float?
-			return errorf("%vexpected numeric (int or float), got %T", prefix, v)
+			return errorf("%vexpected numeric (int or float), got %T", prefix, v.Unstructured())
 		}
 	case schema.String:
 		if !v.IsString() {
@@ -123,7 +123,7 @@ func (v *validatingObjectWalker) visitListItems(t *schema.List, list value.List)
 			pe.Index = &i
 		} else {
 			var err error
-			pe, err = listItemToPathElement(v.allocator, t, i, child)
+			pe, err = listItemToPathElement(v.allocator, v.schema, t, i, child)
 			if err != nil {
 				errs = append(errs, errorf("element %v: %v", i, err.Error())...)
 				// If we can't construct the path element, we can't

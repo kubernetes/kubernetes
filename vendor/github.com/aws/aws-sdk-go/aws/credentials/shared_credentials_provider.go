@@ -17,8 +17,9 @@ var (
 	ErrSharedCredentialsHomeNotFound = awserr.New("UserHomeNotFound", "user home directory not found.", nil)
 )
 
-// A SharedCredentialsProvider retrieves credentials from the current user's home
-// directory, and keeps track if those credentials are expired.
+// A SharedCredentialsProvider retrieves access key pair (access key ID,
+// secret access key, and session token if present) credentials from the current
+// user's home directory, and keeps track if those credentials are expired.
 //
 // Profile ini file example: $HOME/.aws/credentials
 type SharedCredentialsProvider struct {

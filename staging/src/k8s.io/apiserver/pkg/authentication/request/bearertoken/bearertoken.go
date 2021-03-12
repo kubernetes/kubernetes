@@ -39,7 +39,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	if auth == "" {
 		return nil, false, nil
 	}
-	parts := strings.Split(auth, " ")
+	parts := strings.SplitN(auth, " ", 3)
 	if len(parts) < 2 || strings.ToLower(parts[0]) != "bearer" {
 		return nil, false, nil
 	}

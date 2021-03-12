@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
@@ -220,13 +221,13 @@ func (o UnmarshalOptions) unmarshalMap(b []byte, wtyp protowire.Type, mapv proto
 		b = b[n:]
 		err = errUnknown
 		switch num {
-		case 1:
+		case genid.MapEntry_Key_field_number:
 			key, n, err = o.unmarshalScalar(b, wtyp, keyField)
 			if err != nil {
 				break
 			}
 			haveKey = true
-		case 2:
+		case genid.MapEntry_Value_field_number:
 			var v protoreflect.Value
 			v, n, err = o.unmarshalScalar(b, wtyp, valField)
 			if err != nil {

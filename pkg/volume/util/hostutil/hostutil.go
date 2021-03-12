@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 // FileType enumerates the known set of possible file types.

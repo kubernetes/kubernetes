@@ -157,11 +157,7 @@ func (o *ScaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -209,7 +205,7 @@ func (o *ScaleOptions) RunScale() error {
 	}
 
 	infos := []*resource.Info{}
-	err = r.Visit(func(info *resource.Info, err error) error {
+	r.Visit(func(info *resource.Info, err error) error {
 		if err == nil {
 			infos = append(infos, info)
 		}

@@ -52,19 +52,15 @@ func runDockershim(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		ImagePullProgressDeadline: kubeDeps.DockerOptions.ImagePullProgressDeadline,
 	}
 	ds, err := dockershim.NewDockerService(dockerClientConfig, crOptions.PodSandboxImage, streamingConfig,
-		&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory, !crOptions.RedirectContainerStreaming)
+		&pluginSettings, runtimeCgroups, kubeCfg.CgroupDriver, crOptions.DockershimRootDirectory)
 	if err != nil {
 		return err
 	}
-	if crOptions.RedirectContainerStreaming {
-		kubeDeps.criHandler = ds
-	}
 
 	// The unix socket for kubelet <-> dockershim communication, dockershim start before runtime service init.
-	klog.V(5).Infof("RemoteRuntimeEndpoint: %q, RemoteImageEndpoint: %q",
-		remoteRuntimeEndpoint,
-		remoteImageEndpoint)
-	klog.V(2).Infof("Starting the GRPC server for the docker CRI shim.")
+	klog.V(5).InfoS("Using remote runtime endpoint and image endpoint", "runtimeEndpoint", remoteRuntimeEndpoint, "imageEndpoint", remoteImageEndpoint)
+	klog.V(2).InfoS("Starting the GRPC server for the docker CRI shim.")
+
 	dockerServer := dockerremote.NewDockerServer(remoteRuntimeEndpoint, ds)
 	if err := dockerServer.Start(); err != nil {
 		return err

@@ -17,9 +17,7 @@ limitations under the License.
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,7 +37,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -47,17 +45,17 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/tools/remotecommand"
-	utiltesting "k8s.io/client-go/util/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/utils/pointer"
 
 	// Do some initialization to decode the query parameters correctly.
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming"
 	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/portforward"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
@@ -298,19 +296,24 @@ type serverTestFramework struct {
 	fakeKubelet     *fakeKubelet
 	fakeAuth        *fakeAuth
 	testHTTPServer  *httptest.Server
-	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {
-	return newServerTestWithDebug(true, false, nil)
+	return newServerTestWithDebug(true, nil)
 }
 
-func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, streamingServer streaming.Server) *serverTestFramework {
-	return newServerTestWithDebuggingHandlers(enableDebugging, enableDebugging, redirectContainerStreaming, streamingServer)
+func newServerTestWithDebug(enableDebugging bool, streamingServer streaming.Server) *serverTestFramework {
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: enableDebugging,
+		EnableSystemLogHandler:  enableDebugging,
+		EnableProfilingHandler:  enableDebugging,
+		EnableDebugFlagsHandler: enableDebugging,
+	}
+	return newServerTestWithDebuggingHandlers(kubeCfg, streamingServer)
 }
 
-func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler, redirectContainerStreaming bool,
-	streamingServer streaming.Server) *serverTestFramework {
+func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletConfiguration, streamingServer streaming.Server) *serverTestFramework {
+
 	fw := &serverTestFramework{}
 	fw.fakeKubelet = &fakeKubelet{
 		hostnameFunc: func() string {
@@ -339,19 +342,11 @@ func newServerTestWithDebuggingHandlers(enableDebugging, enableSystemLogHandler,
 			return authorizer.DecisionAllow, "", nil
 		},
 	}
-	fw.criHandler = &utiltesting.FakeHandler{
-		StatusCode: http.StatusOK,
-	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
 		fw.fakeAuth,
-		true,
-		enableDebugging,
-		false,
-		redirectContainerStreaming,
-		enableSystemLogHandler,
-		fw.criHandler)
+		kubeCfg)
 	fw.serverUnderTest = &server
 	fw.testHTTPServer = httptest.NewServer(fw.serverUnderTest)
 	return fw
@@ -363,185 +358,6 @@ func getPodName(name, namespace string) string {
 		namespace = metav1.NamespaceDefault
 	}
 	return name + "_" + namespace
-}
-
-func TestContainerInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{}
-	podID := "somepod"
-	expectedPodID := getPodName(podID, "")
-	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		if podID != expectedPodID || containerName != expectedContainerName {
-			return nil, fmt.Errorf("bad podID or containerName: podID=%v; containerName=%v", podID, containerName)
-		}
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v", podID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
-}
-
-func TestContainerInfoWithUidNamespace(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{}
-	podID := "somepod"
-	expectedNamespace := "custom"
-	expectedPodID := getPodName(podID, expectedNamespace)
-	expectedContainerName := "goodcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		if podID != expectedPodID || string(uid) != testUID || containerName != expectedContainerName {
-			return nil, fmt.Errorf("bad podID or uid or containerName: podID=%v; uid=%v; containerName=%v", podID, uid, containerName)
-		}
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
-}
-
-func TestContainerNotFound(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	podID := "somepod"
-	expectedNamespace := "custom"
-	expectedContainerName := "slowstartcontainer"
-	fw.fakeKubelet.containerInfoFunc = func(podID string, uid types.UID, containerName string, req *cadvisorapi.ContainerInfoRequest) (*cadvisorapi.ContainerInfo, error) {
-		return nil, kubecontainer.ErrContainerNotFound
-	}
-	resp, err := http.Get(fw.testHTTPServer.URL + fmt.Sprintf("/stats/%v/%v/%v/%v", expectedNamespace, podID, testUID, expectedContainerName))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	if resp.StatusCode != http.StatusNotFound {
-		t.Fatalf("Received status %d expecting %d", resp.StatusCode, http.StatusNotFound)
-	}
-	defer resp.Body.Close()
-}
-
-func TestRootInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: "/",
-		},
-	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return map[string]*cadvisorapi.ContainerInfo{
-			expectedInfo.Name: expectedInfo,
-		}, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !receivedInfo.Eq(expectedInfo) {
-		t.Errorf("received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
-	}
-}
-
-func TestSubcontainerContainerInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	const kubeletContainer = "/kubelet"
-	const kubeletSubContainer = "/kubelet/sub"
-	expectedInfo := map[string]*cadvisorapi.ContainerInfo{
-		kubeletContainer: {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: kubeletContainer,
-			},
-		},
-		kubeletSubContainer: {
-			ContainerReference: cadvisorapi.ContainerReference{
-				Name: kubeletSubContainer,
-			},
-		},
-	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return expectedInfo, nil
-	}
-
-	request := fmt.Sprintf("{\"containerName\":%q, \"subcontainers\": true}", kubeletContainer)
-	resp, err := http.Post(fw.testHTTPServer.URL+"/stats/container", "application/json", bytes.NewBuffer([]byte(request)))
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo map[string]*cadvisorapi.ContainerInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("Received invalid json data: %v", err)
-	}
-	if len(receivedInfo) != len(expectedInfo) {
-		t.Errorf("Received wrong data: %#v, expected %#v", receivedInfo, expectedInfo)
-	}
-
-	for _, containerName := range []string{kubeletContainer, kubeletSubContainer} {
-		if _, ok := receivedInfo[containerName]; !ok {
-			t.Errorf("Expected container %q to be present in result: %#v", containerName, receivedInfo)
-		}
-		if !receivedInfo[containerName].Eq(expectedInfo[containerName]) {
-			t.Errorf("Invalid result for %q: Expected %#v, received %#v", containerName, expectedInfo[containerName], receivedInfo[containerName])
-		}
-	}
-}
-
-func TestMachineInfo(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-	expectedInfo := &cadvisorapi.MachineInfo{
-		NumCores:       4,
-		MemoryCapacity: 1024,
-	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
-		return expectedInfo, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/spec")
-	if err != nil {
-		t.Fatalf("Got error GETing: %v", err)
-	}
-	defer resp.Body.Close()
-	var receivedInfo cadvisorapi.MachineInfo
-	err = json.NewDecoder(resp.Body).Decode(&receivedInfo)
-	if err != nil {
-		t.Fatalf("received invalid json data: %v", err)
-	}
-	if !reflect.DeepEqual(&receivedInfo, expectedInfo) {
-		t.Errorf("received wrong data: %#v", receivedInfo)
-	}
 }
 
 func TestServeLogs(t *testing.T) {
@@ -1036,7 +852,7 @@ func TestServeExecInContainerIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1077,7 +893,6 @@ func testExecAttach(t *testing.T, verb string) {
 		tty                bool
 		responseStatusCode int
 		uid                bool
-		redirect           bool
 	}{
 		"no input or output":           {responseStatusCode: http.StatusBadRequest},
 		"stdin":                        {stdin: true, responseStatusCode: http.StatusSwitchingProtocols},
@@ -1086,7 +901,6 @@ func testExecAttach(t *testing.T, verb string) {
 		"stdout and stderr":            {stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout and stderr":      {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols},
 		"stdin stdout stderr with uid": {stdin: true, stdout: true, stderr: true, responseStatusCode: http.StatusSwitchingProtocols, uid: true},
-		"stdout with redirect":         {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
 	for desc := range tests {
@@ -1095,7 +909,7 @@ func testExecAttach(t *testing.T, verb string) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, ss)
 			defer fw.testHTTPServer.Close()
 			fmt.Println(desc)
 
@@ -1203,16 +1017,8 @@ func testExecAttach(t *testing.T, verb string) {
 				upgradeRoundTripper httpstream.UpgradeRoundTripper
 				c                   *http.Client
 			)
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
+			upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+			c = &http.Client{Transport: upgradeRoundTripper}
 
 			resp, err = c.Do(makeReq(t, "POST", url, "v4.channel.k8s.io"))
 			require.NoError(t, err, "POSTing")
@@ -1299,7 +1105,7 @@ func TestServePortForwardIdleTimeout(t *testing.T) {
 	ss, err := newTestStreamingServer(100 * time.Millisecond)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, ss)
 	defer fw.testHTTPServer.Close()
 
 	podNamespace := "other"
@@ -1335,7 +1141,6 @@ func TestServePortForward(t *testing.T) {
 		uid           bool
 		clientData    string
 		containerData string
-		redirect      bool
 		shouldError   bool
 	}{
 		"no port":                       {port: "", shouldError: true},
@@ -1348,7 +1153,6 @@ func TestServePortForward(t *testing.T) {
 		"normal port with data forward": {port: "8000", clientData: "client data", containerData: "container data", shouldError: false},
 		"max port":                      {port: "65535", shouldError: false},
 		"normal port with uid":          {port: "8000", uid: true, shouldError: false},
-		"normal port with redirect":     {port: "8000", redirect: true, shouldError: false},
 	}
 
 	podNamespace := "other"
@@ -1360,7 +1164,7 @@ func TestServePortForward(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, test.redirect, ss)
+			fw := newServerTestWithDebug(true, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -1408,26 +1212,14 @@ func TestServePortForward(t *testing.T) {
 				c                   *http.Client
 			)
 
-			if test.redirect {
-				c = &http.Client{}
-				// Don't follow redirects, since we want to inspect the redirect response.
-				c.CheckRedirect = func(*http.Request, []*http.Request) error {
-					return http.ErrUseLastResponse
-				}
-			} else {
-				upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
-				c = &http.Client{Transport: upgradeRoundTripper}
-			}
+			upgradeRoundTripper = spdy.NewRoundTripper(nil, true, true)
+			c = &http.Client{Transport: upgradeRoundTripper}
 
 			req := makeReq(t, "POST", url, "portforward.k8s.io")
 			resp, err := c.Do(req)
 			require.NoError(t, err, "POSTing")
 			defer resp.Body.Close()
 
-			if test.redirect {
-				assert.Equal(t, http.StatusFound, resp.StatusCode, "status code")
-				return
-			}
 			assert.Equal(t, http.StatusSwitchingProtocols, resp.StatusCode, "status code")
 
 			conn, err := upgradeRoundTripper.NewConnection(resp)
@@ -1466,22 +1258,6 @@ func TestServePortForward(t *testing.T) {
 	}
 }
 
-func TestCRIHandler(t *testing.T) {
-	fw := newServerTest()
-	defer fw.testHTTPServer.Close()
-
-	const (
-		path  = "/cri/exec/123456abcdef"
-		query = "cmd=echo+foo"
-	)
-	resp, err := http.Get(fw.testHTTPServer.URL + path + "?" + query)
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "GET", fw.criHandler.RequestReceived.Method)
-	assert.Equal(t, path, fw.criHandler.RequestReceived.URL.Path)
-	assert.Equal(t, query, fw.criHandler.RequestReceived.URL.RawQuery)
-}
-
 func TestMetricBuckets(t *testing.T) {
 	tests := map[string]struct {
 		url    string
@@ -1492,8 +1268,6 @@ func TestMetricBuckets(t *testing.T) {
 		"attach with uid":                 {url: "/attach/podNamespace/podID/uid/containerName", bucket: "attach"},
 		"configz":                         {url: "/configz", bucket: "configz"},
 		"containerLogs":                   {url: "/containerLogs/podNamespace/podID/containerName", bucket: "containerLogs"},
-		"cri":                             {url: "/cri/", bucket: "cri"},
-		"cri with sub":                    {url: "/cri/foo", bucket: "cri"},
 		"debug v flags":                   {url: "/debug/flags/v", bucket: "debug"},
 		"pprof with sub":                  {url: "/debug/pprof/subpath", bucket: "debug"},
 		"exec":                            {url: "/exec/podNamespace/podID/containerName", bucket: "exec"},
@@ -1507,7 +1281,6 @@ func TestMetricBuckets(t *testing.T) {
 		"metrics":                         {url: "/metrics", bucket: "metrics"},
 		"metrics cadvisor sub":            {url: "/metrics/cadvisor", bucket: "metrics/cadvisor"},
 		"metrics probes sub":              {url: "/metrics/probes", bucket: "metrics/probes"},
-		"metrics resource v1alpha1":       {url: "/metrics/resource/v1alpha1", bucket: "metrics/resource"},
 		"metrics resource sub":            {url: "/metrics/resource", bucket: "metrics/resource"},
 		"pods":                            {url: "/pods/", bucket: "pods"},
 		"portForward":                     {url: "/portForward/podNamespace/podID", bucket: "portForward"},
@@ -1515,12 +1288,8 @@ func TestMetricBuckets(t *testing.T) {
 		"run":                             {url: "/run/podNamespace/podID/containerName", bucket: "run"},
 		"run with uid":                    {url: "/run/podNamespace/podID/uid/containerName", bucket: "run"},
 		"runningpods":                     {url: "/runningpods/", bucket: "runningpods"},
-		"spec":                            {url: "/spec/", bucket: "spec"},
 		"stats":                           {url: "/stats/", bucket: "stats"},
-		"stats container sub":             {url: "/stats/container", bucket: "stats"},
 		"stats summary sub":               {url: "/stats/summary", bucket: "stats"},
-		"stats containerName with uid":    {url: "/stats/namespace/podName/uid/containerName", bucket: "stats"},
-		"stats containerName":             {url: "/stats/podName/containerName", bucket: "stats"},
 		"invalid path":                    {url: "/junk", bucket: "other"},
 		"invalid path starting with good": {url: "/healthzjunk", bucket: "other"},
 	}
@@ -1555,9 +1324,15 @@ func TestMetricMethodBuckets(t *testing.T) {
 }
 
 func TestDebuggingDisabledHandlers(t *testing.T) {
-	// for backward compatibility even if enablesystemLogHandler is set but not enableDebuggingHandler then /logs
-	//shouldn't be served.
-	fw := newServerTestWithDebuggingHandlers(false, true, false, nil)
+	// for backward compatibility even if enablesystemLogHandler or enableProfilingHandler is set but not
+	// enableDebuggingHandler then /logs, /pprof and /flags shouldn't be served.
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: false,
+		EnableSystemLogHandler:  true,
+		EnableDebugFlagsHandler: true,
+		EnableProfilingHandler:  true,
+	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
 	paths := []string{
@@ -1569,43 +1344,19 @@ func TestDebuggingDisabledHandlers(t *testing.T) {
 	for _, p := range paths {
 		verifyEndpointResponse(t, fw, p, "Debug endpoints are disabled.\n")
 	}
-
-	// test some other paths, make sure they're working
-	containerInfo := &cadvisorapi.ContainerInfo{
-		ContainerReference: cadvisorapi.ContainerReference{
-			Name: "/",
-		},
-	}
-	fw.fakeKubelet.rawInfoFunc = func(req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {
-		return map[string]*cadvisorapi.ContainerInfo{
-			containerInfo.Name: containerInfo,
-		}, nil
-	}
-
-	resp, err := http.Get(fw.testHTTPServer.URL + "/stats")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
-	machineInfo := &cadvisorapi.MachineInfo{
-		NumCores:       4,
-		MemoryCapacity: 1024,
-	}
-	fw.fakeKubelet.machineInfoFunc = func() (*cadvisorapi.MachineInfo, error) {
-		return machineInfo, nil
-	}
-
-	resp, err = http.Get(fw.testHTTPServer.URL + "/spec")
-	require.NoError(t, err)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-
 }
 
-func TestDisablingSystemLogHandler(t *testing.T) {
-	fw := newServerTestWithDebuggingHandlers(true, false, false, nil)
+func TestDisablingLogAndProfilingHandler(t *testing.T) {
+	kubeCfg := &kubeletconfiginternal.KubeletConfiguration{
+		EnableDebuggingHandlers: true,
+	}
+	fw := newServerTestWithDebuggingHandlers(kubeCfg, nil)
 	defer fw.testHTTPServer.Close()
 
-	// verify logs endpoint is disabled
+	// verify debug endpoints are disabled
 	verifyEndpointResponse(t, fw, "/logs/kubelet.log", "logs endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/pprof/profile?seconds=2", "profiling endpoint is disabled.\n")
+	verifyEndpointResponse(t, fw, "/debug/flags/v", "flags endpoint is disabled.\n")
 }
 
 func TestFailedParseParamsSummaryHandler(t *testing.T) {

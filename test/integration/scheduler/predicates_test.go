@@ -43,9 +43,9 @@ func TestInterPodAffinity(t *testing.T) {
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Add a few nodes with labels
-	nodes, err := createNodes(testCtx.ClientSet, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
+	nodes, err := createAndWaitForNodesInCache(testCtx, "testnode", st.MakeNode().Label("region", "r1").Label("zone", "z11"), 2)
 	if err != nil {
-		t.Fatalf("Cannot create nodes: %v", err)
+		t.Fatal(err)
 	}
 
 	cs := testCtx.ClientSet

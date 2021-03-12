@@ -134,7 +134,7 @@ func (c *Client) RuleDelete(opts types.DeleteOptions) error {
 				return ErrRuleInUse
 			}
 		}
-		return nil
+		return err
 	}
 	defer resp.Body.Close()
 	return nil

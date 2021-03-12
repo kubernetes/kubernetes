@@ -52,7 +52,8 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type TTLController struct {
+// Controller sets ttl annotations on nodes, based on cluster size.
+type Controller struct {
 	kubeClient clientset.Interface
 
 	// nodeStore is a local cache of nodes.
@@ -76,8 +77,9 @@ type TTLController struct {
 	boundaryStep int
 }
 
-func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *TTLController {
-	ttlc := &TTLController{
+// NewTTLController creates a new TTLController
+func NewTTLController(nodeInformer informers.NodeInformer, kubeClient clientset.Interface) *Controller {
+	ttlc := &Controller{
 		kubeClient: kubeClient,
 		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttlcontroller"),
 	}
@@ -111,7 +113,8 @@ var (
 	}
 )
 
-func (ttlc *TTLController) Run(workers int, stopCh <-chan struct{}) {
+// Run begins watching and syncing.
+func (ttlc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ttlc.queue.ShutDown()
 
@@ -129,7 +132,7 @@ func (ttlc *TTLController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (ttlc *TTLController) addNode(obj interface{}) {
+func (ttlc *Controller) addNode(obj interface{}) {
 	node, ok := obj.(*v1.Node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
@@ -148,7 +151,7 @@ func (ttlc *TTLController) addNode(obj interface{}) {
 	ttlc.enqueueNode(node)
 }
 
-func (ttlc *TTLController) updateNode(_, newObj interface{}) {
+func (ttlc *Controller) updateNode(_, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
@@ -162,7 +165,7 @@ func (ttlc *TTLController) updateNode(_, newObj interface{}) {
 	ttlc.enqueueNode(node)
 }
 
-func (ttlc *TTLController) deleteNode(obj interface{}) {
+func (ttlc *Controller) deleteNode(obj interface{}) {
 	_, ok := obj.(*v1.Node)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
@@ -189,7 +192,7 @@ func (ttlc *TTLController) deleteNode(obj interface{}) {
 	// We are not processing the node, as it no longer exists.
 }
 
-func (ttlc *TTLController) enqueueNode(node *v1.Node) {
+func (ttlc *Controller) enqueueNode(node *v1.Node) {
 	key, err := controller.KeyFunc(node)
 	if err != nil {
 		klog.Errorf("Couldn't get key for object %+v", node)
@@ -198,12 +201,12 @@ func (ttlc *TTLController) enqueueNode(node *v1.Node) {
 	ttlc.queue.Add(key)
 }
 
-func (ttlc *TTLController) worker() {
+func (ttlc *Controller) worker() {
 	for ttlc.processItem() {
 	}
 }
 
-func (ttlc *TTLController) processItem() bool {
+func (ttlc *Controller) processItem() bool {
 	key, quit := ttlc.queue.Get()
 	if quit {
 		return false
@@ -221,7 +224,7 @@ func (ttlc *TTLController) processItem() bool {
 	return true
 }
 
-func (ttlc *TTLController) getDesiredTTLSeconds() int {
+func (ttlc *Controller) getDesiredTTLSeconds() int {
 	ttlc.lock.RLock()
 	defer ttlc.lock.RUnlock()
 	return ttlc.desiredTTLSeconds
@@ -251,7 +254,7 @@ func setIntAnnotation(node *v1.Node, annotationKey string, value int) {
 	node.Annotations[annotationKey] = strconv.Itoa(value)
 }
 
-func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey string, value int) error {
+func (ttlc *Controller) patchNodeWithAnnotation(node *v1.Node, annotationKey string, value int) error {
 	oldData, err := json.Marshal(node)
 	if err != nil {
 		return err
@@ -274,7 +277,7 @@ func (ttlc *TTLController) patchNodeWithAnnotation(node *v1.Node, annotationKey 
 	return nil
 }
 
-func (ttlc *TTLController) updateNodeIfNeeded(key string) error {
+func (ttlc *Controller) updateNodeIfNeeded(key string) error {
 	node, err := ttlc.nodeStore.Get(key)
 	if err != nil {
 		if apierrors.IsNotFound(err) {

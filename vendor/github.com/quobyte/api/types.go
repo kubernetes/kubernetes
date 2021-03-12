@@ -1,25 +1,31 @@
 package quobyte
 
 type retryPolicy struct {
-        RetryPolicy string `json:"retry,omitempty"`
+	RetryPolicy string `json:"retry,omitempty"`
 }
 
 // CreateVolumeRequest represents a CreateVolumeRequest
 type CreateVolumeRequest struct {
-        Name              string   `json:"name,omitempty"`
-        RootUserID        string   `json:"root_user_id,omitempty"`
-        RootGroupID       string   `json:"root_group_id,omitempty"`
-        ReplicaDeviceIDS  []uint64 `json:"replica_device_ids,string,omitempty"`
-        ConfigurationName string   `json:"configuration_name,omitempty"`
-        AccessMode        uint32   `json:"access_mode,string,omitempty"`
-        TenantID          string   `json:"tenant_id,omitempty"`
-        retryPolicy
+	Name              string   `json:"name,omitempty"`
+	RootUserID        string   `json:"root_user_id,omitempty"`
+	RootGroupID       string   `json:"root_group_id,omitempty"`
+	ReplicaDeviceIDS  []uint64 `json:"replica_device_ids,string,omitempty"`
+	ConfigurationName string   `json:"configuration_name,omitempty"`
+	Labels            []Label  `json:"label,omitempty"`
+	AccessMode        uint32   `json:"access_mode,uint32,omitempty"`
+	TenantID          string   `json:"tenant_id,omitempty"`
+	retryPolicy
+}
+
+type Label struct {
+	Name  string `json:"name,string,omitempty"`
+	Value string `json:"value,string,omitempty"`
 }
 
 type resolveVolumeNameRequest struct {
-        VolumeName   string `json:"volume_name,omitempty"`
-        TenantDomain string `json:"tenant_domain,omitempty"`
-        retryPolicy
+	VolumeName   string `json:"volume_name,omitempty"`
+	TenantDomain string `json:"tenant_domain,omitempty"`
+	retryPolicy
 }
 
 type resolveTenantNameRequest struct {
@@ -35,8 +41,8 @@ type volumeUUID struct {
 }
 
 type getClientListRequest struct {
-        TenantDomain string `json:"tenant_domain,omitempty"`
-        retryPolicy
+	TenantDomain string `json:"tenant_domain,omitempty"`
+	retryPolicy
 }
 
 type GetClientListResponse struct {
@@ -67,13 +73,13 @@ type quota struct {
 }
 
 type setQuotaRequest struct {
-        Quotas []*quota `json:"quotas,omitempty"`
-        retryPolicy
+	Quotas []*quota `json:"quotas,omitempty"`
+	retryPolicy
 }
 
 type getTenantRequest struct {
-        TenantIDs []string `json:"tenant_id,omitempty"`
-        retryPolicy
+	TenantIDs []string `json:"tenant_id,omitempty"`
+	retryPolicy
 }
 
 type GetTenantResponse struct {
@@ -94,8 +100,8 @@ type TenantDomainConfigurationVolumeAccess struct {
 }
 
 type setTenantRequest struct {
-        Tenants *TenantDomainConfiguration `json:"tenant,omitempty"`
-        retryPolicy
+	Tenants *TenantDomainConfiguration `json:"tenant,omitempty"`
+	retryPolicy
 }
 
 type setTenantResponse struct {

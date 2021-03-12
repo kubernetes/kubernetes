@@ -35,8 +35,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -72,7 +72,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 	}))
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	resourceConfig := master.DefaultAPIResourceConfigSource()
+	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		resourceConfig.EnableVersions(schema.GroupVersion{
 			Group:   "storage.k8s.io",
@@ -115,7 +115,6 @@ func initTestSchedulerWithOptions(
 	// 1. Create scheduler
 	testCtx.informerFactory = informers.NewSharedInformerFactory(testCtx.clientSet, resyncPeriod)
 
-	podInformer := testCtx.informerFactory.Core().V1().Pods()
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: testCtx.clientSet.EventsV1(),
 	})
@@ -124,7 +123,6 @@ func initTestSchedulerWithOptions(
 	testCtx.scheduler, err = scheduler.New(
 		testCtx.clientSet,
 		testCtx.informerFactory,
-		podInformer,
 		profile.NewRecorderFactory(eventBroadcaster),
 		testCtx.ctx.Done())
 

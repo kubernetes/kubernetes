@@ -51,8 +51,8 @@ type UndoOptions struct {
 }
 
 var (
-	undoLong = templates.LongDesc(`
-		Rollback to a previous rollout.`)
+	undoLong = templates.LongDesc(i18n.T(`
+		Rollback to a previous rollout.`))
 
 	undoExample = templates.Examples(`
 		# Rollback to the previous deployment
@@ -114,11 +114,7 @@ func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []str
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	if o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace(); err != nil {
 		return err

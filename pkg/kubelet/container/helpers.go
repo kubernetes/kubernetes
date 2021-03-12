@@ -191,10 +191,11 @@ type innerEventRecorder struct {
 }
 
 func (irecorder *innerEventRecorder) shouldRecordEvent(object runtime.Object) (*v1.ObjectReference, bool) {
-	if object == nil {
-		return nil, false
-	}
 	if ref, ok := object.(*v1.ObjectReference); ok {
+		// this check is needed AFTER the cast. See https://github.com/kubernetes/kubernetes/issues/95552
+		if ref == nil {
+			return nil, false
+		}
 		if !strings.HasPrefix(ref.FieldPath, ImplicitContainerPrefix) {
 			return ref, true
 		}
@@ -335,7 +336,7 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 
 		var name string = p.Name
 		if name == "" {
-			name = fmt.Sprintf("%s-%s:%d", family, p.Protocol, p.ContainerPort)
+			name = fmt.Sprintf("%s-%s-%s:%d:%d", family, p.Protocol, p.HostIP, p.ContainerPort, p.HostPort)
 		}
 
 		// Protect against a port name being used more than once in a container.

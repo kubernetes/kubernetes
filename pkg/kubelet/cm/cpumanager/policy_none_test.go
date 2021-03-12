@@ -28,8 +28,7 @@ func TestNonePolicyName(t *testing.T) {
 
 	policyName := policy.Name()
 	if policyName != "none" {
-		t.Errorf("NonePolicy Name() error. expected: none, returned: %v",
-			policyName)
+		t.Errorf("NonePolicy Name() error. expected: none, returned: %v", policyName)
 	}
 }
 
@@ -64,5 +63,26 @@ func TestNonePolicyRemove(t *testing.T) {
 	err := policy.RemoveContainer(st, string(testPod.UID), container.Name)
 	if err != nil {
 		t.Errorf("NonePolicy RemoveContainer() error. expected no error but got %v", err)
+	}
+}
+
+func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
+	// any random topology is fine
+
+	var cpuIDs []int
+	for cpuID := range topoSingleSocketHT.CPUDetails {
+		cpuIDs = append(cpuIDs, cpuID)
+	}
+
+	policy := &nonePolicy{}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.NewCPUSet(cpuIDs...),
+	}
+
+	cpus := policy.GetAllocatableCPUs(st)
+	if cpus.Size() != 0 {
+		t.Errorf("NonePolicy GetAllocatableCPUs() error. expected empty set, returned: %v", cpus)
 	}
 }

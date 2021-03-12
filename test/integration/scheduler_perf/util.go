@@ -17,11 +17,13 @@ limitations under the License.
 package benchmark
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"math"
+	"os"
 	"path"
 	"sort"
 	"time"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/dynamic"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -53,20 +56,25 @@ var dataItemsDir = flag.String("data-items-dir", "", "destination directory for 
 // mustSetupScheduler starts the following components:
 // - k8s api server (a.k.a. master)
 // - scheduler
-// It returns clientset and destroyFunc which should be used to
+// It returns regular and dynamic clients, and destroyFunc which should be used to
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface) {
+func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface, dynamic.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
-	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
+
+	cfg := &restclient.Config{
 		Host:          apiURL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
 		QPS:           5000.0,
 		Burst:         5000,
-	})
-	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
-	fakePVControllerShutdown := util.StartFakePVController(clientSet)
+	}
+
+	client := clientset.NewForConfigOrDie(cfg)
+	dynClient := dynamic.NewForConfigOrDie(cfg)
+
+	_, podInformer, schedulerShutdown := util.StartScheduler(client)
+	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {
 		fakePVControllerShutdown()
@@ -74,11 +82,11 @@ func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clients
 		apiShutdown()
 	}
 
-	return shutdownFunc, podInformer, clientSet
+	return shutdownFunc, podInformer, client, dynClient
 }
 
 // Returns the list of scheduled pods in the specified namespaces.
-// Note that no namespces specified matches all namespaces.
+// Note that no namespaces specified matches all namespaces.
 func getScheduledPods(podInformer coreinformers.PodInformer, namespaces ...string) ([]*v1.Pod, error) {
 	pods, err := podInformer.Lister().List(labels.Everything())
 	if err != nil {
@@ -133,6 +141,10 @@ func dataItems2JSONFile(dataItems DataItems, namePrefix string) error {
 
 	destFile := fmt.Sprintf("%v_%v.json", namePrefix, time.Now().Format(dateFormat))
 	if *dataItemsDir != "" {
+		// Ensure the "dataItemsDir" path to be valid.
+		if err := os.MkdirAll(*dataItemsDir, 0750); err != nil {
+			return fmt.Errorf("dataItemsDir path %v does not exist and cannot be created: %v", *dataItemsDir, err)
+		}
 		destFile = path.Join(*dataItemsDir, destFile)
 	}
 
@@ -147,18 +159,18 @@ type metricsCollectorConfig struct {
 // metricsCollector collects metrics from legacyregistry.DefaultGatherer.Gather() endpoint.
 // Currently only Histrogram metrics are supported.
 type metricsCollector struct {
-	metricsCollectorConfig
+	*metricsCollectorConfig
 	labels map[string]string
 }
 
-func newMetricsCollector(config metricsCollectorConfig, labels map[string]string) *metricsCollector {
+func newMetricsCollector(config *metricsCollectorConfig, labels map[string]string) *metricsCollector {
 	return &metricsCollector{
 		metricsCollectorConfig: config,
 		labels:                 labels,
 	}
 }
 
-func (*metricsCollector) run(stopCh chan struct{}) {
+func (*metricsCollector) run(ctx context.Context) {
 	// metricCollector doesn't need to start before the tests, so nothing to do here.
 }
 
@@ -192,10 +204,6 @@ func collectHistogram(metric string, labels map[string]string) *DataItem {
 	q90 := hist.Quantile(0.90)
 	q99 := hist.Quantile(0.95)
 	avg := hist.Average()
-
-	// clear the metrics so that next test always starts with empty prometheus
-	// metrics (since the metrics are shared among all tests run inside the same binary)
-	hist.Clear()
 
 	msFactor := float64(time.Second) / float64(time.Millisecond)
 
@@ -231,29 +239,34 @@ func newThroughputCollector(podInformer coreinformers.PodInformer, labels map[st
 	}
 }
 
-func (tc *throughputCollector) run(stopCh chan struct{}) {
+func (tc *throughputCollector) run(ctx context.Context) {
 	podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 	if err != nil {
 		klog.Fatalf("%v", err)
 	}
 	lastScheduledCount := len(podsScheduled)
+	ticker := time.NewTicker(throughputSampleFrequency)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-stopCh:
+		case <-ctx.Done():
 			return
-		case <-time.After(throughputSampleFrequency):
+		case <-ticker.C:
 			podsScheduled, err := getScheduledPods(tc.podInformer, tc.namespaces...)
 			if err != nil {
 				klog.Fatalf("%v", err)
 			}
 
 			scheduled := len(podsScheduled)
-			samplingRatioSeconds := float64(throughputSampleFrequency) / float64(time.Second)
-			throughput := float64(scheduled-lastScheduledCount) / samplingRatioSeconds
-			tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
-			lastScheduledCount = scheduled
+			// Only do sampling if number of scheduled pods is greater than zero
+			if scheduled > 0 {
+				samplingRatioSeconds := float64(throughputSampleFrequency) / float64(time.Second)
+				throughput := float64(scheduled-lastScheduledCount) / samplingRatioSeconds
+				tc.schedulingThroughputs = append(tc.schedulingThroughputs, throughput)
+				lastScheduledCount = scheduled
+				klog.Infof("%d pods scheduled", lastScheduledCount)
+			}
 
-			klog.Infof("%d pods scheduled", lastScheduledCount)
 		}
 	}
 }

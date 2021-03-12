@@ -27,7 +27,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -52,6 +52,8 @@ type cadvisorStatsProvider struct {
 	imageService kubecontainer.ImageService
 	// statusProvider is used to get pod metadata
 	statusProvider status.PodStatusProvider
+	// hostStatsProvider is used to get pod host stat usage.
+	hostStatsProvider HostStatsProvider
 }
 
 // newCadvisorStatsProvider returns a containerStatsProvider that provides
@@ -61,12 +63,14 @@ func newCadvisorStatsProvider(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	imageService kubecontainer.ImageService,
 	statusProvider status.PodStatusProvider,
+	hostStatsProvider HostStatsProvider,
 ) containerStatsProvider {
 	return &cadvisorStatsProvider{
-		cadvisor:         cadvisor,
-		resourceAnalyzer: resourceAnalyzer,
-		imageService:     imageService,
-		statusProvider:   statusProvider,
+		cadvisor:          cadvisor,
+		resourceAnalyzer:  resourceAnalyzer,
+		imageService:      imageService,
+		statusProvider:    statusProvider,
+		hostStatsProvider: hostStatsProvider,
 	}
 }
 
@@ -137,7 +141,17 @@ func (p *cadvisorStatsProvider) ListPodStats() ([]statsapi.PodStats, error) {
 			copy(ephemeralStats, vstats.EphemeralVolumes)
 			podStats.VolumeStats = append(append([]statsapi.VolumeStats{}, vstats.EphemeralVolumes...), vstats.PersistentVolumes...)
 		}
-		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, nil, false)
+
+		logStats, err := p.hostStatsProvider.getPodLogStats(podStats.PodRef.Namespace, podStats.PodRef.Name, podUID, &rootFsInfo)
+		if err != nil {
+			klog.ErrorS(err, "Unable to fetch pod log stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
+		}
+		etcHostsStats, err := p.hostStatsProvider.getPodEtcHostsStats(podUID, &rootFsInfo)
+		if err != nil {
+			klog.ErrorS(err, "Unable to fetch pod etc hosts stats", "pod", klog.KRef(podStats.PodRef.Namespace, podStats.PodRef.Name))
+		}
+
+		podStats.EphemeralStorage = calcEphemeralStorage(podStats.Containers, ephemeralStats, &rootFsInfo, logStats, etcHostsStats, false)
 		// Lookup the pod-level cgroup's CPU and memory stats
 		podInfo := getCadvisorPodInfoFromPodUID(podUID, allInfos)
 		if podInfo != nil {
@@ -280,9 +294,9 @@ func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
 	podNamespace := kubetypes.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
-		klog.Warningf(
-			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
-			podName, podNamespace)
+		klog.InfoS(
+			"Expect container to have either both podName and podNamespace labels, or neither",
+			"podNameLabel", podName, "podNamespaceLabel", podNamespace)
 	}
 	return managed
 }
@@ -398,7 +412,7 @@ func getCadvisorContainerInfo(ca cadvisor.Interface) (map[string]cadvisorapiv2.C
 		if _, ok := infos["/"]; ok {
 			// If the failure is partial, log it and return a best-effort
 			// response.
-			klog.Errorf("Partial failure issuing cadvisor.ContainerInfoV2: %v", err)
+			klog.ErrorS(err, "Partial failure issuing cadvisor.ContainerInfoV2")
 		} else {
 			return nil, fmt.Errorf("failed to get root cgroup stats: %v", err)
 		}

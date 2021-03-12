@@ -18,7 +18,9 @@ package monitoring
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -35,13 +37,29 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 	f := framework.NewDefaultFramework("metrics-grabber")
 	var c, ec clientset.Interface
 	var grabber *e2emetrics.Grabber
+	var masterRegistered bool
 	ginkgo.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
+		// Check if master Node is registered
+		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
-		framework.ExpectNoError(err)
+		for _, node := range nodes.Items {
+			if strings.HasSuffix(node.Name, "master") {
+				masterRegistered = true
+			}
+		}
+		gomega.Eventually(func() error {
+			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
+			if err != nil {
+				return fmt.Errorf("failed to create metrics grabber: %v", err)
+			}
+			if masterRegistered && !grabber.HasControlPlanePods() {
+				return fmt.Errorf("unable to get find control plane pods")
+			}
+			return nil
+		}, 5*time.Minute, 10*time.Second).Should(gomega.BeNil())
 	})
 
 	ginkgo.It("should grab all metrics from API server.", func() {
@@ -62,16 +80,6 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from a Scheduler.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
-		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-
-		var masterRegistered = false
-		for _, node := range nodes.Items {
-			if strings.HasSuffix(node.Name, "master") {
-				masterRegistered = true
-			}
-		}
 		if !masterRegistered {
 			framework.Logf("Master is node api.Registry. Skipping testing Scheduler metrics.")
 			return
@@ -83,16 +91,6 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	ginkgo.It("should grab all metrics from a ControllerManager.", func() {
 		ginkgo.By("Proxying to Pod through the API server")
-		// Check if master Node is registered
-		nodes, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-
-		var masterRegistered = false
-		for _, node := range nodes.Items {
-			if strings.HasSuffix(node.Name, "master") {
-				masterRegistered = true
-			}
-		}
 		if !masterRegistered {
 			framework.Logf("Master is node api.Registry. Skipping testing ControllerManager metrics.")
 			return

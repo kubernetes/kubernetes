@@ -71,7 +71,7 @@ var (
 		## via your distribution's package manager.
 		## Load the kubectl completion code for bash into the current shell
 		    source <(kubectl completion bash)
-		## Write bash completion code to a file and source if from .bash_profile
+		## Write bash completion code to a file and source it from .bash_profile
 		    kubectl completion bash > ~/.kube/completion.bash.inc
 		    printf "
 		      # Kubectl shell completion
@@ -233,7 +233,7 @@ autoload -U +X bashcompinit && bashcompinit
 # use word boundary patterns for BSD or GNU sed
 LWORD='[[:<:]]'
 RWORD='[[:>:]]'
-if sed --help 2>&1 | grep -q 'GNU\|BusyBox'; then
+if sed --version 2>&1 | grep -q GNU; then
 	LWORD='\<'
 	RWORD='\>'
 fi

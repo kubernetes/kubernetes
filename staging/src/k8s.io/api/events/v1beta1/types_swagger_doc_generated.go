@@ -28,7 +28,8 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_Event = map[string]string{
-	"":                         "Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system.",
+	"":                         "Event is a report of an event somewhere in the cluster. It generally denotes some state change in the system. Events have a limited retention time and triggers and messages may evolve with time.  Event consumers should not rely on the timing of an event with a given Reason reflecting a consistent underlying trigger, or the continued existence of events with that Reason.  Events should be treated as informative, best-effort, supplemental data.",
+	"metadata":                 "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"eventTime":                "eventTime is the time when this Event was first observed. It is required.",
 	"series":                   "series is data about the Event series this event represents or nil if it's a singleton Event.",
 	"reportingController":      "reportingController is the name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`. This field cannot be empty for new Events.",

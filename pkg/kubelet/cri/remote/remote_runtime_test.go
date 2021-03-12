@@ -17,6 +17,7 @@ limitations under the License.
 package remote
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -25,6 +26,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	apitest "k8s.io/cri-api/pkg/apis/testing"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
+	"k8s.io/kubernetes/pkg/kubelet/cri/remote/util"
 )
 
 const (
@@ -53,7 +55,15 @@ func createRemoteRuntimeService(endpoint string, t *testing.T) internalapi.Runti
 
 func TestVersion(t *testing.T) {
 	fakeRuntime, endpoint := createAndStartFakeRemoteRuntime(t)
-	defer fakeRuntime.Stop()
+	defer func() {
+		fakeRuntime.Stop()
+		// clear endpoint file
+		if addr, _, err := util.GetAddressAndDialer(endpoint); err == nil {
+			if _, err := os.Stat(addr); err == nil {
+				os.Remove(addr)
+			}
+		}
+	}()
 
 	r := createRemoteRuntimeService(endpoint, t)
 	version, err := r.Version(apitest.FakeVersion)

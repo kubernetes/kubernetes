@@ -19,7 +19,7 @@ package volume
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -75,7 +75,7 @@ func (plugin *testPlugins) CanSupport(spec *Spec) bool {
 	return true
 }
 
-func (plugin *testPlugins) RequiresRemount() bool {
+func (plugin *testPlugins) RequiresRemount(spec *Spec) bool {
 	return false
 }
 

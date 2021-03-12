@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	certv1beta1 "k8s.io/api/certificates/v1beta1"
+	certv1 "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 
@@ -36,16 +36,12 @@ func TestCertificateSubjectRestrictionPlugin(t *testing.T) {
 		error      string
 	}{
 		"should reject a request if signerName is kube-apiserver-client and group is system:masters": {
-			signerName: certv1beta1.KubeAPIServerClientSignerName,
+			signerName: certv1.KubeAPIServerClientSignerName,
 			group:      "system:masters",
 			error:      `certificatesigningrequests.certificates.k8s.io "csr" is forbidden: use of kubernetes.io/kube-apiserver-client signer with system:masters group is not allowed`,
 		},
-		"should admit a request if signerName is NOT kube-apiserver-client and org is system:masters": {
-			signerName: certv1beta1.LegacyUnknownSignerName,
-			group:      "system:masters",
-		},
 		"should admit a request if signerName is kube-apiserver-client and group is NOT system:masters": {
-			signerName: certv1beta1.KubeAPIServerClientSignerName,
+			signerName: certv1.KubeAPIServerClientSignerName,
 			group:      "system:notmasters",
 		},
 	}
@@ -58,7 +54,7 @@ func TestCertificateSubjectRestrictionPlugin(t *testing.T) {
 
 			// Attempt to create the CSR resource.
 			csr := buildTestingCSR("csr", test.signerName, test.group)
-			_, err := client.CertificatesV1beta1().CertificateSigningRequests().Create(context.TODO(), csr, metav1.CreateOptions{})
+			_, err := client.CertificatesV1().CertificateSigningRequests().Create(context.TODO(), csr, metav1.CreateOptions{})
 			if err != nil && test.error != err.Error() {
 				t.Errorf("expected error %q but got: %v", test.error, err)
 			}

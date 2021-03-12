@@ -19,7 +19,7 @@ limitations under the License.
 package pidlimit
 
 import (
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 // Stats provides basic information about max and current process count

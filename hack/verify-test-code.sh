@@ -35,6 +35,10 @@ do
     then
         errors_expect_no_error+=( "${file}" )
     fi
+    if grep -E "Expect\(err\)\.To\(gomega\.BeNil\(\)\)" "${file}" > /dev/null
+    then
+        errors_expect_no_error+=( "${file}" )
+    fi
 done
 
 errors_expect_error=()

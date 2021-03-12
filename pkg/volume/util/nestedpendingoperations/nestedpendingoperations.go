@@ -240,7 +240,7 @@ func (grm *nestedPendingOperations) getOperation(key operationKey) (uint, error)
 		}
 	}
 
-	return 0, fmt.Errorf("Operation %+v not found", key)
+	return 0, fmt.Errorf("operation %+v not found", key)
 }
 
 func (grm *nestedPendingOperations) deleteOperation(key operationKey) {

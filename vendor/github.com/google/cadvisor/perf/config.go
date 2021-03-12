@@ -34,7 +34,7 @@ type PerfEvents struct {
 
 type Events struct {
 	// List of perf events' names to be measured.
-	Events [][]Event `json:"events"`
+	Events []Group `json:"events"`
 
 	// List of custom perf events' to be measured. It is impossible to
 	// specify some events using their names and in such case you have
@@ -88,4 +88,40 @@ func parseConfig(file *os.File) (events PerfEvents, err error) {
 		return
 	}
 	return
+}
+
+type Group struct {
+	events []Event
+	array  bool
+}
+
+func (g *Group) UnmarshalJSON(b []byte) error {
+	var jsonObj interface{}
+	err := json.Unmarshal(b, &jsonObj)
+	if err != nil {
+		return err
+	}
+	switch obj := jsonObj.(type) {
+	case string:
+		*g = Group{
+			events: []Event{Event(obj)},
+			array:  false,
+		}
+		return nil
+	case []interface{}:
+		group := Group{
+			events: make([]Event, 0, len(obj)),
+			array:  true,
+		}
+		for _, v := range obj {
+			value, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("cannot unmarshal %v", value)
+			}
+			group.events = append(group.events, Event(value))
+		}
+		*g = group
+		return nil
+	}
+	return fmt.Errorf("unsupported type")
 }

@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	fakeexternal "k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
+	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 )
 
 var (
@@ -429,7 +430,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container selected",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			podLogOptions:     &corev1.PodLogOptions{},
@@ -439,7 +440,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container selected but also container set explicitly",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			podLogOptions: &corev1.PodLogOptions{
@@ -451,7 +452,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with non-existing default container selected",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "non-existing"}
+				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "non-existing"}
 				return pod
 			},
 			podLogOptions: &corev1.PodLogOptions{},
@@ -461,7 +462,7 @@ func TestLogsForObjectWithClient(t *testing.T) {
 			name: "two container pod with default container set, but allContainers also set",
 			podFn: func() *corev1.Pod {
 				pod := testPodWithTwoContainers()
-				pod.Annotations = map[string]string{defaultLogsContainerAnnotationName: "foo-2-c1"}
+				pod.Annotations = map[string]string{podcmd.DefaultContainerAnnotationName: "foo-2-c1"}
 				return pod
 			},
 			allContainers:     true,

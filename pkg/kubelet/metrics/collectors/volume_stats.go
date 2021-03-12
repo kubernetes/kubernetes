@@ -19,7 +19,7 @@ package collectors
 import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics"
-	stats "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	stats "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	serverstats "k8s.io/kubernetes/pkg/kubelet/server/stats"
 )

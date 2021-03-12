@@ -17,9 +17,13 @@ limitations under the License.
 package options
 
 import (
+	"fmt"
+
 	"github.com/spf13/pflag"
 
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	netutils "k8s.io/utils/net"
 )
 
 // PersistentVolumeBinderControllerOptions holds the PersistentVolumeBinderController options.
@@ -43,6 +47,8 @@ func (o *PersistentVolumeBinderControllerOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&o.VolumeConfiguration.EnableHostPathProvisioning, "enable-hostpath-provisioner", o.VolumeConfiguration.EnableHostPathProvisioning, "Enable HostPath PV provisioning when running without a cloud provider. This allows testing and development of provisioning features.  HostPath provisioning is not supported in any way, won't work in a multi-node cluster, and should not be used for anything other than testing or development.")
 	fs.BoolVar(&o.VolumeConfiguration.EnableDynamicProvisioning, "enable-dynamic-provisioning", o.VolumeConfiguration.EnableDynamicProvisioning, "Enable dynamic provisioning for environments that support it.")
 	fs.StringVar(&o.VolumeConfiguration.FlexVolumePluginDir, "flex-volume-plugin-dir", o.VolumeConfiguration.FlexVolumePluginDir, "Full path of the directory in which the flex volume plugin should search for additional third party volume plugins.")
+	fs.StringSliceVar(&o.VolumeHostCIDRDenylist, "volume-host-cidr-denylist", o.VolumeHostCIDRDenylist, "A comma-separated list of CIDR ranges to avoid from volume plugins.")
+	fs.BoolVar(&o.VolumeHostAllowLocalLoopback, "volume-host-allow-local-loopback", o.VolumeHostAllowLocalLoopback, "If false, deny local loopback IPs in addition to any CIDR ranges in --volume-host-cidr-denylist")
 }
 
 // ApplyTo fills up PersistentVolumeBinderController config with options.
@@ -53,6 +59,8 @@ func (o *PersistentVolumeBinderControllerOptions) ApplyTo(cfg *persistentvolumec
 
 	cfg.PVClaimBinderSyncPeriod = o.PVClaimBinderSyncPeriod
 	cfg.VolumeConfiguration = o.VolumeConfiguration
+	cfg.VolumeHostCIDRDenylist = o.VolumeHostCIDRDenylist
+	cfg.VolumeHostAllowLocalLoopback = o.VolumeHostAllowLocalLoopback
 
 	return nil
 }
@@ -64,5 +72,17 @@ func (o *PersistentVolumeBinderControllerOptions) Validate() []error {
 	}
 
 	errs := []error{}
+	if _, err := ParseVolumeHostFilters(o.VolumeHostCIDRDenylist, o.VolumeHostAllowLocalLoopback); err != nil {
+		errs = append(errs, fmt.Errorf("Bad --volume-host-ip-denylist/--volume-host-allow-local-loopback %w", err))
+	}
 	return errs
+}
+
+// ParseVolumeHostFilters process the --volume-host-ip-denylist and --volume-host-allow-local-loopback flags.
+func ParseVolumeHostFilters(denylist []string, allowLocalLoopback bool) (*proxyutil.FilteredDialOptions, error) {
+	denyCIDRs, err := netutils.ParseCIDRs(denylist)
+	if err != nil {
+		return nil, err
+	}
+	return &proxyutil.FilteredDialOptions{DialHostCIDRDenylist: denyCIDRs, AllowLocalLoopback: allowLocalLoopback}, nil
 }

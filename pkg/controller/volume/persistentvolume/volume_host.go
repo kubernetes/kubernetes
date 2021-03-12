@@ -21,8 +21,8 @@ import (
 	"net"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
 	v1 "k8s.io/api/core/v1"
@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	cloudprovider "k8s.io/cloud-provider"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	vol "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
@@ -137,4 +138,8 @@ func (ctrl *PersistentVolumeController) GetEventRecorder() record.EventRecorder 
 func (ctrl *PersistentVolumeController) GetSubpather() subpath.Interface {
 	// No volume plugin needs Subpaths in PV controller.
 	return nil
+}
+
+func (ctrl *PersistentVolumeController) GetFilteredDialOptions() *proxyutil.FilteredDialOptions {
+	return ctrl.filteredDialOptions
 }

@@ -62,7 +62,7 @@ func TestGetVolumeName_PersistentVolume(t *testing.T) {
 
 // One testcase for TestAttachDetach table test below
 type testcase struct {
-	name aws.KubernetesVolumeID
+	name string
 	// For fake AWS:
 	attach attachCall
 	detach detachCall
@@ -128,15 +128,16 @@ func TestAttachDetach(t *testing.T) {
 	}
 
 	for _, testcase := range tests {
-		testcase.t = t
-		device, err := testcase.test(&testcase)
-		if err != testcase.expectedError {
-			t.Errorf("%s failed: expected err=%q, got %q", testcase.name, testcase.expectedError.Error(), err.Error())
-		}
-		if device != testcase.expectedDevice {
-			t.Errorf("%s failed: expected device=%q, got %q", testcase.name, testcase.expectedDevice, device)
-		}
-		t.Logf("Test %q succeeded", testcase.name)
+		t.Run(testcase.name, func(t *testing.T) {
+			testcase.t = t
+			device, err := testcase.test(&testcase)
+			if err != testcase.expectedError {
+				t.Errorf("failed: expected err=%q, got %q", testcase.expectedError.Error(), err.Error())
+			}
+			if device != testcase.expectedDevice {
+				t.Errorf("failed: expected device=%q, got %q", testcase.expectedDevice, device)
+			}
+		})
 	}
 }
 

@@ -44,10 +44,10 @@ type createClusterOptions struct {
 }
 
 var (
-	createClusterLong = templates.LongDesc(`
+	createClusterLong = templates.LongDesc(i18n.T(`
 		Sets a cluster entry in kubeconfig.
 
-		Specifying a name that already exists will merge new fields on top of existing values for those fields.`)
+		Specifying a name that already exists will merge new fields on top of existing values for those fields.`))
 
 	createClusterExample = templates.Examples(`
 		# Set only the server field on the e2e cluster entry without touching other values.

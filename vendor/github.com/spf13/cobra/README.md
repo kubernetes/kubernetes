@@ -2,35 +2,14 @@
 
 Cobra is both a library for creating powerful modern CLI applications as well as a program to generate applications and command files.
 
-Many of the most widely used Go projects are built using Cobra, such as:
-[Kubernetes](http://kubernetes.io/),
-[Hugo](http://gohugo.io),
-[rkt](https://github.com/coreos/rkt),
-[etcd](https://github.com/coreos/etcd),
-[Moby (former Docker)](https://github.com/moby/moby),
-[Docker (distribution)](https://github.com/docker/distribution),
-[OpenShift](https://www.openshift.com/),
-[Delve](https://github.com/derekparker/delve),
-[GopherJS](http://www.gopherjs.org/),
-[CockroachDB](http://www.cockroachlabs.com/),
-[Bleve](http://www.blevesearch.com/),
-[ProjectAtomic (enterprise)](http://www.projectatomic.io/),
-[Giant Swarm's gsctl](https://github.com/giantswarm/gsctl),
-[Nanobox](https://github.com/nanobox-io/nanobox)/[Nanopack](https://github.com/nanopack),
-[rclone](http://rclone.org/),
-[nehm](https://github.com/bogem/nehm),
-[Pouch](https://github.com/alibaba/pouch),
-[Istio](https://istio.io),
-[Prototool](https://github.com/uber/prototool),
-[mattermost-server](https://github.com/mattermost/mattermost-server),
-[Gardener](https://github.com/gardener/gardenctl),
-[Linkerd](https://linkerd.io/),
-[Github CLI](https://github.com/cli/cli)
-etc.
+Cobra is used in many Go projects such as [Kubernetes](http://kubernetes.io/),
+[Hugo](https://gohugo.io), and [Github CLI](https://github.com/cli/cli) to
+name a few. [This list](./projects_using_cobra.md) contains a more extensive list of projects using Cobra.
 
 [![Build Status](https://travis-ci.org/spf13/cobra.svg "Travis CI status")](https://travis-ci.org/spf13/cobra)
 [![GoDoc](https://godoc.org/github.com/spf13/cobra?status.svg)](https://godoc.org/github.com/spf13/cobra)
 [![Go Report Card](https://goreportcard.com/badge/github.com/spf13/cobra)](https://goreportcard.com/report/github.com/spf13/cobra)
+[![Slack](https://img.shields.io/badge/Slack-cobra-brightgreen)](https://gophers.slack.com/archives/CD3LP1199)
 
 # Table of Contents
 
@@ -50,9 +29,8 @@ etc.
   * [PreRun and PostRun Hooks](#prerun-and-postrun-hooks)
   * [Suggestions when "unknown command" happens](#suggestions-when-unknown-command-happens)
   * [Generating documentation for your command](#generating-documentation-for-your-command)
-  * [Generating bash completions](#generating-bash-completions)
-  * [Generating zsh completions](#generating-zsh-completions)
-- [Contributing](#contributing)
+  * [Generating shell completions](#generating-shell-completions)
+- [Contributing](CONTRIBUTING.md)
 - [License](#license)
 
 # Overview
@@ -72,7 +50,7 @@ Cobra provides:
 * Intelligent suggestions (`app srver`... did you mean `app server`?)
 * Automatic help generation for commands and flags
 * Automatic help flag recognition of `-h`, `--help`, etc.
-* Automatically generated bash autocomplete for your application
+* Automatically generated shell autocomplete for your application (bash, zsh, fish, powershell)
 * Automatically generated man pages for your application
 * Command aliases so you can change things without breaking them
 * The flexibility to define your own help, usage, etc.
@@ -130,7 +108,7 @@ Using Cobra is easy. First, use `go get` to install the latest version
 of the library. This command will install the `cobra` generator executable
 along with the library and its dependencies:
 
-    go get -u github.com/spf13/cobra/cobra
+    go get -u github.com/spf13/cobra
 
 Next, include Cobra in your application:
 
@@ -199,7 +177,7 @@ var rootCmd = &cobra.Command{
 
 func Execute() {
   if err := rootCmd.Execute(); err != nil {
-    fmt.Println(err)
+    fmt.Fprintln(os.Stderr, err)
     os.Exit(1)
   }
 }
@@ -335,6 +313,37 @@ var versionCmd = &cobra.Command{
 }
 ```
 
+### Returning and handling errors
+
+If you wish to return an error to the caller of a command, `RunE` can be used.
+
+```go
+package cmd
+
+import (
+  "fmt"
+
+  "github.com/spf13/cobra"
+)
+
+func init() {
+  rootCmd.AddCommand(tryCmd)
+}
+
+var tryCmd = &cobra.Command{
+  Use:   "try",
+  Short: "Try and possibly fail at something",
+  RunE: func(cmd *cobra.Command, args []string) error {
+    if err := someFunc(); err != nil {
+	return err
+    }
+    return nil
+  },
+}
+```
+
+The error can then be caught at the execute function call.
+
 ## Working with Flags
 
 Flags provide modifiers to control how the action command operates.
@@ -408,6 +417,12 @@ when a flag has not been set, mark it as required:
 ```go
 rootCmd.Flags().StringVarP(&Region, "region", "r", "", "AWS region (required)")
 rootCmd.MarkFlagRequired("region")
+```
+
+Or, for persistent flags:
+```go
+rootCmd.PersistentFlags().StringVarP(&Region, "region", "r", "", "AWS region (required)")
+rootCmd.MarkPersistentFlagRequired("region")
 ```
 
 ## Positional and Custom Arguments
@@ -740,30 +755,11 @@ Run 'kubectl help' for usage.
 
 ## Generating documentation for your command
 
-Cobra can generate documentation based on subcommands, flags, etc. in the following formats:
+Cobra can generate documentation based on subcommands, flags, etc. Read more about it in the [docs generation documentation](doc/README.md).
 
-- [Markdown](doc/md_docs.md)
-- [ReStructured Text](doc/rest_docs.md)
-- [Man Page](doc/man_docs.md)
+## Generating shell completions
 
-## Generating bash completions
-
-Cobra can generate a bash-completion file. If you add more information to your command, these completions can be amazingly powerful and flexible.  Read more about it in [Bash Completions](bash_completions.md).
-
-## Generating zsh completions
-
-Cobra can generate zsh-completion file. Read more about it in
-[Zsh Completions](zsh_completions.md).
-
-# Contributing
-
-1. Fork it
-2. Download your fork to your PC (`git clone https://github.com/your_username/cobra && cd cobra`)
-3. Create your feature branch (`git checkout -b my-new-feature`)
-4. Make changes and add them (`git add .`)
-5. Commit your changes (`git commit -m 'Add some feature'`)
-6. Push to the branch (`git push origin my-new-feature`)
-7. Create new pull request
+Cobra can generate a shell-completion file for the following shells: Bash, Zsh, Fish, Powershell. If you add more information to your commands, these completions can be amazingly powerful and flexible.  Read more about it in [Shell Completions](shell_completions.md).
 
 # License
 

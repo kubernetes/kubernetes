@@ -35,7 +35,7 @@ run_kubectl_apply_tests() {
   # Post-Condition: pod "test-pod" has configuration annotation
   grep -q kubectl.kubernetes.io/last-applied-configuration <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]:?}")"
   # pod has field manager for kubectl client-side apply
-  output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-client-side-apply'
   # Clean up
   kubectl delete pods test-pod "${kube_flags[@]:?}"
@@ -159,7 +159,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
@@ -173,11 +173,8 @@ __EOF__
   kube::test::get_object_assert 'pods a -n nsb' "{{${id_field:?}}}" 'a'
   # apply b with namespace
   kubectl apply --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
+  # check right pod exists and wrong pod doesn't exist
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete pods b -n nsb
@@ -191,8 +188,7 @@ __EOF__
   # check right pod exists
   kube::test::get_object_assert 'pods a' "{{${id_field:?}}}" 'a'
   # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods b -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "b" not found'
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   # apply b
   kubectl apply -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
@@ -254,11 +250,8 @@ __EOF__
   kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
   # apply --prune must prune a
   kubectl apply --prune --all -f hack/testdata/prune/b.yaml
-  # check wrong pod doesn't exist
-  output_message=$(! kubectl get pods a -n nsb 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'pods "a" not found'
-  # check right pod exists
-  kube::test::get_object_assert 'pods b -n nsb' "{{${id_field:?}}}" 'b'
+  # check wrong pod doesn't exist and right pod exists
+  kube::test::wait_object_assert 'pods -n nsb' "{{range.items}}{{${id_field:?}}}:{{end}}" 'b:'
 
   # cleanup
   kubectl delete ns nsb
@@ -276,7 +269,7 @@ __EOF__
   kube::test::get_object_assert 'services a' "{{${id_field:?}}}" 'a'
   # change immutable field and apply service a
   output_message=$(! kubectl apply -f hack/testdata/service-revision2.yaml 2>&1 "${kube_flags[@]:?}")
-  kube::test::if_has_string "${output_message}" 'field is immutable'
+  kube::test::if_has_string "${output_message}" 'may not change once set'
   # apply --force to recreate resources for immutable fields
   kubectl apply -f hack/testdata/service-revision2.yaml --force "${kube_flags[@]:?}"
   # check immutable field exists
@@ -317,8 +310,8 @@ __EOF__
   kubectl delete -f hack/testdata/multi-resource-1.yaml "${kube_flags[@]:?}"
 
   ## kubectl apply multiple resources with one failure during builder phase.
-  # Pre-Condition: No configmaps
-  kube::test::get_object_assert configmaps "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  # Pre-Condition: No configmaps with name=foo
+  kube::test::get_object_assert 'configmaps --field-selector=metadata.name=foo' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Apply a configmap and a bogus custom resource.
   output_message=$(! kubectl apply -f hack/testdata/multi-resource-2.yaml 2>&1 "${kube_flags[@]:?}")
   # Should be error message from bogus custom resource.
@@ -374,7 +367,7 @@ run_kubectl_server_side_apply_tests() {
   # Post-Condition: pod "test-pod" is created
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
   # pod has field manager for kubectl server-side apply
-  output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl'
   # pod has custom field manager
   kubectl apply --server-side --field-manager=my-field-manager --force-conflicts -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
@@ -471,7 +464,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-side --dry-run=server -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj 2>/dev/null || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com

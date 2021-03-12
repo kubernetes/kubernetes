@@ -15,12 +15,8 @@ func (s *NetPrioGroup) Name() string {
 	return "net_prio"
 }
 
-func (s *NetPrioGroup) Apply(d *cgroupData) error {
-	_, err := d.join("net_prio")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+func (s *NetPrioGroup) Apply(path string, d *cgroupData) error {
+	return join(path, d.pid)
 }
 
 func (s *NetPrioGroup) Set(path string, cgroup *configs.Cgroup) error {
@@ -31,10 +27,6 @@ func (s *NetPrioGroup) Set(path string, cgroup *configs.Cgroup) error {
 	}
 
 	return nil
-}
-
-func (s *NetPrioGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("net_prio"))
 }
 
 func (s *NetPrioGroup) GetStats(path string, stats *cgroups.Stats) error {

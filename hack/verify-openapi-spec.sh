@@ -39,7 +39,6 @@ mkdir -p "${_tmp}"
 cp -a "${SPECROOT}" "${TMP_SPECROOT}"
 trap 'cp -a ${TMP_SPECROOT} ${SPECROOT}/..; rm -rf ${_tmp}' EXIT SIGINT
 rm "${SPECROOT}"/*
-cp "${TMP_SPECROOT}/BUILD" "${SPECROOT}/BUILD"
 cp "${TMP_SPECROOT}/README.md" "${SPECROOT}/README.md"
 
 "${KUBE_ROOT}/hack/update-openapi-spec.sh"

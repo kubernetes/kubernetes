@@ -17,7 +17,6 @@ limitations under the License.
 package statefulset
 
 import (
-	"math"
 	"sort"
 
 	apps "k8s.io/api/apps/v1"
@@ -299,7 +298,6 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	// slice that will contain all Pods such that set.Spec.Replicas <= getOrdinal(pod)
 	condemned := make([]*v1.Pod, 0, len(pods))
 	unhealthy := 0
-	firstUnhealthyOrdinal := math.MaxInt32
 	var firstUnhealthyPod *v1.Pod
 
 	// First we partition pods into two lists valid replicas and condemned Pods
@@ -351,8 +349,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range replicas {
 		if !isHealthy(replicas[i]) {
 			unhealthy++
-			if ord := getOrdinal(replicas[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
+			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = replicas[i]
 			}
 		}
@@ -361,8 +358,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range condemned {
 		if !isHealthy(condemned[i]) {
 			unhealthy++
-			if ord := getOrdinal(condemned[i]); ord < firstUnhealthyOrdinal {
-				firstUnhealthyOrdinal = ord
+			if firstUnhealthyPod == nil {
 				firstUnhealthyPod = condemned[i]
 			}
 		}

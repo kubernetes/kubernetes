@@ -40,6 +40,10 @@ import (
 // to access api-server
 const RootCACertConfigMapName = "kube-root-ca.crt"
 
+func init() {
+	registerMetrics()
+}
+
 // NewPublisher construct a new controller which would manage the configmap
 // which stores certificates in each namespace. It will make sure certificate
 // configmap exists in each namespace.
@@ -170,16 +174,17 @@ func (c *Publisher) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Publisher) syncNamespace(ns string) error {
+func (c *Publisher) syncNamespace(ns string) (err error) {
 	startTime := time.Now()
 	defer func() {
+		recordMetrics(startTime, ns, err)
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 	}()
 
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
 	case apierrors.IsNotFound(err):
-		_, err := c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
+		_, err = c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: RootCACertConfigMapName,
 			},
@@ -187,6 +192,10 @@ func (c *Publisher) syncNamespace(ns string) error {
 				"ca.crt": string(c.rootCA),
 			},
 		}, metav1.CreateOptions{})
+		// don't retry a create if the namespace doesn't exist or is terminating
+		if apierrors.IsNotFound(err) || apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			return nil
+		}
 		return err
 	case err != nil:
 		return err
@@ -200,6 +209,8 @@ func (c *Publisher) syncNamespace(ns string) error {
 		return nil
 	}
 
+	// copy so we don't modify the cache's instance of the configmap
+	cm = cm.DeepCopy()
 	cm.Data = data
 
 	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})

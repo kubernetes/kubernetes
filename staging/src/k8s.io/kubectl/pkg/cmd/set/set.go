@@ -25,10 +25,10 @@ import (
 )
 
 var (
-	setLong = templates.LongDesc(`
+	setLong = templates.LongDesc(i18n.T(`
 		Configure application resources
 
-		These commands help you make changes to existing application resources.`)
+		These commands help you make changes to existing application resources.`))
 )
 
 // NewCmdSet returns an initialized Command instance for 'set' sub command

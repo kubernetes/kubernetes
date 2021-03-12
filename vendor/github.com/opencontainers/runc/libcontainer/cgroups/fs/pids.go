@@ -19,12 +19,8 @@ func (s *PidsGroup) Name() string {
 	return "pids"
 }
 
-func (s *PidsGroup) Apply(d *cgroupData) error {
-	_, err := d.join("pids")
-	if err != nil && !cgroups.IsNotFound(err) {
-		return err
-	}
-	return nil
+func (s *PidsGroup) Apply(path string, d *cgroupData) error {
+	return join(path, d.pid)
 }
 
 func (s *PidsGroup) Set(path string, cgroup *configs.Cgroup) error {
@@ -44,11 +40,10 @@ func (s *PidsGroup) Set(path string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func (s *PidsGroup) Remove(d *cgroupData) error {
-	return removePath(d.path("pids"))
-}
-
 func (s *PidsGroup) GetStats(path string, stats *cgroups.Stats) error {
+	if !cgroups.PathExists(path) {
+		return nil
+	}
 	current, err := fscommon.GetCgroupParamUint(path, "pids.current")
 	if err != nil {
 		return fmt.Errorf("failed to parse pids.current - %s", err)

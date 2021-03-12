@@ -53,10 +53,10 @@ type RestartOptions struct {
 }
 
 var (
-	restartLong = templates.LongDesc(`
+	restartLong = templates.LongDesc(i18n.T(`
 		Restart a resource.
 
-	        Resource will be rollout restarted.`)
+	        Resource will be rollout restarted.`))
 
 	restartExample = templates.Examples(`
 		# Restart a deployment

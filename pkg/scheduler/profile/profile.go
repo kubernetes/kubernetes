@@ -26,44 +26,30 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // RecorderFactory builds an EventRecorder for a given scheduler name.
 type RecorderFactory func(string) events.EventRecorder
 
-// FrameworkFactory builds a Framework for a given profile configuration.
-type FrameworkFactory func(config.KubeSchedulerProfile, ...frameworkruntime.Option) (framework.Framework, error)
-
-// Profile is a scheduling profile.
-type Profile struct {
-	framework.Framework
-	Recorder events.EventRecorder
-	Name     string
-}
-
-// NewProfile builds a Profile for the given configuration.
-func NewProfile(cfg config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
-	opts ...frameworkruntime.Option) (*Profile, error) {
+// newProfile builds a Profile for the given configuration.
+func newProfile(cfg config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
+	opts ...frameworkruntime.Option) (framework.Framework, error) {
 	recorder := recorderFact(cfg.SchedulerName)
-	opts = append(opts, frameworkruntime.WithEventRecorder(recorder), frameworkruntime.WithProfileName(cfg.SchedulerName))
-	fwk, err := frameworkFact(cfg, opts...)
+	opts = append(opts, frameworkruntime.WithEventRecorder(recorder))
+	fwk, err := frameworkruntime.NewFramework(r, &cfg, opts...)
 	if err != nil {
 		return nil, err
 	}
-	return &Profile{
-		Name:      cfg.SchedulerName,
-		Framework: fwk,
-		Recorder:  recorder,
-	}, nil
+	return fwk, nil
 }
 
-// Map holds profiles indexed by scheduler name.
-type Map map[string]*Profile
+// Map holds frameworks indexed by scheduler name.
+type Map map[string]framework.Framework
 
-// NewMap builds the profiles given by the configuration, indexed by name.
-func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, recorderFact RecorderFactory,
+// NewMap builds the frameworks given by the configuration, indexed by name.
+func NewMap(cfgs []config.KubeSchedulerProfile, r frameworkruntime.Registry, recorderFact RecorderFactory,
 	opts ...frameworkruntime.Option) (Map, error) {
 	m := make(Map)
 	v := cfgValidator{m: m}
@@ -72,7 +58,7 @@ func NewMap(cfgs []config.KubeSchedulerProfile, frameworkFact FrameworkFactory, 
 		if err := v.validate(cfg); err != nil {
 			return nil, err
 		}
-		p, err := NewProfile(cfg, frameworkFact, recorderFact, opts...)
+		p, err := newProfile(cfg, r, recorderFact, opts...)
 		if err != nil {
 			return nil, fmt.Errorf("creating profile for scheduler name %s: %v", cfg.SchedulerName, err)
 		}
@@ -110,7 +96,7 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 	if v.m[cfg.SchedulerName] != nil {
 		return fmt.Errorf("duplicate profile with scheduler name %q", cfg.SchedulerName)
 	}
-	if cfg.Plugins.QueueSort == nil || len(cfg.Plugins.QueueSort.Enabled) != 1 {
+	if len(cfg.Plugins.QueueSort.Enabled) != 1 {
 		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
 	}
 	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name

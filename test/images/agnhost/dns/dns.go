@@ -28,7 +28,9 @@ const etcHostsFile = "/etc/hosts"
 // nameserver DNS_CLUSTER_IP
 // search test-dns.svc.cluster.local svc.cluster.local cluster.local q53aahaikqaehcai3ylfqdtc5b.bx.internal.cloudapp.net
 // options ndots:5
-func getDNSSuffixList() []string {
+
+// GetDNSSuffixList reads DNS config file and returns the list of configured DNS suffixes
+func GetDNSSuffixList() []string {
 	fileData := readFile("/etc/resolv.conf")
 	lines := strings.Split(fileData, "\n")
 	for _, line := range lines {

@@ -10,8 +10,9 @@ import (
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
-	libseccomp "github.com/seccomp/libseccomp-golang"
+	"github.com/opencontainers/runc/libcontainer/seccomp/patchbpf"
 
+	libseccomp "github.com/seccomp/libseccomp-golang"
 	"golang.org/x/sys/unix"
 )
 
@@ -54,7 +55,6 @@ func InitSeccomp(config *configs.Seccomp) error {
 		if err != nil {
 			return fmt.Errorf("error validating Seccomp architecture: %s", err)
 		}
-
 		if err := filter.AddArch(scmpArch); err != nil {
 			return fmt.Errorf("error adding architecture to seccomp filter: %s", err)
 		}
@@ -70,16 +70,13 @@ func InitSeccomp(config *configs.Seccomp) error {
 		if call == nil {
 			return errors.New("encountered nil syscall while initializing Seccomp")
 		}
-
-		if err = matchCall(filter, call); err != nil {
+		if err := matchCall(filter, call); err != nil {
 			return err
 		}
 	}
-
-	if err = filter.Load(); err != nil {
+	if err := patchbpf.PatchAndLoad(config, filter); err != nil {
 		return fmt.Errorf("error loading seccomp filter into kernel: %s", err)
 	}
-
 	return nil
 }
 
@@ -190,7 +187,7 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 
 	// Unconditional match - just add the rule
 	if len(call.Args) == 0 {
-		if err = filter.AddRule(callNum, callAct); err != nil {
+		if err := filter.AddRule(callNum, callAct); err != nil {
 			return fmt.Errorf("error adding seccomp filter rule for syscall %s: %s", call.Name, err)
 		}
 	} else {
@@ -224,14 +221,14 @@ func matchCall(filter *libseccomp.ScmpFilter, call *configs.Syscall) error {
 			for _, cond := range conditions {
 				condArr := []libseccomp.ScmpCondition{cond}
 
-				if err = filter.AddRuleConditional(callNum, callAct, condArr); err != nil {
+				if err := filter.AddRuleConditional(callNum, callAct, condArr); err != nil {
 					return fmt.Errorf("error adding seccomp rule for syscall %s: %s", call.Name, err)
 				}
 			}
 		} else {
 			// No conditions share same argument
 			// Use new, proper behavior
-			if err = filter.AddRuleConditional(callNum, callAct, conditions); err != nil {
+			if err := filter.AddRuleConditional(callNum, callAct, conditions); err != nil {
 				return fmt.Errorf("error adding seccomp rule for syscall %s: %s", call.Name, err)
 			}
 		}
@@ -265,4 +262,9 @@ func parseStatusFile(path string) (map[string]string, error) {
 	}
 
 	return status, nil
+}
+
+// Version returns major, minor, and micro.
+func Version() (uint, uint, uint) {
+	return libseccomp.GetLibraryVersion()
 }

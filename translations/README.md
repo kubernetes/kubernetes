@@ -76,6 +76,3 @@ return i18n.Error("Something bad happened")
 // Translated plural error
 return i18n.Error("%d bad things happened")
 ```
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/translations/README.md?pixel)]()

@@ -42,9 +42,9 @@ import (
 )
 
 var (
-	exposeResources = `pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`
+	exposeResources = i18n.T(`pod (po), service (svc), replicationcontroller (rc), deployment (deploy), replicaset (rs)`)
 
-	exposeLong = templates.LongDesc(`
+	exposeLong = templates.LongDesc(i18n.T(`
 		Expose a resource as a new Kubernetes service.
 
 		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
@@ -56,7 +56,7 @@ var (
 
 		Possible resources include (case insensitive):
 
-		` + exposeResources)
+		`) + exposeResources)
 
 	exposeExample = templates.Examples(i18n.T(`
 		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
@@ -178,11 +178,7 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
@@ -335,6 +331,9 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
+			if meta, err := meta.Accessor(object); err == nil && o.EnforceNamespace {
+				meta.SetNamespace(o.Namespace)
+			}
 			return o.PrintObj(object, o.Out)
 		}
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {

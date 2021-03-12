@@ -78,4 +78,7 @@ type VMSet interface {
 
 	// GetPrivateIPsByNodeName returns a slice of all private ips assigned to node (ipv6 and ipv4)
 	GetPrivateIPsByNodeName(name string) ([]string, error)
+
+	// GetNodeNameByIPConfigurationID gets the nodeName and vmSetName by IP configuration ID.
+	GetNodeNameByIPConfigurationID(ipConfigurationID string) (string, string, error)
 }

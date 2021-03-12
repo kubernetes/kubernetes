@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec/testing"
-	"k8s.io/utils/mount"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,7 +120,7 @@ func (fake *fakeDiskManager) AttachDisk(b iscsiDiskMounter) (string, error) {
 	}
 	// Simulate the global mount so that the fakeMounter returns the
 	// expected number of mounts for the attached disk.
-	b.mounter.Mount(globalPath, globalPath, b.fsType, nil)
+	b.mounter.MountSensitiveWithoutSystemd(globalPath, globalPath, b.fsType, nil, nil)
 
 	return "/dev/sdb", nil
 }

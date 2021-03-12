@@ -75,7 +75,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 
 	})
 
-	utils.SIGDescribe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
+	ginkgo.Describe("Selector-Label Volume Binding:vsphere [Feature:vsphere]", func() {
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Running clean up actions")
 			if framework.ProviderIs("vsphere") {
@@ -87,7 +87,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:LabelSele
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the pvcSsd to bind with pvSsd")
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pvSsd, pvcSsd))
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pvSsd, pvcSsd))
 
 			ginkgo.By("Verify status of pvcVvol is pending")
 			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimPending, c, ns, pvcVvol.Name, 3*time.Second, 300*time.Second)

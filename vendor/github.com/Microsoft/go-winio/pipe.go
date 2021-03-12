@@ -182,13 +182,14 @@ func (s pipeAddress) String() string {
 }
 
 // tryDialPipe attempts to dial the pipe at `path` until `ctx` cancellation or timeout.
-func tryDialPipe(ctx context.Context, path *string) (syscall.Handle, error) {
+func tryDialPipe(ctx context.Context, path *string, access uint32) (syscall.Handle, error) {
 	for {
+
 		select {
 		case <-ctx.Done():
 			return syscall.Handle(0), ctx.Err()
 		default:
-			h, err := createFile(*path, syscall.GENERIC_READ|syscall.GENERIC_WRITE, 0, nil, syscall.OPEN_EXISTING, syscall.FILE_FLAG_OVERLAPPED|cSECURITY_SQOS_PRESENT|cSECURITY_ANONYMOUS, 0)
+			h, err := createFile(*path, access, 0, nil, syscall.OPEN_EXISTING, syscall.FILE_FLAG_OVERLAPPED|cSECURITY_SQOS_PRESENT|cSECURITY_ANONYMOUS, 0)
 			if err == nil {
 				return h, nil
 			}
@@ -197,7 +198,7 @@ func tryDialPipe(ctx context.Context, path *string) (syscall.Handle, error) {
 			}
 			// Wait 10 msec and try again. This is a rather simplistic
 			// view, as we always try each 10 milliseconds.
-			time.Sleep(time.Millisecond * 10)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -210,7 +211,7 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 	if timeout != nil {
 		absTimeout = time.Now().Add(*timeout)
 	} else {
-		absTimeout = time.Now().Add(time.Second * 2)
+		absTimeout = time.Now().Add(2 * time.Second)
 	}
 	ctx, _ := context.WithDeadline(context.Background(), absTimeout)
 	conn, err := DialPipeContext(ctx, path)
@@ -223,9 +224,15 @@ func DialPipe(path string, timeout *time.Duration) (net.Conn, error) {
 // DialPipeContext attempts to connect to a named pipe by `path` until `ctx`
 // cancellation or timeout.
 func DialPipeContext(ctx context.Context, path string) (net.Conn, error) {
+	return DialPipeAccess(ctx, path, syscall.GENERIC_READ|syscall.GENERIC_WRITE)
+}
+
+// DialPipeAccess attempts to connect to a named pipe by `path` with `access` until `ctx`
+// cancellation or timeout.
+func DialPipeAccess(ctx context.Context, path string, access uint32) (net.Conn, error) {
 	var err error
 	var h syscall.Handle
-	h, err = tryDialPipe(ctx, &path)
+	h, err = tryDialPipe(ctx, &path, access)
 	if err != nil {
 		return nil, err
 	}

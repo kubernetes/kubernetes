@@ -377,13 +377,13 @@ func getNodeMemInfo(sysFs sysfs.SysFs, nodeDir string) (uint64, error) {
 	return uint64(memory), nil
 }
 
-// getCoresInfo retruns infromation about physical cores
+// getCoresInfo returns information about physical cores
 func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 	cores := make([]info.Core, 0, len(cpuDirs))
 	for _, cpuDir := range cpuDirs {
 		cpuID, err := getMatchedInt(cpuDirRegExp, cpuDir)
 		if err != nil {
-			return nil, fmt.Errorf("Unexpected format of CPU directory, cpuDirRegExp %s, cpuDir: %s", cpuDirRegExp, cpuDir)
+			return nil, fmt.Errorf("unexpected format of CPU directory, cpuDirRegExp %s, cpuDir: %s", cpuDirRegExp, cpuDir)
 		}
 		if !sysFs.IsCPUOnline(cpuDir) {
 			continue
@@ -401,25 +401,6 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 			return nil, err
 		}
 
-		coreIDx := -1
-		for id, core := range cores {
-			if core.Id == physicalID {
-				coreIDx = id
-			}
-		}
-		if coreIDx == -1 {
-			cores = append(cores, info.Core{})
-			coreIDx = len(cores) - 1
-		}
-		desiredCore := &cores[coreIDx]
-
-		desiredCore.Id = physicalID
-		if len(desiredCore.Threads) == 0 {
-			desiredCore.Threads = []int{cpuID}
-		} else {
-			desiredCore.Threads = append(desiredCore.Threads, cpuID)
-		}
-
 		rawPhysicalPackageID, err := sysFs.GetCPUPhysicalPackageID(cpuDir)
 		if os.IsNotExist(err) {
 			klog.Warningf("Cannot read physical package id for %s, physical_package_id file does not exist, err: %s", cpuDir, err)
@@ -432,7 +413,28 @@ func getCoresInfo(sysFs sysfs.SysFs, cpuDirs []string) ([]info.Core, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		coreIDx := -1
+		for id, core := range cores {
+			if core.Id == physicalID && core.SocketID == physicalPackageID {
+				coreIDx = id
+			}
+		}
+		if coreIDx == -1 {
+			cores = append(cores, info.Core{})
+			coreIDx = len(cores) - 1
+		}
+		desiredCore := &cores[coreIDx]
+
+		desiredCore.Id = physicalID
 		desiredCore.SocketID = physicalPackageID
+
+		if len(desiredCore.Threads) == 0 {
+			desiredCore.Threads = []int{cpuID}
+		} else {
+			desiredCore.Threads = append(desiredCore.Threads, cpuID)
+		}
+
 	}
 	return cores, nil
 }
@@ -522,4 +524,15 @@ func GetSocketFromCPU(topology []info.Node, cpu int) int {
 		}
 	}
 	return -1
+}
+
+// GetOnlineCPUs returns available cores.
+func GetOnlineCPUs(topology []info.Node) []int {
+	onlineCPUs := make([]int, 0)
+	for _, node := range topology {
+		for _, core := range node.Cores {
+			onlineCPUs = append(onlineCPUs, core.Threads...)
+		}
+	}
+	return onlineCPUs
 }

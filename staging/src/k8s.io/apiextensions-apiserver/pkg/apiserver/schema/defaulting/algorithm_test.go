@@ -135,7 +135,83 @@ func TestDefault(t *testing.T) {
 					},
 				},
 			},
-		}, `[{"a":"A"},{"a":1},{"a":0},{"a":0.0},{"a":""},{"a":null},{"a":[]},{"a":{}}]`},
+		}, `[{"a":"A"},{"a":1},{"a":0},{"a":0.0},{"a":""},{"a":"A"},{"a":[]},{"a":{}}]`},
+		{"null in nullable list", `[null]`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				Nullable: true,
+			},
+			Items: &structuralschema.Structural{
+				Properties: map[string]structuralschema.Structural{
+					"a": {
+						Generic: structuralschema.Generic{
+							Default: structuralschema.JSON{"A"},
+						},
+					},
+				},
+			},
+		}, `[null]`},
+		{"null in non-nullable list", `[null]`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				Nullable: false,
+			},
+			Items: &structuralschema.Structural{
+				Generic: structuralschema.Generic{
+					Default: structuralschema.JSON{"A"},
+				},
+			},
+		}, `["A"]`},
+		{"null in nullable object", `{"a": null}`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{},
+			Properties: map[string]structuralschema.Structural{
+				"a": {
+					Generic: structuralschema.Generic{
+						Nullable: true,
+						Default:  structuralschema.JSON{"A"},
+					},
+				},
+			},
+		}, `{"a": null}`},
+		{"null in non-nullable object", `{"a": null}`, &structuralschema.Structural{
+			Properties: map[string]structuralschema.Structural{
+				"a": {
+					Generic: structuralschema.Generic{
+						Nullable: false,
+						Default:  structuralschema.JSON{"A"},
+					},
+				},
+			},
+		}, `{"a": "A"}`},
+		{"null in nullable object with additionalProperties", `{"a": null}`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				AdditionalProperties: &structuralschema.StructuralOrBool{
+					Structural: &structuralschema.Structural{
+						Generic: structuralschema.Generic{
+							Nullable: true,
+							Default:  structuralschema.JSON{"A"},
+						},
+					},
+				},
+			},
+		}, `{"a": null}`},
+		{"null in non-nullable object with additionalProperties", `{"a": null}`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				AdditionalProperties: &structuralschema.StructuralOrBool{
+					Structural: &structuralschema.Structural{
+						Generic: structuralschema.Generic{
+							Nullable: false,
+							Default:  structuralschema.JSON{"A"},
+						},
+					},
+				},
+			},
+		}, `{"a": "A"}`},
+		{"null unknown field", `{"a": null}`, &structuralschema.Structural{
+			Generic: structuralschema.Generic{
+				AdditionalProperties: &structuralschema.StructuralOrBool{
+					Bool: true,
+				},
+			},
+		}, `{"a": null}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

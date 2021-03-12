@@ -24,11 +24,11 @@ import (
 	unsafe "unsafe"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1alpha1 "k8s.io/component-base/config/v1alpha1"
-	v1 "k8s.io/kube-scheduler/config/v1"
+	configv1 "k8s.io/kube-scheduler/config/v1"
 	v1beta1 "k8s.io/kube-scheduler/config/v1beta1"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -40,6 +40,16 @@ func init() {
 // RegisterConversions adds conversion functions to the given scheme.
 // Public to allow building arbitrary schemes.
 func RegisterConversions(s *runtime.Scheme) error {
+	if err := s.AddGeneratedConversionFunc((*v1beta1.DefaultPreemptionArgs)(nil), (*config.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(a.(*v1beta1.DefaultPreemptionArgs), b.(*config.DefaultPreemptionArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.DefaultPreemptionArgs)(nil), (*v1beta1.DefaultPreemptionArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs(a.(*config.DefaultPreemptionArgs), b.(*v1beta1.DefaultPreemptionArgs), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1beta1.Extender)(nil), (*config.Extender)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_Extender_To_config_Extender(a.(*v1beta1.Extender), b.(*config.Extender), scope)
 	}); err != nil {
@@ -67,6 +77,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*config.KubeSchedulerProfile)(nil), (*v1beta1.KubeSchedulerProfile)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(a.(*config.KubeSchedulerProfile), b.(*v1beta1.KubeSchedulerProfile), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1beta1.NodeAffinityArgs)(nil), (*config.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs(a.(*v1beta1.NodeAffinityArgs), b.(*config.NodeAffinityArgs), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*config.NodeAffinityArgs)(nil), (*v1beta1.NodeAffinityArgs)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs(a.(*config.NodeAffinityArgs), b.(*v1beta1.NodeAffinityArgs), scope)
 	}); err != nil {
 		return err
 	}
@@ -130,23 +150,8 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_PluginSet_To_config_PluginSet(a.(*v1beta1.PluginSet), b.(*config.PluginSet), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*config.PluginSet)(nil), (*v1beta1.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_config_PluginSet_To_v1beta1_PluginSet(a.(*config.PluginSet), b.(*v1beta1.PluginSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1beta1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta1_Plugins_To_config_Plugins(a.(*v1beta1.Plugins), b.(*config.Plugins), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*config.Plugins)(nil), (*v1beta1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_config_Plugins_To_v1beta1_Plugins(a.(*config.Plugins), b.(*v1beta1.Plugins), scope)
 	}); err != nil {
 		return err
 	}
@@ -215,12 +220,57 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.Plugins)(nil), (*v1beta1.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_Plugins_To_v1beta1_Plugins(a.(*config.Plugins), b.(*v1beta1.Plugins), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1beta1.KubeSchedulerConfiguration)(nil), (*config.KubeSchedulerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(a.(*v1beta1.KubeSchedulerConfiguration), b.(*config.KubeSchedulerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*v1beta1.PluginSet)(nil), (*config.PluginSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_PluginSet_To_config_PluginSet(a.(*v1beta1.PluginSet), b.(*config.PluginSet), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1beta1.Plugins)(nil), (*config.Plugins)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta1_Plugins_To_config_Plugins(a.(*v1beta1.Plugins), b.(*config.Plugins), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
+}
+
+func autoConvert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1beta1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_int32_To_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs is an autogenerated conversion function.
+func Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v1beta1.DefaultPreemptionArgs, out *config.DefaultPreemptionArgs, s conversion.Scope) error {
+	return autoConvert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in, out, s)
+}
+
+func autoConvert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1beta1.DefaultPreemptionArgs, s conversion.Scope) error {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesAbsolute, &out.MinCandidateNodesAbsolute, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Convert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs is an autogenerated conversion function.
+func Convert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1beta1.DefaultPreemptionArgs, s conversion.Scope) error {
+	return autoConvert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_Extender_To_config_Extender(in *v1beta1.Extender, out *config.Extender, s conversion.Scope) error {
@@ -252,10 +302,10 @@ func autoConvert_config_Extender_To_v1beta1_Extender(in *config.Extender, out *v
 	out.Weight = in.Weight
 	out.BindVerb = in.BindVerb
 	out.EnableHTTPS = in.EnableHTTPS
-	out.TLSConfig = (*v1.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
+	out.TLSConfig = (*configv1.ExtenderTLSConfig)(unsafe.Pointer(in.TLSConfig))
 	out.HTTPTimeout = in.HTTPTimeout
 	out.NodeCacheCapable = in.NodeCacheCapable
-	out.ManagedResources = *(*[]v1.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
+	out.ManagedResources = *(*[]configv1.ExtenderManagedResource)(unsafe.Pointer(&in.ManagedResources))
 	out.Ignorable = in.Ignorable
 	return nil
 }
@@ -266,7 +316,7 @@ func Convert_config_Extender_To_v1beta1_Extender(in *config.Extender, out *v1bet
 }
 
 func autoConvert_v1beta1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1beta1.InterPodAffinityArgs, out *config.InterPodAffinityArgs, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
 	return nil
@@ -278,7 +328,7 @@ func Convert_v1beta1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1b
 }
 
 func autoConvert_config_InterPodAffinityArgs_To_v1beta1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1beta1.InterPodAffinityArgs, s conversion.Scope) error {
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
 	return nil
@@ -290,28 +340,31 @@ func Convert_config_InterPodAffinityArgs_To_v1beta1_InterPodAffinityArgs(in *con
 }
 
 func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfiguration(in *v1beta1.KubeSchedulerConfiguration, out *config.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+		return err
+	}
 	if err := v1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
 	if err := v1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_string_To_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
+	if err := v1.Convert_Pointer_string_To_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_string_To_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
+	if err := v1.Convert_Pointer_string_To_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
 	if err := v1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
+	if err := v1.Convert_Pointer_int64_To_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
+	if err := v1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
 	if in.Profiles != nil {
@@ -330,6 +383,9 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 }
 
 func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
+		return err
+	}
 	// WARNING: in.AlgorithmSource requires manual conversion: does not exist in peer-type
 	if err := v1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
@@ -337,22 +393,22 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfi
 	if err := v1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_string_To_Pointer_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
+	if err := v1.Convert_string_To_Pointer_string(&in.HealthzBindAddress, &out.HealthzBindAddress, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_string_To_Pointer_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
+	if err := v1.Convert_string_To_Pointer_string(&in.MetricsBindAddress, &out.MetricsBindAddress, s); err != nil {
 		return err
 	}
 	if err := v1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.PercentageOfNodesToScore, &out.PercentageOfNodesToScore, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
+	if err := v1.Convert_int64_To_Pointer_int64(&in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds, s); err != nil {
 		return err
 	}
-	if err := metav1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
+	if err := v1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
 	if in.Profiles != nil {
@@ -371,7 +427,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfi
 }
 
 func autoConvert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1beta1.KubeSchedulerProfile, out *config.KubeSchedulerProfile, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+	if err := v1.Convert_Pointer_string_To_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
 	if in.Plugins != nil {
@@ -403,7 +459,7 @@ func Convert_v1beta1_KubeSchedulerProfile_To_config_KubeSchedulerProfile(in *v1b
 }
 
 func autoConvert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta1.KubeSchedulerProfile, s conversion.Scope) error {
-	if err := metav1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
+	if err := v1.Convert_string_To_Pointer_string(&in.SchedulerName, &out.SchedulerName, s); err != nil {
 		return err
 	}
 	if in.Plugins != nil {
@@ -432,6 +488,26 @@ func autoConvert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in 
 // Convert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile is an autogenerated conversion function.
 func Convert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in *config.KubeSchedulerProfile, out *v1beta1.KubeSchedulerProfile, s conversion.Scope) error {
 	return autoConvert_config_KubeSchedulerProfile_To_v1beta1_KubeSchedulerProfile(in, out, s)
+}
+
+func autoConvert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1beta1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
+	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
+	return nil
+}
+
+// Convert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs is an autogenerated conversion function.
+func Convert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1beta1.NodeAffinityArgs, out *config.NodeAffinityArgs, s conversion.Scope) error {
+	return autoConvert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs(in, out, s)
+}
+
+func autoConvert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1beta1.NodeAffinityArgs, s conversion.Scope) error {
+	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
+	return nil
+}
+
+// Convert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs is an autogenerated conversion function.
+func Convert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1beta1.NodeAffinityArgs, s conversion.Scope) error {
+	return autoConvert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs(in, out, s)
 }
 
 func autoConvert_v1beta1_NodeLabelArgs_To_config_NodeLabelArgs(in *v1beta1.NodeLabelArgs, out *config.NodeLabelArgs, s conversion.Scope) error {
@@ -524,7 +600,7 @@ func Convert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostA
 
 func autoConvert_v1beta1_Plugin_To_config_Plugin(in *v1beta1.Plugin, out *config.Plugin, s conversion.Scope) error {
 	out.Name = in.Name
-	if err := metav1.Convert_Pointer_int32_To_int32(&in.Weight, &out.Weight, s); err != nil {
+	if err := v1.Convert_Pointer_int32_To_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
 	}
 	return nil
@@ -537,7 +613,7 @@ func Convert_v1beta1_Plugin_To_config_Plugin(in *v1beta1.Plugin, out *config.Plu
 
 func autoConvert_config_Plugin_To_v1beta1_Plugin(in *config.Plugin, out *v1beta1.Plugin, s conversion.Scope) error {
 	out.Name = in.Name
-	if err := metav1.Convert_int32_To_Pointer_int32(&in.Weight, &out.Weight, s); err != nil {
+	if err := v1.Convert_int32_To_Pointer_int32(&in.Weight, &out.Weight, s); err != nil {
 		return err
 	}
 	return nil
@@ -600,11 +676,6 @@ func autoConvert_v1beta1_PluginSet_To_config_PluginSet(in *v1beta1.PluginSet, ou
 	return nil
 }
 
-// Convert_v1beta1_PluginSet_To_config_PluginSet is an autogenerated conversion function.
-func Convert_v1beta1_PluginSet_To_config_PluginSet(in *v1beta1.PluginSet, out *config.PluginSet, s conversion.Scope) error {
-	return autoConvert_v1beta1_PluginSet_To_config_PluginSet(in, out, s)
-}
-
 func autoConvert_config_PluginSet_To_v1beta1_PluginSet(in *config.PluginSet, out *v1beta1.PluginSet, s conversion.Scope) error {
 	if in.Enabled != nil {
 		in, out := &in.Enabled, &out.Enabled
@@ -637,223 +708,38 @@ func Convert_config_PluginSet_To_v1beta1_PluginSet(in *config.PluginSet, out *v1
 }
 
 func autoConvert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *config.Plugins, s conversion.Scope) error {
-	if in.QueueSort != nil {
-		in, out := &in.QueueSort, &out.QueueSort
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.QueueSort = nil
-	}
-	if in.PreFilter != nil {
-		in, out := &in.PreFilter, &out.PreFilter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreFilter = nil
-	}
-	if in.Filter != nil {
-		in, out := &in.Filter, &out.Filter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Filter = nil
-	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
-	}
-	if in.PreScore != nil {
-		in, out := &in.PreScore, &out.PreScore
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreScore = nil
-	}
-	if in.Score != nil {
-		in, out := &in.Score, &out.Score
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Score = nil
-	}
-	if in.Reserve != nil {
-		in, out := &in.Reserve, &out.Reserve
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Reserve = nil
-	}
-	if in.Permit != nil {
-		in, out := &in.Permit, &out.Permit
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Permit = nil
-	}
-	if in.PreBind != nil {
-		in, out := &in.PreBind, &out.PreBind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreBind = nil
-	}
-	if in.Bind != nil {
-		in, out := &in.Bind, &out.Bind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Bind = nil
-	}
-	if in.PostBind != nil {
-		in, out := &in.PostBind, &out.PostBind
-		*out = new(config.PluginSet)
-		if err := Convert_v1beta1_PluginSet_To_config_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostBind = nil
-	}
+	// WARNING: in.QueueSort requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.PreFilter requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.Filter requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.PostFilter requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.PreScore requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.Score requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.Reserve requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.Permit requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.PreBind requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.Bind requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
+	// WARNING: in.PostBind requires manual conversion: inconvertible types (*k8s.io/kube-scheduler/config/v1beta1.PluginSet vs k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet)
 	return nil
-}
-
-// Convert_v1beta1_Plugins_To_config_Plugins is an autogenerated conversion function.
-func Convert_v1beta1_Plugins_To_config_Plugins(in *v1beta1.Plugins, out *config.Plugins, s conversion.Scope) error {
-	return autoConvert_v1beta1_Plugins_To_config_Plugins(in, out, s)
 }
 
 func autoConvert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1beta1.Plugins, s conversion.Scope) error {
-	if in.QueueSort != nil {
-		in, out := &in.QueueSort, &out.QueueSort
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.QueueSort = nil
-	}
-	if in.PreFilter != nil {
-		in, out := &in.PreFilter, &out.PreFilter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreFilter = nil
-	}
-	if in.Filter != nil {
-		in, out := &in.Filter, &out.Filter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Filter = nil
-	}
-	if in.PostFilter != nil {
-		in, out := &in.PostFilter, &out.PostFilter
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostFilter = nil
-	}
-	if in.PreScore != nil {
-		in, out := &in.PreScore, &out.PreScore
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreScore = nil
-	}
-	if in.Score != nil {
-		in, out := &in.Score, &out.Score
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Score = nil
-	}
-	if in.Reserve != nil {
-		in, out := &in.Reserve, &out.Reserve
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Reserve = nil
-	}
-	if in.Permit != nil {
-		in, out := &in.Permit, &out.Permit
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Permit = nil
-	}
-	if in.PreBind != nil {
-		in, out := &in.PreBind, &out.PreBind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PreBind = nil
-	}
-	if in.Bind != nil {
-		in, out := &in.Bind, &out.Bind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.Bind = nil
-	}
-	if in.PostBind != nil {
-		in, out := &in.PostBind, &out.PostBind
-		*out = new(v1beta1.PluginSet)
-		if err := Convert_config_PluginSet_To_v1beta1_PluginSet(*in, *out, s); err != nil {
-			return err
-		}
-	} else {
-		out.PostBind = nil
-	}
+	// WARNING: in.QueueSort requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.PreFilter requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.Filter requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.PostFilter requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.PreScore requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.Score requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.Reserve requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.Permit requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.PreBind requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.Bind requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
+	// WARNING: in.PostBind requires manual conversion: inconvertible types (k8s.io/kubernetes/pkg/scheduler/apis/config.PluginSet vs *k8s.io/kube-scheduler/config/v1beta1.PluginSet)
 	return nil
-}
-
-// Convert_config_Plugins_To_v1beta1_Plugins is an autogenerated conversion function.
-func Convert_config_Plugins_To_v1beta1_Plugins(in *config.Plugins, out *v1beta1.Plugins, s conversion.Scope) error {
-	return autoConvert_config_Plugins_To_v1beta1_Plugins(in, out, s)
 }
 
 func autoConvert_v1beta1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v1beta1.PodTopologySpreadArgs, out *config.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = config.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
@@ -864,6 +750,7 @@ func Convert_v1beta1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v
 
 func autoConvert_config_PodTopologySpreadArgs_To_v1beta1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1beta1.PodTopologySpreadArgs, s conversion.Scope) error {
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
+	out.DefaultingType = v1beta1.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
 }
 
@@ -961,7 +848,7 @@ func Convert_config_UtilizationShapePoint_To_v1beta1_UtilizationShapePoint(in *c
 }
 
 func autoConvert_v1beta1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1beta1.VolumeBindingArgs, out *config.VolumeBindingArgs, s conversion.Scope) error {
-	if err := metav1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
+	if err := v1.Convert_Pointer_int64_To_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
 	return nil
@@ -973,7 +860,7 @@ func Convert_v1beta1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1beta1.V
 }
 
 func autoConvert_config_VolumeBindingArgs_To_v1beta1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1beta1.VolumeBindingArgs, s conversion.Scope) error {
-	if err := metav1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
+	if err := v1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}
 	return nil

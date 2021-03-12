@@ -36,10 +36,10 @@ type unsetOptions struct {
 }
 
 var (
-	unsetLong = templates.LongDesc(`
+	unsetLong = templates.LongDesc(i18n.T(`
 	Unsets an individual value in a kubeconfig file
 
-	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`)
+	PROPERTY_NAME is a dot delimited name where each token represents either an attribute name or a map key.  Map keys may not contain dots.`))
 
 	unsetExample = templates.Examples(`
 		# Unset the current-context.

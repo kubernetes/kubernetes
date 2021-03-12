@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -176,7 +176,7 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 		case "iopspergb":
 			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
 			if err != nil {
-				return nil, fmt.Errorf("invalid iopsPerGB value %q, must be integer between 1 and 30: %v", v, err)
+				return nil, fmt.Errorf("invalid iopsPerGB value %q: %v", v, err)
 			}
 		case "encrypted":
 			volumeOptions.Encrypted, err = strconv.ParseBool(v)

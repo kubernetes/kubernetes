@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,11 +35,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
@@ -68,6 +69,8 @@ const (
 	ErrReasonNodeConflict ConflictReason = "node(s) had volume node affinity conflict"
 	// ErrReasonNotEnoughSpace is used when a pod cannot start on a node because not enough storage space is available.
 	ErrReasonNotEnoughSpace = "node(s) did not have enough free storage"
+	// ErrReasonPVNotExist is used when a PVC can't find the bound persistent volumes"
+	ErrReasonPVNotExist = "pvc(s) bound to non-existent pv(s)"
 )
 
 // BindingInfo holds a binding between PV and PVC.
@@ -77,6 +80,28 @@ type BindingInfo struct {
 
 	// Proposed PV to bind to this PVC
 	pv *v1.PersistentVolume
+}
+
+// StorageClassName returns the name of the storage class.
+func (b *BindingInfo) StorageClassName() string {
+	return b.pv.Spec.StorageClassName
+}
+
+// StorageResource represents storage resource.
+type StorageResource struct {
+	Requested int64
+	Capacity  int64
+}
+
+// StorageResource returns storage resource.
+func (b *BindingInfo) StorageResource() *StorageResource {
+	// both fields are mandatory
+	requestedQty := b.pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	capacityQty := b.pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	return &StorageResource{
+		Requested: requestedQty.Value(),
+		Capacity:  capacityQty.Value(),
+	}
 }
 
 // PodVolumes holds pod's volumes information used in volume scheduling.
@@ -185,7 +210,7 @@ type volumeBinder struct {
 
 	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
-	csiStorageCapacityLister storagelistersv1alpha1.CSIStorageCapacityLister
+	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
 }
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
@@ -193,7 +218,7 @@ type volumeBinder struct {
 // capacity is desired.
 type CapacityCheck struct {
 	CSIDriverInformer          storageinformers.CSIDriverInformer
-	CSIStorageCapacityInformer storageinformersv1alpha1.CSIStorageCapacityInformer
+	CSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
@@ -246,6 +271,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 	unboundVolumesSatisfied := true
 	boundVolumesSatisfied := true
 	sufficientStorage := true
+	boundPVsFound := true
 	defer func() {
 		if err != nil {
 			return
@@ -258,6 +284,9 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 		}
 		if !sufficientStorage {
 			reasons = append(reasons, ErrReasonNotEnoughSpace)
+		}
+		if !boundPVsFound {
+			reasons = append(reasons, ErrReasonPVNotExist)
 		}
 	}()
 
@@ -288,7 +317,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 
 	// Check PV node affinity on bound volumes
 	if len(boundClaims) > 0 {
-		boundVolumesSatisfied, err = b.checkBoundClaims(boundClaims, node, podName)
+		boundVolumesSatisfied, boundPVsFound, err = b.checkBoundClaims(boundClaims, node, podName)
 		if err != nil {
 			return
 		}
@@ -443,7 +472,7 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes
 		return b, err
 	})
 	if err != nil {
-		return fmt.Errorf("Failed to bind volumes: %v", err)
+		return fmt.Errorf("binding volumes: %w", err)
 	}
 	return nil
 }
@@ -503,7 +532,7 @@ func (b *volumeBinder) bindAPIUpdate(podName string, bindings []*BindingInfo, cl
 	}
 
 	// Update claims objects to trigger volume provisioning. Let the PV controller take care of the rest
-	// PV controller is expect to signal back by removing related annotations if actual provisioning fails
+	// PV controller is expected to signal back by removing related annotations if actual provisioning fails
 	for i, claim = range claimsToProvision {
 		klog.V(5).Infof("bindAPIUpdate: Pod %q, PVC %q", podName, getPVCName(claim))
 		newClaim, err := b.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claim, metav1.UpdateOptions{})
@@ -543,7 +572,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 	node, err := b.nodeLister.Get(pod.Spec.NodeName)
 	if err != nil {
-		return false, fmt.Errorf("failed to get node %q: %v", pod.Spec.NodeName, err)
+		return false, fmt.Errorf("failed to get node %q: %w", pod.Spec.NodeName, err)
 	}
 
 	csiNode, err := b.csiNodeLister.Get(node.Name)
@@ -559,7 +588,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	_, err = b.podLister.Pods(pod.Namespace).Get(pod.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return false, fmt.Errorf("pod %q does not exist any more", podName)
+			return false, fmt.Errorf("pod does not exist any more: %w", err)
 		}
 		klog.Errorf("failed to get pod %s/%s from the lister: %v", pod.Namespace, pod.Name, err)
 	}
@@ -567,12 +596,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	for _, binding := range bindings {
 		pv, err := b.pvCache.GetAPIPV(binding.pv.Name)
 		if err != nil {
-			return false, fmt.Errorf("failed to check binding: %v", err)
+			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
 		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(binding.pvc))
 		if err != nil {
-			return false, fmt.Errorf("failed to check binding: %v", err)
+			return false, fmt.Errorf("failed to check binding: %w", err)
 		}
 
 		// Because we updated PV in apiserver, skip if API object is older
@@ -583,12 +612,12 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 
 		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
 		if err != nil {
-			return false, fmt.Errorf("failed to translate pv to csi: %v", err)
+			return false, fmt.Errorf("failed to translate pv to csi: %w", err)
 		}
 
 		// Check PV's node affinity (the node might not have the proper label)
 		if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
-			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
+			return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 		}
 
 		// Check if pv.ClaimRef got dropped by unbindVolume()
@@ -605,7 +634,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	for _, claim := range claimsToProvision {
 		pvc, err := b.pvcCache.GetAPIPVC(getPVCName(claim))
 		if err != nil {
-			return false, fmt.Errorf("failed to check provisioning pvc: %v", err)
+			return false, fmt.Errorf("failed to check provisioning pvc: %w", err)
 		}
 
 		// Because we updated PVC in apiserver, skip if API object is older
@@ -637,7 +666,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 					// be unbound eventually.
 					return false, nil
 				}
-				return false, fmt.Errorf("failed to get pv %q from cache: %v", pvc.Spec.VolumeName, err)
+				return false, fmt.Errorf("failed to get pv %q from cache: %w", pvc.Spec.VolumeName, err)
 			}
 
 			pv, err = b.tryTranslatePVToCSI(pv, csiNode)
@@ -646,7 +675,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 			}
 
 			if err := volumeutil.CheckNodeAffinity(pv, node.Labels); err != nil {
-				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %v", pv.Name, node.Name, err)
+				return false, fmt.Errorf("pv %q node affinity doesn't match node %q: %w", pv.Name, node.Name, err)
 			}
 		}
 
@@ -667,8 +696,13 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 	switch {
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
-	case vol.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+	case vol.Ephemeral != nil:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			return false, nil, fmt.Errorf(
+				"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
+				vol.Name,
+			)
+		}
 		// Generic ephemeral inline volumes also use a PVC,
 		// just with a computed name, and...
 		pvcName = pod.Name + "-" + vol.Name
@@ -762,7 +796,7 @@ func (b *volumeBinder) GetPodVolumes(pod *v1.Pod) (boundClaims []*v1.PersistentV
 	return boundClaims, unboundClaimsDelayBinding, unboundClaimsImmediate, nil
 }
 
-func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, error) {
+func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node *v1.Node, podName string) (bool, bool, error) {
 	csiNode, err := b.csiNodeLister.Get(node.Name)
 	if err != nil {
 		// TODO: return the error once CSINode is created by default
@@ -773,24 +807,27 @@ func (b *volumeBinder) checkBoundClaims(claims []*v1.PersistentVolumeClaim, node
 		pvName := pvc.Spec.VolumeName
 		pv, err := b.pvCache.GetPV(pvName)
 		if err != nil {
-			return false, err
+			if _, ok := err.(*errNotFound); ok {
+				err = nil
+			}
+			return true, false, err
 		}
 
 		pv, err = b.tryTranslatePVToCSI(pv, csiNode)
 		if err != nil {
-			return false, err
+			return false, true, err
 		}
 
 		err = volumeutil.CheckNodeAffinity(pv, node.Labels)
 		if err != nil {
 			klog.V(4).Infof("PersistentVolume %q, Node %q mismatch for Pod %q: %v", pvName, node.Name, podName, err)
-			return false, nil
+			return false, true, nil
 		}
 		klog.V(5).Infof("PersistentVolume %q, Node %q matches for Pod %q", pvName, node.Name, podName)
 	}
 
 	klog.V(4).Infof("All bound volumes for Pod %q match with Node %q", podName, node.Name)
-	return true, nil
+	return true, true, nil
 }
 
 // findMatchingVolumes tries to find matching volumes for given claims,
@@ -806,7 +843,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := v1helper.GetPersistentVolumeClaimClass(pvc)
+		storageClassName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 		pvcName := getPVCName(pvc)
 
@@ -846,7 +883,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 	// fails or we encounter an error.
 	for _, claim := range claimsToProvision {
 		pvcName := getPVCName(claim)
-		className := v1helper.GetPersistentVolumeClaimClass(claim)
+		className := storagehelpers.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
 			return false, false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
@@ -937,8 +974,7 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	sizeInBytes := quantity.Value()
 	for _, capacity := range capacities {
 		if capacity.StorageClassName == storageClass.Name &&
-			capacity.Capacity != nil &&
-			capacity.Capacity.Value() >= sizeInBytes &&
+			capacitySufficient(capacity, sizeInBytes) &&
 			b.nodeHasAccess(node, capacity) {
 			// Enough capacity found.
 			return true, nil
@@ -952,7 +988,16 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	return false, nil
 }
 
-func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1alpha1.CSIStorageCapacity) bool {
+func capacitySufficient(capacity *storagev1beta1.CSIStorageCapacity, sizeInBytes int64) bool {
+	limit := capacity.Capacity
+	if capacity.MaximumVolumeSize != nil {
+		// Prefer MaximumVolumeSize if available, it is more precise.
+		limit = capacity.MaximumVolumeSize
+	}
+	return limit != nil && limit.Value() >= sizeInBytes
+}
+
+func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSIStorageCapacity) bool {
 	if capacity.NodeTopology == nil {
 		// Unavailable
 		return false

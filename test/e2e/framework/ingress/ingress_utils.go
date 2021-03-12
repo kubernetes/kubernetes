@@ -460,10 +460,10 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 
 	j.Logger.Infof("creating replication controller")
-	framework.RunKubectlOrDieInput(ns, read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	framework.RunKubectlOrDieInput(ns, read("rc.yaml"), "create", "-f", "-")
 
 	j.Logger.Infof("creating service")
-	framework.RunKubectlOrDieInput(ns, read("svc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+	framework.RunKubectlOrDieInput(ns, read("svc.yaml"), "create", "-f", "-")
 	if len(svcAnnotations) > 0 {
 		svcList, err := j.Client.CoreV1().Services(ns).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -476,7 +476,7 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 
 	if exists("secret.yaml") {
 		j.Logger.Infof("creating secret")
-		framework.RunKubectlOrDieInput(ns, read("secret.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
+		framework.RunKubectlOrDieInput(ns, read("secret.yaml"), "create", "-f", "-")
 	}
 	j.Logger.Infof("Parsing ingress from %v", filepath.Join(manifestPath, "ing.yaml"))
 
@@ -569,7 +569,7 @@ func (j *TestJig) runUpdate(ing *networkingv1beta1.Ingress) (*networkingv1beta1.
 func DescribeIng(ns string) {
 	framework.Logf("\nOutput of kubectl describe ing:\n")
 	desc, _ := framework.RunKubectl(
-		ns, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+		ns, "describe", "ing")
 	framework.Logf(desc)
 }
 
@@ -732,9 +732,6 @@ func (j *TestJig) WaitForIngressAddress(c clientset.Interface, ns, ingName strin
 		ipOrNameList, err := getIngressAddress(c, ns, ingName, j.Class)
 		if err != nil || len(ipOrNameList) == 0 {
 			j.Logger.Errorf("Waiting for Ingress %s/%s to acquire IP, error: %v, ipOrNameList: %v", ns, ingName, err, ipOrNameList)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		address = ipOrNameList[0]
@@ -883,8 +880,8 @@ func getPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 	if err != nil {
 		return "", err
 	}
-	// This list of nodes must not include the master, which is marked
-	// unschedulable, since the master doesn't run kube-proxy. Without
+	// This list of nodes must not include the any control plane nodes, which are marked
+	// unschedulable, since control plane nodes don't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *v1.NodeList
 	if wait.PollImmediate(poll, framework.SingleCallTimeout, func() (bool, error) {
@@ -892,9 +889,6 @@ func getPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 			"spec.unschedulable": "false",
 		}.AsSelector().String()})
 		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
 			return false, err
 		}
 		return true, nil
@@ -1034,7 +1028,7 @@ func (cont *NginxIngressController) Init() {
 	}
 
 	framework.Logf("initializing nginx ingress controller")
-	framework.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
+	framework.RunKubectlOrDieInput(cont.Ns, read("rc.yaml"), "create", "-f", "-")
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get(context.TODO(), "nginx-ingress-controller", metav1.GetOptions{})
 	framework.ExpectNoError(err)

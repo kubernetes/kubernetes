@@ -1,4 +1,4 @@
-semver for golang [![Build Status](https://drone.io/github.com/blang/semver/status.png)](https://drone.io/github.com/blang/semver/latest) [![GoDoc](https://godoc.org/github.com/blang/semver?status.png)](https://godoc.org/github.com/blang/semver) [![Coverage Status](https://img.shields.io/coveralls/blang/semver.svg)](https://coveralls.io/r/blang/semver?branch=master)
+semver for golang [![Build Status](https://travis-ci.org/blang/semver.svg?branch=master)](https://travis-ci.org/blang/semver) [![GoDoc](https://godoc.org/github.com/blang/semver?status.png)](https://godoc.org/github.com/blang/semver) [![Coverage Status](https://img.shields.io/coveralls/blang/semver.svg)](https://coveralls.io/r/blang/semver?branch=master)
 ======
 
 semver is a [Semantic Versioning](http://semver.org/) library written in golang. It fully covers spec version `2.0.0`.
@@ -41,6 +41,7 @@ Features
 - Compare Helper Methods
 - InPlace manipulation
 - Ranges `>=1.0.0 <2.0.0 || >=3.0.0 !3.0.1-beta.1`
+- Wildcards `>=1.x`, `<=2.5.x`
 - Sortable (implements sort.Interface)
 - database/sql compatible (sql.Scanner/Valuer)
 - encoding/json compatible (json.Marshaler/Unmarshaler)
@@ -58,6 +59,8 @@ A condition is composed of an operator and a version. The supported operators ar
 - `>=1.0.0` Greater than or equal to `1.0.0`
 - `1.0.0`, `=1.0.0`, `==1.0.0` Equal to `1.0.0`
 - `!1.0.0`, `!=1.0.0` Not equal to `1.0.0`. Excludes version `1.0.0`.
+
+Note that spaces between the operator and the version will be gracefully tolerated.
 
 A `Range` can link multiple `Ranges` separated by space:
 

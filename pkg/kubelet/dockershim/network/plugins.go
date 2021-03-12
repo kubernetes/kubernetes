@@ -165,7 +165,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("network plugin %q failed init: %v", networkPluginName, err))
 		} else {
-			klog.V(1).Infof("Loaded network plugin %q", networkPluginName)
+			klog.V(1).InfoS("Loaded network plugin", "networkPluginName", networkPluginName)
 		}
 	} else {
 		allErrs = append(allErrs, fmt.Errorf("network plugin %q not found", networkPluginName))
@@ -192,12 +192,12 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode kubeletconfig.Hairp
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
 	if err := plugin.Sysctl.SetSysctl(sysctlBridgeCallIPTables, 1); err != nil {
-		klog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIPTables, err)
+		klog.InfoS("can't set sysctl bridge-nf-call-iptables", "err", err)
 	}
 	if val, err := plugin.Sysctl.GetSysctl(sysctlBridgeCallIP6Tables); err == nil {
 		if val != 1 {
 			if err = plugin.Sysctl.SetSysctl(sysctlBridgeCallIP6Tables, 1); err != nil {
-				klog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIP6Tables, err)
+				klog.InfoS("can't set sysctl bridge-nf-call-ip6tables", "err", err)
 			}
 		}
 	}
@@ -365,12 +365,12 @@ func (pm *PluginManager) podUnlock(fullPodName string) {
 
 	lock, ok := pm.pods[fullPodName]
 	if !ok {
-		klog.Warningf("Unbalanced pod lock unref for %s", fullPodName)
+		klog.InfoS("Unbalanced pod lock unref for the pod", "podFullName", fullPodName)
 		return
 	} else if lock.refcount == 0 {
 		// This should never ever happen, but handle it anyway
 		delete(pm.pods, fullPodName)
-		klog.Warningf("Pod lock for %s still in map with zero refcount", fullPodName)
+		klog.InfoS("Pod lock for the pod still in map with zero refcount", "podFullName", fullPodName)
 		return
 	}
 	lock.refcount--
@@ -382,17 +382,25 @@ func (pm *PluginManager) podUnlock(fullPodName string) {
 
 // recordOperation records operation and duration
 func recordOperation(operation string, start time.Time) {
+	metrics.NetworkPluginOperations.WithLabelValues(operation).Inc()
 	metrics.NetworkPluginOperationsLatency.WithLabelValues(operation).Observe(metrics.SinceInSeconds(start))
 }
 
+// recordError records errors for metric.
+func recordError(operation string) {
+	metrics.NetworkPluginOperationsErrors.WithLabelValues(operation).Inc()
+}
+
 func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id kubecontainer.ContainerID) (*PodNetworkStatus, error) {
-	defer recordOperation("get_pod_network_status", time.Now())
+	const operation = "get_pod_network_status"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
 	netStatus, err := pm.plugin.GetPodNetworkStatus(podNamespace, podName, id)
 	if err != nil {
+		recordError(operation)
 		return nil, fmt.Errorf("networkPlugin %s failed on the status hook for pod %q: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
@@ -400,13 +408,15 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 }
 
 func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
-	defer recordOperation("set_up_pod", time.Now())
+	const operation = "set_up_pod"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
-	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
+	klog.V(3).InfoS("Calling network plugin to set up the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
 	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
+		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 
@@ -414,13 +424,15 @@ func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer
 }
 
 func (pm *PluginManager) TearDownPod(podNamespace, podName string, id kubecontainer.ContainerID) error {
-	defer recordOperation("tear_down_pod", time.Now())
+	const operation = "tear_down_pod"
+	defer recordOperation(operation, time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
-	klog.V(3).Infof("Calling network plugin %s to tear down pod %q", pm.plugin.Name(), fullPodName)
+	klog.V(3).InfoS("Calling network plugin to tear down the pod", "pod", klog.KRef(podNamespace, podName), "networkPluginName", pm.plugin.Name())
 	if err := pm.plugin.TearDownPod(podNamespace, podName, id); err != nil {
+		recordError(operation)
 		return fmt.Errorf("networkPlugin %s failed to teardown pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 

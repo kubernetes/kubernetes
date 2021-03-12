@@ -17,8 +17,13 @@ limitations under the License.
 package plugins
 
 import (
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
+	plfeature "k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -44,6 +49,10 @@ import (
 // A scheduler that runs out of tree plugins can register additional plugins
 // through the WithFrameworkOutOfTreeRegistry option.
 func NewInTreeRegistry() runtime.Registry {
+	fts := plfeature.Features{
+		EnablePodAffinityNamespaceSelector: utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
+	}
+
 	return runtime.Registry{
 		selectorspread.Name:                        selectorspread.New,
 		imagelocality.Name:                         imagelocality.New,
@@ -67,11 +76,13 @@ func NewInTreeRegistry() runtime.Registry {
 		nodevolumelimits.GCEPDName:                 nodevolumelimits.NewGCEPD,
 		nodevolumelimits.AzureDiskName:             nodevolumelimits.NewAzureDisk,
 		nodevolumelimits.CinderName:                nodevolumelimits.NewCinder,
-		interpodaffinity.Name:                      interpodaffinity.New,
-		nodelabel.Name:                             nodelabel.New,
-		serviceaffinity.Name:                       serviceaffinity.New,
-		queuesort.Name:                             queuesort.New,
-		defaultbinder.Name:                         defaultbinder.New,
-		defaultpreemption.Name:                     defaultpreemption.New,
+		interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return interpodaffinity.New(plArgs, fh, fts)
+		},
+		nodelabel.Name:         nodelabel.New,
+		serviceaffinity.Name:   serviceaffinity.New,
+		queuesort.Name:         queuesort.New,
+		defaultbinder.Name:     defaultbinder.New,
+		defaultpreemption.Name: defaultpreemption.New,
 	}
 }

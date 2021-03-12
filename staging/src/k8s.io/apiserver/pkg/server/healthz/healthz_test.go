@@ -94,24 +94,24 @@ func TestInstallPathHandler(t *testing.T) {
 
 }
 
-func testMultipleChecks(path string, t *testing.T) {
+func testMultipleChecks(path, name string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n%s check passed\n", name), http.StatusOK, false},
 		{"?exclude=dontexist", "ok", http.StatusOK, false},
 		{"?exclude=bad", "ok", http.StatusOK, true},
-		{"?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
-		{"?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose=true&exclude=bad", fmt.Sprintf("[+]ping ok\n[+]bad excluded: ok\n%s check passed\n", name), http.StatusOK, true},
+		{"?verbose=true&exclude=dontexist", fmt.Sprintf("[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\n%s check passed\n", name), http.StatusOK, false},
 		{"/ping", "ok", http.StatusOK, false},
 		{"", "ok", http.StatusOK, false},
-		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 		{"/ping", "ok", http.StatusOK, true},
 		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
@@ -148,11 +148,11 @@ func testMultipleChecks(path string, t *testing.T) {
 }
 
 func TestMultipleChecks(t *testing.T) {
-	testMultipleChecks("", t)
+	testMultipleChecks("", "healthz", t)
 }
 
 func TestMultiplePathChecks(t *testing.T) {
-	testMultipleChecks("/ready", t)
+	testMultipleChecks("/ready", "ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {
@@ -252,11 +252,11 @@ func TestMetrics(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
-        # HELP apiserver_request_total [ALPHA] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
         # TYPE apiserver_request_total counter
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
 `)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
 		t.Error(err)

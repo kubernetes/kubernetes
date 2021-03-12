@@ -62,7 +62,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	// Load the CACertHashes into a pubkeypin.Set
 	pubKeyPins := pubkeypin.NewSet()
 	if err = pubKeyPins.Allow(cfg.BootstrapToken.CACertHashes...); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "invalid discovery token CA certificate hash")
 	}
 
 	duration := cfg.Timeout.Duration

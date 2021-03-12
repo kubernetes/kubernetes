@@ -36,12 +36,23 @@ import (
 // timeout of the HTTP request, including reading the response body.
 const defaultRequestTimeout = 30 * time.Second
 
+// DefaultRetryBackoffWithInitialDelay returns the default backoff parameters for webhook retry from a given initial delay.
+// Handy for the client that provides a custom initial delay only.
+func DefaultRetryBackoffWithInitialDelay(initialBackoffDelay time.Duration) wait.Backoff {
+	return wait.Backoff{
+		Duration: initialBackoffDelay,
+		Factor:   1.5,
+		Jitter:   0.2,
+		Steps:    5,
+	}
+}
+
 // GenericWebhook defines a generic client for webhooks with commonly used capabilities,
 // such as retry requests.
 type GenericWebhook struct {
-	RestClient     *rest.RESTClient
-	InitialBackoff time.Duration
-	ShouldRetry    func(error) bool
+	RestClient   *rest.RESTClient
+	RetryBackoff wait.Backoff
+	ShouldRetry  func(error) bool
 }
 
 // DefaultShouldRetry is a default implementation for the GenericWebhook ShouldRetry function property.
@@ -61,11 +72,11 @@ func DefaultShouldRetry(err error) bool {
 }
 
 // NewGenericWebhook creates a new GenericWebhook from the provided kubeconfig file.
-func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
-	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, initialBackoff, defaultRequestTimeout, customDial)
+func NewGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*GenericWebhook, error) {
+	return newGenericWebhook(scheme, codecFactory, kubeConfigFile, groupVersions, retryBackoff, defaultRequestTimeout, customDial)
 }
 
-func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, initialBackoff, requestTimeout time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
+func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFactory, kubeConfigFile string, groupVersions []schema.GroupVersion, retryBackoff wait.Backoff, requestTimeout time.Duration, customDial utilnet.DialFunc) (*GenericWebhook, error) {
 	for _, groupVersion := range groupVersions {
 		if !scheme.IsVersionRegistered(groupVersion) {
 			return nil, fmt.Errorf("webhook plugin requires enabling extension resource: %s", groupVersion)
@@ -102,19 +113,20 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 		return nil, err
 	}
 
-	return &GenericWebhook{restClient, initialBackoff, DefaultShouldRetry}, nil
+	return &GenericWebhook{restClient, retryBackoff, DefaultShouldRetry}, nil
 }
 
-// WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
-// it returns an error for which this GenericWebhook's ShouldRetry function returns true, confirming it to
-// be retriable. If no ShouldRetry has been defined for the webhook, then the default one is used (DefaultShouldRetry).
+// WithExponentialBackoff will retry webhookFn() as specified by the given backoff parameters with exponentially
+// increasing backoff when it returns an error for which this GenericWebhook's ShouldRetry function returns true,
+// confirming it to be retriable. If no ShouldRetry has been defined for the webhook,
+// then the default one is used (DefaultShouldRetry).
 func (g *GenericWebhook) WithExponentialBackoff(ctx context.Context, webhookFn func() rest.Result) rest.Result {
 	var result rest.Result
 	shouldRetry := g.ShouldRetry
 	if shouldRetry == nil {
 		shouldRetry = DefaultShouldRetry
 	}
-	WithExponentialBackoff(ctx, g.InitialBackoff, func() error {
+	WithExponentialBackoff(ctx, g.RetryBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
 	}, shouldRetry)
@@ -123,28 +135,28 @@ func (g *GenericWebhook) WithExponentialBackoff(ctx context.Context, webhookFn f
 
 // WithExponentialBackoff will retry webhookFn up to 5 times with exponentially increasing backoff when
 // it returns an error for which shouldRetry returns true, confirming it to be retriable.
-func WithExponentialBackoff(ctx context.Context, initialBackoff time.Duration, webhookFn func() error, shouldRetry func(error) bool) error {
-	backoff := wait.Backoff{
-		Duration: initialBackoff,
-		Factor:   1.5,
-		Jitter:   0.2,
-		Steps:    5,
-	}
-
-	var err error
-	wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err = webhookFn()
-		if ctx.Err() != nil {
-			// we timed out or were cancelled, we should not retry
-			return true, err
-		}
-		if shouldRetry(err) {
+func WithExponentialBackoff(ctx context.Context, retryBackoff wait.Backoff, webhookFn func() error, shouldRetry func(error) bool) error {
+	// having a webhook error allows us to track the last actual webhook error for requests that
+	// are later cancelled or time out.
+	var webhookErr error
+	err := wait.ExponentialBackoffWithContext(ctx, retryBackoff, func() (bool, error) {
+		webhookErr = webhookFn()
+		if shouldRetry(webhookErr) {
 			return false, nil
 		}
-		if err != nil {
-			return false, err
+		if webhookErr != nil {
+			return false, webhookErr
 		}
 		return true, nil
 	})
-	return err
+
+	switch {
+	// we check for webhookErr first, if webhookErr is set it's the most important error to return.
+	case webhookErr != nil:
+		return webhookErr
+	case err != nil:
+		return fmt.Errorf("webhook call failed: %s", err.Error())
+	default:
+		return nil
+	}
 }

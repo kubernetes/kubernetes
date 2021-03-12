@@ -53,10 +53,9 @@ func Every(interval time.Duration) Limit {
 //
 // The methods AllowN, ReserveN, and WaitN consume n tokens.
 type Limiter struct {
-	limit Limit
-	burst int
-
 	mu     sync.Mutex
+	limit  Limit
+	burst  int
 	tokens float64
 	// last is the last time the limiter's tokens field was updated
 	last time.Time
@@ -76,6 +75,8 @@ func (lim *Limiter) Limit() Limit {
 // Burst values allow more events to happen at once.
 // A zero Burst allows no events, unless limit == Inf.
 func (lim *Limiter) Burst() int {
+	lim.mu.Lock()
+	defer lim.mu.Unlock()
 	return lim.burst
 }
 
@@ -196,7 +197,7 @@ func (lim *Limiter) Reserve() *Reservation {
 
 // ReserveN returns a Reservation that indicates how long the caller must wait before n events happen.
 // The Limiter takes this Reservation into account when allowing future events.
-// ReserveN returns false if n exceeds the Limiter's burst size.
+// The returned Reservation’s OK() method returns false if n exceeds the Limiter's burst size.
 // Usage example:
 //   r := lim.ReserveN(time.Now(), 1)
 //   if !r.OK() {
@@ -229,7 +230,7 @@ func (lim *Limiter) WaitN(ctx context.Context, n int) (err error) {
 	lim.mu.Unlock()
 
 	if n > burst && limit != Inf {
-		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, lim.burst)
+		return fmt.Errorf("rate: Wait(n=%d) exceeds limiter's burst %d", n, burst)
 	}
 	// Check if ctx is already cancelled
 	select {
@@ -359,6 +360,7 @@ func (lim *Limiter) reserveN(now time.Time, n int, maxFutureReserve time.Duratio
 
 // advance calculates and returns an updated state for lim resulting from the passage of time.
 // lim is not changed.
+// advance requires that lim.mu is held.
 func (lim *Limiter) advance(now time.Time) (newNow time.Time, newLast time.Time, newTokens float64) {
 	last := lim.last
 	if now.Before(last) {

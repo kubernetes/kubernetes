@@ -2,6 +2,7 @@ package session
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -16,12 +17,13 @@ const (
 	sessionTokenKey = `aws_session_token`     // optional
 
 	// Assume Role Credentials group
-	roleArnKey          = `role_arn`          // group required
-	sourceProfileKey    = `source_profile`    // group required (or credential_source)
-	credentialSourceKey = `credential_source` // group required (or source_profile)
-	externalIDKey       = `external_id`       // optional
-	mfaSerialKey        = `mfa_serial`        // optional
-	roleSessionNameKey  = `role_session_name` // optional
+	roleArnKey             = `role_arn`          // group required
+	sourceProfileKey       = `source_profile`    // group required (or credential_source)
+	credentialSourceKey    = `credential_source` // group required (or source_profile)
+	externalIDKey          = `external_id`       // optional
+	mfaSerialKey           = `mfa_serial`        // optional
+	roleSessionNameKey     = `role_session_name` // optional
+	roleDurationSecondsKey = "duration_seconds"  // optional
 
 	// CSM options
 	csmEnabledKey  = `csm_enabled`
@@ -73,10 +75,11 @@ type sharedConfig struct {
 	CredentialProcess    string
 	WebIdentityTokenFile string
 
-	RoleARN         string
-	RoleSessionName string
-	ExternalID      string
-	MFASerial       string
+	RoleARN            string
+	RoleSessionName    string
+	ExternalID         string
+	MFASerial          string
+	AssumeRoleDuration *time.Duration
 
 	SourceProfileName string
 	SourceProfile     *sharedConfig
@@ -273,6 +276,11 @@ func (cfg *sharedConfig) setFromIniFile(profile string, file sharedConfigFile, e
 		updateString(&cfg.SourceProfileName, section, sourceProfileKey)
 		updateString(&cfg.CredentialSource, section, credentialSourceKey)
 		updateString(&cfg.Region, section, regionKey)
+
+		if section.Has(roleDurationSecondsKey) {
+			d := time.Duration(section.Int(roleDurationSecondsKey)) * time.Second
+			cfg.AssumeRoleDuration = &d
+		}
 
 		if v := section.String(stsRegionalEndpointSharedKey); len(v) != 0 {
 			sre, err := endpoints.GetSTSRegionalEndpoint(v)

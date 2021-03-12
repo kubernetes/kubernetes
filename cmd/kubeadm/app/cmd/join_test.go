@@ -255,7 +255,7 @@ func TestNewJoinData(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external join option and inject it to the join cmd
 			joinOptions := newJoinOptions()
-			cmd := NewCmdJoin(nil, joinOptions)
+			cmd := newCmdJoin(nil, joinOptions)
 
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {

@@ -351,7 +351,8 @@ func (kubemarkController *KubemarkController) runNodeCreation(stop <-chan struct
 }
 
 func (kubemarkCluster *kubemarkCluster) getHollowNodeName() (string, error) {
-	nodes, err := kubemarkCluster.nodeLister.List(labels.Everything())
+	selector, _ := labels.Parse(nodeGroupLabel)
+	nodes, err := kubemarkCluster.nodeLister.List(selector)
 	if err != nil {
 		return "", err
 	}

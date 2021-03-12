@@ -22,7 +22,7 @@ import (
 	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 )
 
@@ -54,7 +54,7 @@ func NewSummaryProvider(statsProvider Provider) SummaryProvider {
 	bootTime, err := util.GetBootTime()
 	if err != nil {
 		// bootTime will be zero if we encounter an error getting the boot time.
-		klog.Warningf("Error getting system boot time.  Node metrics will have an incorrect start time: %v", err)
+		klog.InfoS("Error getting system boot time. Node metrics will have an incorrect start time", "err", err)
 	}
 
 	return &summaryProviderImpl{

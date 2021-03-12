@@ -12,7 +12,6 @@ import (
 )
 
 var (
-
 	// UserAPIPrefix is a partial path to the HTTP endpoint.
 	UserAPIPrefix = "users"
 
@@ -77,7 +76,7 @@ func (c *Client) UserCreate(opts types.UserCreateOptions) error {
 }
 
 // UserUpdate updates a user on the server.
-func (c *Client) UserUpdate(user *types.User, ctx context.Context) error {
+func (c *Client) UserUpdate(ctx context.Context, user *types.User) error {
 	var ref string
 	switch {
 	case user.UUID != "":

@@ -28,6 +28,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -88,19 +89,19 @@ func (m *containerManager) Start() error {
 func (m *containerManager) doWork() {
 	v, err := m.client.Version()
 	if err != nil {
-		klog.Errorf("Unable to get docker version: %v", err)
+		klog.ErrorS(err, "Unable to get docker version")
 		return
 	}
 	version, err := utilversion.ParseGeneric(v.APIVersion)
 	if err != nil {
-		klog.Errorf("Unable to parse docker version %q: %v", v.APIVersion, err)
+		klog.ErrorS(err, "Unable to parse docker version", "dockerVersion", v.APIVersion)
 		return
 	}
 	// EnsureDockerInContainer does two things.
 	//   1. Ensure processes run in the cgroups if m.cgroupsManager is not nil.
 	//   2. Ensure processes have the OOM score applied.
 	if err := kubecm.EnsureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
-		klog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
+		klog.ErrorS(err, "Unable to ensure the docker processes run in the desired containers")
 	}
 }
 
@@ -109,7 +110,7 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 
 	memoryCapacity, err := getMemoryCapacity()
 	if err != nil {
-		klog.Errorf("Failed to get the memory capacity on machine: %v", err)
+		klog.ErrorS(err, "Failed to get the memory capacity on machine")
 	} else {
 		memoryLimit = memoryCapacity * dockerMemoryLimitThresholdPercent / 100
 	}
@@ -117,7 +118,7 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 	if err != nil || memoryLimit < minDockerMemoryLimit {
 		memoryLimit = minDockerMemoryLimit
 	}
-	klog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
+	klog.V(2).InfoS("Configure resource-only container with memory limit", "containerName", name, "memoryLimit", memoryLimit)
 
 	cg := &configs.Cgroup{
 		Parent: "/",
@@ -126,10 +127,10 @@ func createCgroupManager(name string) (cgroups.Manager, error) {
 			Memory:      int64(memoryLimit),
 			MemorySwap:  -1,
 			SkipDevices: true,
-			Devices: []*configs.DeviceRule{
+			Devices: []*libcontainerdevices.Rule{
 				{
-					Minor:       configs.Wildcard,
-					Major:       configs.Wildcard,
+					Minor:       libcontainerdevices.Wildcard,
+					Major:       libcontainerdevices.Wildcard,
 					Type:        'a',
 					Permissions: "rwm",
 					Allow:       true,

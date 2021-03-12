@@ -22,9 +22,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -100,12 +101,12 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 		errs = append(errs, err)
 	}
 
-	// If the coredns / kube-dns ConfigMaps are missing, show a warning and assume that the
+	// If the coredns ConfigMap is missing, show a warning and assume that the
 	// DNS addon was skipped during "kubeadm init", and that its redeployment on upgrade is not desired.
 	//
 	// TODO: remove this once "kubeadm upgrade apply" phases are supported:
 	//   https://github.com/kubernetes/kubeadm/issues/1318
-	var missingCoreDNSConfigMap, missingKubeDNSConfigMap bool
+	var missingCoreDNSConfigMap bool
 	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
 		context.TODO(),
 		kubeadmconstants.CoreDNSConfigMap,
@@ -113,28 +114,16 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	); err != nil && apierrors.IsNotFound(err) {
 		missingCoreDNSConfigMap = true
 	}
-	if _, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(
-		context.TODO(),
-		kubeadmconstants.KubeDNSConfigMap,
-		metav1.GetOptions{},
-	); err != nil && apierrors.IsNotFound(err) {
-		missingKubeDNSConfigMap = true
-	}
-	if missingCoreDNSConfigMap && missingKubeDNSConfigMap {
-		klog.Warningf("the ConfigMaps %q/%q in the namespace %q were not found. "+
+	if missingCoreDNSConfigMap {
+		klog.Warningf("the ConfigMaps %q in the namespace %q were not found. "+
 			"Assuming that a DNS server was not deployed for this cluster. "+
 			"Note that once 'kubeadm upgrade apply' supports phases you "+
 			"will have to skip the DNS upgrade manually",
 			kubeadmconstants.CoreDNSConfigMap,
-			kubeadmconstants.KubeDNSConfigMap,
 			metav1.NamespaceSystem)
 	} else {
-		// Upgrade CoreDNS/kube-dns
+		// Upgrade CoreDNS
 		if err := dns.EnsureDNSAddon(&cfg.ClusterConfiguration, client); err != nil {
-			errs = append(errs, err)
-		}
-		// Remove the old DNS deployment if a new DNS service is now used (kube-dns to CoreDNS or vice versa)
-		if err := removeOldDNSDeploymentIfAnotherDNSIsUsed(&cfg.ClusterConfiguration, client, dryRun); err != nil {
 			errs = append(errs, err)
 		}
 	}
@@ -163,44 +152,6 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 	}
 
 	return errorsutil.NewAggregate(errs)
-}
-
-func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
-	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
-		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
-
-		if cfg.DNS.Type == kubeadmapi.CoreDNS {
-			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
-			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
-		}
-
-		nodes, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-			FieldSelector: fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		})
-		if err != nil {
-			return err
-		}
-
-		// If we're dry-running or there are no scheduable nodes available, we don't need to wait for the new DNS addon to become ready
-		if !dryRun && len(nodes.Items) != 0 {
-			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(context.TODO(), installedDeploymentName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			if dnsDeployment.Status.ReadyReplicas == 0 {
-				return errors.New("the DNS deployment isn't ready yet")
-			}
-		}
-
-		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
-		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
-		err = apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}, 10)
 }
 
 func writeKubeletConfigFiles(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, dryRun bool) error {
@@ -250,4 +201,60 @@ func rollbackFiles(files map[string]string, originalErr error) error {
 		}
 	}
 	return errors.Errorf("couldn't move these files: %v. Got errors: %v", files, errorsutil.NewAggregate(errs))
+}
+
+// LabelOldControlPlaneNodes finds all nodes with the legacy node-role label and also applies
+// the "control-plane" node-role label to them.
+// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+func LabelOldControlPlaneNodes(client clientset.Interface) error {
+	selectorOldControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		kubeadmconstants.LabelNodeRoleOldControlPlane: "",
+	}))
+	nodesWithOldLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorOldControlPlane.String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleOldControlPlane)
+	}
+
+	for _, n := range nodesWithOldLabel.Items {
+		if _, hasNewLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane]; hasNewLabel {
+			continue
+		}
+		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
+			n.ObjectMeta.Labels[kubeadmconstants.LabelNodeRoleControlPlane] = ""
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// LabelControlPlaneNodesWithExcludeFromLB finds all control plane nodes and applies the LabelExcludeFromExternalLB
+// label to them.
+// TODO: https://github.com/kubernetes/kubeadm/issues/2375
+func LabelControlPlaneNodesWithExcludeFromLB(client clientset.Interface) error {
+	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
+		kubeadmconstants.LabelNodeRoleControlPlane: "",
+	}))
+	nodesWithLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
+		LabelSelector: selectorControlPlane.String(),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
+	}
+
+	for _, n := range nodesWithLabel.Items {
+		if _, hasLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB]; hasLabel {
+			continue
+		}
+		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
+			n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB] = ""
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

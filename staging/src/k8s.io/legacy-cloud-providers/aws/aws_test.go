@@ -20,6 +20,7 @@ package aws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -808,6 +809,356 @@ func constructRouteTable(subnetID string, public bool) *ec2.RouteTable {
 	}
 }
 
+func Test_findELBSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	subnetA0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetA0000003 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2a"),
+		SubnetId:         aws.String("subnet-a0000003"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetPublicELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetB0000002 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2b"),
+		SubnetId:         aws.String("subnet-b0000002"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetC0000001 := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-c0000001"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(c.tagging.clusterTagKey()),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetOther := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-other"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(TagNameKubernetesClusterPrefix + "clusterid.other"),
+				Value: aws.String("owned"),
+			},
+			{
+				Key:   aws.String(TagNameSubnetInternalELB),
+				Value: aws.String("1"),
+			},
+		},
+	}
+	subnetNoTag := &ec2.Subnet{
+		AvailabilityZone: aws.String("us-west-2c"),
+		SubnetId:         aws.String("subnet-notag"),
+	}
+
+	tests := []struct {
+		name        string
+		subnets     []*ec2.Subnet
+		routeTables map[string]bool
+		internal    bool
+		want        []string
+	}{
+		{
+			name: "no subnets",
+		},
+		{
+			name: "single tagged subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+			},
+			internal: false,
+			want:     []string{"subnet-a0000001"},
+		},
+		{
+			name: "no matching public subnet",
+			subnets: []*ec2.Subnet{
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000002": false,
+			},
+			want: nil,
+		},
+		{
+			name: "prefer role over cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000003,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000003": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "prefer cluster tag",
+			subnets: []*ec2.Subnet{
+				subnetC0000001,
+				subnetNoTag,
+			},
+			want: []string{"subnet-c0000001"},
+		},
+		{
+			name: "include untagged",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetNoTag,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-notag":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-notag"},
+		},
+		{
+			name: "ignore some other cluster owned subnet",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-b0000001"},
+		},
+		{
+			name: "prefer matching role",
+			subnets: []*ec2.Subnet{
+				subnetB0000001,
+				subnetB0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-b0000001": false,
+				"subnet-b0000002": false,
+			},
+			want:     []string{"subnet-b0000002"},
+			internal: true,
+		},
+		{
+			name: "choose lexicographic order",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+			},
+			want: []string{"subnet-a0000001"},
+		},
+		{
+			name: "everything",
+			subnets: []*ec2.Subnet{
+				subnetA0000001,
+				subnetA0000002,
+				subnetB0000001,
+				subnetB0000002,
+				subnetC0000001,
+				subnetNoTag,
+				subnetOther,
+			},
+			routeTables: map[string]bool{
+				"subnet-a0000001": true,
+				"subnet-a0000002": true,
+				"subnet-b0000001": true,
+				"subnet-b0000002": true,
+				"subnet-c0000001": true,
+				"subnet-notag":    true,
+				"subnet-other":    true,
+			},
+			want: []string{"subnet-a0000001", "subnet-b0000001", "subnet-c0000001"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			awsServices.ec2.RemoveRouteTables()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			routeTables := constructRouteTables(tt.routeTables)
+			for _, rt := range routeTables {
+				awsServices.ec2.CreateRouteTable(rt)
+			}
+			got, _ := c.findELBSubnets(tt.internal)
+			sort.Strings(tt.want)
+			sort.Strings(got)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_getLoadBalancerSubnets(t *testing.T) {
+	awsServices := newMockedFakeAWSServices(TestClusterID)
+	c, err := newAWSCloud(CloudConfig{}, awsServices)
+	if err != nil {
+		t.Errorf("Error building aws cloud: %v", err)
+		return
+	}
+	tests := []struct {
+		name        string
+		service     *v1.Service
+		subnets     []*ec2.Subnet
+		internalELB bool
+		want        []string
+		wantErr     error
+	}{
+		{
+			name:    "no annotation",
+			service: &v1.Service{},
+		},
+		{
+			name: "annotation with no subnets",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "\t",
+					},
+				},
+			},
+			wantErr: errors.New("unable to resolve empty subnet slice"),
+		},
+		{
+			name: "subnet ids",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "subnet-a000001, subnet-a000002",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "subnet names",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+				{
+					AvailabilityZone: aws.String("us-west-2b"),
+					SubnetId:         aws.String("subnet-a000002"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2 ",
+					},
+				},
+			},
+			want: []string{"subnet-a000001", "subnet-a000002"},
+		},
+		{
+			name: "unable to find all subnets",
+			subnets: []*ec2.Subnet{
+				{
+					AvailabilityZone: aws.String("us-west-2c"),
+					SubnetId:         aws.String("subnet-a000001"),
+				},
+			},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"service.beta.kubernetes.io/aws-load-balancer-subnets": "My Subnet 1, My Subnet 2, Test Subnet ",
+					},
+				},
+			},
+			wantErr: errors.New("expected to find 3, but found 1 subnets"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			awsServices.ec2.RemoveSubnets()
+			for _, subnet := range tt.subnets {
+				awsServices.ec2.CreateSubnet(subnet)
+			}
+			got, err := c.getLoadBalancerSubnets(tt.service, tt.internalELB)
+			if tt.wantErr != nil {
+				assert.EqualError(t, err, tt.wantErr.Error())
+			} else {
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 func TestSubnetIDsinVPC(t *testing.T) {
 	awsServices := newMockedFakeAWSServices(TestClusterID)
 	c, err := newAWSCloud(CloudConfig{}, awsServices)
@@ -1225,8 +1576,8 @@ func TestGetVolumeLabels(t *testing.T) {
 
 	assert.Nil(t, err, "Error creating Volume %v", err)
 	assert.Equal(t, map[string]string{
-		v1.LabelZoneFailureDomain: "us-east-1a",
-		v1.LabelZoneRegion:        "us-east-1"}, labels)
+		v1.LabelTopologyZone:   "us-east-1a",
+		v1.LabelTopologyRegion: "us-east-1"}, labels)
 	awsServices.ec2.(*MockedFakeEC2).AssertExpectations(t)
 }
 
@@ -1299,8 +1650,8 @@ func TestGetLabelsForVolume(t *testing.T) {
 				AvailabilityZone: aws.String("us-east-1a"),
 			}},
 			map[string]string{
-				v1.LabelZoneFailureDomain: "us-east-1a",
-				v1.LabelZoneRegion:        "us-east-1",
+				v1.LabelTopologyZone:   "us-east-1a",
+				v1.LabelTopologyRegion: "us-east-1",
 			},
 			nil,
 		},
@@ -1721,16 +2072,135 @@ func TestAddLoadBalancerTags(t *testing.T) {
 
 func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 	tests := []struct {
-		name                string
-		annotations         map[string]string
-		overriddenFieldName string
-		overriddenValue     int64
+		name        string
+		annotations map[string]string
+		want        elb.HealthCheck
 	}{
-		{"falls back to HC defaults", map[string]string{}, "", int64(0)},
-		{"healthy threshold override", map[string]string{ServiceAnnotationLoadBalancerHCHealthyThreshold: "7"}, "HealthyThreshold", int64(7)},
-		{"unhealthy threshold override", map[string]string{ServiceAnnotationLoadBalancerHCUnhealthyThreshold: "7"}, "UnhealthyThreshold", int64(7)},
-		{"timeout override", map[string]string{ServiceAnnotationLoadBalancerHCTimeout: "7"}, "Timeout", int64(7)},
-		{"interval override", map[string]string{ServiceAnnotationLoadBalancerHCInterval: "7"}, "Interval", int64(7)},
+		{
+			name:        "falls back to HC defaults",
+			annotations: map[string]string{},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
+		{
+			name:        "healthy threshold override",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerHCHealthyThreshold: "7"},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(7),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
+		{
+			name:        "unhealthy threshold override",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerHCUnhealthyThreshold: "7"},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(7),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
+		{
+			name:        "timeout override",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerHCTimeout: "7"},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(7),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
+		{
+			name:        "interval override",
+			annotations: map[string]string{ServiceAnnotationLoadBalancerHCInterval: "7"},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(7),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
+		{
+			name: "healthcheck port override",
+			annotations: map[string]string{
+				ServiceAnnotationLoadBalancerHealthCheckPort: "2122",
+			},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:2122"),
+			},
+		},
+		{
+			name: "healthcheck protocol override",
+			annotations: map[string]string{
+				ServiceAnnotationLoadBalancerHealthCheckProtocol: "HTTP",
+			},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("HTTP:8080/"),
+			},
+		},
+		{
+			name: "healthcheck protocol, port, path override",
+			annotations: map[string]string{
+				ServiceAnnotationLoadBalancerHealthCheckProtocol: "HTTPS",
+				ServiceAnnotationLoadBalancerHealthCheckPath:     "/healthz",
+				ServiceAnnotationLoadBalancerHealthCheckPort:     "31224",
+			},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("HTTPS:31224/healthz"),
+			},
+		},
+		{
+			name: "healthcheck protocol SSL",
+			annotations: map[string]string{
+				ServiceAnnotationLoadBalancerHealthCheckProtocol: "SSL",
+				ServiceAnnotationLoadBalancerHealthCheckPath:     "/healthz",
+				ServiceAnnotationLoadBalancerHealthCheckPort:     "3124",
+			},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("SSL:3124"),
+			},
+		},
+		{
+			name: "healthcheck port annotation traffic-port",
+			annotations: map[string]string{
+				ServiceAnnotationLoadBalancerHealthCheckProtocol: "TCP",
+				ServiceAnnotationLoadBalancerHealthCheckPort:     "traffic-port",
+			},
+			want: elb.HealthCheck{
+				HealthyThreshold:   aws.Int64(2),
+				UnhealthyThreshold: aws.Int64(6),
+				Timeout:            aws.Int64(5),
+				Interval:           aws.Int64(10),
+				Target:             aws.String("TCP:8080"),
+			},
+		},
 	}
 	lbName := "myLB"
 	// this HC will always differ from the expected HC and thus it is expected an
@@ -1741,8 +2211,8 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 	defaultUnhealthyThreshold := int64(6)
 	defaultTimeout := int64(5)
 	defaultInterval := int64(10)
-	protocol, path, port := "tcp", "", int32(8080)
-	target := "tcp:8080"
+	protocol, path, port := "TCP", "", int32(8080)
+	target := "TCP:8080"
 	defaultHC := &elb.HealthCheck{
 		HealthyThreshold:   &defaultHealthyThreshold,
 		UnhealthyThreshold: &defaultUnhealthyThreshold,
@@ -1755,16 +2225,12 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 			awsServices := newMockedFakeAWSServices(TestClusterID)
 			c, err := newAWSCloud(CloudConfig{}, awsServices)
 			assert.Nil(t, err, "Error building aws cloud: %v", err)
-			expectedHC := *defaultHC
-			if test.overriddenFieldName != "" { // cater for test case with no overrides
-				value := reflect.ValueOf(&test.overriddenValue)
-				reflect.ValueOf(&expectedHC).Elem().FieldByName(test.overriddenFieldName).Set(value)
-			}
+			expectedHC := test.want
 			awsServices.elb.(*MockedFakeELB).expectConfigureHealthCheck(&lbName, &expectedHC, nil)
 
 			err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, test.annotations)
 
-			require.Nil(t, err)
+			require.NoError(t, err)
 			awsServices.elb.(*MockedFakeELB).AssertExpectations(t)
 		})
 	}
@@ -1784,11 +2250,11 @@ func TestEnsureLoadBalancerHealthCheck(t *testing.T) {
 		// test default HC
 		elbDesc := &elb.LoadBalancerDescription{LoadBalancerName: &lbName, HealthCheck: defaultHC}
 		err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, map[string]string{})
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		// test HC with override
 		elbDesc = &elb.LoadBalancerDescription{LoadBalancerName: &lbName, HealthCheck: &currentHC}
 		err = c.ensureLoadBalancerHealthCheck(elbDesc, protocol, port, path, annotations)
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 	})
 
 	t.Run("validates resulting expected health check before making an API call", func(t *testing.T) {
@@ -2104,10 +2570,17 @@ func (m *MockedFakeELBV2) CreateTargetGroup(request *elbv2.CreateTargetGroupInpu
 		rand.Uint32())
 
 	newTG := &elbv2.TargetGroup{
-		TargetGroupArn:  aws.String(arn),
-		TargetGroupName: request.Name,
-		Port:            request.Port,
-		Protocol:        request.Protocol,
+		TargetGroupArn:             aws.String(arn),
+		TargetGroupName:            request.Name,
+		Port:                       request.Port,
+		Protocol:                   request.Protocol,
+		HealthCheckProtocol:        request.HealthCheckProtocol,
+		HealthCheckPath:            request.HealthCheckPath,
+		HealthCheckPort:            request.HealthCheckPort,
+		HealthCheckTimeoutSeconds:  request.HealthCheckTimeoutSeconds,
+		HealthCheckIntervalSeconds: request.HealthCheckIntervalSeconds,
+		HealthyThresholdCount:      request.HealthyThresholdCount,
+		UnhealthyThresholdCount:    request.UnhealthyThresholdCount,
 	}
 
 	m.TargetGroups = append(m.TargetGroups, newTG)
@@ -2528,6 +3001,15 @@ func TestNLBNodeRegistration(t *testing.T) {
 			t.Errorf("Expected 3 nodes registered with target group, saw %d", len(instances))
 		}
 	}
+
+	fauxService.Annotations[ServiceAnnotationLoadBalancerHealthCheckProtocol] = "http"
+	tgARN := aws.StringValue(awsServices.elbv2.(*MockedFakeELBV2).Listeners[0].DefaultActions[0].TargetGroupArn)
+	_, err = c.EnsureLoadBalancer(context.TODO(), TestClusterName, fauxService, nodes)
+	if err != nil {
+		t.Errorf("EnsureLoadBalancer returned an error: %v", err)
+	}
+	assert.Equal(t, 1, len(awsServices.elbv2.(*MockedFakeELBV2).Listeners))
+	assert.NotEqual(t, tgARN, aws.StringValue(awsServices.elbv2.(*MockedFakeELBV2).Listeners[0].DefaultActions[0].TargetGroupArn))
 }
 
 func makeNamedNode(s *FakeAWSServices, offset int, name string) *v1.Node {
@@ -2640,6 +3122,347 @@ func TestCloud_sortELBSecurityGroupList(t *testing.T) {
 			c := &Cloud{}
 			c.sortELBSecurityGroupList(tt.args.securityGroupIDs, tt.args.annotations)
 			assert.Equal(t, tt.wantSecurityGroupIDs, tt.args.securityGroupIDs)
+		})
+	}
+}
+
+func TestCloud_buildNLBHealthCheckConfiguration(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		service     *v1.Service
+		want        healthCheckConfig
+		wantError   bool
+	}{
+		{
+			name:        "default cluster",
+			annotations: map[string]string{},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           30,
+				Timeout:            10,
+				HealthyThreshold:   3,
+				UnhealthyThreshold: 3,
+			},
+			wantError: false,
+		},
+		{
+			name:        "default local",
+			annotations: map[string]string{},
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					HealthCheckNodePort:   32213,
+				},
+			},
+			want: healthCheckConfig{
+				Port:               "32213",
+				Path:               "/healthz",
+				Protocol:           elbv2.ProtocolEnumHttp,
+				Interval:           10,
+				Timeout:            10,
+				HealthyThreshold:   2,
+				UnhealthyThreshold: 2,
+			},
+			wantError: false,
+		},
+		{
+			name: "with TCP healthcheck",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHealthCheckProtocol:  "TCP",
+						ServiceAnnotationLoadBalancerHealthCheckPort:      "8001",
+						ServiceAnnotationLoadBalancerHealthCheckPath:      "/healthz",
+						ServiceAnnotationLoadBalancerHCHealthyThreshold:   "4",
+						ServiceAnnotationLoadBalancerHCUnhealthyThreshold: "4",
+						ServiceAnnotationLoadBalancerHCInterval:           "10",
+						ServiceAnnotationLoadBalancerHCTimeout:            "5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type: v1.ServiceTypeLoadBalancer,
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+					ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					HealthCheckNodePort:   32213,
+				},
+			},
+			want: healthCheckConfig{
+				Interval:           10,
+				Timeout:            5,
+				Protocol:           "TCP",
+				Port:               "8001",
+				HealthyThreshold:   4,
+				UnhealthyThreshold: 4,
+			},
+			wantError: false,
+		},
+		{
+			name: "with HTTP healthcheck",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHealthCheckProtocol:  "HTTP",
+						ServiceAnnotationLoadBalancerHealthCheckPort:      "41233",
+						ServiceAnnotationLoadBalancerHealthCheckPath:      "/healthz",
+						ServiceAnnotationLoadBalancerHCHealthyThreshold:   "5",
+						ServiceAnnotationLoadBalancerHCUnhealthyThreshold: "5",
+						ServiceAnnotationLoadBalancerHCInterval:           "30",
+						ServiceAnnotationLoadBalancerHCTimeout:            "6",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want: healthCheckConfig{
+				Interval:           30,
+				Timeout:            6,
+				Protocol:           "HTTP",
+				Port:               "41233",
+				Path:               "/healthz",
+				HealthyThreshold:   5,
+				UnhealthyThreshold: 5,
+			},
+			wantError: false,
+		},
+		{
+			name: "HTTP healthcheck default path",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHealthCheckProtocol: "Http",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want: healthCheckConfig{
+				Interval:           30,
+				Timeout:            10,
+				Protocol:           "HTTP",
+				Path:               "/",
+				Port:               "traffic-port",
+				HealthyThreshold:   3,
+				UnhealthyThreshold: 3,
+			},
+			wantError: false,
+		},
+		{
+			name: "interval not 10 or 30",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHCInterval: "23",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           23,
+				Timeout:            10,
+				HealthyThreshold:   3,
+				UnhealthyThreshold: 3,
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid timeout",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHCTimeout: "non-numeric",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want:      healthCheckConfig{},
+			wantError: true,
+		},
+		{
+			name: "mismatch healthy and unhealthy targets",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-svc",
+					UID:  "UID",
+					Annotations: map[string]string{
+						ServiceAnnotationLoadBalancerHCHealthyThreshold:   "7",
+						ServiceAnnotationLoadBalancerHCUnhealthyThreshold: "5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Ports: []v1.ServicePort{
+						{
+							Name:       "http",
+							Protocol:   v1.ProtocolTCP,
+							Port:       8080,
+							TargetPort: intstr.FromInt(8880),
+							NodePort:   32205,
+						},
+					},
+				},
+			},
+			want: healthCheckConfig{
+				Port:               "traffic-port",
+				Protocol:           elbv2.ProtocolEnumTcp,
+				Interval:           30,
+				Timeout:            10,
+				HealthyThreshold:   7,
+				UnhealthyThreshold: 5,
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			hc, err := c.buildNLBHealthCheckConfiguration(tt.service)
+			if !tt.wantError {
+				assert.Equal(t, tt.want, hc)
+			} else {
+				assert.NotNil(t, err)
+			}
+		})
+	}
+}
+
+func Test_parseStringSliceAnnotation(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotation  string
+		annotations map[string]string
+		want        []string
+		wantExist   bool
+	}{
+		{
+			name:       "empty annotation",
+			annotation: "test.annotation",
+			wantExist:  false,
+		},
+		{
+			name:       "empty value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "\t, ,,",
+			},
+			want:      nil,
+			wantExist: true,
+		},
+		{
+			name:       "single value",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "   value 1 ",
+			},
+			want:      []string{"value 1"},
+			wantExist: true,
+		},
+		{
+			name:       "multiple values",
+			annotation: "a1",
+			annotations: map[string]string{
+				"a1": "subnet-1, subnet-2, My Subnet ",
+			},
+			want:      []string{"subnet-1", "subnet-2", "My Subnet"},
+			wantExist: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotValue []string
+			gotExist := parseStringSliceAnnotation(tt.annotations, tt.annotation, &gotValue)
+			assert.Equal(t, tt.wantExist, gotExist)
+			assert.Equal(t, tt.want, gotValue)
 		})
 	}
 }

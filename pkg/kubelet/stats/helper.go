@@ -24,7 +24,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -153,6 +153,27 @@ func cadvisorInfoToContainerCPUAndMemoryStats(name string, info *cadvisorapiv2.C
 	return result
 }
 
+// cadvisorInfoToAcceleratorStats returns the statsapi.AcceleratorStats converted from
+// the container info from cadvisor.
+func cadvisorInfoToAcceleratorStats(info *cadvisorapiv2.ContainerInfo) []statsapi.AcceleratorStats {
+	cstat, found := latestContainerStats(info)
+	if !found || cstat.Accelerators == nil {
+		return nil
+	}
+	var result []statsapi.AcceleratorStats
+	for _, acc := range cstat.Accelerators {
+		result = append(result, statsapi.AcceleratorStats{
+			Make:        acc.Make,
+			Model:       acc.Model,
+			ID:          acc.ID,
+			MemoryTotal: acc.MemoryTotal,
+			MemoryUsed:  acc.MemoryUsed,
+			DutyCycle:   acc.DutyCycle,
+		})
+	}
+	return result
+}
+
 func cadvisorInfoToProcessStats(info *cadvisorapiv2.ContainerInfo) *statsapi.ProcessStats {
 	cstat, found := latestContainerStats(info)
 	if !found || cstat.Processes == nil {
@@ -225,7 +246,7 @@ func cadvisorInfoToUserDefinedMetrics(info *cadvisorapiv2.ContainerInfo) []stats
 		for name, values := range stat.CustomMetrics {
 			specVal, ok := udmMap[name]
 			if !ok {
-				klog.Warningf("spec for custom metric %q is missing from cAdvisor output. Spec: %+v, Metrics: %+v", name, info.Spec, stat.CustomMetrics)
+				klog.InfoS("Spec for custom metric is missing from cAdvisor output", "metric", name, "spec", info.Spec, "metrics", stat.CustomMetrics)
 				continue
 			}
 			for _, value := range values {
@@ -351,7 +372,7 @@ func uint64Ptr(i uint64) *uint64 {
 }
 
 func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsapi.VolumeStats, rootFsInfo *cadvisorapiv2.FsInfo,
-	podLogStats *statsapi.FsStats, isCRIStatsProvider bool) *statsapi.FsStats {
+	podLogStats *statsapi.FsStats, etcHostsStats *statsapi.FsStats, isCRIStatsProvider bool) *statsapi.FsStats {
 	result := &statsapi.FsStats{
 		Time:           metav1.NewTime(rootFsInfo.Timestamp),
 		AvailableBytes: &rootFsInfo.Available,
@@ -371,6 +392,11 @@ func calcEphemeralStorage(containers []statsapi.ContainerStats, volumes []statsa
 		result.UsedBytes = addUsage(result.UsedBytes, podLogStats.UsedBytes)
 		result.InodesUsed = addUsage(result.InodesUsed, podLogStats.InodesUsed)
 		result.Time = maxUpdateTime(&result.Time, &podLogStats.Time)
+	}
+	if etcHostsStats != nil {
+		result.UsedBytes = addUsage(result.UsedBytes, etcHostsStats.UsedBytes)
+		result.InodesUsed = addUsage(result.InodesUsed, etcHostsStats.InodesUsed)
+		result.Time = maxUpdateTime(&result.Time, &etcHostsStats.Time)
 	}
 	return result
 }

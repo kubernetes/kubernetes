@@ -119,5 +119,5 @@ func (m *MockInterface) ListByResourceGroup(ctx context.Context, resourceGroupNa
 // ListByResourceGroup indicates an expected call of ListByResourceGroup
 func (mr *MockInterfaceMockRecorder) ListByResourceGroup(ctx, resourceGroupName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByResourceGroup", reflect.TypeOf((*MockInterface)(nil).Delete), ctx, resourceGroupName)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListByResourceGroup", reflect.TypeOf((*MockInterface)(nil).ListByResourceGroup), ctx, resourceGroupName)
 }

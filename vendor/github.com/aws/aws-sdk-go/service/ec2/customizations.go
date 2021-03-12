@@ -26,8 +26,12 @@ func init() {
 
 		// only set the retryer on request if config doesn't have a retryer
 		if r.Config.Retryer == nil && (r.Operation.Name == opModifyNetworkInterfaceAttribute || r.Operation.Name == opAssignPrivateIpAddresses) {
+			maxRetries := client.DefaultRetryerMaxNumRetries
+			if m := r.Config.MaxRetries; m != nil && *m != aws.UseServiceDefaultRetries {
+				maxRetries = *m
+			}
 			r.Retryer = client.DefaultRetryer{
-				NumMaxRetries:    client.DefaultRetryerMaxNumRetries,
+				NumMaxRetries:    maxRetries,
 				MinRetryDelay:    customRetryerMinRetryDelay,
 				MinThrottleDelay: customRetryerMinRetryDelay,
 				MaxRetryDelay:    customRetryerMaxRetryDelay,

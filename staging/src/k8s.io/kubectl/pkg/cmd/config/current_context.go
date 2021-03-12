@@ -34,8 +34,8 @@ type CurrentContextOptions struct {
 }
 
 var (
-	currentContextLong = templates.LongDesc(`
-		Displays the current-context`)
+	currentContextLong = templates.LongDesc(i18n.T(`
+		Displays the current-context`))
 
 	currentContextExample = templates.Examples(`
 		# Display the current-context

@@ -130,7 +130,6 @@ var (
 type claimsTest struct {
 	name               string
 	options            Options
-	now                time.Time
 	signingKey         *jose.JSONWebKey
 	pubKeys            []*jose.JSONWebKey
 	claims             string

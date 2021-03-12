@@ -116,7 +116,7 @@ func getXFSQuotaCmd() (string, error) {
 		}
 	}
 	quotaCmdInitialized = true
-	return "", fmt.Errorf("No xfs_quota program found")
+	return "", fmt.Errorf("no xfs_quota program found")
 }
 
 func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string, error) {
@@ -145,7 +145,7 @@ func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string
 func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
 	tmpMounts, err := ioutil.TempFile("", "mounts")
 	if err != nil {
-		return "", fmt.Errorf("Cannot create temporary mount file: %v", err)
+		return "", fmt.Errorf("cannot create temporary mount file: %v", err)
 	}
 	tmpMountsFileName := tmpMounts.Name()
 	defer tmpMounts.Close()
@@ -153,7 +153,7 @@ func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
 
 	mounts, err := os.Open(MountsFile)
 	if err != nil {
-		return "", fmt.Errorf("Cannot open mounts file %s: %v", MountsFile, err)
+		return "", fmt.Errorf("cannot open mounts file %s: %v", MountsFile, err)
 	}
 	defer mounts.Close()
 
@@ -164,16 +164,16 @@ func runXFSQuotaCommand(mountpoint string, command string) (string, error) {
 			mount := match[2]
 			if mount == mountpoint {
 				if _, err := tmpMounts.WriteString(fmt.Sprintf("%s\n", scanner.Text())); err != nil {
-					return "", fmt.Errorf("Cannot write temporary mounts file: %v", err)
+					return "", fmt.Errorf("cannot write temporary mounts file: %v", err)
 				}
 				if err := tmpMounts.Sync(); err != nil {
-					return "", fmt.Errorf("Cannot sync temporary mounts file: %v", err)
+					return "", fmt.Errorf("cannot sync temporary mounts file: %v", err)
 				}
 				return doRunXFSQuotaCommand(mountpoint, tmpMountsFileName, command)
 			}
 		}
 	}
-	return "", fmt.Errorf("Cannot run xfs_quota: cannot find mount point %s in %s", mountpoint, MountsFile)
+	return "", fmt.Errorf("cannot run xfs_quota: cannot find mount point %s in %s", mountpoint, MountsFile)
 }
 
 // SupportsQuotas determines whether the filesystem supports quotas.
@@ -215,14 +215,14 @@ func (v linuxVolumeQuotaApplier) GetQuotaOnDir(path string) (QuotaID, error) {
 	}
 	match := lsattrParseRegexp.FindStringSubmatch(string(data))
 	if match == nil {
-		return BadQuotaID, fmt.Errorf("Unable to parse lsattr -pd %s output %s", path, string(data))
+		return BadQuotaID, fmt.Errorf("unable to parse lsattr -pd %s output %s", path, string(data))
 	}
 	if match[2] != path {
-		return BadQuotaID, fmt.Errorf("Mismatch between supplied and returned path (%s != %s)", path, match[2])
+		return BadQuotaID, fmt.Errorf("mismatch between supplied and returned path (%s != %s)", path, match[2])
 	}
 	projid, err := strconv.ParseInt(match[1], 10, 32)
 	if err != nil {
-		return BadQuotaID, fmt.Errorf("Unable to parse project ID from %s (%v)", match[1], err)
+		return BadQuotaID, fmt.Errorf("unable to parse project ID from %s (%v)", match[1], err)
 	}
 	return QuotaID(projid), nil
 }
@@ -244,18 +244,18 @@ func (v linuxVolumeQuotaApplier) SetQuotaOnDir(path string, id QuotaID, bytes in
 func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier int64, allowEmptyOutput bool) (int64, error) {
 	data, err := runXFSQuotaCommand(mountpoint, fmt.Sprintf("quota -p -N -n -v %s %v", xfsQuotaArg, id))
 	if err != nil {
-		return 0, fmt.Errorf("Unable to run xfs_quota: %v", err)
+		return 0, fmt.Errorf("unable to run xfs_quota: %v", err)
 	}
 	if data == "" && allowEmptyOutput {
 		return 0, nil
 	}
 	match := quotaParseRegexp.FindStringSubmatch(data)
 	if match == nil {
-		return 0, fmt.Errorf("Unable to parse quota output '%s'", data)
+		return 0, fmt.Errorf("unable to parse quota output '%s'", data)
 	}
 	size, err := strconv.ParseInt(match[1], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("Unable to parse data size '%s' from '%s': %v", match[1], data, err)
+		return 0, fmt.Errorf("unable to parse data size '%s' from '%s': %v", match[1], data, err)
 	}
 	klog.V(4).Infof("getQuantity %s %d %s %d => %d %v", mountpoint, id, xfsQuotaArg, multiplier, size, err)
 	return size * multiplier, nil

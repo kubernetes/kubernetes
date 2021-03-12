@@ -52,7 +52,7 @@ func TestIsAvailabilityZone(t *testing.T) {
 		expected bool
 	}{
 		{"empty string should return false", "", false},
-		{"wrong farmat should return false", "123", false},
+		{"wrong format should return false", "123", false},
 		{"wrong location should return false", "chinanorth-1", false},
 		{"correct zone should return true", "eastus-1", true},
 	}
@@ -78,7 +78,7 @@ func TestGetZoneID(t *testing.T) {
 		expected string
 	}{
 		{"empty string should return empty string", "", ""},
-		{"wrong farmat should return empty string", "123", ""},
+		{"wrong format should return empty string", "123", ""},
 		{"wrong location should return empty string", "chinanorth-1", ""},
 		{"correct zone should return zone ID", "eastus-1", "1"},
 	}

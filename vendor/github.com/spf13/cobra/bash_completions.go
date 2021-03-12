@@ -62,6 +62,12 @@ __%[1]s_handle_go_custom_completion()
 {
     __%[1]s_debug "${FUNCNAME[0]}: cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}"
 
+    local shellCompDirectiveError=%[3]d
+    local shellCompDirectiveNoSpace=%[4]d
+    local shellCompDirectiveNoFileComp=%[5]d
+    local shellCompDirectiveFilterFileExt=%[6]d
+    local shellCompDirectiveFilterDirs=%[7]d
+
     local out requestComp lastParam lastChar comp directive args
 
     # Prepare the command to request completions for the program.
@@ -95,24 +101,50 @@ __%[1]s_handle_go_custom_completion()
     __%[1]s_debug "${FUNCNAME[0]}: the completion directive is: ${directive}"
     __%[1]s_debug "${FUNCNAME[0]}: the completions are: ${out[*]}"
 
-    if [ $((directive & %[3]d)) -ne 0 ]; then
+    if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
         # Error code.  No completion.
         __%[1]s_debug "${FUNCNAME[0]}: received error from custom completion go code"
         return
     else
-        if [ $((directive & %[4]d)) -ne 0 ]; then
+        if [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
             if [[ $(type -t compopt) = "builtin" ]]; then
                 __%[1]s_debug "${FUNCNAME[0]}: activating no space"
                 compopt -o nospace
             fi
         fi
-        if [ $((directive & %[5]d)) -ne 0 ]; then
+        if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
             if [[ $(type -t compopt) = "builtin" ]]; then
                 __%[1]s_debug "${FUNCNAME[0]}: activating no file completion"
                 compopt +o default
             fi
         fi
+    fi
 
+    if [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
+        # File extension filtering
+        local fullFilter filter filteringCmd
+        # Do not use quotes around the $out variable or else newline
+        # characters will be kept.
+        for filter in ${out[*]}; do
+            fullFilter+="$filter|"
+        done
+
+        filteringCmd="_filedir $fullFilter"
+        __%[1]s_debug "File filtering command: $filteringCmd"
+        $filteringCmd
+    elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
+        # File completion for directories only
+        local subDir
+        # Use printf to strip any trailing newline
+        subdir=$(printf "%%s" "${out[0]}")
+        if [ -n "$subdir" ]; then
+            __%[1]s_debug "Listing directories in $subdir"
+            __%[1]s_handle_subdirs_in_dir_flag "$subdir"
+        else
+            __%[1]s_debug "Listing directories in ."
+            _filedir -d
+        fi
+    else
         while IFS='' read -r comp; do
             COMPREPLY+=("$comp")
         done < <(compgen -W "${out[*]}" -- "$cur")
@@ -181,10 +213,9 @@ __%[1]s_handle_reply()
     local completions
     completions=("${commands[@]}")
     if [[ ${#must_have_one_noun[@]} -ne 0 ]]; then
-        completions=("${must_have_one_noun[@]}")
+        completions+=("${must_have_one_noun[@]}")
     elif [[ -n "${has_completion_function}" ]]; then
         # if a go completion function is provided, defer to that function
-        completions=()
         __%[1]s_handle_go_custom_completion
     fi
     if [[ ${#must_have_one_flag[@]} -ne 0 ]]; then
@@ -344,7 +375,9 @@ __%[1]s_handle_word()
     __%[1]s_handle_word
 }
 
-`, name, ShellCompNoDescRequestCmd, ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp))
+`, name, ShellCompNoDescRequestCmd,
+		ShellCompDirectiveError, ShellCompDirectiveNoSpace, ShellCompDirectiveNoFileComp,
+		ShellCompDirectiveFilterFileExt, ShellCompDirectiveFilterDirs))
 }
 
 func writePostscript(buf *bytes.Buffer, name string) {
@@ -390,7 +423,7 @@ fi
 func writeCommands(buf *bytes.Buffer, cmd *Command) {
 	buf.WriteString("    commands=()\n")
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c == cmd.helpCommand {
+		if !c.IsAvailableCommand() && c != cmd.helpCommand {
 			continue
 		}
 		buf.WriteString(fmt.Sprintf("    commands+=(%q)\n", c.Name()))
@@ -462,12 +495,14 @@ func writeFlag(buf *bytes.Buffer, flag *pflag.Flag, cmd *Command) {
 
 func writeLocalNonPersistentFlag(buf *bytes.Buffer, flag *pflag.Flag) {
 	name := flag.Name
-	format := "    local_nonpersistent_flags+=(\"--%s"
+	format := "    local_nonpersistent_flags+=(\"--%[1]s\")\n"
 	if len(flag.NoOptDefVal) == 0 {
-		format += "="
+		format += "    local_nonpersistent_flags+=(\"--%[1]s=\")\n"
 	}
-	format += "\")\n"
 	buf.WriteString(fmt.Sprintf(format, name))
+	if len(flag.Shorthand) > 0 {
+		buf.WriteString(fmt.Sprintf("    local_nonpersistent_flags+=(\"-%s\")\n", flag.Shorthand))
+	}
 }
 
 // Setup annotations for go completions for registered flags
@@ -502,7 +537,9 @@ func writeFlags(buf *bytes.Buffer, cmd *Command) {
 		if len(flag.Shorthand) > 0 {
 			writeShortFlag(buf, flag, cmd)
 		}
-		if localNonPersistentFlags.Lookup(flag.Name) != nil {
+		// localNonPersistentFlags are used to stop the completion of subcommands when one is set
+		// if TraverseChildren is true we should allow to complete subcommands
+		if localNonPersistentFlags.Lookup(flag.Name) != nil && !cmd.Root().TraverseChildren {
 			writeLocalNonPersistentFlag(buf, flag)
 		}
 	})
@@ -583,7 +620,7 @@ func writeArgAliases(buf *bytes.Buffer, cmd *Command) {
 
 func gen(buf *bytes.Buffer, cmd *Command) {
 	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c == cmd.helpCommand {
+		if !c.IsAvailableCommand() && c != cmd.helpCommand {
 			continue
 		}
 		gen(buf, c)

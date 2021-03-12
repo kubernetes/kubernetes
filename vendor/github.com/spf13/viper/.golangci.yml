@@ -1,0 +1,27 @@
+linters-settings:
+    golint:
+        min-confidence: 0.1
+    goimports:
+        local-prefixes: github.com/spf13/viper
+
+linters:
+    enable-all: true
+    disable:
+        - funlen
+        - maligned
+
+        # TODO: fix me
+        - wsl
+        - gochecknoinits
+        - gosimple
+        - gochecknoglobals
+        - errcheck
+        - lll
+        - godox
+        - scopelint
+        - gocyclo
+        - gocognit
+        - gocritic
+
+service:
+    golangci-lint-version: 1.21.x

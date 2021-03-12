@@ -1,0 +1,10 @@
+language: go
+go:
+  - 1.x
+os:
+  - linux
+  - osx
+script:
+  - go test -test.v -coverprofile=coverage.out -covermode=count
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

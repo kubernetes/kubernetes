@@ -18,15 +18,17 @@ package serviceaffinity
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -85,8 +87,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on same node",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -94,8 +96,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, region match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -103,8 +105,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region"},
@@ -112,8 +114,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service in different namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns1", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns2"}}},
 			labels:   []string{"region"},
@@ -121,8 +123,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "pod in different namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns2"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns2", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			labels:   []string{"region"},
@@ -130,8 +132,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service and pod in same namespace, region mismatch",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Labels: selector, Namespace: "ns1"}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, Namespace: "ns1", UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine3"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, Namespace: "ns1", UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
 			labels:   []string{"region"},
@@ -139,8 +141,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, multiple labels, not all match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine2"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node1,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region", "zone"},
@@ -148,8 +150,8 @@ func TestServiceAffinity(t *testing.T) {
 		},
 		{
 			name:     "service pod on different node, multiple labels, all match",
-			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: selector}},
-			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Labels: selector}}},
+			pod:      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1", Labels: selector, UID: types.UID("pod1")}},
+			pods:     []*v1.Pod{{Spec: v1.PodSpec{NodeName: "machine5"}, ObjectMeta: metav1.ObjectMeta{Name: "pod2", Labels: selector, UID: types.UID("pod2")}}},
 			node:     &node4,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: selector}}},
 			labels:   []string{"region", "zone"},
@@ -538,7 +540,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 
 			// Add test.addedPod to state1 and verify it is equal to allPodsState.
 			nodeInfo := mustGetNodeInfo(t, snapshot, test.addedPod.Spec.NodeName)
-			if err := ipa.AddPod(context.Background(), state, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			addedPodInfo := framework.NewPodInfo(test.addedPod)
+			if err := ipa.AddPod(context.Background(), state, test.pendingPod, addedPodInfo, nodeInfo); err != nil {
 				t.Errorf("error adding pod to preFilterState: %v", err)
 			}
 
@@ -546,8 +549,8 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 				t.Errorf("State is not equal, got: %v, want: %v", plState, plStateAllPods)
 			}
 
-			// Remove the added pod pod and make sure it is equal to the original state.
-			if err := ipa.RemovePod(context.Background(), state, test.pendingPod, test.addedPod, nodeInfo); err != nil {
+			// Remove the added pod and make sure it is equal to the original state.
+			if err := ipa.RemovePod(context.Background(), state, test.pendingPod, addedPodInfo, nodeInfo); err != nil {
 				t.Errorf("error removing pod from preFilterState: %v", err)
 			}
 			if !reflect.DeepEqual(sortState(plStateOriginal), sortState(plState)) {
@@ -615,7 +618,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterServiceAffinity" from cycleState: not found`)
+	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterServiceAffinity" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

@@ -79,6 +79,7 @@ func Test_getProxyMode(t *testing.T) {
 		kernelCompat  bool
 		ipsetError    error
 		expected      string
+		scheduler     string
 	}{
 		{ // flag says userspace
 			flag:     "userspace",
@@ -110,6 +111,7 @@ func Test_getProxyMode(t *testing.T) {
 			kernelVersion: "4.18",
 			ipsetVersion:  ipvs.MinIPSetCheckVersion,
 			expected:      proxyModeIPVS,
+			scheduler:     "rr",
 		},
 		{ // flag says ipvs, ipset version ok, kernel modules installed for linux kernel 4.19
 			flag:          "ipvs",
@@ -117,6 +119,7 @@ func Test_getProxyMode(t *testing.T) {
 			kernelVersion: "4.19",
 			ipsetVersion:  ipvs.MinIPSetCheckVersion,
 			expected:      proxyModeIPVS,
+			scheduler:     "rr",
 		},
 		{ // flag says ipvs, ipset version too low, fallback on iptables mode
 			flag:          "ipvs",
@@ -142,6 +145,23 @@ func Test_getProxyMode(t *testing.T) {
 			kernelCompat:  true,
 			expected:      proxyModeIPTables,
 		},
+		{ // flag says ipvs, ipset version ok, kernel modules installed for sed scheduler
+			flag:          "ipvs",
+			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack", "ip_vs_sed"},
+			kernelVersion: "4.19",
+			ipsetVersion:  ipvs.MinIPSetCheckVersion,
+			expected:      proxyModeIPVS,
+			scheduler:     "sed",
+		},
+		{ // flag says ipvs, kernel modules not installed for sed scheduler, fallback to iptables
+			flag:          "ipvs",
+			kmods:         []string{"ip_vs", "ip_vs_rr", "ip_vs_wrr", "ip_vs_sh", "nf_conntrack"},
+			kernelVersion: "4.19",
+			ipsetVersion:  ipvs.MinIPSetCheckVersion,
+			expected:      proxyModeIPTables,
+			kernelCompat:  true,
+			scheduler:     "sed",
+		},
 	}
 	for i, c := range cases {
 		kcompater := &fakeKernelCompatTester{c.kernelCompat}
@@ -150,7 +170,7 @@ func Test_getProxyMode(t *testing.T) {
 			modules:       c.kmods,
 			kernelVersion: c.kernelVersion,
 		}
-		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver)
+		canUseIPVS, _ := ipvs.CanUseIPVSProxier(khandler, ipsetver, cases[i].scheduler)
 		r := getProxyMode(c.flag, canUseIPVS, kcompater)
 		if r != c.expected {
 			t.Errorf("Case[%d] Expected %q, got %q", i, c.expected, r)

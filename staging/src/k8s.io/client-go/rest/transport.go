@@ -21,6 +21,7 @@ import (
 	"errors"
 	"net/http"
 
+	"k8s.io/client-go/pkg/apis/clientauthentication"
 	"k8s.io/client-go/plugin/pkg/client/auth/exec"
 	"k8s.io/client-go/transport"
 )
@@ -94,7 +95,15 @@ func (c *Config) TransportConfig() (*transport.Config, error) {
 	}
 
 	if c.ExecProvider != nil {
-		provider, err := exec.GetAuthenticator(c.ExecProvider)
+		var cluster *clientauthentication.Cluster
+		if c.ExecProvider.ProvideClusterInfo {
+			var err error
+			cluster, err = ConfigToExecCluster(c)
+			if err != nil {
+				return nil, err
+			}
+		}
+		provider, err := exec.GetAuthenticator(c.ExecProvider, cluster)
 		if err != nil {
 			return nil, err
 		}

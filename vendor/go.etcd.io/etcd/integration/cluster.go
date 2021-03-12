@@ -152,6 +152,8 @@ type ClusterConfig struct {
 
 	EnableLeaseCheckpoint   bool
 	LeaseCheckpointInterval time.Duration
+
+	WatchProgressNotifyInterval time.Duration
 }
 
 type cluster struct {
@@ -279,23 +281,24 @@ func (c *cluster) HTTPMembers() []client.Member {
 func (c *cluster) mustNewMember(t testing.TB) *member {
 	m := mustNewMember(t,
 		memberConfig{
-			name:                     c.name(rand.Int()),
-			authToken:                c.cfg.AuthToken,
-			peerTLS:                  c.cfg.PeerTLS,
-			clientTLS:                c.cfg.ClientTLS,
-			quotaBackendBytes:        c.cfg.QuotaBackendBytes,
-			maxTxnOps:                c.cfg.MaxTxnOps,
-			maxRequestBytes:          c.cfg.MaxRequestBytes,
-			snapshotCount:            c.cfg.SnapshotCount,
-			snapshotCatchUpEntries:   c.cfg.SnapshotCatchUpEntries,
-			grpcKeepAliveMinTime:     c.cfg.GRPCKeepAliveMinTime,
-			grpcKeepAliveInterval:    c.cfg.GRPCKeepAliveInterval,
-			grpcKeepAliveTimeout:     c.cfg.GRPCKeepAliveTimeout,
-			clientMaxCallSendMsgSize: c.cfg.ClientMaxCallSendMsgSize,
-			clientMaxCallRecvMsgSize: c.cfg.ClientMaxCallRecvMsgSize,
-			useIP:                    c.cfg.UseIP,
-			enableLeaseCheckpoint:    c.cfg.EnableLeaseCheckpoint,
-			leaseCheckpointInterval:  c.cfg.LeaseCheckpointInterval,
+			name:                        c.name(rand.Int()),
+			authToken:                   c.cfg.AuthToken,
+			peerTLS:                     c.cfg.PeerTLS,
+			clientTLS:                   c.cfg.ClientTLS,
+			quotaBackendBytes:           c.cfg.QuotaBackendBytes,
+			maxTxnOps:                   c.cfg.MaxTxnOps,
+			maxRequestBytes:             c.cfg.MaxRequestBytes,
+			snapshotCount:               c.cfg.SnapshotCount,
+			snapshotCatchUpEntries:      c.cfg.SnapshotCatchUpEntries,
+			grpcKeepAliveMinTime:        c.cfg.GRPCKeepAliveMinTime,
+			grpcKeepAliveInterval:       c.cfg.GRPCKeepAliveInterval,
+			grpcKeepAliveTimeout:        c.cfg.GRPCKeepAliveTimeout,
+			clientMaxCallSendMsgSize:    c.cfg.ClientMaxCallSendMsgSize,
+			clientMaxCallRecvMsgSize:    c.cfg.ClientMaxCallRecvMsgSize,
+			useIP:                       c.cfg.UseIP,
+			enableLeaseCheckpoint:       c.cfg.EnableLeaseCheckpoint,
+			leaseCheckpointInterval:     c.cfg.LeaseCheckpointInterval,
+			WatchProgressNotifyInterval: c.cfg.WatchProgressNotifyInterval,
 		})
 	m.DiscoveryURL = c.cfg.DiscoveryURL
 	if c.cfg.UseGRPC {
@@ -568,23 +571,24 @@ type member struct {
 func (m *member) GRPCAddr() string { return m.grpcAddr }
 
 type memberConfig struct {
-	name                     string
-	peerTLS                  *transport.TLSInfo
-	clientTLS                *transport.TLSInfo
-	authToken                string
-	quotaBackendBytes        int64
-	maxTxnOps                uint
-	maxRequestBytes          uint
-	snapshotCount            uint64
-	snapshotCatchUpEntries   uint64
-	grpcKeepAliveMinTime     time.Duration
-	grpcKeepAliveInterval    time.Duration
-	grpcKeepAliveTimeout     time.Duration
-	clientMaxCallSendMsgSize int
-	clientMaxCallRecvMsgSize int
-	useIP                    bool
-	enableLeaseCheckpoint    bool
-	leaseCheckpointInterval  time.Duration
+	name                        string
+	peerTLS                     *transport.TLSInfo
+	clientTLS                   *transport.TLSInfo
+	authToken                   string
+	quotaBackendBytes           int64
+	maxTxnOps                   uint
+	maxRequestBytes             uint
+	snapshotCount               uint64
+	snapshotCatchUpEntries      uint64
+	grpcKeepAliveMinTime        time.Duration
+	grpcKeepAliveInterval       time.Duration
+	grpcKeepAliveTimeout        time.Duration
+	clientMaxCallSendMsgSize    int
+	clientMaxCallRecvMsgSize    int
+	useIP                       bool
+	enableLeaseCheckpoint       bool
+	leaseCheckpointInterval     time.Duration
+	WatchProgressNotifyInterval time.Duration
 }
 
 // mustNewMember return an inited member with the given name. If peerTLS is
@@ -677,6 +681,8 @@ func mustNewMember(t testing.TB, mcfg memberConfig) *member {
 	m.useIP = mcfg.useIP
 	m.EnableLeaseCheckpoint = mcfg.enableLeaseCheckpoint
 	m.LeaseCheckpointInterval = mcfg.leaseCheckpointInterval
+
+	m.WatchProgressNotifyInterval = mcfg.WatchProgressNotifyInterval
 
 	m.InitialCorruptCheck = true
 

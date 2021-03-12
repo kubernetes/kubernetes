@@ -35,7 +35,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 var FileExtensions = []string{".json", ".yaml", ".yml"}
@@ -176,6 +179,25 @@ func newBuilder(clientConfigFn ClientConfigFunc, restMapper RESTMapperFunc, cate
 	}
 }
 
+// noopClientGetter implements RESTClientGetter returning only errors.
+// used as a dummy getter in a local-only builder.
+type noopClientGetter struct{}
+
+func (noopClientGetter) ToRESTConfig() (*rest.Config, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+func (noopClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+func (noopClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	return nil, fmt.Errorf("local operation only")
+}
+
+// NewLocalBuilder returns a builder that is configured not to create REST clients and avoids asking the server for results.
+func NewLocalBuilder() *Builder {
+	return NewBuilder(noopClientGetter{}).Local()
+}
+
 func NewBuilder(restClientGetter RESTClientGetter) *Builder {
 	categoryExpanderFn := func() (restmapper.CategoryExpander, error) {
 		discoveryClient, err := restClientGetter.ToDiscoveryClient()
@@ -237,8 +259,14 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 		}
 	}
 	if filenameOptions.Kustomize != "" {
-		b.paths = append(b.paths, &KustomizeVisitor{filenameOptions.Kustomize,
-			NewStreamVisitor(nil, b.mapper, filenameOptions.Kustomize, b.schema)})
+		b.paths = append(
+			b.paths,
+			&KustomizeVisitor{
+				mapper:  b.mapper,
+				dirPath: filenameOptions.Kustomize,
+				schema:  b.schema,
+				fSys:    filesys.MakeFsOnDisk(),
+			})
 	}
 
 	if enforceNamespace {
@@ -818,7 +846,7 @@ func (b *Builder) visitorResult() *Result {
 				return &Result{err: err}
 			}
 		}
-		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+		return &Result{err: fmt.Errorf("resource(s) were provided, but no name was specified")}
 	}
 	return &Result{err: missingResourceError}
 }

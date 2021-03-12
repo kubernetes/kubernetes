@@ -211,6 +211,60 @@ func TestIsHugePageResourceName(t *testing.T) {
 	}
 }
 
+func TestIsHugePageResourceValueDivisible(t *testing.T) {
+	testCases := []struct {
+		name     core.ResourceName
+		quantity resource.Quantity
+		result   bool
+	}{
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("4Mi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-2Mi"),
+			quantity: resource.MustParse("5Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2Gi"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Gi"),
+			quantity: resource.MustParse("2.1Gi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-1Mi"),
+			quantity: resource.MustParse("2.1Mi"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages-64Ki"),
+			quantity: resource.MustParse("128Ki"),
+			result:   true,
+		},
+		{
+			name:     core.ResourceName("hugepages-"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+		{
+			name:     core.ResourceName("hugepages"),
+			quantity: resource.MustParse("128Ki"),
+			result:   false,
+		},
+	}
+	for _, testCase := range testCases {
+		if testCase.result != IsHugePageResourceValueDivisible(testCase.name, testCase.quantity) {
+			t.Errorf("resource: %v storage:%v expected result: %v", testCase.name, testCase.quantity, testCase.result)
+		}
+	}
+}
+
 func TestHugePageResourceName(t *testing.T) {
 	testCases := []struct {
 		pageSize resource.Quantity
@@ -292,5 +346,75 @@ func TestIsOvercommitAllowed(t *testing.T) {
 		if testCase.allowed != IsOvercommitAllowed(testCase.name) {
 			t.Errorf("Unexpected result for %v", testCase.name)
 		}
+	}
+}
+
+func TestIsServiceIPSet(t *testing.T) {
+	testCases := []struct {
+		input  core.ServiceSpec
+		output bool
+		name   string
+	}{
+		{
+			name: "nil cluster ip",
+			input: core.ServiceSpec{
+				ClusterIPs: nil,
+			},
+
+			output: false,
+		},
+		{
+			name: "headless service",
+			input: core.ServiceSpec{
+				ClusterIP:  "None",
+				ClusterIPs: []string{"None"},
+			},
+			output: false,
+		},
+		// true cases
+		{
+			name: "one ipv4",
+			input: core.ServiceSpec{
+				ClusterIP:  "1.2.3.4",
+				ClusterIPs: []string{"1.2.3.4"},
+			},
+			output: true,
+		},
+		{
+			name: "one ipv6",
+			input: core.ServiceSpec{
+				ClusterIP:  "2001::1",
+				ClusterIPs: []string{"2001::1"},
+			},
+			output: true,
+		},
+		{
+			name: "v4, v6",
+			input: core.ServiceSpec{
+				ClusterIP:  "1.2.3.4",
+				ClusterIPs: []string{"1.2.3.4", "2001::1"},
+			},
+			output: true,
+		},
+		{
+			name: "v6, v4",
+			input: core.ServiceSpec{
+				ClusterIP:  "2001::1",
+				ClusterIPs: []string{"2001::1", "1.2.3.4"},
+			},
+
+			output: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := core.Service{
+				Spec: tc.input,
+			}
+			if IsServiceIPSet(&s) != tc.output {
+				t.Errorf("case, input: %v, expected: %v, got: %v", tc.input, tc.output, !tc.output)
+			}
+		})
 	}
 }

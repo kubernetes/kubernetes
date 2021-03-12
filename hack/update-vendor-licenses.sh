@@ -197,18 +197,24 @@ for PACKAGE in $(go list -m -json all | jq -r .Path | sort -f); do
     continue
   fi
   # Skip a directory if 1) it has no files and 2) all the subdirectories contain a go.mod file.
-  if [[ -z "$(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
-      misses_go_mod=false
+  misses_go_mod=false
+  DEPS_SUBDIR="${DEPS_DIR}/${PACKAGE}"
+  search_for_mods () {
+    if [[ -z "$(find "${DEPS_SUBDIR}/" -mindepth 1 -maxdepth 1 -type f)" ]]; then
       while read -d "" -r SUBDIR; do
           if [[ ! -e "${SUBDIR}/go.mod" ]]; then
-              misses_go_mod=true
-              break
+              DEPS_SUBDIR=${SUBDIR}
+              search_for_mods
           fi
-      done < <(find "${DEPS_DIR}/${PACKAGE}/" -mindepth 1 -maxdepth 1 -type d -print0)
-      if [[ $misses_go_mod = false ]]; then
-          echo "${PACKAGE} has no files, skipping" >&2
-          continue
-      fi
+      done < <(find "${DEPS_SUBDIR}/" -mindepth 1 -maxdepth 1 -type d -print0)
+    else
+      misses_go_mod=true
+    fi
+  }
+  search_for_mods
+  if [[ $misses_go_mod = false ]]; then
+      echo "${PACKAGE} has no files, skipping" >&2
+      continue
   fi
   echo "${PACKAGE}"
 

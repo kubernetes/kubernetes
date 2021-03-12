@@ -36,9 +36,6 @@ const (
 
 	// auditKey is the context key for the audit event.
 	auditKey
-
-	// audiencesKey is the context key for request audiences.
-	audiencesKey
 )
 
 // NewContext instantiates a base context object for request flows.

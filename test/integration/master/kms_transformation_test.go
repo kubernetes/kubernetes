@@ -260,6 +260,7 @@ func mustBeHealthy(t *testing.T, checkName string, clientConfig *rest.Config) {
 	var restErr error
 	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 		status, err := getHealthz(checkName, clientConfig)
+		restErr = err
 		if err != nil {
 			return false, err
 		}
@@ -267,7 +268,7 @@ func mustBeHealthy(t *testing.T, checkName string, clientConfig *rest.Config) {
 	})
 
 	if pollErr == wait.ErrWaitTimeout {
-		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v", restErr, checkName)
+		t.Fatalf("failed to get the expected healthz status of OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 
@@ -276,6 +277,7 @@ func mustBeUnHealthy(t *testing.T, checkName string, clientConfig *rest.Config) 
 	var restErr error
 	pollErr := wait.PollImmediate(2*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 		status, err := getHealthz(checkName, clientConfig)
+		restErr = err
 		if err != nil {
 			return false, err
 		}
@@ -283,7 +285,7 @@ func mustBeUnHealthy(t *testing.T, checkName string, clientConfig *rest.Config) 
 	})
 
 	if pollErr == wait.ErrWaitTimeout {
-		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v", restErr, checkName)
+		t.Fatalf("failed to get the expected healthz status of !OK for check: %s, error: %v, debug inner error: %v", checkName, pollErr, restErr)
 	}
 }
 

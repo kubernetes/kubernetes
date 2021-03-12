@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/klog/v2"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
@@ -57,11 +57,11 @@ func (c *CacheComparer) Compare() error {
 	pendingPods := c.PodQueue.PendingPods()
 
 	if missed, redundant := c.CompareNodes(nodes, dump.Nodes); len(missed)+len(redundant) != 0 {
-		klog.Warningf("cache mismatch: missed nodes: %s; redundant nodes: %s", missed, redundant)
+		klog.InfoS("cache mismatch", "missed nodes", missed, "redundant nodes", redundant)
 	}
 
 	if missed, redundant := c.ComparePods(pods, pendingPods, dump.Nodes); len(missed)+len(redundant) != 0 {
-		klog.Warningf("cache mismatch: missed pods: %s; redundant pods: %s", missed, redundant)
+		klog.InfoS("cache mismatch", "missed pods", missed, "redundant pods", redundant)
 	}
 
 	return nil

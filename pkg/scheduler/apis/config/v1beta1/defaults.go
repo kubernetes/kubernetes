@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/util/feature"
 	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
@@ -28,9 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/utils/pointer"
-
-	// this package shouldn't really depend on other k8s.io/kubernetes code
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 var defaultResourceSpec = []v1beta1.ResourceSpec{
@@ -44,13 +42,18 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_KubeSchedulerConfiguration sets additional defaults
 func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfiguration) {
+
+	if obj.Parallelism == nil {
+		obj.Parallelism = pointer.Int32Ptr(16)
+	}
+
 	if len(obj.Profiles) == 0 {
 		obj.Profiles = append(obj.Profiles, v1beta1.KubeSchedulerProfile{})
 	}
 	// Only apply a default scheduler name when there is a single profile.
 	// Validation will ensure that every profile has a non-empty unique name.
 	if len(obj.Profiles) == 1 && obj.Profiles[0].SchedulerName == nil {
-		obj.Profiles[0].SchedulerName = pointer.StringPtr(api.DefaultSchedulerName)
+		obj.Profiles[0].SchedulerName = pointer.StringPtr(v1.DefaultSchedulerName)
 	}
 
 	// For Healthz and Metrics bind addresses, we want to check:
@@ -109,7 +112,10 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 
 	if len(obj.LeaderElection.ResourceLock) == 0 {
-		obj.LeaderElection.ResourceLock = "endpointsleases"
+		// Use lease-based leader election to reduce cost.
+		// We migrated for EndpointsLease lock in 1.17 and starting in 1.20 we
+		// migrated to Lease lock.
+		obj.LeaderElection.ResourceLock = "leases"
 	}
 	if len(obj.LeaderElection.ResourceNamespace) == 0 {
 		obj.LeaderElection.ResourceNamespace = v1beta1.SchedulerDefaultLockObjectNamespace
@@ -155,6 +161,15 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 	}
 }
 
+func SetDefaults_DefaultPreemptionArgs(obj *v1beta1.DefaultPreemptionArgs) {
+	if obj.MinCandidateNodesPercentage == nil {
+		obj.MinCandidateNodesPercentage = pointer.Int32Ptr(10)
+	}
+	if obj.MinCandidateNodesAbsolute == nil {
+		obj.MinCandidateNodesAbsolute = pointer.Int32Ptr(100)
+	}
+}
+
 func SetDefaults_InterPodAffinityArgs(obj *v1beta1.InterPodAffinityArgs) {
 	// Note that an object is created manually in cmd/kube-scheduler/app/options/deprecated.go
 	// DeprecatedOptions#ApplyTo.
@@ -192,23 +207,18 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 }
 
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
-	if !feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
-		// When feature is disabled, the default spreading is done by legacy
-		// SelectorSpread plugin.
+	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
+		if obj.DefaultingType == "" {
+			// TODO(#94008): Always default to System in v1beta2.
+			if len(obj.DefaultConstraints) != 0 {
+				obj.DefaultingType = v1beta1.ListDefaulting
+			} else {
+				obj.DefaultingType = v1beta1.SystemDefaulting
+			}
+		}
 		return
 	}
-	if obj.DefaultConstraints == nil {
-		obj.DefaultConstraints = []corev1.TopologySpreadConstraint{
-			{
-				TopologyKey:       corev1.LabelHostname,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-				MaxSkew:           3,
-			},
-			{
-				TopologyKey:       corev1.LabelZoneFailureDomainStable,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-				MaxSkew:           5,
-			},
-		}
+	if obj.DefaultingType == "" {
+		obj.DefaultingType = v1beta1.ListDefaulting
 	}
 }

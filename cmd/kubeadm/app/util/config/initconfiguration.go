@@ -36,10 +36,21 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
 	kubeadmruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
+)
+
+var (
+	// PlaceholderToken is only set statically to make kubeadm not randomize the token on every run
+	PlaceholderToken = kubeadmapiv1beta2.BootstrapToken{
+		Token: &kubeadmapiv1beta2.BootstrapTokenString{
+			ID:     "abcdef",
+			Secret: "0123456789abcdef",
+		},
+	}
 )
 
 // SetInitDynamicDefaults checks and sets configuration values for the InitConfiguration object
@@ -83,7 +94,7 @@ func SetBootstrapTokensDynamicDefaults(cfg *[]kubeadmapi.BootstrapToken) error {
 }
 
 // SetNodeRegistrationDynamicDefaults checks and sets configuration values for the NodeRegistration object
-func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, ControlPlaneTaint bool) error {
+func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions, controlPlaneTaint bool) error {
 	var err error
 	cfg.Name, err = kubeadmutil.GetHostname(cfg.Name)
 	if err != nil {
@@ -91,8 +102,9 @@ func SetNodeRegistrationDynamicDefaults(cfg *kubeadmapi.NodeRegistrationOptions,
 	}
 
 	// Only if the slice is nil, we should append the control-plane taint. This allows the user to specify an empty slice for no default control-plane taint
-	if ControlPlaneTaint && cfg.Taints == nil {
-		cfg.Taints = []v1.Taint{kubeadmconstants.ControlPlaneTaint}
+	if controlPlaneTaint && cfg.Taints == nil {
+		// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+		cfg.Taints = []v1.Taint{kubeadmconstants.OldControlPlaneTaint}
 	}
 
 	if cfg.CRISocket == "" {
@@ -166,6 +178,40 @@ func SetClusterDynamicDefaults(cfg *kubeadmapi.ClusterConfiguration, localAPIEnd
 	// Downcase SANs. Some domain names (like ELBs) have capitals in them.
 	LowercaseSANs(cfg.APIServer.CertSANs)
 	return nil
+}
+
+// DefaultedStaticInitConfiguration returns the internal InitConfiguration with static defaults.
+func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
+	versionedInitCfg := &kubeadmapiv1beta2.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{PlaceholderToken},
+		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
+			Name:      "node",
+		},
+	}
+	versionedClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
+		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+	}
+
+	internalcfg := &kubeadmapi.InitConfiguration{}
+
+	// Takes passed flags into account; the defaulting is executed once again enforcing assignment of
+	// static default values to cfg only for values not provided with flags
+	kubeadmscheme.Scheme.Default(versionedInitCfg)
+	if err := kubeadmscheme.Scheme.Convert(versionedInitCfg, internalcfg, nil); err != nil {
+		return nil, err
+	}
+
+	kubeadmscheme.Scheme.Default(versionedClusterCfg)
+	if err := kubeadmscheme.Scheme.Convert(versionedClusterCfg, &internalcfg.ClusterConfiguration, nil); err != nil {
+		return nil, err
+	}
+
+	// Default all the embedded ComponentConfig structs
+	componentconfigs.Default(&internalcfg.ClusterConfiguration, &internalcfg.LocalAPIEndpoint, &internalcfg.NodeRegistration)
+
+	return internalcfg, nil
 }
 
 // DefaultedInitConfiguration takes a versioned init config (often populated by flags), defaults it and converts it into internal InitConfiguration

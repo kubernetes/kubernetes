@@ -128,11 +128,16 @@ func AddSystemPriorityClasses() genericapiserver.PostStartHookFunc {
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						_, err := schedClientSet.PriorityClasses().Create(context.TODO(), pc, metav1.CreateOptions{})
-						if err != nil && !apierrors.IsAlreadyExists(err) {
-							return false, err
-						} else {
+						if err == nil || apierrors.IsAlreadyExists(err) {
 							klog.Infof("created PriorityClass %s with value %v", pc.Name, pc.Value)
+							continue
 						}
+						// ServiceUnavailble error is returned when the API server is blocked by storage version updates
+						if apierrors.IsServiceUnavailable(err) {
+							klog.Infof("going to retry, unable to create PriorityClass %s: %v", pc.Name, err)
+							return false, nil
+						}
+						return false, err
 					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityClass %v: %v. Retrying...", pc.Name, err)

@@ -33,7 +33,7 @@ import (
 // PodExistsInVolume() VolumeExists() and GetVolumesToMount()
 func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -78,7 +78,7 @@ func Test_AddPodToVolume_Positive_NewPodNewVolume(t *testing.T) {
 // PodExistsInVolume() VolumeExists() and GetVolumesToMount() and no errors.
 func Test_AddPodToVolume_Positive_ExistingPodExistingVolume(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -285,7 +285,7 @@ func Test_AddPodToVolume_Positive_NamesForDifferentPodsAndDifferentVolumes(t *te
 // Verifies newly added pod/volume are deleted
 func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -337,7 +337,7 @@ func Test_DeletePodFromVolume_Positive_PodExistsVolumeExists(t *testing.T) {
 // Verifies only that volume is marked reported in use
 func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 	// Arrange
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
 
 	pod1 := &v1.Pod{
@@ -462,7 +462,7 @@ func Test_MarkVolumesReportedInUse_Positive_NewPodNewVolume(t *testing.T) {
 }
 
 func Test_AddPodToVolume_WithEmptyDirSizeLimit(t *testing.T) {
-	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	volumePluginMgr, _ := volumetesting.GetTestKubeletVolumePluginMgr(t)
 	dsw := NewDesiredStateOfWorld(volumePluginMgr)
 	quantity1Gi := resource.MustParse("1Gi")
 	quantity2Gi := resource.MustParse("2Gi")

@@ -22,15 +22,17 @@ import (
 	"math/rand"
 	"reflect"
 	"strconv"
+	"syscall"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -355,6 +357,82 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		}
 		r := NewReflector(lw, &v1.Pod{}, s, 0)
 		r.ListAndWatch(wait.NeverStop)
+	}
+}
+
+func TestReflectorListAndWatchInitConnBackoff(t *testing.T) {
+	maxBackoff := 50 * time.Millisecond
+	table := []struct {
+		numConnFails  int
+		expLowerBound time.Duration
+		expUpperBound time.Duration
+	}{
+		{5, 32 * time.Millisecond, 64 * time.Millisecond}, // case where maxBackoff is not hit, time should grow exponentially
+		{40, 35 * 2 * maxBackoff, 40 * 2 * maxBackoff},    // case where maxBoff is hit, backoff time should flatten
+
+	}
+	for _, test := range table {
+		t.Run(fmt.Sprintf("%d connection failures takes at least %d ms", test.numConnFails, 1<<test.numConnFails),
+			func(t *testing.T) {
+				stopCh := make(chan struct{})
+				connFails := test.numConnFails
+				fakeClock := clock.NewFakeClock(time.Unix(0, 0))
+				bm := wait.NewExponentialBackoffManager(time.Millisecond, maxBackoff, 100*time.Millisecond, 2.0, 1.0, fakeClock)
+				done := make(chan struct{})
+				defer close(done)
+				go func() {
+					i := 0
+					for {
+						select {
+						case <-done:
+							return
+						default:
+						}
+						if fakeClock.HasWaiters() {
+							step := (1 << (i + 1)) * time.Millisecond
+							if step > maxBackoff*2 {
+								step = maxBackoff * 2
+							}
+							fakeClock.Step(step)
+							i++
+						}
+						time.Sleep(100 * time.Microsecond)
+					}
+				}()
+				lw := &testLW{
+					WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+						if connFails > 0 {
+							connFails--
+							return nil, syscall.ECONNREFUSED
+						}
+						close(stopCh)
+						return watch.NewFake(), nil
+					},
+					ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+						return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+					},
+				}
+				r := &Reflector{
+					name:                   "test-reflector",
+					listerWatcher:          lw,
+					store:                  NewFIFO(MetaNamespaceKeyFunc),
+					initConnBackoffManager: bm,
+					clock:                  fakeClock,
+					watchErrorHandler:      WatchErrorHandler(DefaultWatchErrorHandler),
+				}
+				start := fakeClock.Now()
+				err := r.ListAndWatch(stopCh)
+				elapsed := fakeClock.Since(start)
+				if err != nil {
+					t.Errorf("unexpected error %v", err)
+				}
+				if elapsed < (test.expLowerBound) {
+					t.Errorf("expected lower bound of ListAndWatch: %v, got %v", test.expLowerBound, elapsed)
+				}
+				if elapsed > (test.expUpperBound) {
+					t.Errorf("expected upper bound of ListAndWatch: %v, got %v", test.expUpperBound, elapsed)
+				}
+			})
 	}
 }
 
@@ -738,9 +816,14 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 				err := apierrors.NewTimeoutError("too large resource version", 1)
 				err.ErrStatus.Details.Causes = []metav1.StatusCause{{Type: metav1.CauseTypeResourceVersionTooLarge}}
 				return nil, err
+			// relist after the initial list (covers the error format used in api server 1.17.0-1.18.5)
+			case "30":
+				err := apierrors.NewTimeoutError("too large resource version", 1)
+				err.ErrStatus.Details.Causes = []metav1.StatusCause{{Message: "Too large resource version"}}
+				return nil, err
 			// relist from etcd after "too large" error
 			case "":
-				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+				return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "30"}}, nil
 			default:
 				return nil, fmt.Errorf("unexpected List call: %s", options.ResourceVersion)
 			}
@@ -759,12 +842,15 @@ func TestReflectorFullListIfTooLarge(t *testing.T) {
 	// may be synced to a different version and they will never converge.
 	// TODO: We should use etcd progress-notify feature to avoid this behavior but until this is
 	// done we simply try to relist from now to avoid continuous errors on relists.
-	stopCh = make(chan struct{})
-	if err := r.ListAndWatch(stopCh); err != nil {
-		t.Fatal(err)
+	for i := 1; i <= 2; i++ {
+		// relist twice to cover the two variants of TooLargeResourceVersion api errors
+		stopCh = make(chan struct{})
+		if err := r.ListAndWatch(stopCh); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	expectedRVs := []string{"0", "20", ""}
+	expectedRVs := []string{"0", "20", "", "30", ""}
 	if !reflect.DeepEqual(listCallRVs, expectedRVs) {
 		t.Errorf("Expected series of list calls with resource version of %#v but got: %#v", expectedRVs, listCallRVs)
 	}
@@ -822,5 +908,61 @@ func TestReflectorSetExpectedType(t *testing.T) {
 				t.Fatalf("Expected expectedGVK %v, got %v", tc.expectedGVK, r.expectedGVK)
 			}
 		})
+	}
+}
+
+type storeWithRV struct {
+	Store
+
+	// resourceVersions tracks values passed by UpdateResourceVersion
+	resourceVersions []string
+}
+
+func (s *storeWithRV) UpdateResourceVersion(resourceVersion string) {
+	s.resourceVersions = append(s.resourceVersions, resourceVersion)
+}
+
+func newStoreWithRV() *storeWithRV {
+	return &storeWithRV{
+		Store: NewStore(MetaNamespaceKeyFunc),
+	}
+}
+
+func TestReflectorResourceVersionUpdate(t *testing.T) {
+	s := newStoreWithRV()
+
+	stopCh := make(chan struct{})
+	fw := watch.NewFake()
+
+	lw := &testLW{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return fw, nil
+		},
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "10"}}, nil
+		},
+	}
+	r := NewReflector(lw, &v1.Pod{}, s, 0)
+
+	makePod := func(rv string) *v1.Pod {
+		return &v1.Pod{ObjectMeta: metav1.ObjectMeta{ResourceVersion: rv}}
+	}
+
+	go func() {
+		fw.Action(watch.Added, makePod("10"))
+		fw.Action(watch.Modified, makePod("20"))
+		fw.Action(watch.Bookmark, makePod("30"))
+		fw.Action(watch.Deleted, makePod("40"))
+		close(stopCh)
+	}()
+
+	// Initial list should use RV=0
+	if err := r.ListAndWatch(stopCh); err != nil {
+		t.Fatal(err)
+	}
+
+	expectedRVs := []string{"10", "20", "30", "40"}
+	if !reflect.DeepEqual(s.resourceVersions, expectedRVs) {
+		t.Errorf("Expected series of resource version updates of %#v but got: %#v", expectedRVs, s.resourceVersions)
 	}
 }

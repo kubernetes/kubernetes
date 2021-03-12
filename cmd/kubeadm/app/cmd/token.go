@@ -28,7 +28,6 @@ import (
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"k8s.io/klog/v2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -38,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
@@ -54,8 +54,8 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
-// NewCmdToken returns cobra.Command for token management
-func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
+// newCmdToken returns cobra.Command for token management
+func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	var kubeConfigFile string
 	var dryRun bool
 	tokenCmd := &cobra.Command{
@@ -92,7 +92,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	tokenCmd.PersistentFlags().BoolVar(&dryRun,
 		options.DryRun, dryRun, "Whether to enable dry-run mode or not")
 
-	cfg := &kubeadmapiv1beta2.InitConfiguration{}
+	cfg := cmdutil.DefaultInitConfiguration()
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
@@ -149,7 +149,7 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	bto.AddDescriptionFlag(createCmd.Flags())
 
 	tokenCmd.AddCommand(createCmd)
-	tokenCmd.AddCommand(NewCmdTokenGenerate(out))
+	tokenCmd.AddCommand(newCmdTokenGenerate(out))
 
 	outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
 
@@ -208,8 +208,8 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 	return tokenCmd
 }
 
-// NewCmdTokenGenerate returns cobra.Command to generate new token
-func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
+// newCmdTokenGenerate returns cobra.Command to generate new token
+func newCmdTokenGenerate(out io.Writer) *cobra.Command {
 	return &cobra.Command{
 		Use:   "generate",
 		Short: "Generate and print a bootstrap token, but do not create it on the server",
@@ -243,11 +243,6 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
 	klog.V(1).Infoln("[token] loading configurations")
-
-	// In fact, we don't do any CRI ops at all.
-	// This is just to force skipping the CRI detection.
-	// Ref: https://github.com/kubernetes/kubeadm/issues/1559
-	initCfg.NodeRegistration.CRISocket = kubeadmconstants.DefaultDockerCRISocket
 
 	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 	if err != nil {
@@ -372,9 +367,6 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
-			// TODO: We hard-code "type" here until `field_constants.go` that is
-			// currently in `pkg/apis/core/` exists in the external API, i.e.
-			// k8s.io/api/v1. Should be v1.SecretTypeField
 			"type": string(bootstrapapi.SecretTypeBootstrapToken),
 		},
 	)
@@ -420,13 +412,13 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 	for _, tokenIDOrToken := range tokenIDsOrTokens {
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
-		klog.V(1).Infof("[token] parsing token %q", tokenIDOrToken)
+		klog.V(1).Info("[token] parsing token")
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
 			if err != nil {
-				return errors.Errorf("given token %q didn't match pattern %q or %q",
-					tokenIDOrToken, bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
+				return errors.Errorf("given token didn't match pattern %q or %q",
+					bootstrapapi.BootstrapTokenIDPattern, bootstrapapi.BootstrapTokenIDPattern)
 			}
 			tokenID = bts.ID
 		}

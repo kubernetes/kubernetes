@@ -57,3 +57,17 @@ func TestLazyClientIP(t *testing.T) {
 	clientIPWithoutReq := &lazyClientIP{}
 	assert.Equal(t, "unknown", fmt.Sprintf("%v", clientIPWithoutReq))
 }
+
+func TestLazyAccept(t *testing.T) {
+	req := &http.Request{}
+	req.Header = http.Header{}
+
+	accept := "application/json"
+	req.Header.Set("Accept", accept)
+
+	acceptWithReq := &lazyAccept{req}
+	assert.Equal(t, accept, fmt.Sprintf("%v", acceptWithReq))
+
+	acceptWithoutReq := &lazyAccept{}
+	assert.Equal(t, "unknown", fmt.Sprintf("%v", acceptWithoutReq))
+}

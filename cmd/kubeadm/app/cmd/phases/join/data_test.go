@@ -38,5 +38,4 @@ func (j *testJoinData) InitCfg() (*kubeadmapi.InitConfiguration, error) { return
 func (j *testJoinData) ClientSet() (*clientset.Clientset, error)        { return nil, nil }
 func (j *testJoinData) IgnorePreflightErrors() sets.String              { return nil }
 func (j *testJoinData) OutputWriter() io.Writer                         { return nil }
-func (j *testJoinData) KustomizeDir() string                            { return "" }
 func (j *testJoinData) PatchesDir() string                              { return "" }

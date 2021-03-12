@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,11 +28,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // strategy implements behavior for Secret objects
@@ -73,6 +70,12 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newSecret := obj.(*api.Secret)
 	oldSecret := old.(*api.Secret)
+
+	// this is weird, but consistent with what the validatedUpdate function used to do.
+	if len(newSecret.Type) == 0 {
+		newSecret.Type = oldSecret.Type
+	}
+
 	dropDisabledFields(newSecret, oldSecret)
 }
 
@@ -80,38 +83,11 @@ func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) fie
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
 }
 
-func isImmutableInUse(secret *api.Secret) bool {
-	return secret != nil && secret.Immutable != nil
-}
-
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ImmutableEphemeralVolumes) && !isImmutableInUse(oldSecret) {
-		secret.Immutable = nil
-	}
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
-}
-
-func (s strategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	t, ok := obj.(*api.Secret)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	s.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// secrets that are tied to the UID of a service account cannot be exported anyway
-	if t.Type == api.SecretTypeServiceAccountToken || len(t.Annotations[api.ServiceAccountUIDKey]) > 0 {
-		errs := []*field.Error{
-			field.Invalid(field.NewPath("type"), t, "can not export service account secrets"),
-		}
-		return errors.NewInvalid(api.Kind("Secret"), t.Name, errs)
-	}
-	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

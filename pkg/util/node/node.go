@@ -33,8 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/kubernetes/pkg/features"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -90,27 +93,60 @@ func GetPreferredNodeAddress(node *v1.Node, preferredAddressTypes []v1.NodeAddre
 	return "", &NoMatchError{addresses: node.Status.Addresses}
 }
 
-// GetNodeHostIP returns the provided node's IP, based on the priority:
-// 1. NodeInternalIP
-// 2. NodeExternalIP
-func GetNodeHostIP(node *v1.Node) (net.IP, error) {
-	addresses := node.Status.Addresses
-	addressMap := make(map[v1.NodeAddressType][]v1.NodeAddress)
-	for i := range addresses {
-		addressMap[addresses[i].Type] = append(addressMap[addresses[i].Type], addresses[i])
+// GetNodeHostIPs returns the provided node's IP(s); either a single "primary IP" for the
+// node in a single-stack cluster, or a dual-stack pair of IPs in a dual-stack cluster
+// (for nodes that actually have dual-stack IPs). Among other things, the IPs returned
+// from this function are used as the `.status.PodIPs` values for host-network pods on the
+// node, and the first IP is used as the `.status.HostIP` for all pods on the node.
+func GetNodeHostIPs(node *v1.Node) ([]net.IP, error) {
+	// Re-sort the addresses with InternalIPs first and then ExternalIPs
+	allIPs := make([]net.IP, 0, len(node.Status.Addresses))
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeInternalIP {
+			ip := net.ParseIP(addr.Address)
+			if ip != nil {
+				allIPs = append(allIPs, ip)
+			}
+		}
 	}
-	if addresses, ok := addressMap[v1.NodeInternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
+	for _, addr := range node.Status.Addresses {
+		if addr.Type == v1.NodeExternalIP {
+			ip := net.ParseIP(addr.Address)
+			if ip != nil {
+				allIPs = append(allIPs, ip)
+			}
+		}
 	}
-	if addresses, ok := addressMap[v1.NodeExternalIP]; ok {
-		return net.ParseIP(addresses[0].Address), nil
+	if len(allIPs) == 0 {
+		return nil, fmt.Errorf("host IP unknown; known addresses: %v", node.Status.Addresses)
 	}
-	return nil, fmt.Errorf("host IP unknown; known addresses: %v", addresses)
+
+	nodeIPs := []net.IP{allIPs[0]}
+	if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		for _, ip := range allIPs {
+			if utilnet.IsIPv6(ip) != utilnet.IsIPv6(nodeIPs[0]) {
+				nodeIPs = append(nodeIPs, ip)
+				break
+			}
+		}
+	}
+
+	return nodeIPs, nil
 }
 
-// GetNodeIP returns the ip of node with the provided hostname
-// If required, wait for the node to be defined.
-func GetNodeIP(client clientset.Interface, hostname string) net.IP {
+// GetNodeHostIP returns the provided node's "primary" IP; see GetNodeHostIPs for more details
+func GetNodeHostIP(node *v1.Node) (net.IP, error) {
+	ips, err := GetNodeHostIPs(node)
+	if err != nil {
+		return nil, err
+	}
+	// GetNodeHostIPs always returns at least one IP if it didn't return an error
+	return ips[0], nil
+}
+
+// GetNodeIP returns an IP (as with GetNodeHostIP) for the node with the provided name.
+// If required, it will wait for the node to be created.
+func GetNodeIP(client clientset.Interface, name string) net.IP {
 	var nodeIP net.IP
 	backoff := wait.Backoff{
 		Steps:    6,
@@ -120,7 +156,7 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), hostname, metav1.GetOptions{})
+		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed to retrieve node info: %v", err)
 			return false, nil
@@ -136,41 +172,6 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
 	}
 	return nodeIP
-}
-
-// GetZoneKey is a helper function that builds a string identifier that is unique per failure-zone;
-// it returns empty-string for no zone.
-// Since there are currently two separate zone keys:
-//   * "failure-domain.beta.kubernetes.io/zone"
-//   * "topology.kubernetes.io/zone"
-// GetZoneKey will first check failure-domain.beta.kubernetes.io/zone and if not exists, will then check
-// topology.kubernetes.io/zone
-func GetZoneKey(node *v1.Node) string {
-	labels := node.Labels
-	if labels == nil {
-		return ""
-	}
-
-	// TODO: prefer stable labels for zone in v1.18
-	zone, ok := labels[v1.LabelZoneFailureDomain]
-	if !ok {
-		zone, _ = labels[v1.LabelZoneFailureDomainStable]
-	}
-
-	// TODO: prefer stable labels for region in v1.18
-	region, ok := labels[v1.LabelZoneRegion]
-	if !ok {
-		region, _ = labels[v1.LabelZoneRegionStable]
-	}
-
-	if region == "" && zone == "" {
-		return ""
-	}
-
-	// We include the null character just in case region or failureDomain has a colon
-	// (We do assume there's no null characters in a region or failureDomain)
-	// As a nice side-benefit, the null character is not printed by fmt.Print or glog
-	return region + ":\x00:" + zone
 }
 
 type nodeForConditionPatch struct {

@@ -24,6 +24,8 @@ import (
 	"github.com/spf13/pflag"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	versionedinformers "k8s.io/client-go/informers"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -37,6 +39,10 @@ type BuiltInAuthorizationOptions struct {
 	WebhookVersion              string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
+	// WebhookRetryBackoff specifies the backoff parameters for the authorization webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	WebhookRetryBackoff *wait.Backoff
 }
 
 // NewBuiltInAuthorizationOptions create a BuiltInAuthorizationOptions with default value
@@ -46,6 +52,7 @@ func NewBuiltInAuthorizationOptions() *BuiltInAuthorizationOptions {
 		WebhookVersion:              "v1beta1",
 		WebhookCacheAuthorizedTTL:   5 * time.Minute,
 		WebhookCacheUnauthorizedTTL: 30 * time.Second,
+		WebhookRetryBackoff:         genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
 }
 
@@ -89,6 +96,10 @@ func (o *BuiltInAuthorizationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("authorization-mode %q has mode specified more than once", o.Modes))
 	}
 
+	if o.WebhookRetryBackoff != nil && o.WebhookRetryBackoff.Steps <= 0 {
+		allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", o.WebhookRetryBackoff.Steps))
+	}
+
 	return allErrors
 }
 
@@ -127,5 +138,6 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		WebhookCacheAuthorizedTTL:   o.WebhookCacheAuthorizedTTL,
 		WebhookCacheUnauthorizedTTL: o.WebhookCacheUnauthorizedTTL,
 		VersionedInformerFactory:    versionedInformerFactory,
+		WebhookRetryBackoff:         o.WebhookRetryBackoff,
 	}
 }

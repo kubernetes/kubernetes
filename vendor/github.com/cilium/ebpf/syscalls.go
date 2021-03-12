@@ -129,12 +129,6 @@ type bpfProgTestRunAttr struct {
 	duration    uint32
 }
 
-type bpfObjGetInfoByFDAttr struct {
-	fd      uint32
-	infoLen uint32
-	info    internal.Pointer // May be either bpfMapInfo or bpfProgInfo
-}
-
 type bpfGetFDByIDAttr struct {
 	id   uint32
 	next uint32
@@ -353,28 +347,9 @@ func bpfMapFreeze(m *internal.FD) error {
 	return err
 }
 
-func bpfGetObjectInfoByFD(fd *internal.FD, info unsafe.Pointer, size uintptr) error {
-	value, err := fd.Value()
-	if err != nil {
-		return err
-	}
-
-	// available from 4.13
-	attr := bpfObjGetInfoByFDAttr{
-		fd:      value,
-		infoLen: uint32(size),
-		info:    internal.NewPointer(info),
-	}
-	_, err = internal.BPF(internal.BPF_OBJ_GET_INFO_BY_FD, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
-	if err != nil {
-		return fmt.Errorf("fd %d: %w", fd, err)
-	}
-	return nil
-}
-
 func bpfGetProgInfoByFD(fd *internal.FD) (*bpfProgInfo, error) {
 	var info bpfProgInfo
-	if err := bpfGetObjectInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info)); err != nil {
+	if err := internal.BPFObjGetInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info)); err != nil {
 		return nil, fmt.Errorf("can't get program info: %w", err)
 	}
 	return &info, nil
@@ -382,7 +357,7 @@ func bpfGetProgInfoByFD(fd *internal.FD) (*bpfProgInfo, error) {
 
 func bpfGetMapInfoByFD(fd *internal.FD) (*bpfMapInfo, error) {
 	var info bpfMapInfo
-	err := bpfGetObjectInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info))
+	err := internal.BPFObjGetInfoByFD(fd, unsafe.Pointer(&info), unsafe.Sizeof(info))
 	if err != nil {
 		return nil, fmt.Errorf("can't get map info: %w", err)
 	}

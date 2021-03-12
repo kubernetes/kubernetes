@@ -77,10 +77,15 @@ func TestCommonAttachDisk(t *testing.T) {
 			expectedErr:     true,
 		},
 		{
-			desc:        "correct LUN and no error shall be returned if everything is good",
-			vmList:      map[string]string{"vm1": "PowerState/Running"},
-			nodeName:    "vm1",
-			existedDisk: compute.Disk{Name: to.StringPtr("disk-name"), DiskProperties: &compute.DiskProperties{Encryption: &compute.Encryption{DiskEncryptionSetID: &diskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey}}, Tags: testTags},
+			desc:     "correct LUN and no error shall be returned if everything is good",
+			vmList:   map[string]string{"vm1": "PowerState/Running"},
+			nodeName: "vm1",
+			existedDisk: compute.Disk{Name: to.StringPtr("disk-name"),
+				DiskProperties: &compute.DiskProperties{
+					Encryption: &compute.Encryption{DiskEncryptionSetID: &diskEncryptionSetID, Type: compute.EncryptionAtRestWithCustomerKey},
+					DiskSizeGB: to.Int32Ptr(4096),
+				},
+				Tags: testTags},
 			expectedLun: 1,
 			expectedErr: false,
 		},
@@ -221,7 +226,7 @@ func TestCommonAttachDiskWithVMSS(t *testing.T) {
 				testCloud.DisableAvailabilitySetNodes = true
 			}
 			ss, err := newScaleSet(testCloud)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 			testCloud.VMSet = ss
 		}
 
@@ -289,7 +294,7 @@ func TestCommonDetachDisk(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			desc:        "no error shall be returned if the disk exsists",
+			desc:        "no error shall be returned if the disk exists",
 			vmList:      map[string]string{"vm1": "PowerState/Running"},
 			nodeName:    "vm1",
 			diskName:    "disk1",
@@ -787,4 +792,33 @@ func TestFilterNonExistingDisksWithSpecialHTTPStatusCode(t *testing.T) {
 	filteredDisks := common.filterNonExistingDisks(ctx, disks)
 	assert.Equal(t, 1, len(filteredDisks))
 	assert.Equal(t, newDiskName, *filteredDisks[0].Name)
+}
+
+func TestIsInstanceNotFoundError(t *testing.T) {
+	testCases := []struct {
+		errMsg         string
+		expectedResult bool
+	}{
+		{
+			errMsg:         "",
+			expectedResult: false,
+		},
+		{
+			errMsg:         "other error",
+			expectedResult: false,
+		},
+		{
+			errMsg:         "not an active Virtual Machine scale set vm",
+			expectedResult: false,
+		},
+		{
+			errMsg:         `compute.VirtualMachineScaleSetVMsClient#Update: Failure sending request: StatusCode=400 -- Original Error: Code="InvalidParameter" Message="The provided instanceId 1181 is not an active Virtual Machine Scale Set VM instanceId." Target="instanceIds"`,
+			expectedResult: true,
+		},
+	}
+
+	for i, test := range testCases {
+		result := isInstanceNotFoundError(fmt.Errorf(test.errMsg))
+		assert.Equal(t, test.expectedResult, result, "TestCase[%d]", i, result)
+	}
 }

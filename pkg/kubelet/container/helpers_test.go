@@ -580,8 +580,6 @@ func TestMakePortMappings(t *testing.T) {
 					port("foo", v1.ProtocolUDP, 555, 5555, ""),
 					// Duplicated, should be ignored.
 					port("foo", v1.ProtocolUDP, 888, 8888, ""),
-					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, "127.0.0.1"),
 					// Duplicated with different address family, shouldn't be ignored
 					port("", v1.ProtocolTCP, 80, 8080, "::"),
 					// No address family specified
@@ -594,6 +592,47 @@ func TestMakePortMappings(t *testing.T) {
 				portMapping(v1.ProtocolUDP, 555, 5555, ""),
 				portMapping(v1.ProtocolTCP, 80, 8080, "::"),
 				portMapping(v1.ProtocolTCP, 1234, 5678, ""),
+			},
+		},
+		{
+			// The same container port can be mapped to different host ports
+			&v1.Container{
+				Name: "fooContainer",
+				Ports: []v1.ContainerPort{
+					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+					port("", v1.ProtocolTCP, 4343, 4343, "192.168.0.1"),
+				},
+			},
+			[]PortMapping{
+				portMapping(v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping(v1.ProtocolTCP, 4343, 4343, "192.168.0.1"),
+			},
+		},
+		{
+			// The same container port AND same container host is not OK
+			&v1.Container{
+				Name: "fooContainer",
+				Ports: []v1.ContainerPort{
+					port("", v1.ProtocolTCP, 443, 4343, ""),
+					port("", v1.ProtocolTCP, 443, 4343, ""),
+				},
+			},
+			[]PortMapping{
+				portMapping(v1.ProtocolTCP, 443, 4343, ""),
+			},
+		},
+		{
+			// multihomed nodes - multiple IP scenario
+			&v1.Container{
+				Name: "fooContainer",
+				Ports: []v1.ContainerPort{
+					port("", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+					port("", v1.ProtocolTCP, 443, 4343, "172.16.0.1"),
+				},
+			},
+			[]PortMapping{
+				portMapping(v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping(v1.ProtocolTCP, 443, 4343, "172.16.0.1"),
 			},
 		},
 	}
@@ -636,4 +675,27 @@ func TestHashContainer(t *testing.T) {
 		hashVal := HashContainer(&container)
 		assert.Equal(t, tc.expectedHash, hashVal, "the hash value here should not be changed.")
 	}
+}
+
+func TestShouldRecordEvent(t *testing.T) {
+	var innerEventRecorder = &innerEventRecorder{
+		recorder: nil,
+	}
+
+	_, actual := innerEventRecorder.shouldRecordEvent(nil)
+	assert.Equal(t, false, actual)
+
+	var obj = &v1.ObjectReference{Namespace: "claimrefns", Name: "claimrefname"}
+
+	_, actual = innerEventRecorder.shouldRecordEvent(obj)
+	assert.Equal(t, true, actual)
+
+	obj = &v1.ObjectReference{Namespace: "system", Name: "infra", FieldPath: "implicitly required container "}
+
+	_, actual = innerEventRecorder.shouldRecordEvent(obj)
+	assert.Equal(t, false, actual)
+
+	var nilObj *v1.ObjectReference = nil
+	_, actual = innerEventRecorder.shouldRecordEvent(nilObj)
+	assert.Equal(t, false, actual, "should not panic if the typed nil was used, see https://github.com/kubernetes/kubernetes/issues/95552")
 }

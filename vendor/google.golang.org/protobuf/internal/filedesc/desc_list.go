@@ -6,7 +6,6 @@ package filedesc
 
 import (
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 
@@ -185,10 +184,7 @@ func (p *FieldRanges) CheckValid(isMessageSet bool) error {
 // Unlike the FieldNumber.IsValid method, it allows ranges that cover the
 // reserved number range.
 func isValidFieldNumber(n protoreflect.FieldNumber, isMessageSet bool) bool {
-	if isMessageSet {
-		return protowire.MinValidNumber <= n && n <= math.MaxInt32
-	}
-	return protowire.MinValidNumber <= n && n <= protowire.MaxValidNumber
+	return protowire.MinValidNumber <= n && (n <= protowire.MaxValidNumber || isMessageSet)
 }
 
 // CheckOverlap reports an error if p and q overlap.

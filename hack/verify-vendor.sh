@@ -26,8 +26,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 # create a nice clean place to put our new vendor tree
-# must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
-# to work with docker-machine on macs
 mkdir -p "${KUBE_ROOT}/_tmp"
 _tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendor.XXXXXX")"
 

@@ -41,20 +41,20 @@ func getContextWithCancel() (context.Context, context.CancelFunc) {
 // verifySandboxStatus verified whether all required fields are set in PodSandboxStatus.
 func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("Id is not set")
+		return fmt.Errorf("status.Id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("Metadata is not set")
+		return fmt.Errorf("status.Metadata is not set")
 	}
 
 	metadata := status.Metadata
 	if metadata.Name == "" || metadata.Namespace == "" || metadata.Uid == "" {
-		return fmt.Errorf("Name, Namespace or Uid is not in metadata %q", metadata)
+		return fmt.Errorf("metadata.Name, metadata.Namespace or metadata.Uid is not in metadata %q", metadata)
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return fmt.Errorf("status.CreatedAt is not set")
 	}
 
 	return nil
@@ -63,28 +63,28 @@ func verifySandboxStatus(status *runtimeapi.PodSandboxStatus) error {
 // verifyContainerStatus verified whether all required fields are set in ContainerStatus.
 func verifyContainerStatus(status *runtimeapi.ContainerStatus) error {
 	if status.Id == "" {
-		return fmt.Errorf("Id is not set")
+		return fmt.Errorf("status.Id is not set")
 	}
 
 	if status.Metadata == nil {
-		return fmt.Errorf("Metadata is not set")
+		return fmt.Errorf("status.Metadata is not set")
 	}
 
 	metadata := status.Metadata
 	if metadata.Name == "" {
-		return fmt.Errorf("Name is not in metadata %q", metadata)
+		return fmt.Errorf("metadata.Name is not in metadata %q", metadata)
 	}
 
 	if status.CreatedAt == 0 {
-		return fmt.Errorf("CreatedAt is not set")
+		return fmt.Errorf("status.CreatedAt is not set")
 	}
 
 	if status.Image == nil || status.Image.Image == "" {
-		return fmt.Errorf("Image is not set")
+		return fmt.Errorf("status.Image is not set")
 	}
 
 	if status.ImageRef == "" {
-		return fmt.Errorf("ImageRef is not set")
+		return fmt.Errorf("status.ImageRef is not set")
 	}
 
 	return nil

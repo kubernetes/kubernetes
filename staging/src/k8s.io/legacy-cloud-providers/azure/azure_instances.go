@@ -258,7 +258,7 @@ func (az *Cloud) isCurrentInstance(name types.NodeName, metadataVMName string) (
 	}
 
 	metadataVMName = strings.ToLower(metadataVMName)
-	return (metadataVMName == nodeName), nil
+	return metadataVMName == nodeName, nil
 }
 
 // InstanceID returns the cloud provider ID of the specified instance.

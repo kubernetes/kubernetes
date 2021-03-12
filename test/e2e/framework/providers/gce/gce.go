@@ -19,6 +19,7 @@ package gce
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os/exec"
 	"regexp"
@@ -47,6 +48,21 @@ func factory() (framework.ProviderInterface, error) {
 	framework.Logf("Fetching cloud provider for %q\r", framework.TestContext.Provider)
 	zone := framework.TestContext.CloudConfig.Zone
 	region := framework.TestContext.CloudConfig.Region
+	allowedZones := framework.TestContext.CloudConfig.Zones
+
+	// ensure users don't specify a zone outside of the requested zones
+	if len(zone) > 0 && len(allowedZones) > 0 {
+		var found bool
+		for _, allowedZone := range allowedZones {
+			if zone == allowedZone {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("the provided zone %q must be included in the list of allowed zones %v", zone, allowedZones)
+		}
+	}
 
 	var err error
 	if region == "" {
@@ -58,6 +74,9 @@ func factory() (framework.ProviderInterface, error) {
 	managedZones := []string{} // Manage all zones in the region
 	if !framework.TestContext.CloudConfig.MultiZone {
 		managedZones = []string{zone}
+	}
+	if len(allowedZones) > 0 {
+		managedZones = allowedZones
 	}
 
 	gceCloud, err := gcecloud.CreateGCECloud(&gcecloud.CloudConfig{
@@ -79,7 +98,10 @@ func factory() (framework.ProviderInterface, error) {
 		return nil, fmt.Errorf("Error building GCE/GKE provider: %v", err)
 	}
 
-	// Arbitrarily pick one of the zones we have nodes in
+	// Arbitrarily pick one of the zones we have nodes in, looking at prepopulated zones first.
+	if framework.TestContext.CloudConfig.Zone == "" && len(managedZones) > 0 {
+		framework.TestContext.CloudConfig.Zone = managedZones[rand.Intn(len(managedZones))]
+	}
 	if framework.TestContext.CloudConfig.Zone == "" && framework.TestContext.CloudConfig.MultiZone {
 		zones, err := gceCloud.GetAllZonesFromCloudProvider()
 		if err != nil {

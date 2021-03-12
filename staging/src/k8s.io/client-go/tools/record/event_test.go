@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -99,6 +100,29 @@ func OnPatchFactory(testCache map[string]*v1.Event, patchEvent chan<- *v1.Event)
 		patchEvent <- patchedObj
 		return patchedObj, nil
 	}
+}
+
+func TestNonRacyShutdown(t *testing.T) {
+	// Attempt to simulate previously racy conditions, and ensure that no race
+	// occurs: Nominally, calling "Eventf" *followed by* shutdown from the same
+	// thread should be a safe operation, but it's not if we launch recorder.Action
+	// in a goroutine.
+
+	caster := NewBroadcasterForTests(0)
+	clock := clock.NewFakeClock(time.Now())
+	recorder := recorderWithFakeClock(v1.EventSource{Component: "eventTest"}, caster, clock)
+
+	var wg sync.WaitGroup
+	wg.Add(100)
+	for i := 0; i < 100; i++ {
+		go func() {
+			defer wg.Done()
+			recorder.Eventf(&v1.ObjectReference{}, v1.EventTypeNormal, "Started", "blah")
+		}()
+	}
+
+	wg.Wait()
+	caster.Shutdown()
 }
 
 func TestEventf(t *testing.T) {

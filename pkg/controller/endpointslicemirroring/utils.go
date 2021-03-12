@@ -22,8 +22,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -62,25 +61,6 @@ func getAddressType(address string) *discovery.AddressType {
 	return &addressType
 }
 
-// endpointsEqualBeyondHash returns true if endpoints have equal attributes
-// but excludes equality checks that would have already been covered with
-// endpoint hashing (see hashEndpoint func for more info).
-func endpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
-	if !apiequality.Semantic.DeepEqual(ep1.Topology, ep2.Topology) {
-		return false
-	}
-
-	if !boolPtrEqual(ep1.Conditions.Ready, ep2.Conditions.Ready) {
-		return false
-	}
-
-	if !objectRefPtrEqual(ep1.TargetRef, ep2.TargetRef) {
-		return false
-	}
-
-	return true
-}
-
 // newEndpointSlice returns an EndpointSlice generated from an Endpoints
 // resource, ports, and address type.
 func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPort, addrType discovery.AddressType, sliceName string) *discovery.EndpointSlice {
@@ -89,6 +69,7 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 	epSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels:          map[string]string{},
+			Annotations:     map[string]string{},
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       endpoints.Namespace,
 		},
@@ -97,12 +78,22 @@ func newEndpointSlice(endpoints *corev1.Endpoints, ports []discovery.EndpointPor
 		Endpoints:   []discovery.Endpoint{},
 	}
 
+	// clone all labels
 	for label, val := range endpoints.Labels {
 		epSlice.Labels[label] = val
 	}
 
+	// overwrite specific labels
 	epSlice.Labels[discovery.LabelServiceName] = endpoints.Name
 	epSlice.Labels[discovery.LabelManagedBy] = controllerName
+
+	// clone all annotations but EndpointsLastChangeTriggerTime
+	for annotation, val := range endpoints.Annotations {
+		if annotation == corev1.EndpointsLastChangeTriggerTime {
+			continue
+		}
+		epSlice.Annotations[annotation] = val
+	}
 
 	if sliceName == "" {
 		epSlice.GenerateName = getEndpointSlicePrefix(endpoints.Name)
@@ -135,9 +126,7 @@ func addressToEndpoint(address corev1.EndpointAddress, ready bool) *discovery.En
 	}
 
 	if address.NodeName != nil {
-		endpoint.Topology = map[string]string{
-			"kubernetes.io/hostname": *address.NodeName,
-		}
+		endpoint.NodeName = address.NodeName
 	}
 	if address.Hostname != "" {
 		endpoint.Hostname = &address.Hostname
@@ -160,29 +149,6 @@ func epPortsToEpsPorts(epPorts []corev1.EndpointPort) []discovery.EndpointPort {
 		})
 	}
 	return epsPorts
-}
-
-// boolPtrEqual returns true if a set of bool pointers have equivalent values.
-func boolPtrEqual(ptr1, ptr2 *bool) bool {
-	if (ptr1 == nil) != (ptr2 == nil) {
-		return false
-	}
-	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
-		return false
-	}
-	return true
-}
-
-// objectRefPtrEqual returns true if a set of object ref pointers have
-// equivalent values.
-func objectRefPtrEqual(ref1, ref2 *corev1.ObjectReference) bool {
-	if (ref1 == nil) != (ref2 == nil) {
-		return false
-	}
-	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
-		return false
-	}
-	return true
 }
 
 // getServiceFromDeleteAction parses a Service resource from a delete
@@ -260,7 +226,7 @@ func endpointsControllerKey(endpointSlice *discovery.EndpointSlice) (string, err
 	return fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName), nil
 }
 
-// skipMirror return true if the the LabelSkipMirror label has been set to
+// skipMirror return true if the LabelSkipMirror label has been set to
 // "true".
 func skipMirror(labels map[string]string) bool {
 	skipMirror, _ := labels[discovery.LabelSkipMirror]
@@ -272,4 +238,23 @@ func skipMirror(labels map[string]string) bool {
 func hasLeaderElection(annotations map[string]string) bool {
 	_, ok := annotations[resourcelock.LeaderElectionRecordAnnotationKey]
 	return ok
+}
+
+// cloneAndRemoveKeys is a copy of CloneAndRemoveLabels
+// it is used here for annotations and labels
+func cloneAndRemoveKeys(a map[string]string, keys ...string) map[string]string {
+	if len(keys) == 0 {
+		// Don't need to remove a key.
+		return a
+	}
+	// Clone.
+	newMap := map[string]string{}
+	for k, v := range a {
+		newMap[k] = v
+	}
+	// remove keys
+	for _, key := range keys {
+		delete(newMap, key)
+	}
+	return newMap
 }

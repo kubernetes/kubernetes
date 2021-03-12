@@ -39,7 +39,7 @@ func NewBootstrapTokenOptions() *BootstrapTokenOptions {
 // TODO: In the future, we might want to group the flags in a better way than adding them all individually like this
 type BootstrapTokenOptions struct {
 	*kubeadmapiv1beta2.BootstrapToken
-	TokenStr string
+	TokenStr string `datapolicy:"token"`
 }
 
 // AddTokenFlag adds the --token flag to the given flagset

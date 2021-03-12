@@ -151,7 +151,7 @@ func TestCreateRoute(t *testing.T) {
 		routeTableName        string
 		initialRoute          *[]network.Route
 		updatedRoute          *[]network.Route
-		hasUnmangedNodes      bool
+		hasUnmanagedNodes     bool
 		nodeInformerNotSynced bool
 		ipv6DualStackEnabled  bool
 		routeTableNotExist    bool
@@ -230,14 +230,14 @@ func TestCreateRoute(t *testing.T) {
 		{
 			name:               "CreateRoute should add route to cloud.RouteCIDRs if node is unmanaged",
 			routeTableName:     "rt8",
-			hasUnmangedNodes:   true,
+			hasUnmanagedNodes:  true,
 			unmanagedNodeName:  "node",
 			routeCIDRs:         map[string]string{},
 			expectedRouteCIDRs: map[string]string{"node": "1.2.3.4/24"},
 		},
 		{
 			name:                 "CreateRoute should report error if node is unmanaged and cloud.ipv6DualStackEnabled is true",
-			hasUnmangedNodes:     true,
+			hasUnmanagedNodes:    true,
 			ipv6DualStackEnabled: true,
 			unmanagedNodeName:    "node",
 			expectedErrMsg:       fmt.Errorf("unmanaged nodes are not supported in dual stack mode"),
@@ -282,7 +282,7 @@ func TestCreateRoute(t *testing.T) {
 
 		cloud.RouteTableName = test.routeTableName
 		cloud.ipv6DualStackEnabled = test.ipv6DualStackEnabled
-		if test.hasUnmangedNodes {
+		if test.hasUnmanagedNodes {
 			cloud.unmanagedNodes.Insert(test.unmanagedNodeName)
 			cloud.routeCIDRs = test.routeCIDRs
 		} else {
@@ -544,7 +544,7 @@ func TestListRoutes(t *testing.T) {
 		name                  string
 		routeTableName        string
 		routeTable            network.RouteTable
-		hasUnmangedNodes      bool
+		hasUnmanagedNodes     bool
 		nodeInformerNotSynced bool
 		unmanagedNodeName     string
 		routeCIDRs            map[string]string
@@ -580,9 +580,9 @@ func TestListRoutes(t *testing.T) {
 		{
 			name:              "ListRoutes should return correct routes if there's unmanaged nodes",
 			routeTableName:    "rt2",
-			hasUnmangedNodes:  true,
-			unmanagedNodeName: "umanaged-node",
-			routeCIDRs:        map[string]string{"umanaged-node": "2.2.3.4/24"},
+			hasUnmanagedNodes: true,
+			unmanagedNodeName: "unmanaged-node",
+			routeCIDRs:        map[string]string{"unmanaged-node": "2.2.3.4/24"},
 			routeTable: network.RouteTable{
 				Name:     to.StringPtr("rt2"),
 				Location: &cloud.Location,
@@ -604,14 +604,14 @@ func TestListRoutes(t *testing.T) {
 					DestinationCIDR: "1.2.3.4/24",
 				},
 				{
-					Name:            "umanaged-node",
-					TargetNode:      mapRouteNameToNodeName(false, "umanaged-node"),
+					Name:            "unmanaged-node",
+					TargetNode:      mapRouteNameToNodeName(false, "unmanaged-node"),
 					DestinationCIDR: "2.2.3.4/24",
 				},
 			},
 		},
 		{
-			name:           "ListRoutes should return nil if routeTabel don't exist",
+			name:           "ListRoutes should return nil if routeTable don't exist",
 			routeTableName: "rt3",
 			routeTable:     network.RouteTable{},
 			getErr: &retry.Error{
@@ -640,7 +640,7 @@ func TestListRoutes(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		if test.hasUnmangedNodes {
+		if test.hasUnmanagedNodes {
 			cloud.unmanagedNodes.Insert(test.unmanagedNodeName)
 			cloud.routeCIDRs = test.routeCIDRs
 		} else {

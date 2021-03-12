@@ -43,14 +43,16 @@ type ExecOptions struct {
 	CaptureStderr bool
 	// If false, whitespace in std{err,out} will be removed.
 	PreserveWhitespace bool
+	Quiet              bool
 }
 
 // ExecWithOptions executes a command in the specified container,
 // returning stdout, stderr and error. `options` allowed for
 // additional parameters to be passed.
 func (f *Framework) ExecWithOptions(options ExecOptions) (string, string, error) {
-	Logf("ExecWithOptions %+v", options)
-
+	if !options.Quiet {
+		Logf("ExecWithOptions %+v", options)
+	}
 	config, err := LoadConfig()
 	ExpectNoError(err, "failed to load restclient config")
 

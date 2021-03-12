@@ -393,6 +393,21 @@ func TestKubernetes(t *testing.T) {
 	testJSONPathSortOutput(randomPrintOrderTests, t)
 }
 
+func TestEmptyRange(t *testing.T) {
+	var input = []byte(`{"items":[]}`)
+	var emptyList interface{}
+	err := json.Unmarshal(input, &emptyList)
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []jsonpathTest{
+		{"empty range", `{range .items[*]}{.metadata.name}{end}`, &emptyList, "", false},
+		{"empty nested range", `{range .items[*]}{.metadata.name}{":"}{range @.spec.containers[*]}{.name}{","}{end}{"+"}{end}`, &emptyList, "", false},
+	}
+	testJSONPath(tests, true, t)
+}
+
 func TestNestedRanges(t *testing.T) {
 	var input = []byte(`{
 		"items": [

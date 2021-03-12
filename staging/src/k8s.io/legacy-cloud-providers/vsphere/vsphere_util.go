@@ -25,7 +25,9 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/vmware/govmomi/find"
@@ -569,6 +571,7 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 					return nodesToRetry, err
 				}
 				klog.V(4).Infof("Verifying Volume Paths by devices for node %s and VM %s", nodeName, nodeInfo.vm)
+				vs.vsphereVolumeMap.Add(nodeName, devices)
 				vclib.VerifyVolumePathsForVMDevices(devices, nodeVolumes[nodeName], convertToString(nodeName), attached)
 			}
 		}
@@ -599,9 +602,129 @@ func (vs *VSphere) checkDiskAttached(ctx context.Context, nodes []k8stypes.NodeN
 		}
 		nodeUUID = strings.ToLower(nodeUUID)
 		klog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %v", nodeName, nodeUUID, vmMoMap)
-		vclib.VerifyVolumePathsForVM(vmMoMap[nodeUUID], nodeVolumes[nodeName], convertToString(nodeName), attached)
+		vmMo := vmMoMap[nodeUUID]
+		vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+		vs.vsphereVolumeMap.Add(nodeName, vmDevices)
+		vclib.VerifyVolumePathsForVMDevices(vmDevices, nodeVolumes[nodeName], convertToString(nodeName), attached)
 	}
 	return nodesToRetry, nil
+}
+
+// BuildMissingVolumeNodeMap builds a map of volumes and nodes which are not known to attach detach controller.
+// There could be nodes in cluster which do not have any pods with vsphere volumes running on them
+// such nodes won't be part of disk verification check because attach-detach controller does not keep track
+// such nodes. But such nodes may still have dangling volumes on them and hence we need to scan all the
+// remaining nodes which weren't scanned by code previously.
+func (vs *VSphere) BuildMissingVolumeNodeMap(ctx context.Context) {
+	nodeNames := vs.nodeManager.GetNodeNames()
+	// Segregate nodes according to VC-DC
+	dcNodes := make(map[string][]k8stypes.NodeName)
+
+	for _, nodeName := range nodeNames {
+		// if given node is not in node volume map
+		if !vs.vsphereVolumeMap.CheckForNode(nodeName) {
+			nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
+			if err != nil {
+				klog.V(4).Infof("Failed to get node info: %+v. err: %+v", nodeInfo.vm, err)
+				continue
+			}
+			vcDC := nodeInfo.vcServer + nodeInfo.dataCenter.String()
+			dcNodes[vcDC] = append(dcNodes[vcDC], nodeName)
+		}
+	}
+
+	var wg sync.WaitGroup
+
+	for _, nodeNames := range dcNodes {
+		// Start go routines per VC-DC to check disks are attached
+		wg.Add(1)
+		go func(nodes []k8stypes.NodeName) {
+			err := vs.checkNodeDisks(ctx, nodeNames)
+			if err != nil {
+				klog.Errorf("Failed to check disk attached for nodes: %+v. err: %+v", nodes, err)
+			}
+			wg.Done()
+		}(nodeNames)
+	}
+	wg.Wait()
+}
+
+func (vs *VSphere) checkNodeDisks(ctx context.Context, nodeNames []k8stypes.NodeName) error {
+	var vmList []*vclib.VirtualMachine
+	var nodeInfo NodeInfo
+	var err error
+
+	for _, nodeName := range nodeNames {
+		nodeInfo, err = vs.nodeManager.GetNodeInfo(nodeName)
+		if err != nil {
+			return err
+		}
+		vmList = append(vmList, nodeInfo.vm)
+	}
+
+	// Making sure session is valid
+	_, err = vs.getVSphereInstanceForServer(nodeInfo.vcServer, ctx)
+	if err != nil {
+		return err
+	}
+
+	// If any of the nodes are not present property collector query will fail for entire operation
+	vmMoList, err := nodeInfo.dataCenter.GetVMMoList(ctx, vmList, []string{"config.hardware.device", "name", "config.uuid"})
+	if err != nil {
+		if vclib.IsManagedObjectNotFoundError(err) {
+			klog.V(4).Infof("checkNodeDisks: ManagedObjectNotFound for property collector query for nodes: %+v vms: %+v", nodeNames, vmList)
+			// Property Collector Query failed
+			// VerifyVolumePaths per VM
+			for _, nodeName := range nodeNames {
+				nodeInfo, err := vs.nodeManager.GetNodeInfo(nodeName)
+				if err != nil {
+					return err
+				}
+				devices, err := nodeInfo.vm.VirtualMachine.Device(ctx)
+				if err != nil {
+					if vclib.IsManagedObjectNotFoundError(err) {
+						klog.V(4).Infof("checkNodeDisks: ManagedObjectNotFound for Kubernetes node: %s with vSphere Virtual Machine reference: %v", nodeName, nodeInfo.vm)
+						continue
+					}
+					return err
+				}
+				klog.V(4).Infof("Verifying Volume Paths by devices for node %s and VM %s", nodeName, nodeInfo.vm)
+				vs.vsphereVolumeMap.Add(nodeName, devices)
+			}
+			return nil
+		}
+		return err
+	}
+
+	vmMoMap := make(map[string]mo.VirtualMachine)
+	for _, vmMo := range vmMoList {
+		if vmMo.Config == nil {
+			klog.Errorf("Config is not available for VM: %q", vmMo.Name)
+			continue
+		}
+		klog.V(9).Infof("vmMoMap vmname: %q vmuuid: %s", vmMo.Name, strings.ToLower(vmMo.Config.Uuid))
+		vmMoMap[strings.ToLower(vmMo.Config.Uuid)] = vmMo
+	}
+
+	klog.V(9).Infof("vmMoMap: +%v", vmMoMap)
+
+	for _, nodeName := range nodeNames {
+		node, err := vs.nodeManager.GetNode(nodeName)
+		if err != nil {
+			return err
+		}
+		nodeUUID, err := GetNodeUUID(&node)
+		if err != nil {
+			klog.Errorf("Node Discovery failed to get node uuid for node %s with error: %v", node.Name, err)
+			return err
+		}
+		nodeUUID = strings.ToLower(nodeUUID)
+		klog.V(9).Infof("Verifying volume for node %s with nodeuuid %q: %v", nodeName, nodeUUID, vmMoMap)
+		vmMo := vmMoMap[nodeUUID]
+		vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
+		vs.vsphereVolumeMap.Add(nodeName, vmDevices)
+	}
+	return nil
 }
 
 func (vs *VSphere) GetNodeNameFromProviderID(providerID string) (string, error) {
@@ -644,6 +767,21 @@ func IsUUIDSupportedNode(node *v1.Node) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func isGuestHardwareVersionDeprecated(vmHardwareversion string) (bool, error) {
+	vmHardwareDeprecated := false
+	// vmconfig.Version returns vm hardware version as vmx-11, vmx-13, vmx-14, vmx-15 etc.
+	version := strings.Trim(vmHardwareversion, "vmx-")
+	value, err := strconv.ParseInt(version, 0, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse vm hardware version: %v Err: %v", version, err)
+	} else {
+		if value < 15 {
+			vmHardwareDeprecated = true
+		}
+	}
+	return vmHardwareDeprecated, nil
 }
 
 func GetNodeUUID(node *v1.Node) (string, error) {

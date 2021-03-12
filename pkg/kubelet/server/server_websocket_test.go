@@ -66,7 +66,7 @@ func TestServeWSPortForward(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
 			defer ss.testHTTPServer.Close()
-			fw := newServerTestWithDebug(true, false, ss)
+			fw := newServerTestWithDebug(true, ss)
 			defer fw.testHTTPServer.Close()
 
 			portForwardFuncDone := make(chan struct{})
@@ -158,7 +158,7 @@ func TestServeWSMultiplePortForward(t *testing.T) {
 	ss, err := newTestStreamingServer(0)
 	require.NoError(t, err)
 	defer ss.testHTTPServer.Close()
-	fw := newServerTestWithDebug(true, false, ss)
+	fw := newServerTestWithDebug(true, ss)
 	defer fw.testHTTPServer.Close()
 
 	portForwardWG := sync.WaitGroup{}

@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	genericoptions "k8s.io/apiserver/pkg/server/options"
 	clientset "k8s.io/client-go/kubernetes"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 	authorizationclient "k8s.io/client-go/kubernetes/typed/authorization/v1"
@@ -84,6 +85,7 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 		if client == nil {
 			return nil, nil, errors.New("no client provided, cannot use webhook authentication")
 		}
+		authenticatorConfig.WebhookRetryBackoff = genericoptions.DefaultAuthWebhookRetryBackoff()
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
@@ -113,6 +115,7 @@ func BuildAuthz(client authorizationclient.SubjectAccessReviewInterface, authz k
 			SubjectAccessReviewClient: client,
 			AllowCacheTTL:             authz.Webhook.CacheAuthorizedTTL.Duration,
 			DenyCacheTTL:              authz.Webhook.CacheUnauthorizedTTL.Duration,
+			WebhookRetryBackoff:       genericoptions.DefaultAuthWebhookRetryBackoff(),
 		}
 		return authorizerConfig.New()
 

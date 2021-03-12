@@ -33,7 +33,7 @@ import (
 func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
 	info, err := ds.client.Info()
 	if err != nil {
-		klog.Errorf("Failed to get docker info: %v", err)
+		klog.ErrorS(err, "Failed to get docker info")
 		return nil, err
 	}
 

@@ -40,9 +40,9 @@ type createAuthInfoOptions struct {
 	name              string
 	clientCertificate cliflag.StringFlag
 	clientKey         cliflag.StringFlag
-	token             cliflag.StringFlag
+	token             cliflag.StringFlag `datapolicy:"token"`
 	username          cliflag.StringFlag
-	password          cliflag.StringFlag
+	password          cliflag.StringFlag `datapolicy:"password"`
 	embedCertData     cliflag.Tristate
 	authProvider      cliflag.StringFlag
 
@@ -67,7 +67,7 @@ const (
 )
 
 var (
-	createAuthInfoLong = fmt.Sprintf(templates.LongDesc(`
+	createAuthInfoLong = fmt.Sprintf(templates.LongDesc(i18n.T(`
 		Sets a user entry in kubeconfig
 
 		Specifying a name that already exists will merge new fields on top of existing values.
@@ -81,7 +81,7 @@ var (
 		    Basic auth flags:
 			  --%v=basic_user --%v=basic_password
 
-		Bearer token and basic auth are mutually exclusive.`), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
+		Bearer token and basic auth are mutually exclusive.`)), clientcmd.FlagCertFile, clientcmd.FlagKeyFile, clientcmd.FlagBearerToken, clientcmd.FlagUsername, clientcmd.FlagPassword)
 
 	createAuthInfoExample = templates.Examples(`
 		# Set only the "client-key" field on the "cluster-admin"

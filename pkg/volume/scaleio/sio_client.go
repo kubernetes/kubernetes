@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -33,6 +34,7 @@ import (
 	sio "github.com/thecodeteam/goscaleio"
 	siotypes "github.com/thecodeteam/goscaleio/types/v1"
 	"k8s.io/klog/v2"
+	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 )
 
 var (
@@ -56,37 +58,39 @@ type sioInterface interface {
 }
 
 type sioClient struct {
-	client           *sio.Client
-	gateway          string
-	username         string
-	password         string
-	insecure         bool
-	certsEnabled     bool
-	system           *siotypes.System
-	sysName          string
-	sysClient        *sio.System
-	protectionDomain *siotypes.ProtectionDomain
-	pdName           string
-	pdClient         *sio.ProtectionDomain
-	storagePool      *siotypes.StoragePool
-	spName           string
-	spClient         *sio.StoragePool
-	provisionMode    string
-	sdcPath          string
-	sdcGUID          string
-	instanceID       string
-	inited           bool
-	diskRegex        *regexp.Regexp
-	mtx              sync.Mutex
-	exec             utilexec.Interface
+	client              *sio.Client
+	gateway             string
+	username            string
+	password            string `datapolicy:"password"`
+	insecure            bool
+	certsEnabled        bool
+	system              *siotypes.System
+	sysName             string
+	sysClient           *sio.System
+	protectionDomain    *siotypes.ProtectionDomain
+	pdName              string
+	pdClient            *sio.ProtectionDomain
+	storagePool         *siotypes.StoragePool
+	spName              string
+	spClient            *sio.StoragePool
+	provisionMode       string
+	sdcPath             string
+	sdcGUID             string
+	instanceID          string
+	inited              bool
+	diskRegex           *regexp.Regexp
+	mtx                 sync.Mutex
+	exec                utilexec.Interface
+	filteredDialOptions *proxyutil.FilteredDialOptions
 }
 
-func newSioClient(gateway, username, password string, sslEnabled bool, exec utilexec.Interface) (*sioClient, error) {
+func newSioClient(gateway, username, password string, sslEnabled bool, exec utilexec.Interface, filteredDialOptions *proxyutil.FilteredDialOptions) (*sioClient, error) {
 	client := new(sioClient)
 	client.gateway = gateway
 	client.username = username
 	client.password = password
 	client.exec = exec
+	client.filteredDialOptions = filteredDialOptions
 	if sslEnabled {
 		client.insecure = false
 		client.certsEnabled = true
@@ -118,6 +122,15 @@ func (c *sioClient) init() error {
 		klog.Error(log("failed to create client: %v", err))
 		return err
 	}
+	transport, ok := client.Http.Transport.(*http.Transport)
+	if !ok {
+		return errors.New("could not set http.Transport options for scaleio client")
+	}
+	//lint:ignore SA1019 DialTLS must be used to support legacy clients.
+	if transport.DialTLS != nil {
+		return errors.New("DialTLS will be used instead of DialContext")
+	}
+	transport.DialContext = proxyutil.NewFilteredDialContext(transport.DialContext, nil, c.filteredDialOptions)
 	c.client = client
 	if _, err = c.client.Authenticate(
 		&sio.ConfigConnect{

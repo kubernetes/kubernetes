@@ -27,14 +27,15 @@ import (
 )
 
 type fakeSocket struct {
+	closed   bool
 	port     int32
 	protocol string
-	closed   bool
+	ip       string
 }
 
 func (f *fakeSocket) Close() error {
 	if f.closed {
-		return fmt.Errorf("Socket %q.%s already closed!", f.port, f.protocol)
+		return fmt.Errorf("socket %q.%s already closed", f.port, f.protocol)
 	}
 	f.closed = true
 	return nil
@@ -52,7 +53,12 @@ func (f *fakeSocketManager) openFakeSocket(hp *hostport) (closeable, error) {
 	if socket, ok := f.mem[*hp]; ok && !socket.closed {
 		return nil, fmt.Errorf("hostport is occupied")
 	}
-	fs := &fakeSocket{hp.port, hp.protocol, false}
+	fs := &fakeSocket{
+		port:     hp.port,
+		protocol: hp.protocol,
+		closed:   false,
+		ip:       hp.ip,
+	}
 	f.mem[*hp] = fs
 	return fs, nil
 }
@@ -80,5 +86,4 @@ func TestEnsureKubeHostportChains(t *testing.T) {
 		assert.EqualValues(t, len(chain.rules), 1)
 		assert.Contains(t, chain.rules[0], jumpRule)
 	}
-
 }

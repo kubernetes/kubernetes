@@ -17,6 +17,7 @@ limitations under the License.
 package endpoint
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -35,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	clientscheme "k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -42,7 +44,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	endptspkg "k8s.io/kubernetes/pkg/api/v1/endpoints"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
+	controllerpkg "k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	utilnet "k8s.io/utils/net"
 	utilpointer "k8s.io/utils/pointer"
@@ -203,7 +205,7 @@ func makeBlockingEndpointDeleteTestServer(t *testing.T, controller *endpointCont
 }
 
 type endpointController struct {
-	*EndpointController
+	*Controller
 	podStore       cache.Store
 	serviceStore   cache.Store
 	endpointsStore cache.Store
@@ -211,7 +213,7 @@ type endpointController struct {
 
 func newController(url string, batchPeriod time.Duration) *endpointController {
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: url, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
 	endpoints := NewEndpointController(informerFactory.Core().V1().Pods(), informerFactory.Core().V1().Services(),
 		informerFactory.Core().V1().Endpoints(), client, batchPeriod)
 	endpoints.podsSynced = alwaysReady
@@ -219,6 +221,29 @@ func newController(url string, batchPeriod time.Duration) *endpointController {
 	endpoints.endpointsSynced = alwaysReady
 	return &endpointController{
 		endpoints,
+		informerFactory.Core().V1().Pods().Informer().GetStore(),
+		informerFactory.Core().V1().Services().Informer().GetStore(),
+		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
+	}
+}
+
+func newFakeController(batchPeriod time.Duration) (*fake.Clientset, *endpointController) {
+	client := fake.NewSimpleClientset()
+	informerFactory := informers.NewSharedInformerFactory(client, controllerpkg.NoResyncPeriodFunc())
+
+	eController := NewEndpointController(
+		informerFactory.Core().V1().Pods(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Core().V1().Endpoints(),
+		client,
+		batchPeriod)
+
+	eController.podsSynced = alwaysReady
+	eController.servicesSynced = alwaysReady
+	eController.endpointsSynced = alwaysReady
+
+	return client, &endpointController{
+		eController,
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
 		informerFactory.Core().V1().Services().Informer().GetStore(),
 		informerFactory.Core().V1().Endpoints().Informer().GetStore(),
@@ -381,6 +406,33 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 		}},
 	})
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "PUT", &data)
+}
+
+func TestSyncEndpointsHeadlessServiceLabel(t *testing.T) {
+	ns := metav1.NamespaceDefault
+	testServer, endpointsHandler := makeTestServer(t, ns)
+	defer testServer.Close()
+	endpoints := newController(testServer.URL, 0*time.Second)
+	endpoints.endpointsStore.Add(&v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
+		},
+		Subsets: []v1.EndpointSubset{},
+	})
+	endpoints.serviceStore.Add(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: v1.ServiceSpec{
+			Selector: map[string]string{"foo": "bar"},
+			Ports:    []v1.ServicePort{{Port: 80}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+	endpointsHandler.ValidateRequestCount(t, 0)
 }
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
@@ -1229,8 +1281,8 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv4,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
 				},
 			},
 
@@ -1262,7 +1314,7 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 				},
 			},
 
-			expectedEndpointFamily: ipv4,
+			expectedEndpointFamily: ipv6,
 		},
 		{
 			name: "v6 service, in a dual stack cluster",
@@ -1293,33 +1345,32 @@ func TestPodToEndpointAddressForService(t *testing.T) {
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 headless service, in a dual stack cluster",
+			name: "v6 headless service, in a dual stack cluster (connected to a new api-server)",
 
 			enableDualStack: true,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
-					IPFamily:  &ipv6,
+					ClusterIP:  v1.ClusterIPNone,
+					IPFamilies: []v1.IPFamily{v1.IPv6Protocol}, // <- set by a api-server defaulting logic
 				},
 			},
 
 			expectedEndpointFamily: ipv6,
 		},
 		{
-			name: "v6 legacy headless service, in a dual stack cluster",
+			name: "v6 legacy headless service, in a dual stack cluster  (connected to a old api-server)",
 
 			enableDualStack: false,
 			ipFamilies:      ipv4ipv6,
 
 			service: v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIP: v1.ClusterIPNone,
+					ClusterIP: v1.ClusterIPNone, // <- families are not set by api-server
 				},
 			},
 
-			// This is not the behavior we *want*, but it's the behavior we currently expect.
 			expectedEndpointFamily: ipv4,
 		},
 
@@ -1955,30 +2006,117 @@ func TestSyncEndpointsServiceNotFound(t *testing.T) {
 	endpointsHandler.ValidateRequest(t, "/api/v1/namespaces/"+ns+"/endpoints/foo", "DELETE", nil)
 }
 
+func TestSyncServiceOverCapacity(t *testing.T) {
+	testCases := []struct {
+		name               string
+		startingAnnotation *string
+		numExisting        int
+		numDesired         int
+		expectedAnnotation bool
+	}{{
+		name:               "empty",
+		startingAnnotation: nil,
+		numExisting:        0,
+		numDesired:         0,
+		expectedAnnotation: false,
+	}, {
+		name:               "annotation added past capacity",
+		startingAnnotation: nil,
+		numExisting:        maxCapacity - 1,
+		numDesired:         maxCapacity + 1,
+		expectedAnnotation: true,
+	}, {
+		name:               "annotation removed below capacity",
+		startingAnnotation: utilpointer.StringPtr("warning"),
+		numExisting:        maxCapacity - 1,
+		numDesired:         maxCapacity - 1,
+		expectedAnnotation: false,
+	}, {
+		name:               "annotation removed at capacity",
+		startingAnnotation: utilpointer.StringPtr("warning"),
+		numExisting:        maxCapacity,
+		numDesired:         maxCapacity,
+		expectedAnnotation: false,
+	}, {
+		name:               "no endpoints change, annotation value corrected",
+		startingAnnotation: utilpointer.StringPtr("invalid"),
+		numExisting:        maxCapacity + 1,
+		numDesired:         maxCapacity + 1,
+		expectedAnnotation: true,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := "test"
+			client, c := newFakeController(0 * time.Second)
+
+			addPods(c.podStore, ns, tc.numDesired, 1, 0, ipv4only)
+			pods := c.podStore.List()
+
+			svc := &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: ns},
+				Spec: v1.ServiceSpec{
+					Selector: map[string]string{"foo": "bar"},
+					Ports:    []v1.ServicePort{{Port: 80}},
+				},
+			}
+			c.serviceStore.Add(svc)
+
+			subset := v1.EndpointSubset{}
+			for i := 0; i < tc.numExisting; i++ {
+				pod := pods[i].(*v1.Pod)
+				epa, _ := podToEndpointAddressForService(svc, pod)
+				subset.Addresses = append(subset.Addresses, *epa)
+			}
+			endpoints := &v1.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            svc.Name,
+					Namespace:       ns,
+					ResourceVersion: "1",
+					Annotations:     map[string]string{},
+				},
+				Subsets: []v1.EndpointSubset{subset},
+			}
+			if tc.startingAnnotation != nil {
+				endpoints.Annotations[v1.EndpointsOverCapacity] = *tc.startingAnnotation
+			}
+			c.endpointsStore.Add(endpoints)
+			client.CoreV1().Endpoints(ns).Create(context.TODO(), endpoints, metav1.CreateOptions{})
+
+			c.syncService(fmt.Sprintf("%s/%s", ns, svc.Name))
+
+			actualEndpoints, err := client.CoreV1().Endpoints(ns).Get(context.TODO(), endpoints.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("unexpected error getting endpoints: %v", err)
+			}
+
+			actualAnnotation, ok := actualEndpoints.Annotations[v1.EndpointsOverCapacity]
+			if tc.expectedAnnotation {
+				if !ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be set")
+				} else if actualAnnotation != "warning" {
+					t.Errorf("Expected EndpointsOverCapacity annotation to be 'warning', got %s", actualAnnotation)
+				}
+			} else {
+				if ok {
+					t.Errorf("Expected EndpointsOverCapacity annotation not to be set, got %s", actualAnnotation)
+				}
+			}
+		})
+	}
+}
+
 func TestEndpointPortFromServicePort(t *testing.T) {
 	http := utilpointer.StringPtr("http")
 	testCases := map[string]struct {
-		featureGateEnabled           bool
 		serviceAppProtocol           *string
 		expectedEndpointsAppProtocol *string
 	}{
-		"feature gate disabled, empty app protocol": {
-			featureGateEnabled:           false,
+		"empty app protocol": {
 			serviceAppProtocol:           nil,
 			expectedEndpointsAppProtocol: nil,
 		},
-		"feature gate disabled, http app protocol": {
-			featureGateEnabled:           false,
-			serviceAppProtocol:           http,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, empty app protocol": {
-			featureGateEnabled:           true,
-			serviceAppProtocol:           nil,
-			expectedEndpointsAppProtocol: nil,
-		},
-		"feature gate enabled, http app protocol": {
-			featureGateEnabled:           true,
+		"http app protocol": {
 			serviceAppProtocol:           http,
 			expectedEndpointsAppProtocol: http,
 		},
@@ -1986,8 +2124,6 @@ func TestEndpointPortFromServicePort(t *testing.T) {
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceAppProtocol, tc.featureGateEnabled)()
-
 			epp := endpointPortFromServicePort(&v1.ServicePort{Name: "test", AppProtocol: tc.serviceAppProtocol}, 80)
 
 			if epp.AppProtocol != tc.expectedEndpointsAppProtocol {

@@ -28,7 +28,7 @@ import (
 const (
 	// When these values are updated, also update test/utils/image/manifest.go
 	defaultPodSandboxImageName    = "k8s.gcr.io/pause"
-	defaultPodSandboxImageVersion = "3.2"
+	defaultPodSandboxImageVersion = "3.4.1"
 )
 
 var (
@@ -45,14 +45,12 @@ func NewContainerRuntimeOptions() *config.ContainerRuntimeOptions {
 	}
 
 	return &config.ContainerRuntimeOptions{
-		ContainerRuntime:           kubetypes.DockerContainerRuntime,
-		RedirectContainerStreaming: false,
-		DockerEndpoint:             dockerEndpoint,
-		DockershimRootDirectory:    "/var/lib/dockershim",
-		PodSandboxImage:            defaultPodSandboxImage,
-		ImagePullProgressDeadline:  metav1.Duration{Duration: 1 * time.Minute},
+		ContainerRuntime:          kubetypes.DockerContainerRuntime,
+		DockerEndpoint:            dockerEndpoint,
+		DockershimRootDirectory:   "/var/lib/dockershim",
+		PodSandboxImage:           defaultPodSandboxImage,
+		ImagePullProgressDeadline: metav1.Duration{Duration: 1 * time.Minute},
 
-		//Alpha feature
 		CNIBinDir:   "/opt/cni/bin",
 		CNIConfDir:  "/etc/cni/net.d",
 		CNICacheDir: "/var/lib/cni/cache",

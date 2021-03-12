@@ -39,6 +39,7 @@ const (
 
 var (
 	kubeReleaseBucketURL  = "https://dl.k8s.io"
+	kubeCIBucketURL       = "https://storage.googleapis.com/k8s-release-dev"
 	kubeReleaseRegex      = regexp.MustCompile(`^v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$`)
 	kubeReleaseLabelRegex = regexp.MustCompile(`^((latest|stable)+(-[1-9](\.[1-9]([0-9])?)?)?)\z`)
 	kubeBucketPrefixes    = regexp.MustCompile(`^((release|ci|ci-cross)/)?([-\w_\.+]+)$`)
@@ -160,7 +161,7 @@ func normalizedBuildVersion(version string) string {
 // Internal helper: split version parts,
 // Return base URL and cleaned-up version
 func splitVersion(version string) (string, string, error) {
-	var urlSuffix string
+	var bucketURL, urlSuffix string
 	subs := kubeBucketPrefixes.FindAllStringSubmatch(version, 1)
 	if len(subs) != 1 || len(subs[0]) != 4 {
 		return "", "", errors.Errorf("invalid version %q", version)
@@ -170,10 +171,12 @@ func splitVersion(version string) (string, string, error) {
 	case strings.HasPrefix(subs[0][2], "ci"):
 		// Just use whichever the user specified
 		urlSuffix = subs[0][2]
+		bucketURL = kubeCIBucketURL
 	default:
 		urlSuffix = "release"
+		bucketURL = kubeReleaseBucketURL
 	}
-	url := fmt.Sprintf("%s/%s", kubeReleaseBucketURL, urlSuffix)
+	url := fmt.Sprintf("%s/%s", bucketURL, urlSuffix)
 	return url, subs[0][3], nil
 }
 

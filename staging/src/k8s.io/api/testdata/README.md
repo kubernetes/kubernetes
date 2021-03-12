@@ -2,6 +2,21 @@
 
 This directory tree contains serialized API objects in json, yaml, and protobuf formats.
 
+## Populating data for each release
+
+After every v1.x.0 release, snapshot compatibility data.
+
+For example, to capture compatibility data for `v1.20.0`:
+
+```sh
+export VERSION=v1.20.0
+git checkout ${VERSION}
+cp -fr staging/src/k8s.io/api/testdata/{HEAD,${VERSION}}
+git checkout -b ${VERSION}-api-testdata master
+git add .
+git commit -m "Add ${VERSION} API testdata"
+```
+
 ## Current version
 
 The `HEAD` subdirectory contains serialized API objects generated from the current commit:

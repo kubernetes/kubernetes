@@ -16,4 +16,5 @@ steps:
       - '-c'
       - |
         gcloud auth configure-docker \
+        && docker buildx create --name img-builder --use \
         && make all-push

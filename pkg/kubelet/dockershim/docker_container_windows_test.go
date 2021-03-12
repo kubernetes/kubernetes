@@ -91,7 +91,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		cleanupInfo := &containerCleanupInfo{}
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, createConfig, cleanupInfo)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// the registry key should have been properly created
 		if assert.Equal(t, 1, len(key.setStringValueArgs)) {
@@ -114,7 +114,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 		cleanupInfo := &containerCleanupInfo{}
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, createConfig, cleanupInfo)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		if assert.NotNil(t, createConfig.HostConfig) && assert.Equal(t, 1, len(createConfig.HostConfig.SecurityOpt)) {
 			secOpt := createConfig.HostConfig.SecurityOpt[0]
@@ -135,7 +135,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
-		require.NotNil(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "error when generating gMSA registry value name: unable to generate random string")
 	})
 	t.Run("if there's an error opening the registry key", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
-		require.NotNil(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to open registry key")
 	})
 	t.Run("if there's an error writing to the registry key", func(t *testing.T) {
@@ -153,7 +153,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 		err := applyGMSAConfig(containerConfigWithGMSAAnnotation, &dockertypes.ContainerCreateConfig{}, &containerCleanupInfo{})
 
-		if assert.NotNil(t, err) {
+		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "unable to write into registry value")
 		}
 		assert.True(t, key.closed)
@@ -163,7 +163,7 @@ func TestApplyGMSAConfig(t *testing.T) {
 
 		err := applyGMSAConfig(&runtimeapi.ContainerConfig{}, createConfig, &containerCleanupInfo{})
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Nil(t, createConfig.HostConfig)
 	})
 }
@@ -178,7 +178,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 
 		err := removeGMSARegistryValue(cleanupInfoWithValue)
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 
 		// the registry key should have been properly deleted
 		if assert.Equal(t, 1, len(key.deleteValueArgs)) {
@@ -191,7 +191,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 
 		err := removeGMSARegistryValue(cleanupInfoWithValue)
 
-		require.NotNil(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "unable to open registry key")
 	})
 	t.Run("if there's an error deleting from the registry key", func(t *testing.T) {
@@ -201,7 +201,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 
 		err := removeGMSARegistryValue(cleanupInfoWithValue)
 
-		if assert.NotNil(t, err) {
+		if assert.Error(t, err) {
 			assert.Contains(t, err.Error(), "unable to remove registry value")
 		}
 		assert.True(t, key.closed)
@@ -212,7 +212,7 @@ func TestRemoveGMSARegistryValue(t *testing.T) {
 
 		err := removeGMSARegistryValue(&containerCleanupInfo{})
 
-		assert.Nil(t, err)
+		assert.NoError(t, err)
 		assert.Equal(t, 0, len(key.deleteValueArgs))
 	})
 }

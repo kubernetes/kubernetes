@@ -21,9 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"k8s.io/utils/mount"
-
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/resizefs"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/mount-utils"
 )
 
 var (
@@ -41,6 +39,12 @@ var (
 		v1.PersistentVolumeClaimFileSystemResizePending: true,
 		v1.PersistentVolumeClaimResizing:                true,
 	}
+
+	// AnnPreResizeCapacity annotation is added to a PV when expanding volume.
+	// Its value is status capacity of the PVC prior to the volume expansion
+	// Its value will be set by the external-resizer when it deems that filesystem resize is required after resizing volume.
+	// Its value will be used by pv_controller to determine pvc's status capacity when binding pvc and pv.
+	AnnPreResizeCapacity = "volume.alpha.kubernetes.io/pre-resize-capacity"
 )
 
 type resizeProcessStatus struct {
@@ -59,27 +63,67 @@ func UpdatePVSize(
 	newSize resource.Quantity,
 	kubeClient clientset.Interface) error {
 	pvClone := pv.DeepCopy()
-
-	oldData, err := json.Marshal(pvClone)
-	if err != nil {
-		return fmt.Errorf("unexpected error marshaling old PV %q with error : %v", pvClone.Name, err)
-	}
-
 	pvClone.Spec.Capacity[v1.ResourceStorage] = newSize
 
-	newData, err := json.Marshal(pvClone)
-	if err != nil {
-		return fmt.Errorf("unexpected error marshaling new PV %q with error : %v", pvClone.Name, err)
+	return PatchPV(pv, pvClone, kubeClient)
+}
+
+// AddAnnPreResizeCapacity adds volume.alpha.kubernetes.io/pre-resize-capacity from the pv
+func AddAnnPreResizeCapacity(
+	pv *v1.PersistentVolume,
+	oldCapacity resource.Quantity,
+	kubeClient clientset.Interface) error {
+	// if the pv already has a resize annotation skip the process
+	if metav1.HasAnnotation(pv.ObjectMeta, AnnPreResizeCapacity) {
+		return nil
 	}
 
-	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, pvClone)
+	pvClone := pv.DeepCopy()
+	if pvClone.ObjectMeta.Annotations == nil {
+		pvClone.ObjectMeta.Annotations = make(map[string]string)
+	}
+	pvClone.ObjectMeta.Annotations[AnnPreResizeCapacity] = oldCapacity.String()
+
+	return PatchPV(pv, pvClone, kubeClient)
+}
+
+// DeleteAnnPreResizeCapacity deletes volume.alpha.kubernetes.io/pre-resize-capacity from the pv
+func DeleteAnnPreResizeCapacity(
+	pv *v1.PersistentVolume,
+	kubeClient clientset.Interface) error {
+	// if the pv does not have a resize annotation skip the entire process
+	if !metav1.HasAnnotation(pv.ObjectMeta, AnnPreResizeCapacity) {
+		return nil
+	}
+	pvClone := pv.DeepCopy()
+	delete(pvClone.ObjectMeta.Annotations, AnnPreResizeCapacity)
+
+	return PatchPV(pv, pvClone, kubeClient)
+}
+
+// PatchPV creates and executes a patch for pv
+func PatchPV(
+	oldPV *v1.PersistentVolume,
+	newPV *v1.PersistentVolume,
+	kubeClient clientset.Interface) error {
+	oldData, err := json.Marshal(oldPV)
 	if err != nil {
-		return fmt.Errorf("error Creating two way merge patch for PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("unexpected error marshaling old PV %q with error : %v", oldPV.Name, err)
 	}
 
-	_, err = kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), pvClone.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	newData, err := json.Marshal(newPV)
 	if err != nil {
-		return fmt.Errorf("error Patching PV %q with error : %v", pvClone.Name, err)
+		return fmt.Errorf("unexpected error marshaling new PV %q with error : %v", newPV.Name, err)
+	}
+
+	patchBytes, err := strategicpatch.CreateTwoWayMergePatch(oldData, newData, oldPV)
+	if err != nil {
+		return fmt.Errorf("error Creating two way merge patch for PV %q with error : %v", oldPV.Name, err)
+	}
+
+	_, err = kubeClient.CoreV1().PersistentVolumes().Patch(context.TODO(), oldPV.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	if err != nil {
+		return fmt.Errorf("error Patching PV %q with error : %v", oldPV.Name, err)
 	}
 	return nil
 }
@@ -266,11 +310,6 @@ func MergeResizeConditionOnPVC(
 
 // GenericResizeFS : call generic filesystem resizer for plugins that don't have any special filesystem resize requirements
 func GenericResizeFS(host volume.VolumeHost, pluginName, devicePath, deviceMountPath string) (bool, error) {
-	mounter := host.GetMounter(pluginName)
-	diskFormatter := &mount.SafeFormatAndMount{
-		Interface: mounter,
-		Exec:      host.GetExec(pluginName),
-	}
-	resizer := resizefs.NewResizeFs(diskFormatter)
+	resizer := mount.NewResizeFs(host.GetExec(pluginName))
 	return resizer.Resize(devicePath, deviceMountPath)
 }

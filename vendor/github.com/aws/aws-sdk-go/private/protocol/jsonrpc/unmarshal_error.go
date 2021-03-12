@@ -54,7 +54,7 @@ func (u *UnmarshalTypedError) UnmarshalError(
 		// If exception code is know, use associated constructor to get a value
 		// for the exception that the JSON body can be unmarshaled into.
 		v := fn(respMeta)
-		err := jsonutil.UnmarshalJSON(v, body)
+		err := jsonutil.UnmarshalJSONCaseInsensitive(v, body)
 		if err != nil {
 			return nil, err
 		}

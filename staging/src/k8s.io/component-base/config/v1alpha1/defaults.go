@@ -44,7 +44,8 @@ func RecommendedDefaultLeaderElectionConfiguration(obj *LeaderElectionConfigurat
 		obj.RetryPeriod = metav1.Duration{Duration: 2 * time.Second}
 	}
 	if obj.ResourceLock == "" {
-		// TODO: Migrate to LeaseLock.
+		// TODO(#80289): Figure out how to migrate to LeaseLock at this point.
+		//   This will most probably require going through EndpointsLease first.
 		obj.ResourceLock = EndpointsResourceLock
 	}
 	if obj.LeaderElect == nil {

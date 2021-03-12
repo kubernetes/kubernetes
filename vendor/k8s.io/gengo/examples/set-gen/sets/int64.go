@@ -28,7 +28,7 @@ type Int64 map[int64]Empty
 
 // NewInt64 creates a Int64 from a list of values.
 func NewInt64(items ...int64) Int64 {
-	ss := Int64{}
+	ss := make(Int64, len(items))
 	ss.Insert(items...)
 	return ss
 }

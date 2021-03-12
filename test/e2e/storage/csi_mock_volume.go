@@ -19,20 +19,23 @@ package storage
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,13 +45,19 @@ import (
 	cachetools "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	utilptr "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -58,6 +67,7 @@ const (
 	csiNodeLimitUpdateTimeout  = 5 * time.Minute
 	csiPodUnschedulableTimeout = 5 * time.Minute
 	csiResizeWaitPeriod        = 5 * time.Minute
+	csiVolumeAttachmentTimeout = 7 * time.Minute
 	// how long to wait for Resizing Condition on PVC to appear
 	csiResizingConditionWait = 2 * time.Minute
 
@@ -66,13 +76,6 @@ const (
 
 	// How log to wait for kubelet to unstage a volume after a pod is deleted
 	csiUnstageWaitTimeout = 1 * time.Minute
-
-	// Name of CSI driver pod name (it's in a StatefulSet with a stable name)
-	driverPodName = "csi-mockplugin-0"
-	// Name of CSI driver container name
-	driverContainerName = "mock"
-	// Prefix of the mock driver grpc log
-	grpcCallPrefix = "gRPCCall:"
 )
 
 // csiCall represents an expected call from Kubernetes to CSI mock driver and
@@ -103,17 +106,22 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		enableNodeExpansion bool   // enable node expansion for CSI mock driver
 		// just disable resizing on driver it overrides enableResizing flag for CSI mock driver
 		disableResizingOnDriver bool
-		javascriptHooks         map[string]string
+		enableSnapshot          bool
+		hooks                   *drivers.Hooks
+		tokenRequests           []storagev1.TokenRequest
+		requiresRepublish       *bool
+		fsGroupPolicy           *storagev1.FSGroupPolicy
 	}
 
 	type mockDriverSetup struct {
 		cs           clientset.Interface
-		config       *testsuites.PerTestConfig
+		config       *storageframework.PerTestConfig
 		testCleanups []func()
 		pods         []*v1.Pod
 		pvcs         []*v1.PersistentVolumeClaim
 		sc           map[string]*storagev1.StorageClass
-		driver       testsuites.TestDriver
+		vsc          map[string]*unstructured.Unstructured
+		driver       drivers.MockCSITestDriver
 		provisioner  string
 		tp           testParameters
 	}
@@ -124,9 +132,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	init := func(tp testParameters) {
 		m = mockDriverSetup{
-			cs: f.ClientSet,
-			sc: make(map[string]*storagev1.StorageClass),
-			tp: tp,
+			cs:  f.ClientSet,
+			sc:  make(map[string]*storagev1.StorageClass),
+			vsc: make(map[string]*unstructured.Unstructured),
+			tp:  tp,
 		}
 		cs := f.ClientSet
 		var err error
@@ -139,7 +148,28 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			DisableAttach:       tp.disableAttach,
 			EnableResizing:      tp.enableResizing,
 			EnableNodeExpansion: tp.enableNodeExpansion,
-			JavascriptHooks:     tp.javascriptHooks,
+			EnableSnapshot:      tp.enableSnapshot,
+			TokenRequests:       tp.tokenRequests,
+			RequiresRepublish:   tp.requiresRepublish,
+			FSGroupPolicy:       tp.fsGroupPolicy,
+		}
+
+		// At the moment, only tests which need hooks are
+		// using the embedded CSI mock driver. The rest run
+		// the driver inside the cluster although they could
+		// changed to use embedding merely by setting
+		// driverOpts.embedded to true.
+		//
+		// Not enabling it for all tests minimizes
+		// the risk that the introduction of embedded breaks
+		// some existings tests and avoids a dependency
+		// on port forwarding, which is important if some of
+		// these tests are supposed to become part of
+		// conformance testing (port forwarding isn't
+		// currently required).
+		if tp.hooks != nil {
+			driverOpts.Embedded = true
+			driverOpts.Hooks = *tp.hooks
 		}
 
 		// this just disable resizing on driver, keeping resizing on SC enabled.
@@ -169,12 +199,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 	createPod := func(ephemeral bool) (class *storagev1.StorageClass, claim *v1.PersistentVolumeClaim, pod *v1.Pod) {
 		ginkgo.By("Creating pod")
-		var sc *storagev1.StorageClass
-		if dDriver, ok := m.driver.(testsuites.DynamicPVTestDriver); ok {
-			sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
-		}
+		sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
 		scTest := testsuites.StorageClassTest{
 			Name:                 m.driver.GetDriverInfo().Name,
+			Timeouts:             f.Timeouts,
 			Provisioner:          sc.Provisioner,
 			Parameters:           sc.Parameters,
 			ClaimSize:            "1Gi",
@@ -214,6 +242,36 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		return pod, err
 	}
 
+	createPodWithFSGroup := func(fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+		ginkgo.By("Creating pod with fsGroup")
+		nodeSelection := m.config.ClientNodeSelection
+		sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+		scTest := testsuites.StorageClassTest{
+			Name:                 m.driver.GetDriverInfo().Name,
+			Provisioner:          sc.Provisioner,
+			Parameters:           sc.Parameters,
+			ClaimSize:            "1Gi",
+			ExpectedSize:         "1Gi",
+			DelayBinding:         m.tp.lateBinding,
+			AllowVolumeExpansion: m.tp.enableResizing,
+		}
+
+		class, claim, pod := startBusyBoxPod(f.ClientSet, scTest, nodeSelection, m.tp.scName, f.Namespace.Name, fsGroup)
+
+		if class != nil {
+			m.sc[class.Name] = class
+		}
+		if claim != nil {
+			m.pvcs = append(m.pvcs, claim)
+		}
+
+		if pod != nil {
+			m.pods = append(m.pods, pod)
+		}
+
+		return class, claim, pod
+	}
+
 	cleanup := func() {
 		cs := f.ClientSet
 		var errs []error
@@ -241,6 +299,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			cs.StorageV1().StorageClasses().Delete(context.TODO(), sc.Name, metav1.DeleteOptions{})
 		}
 
+		for _, vsc := range m.vsc {
+			ginkgo.By(fmt.Sprintf("Deleting volumesnapshotclass %s", vsc.GetName()))
+			m.config.Framework.DynamicClient.Resource(utils.SnapshotClassGVR).Delete(context.TODO(), vsc.GetName(), metav1.DeleteOptions{})
+		}
 		ginkgo.By("Cleaning up resources")
 		for _, cleanupFunc := range m.testCleanups {
 			cleanupFunc()
@@ -305,6 +367,77 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 
 		}
+	})
+
+	ginkgo.Context("CSI CSIDriver deployment after pod creation using non-attachable mock driver", func() {
+		ginkgo.It("should bringup pod after deploying CSIDriver attach=false [Slow]", func() {
+			var err error
+			init(testParameters{registerDriver: false, disableAttach: true})
+			defer cleanup()
+
+			_, claim, pod := createPod(false /* persistent volume, late binding as specified above */)
+			if pod == nil {
+				return
+			}
+
+			ginkgo.By("Checking if attaching failed and pod cannot start")
+			eventSelector := fields.Set{
+				"involvedObject.kind":      "Pod",
+				"involvedObject.name":      pod.Name,
+				"involvedObject.namespace": pod.Namespace,
+				"reason":                   events.FailedAttachVolume,
+			}.AsSelector().String()
+			msg := "AttachVolume.Attach failed for volume"
+
+			err = e2eevents.WaitTimeoutForEvent(m.cs, pod.Namespace, eventSelector, msg, f.Timeouts.PodStart)
+			if err != nil {
+				podErr := e2epod.WaitTimeoutForPodRunningInNamespace(m.cs, pod.Name, pod.Namespace, 10*time.Second)
+				framework.ExpectError(podErr, "Pod should not be in running status because attaching should failed")
+				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
+				framework.Logf("Attach should fail and the corresponding event should show up, error: %v", err)
+			}
+
+			// VolumeAttachment should be created because the default value for CSI attachable is true
+			ginkgo.By("Checking if VolumeAttachment was created for the pod")
+			handle := getVolumeHandle(m.cs, claim)
+			attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
+			attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+			if err != nil {
+				if apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
+				} else {
+					framework.ExpectNoError(err, "Failed to find VolumeAttachment")
+				}
+			}
+
+			ginkgo.By("Deploy CSIDriver object with attachRequired=false")
+			driverNamespace := m.config.DriverNamespace
+
+			canAttach := false
+			o := utils.PatchCSIOptions{
+				OldDriverName: "csi-mock",
+				NewDriverName: "csi-mock-" + f.UniqueName,
+				CanAttach:     &canAttach,
+			}
+			cleanupCSIDriver, err := utils.CreateFromManifests(f, driverNamespace, func(item interface{}) error {
+				return utils.PatchCSIDeployment(f, o, item)
+			}, "test/e2e/testing-manifests/storage-csi/mock/csi-mock-driverinfo.yaml")
+			if err != nil {
+				framework.Failf("fail to deploy CSIDriver object: %v", err)
+			}
+			m.testCleanups = append(m.testCleanups, cleanupCSIDriver)
+
+			ginkgo.By("Wait for the pod in running status")
+			err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+			framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
+			// This step can be slow because we have to wait either a NodeUpdate event happens or
+			// the detachment for this volume timeout so that we can do a force detach.
+			err = waitForVolumeAttachmentTerminated(attachmentName, m.cs)
+			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
+		})
 	})
 
 	ginkgo.Context("CSI workload information using mock driver", func() {
@@ -377,7 +510,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				csiInlineVolumesEnabled := test.expectEphemeral
 				if test.expectPodInfo {
 					ginkgo.By("checking for CSIInlineVolumes feature")
-					csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(m.cs, f.Namespace.Name)
+					csiInlineVolumesEnabled, err = testsuites.CSIInlineVolumesEnabled(m.cs, f.Timeouts, f.Namespace.Name)
 					framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
 				}
 
@@ -386,7 +519,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "while deleting")
 
 				ginkgo.By("Checking CSI driver logs")
-				err = checkPodLogs(m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
+				err = checkPodLogs(m.driver.GetCalls, pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled, false, 1)
 				framework.ExpectNoError(err)
 			})
 		}
@@ -599,19 +732,19 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	ginkgo.Context("CSI NodeStage error cases [Slow]", func() {
-		// Global variable in all scripts (called before each test)
-		globalScript := `counter=0; console.log("globals loaded", OK, INVALIDARGUMENT)`
 		trackedCalls := []string{
 			"NodeStageVolume",
 			"NodeUnstageVolume",
 		}
 
 		tests := []struct {
-			name              string
-			expectPodRunning  bool
-			expectedCalls     []csiCall
-			nodeStageScript   string
-			nodeUnstageScript string
+			name             string
+			expectPodRunning bool
+			expectedCalls    []csiCall
+
+			// Called for each NodeStateVolume calls, with counter incremented atomically before
+			// the invocation (i.e. first value will be 1).
+			nodeStageHook func(counter int64) error
 		}{
 			{
 				// This is already tested elsewhere, adding simple good case here to test the test framework.
@@ -621,7 +754,6 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeStageVolume", expectedError: codes.OK, deletePod: true},
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
-				nodeStageScript: `OK;`,
 			},
 			{
 				// Kubelet should repeat NodeStage as long as the pod exists
@@ -634,7 +766,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
 				// Fail first 3 NodeStage requests, 4th succeeds
-				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { INVALIDARGUMENT; } else { OK; }`,
+				nodeStageHook: func(counter int64) error {
+					if counter < 4 {
+						return status.Error(codes.InvalidArgument, "fake error")
+					}
+					return nil
+				},
 			},
 			{
 				// Kubelet should repeat NodeStage as long as the pod exists
@@ -647,7 +784,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
 				// Fail first 3 NodeStage requests, 4th succeeds
-				nodeStageScript: `console.log("Counter:", ++counter); if (counter < 4) { DEADLINEEXCEEDED; } else { OK; }`,
+				nodeStageHook: func(counter int64) error {
+					if counter < 4 {
+						return status.Error(codes.DeadlineExceeded, "fake error")
+					}
+					return nil
+				},
 			},
 			{
 				// After NodeUnstage with ephemeral error, the driver may continue staging the volume.
@@ -661,7 +803,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					{expectedMethod: "NodeStageVolume", expectedError: codes.DeadlineExceeded, deletePod: true},
 					{expectedMethod: "NodeUnstageVolume", expectedError: codes.OK},
 				},
-				nodeStageScript: `DEADLINEEXCEEDED;`,
+				nodeStageHook: func(counter int64) error {
+					return status.Error(codes.DeadlineExceeded, "fake error")
+				},
 			},
 			{
 				// After NodeUnstage with final error, kubelet can be sure the volume is not staged.
@@ -673,21 +817,23 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					// This matches all repeated NodeStage calls with InvalidArgument error (due to exp. backoff).
 					{expectedMethod: "NodeStageVolume", expectedError: codes.InvalidArgument, deletePod: true},
 				},
-				nodeStageScript: `INVALIDARGUMENT;`,
+				// nodeStageScript: `INVALIDARGUMENT;`,
+				nodeStageHook: func(counter int64) error {
+					return status.Error(codes.InvalidArgument, "fake error")
+				},
 			},
 		}
 		for _, t := range tests {
 			test := t
 			ginkgo.It(test.name, func() {
-				scripts := map[string]string{
-					"globals":                globalScript,
-					"nodeStageVolumeStart":   test.nodeStageScript,
-					"nodeUnstageVolumeStart": test.nodeUnstageScript,
+				var hooks *drivers.Hooks
+				if test.nodeStageHook != nil {
+					hooks = createPreHook("NodeStageVolume", test.nodeStageHook)
 				}
 				init(testParameters{
-					disableAttach:   true,
-					registerDriver:  true,
-					javascriptHooks: scripts,
+					disableAttach:  true,
+					registerDriver: true,
+					hooks:          hooks,
 				})
 				defer cleanup()
 
@@ -708,7 +854,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						framework.Failf("timed out waiting for the CSI call that indicates that the pod can be deleted: %v", test.expectedCalls)
 					}
 					time.Sleep(1 * time.Second)
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					framework.ExpectNoError(err, "while waiting for initial CSI calls")
 					if index == 0 {
 						// No CSI call received yet
@@ -732,7 +878,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				ginkgo.By("Waiting for all remaining expected CSI calls")
 				err = wait.Poll(time.Second, csiUnstageWaitTimeout, func() (done bool, err error) {
-					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
+					_, index, err := compareCSICalls(trackedCalls, test.expectedCalls, m.driver.GetCalls)
 					if err != nil {
 						return true, err
 					}
@@ -781,9 +927,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		createVolume := "CreateVolume"
 		deleteVolume := "DeleteVolume"
 		// publishVolume := "NodePublishVolume"
-		unpublishVolume := "NodeUnpublishVolume"
+		// unpublishVolume := "NodeUnpublishVolume"
 		// stageVolume := "NodeStageVolume"
-		unstageVolume := "NodeUnstageVolume"
+		// unstageVolume := "NodeUnstageVolume"
 
 		// These calls are assumed to occur in this order for
 		// each test run. NodeStageVolume and
@@ -793,12 +939,17 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 		// (https://github.com/kubernetes/kubernetes/issues/90250).
 		// Therefore they are temporarily commented out until
 		// that issue is resolved.
+		//
+		// NodeUnpublishVolume and NodeUnstageVolume are racing
+		// with DeleteVolume, so we cannot assume a deterministic
+		// order and have to ignore them
+		// (https://github.com/kubernetes/kubernetes/issues/94108).
 		deterministicCalls := []string{
 			createVolume,
 			// stageVolume,
 			// publishVolume,
-			unpublishVolume,
-			unstageVolume,
+			// unpublishVolume,
+			// unstageVolume,
 			deleteVolume,
 		}
 
@@ -818,11 +969,12 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				}
 
 				if test.resourceExhausted {
-					params.javascriptHooks = map[string]string{
-						"globals": `counter=0; console.log("globals loaded", OK, INVALIDARGUMENT)`,
-						// Every second call returns RESOURCEEXHAUSTED, starting with the first one.
-						"createVolumeStart": `console.log("Counter:", ++counter); if (counter % 2) { RESOURCEEXHAUSTED; } else { OK; }`,
-					}
+					params.hooks = createPreHook("CreateVolume", func(counter int64) error {
+						if counter%2 != 0 {
+							return status.Error(codes.ResourceExhausted, "fake error")
+						}
+						return nil
+					})
 				}
 
 				init(params)
@@ -878,9 +1030,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					expected = append(expected, normal...)
 				}
 
-				var calls []mockCSICall
+				var calls []drivers.MockCSICall
 				err = wait.PollImmediateUntil(time.Second, func() (done bool, err error) {
-					c, index, err := compareCSICalls(deterministicCalls, expected, m.cs, m.config.DriverNamespace.Name, driverPodName, driverContainerName)
+					c, index, err := compareCSICalls(deterministicCalls, expected, m.driver.GetCalls)
 					if err != nil {
 						return true, fmt.Errorf("error waiting for expected CSI calls: %s", err)
 					}
@@ -979,7 +1131,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 	})
 
 	// These tests *only* work on a cluster which has the CSIStorageCapacity feature enabled.
-	ginkgo.Context("CSIStorageCapacity [Feature:CSIStorageCapacity]", func() {
+	ginkgo.Context("CSIStorageCapacity", func() {
 		var (
 			err error
 			yes = true
@@ -1036,7 +1188,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				// before adding CSIStorageCapacity objects for it.
 				for _, capacityStr := range test.capacities {
 					capacityQuantity := resource.MustParse(capacityStr)
-					capacity := &storagev1alpha1.CSIStorageCapacity{
+					capacity := &storagev1beta1.CSIStorageCapacity{
 						ObjectMeta: metav1.ObjectMeta{
 							GenerateName: "fake-capacity-",
 						},
@@ -1045,10 +1197,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 						NodeTopology:     &metav1.LabelSelector{},
 						Capacity:         &capacityQuantity,
 					}
-					createdCapacity, err := f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
+					createdCapacity, err := f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Create(context.Background(), capacity, metav1.CreateOptions{})
 					framework.ExpectNoError(err, "create CSIStorageCapacity %+v", *capacity)
 					m.testCleanups = append(m.testCleanups, func() {
-						f.ClientSet.StorageV1alpha1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
+						f.ClientSet.StorageV1beta1().CSIStorageCapacities(f.Namespace.Name).Delete(context.Background(), createdCapacity.Name, metav1.DeleteOptions{})
 					})
 				}
 
@@ -1060,7 +1212,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				sc, _, pod := createPod(false /* persistent volume, late binding as specified above */)
 				framework.ExpectEqual(sc.Name, scName, "pre-selected storage class name not used")
 
-				waitCtx, cancel := context.WithTimeout(context.Background(), podStartTimeout)
+				waitCtx, cancel := context.WithTimeout(context.Background(), f.Timeouts.PodStart)
 				defer cancel()
 				condition := anyOf(
 					podRunning(waitCtx, f.ClientSet, pod.Name, pod.Namespace),
@@ -1091,7 +1243,393 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			})
 		}
 	})
+
+	ginkgo.Context("CSI Volume Snapshots [Feature:VolumeSnapshotDataSource]", func() {
+		tests := []struct {
+			name               string
+			createSnapshotHook func(counter int64) error
+		}{
+			{
+				name: "volumesnapshotcontent and pvc in Bound state with deletion timestamp set should not get deleted while snapshot finalizer exists",
+				createSnapshotHook: func(counter int64) error {
+					if counter < 8 {
+						return status.Error(codes.DeadlineExceeded, "fake error")
+					}
+					return nil
+				},
+			},
+		}
+		for _, test := range tests {
+			test := test
+			ginkgo.It(test.name, func() {
+				var hooks *drivers.Hooks
+				if test.createSnapshotHook != nil {
+					hooks = createPreHook("CreateSnapshot", test.createSnapshotHook)
+				}
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					enableSnapshot: true,
+					hooks:          hooks,
+				})
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
+				if !ok {
+					e2eskipper.Skipf("mock driver %s does not support snapshots -- skipping", m.driver.GetDriverInfo().Name)
+
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), csiPodRunningTimeout)
+				defer cancel()
+				defer cleanup()
+
+				sc := m.driver.GetDynamicProvisionStorageClass(m.config, "")
+				ginkgo.By("Creating storage class")
+				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create class: %v", err)
+				m.sc[class.Name] = class
+				claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					// Use static name so that the volumesnapshot can be created before the pvc.
+					Name:             "snapshot-test-pvc",
+					StorageClassName: &(class.Name),
+				}, f.Namespace.Name)
+
+				ginkgo.By("Creating snapshot")
+				// TODO: Test VolumeSnapshots with Retain policy
+				parameters := map[string]string{}
+				snapshotClass, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, claim.Name, claim.Namespace, f.Timeouts, parameters)
+				framework.ExpectNoError(err, "failed to create snapshot")
+				m.vsc[snapshotClass.GetName()] = snapshotClass
+				volumeSnapshotName := snapshot.GetName()
+
+				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", claim.Namespace, claim.Name))
+				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), claim, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By(fmt.Sprintf("Wait for finalizer to be added to claim %s/%s", claim.Namespace, claim.Name))
+				err = e2epv.WaitForPVCFinalizer(ctx, m.cs, claim.Name, claim.Namespace, pvcAsSourceProtectionFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("Wait for PVC to be Bound")
+				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{claim}, 1*time.Minute)
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By(fmt.Sprintf("Delete PVC %s", claim.Name))
+				err = e2epv.DeletePersistentVolumeClaim(m.cs, claim.Name, claim.Namespace)
+				framework.ExpectNoError(err, "failed to delete pvc")
+
+				ginkgo.By("Get PVC from API server and verify deletion timestamp is set")
+				claim, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Get(context.TODO(), claim.Name, metav1.GetOptions{})
+				if err != nil {
+					if !apierrors.IsNotFound(err) {
+						framework.ExpectNoError(err, "Failed to get claim: %v", err)
+					}
+					framework.Logf("PVC not found. Continuing to test VolumeSnapshotContent finalizer")
+				} else if claim.DeletionTimestamp == nil {
+					framework.Failf("Expected deletion timestamp to be set on PVC: %v", claim)
+				}
+
+				ginkgo.By(fmt.Sprintf("Get VolumeSnapshotContent bound to VolumeSnapshot %s", snapshot.GetName()))
+				snapshotContent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				volumeSnapshotContentName := snapshotContent.GetName()
+
+				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshotContent %s contains finalizer %s", snapshot.GetName(), volumeSnapshotContentFinalizer))
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, "", volumeSnapshotContentFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By(fmt.Sprintf("Delete VolumeSnapshotContent %s", snapshotContent.GetName()))
+				err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Delete(ctx, snapshotContent.GetName(), metav1.DeleteOptions{})
+				framework.ExpectNoError(err, "Failed to delete snapshotcontent: %v", err)
+
+				ginkgo.By("Get VolumeSnapshotContent from API server and verify deletion timestamp is set")
+				snapshotContent, err = m.config.Framework.DynamicClient.Resource(utils.SnapshotContentGVR).Get(context.TODO(), snapshotContent.GetName(), metav1.GetOptions{})
+				framework.ExpectNoError(err)
+
+				if snapshotContent.GetDeletionTimestamp() == nil {
+					framework.Failf("Expected deletion timestamp to be set on snapshotcontent")
+				}
+
+				if claim != nil {
+					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
+					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
+					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
+				}
+
+				ginkgo.By(fmt.Sprintf("Verify VolumeSnapshot %s contains finalizer %s", snapshot.GetName(), volumeSnapshotBoundFinalizer))
+				err = utils.WaitForGVRFinalizer(ctx, m.config.Framework.DynamicClient, utils.SnapshotGVR, volumeSnapshotName, f.Namespace.Name, volumeSnapshotBoundFinalizer, 1*time.Millisecond, 1*time.Minute)
+				framework.ExpectNoError(err)
+
+				ginkgo.By("Delete VolumeSnapshot")
+				err = utils.DeleteAndWaitSnapshot(m.config.Framework.DynamicClient, f.Namespace.Name, volumeSnapshotName, framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshot %s", volumeSnapshotName))
+
+				ginkgo.By(fmt.Sprintf("Wait for VolumeSnapshotContent %s to be deleted", volumeSnapshotContentName))
+				err = utils.WaitForGVRDeletion(m.config.Framework.DynamicClient, utils.SnapshotContentGVR, volumeSnapshotContentName, framework.Poll, framework.SnapshotDeleteTimeout)
+				framework.ExpectNoError(err, fmt.Sprintf("failed to delete VolumeSnapshotContent %s", volumeSnapshotContentName))
+			})
+		}
+	})
+
+	ginkgo.Context("CSIServiceAccountToken", func() {
+		var (
+			err error
+		)
+		tests := []struct {
+			desc                  string
+			deployCSIDriverObject bool
+			tokenRequests         []storagev1.TokenRequest
+		}{
+			{
+				desc:                  "token should not be plumbed down when csiServiceAccountTokenEnabled=false",
+				deployCSIDriverObject: true,
+				tokenRequests:         nil,
+			},
+			{
+				desc:                  "token should not be plumbed down when CSIDriver is not deployed",
+				deployCSIDriverObject: false,
+				tokenRequests:         []storagev1.TokenRequest{{}},
+			},
+			{
+				desc:                  "token should be plumbed down when csiServiceAccountTokenEnabled=true",
+				deployCSIDriverObject: true,
+				tokenRequests:         []storagev1.TokenRequest{{ExpirationSeconds: utilptr.Int64Ptr(60 * 10)}},
+			},
+		}
+		for _, test := range tests {
+			test := test
+			csiServiceAccountTokenEnabled := test.tokenRequests != nil
+			ginkgo.It(test.desc, func() {
+				init(testParameters{
+					registerDriver:    test.deployCSIDriverObject,
+					tokenRequests:     test.tokenRequests,
+					requiresRepublish: &csiServiceAccountTokenEnabled,
+				})
+
+				defer cleanup()
+
+				_, _, pod := createPod(false)
+				if pod == nil {
+					return
+				}
+				err = e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "Failed to start pod: %v", err)
+
+				// sleep to make sure RequiresRepublish triggers more than 1 NodePublishVolume
+				numNodePublishVolume := 1
+				if test.deployCSIDriverObject && csiServiceAccountTokenEnabled {
+					time.Sleep(time.Second)
+					numNodePublishVolume = 2
+				}
+
+				ginkgo.By("Deleting the previously created pod")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting")
+
+				ginkgo.By("Checking CSI driver logs")
+				err = checkPodLogs(m.driver.GetCalls, pod, false, false, false, test.deployCSIDriverObject && csiServiceAccountTokenEnabled, numNodePublishVolume)
+				framework.ExpectNoError(err)
+			})
+		}
+	})
+	// These tests *only* work on a cluster which has the CSIVolumeFSGroupPolicy feature enabled.
+	ginkgo.Context("CSI FSGroupPolicy [LinuxOnly]", func() {
+		tests := []struct {
+			name          string
+			fsGroupPolicy storagev1.FSGroupPolicy
+			modified      bool
+		}{
+			{
+				name:          "should modify fsGroup if fsGroupPolicy=default",
+				fsGroupPolicy: storagev1.ReadWriteOnceWithFSTypeFSGroupPolicy,
+				modified:      true,
+			},
+			{
+				name:          "should modify fsGroup if fsGroupPolicy=File",
+				fsGroupPolicy: storagev1.FileFSGroupPolicy,
+				modified:      true,
+			},
+			{
+				name:          "should not modify fsGroup if fsGroupPolicy=None",
+				fsGroupPolicy: storagev1.NoneFSGroupPolicy,
+				modified:      false,
+			},
+		}
+		for _, t := range tests {
+			test := t
+			ginkgo.It(test.name, func() {
+				if framework.NodeOSDistroIs("windows") {
+					e2eskipper.Skipf("FSGroupPolicy is only applied on linux nodes -- skipping")
+				}
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					fsGroupPolicy:  &test.fsGroupPolicy,
+				})
+				defer cleanup()
+
+				// kube-scheduler may need some time before it gets the CSIDriver object.
+				// Without them, scheduling doesn't run as expected by the test.
+				syncDelay := 5 * time.Second
+				time.Sleep(syncDelay)
+
+				fsGroupVal := int64(rand.Int63n(20000) + 1024)
+				fsGroup := &fsGroupVal
+
+				_, _, pod := createPodWithFSGroup(fsGroup) /* persistent volume */
+
+				mountPath := pod.Spec.Containers[0].VolumeMounts[0].MountPath
+				dirName := mountPath + "/" + f.UniqueName
+				fileName := dirName + "/" + f.UniqueName
+
+				err := e2epod.WaitForPodNameRunningInNamespace(m.cs, pod.Name, pod.Namespace)
+				framework.ExpectNoError(err, "failed to start pod")
+
+				// Create the subdirectory to ensure that fsGroup propagates
+				createDirectory := fmt.Sprintf("mkdir %s", dirName)
+				_, _, err = e2evolume.PodExec(f, pod, createDirectory)
+				framework.ExpectNoError(err, "failed: creating the directory: %s", err)
+
+				// Inject the contents onto the mount
+				createFile := fmt.Sprintf("echo '%s' > '%s'; sync", "filecontents", fileName)
+				_, _, err = e2evolume.PodExec(f, pod, createFile)
+				framework.ExpectNoError(err, "failed: writing the contents: %s", err)
+
+				// Delete the created file. This step is mandatory, as the mock driver
+				// won't clean up the contents automatically.
+				defer func() {
+					delete := fmt.Sprintf("rm -fr %s", dirName)
+					_, _, err = e2evolume.PodExec(f, pod, delete)
+					framework.ExpectNoError(err, "failed: deleting the directory: %s", err)
+				}()
+
+				// Ensure that the fsGroup matches what we expect
+				if test.modified {
+					utils.VerifyFSGroupInPod(f, fileName, strconv.FormatInt(*fsGroup, 10), pod)
+				} else {
+					utils.VerifyFSGroupInPod(f, fileName, "root", pod)
+				}
+
+				// The created resources will be removed by the cleanup() function,
+				// so need to delete anything here.
+			})
+		}
+	})
+
+	ginkgo.Context("CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource]", func() {
+
+		var (
+			// CSISnapshotterSecretName is the name of the secret to be created
+			CSISnapshotterSecretName string = "snapshot-secret"
+
+			// CSISnapshotterSecretNameAnnotation is the annotation key for the CSI snapshotter secret name in VolumeSnapshotClass.parameters
+			CSISnapshotterSecretNameAnnotation string = "csi.storage.k8s.io/snapshotter-secret-name"
+
+			// CSISnapshotterSecretNamespaceAnnotation is the annotation key for the CSI snapshotter secret namespace in VolumeSnapshotClass.parameters
+			CSISnapshotterSecretNamespaceAnnotation string = "csi.storage.k8s.io/snapshotter-secret-namespace"
+
+			// anotations holds the annotations object
+			annotations interface{}
+		)
+
+		tests := []struct {
+			name               string
+			createSnapshotHook func(counter int64) error
+		}{
+			{
+				// volume snapshot should be created using secrets successfully even if there is a failure in the first few attempts,
+				name: "volume snapshot create/delete with secrets",
+				// Fail the first 8 calls to create snapshot and succeed the  9th call.
+				createSnapshotHook: func(counter int64) error {
+					if counter < 8 {
+						return status.Error(codes.DeadlineExceeded, "fake error")
+					}
+					return nil
+				},
+			},
+		}
+		for _, test := range tests {
+			ginkgo.It(test.name, func() {
+				hooks := createPreHook("CreateSnapshot", test.createSnapshotHook)
+				init(testParameters{
+					disableAttach:  true,
+					registerDriver: true,
+					enableSnapshot: true,
+					hooks:          hooks,
+				})
+
+				sDriver, ok := m.driver.(storageframework.SnapshottableTestDriver)
+				if !ok {
+					e2eskipper.Skipf("mock driver does not support snapshots -- skipping")
+				}
+				defer cleanup()
+
+				var sc *storagev1.StorageClass
+				if dDriver, ok := m.driver.(storageframework.DynamicPVTestDriver); ok {
+					sc = dDriver.GetDynamicProvisionStorageClass(m.config, "")
+				}
+				ginkgo.By("Creating storage class")
+				class, err := m.cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create storage class: %v", err)
+				m.sc[class.Name] = class
+				pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+					Name:             "snapshot-test-pvc",
+					StorageClassName: &(class.Name),
+				}, f.Namespace.Name)
+
+				ginkgo.By(fmt.Sprintf("Creating PVC %s/%s", pvc.Namespace, pvc.Name))
+				pvc, err = m.cs.CoreV1().PersistentVolumeClaims(f.Namespace.Name).Create(context.TODO(), pvc, metav1.CreateOptions{})
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Wait for PVC to be Bound")
+				_, err = e2epv.WaitForPVClaimBoundPhase(m.cs, []*v1.PersistentVolumeClaim{pvc}, 1*time.Minute)
+				framework.ExpectNoError(err, "Failed to create claim: %v", err)
+
+				ginkgo.By("Creating Secret")
+				secret := &v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: f.Namespace.Name,
+						Name:      CSISnapshotterSecretName,
+					},
+					Data: map[string][]byte{
+						"secret-data": []byte("secret-value-1"),
+					},
+				}
+
+				if secret, err := m.cs.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+					framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+				}
+
+				ginkgo.By("Creating snapshot with secrets")
+				parameters := map[string]string{
+					CSISnapshotterSecretNameAnnotation:      CSISnapshotterSecretName,
+					CSISnapshotterSecretNamespaceAnnotation: f.Namespace.Name,
+				}
+
+				_, snapshot := storageframework.CreateSnapshot(sDriver, m.config, storageframework.DynamicSnapshotDelete, pvc.Name, pvc.Namespace, f.Timeouts, parameters)
+				framework.ExpectNoError(err, "failed to create snapshot")
+				snapshotcontent := utils.GetSnapshotContentFromSnapshot(m.config.Framework.DynamicClient, snapshot)
+				if annotations, ok = snapshotcontent.Object["metadata"].(map[string]interface{})["annotations"]; !ok {
+					framework.Failf("Unable to get volume snapshot content annotations")
+				}
+
+				// checks if delete snapshot secrets annotation is applied to the VolumeSnapshotContent.
+				checkDeleteSnapshotSecrets(m.cs, annotations)
+
+				// delete the snapshot and check if the snapshot is deleted.
+				deleteSnapshot(m.cs, m.config, snapshot)
+			})
+		}
+	})
 })
+
+func deleteSnapshot(cs clientset.Interface, config *storageframework.PerTestConfig, snapshot *unstructured.Unstructured) {
+	// delete the given snapshot
+	dc := config.Framework.DynamicClient
+	err := dc.Resource(utils.SnapshotGVR).Namespace(snapshot.GetNamespace()).Delete(context.TODO(), snapshot.GetName(), metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
+
+	// check if the snapshot is deleted
+	_, err = dc.Resource(utils.SnapshotGVR).Get(context.TODO(), snapshot.GetName(), metav1.GetOptions{})
+	framework.ExpectError(err)
+}
 
 // A lot of this code was copied from e2e/framework. It would be nicer
 // if it could be reused - see https://github.com/kubernetes/kubernetes/issues/92754
@@ -1112,8 +1650,11 @@ func podRunning(ctx context.Context, c clientset.Interface, podName, namespace s
 }
 
 const (
-	podStartTimeout = 5 * time.Minute
-	poll            = 2 * time.Second
+	podStartTimeout                = 5 * time.Minute
+	poll                           = 2 * time.Second
+	pvcAsSourceProtectionFinalizer = "snapshot.storage.kubernetes.io/pvc-as-source-protection"
+	volumeSnapshotContentFinalizer = "snapshot.storage.kubernetes.io/volumesnapshotcontent-bound-protection"
+	volumeSnapshotBoundFinalizer   = "snapshot.storage.kubernetes.io/volumesnapshot-bound-protection"
 )
 
 var (
@@ -1186,6 +1727,24 @@ func waitForMaxVolumeCondition(pod *v1.Pod, cs clientset.Interface) error {
 	return nil
 }
 
+func waitForVolumeAttachmentTerminated(attachmentName string, cs clientset.Interface) error {
+	waitErr := wait.PollImmediate(10*time.Second, csiVolumeAttachmentTimeout, func() (bool, error) {
+		_, err := cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+		if err != nil {
+			// if the volumeattachment object is not found, it means it has been terminated.
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+		}
+		return false, nil
+	})
+	if waitErr != nil {
+		return fmt.Errorf("error waiting volume attachment %v to terminate: %v", attachmentName, waitErr)
+	}
+	return nil
+}
+
 func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Interface) (int32, error) {
 	var attachLimit int32
 
@@ -1206,7 +1765,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 	return attachLimit, nil
 }
 
-func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+func createClaim(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim) {
 	class := newStorageClass(t, ns, "")
 	if scName != "" {
 		class.Name = scName
@@ -1215,7 +1774,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	_, err = cs.StorageV1().StorageClasses().Get(context.TODO(), class.Name, metav1.GetOptions{})
 	if err != nil {
 		class, err = cs.StorageV1().StorageClasses().Create(context.TODO(), class, metav1.CreateOptions{})
-		framework.ExpectNoError(err, "Failed to create class : %v", err)
+		framework.ExpectNoError(err, "Failed to create class: %v", err)
 	}
 
 	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -1229,11 +1788,23 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	if !t.DelayBinding {
 		pvcClaims := []*v1.PersistentVolumeClaim{claim}
 		_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
-		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
+		framework.ExpectNoError(err, "Failed waiting for PVC to be bound: %v", err)
 	}
+	return class, claim
+}
+
+func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(cs, t, node, scName, ns)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
-	framework.ExpectNoError(err, "Failed to create pod: %v", err)
+	framework.ExpectNoError(err, "Failed to create pause pod: %v", err)
+	return class, claim, pod
+}
+
+func startBusyBoxPod(cs clientset.Interface, t testsuites.StorageClassTest, node e2epod.NodeSelection, scName, ns string, fsGroup *int64) (*storagev1.StorageClass, *v1.PersistentVolumeClaim, *v1.Pod) {
+	class, claim := createClaim(cs, t, node, scName, ns)
+	pod, err := startBusyBoxPodWithClaim(cs, claim, node, ns, fsGroup)
+	framework.ExpectNoError(err, "Failed to create busybox pod: %v", err)
 	return class, claim, pod
 }
 
@@ -1256,6 +1827,17 @@ func startPausePodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClai
 			},
 		},
 		node, ns)
+}
+
+func startBusyBoxPodWithClaim(cs clientset.Interface, pvc *v1.PersistentVolumeClaim, node e2epod.NodeSelection, ns string, fsGroup *int64) (*v1.Pod, error) {
+	return startBusyBoxPodWithVolumeSource(cs,
+		v1.VolumeSource{
+			PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+				ClaimName: pvc.Name,
+				ReadOnly:  false,
+			},
+		},
+		node, ns, fsGroup)
 }
 
 func startPausePodWithInlineVolume(cs clientset.Interface, inlineVolume *v1.CSIVolumeSource, node e2epod.NodeSelection, ns string) (*v1.Pod, error) {
@@ -1297,43 +1879,70 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
-// Dummy structure that parses just volume_attributes and error code out of logged CSI call
-type mockCSICall struct {
-	json string // full log entry
-
-	Method  string
-	Request struct {
-		VolumeContext map[string]string `json:"volume_context"`
+func startBusyBoxPodWithVolumeSource(cs clientset.Interface, volumeSource v1.VolumeSource, node e2epod.NodeSelection, ns string, fsGroup *int64) (*v1.Pod, error) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pvc-volume-tester-",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "volume-tester",
+					Image: framework.BusyBoxImage,
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "my-volume",
+							MountPath: "/mnt/test",
+						},
+					},
+					Command: e2evolume.GenerateScriptCmd("while true ; do sleep 2; done"),
+				},
+			},
+			SecurityContext: &v1.PodSecurityContext{
+				FSGroup: fsGroup,
+			},
+			RestartPolicy: v1.RestartPolicyNever,
+			Volumes: []v1.Volume{
+				{
+					Name:         "my-volume",
+					VolumeSource: volumeSource,
+				},
+			},
+		},
 	}
-	FullError struct {
-		Code    codes.Code `json:"code"`
-		Message string     `json:"message"`
-	}
-	Error string
+	e2epod.SetNodeSelection(&pod.Spec, node)
+	return cs.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 }
 
 // checkPodLogs tests that NodePublish was called with expected volume_context and (for ephemeral inline volumes)
 // has the matching NodeUnpublish
-func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled bool) error {
-	expectedAttributes := map[string]string{
-		"csi.storage.k8s.io/pod.name":            pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,
-		"csi.storage.k8s.io/pod.uid":             string(pod.UID),
-		"csi.storage.k8s.io/serviceAccount.name": "default",
+func checkPodLogs(getCalls func() ([]drivers.MockCSICall, error), pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled, csiServiceAccountTokenEnabled bool, expectedNumNodePublish int) error {
+	expectedAttributes := map[string]string{}
+	if expectPodInfo {
+		expectedAttributes["csi.storage.k8s.io/pod.name"] = pod.Name
+		expectedAttributes["csi.storage.k8s.io/pod.namespace"] = pod.Namespace
+		expectedAttributes["csi.storage.k8s.io/pod.uid"] = string(pod.UID)
+		expectedAttributes["csi.storage.k8s.io/serviceAccount.name"] = "default"
+
 	}
 	if csiInlineVolumesEnabled {
 		// This is only passed in 1.15 when the CSIInlineVolume feature gate is set.
 		expectedAttributes["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(ephemeralVolume)
 	}
 
+	if csiServiceAccountTokenEnabled {
+		expectedAttributes["csi.storage.k8s.io/serviceAccount.tokens"] = "<nonempty>"
+	}
+
 	// Find NodePublish in the GRPC calls.
 	foundAttributes := sets.NewString()
 	numNodePublishVolume := 0
 	numNodeUnpublishVolume := 0
-	calls, err := parseMockLogs(cs, namespace, driverPodName, driverContainerName)
+	calls, err := getCalls()
 	if err != nil {
 		return err
 	}
+
 	for _, call := range calls {
 		switch call.Method {
 		case "NodePublishVolume":
@@ -1342,9 +1951,9 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 				// Check that NodePublish had expected attributes for first volume
 				for k, v := range expectedAttributes {
 					vv, found := call.Request.VolumeContext[k]
-					if found && v == vv {
+					if found && (v == vv || (v == "<nonempty>" && len(vv) != 0)) {
 						foundAttributes.Insert(k)
-						framework.Logf("Found volume attribute %s: %s", k, v)
+						framework.Logf("Found volume attribute %s: %s", k, vv)
 					}
 				}
 			}
@@ -1353,57 +1962,17 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 			numNodeUnpublishVolume++
 		}
 	}
-	if numNodePublishVolume == 0 {
-		return fmt.Errorf("NodePublish was never called")
+	if numNodePublishVolume < expectedNumNodePublish {
+		return fmt.Errorf("NodePublish should be called at least %d", expectedNumNodePublish)
 	}
 
 	if numNodeUnpublishVolume == 0 {
 		return fmt.Errorf("NodeUnpublish was never called")
 	}
-	if expectPodInfo {
-		if foundAttributes.Len() != len(expectedAttributes) {
-			return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
-		}
-		return nil
+	if foundAttributes.Len() != len(expectedAttributes) {
+		return fmt.Errorf("number of found volume attributes does not match, expected %d, got %d", len(expectedAttributes), foundAttributes.Len())
 	}
-	if foundAttributes.Len() != 0 {
-		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
-	}
-
 	return nil
-}
-
-func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string) ([]mockCSICall, error) {
-	// Load logs of driver pod
-	log, err := e2epod.GetPodLogs(cs, namespace, driverPodName, driverContainerName)
-	if err != nil {
-		return nil, fmt.Errorf("could not load CSI driver logs: %s", err)
-	}
-
-	logLines := strings.Split(log, "\n")
-	var calls []mockCSICall
-	for _, line := range logLines {
-		index := strings.Index(line, grpcCallPrefix)
-		if index == -1 {
-			continue
-		}
-		line = line[index+len(grpcCallPrefix):]
-		call := mockCSICall{
-			json: string(line),
-		}
-		err := json.Unmarshal([]byte(line), &call)
-		if err != nil {
-			framework.Logf("Could not parse CSI driver log line %q: %s", line, err)
-			continue
-		}
-
-		// Trim gRPC service name, i.e. "/csi.v1.Identity/Probe" -> "Probe"
-		methodParts := strings.Split(call.Method, "/")
-		call.Method = methodParts[len(methodParts)-1]
-
-		calls = append(calls, call)
-	}
-	return calls, nil
 }
 
 // compareCSICalls compares expectedCalls with logs of the mock driver.
@@ -1414,8 +1983,8 @@ func parseMockLogs(cs clientset.Interface, namespace, driverPodName, driverConta
 //
 // Only permanent errors are returned. Other errors are logged and no
 // calls are returned. The caller is expected to retry.
-func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, cs clientset.Interface, namespace, driverPodName, driverContainerName string) ([]mockCSICall, int, error) {
-	allCalls, err := parseMockLogs(cs, namespace, driverPodName, driverContainerName)
+func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, getCalls func() ([]drivers.MockCSICall, error)) ([]drivers.MockCSICall, int, error) {
+	allCalls, err := getCalls()
 	if err != nil {
 		framework.Logf("intermittent (?) log retrieval error, proceeding without output: %v", err)
 		return nil, 0, nil
@@ -1423,8 +1992,8 @@ func compareCSICalls(trackedCalls []string, expectedCallSequence []csiCall, cs c
 
 	// Remove all repeated and ignored calls
 	tracked := sets.NewString(trackedCalls...)
-	var calls []mockCSICall
-	var last mockCSICall
+	var calls []drivers.MockCSICall
+	var last drivers.MockCSICall
 	for _, c := range allCalls {
 		if !tracked.Has(c.Method) {
 			continue
@@ -1510,4 +2079,58 @@ func getVolumeLimitFromCSINode(csiNode *storagev1.CSINode, driverName string) in
 		}
 	}
 	return 0
+}
+
+// checkDeleteSnapshotSecrets checks if delete snapshot secrets annotation is applied to the VolumeSnapshotContent.
+func checkDeleteSnapshotSecrets(cs clientset.Interface, annotations interface{}) error {
+	ginkgo.By("checking if delete snapshot secrets annotation is applied to the VolumeSnapshotContent")
+
+	var (
+		annDeletionSecretName      string
+		annDeletionSecretNamespace string
+		ok                         bool
+		err                        error
+
+		// CSISnapshotterDeleteSecretNameAnnotation is the annotation key for the CSI snapshotter delete secret name in VolumeSnapshotClass.parameters
+		CSISnapshotterDeleteSecretNameAnnotation string = "snapshot.storage.kubernetes.io/deletion-secret-name"
+
+		// CSISnapshotterDeleteSecretNamespaceAnnotation is the annotation key for the CSI snapshotter delete secret namespace in VolumeSnapshotClass.parameters
+		CSISnapshotterDeleteSecretNamespaceAnnotation string = "snapshot.storage.kubernetes.io/deletion-secret-namespace"
+	)
+
+	annotationsObj, ok := annotations.(map[string]interface{})
+	if !ok {
+		framework.Failf("failed to get annotations from annotations object")
+	}
+
+	if annDeletionSecretName, ok = annotationsObj[CSISnapshotterDeleteSecretNameAnnotation].(string); !ok {
+		framework.Failf("unable to get secret annotation name")
+	}
+	if annDeletionSecretNamespace, ok = annotationsObj[CSISnapshotterDeleteSecretNamespaceAnnotation].(string); !ok {
+		framework.Failf("unable to get secret annotation namespace")
+	}
+
+	// verify if secrets exists
+	if _, err = cs.CoreV1().Secrets(annDeletionSecretNamespace).Get(context.TODO(), annDeletionSecretName, metav1.GetOptions{}); err != nil {
+		framework.Failf("unable to get test secret %s: %v", annDeletionSecretName, err)
+	}
+
+	return err
+}
+
+// createPreHook counts invocations of a certain method (identified by a substring in the full gRPC method name).
+func createPreHook(method string, callback func(counter int64) error) *drivers.Hooks {
+	var counter int64
+
+	return &drivers.Hooks{
+		Pre: func() func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
+			return func(ctx context.Context, fullMethod string, request interface{}) (reply interface{}, err error) {
+				if strings.Contains(fullMethod, method) {
+					counter := atomic.AddInt64(&counter, 1)
+					return nil, callback(counter)
+				}
+				return nil, nil
+			}
+		}(),
+	}
 }

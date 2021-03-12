@@ -37,17 +37,17 @@ run_kubectl_delete_allnamespaces_tests() {
   kubectl delete configmap --dry-run=client -l deletetest=true --all-namespaces
   kubectl delete configmap --dry-run=server -l deletetest=true --all-namespaces
   kubectl config set-context "${CONTEXT}" --namespace="${ns_one}"
-  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" 'one:'
+  kube::test::get_object_assert 'configmap -l deletetest' "{{range.items}}{{${id_field:?}}}:{{end}}" 'one:'
   kubectl config set-context "${CONTEXT}" --namespace="${ns_two}"
-  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" 'two:'
+  kube::test::get_object_assert 'configmap -l deletetest' "{{range.items}}{{${id_field:?}}}:{{end}}" 'two:'
 
   kubectl delete configmap -l deletetest=true --all-namespaces
 
-  # no configmaps should be in either of those namespaces
+  # no configmaps should be in either of those namespaces with label deletetest
   kubectl config set-context "${CONTEXT}" --namespace="${ns_one}"
-  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  kube::test::get_object_assert 'configmap -l deletetest' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   kubectl config set-context "${CONTEXT}" --namespace="${ns_two}"
-  kube::test::get_object_assert configmap "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+  kube::test::get_object_assert 'configmap -l deletetest' "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
   set +o nounset
   set +o errexit

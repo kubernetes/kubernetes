@@ -93,7 +93,7 @@ func decodeV3Endpoints(modelDef modelDefinition, opts DecodeModelOptions) (Resol
 }
 
 func custAddS3DualStack(p *partition) {
-	if p.ID != "aws" {
+	if !(p.ID == "aws" || p.ID == "aws-cn" || p.ID == "aws-us-gov") {
 		return
 	}
 

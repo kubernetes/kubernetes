@@ -87,6 +87,7 @@ func GetAttributes(mi *v1.MachineInfo, vi *v1.VersionInfo) Attributes {
 		MemoryCapacity:     mi.MemoryCapacity,
 		MachineID:          mi.MachineID,
 		SystemUUID:         mi.SystemUUID,
+		HugePages:          mi.HugePages,
 		Filesystems:        mi.Filesystems,
 		DiskMap:            mi.DiskMap,
 		NetworkDevices:     mi.NetworkDevices,

@@ -36,7 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 )
 
@@ -328,7 +328,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	}
 
 	gce.CreateRegionBackendService(existingBS, gce.region)
-	existingFwdRule.BackendService = existingBS.Name
+	existingFwdRule.BackendService = cloud.SelfLink(meta.VersionGA, vals.ProjectID, "backendServices", meta.RegionalKey(existingBS.Name, gce.region))
 
 	_, err = createInternalLoadBalancer(gce, svc, existingFwdRule, []string{"test-node-1"}, vals.ClusterName, vals.ClusterID, vals.ZoneName)
 	assert.NoError(t, err)
@@ -682,11 +682,11 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	}
 
 	existingFirewall, err := gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 	// Existing firewall will not be deleted yet since this was the first sync with the new rule created.
 	existingLegacyFirewall, err := gce.GetFirewall(lbName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingLegacyFirewall)
 
 	// Now ensure the firewall again to simulate a second sync where the old rule will be deleted.
@@ -704,10 +704,10 @@ func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
 	}
 
 	existingFirewall, err = gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 	existingLegacyFirewall, err = gce.GetFirewall(lbName)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	require.Nil(t, existingLegacyFirewall)
 
 }
@@ -761,9 +761,9 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		v1.ProtocolTCP,
 		nodes,
 		lbName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	existingFirewall, err := gce.GetFirewall(fwName)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.NotNil(t, existingFirewall)
 
 	gce.onXPN = true
@@ -949,6 +949,11 @@ func TestEnsureInternalLoadBalancerErrors(t *testing.T) {
 			)
 			assert.Error(t, err, "Should return an error when "+desc)
 			assert.Nil(t, status, "Should not return a status when "+desc)
+
+			// ensure that the temporarily reserved IP address is released upon sync errors
+			ip, err := gce.GetRegionAddress(gce.GetLoadBalancerName(context.TODO(), params.clusterName, params.service), gce.region)
+			require.Error(t, err)
+			assert.Nil(t, ip)
 		})
 	}
 }
@@ -1310,6 +1315,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "tcp-fwd-rule",
@@ -1317,6 +1323,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "udp-fwd-rule",
@@ -1324,6 +1331,7 @@ func TestForwardingRulesEqual(t *testing.T) {
 			Ports:               []string{"123"},
 			IPProtocol:          "UDP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 		{
 			Name:                "global-access-fwd-rule",
@@ -1332,6 +1340,25 @@ func TestForwardingRulesEqual(t *testing.T) {
 			IPProtocol:          "TCP",
 			LoadBalancingScheme: string(cloud.SchemeInternal),
 			AllowGlobalAccess:   true,
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
+		},
+		{
+			Name:                "global-access-fwd-rule",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			IPProtocol:          "TCP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+			AllowGlobalAccess:   true,
+			BackendService:      "http://compute.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
+		},
+		{
+			Name:                "udp-fwd-rule-allports",
+			IPAddress:           "10.0.0.0",
+			Ports:               []string{"123"},
+			AllPorts:            true,
+			IPProtocol:          "UDP",
+			LoadBalancingScheme: string(cloud.SchemeInternal),
+			BackendService:      "http://www.googleapis.com/projects/test/regions/us-central1/backendServices/bs1",
 		},
 	}
 
@@ -1365,6 +1392,18 @@ func TestForwardingRulesEqual(t *testing.T) {
 			newFwdRule: fwdRules[3],
 			expect:     true,
 		},
+		{
+			desc:       "same forwarding rule, different basepath",
+			oldFwdRule: fwdRules[3],
+			newFwdRule: fwdRules[4],
+			expect:     true,
+		},
+		{
+			desc:       "same forwarding rule, one uses AllPorts",
+			oldFwdRule: fwdRules[2],
+			newFwdRule: fwdRules[5],
+			expect:     false,
+		},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
 			got := forwardingRulesEqual(tc.oldFwdRule, tc.newFwdRule)
@@ -1381,7 +1420,6 @@ func TestEnsureInternalLoadBalancerCustomSubnet(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
-	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureILBCustomSubnet})
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
@@ -1637,4 +1675,148 @@ func TestEnsureLoadBalancerPartialDelete(t *testing.T) {
 	_, exists, err = gce.GetLoadBalancer(context.TODO(), vals.ClusterName, svc)
 	require.NoError(t, err)
 	assert.False(t, exists)
+}
+
+func TestEnsureInternalLoadBalancerModifyProtocol(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	c := gce.c.(*cloud.MockGCE)
+	c.MockRegionBackendServices.UpdateHook = func(ctx context.Context, key *meta.Key, be *compute.BackendService, m *cloud.MockRegionBackendServices) error {
+		// Same key can be used since FR will have the same name.
+		fr, err := c.MockForwardingRules.Get(ctx, key)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if fr != nil && fr.IPProtocol != be.Protocol {
+			return fmt.Errorf("Protocol mismatch between Forwarding Rule value %q and Backend service value %q", fr.IPProtocol, be.Protocol)
+		}
+		return mock.UpdateRegionBackendServiceHook(ctx, key, be, m)
+	}
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.IPProtocol != "TCP" {
+		t.Errorf("Unexpected protocol value %s, expected TCP", fwdRule.IPProtocol)
+	}
+
+	// change the protocol to UDP
+	svc.Spec.Ports[0].Protocol = v1.ProtocolUDP
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.IPProtocol != "UDP" {
+		t.Errorf("Unexpected protocol value %s, expected UDP", fwdRule.IPProtocol)
+	}
+
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerAllPorts(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc, err = gce.client.CoreV1().Services(svc.Namespace).Create(context.TODO(), svc, metav1.CreateOptions{})
+	require.NoError(t, err)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.Ports[0] != "123" {
+		t.Errorf("Unexpected port value %v, expected [123]", fwdRule.Ports)
+	}
+
+	// Change service spec to use more than 5 ports
+	svc.Spec.Ports = []v1.ServicePort{
+		{Name: "testport", Port: int32(8080), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8090), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8100), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8200), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8300), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8400), Protocol: "TCP"},
+	}
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if !fwdRule.AllPorts {
+		t.Errorf("Unexpected AllPorts false value, expected true, FR - %v", fwdRule)
+	}
+	if len(fwdRule.Ports) != 0 {
+		t.Errorf("Unexpected port value %v, expected empty list", fwdRule.Ports)
+	}
+
+	// Change service spec back to use < 5 ports
+	svc.Spec.Ports = []v1.ServicePort{
+		{Name: "testport", Port: int32(8090), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8100), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8300), Protocol: "TCP"},
+		{Name: "testport", Port: int32(8400), Protocol: "TCP"},
+	}
+	expectPorts := []string{"8090", "8100", "8300", "8400"}
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("gce.GetRegionForwardingRule(%q, %q) = %v, want nil", lbName, gce.region, err)
+	}
+	if fwdRule.AllPorts {
+		t.Errorf("Unexpected AllPorts true value, expected false, FR - %v", fwdRule)
+	}
+	if !equalStringSets(fwdRule.Ports, expectPorts) {
+		t.Errorf("Unexpected port value %v, expected %v", fwdRule.Ports, expectPorts)
+	}
+
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
 }

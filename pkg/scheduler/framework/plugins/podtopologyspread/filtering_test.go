@@ -18,6 +18,7 @@ package podtopologyspread
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,12 +27,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/utils/pointer"
 )
@@ -515,18 +514,13 @@ func TestPreFilterState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
-			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(tt.existingPods, tt.nodes),
-				args: config.PodTopologySpreadArgs{
-					DefaultConstraints: tt.defaultConstraints,
-				},
+			args := &config.PodTopologySpreadArgs{
+				DefaultConstraints: tt.defaultConstraints,
+				DefaultingType:     config.ListDefaulting,
 			}
-			pl.setListers(informerFactory)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
 			cs := framework.NewCycleState()
-			if s := pl.PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
+			if s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			got, err := getPreFilterState(cs)
@@ -827,20 +821,19 @@ func TestPreFilterStateAddPod(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := PodTopologySpread{
-				sharedLister: snapshot,
-			}
-			cs := framework.NewCycleState()
 			ctx := context.Background()
-			if s := pl.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			cs := framework.NewCycleState()
+			if s := p.PreFilter(ctx, cs, tt.preemptor); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			nodeInfo, err := snapshot.Get(tt.nodes[tt.nodeIdx].Name)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := pl.AddPod(ctx, cs, tt.preemptor, tt.addedPod, nodeInfo); !s.IsSuccess() {
+			if s := p.AddPod(ctx, cs, tt.preemptor, framework.NewPodInfo(tt.addedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 			state, err := getPreFilterState(cs)
@@ -1032,13 +1025,12 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			pl := PodTopologySpread{
-				sharedLister: snapshot,
-			}
-			cs := framework.NewCycleState()
 			ctx := context.Background()
-			s := pl.PreFilter(ctx, cs, tt.preemptor)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
+			cs := framework.NewCycleState()
+			s := p.PreFilter(ctx, cs, tt.preemptor)
 			if !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
@@ -1052,7 +1044,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if s := pl.RemovePod(ctx, cs, tt.preemptor, deletedPod, nodeInfo); !s.IsSuccess() {
+			if s := p.RemovePod(ctx, cs, tt.preemptor, framework.NewPodInfo(deletedPod), nodeInfo); !s.IsSuccess() {
 				t.Fatal(s.AsError())
 			}
 
@@ -1078,7 +1070,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/single-constraint-zone",
 			pod: st.MakePod().Name("p").Label("foo", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelTopologyZone, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
 			allNodesNum:      1000,
@@ -1096,7 +1088,7 @@ func BenchmarkFilter(b *testing.B) {
 		{
 			name: "1000nodes/two-Constraints-zone-node",
 			pod: st.MakePod().Name("p").Label("foo", "").Label("bar", "").
-				SpreadConstraint(1, v1.LabelZoneFailureDomain, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
+				SpreadConstraint(1, v1.LabelTopologyZone, v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj()).
 				SpreadConstraint(1, v1.LabelHostname, v1.DoNotSchedule, st.MakeLabelSelector().Exists("bar").Obj()).
 				Obj(),
 			existingPodsNum:  10000,
@@ -1108,22 +1100,21 @@ func BenchmarkFilter(b *testing.B) {
 		var state *framework.CycleState
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			pl := PodTopologySpread{
-				sharedLister: cache.NewSnapshot(existingPods, allNodes),
-			}
 			ctx := context.Background()
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			p := pl.(*PodTopologySpread)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				state = framework.NewCycleState()
-				s := pl.PreFilter(ctx, state, tt.pod)
+				s := p.PreFilter(ctx, state, tt.pod)
 				if !s.IsSuccess() {
 					b.Fatal(s.AsError())
 				}
 				filterNode := func(i int) {
-					n, _ := pl.sharedLister.NodeInfos().Get(allNodes[i].Name)
-					pl.Filter(ctx, state, tt.pod, n)
+					n, _ := p.sharedLister.NodeInfos().Get(allNodes[i].Name)
+					p.Filter(ctx, state, tt.pod, n)
 				}
-				parallelize.Until(ctx, len(allNodes), filterNode)
+				p.parallelizer.Until(ctx, len(allNodes), filterNode)
 			}
 		})
 		b.Run(tt.name+"/Clone", func(b *testing.B) {
@@ -1264,6 +1255,20 @@ func TestSingleConstraint(t *testing.T) {
 			},
 		},
 		{
+			name: "pod cannot be scheduled as all nodes don't have label 'rack'",
+			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
+				1, "rack", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
+			).Obj(),
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
+				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
+			},
+			wantStatusCode: map[string]framework.Code{
+				"node-a": framework.UnschedulableAndUnresolvable,
+				"node-x": framework.UnschedulableAndUnresolvable,
+			},
+		},
+		{
 			name: "pods spread across nodes as 2/1/0/3, only node-x fits",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "node", v1.DoNotSchedule, st.MakeLabelSelector().Exists("foo").Obj(),
@@ -1399,7 +1404,8 @@ func TestSingleConstraint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -1625,7 +1631,8 @@ func TestMultipleConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
-			p := &PodTopologySpread{sharedLister: snapshot}
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
+			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
 			preFilterStatus := p.PreFilter(context.Background(), state, tt.pod)
 			if !preFilterStatus.IsSuccess() {
@@ -1648,10 +1655,10 @@ func TestPreFilterDisabled(t *testing.T) {
 	nodeInfo := framework.NewNodeInfo()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p := &PodTopologySpread{}
+	p := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())
 	cycleState := framework.NewCycleState()
-	gotStatus := p.Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterPodTopologySpread" from cycleState: not found`)
+	gotStatus := p.(*PodTopologySpread).Filter(context.Background(), cycleState, pod, nodeInfo)
+	wantStatus := framework.AsStatus(fmt.Errorf(`reading "PreFilterPodTopologySpread" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}

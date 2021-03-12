@@ -19,7 +19,7 @@ package container
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
@@ -46,7 +46,7 @@ func TestFieldPath(t *testing.T) {
 
 	for name, item := range table {
 		res, err := fieldPath(item.pod, item.container)
-		if item.success == false {
+		if !item.success {
 			if err == nil {
 				t.Errorf("%v: unexpected non-error", name)
 			}

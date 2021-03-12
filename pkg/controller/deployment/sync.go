@@ -448,7 +448,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 		return nil
 	}
 
-	sort.Sort(controller.ReplicaSetsByCreationTimestamp(cleanableRSes))
+	sort.Sort(deploymentutil.ReplicaSetsByRevision(cleanableRSes))
 	klog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
 
 	for i := int32(0); i < diff; i++ {

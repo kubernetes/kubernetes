@@ -44,6 +44,9 @@ var (
 	// ErrProxyNotSupported is returned when a client is unable to set a proxy for http requests.
 	ErrProxyNotSupported = errors.New("client does not support http proxy")
 
+	// ErrDialerNotSupported is returned when a client is unable to set a DialContext for http requests.
+	ErrDialerNotSupported = errors.New("client does not support setting DialContext")
+
 	// DefaultPort is the default API port.
 	DefaultPort = "5705"
 
@@ -106,6 +109,8 @@ func (c *Client) ClientVersion() string {
 type Dialer interface {
 	Dial(network, address string) (net.Conn, error)
 }
+
+type dialContext = func(ctx context.Context, network, address string) (net.Conn, error)
 
 // NewClient returns a Client instance ready for communication with the given
 // server endpoint. It will use the latest remote API version available in the
@@ -203,6 +208,36 @@ func (c *Client) SetTimeout(t time.Duration) {
 	}
 }
 
+// GetDialContext returns the current DialContext function, or nil if there is none.
+func (c *Client) GetDialContext() dialContext {
+	c.configLock.RLock()
+	defer c.configLock.RUnlock()
+
+	if c.httpClient == nil {
+		return nil
+	}
+	transport, supported := c.httpClient.Transport.(*http.Transport)
+	if !supported {
+		return nil
+	}
+	return transport.DialContext
+}
+
+// SetDialContext uses the given dial function to establish TCP connections in the HTTPClient.
+func (c *Client) SetDialContext(dial dialContext) error {
+	c.configLock.Lock()
+	defer c.configLock.Unlock()
+
+	if client := c.httpClient; client != nil {
+		transport, supported := client.Transport.(*http.Transport)
+		if !supported {
+			return ErrDialerNotSupported
+		}
+		transport.DialContext = dial
+	}
+	return nil
+}
+
 func (c *Client) checkAPIVersion() error {
 	serverAPIVersionString, err := c.getServerAPIVersionString()
 	if err != nil {
@@ -259,6 +294,8 @@ type doOptions struct {
 	forceJSON   bool
 	force       bool
 	unversioned bool
+
+	retryOn []int // http.status codes
 }
 
 func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response, error) {
@@ -338,6 +375,7 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 
 		resp, err := httpClient.Do(req.WithContext(ctx))
 		if err != nil {
+
 			// If it is a custom error, return it. It probably knows more than us
 			if serror.IsStorageOSError(err) {
 				switch serror.ErrorKind(err) {
@@ -366,6 +404,17 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 			}
 		}
 
+		var shouldretry bool
+		if doOptions.retryOn != nil {
+			for _, code := range doOptions.retryOn {
+				if resp.StatusCode == code {
+					failedAddresses[address] = struct{}{}
+					shouldretry = true
+				}
+
+			}
+		}
+
 		// If we get to the point of response, we should move any failed
 		// addresses to the back.
 		failed := len(failedAddresses)
@@ -386,6 +435,10 @@ func (c *Client) do(method, urlpath string, doOptions doOptions) (*http.Response
 			// Bring in the new order
 			c.addresses = newOrder
 			c.addressLock.Unlock()
+		}
+
+		if shouldretry {
+			continue
 		}
 
 		if resp.StatusCode < 200 || resp.StatusCode >= 400 {

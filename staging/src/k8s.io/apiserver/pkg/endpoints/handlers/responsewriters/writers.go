@@ -21,11 +21,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/apiserver/pkg/features"
 
@@ -40,6 +40,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/apiserver/pkg/util/wsstream"
+	utiltrace "k8s.io/utils/trace"
 )
 
 // StreamObject performs input stream negotiation from a ResourceStreamer and writes that to the response.
@@ -86,19 +87,30 @@ func StreamObject(statusCode int, gv schema.GroupVersion, s runtime.NegotiatedSe
 // The context is optional and can be nil. This method will perform optional content compression if requested by
 // a client and the feature gate for APIResponseCompression is enabled.
 func SerializeObject(mediaType string, encoder runtime.Encoder, hw http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {
+	trace := utiltrace.New("SerializeObject",
+		utiltrace.Field{"method", req.Method},
+		utiltrace.Field{"url", req.URL.Path},
+		utiltrace.Field{"protocol", req.Proto},
+		utiltrace.Field{"mediaType", mediaType},
+		utiltrace.Field{"encoder", encoder.Identifier()})
+	defer trace.LogIfLong(5 * time.Second)
+
 	w := &deferredResponseWriter{
 		mediaType:       mediaType,
 		statusCode:      statusCode,
 		contentEncoding: negotiateContentEncoding(req),
 		hw:              hw,
+		trace:           trace,
 	}
 
 	err := encoder.Encode(object, w)
 	if err == nil {
 		err = w.Close()
-		if err == nil {
-			return
+		if err != nil {
+			// we cannot write an error to the writer anymore as the Encode call was successful.
+			utilruntime.HandleError(fmt.Errorf("apiserver was unable to close cleanly the response writer: %v", err))
 		}
+		return
 	}
 
 	// make a best effort to write the object if a failure is detected
@@ -175,9 +187,23 @@ type deferredResponseWriter struct {
 	hasWritten bool
 	hw         http.ResponseWriter
 	w          io.Writer
+
+	trace *utiltrace.Trace
 }
 
 func (w *deferredResponseWriter) Write(p []byte) (n int, err error) {
+	if w.trace != nil {
+		// This Step usually wraps in-memory object serialization.
+		w.trace.Step("About to start writing response", utiltrace.Field{"size", len(p)})
+
+		firstWrite := !w.hasWritten
+		defer func() {
+			w.trace.Step("Write call finished",
+				utiltrace.Field{"writer", fmt.Sprintf("%T", w.w)},
+				utiltrace.Field{"size", len(p)},
+				utiltrace.Field{"firstWrite", firstWrite})
+		}()
+	}
 	if w.hasWritten {
 		return w.w.Write(p)
 	}
@@ -216,8 +242,6 @@ func (w *deferredResponseWriter) Close() error {
 	}
 	return err
 }
-
-var nopCloser = ioutil.NopCloser(nil)
 
 // WriteObjectNegotiated renders an object in the content type negotiated by the client.
 func WriteObjectNegotiated(s runtime.NegotiatedSerializer, restrictions negotiation.EndpointRestrictions, gv schema.GroupVersion, w http.ResponseWriter, req *http.Request, statusCode int, object runtime.Object) {

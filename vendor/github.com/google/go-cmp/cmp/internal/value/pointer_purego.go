@@ -21,3 +21,13 @@ func PointerOf(v reflect.Value) Pointer {
 	// assumes that the GC implementation does not use a moving collector.
 	return Pointer{v.Pointer(), v.Type()}
 }
+
+// IsNil reports whether the pointer is nil.
+func (p Pointer) IsNil() bool {
+	return p.p == 0
+}
+
+// Uintptr returns the pointer as a uintptr.
+func (p Pointer) Uintptr() uintptr {
+	return p.p
+}

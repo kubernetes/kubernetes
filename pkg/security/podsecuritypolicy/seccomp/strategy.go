@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -66,6 +67,15 @@ func NewStrategy(pspAnnotations map[string]string) Strategy {
 			if p == AllowAny {
 				allowAnyProfile = true
 				continue
+			}
+			// With the graduation of seccomp to GA we automatically convert
+			// the deprecated seccomp profile annotation `docker/default` to
+			// `runtime/default`. This means that we now have to automatically
+			// allow `runtime/default` if a user specifies `docker/default` and
+			// vice versa in a PSP.
+			if p == v1.DeprecatedSeccompProfileDockerDefault || p == v1.SeccompProfileRuntimeDefault {
+				allowedProfiles[v1.SeccompProfileRuntimeDefault] = true
+				allowedProfiles[v1.DeprecatedSeccompProfileDockerDefault] = true
 			}
 			allowedProfiles[p] = true
 		}

@@ -50,6 +50,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/hack/lib/logging.sh"
 
 kube::log::install_errexit
+kube::util::ensure-bash-version
 
 source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
@@ -79,12 +80,11 @@ autoscaling/v2beta1 \
 autoscaling/v2beta2 \
 batch/v1 \
 batch/v1beta1 \
-batch/v2alpha1 \
 certificates.k8s.io/v1 \
 certificates.k8s.io/v1beta1 \
 coordination.k8s.io/v1beta1 \
 coordination.k8s.io/v1 \
-discovery.k8s.io/v1alpha1 \
+discovery.k8s.io/v1 \
 discovery.k8s.io/v1beta1 \
 extensions/v1beta1 \
 events.k8s.io/v1 \
@@ -92,8 +92,10 @@ events.k8s.io/v1beta1 \
 imagepolicy.k8s.io/v1alpha1 \
 networking.k8s.io/v1 \
 networking.k8s.io/v1beta1 \
+node.k8s.io/v1 \
 node.k8s.io/v1alpha1 \
 node.k8s.io/v1beta1 \
+policy/v1 \
 policy/v1beta1 \
 rbac.authorization.k8s.io/v1 \
 rbac.authorization.k8s.io/v1beta1 \
@@ -101,11 +103,12 @@ rbac.authorization.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1alpha1 \
 scheduling.k8s.io/v1beta1 \
 scheduling.k8s.io/v1 \
-settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
 flowcontrol.apiserver.k8s.io/v1alpha1 \
+flowcontrol.apiserver.k8s.io/v1beta1 \
+internal.apiserver.k8s.io/v1alpha1 \
 }"
 
 # not all group versions are exposed by the server.  This list contains those

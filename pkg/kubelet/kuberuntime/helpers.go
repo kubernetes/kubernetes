@@ -228,7 +228,7 @@ func annotationProfile(profile, profileRootPath string) string {
 	return profile
 }
 
-func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
+func (m *kubeGenericRuntimeManager) getSeccompProfilePath(annotations map[string]string, containerName string,
 	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext) string {
 	// container fields are applied first
 	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
@@ -253,6 +253,48 @@ func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]str
 	}
 
 	return ""
+}
+
+func fieldSeccompProfile(scmp *v1.SeccompProfile, profileRootPath string) *runtimeapi.SecurityProfile {
+	// TODO: Move to RuntimeDefault as the default instead of Unconfined after discussion
+	// with sig-node.
+	if scmp == nil {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_Unconfined,
+		}
+	}
+	if scmp.Type == v1.SeccompProfileTypeRuntimeDefault {
+		return &runtimeapi.SecurityProfile{
+			ProfileType: runtimeapi.SecurityProfile_RuntimeDefault,
+		}
+	}
+	if scmp.Type == v1.SeccompProfileTypeLocalhost && scmp.LocalhostProfile != nil && len(*scmp.LocalhostProfile) > 0 {
+		fname := filepath.Join(profileRootPath, *scmp.LocalhostProfile)
+		return &runtimeapi.SecurityProfile{
+			ProfileType:  runtimeapi.SecurityProfile_Localhost,
+			LocalhostRef: fname,
+		}
+	}
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}
+}
+
+func (m *kubeGenericRuntimeManager) getSeccompProfile(annotations map[string]string, containerName string,
+	podSecContext *v1.PodSecurityContext, containerSecContext *v1.SecurityContext) *runtimeapi.SecurityProfile {
+	// container fields are applied first
+	if containerSecContext != nil && containerSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(containerSecContext.SeccompProfile, m.seccompProfileRoot)
+	}
+
+	// when container seccomp is not defined, try to apply from pod field
+	if podSecContext != nil && podSecContext.SeccompProfile != nil {
+		return fieldSeccompProfile(podSecContext.SeccompProfile, m.seccompProfileRoot)
+	}
+
+	return &runtimeapi.SecurityProfile{
+		ProfileType: runtimeapi.SecurityProfile_Unconfined,
+	}
 }
 
 func ipcNamespaceForPod(pod *v1.Pod) runtimeapi.NamespaceMode {

@@ -304,10 +304,7 @@ func TestGetFileType(t *testing.T) {
 }
 
 func isOperationNotPermittedError(err error) bool {
-	if strings.Contains(err.Error(), "Operation not permitted") {
-		return true
-	}
-	return false
+	return strings.Contains(err.Error(), "Operation not permitted")
 }
 
 func writeFile(content string) (string, string, error) {

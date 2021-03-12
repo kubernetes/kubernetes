@@ -22,10 +22,11 @@ import (
 	"sync"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -34,7 +35,9 @@ import (
 // cjControlInterface is an interface that knows how to update CronJob status
 // created as an interface to allow testing.
 type cjControlInterface interface {
-	UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error)
+	UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error)
+	// GetCronJob retrieves a CronJob.
+	GetCronJob(namespace, name string) (*batchv1.CronJob, error)
 }
 
 // realCJControl is the default implementation of cjControlInterface.
@@ -42,20 +45,35 @@ type realCJControl struct {
 	KubeClient clientset.Interface
 }
 
+func (c *realCJControl) GetCronJob(namespace, name string) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
+}
+
 var _ cjControlInterface = &realCJControl{}
 
-func (c *realCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
-	return c.KubeClient.BatchV1beta1().CronJobs(cj.Namespace).UpdateStatus(context.TODO(), cj, metav1.UpdateOptions{})
+func (c *realCJControl) UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error) {
+	return c.KubeClient.BatchV1().CronJobs(cj.Namespace).UpdateStatus(context.TODO(), cj, metav1.UpdateOptions{})
 }
 
 // fakeCJControl is the default implementation of cjControlInterface.
 type fakeCJControl struct {
-	Updates []batchv1beta1.CronJob
+	CronJob *batchv1.CronJob
+	Updates []batchv1.CronJob
+}
+
+func (c *fakeCJControl) GetCronJob(namespace, name string) (*batchv1.CronJob, error) {
+	if name == c.CronJob.Name && namespace == c.CronJob.Namespace {
+		return c.CronJob, nil
+	}
+	return nil, errors.NewNotFound(schema.GroupResource{
+		Group:    "v1beta1",
+		Resource: "cronjobs",
+	}, name)
 }
 
 var _ cjControlInterface = &fakeCJControl{}
 
-func (c *fakeCJControl) UpdateStatus(cj *batchv1beta1.CronJob) (*batchv1beta1.CronJob, error) {
+func (c *fakeCJControl) UpdateStatus(cj *batchv1.CronJob) (*batchv1.CronJob, error) {
 	c.Updates = append(c.Updates, *cj)
 	return cj, nil
 }
@@ -86,7 +104,7 @@ type realJobControl struct {
 
 var _ jobControlInterface = &realJobControl{}
 
-func copyLabels(template *batchv1beta1.JobTemplateSpec) labels.Set {
+func copyLabels(template *batchv1.JobTemplateSpec) labels.Set {
 	l := make(labels.Set)
 	for k, v := range template.Labels {
 		l[k] = v
@@ -94,7 +112,7 @@ func copyLabels(template *batchv1beta1.JobTemplateSpec) labels.Set {
 	return l
 }
 
-func copyAnnotations(template *batchv1beta1.JobTemplateSpec) labels.Set {
+func copyAnnotations(template *batchv1.JobTemplateSpec) labels.Set {
 	a := make(labels.Set)
 	for k, v := range template.Annotations {
 		a[k] = v
@@ -129,6 +147,7 @@ type fakeJobControl struct {
 	Jobs          []batchv1.Job
 	DeleteJobName []string
 	Err           error
+	CreateErr     error
 	UpdateJobName []string
 	PatchJobName  []string
 	Patches       [][]byte
@@ -139,8 +158,8 @@ var _ jobControlInterface = &fakeJobControl{}
 func (f *fakeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	f.Lock()
 	defer f.Unlock()
-	if f.Err != nil {
-		return nil, f.Err
+	if f.CreateErr != nil {
+		return nil, f.CreateErr
 	}
 	job.SelfLink = fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
 	f.Jobs = append(f.Jobs, *job)

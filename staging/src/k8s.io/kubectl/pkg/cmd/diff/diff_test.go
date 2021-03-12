@@ -52,18 +52,27 @@ func (f *FakeObject) Live() runtime.Object {
 }
 
 func TestDiffProgram(t *testing.T) {
-	os.Setenv("KUBECTL_EXTERNAL_DIFF", "echo")
-	streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
-	diff := DiffProgram{
-		IOStreams: streams,
-		Exec:      exec.New(),
-	}
-	err := diff.Run("one", "two")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if output := stdout.String(); output != "one two\n" {
-		t.Fatalf(`stdout = %q, expected "one two\n"`, output)
+	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
+
+	for i, c := range externalDiffCommands {
+		os.Setenv("KUBECTL_EXTERNAL_DIFF", c)
+		streams, _, stdout, _ := genericclioptions.NewTestIOStreams()
+		diff := DiffProgram{
+			IOStreams: streams,
+			Exec:      exec.New(),
+		}
+		err := diff.Run("/dev/zero", "/dev/zero")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Testing diff --report-identical-files
+		if i == 2 {
+			output_msg := "Files /dev/zero and /dev/zero are identical\n"
+			if output := stdout.String(); output != output_msg {
+				t.Fatalf(`stdout = %q, expected = %s"`, output, output_msg)
+			}
+		}
 	}
 }
 

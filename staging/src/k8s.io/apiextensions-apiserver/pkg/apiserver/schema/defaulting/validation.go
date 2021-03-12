@@ -20,9 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/go-openapi/strfmt"
-	goopenapivalidate "github.com/go-openapi/validate"
-
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema/pruning"
@@ -30,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	"k8s.io/kube-openapi/pkg/validation/strfmt"
+	kubeopenapivalidate "k8s.io/kube-openapi/pkg/validation/validate"
 )
 
 // ValidateDefaults checks that default values validate and are properly pruned.
@@ -67,7 +66,7 @@ func validate(pth *field.Path, s *structuralschema.Structural, rootSchema *struc
 	allErrs := field.ErrorList{}
 
 	if s.Default.Object != nil {
-		validator := goopenapivalidate.NewSchemaValidator(s.ToGoOpenAPI(), nil, "", strfmt.Default)
+		validator := kubeopenapivalidate.NewSchemaValidator(s.ToKubeOpenAPI(), nil, "", strfmt.Default)
 
 		if insideMeta {
 			obj, _, err := f(runtime.DeepCopyJSONValue(s.Default.Object))

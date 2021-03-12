@@ -30,7 +30,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const (
@@ -269,11 +269,13 @@ func convertToNodeNameToMetaVictims(
 
 // Filter based on extender implemented predicate functions. The filtered list is
 // expected to be a subset of the supplied list; otherwise the function returns an error.
-// failedNodesMap optionally contains the list of failed nodes and failure reasons.
+// The failedNodes and failedAndUnresolvableNodes optionally contains the list
+// of failed nodes and failure reasons, except nodes in the latter are
+// unresolvable.
 func (h *HTTPExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) ([]*v1.Node, extenderv1.FailedNodesMap, error) {
+) (filteredList []*v1.Node, failedNodes, failedAndUnresolvableNodes extenderv1.FailedNodesMap, err error) {
 	var (
 		result     extenderv1.ExtenderFilterResult
 		nodeList   *v1.NodeList
@@ -287,7 +289,7 @@ func (h *HTTPExtender) Filter(
 	}
 
 	if h.filterVerb == "" {
-		return nodes, extenderv1.FailedNodesMap{}, nil
+		return nodes, extenderv1.FailedNodesMap{}, extenderv1.FailedNodesMap{}, nil
 	}
 
 	if h.nodeCacheCapable {
@@ -310,10 +312,10 @@ func (h *HTTPExtender) Filter(
 	}
 
 	if err := h.send(h.filterVerb, args, &result); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if result.Error != "" {
-		return nil, nil, fmt.Errorf(result.Error)
+		return nil, nil, nil, fmt.Errorf(result.Error)
 	}
 
 	if h.nodeCacheCapable && result.NodeNames != nil {
@@ -322,7 +324,7 @@ func (h *HTTPExtender) Filter(
 			if n, ok := fromNodeName[nodeName]; ok {
 				nodeResult[i] = n
 			} else {
-				return nil, nil, fmt.Errorf(
+				return nil, nil, nil, fmt.Errorf(
 					"extender %q claims a filtered node %q which is not found in the input node list",
 					h.extenderURL, nodeName)
 			}
@@ -334,7 +336,7 @@ func (h *HTTPExtender) Filter(
 		}
 	}
 
-	return nodeResult, result.FailedNodes, nil
+	return nodeResult, result.FailedNodes, result.FailedAndUnresolvableNodes, nil
 }
 
 // Prioritize based on extender implemented priority functions. Weight*priority is added
@@ -386,7 +388,7 @@ func (h *HTTPExtender) Bind(binding *v1.Binding) error {
 	var result extenderv1.ExtenderBindingResult
 	if !h.IsBinder() {
 		// This shouldn't happen as this extender wouldn't have become a Binder.
-		return fmt.Errorf("Unexpected empty bindVerb in extender")
+		return fmt.Errorf("unexpected empty bindVerb in extender")
 	}
 	req := &extenderv1.ExtenderBindingArgs{
 		PodName:      binding.Name,
@@ -394,7 +396,7 @@ func (h *HTTPExtender) Bind(binding *v1.Binding) error {
 		PodUID:       binding.UID,
 		Node:         binding.Target.Name,
 	}
-	if err := h.send(h.bindVerb, &req, &result); err != nil {
+	if err := h.send(h.bindVerb, req, &result); err != nil {
 		return err
 	}
 	if result.Error != "" {
@@ -431,7 +433,7 @@ func (h *HTTPExtender) send(action string, args interface{}, result interface{})
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Failed %v with extender at URL %v, code %v", action, url, resp.StatusCode)
+		return fmt.Errorf("failed %v with extender at URL %v, code %v", action, url, resp.StatusCode)
 	}
 
 	return json.NewDecoder(resp.Body).Decode(result)

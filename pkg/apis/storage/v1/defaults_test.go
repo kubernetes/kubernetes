@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -88,5 +89,50 @@ func TestSetDefaultVolumeBindingMode(t *testing.T) {
 		t.Errorf("Expected VolumeBindingMode to be defaulted to: %+v, got: nil", defaultMode)
 	} else if *outMode != defaultMode {
 		t.Errorf("Expected VolumeBindingMode to be defaulted to: %+v, got: %+v", defaultMode, outMode)
+	}
+}
+
+func TestSetDefaultCSIDriver(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIServiceAccountToken, true)()
+
+	enabled := true
+	disabled := false
+	tests := []struct {
+		desc     string
+		field    string
+		wantSpec *storagev1.CSIDriverSpec
+	}{
+		{
+			desc:     "AttachRequired default to true",
+			field:    "AttachRequired",
+			wantSpec: &storagev1.CSIDriverSpec{AttachRequired: &enabled},
+		},
+		{
+			desc:     "PodInfoOnMount default to false",
+			field:    "PodInfoOnMount",
+			wantSpec: &storagev1.CSIDriverSpec{PodInfoOnMount: &disabled},
+		},
+		{
+			desc:     "VolumeLifecycleModes default to VolumeLifecyclePersistent",
+			field:    "VolumeLifecycleModes",
+			wantSpec: &storagev1.CSIDriverSpec{VolumeLifecycleModes: []storagev1.VolumeLifecycleMode{storagev1.VolumeLifecyclePersistent}},
+		},
+		{
+			desc:     "RequiresRepublish default to false",
+			field:    "RequiresRepublish",
+			wantSpec: &storagev1.CSIDriverSpec{RequiresRepublish: &disabled},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			gotSpec := roundTrip(t, runtime.Object(&storagev1.CSIDriver{})).(*storagev1.CSIDriver).Spec
+			got := reflect.Indirect(reflect.ValueOf(gotSpec)).FieldByName(test.field).Interface()
+			want := reflect.Indirect(reflect.ValueOf(test.wantSpec)).FieldByName(test.field).Interface()
+			if diff := cmp.Diff(want, got); diff != "" {
+				t.Errorf("CSIDriver defaults diff (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

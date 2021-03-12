@@ -1,9 +1,9 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-- dashpole
 - Random-Liu
 - yguo0905
 - yujuhong
+- mrunalp
 emeritus_approvers:
 - krzyzacy

@@ -6,6 +6,10 @@
 //
 // This package is intended to be a more powerful and safer alternative to
 // reflect.DeepEqual for comparing whether two values are semantically equal.
+// It is intended to only be used in tests, as performance is not a goal and
+// it may panic if it cannot compare the values. Its propensity towards
+// panicking means that its unsuitable for production environments where a
+// spurious panic may be fatal.
 //
 // The primary features of cmp are:
 //
@@ -86,6 +90,52 @@ import (
 // If there is a cycle, then the pointed at values are considered equal
 // only if both addresses were previously visited in the same path step.
 func Equal(x, y interface{}, opts ...Option) bool {
+	s := newState(opts)
+	s.compareAny(rootStep(x, y))
+	return s.result.Equal()
+}
+
+// Diff returns a human-readable report of the differences between two values:
+// y - x. It returns an empty string if and only if Equal returns true for the
+// same input values and options.
+//
+// The output is displayed as a literal in pseudo-Go syntax.
+// At the start of each line, a "-" prefix indicates an element removed from y,
+// a "+" prefix to indicates an element added to y, and the lack of a prefix
+// indicates an element common to both x and y. If possible, the output
+// uses fmt.Stringer.String or error.Error methods to produce more humanly
+// readable outputs. In such cases, the string is prefixed with either an
+// 's' or 'e' character, respectively, to indicate that the method was called.
+//
+// Do not depend on this output being stable. If you need the ability to
+// programmatically interpret the difference, consider using a custom Reporter.
+func Diff(x, y interface{}, opts ...Option) string {
+	s := newState(opts)
+
+	// Optimization: If there are no other reporters, we can optimize for the
+	// common case where the result is equal (and thus no reported difference).
+	// This avoids the expensive construction of a difference tree.
+	if len(s.reporters) == 0 {
+		s.compareAny(rootStep(x, y))
+		if s.result.Equal() {
+			return ""
+		}
+		s.result = diff.Result{} // Reset results
+	}
+
+	r := new(defaultReporter)
+	s.reporters = append(s.reporters, reporter{r})
+	s.compareAny(rootStep(x, y))
+	d := r.String()
+	if (d == "") != s.result.Equal() {
+		panic("inconsistent difference and equality results")
+	}
+	return d
+}
+
+// rootStep constructs the first path step. If x and y have differing types,
+// then they are stored within an empty interface type.
+func rootStep(x, y interface{}) PathStep {
 	vx := reflect.ValueOf(x)
 	vy := reflect.ValueOf(y)
 
@@ -108,33 +158,7 @@ func Equal(x, y interface{}, opts ...Option) bool {
 		t = vx.Type()
 	}
 
-	s := newState(opts)
-	s.compareAny(&pathStep{t, vx, vy})
-	return s.result.Equal()
-}
-
-// Diff returns a human-readable report of the differences between two values.
-// It returns an empty string if and only if Equal returns true for the same
-// input values and options.
-//
-// The output is displayed as a literal in pseudo-Go syntax.
-// At the start of each line, a "-" prefix indicates an element removed from x,
-// a "+" prefix to indicates an element added to y, and the lack of a prefix
-// indicates an element common to both x and y. If possible, the output
-// uses fmt.Stringer.String or error.Error methods to produce more humanly
-// readable outputs. In such cases, the string is prefixed with either an
-// 's' or 'e' character, respectively, to indicate that the method was called.
-//
-// Do not depend on this output being stable. If you need the ability to
-// programmatically interpret the difference, consider using a custom Reporter.
-func Diff(x, y interface{}, opts ...Option) string {
-	r := new(defaultReporter)
-	eq := Equal(x, y, Options(opts), Reporter(r))
-	d := r.String()
-	if (d == "") != eq {
-		panic("inconsistent difference and equality results")
-	}
-	return d
+	return &pathStep{t, vx, vy}
 }
 
 type state struct {
@@ -352,7 +376,7 @@ func detectRaces(c chan<- reflect.Value, f reflect.Value, vs ...reflect.Value) {
 // assuming that T is assignable to R.
 // Otherwise, it returns the input value as is.
 func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
-	// TODO(dsnet): Workaround for reflect bug (https://golang.org/issue/22143).
+	// TODO(≥go1.10): Workaround for reflect bug (https://golang.org/issue/22143).
 	if !flags.AtLeastGo110 {
 		if v.Kind() == reflect.Interface && v.IsNil() && v.Type() != t {
 			return reflect.New(t).Elem()
@@ -362,6 +386,7 @@ func sanitizeValue(v reflect.Value, t reflect.Type) reflect.Value {
 }
 
 func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
+	var addr bool
 	var vax, vay reflect.Value // Addressable versions of vx and vy
 
 	var mayForce, mayForceInit bool
@@ -383,6 +408,7 @@ func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
 				// For retrieveUnexportedField to work, the parent struct must
 				// be addressable. Create a new copy of the values if
 				// necessary to make them addressable.
+				addr = vx.CanAddr() || vy.CanAddr()
 				vax = makeAddressable(vx)
 				vay = makeAddressable(vy)
 			}
@@ -393,6 +419,7 @@ func (s *state) compareStruct(t reflect.Type, vx, vy reflect.Value) {
 				mayForceInit = true
 			}
 			step.mayForce = mayForce
+			step.paddr = addr
 			step.pvx = vax
 			step.pvy = vay
 			step.field = t.Field(i)

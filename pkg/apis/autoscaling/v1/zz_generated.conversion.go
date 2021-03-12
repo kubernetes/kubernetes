@@ -119,6 +119,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*autoscaling.ContainerResourceMetricSource)(nil), (*v1.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ContainerResourceMetricSource_To_v1_ContainerResourceMetricSource(a.(*autoscaling.ContainerResourceMetricSource), b.(*v1.ContainerResourceMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*autoscaling.ContainerResourceMetricStatus)(nil), (*v1.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_autoscaling_ContainerResourceMetricStatus_To_v1_ContainerResourceMetricStatus(a.(*autoscaling.ContainerResourceMetricStatus), b.(*v1.ContainerResourceMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*autoscaling.ExternalMetricSource)(nil), (*v1.ExternalMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_autoscaling_ExternalMetricSource_To_v1_ExternalMetricSource(a.(*autoscaling.ExternalMetricSource), b.(*v1.ExternalMetricSource), scope)
 	}); err != nil {
@@ -176,6 +186,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*autoscaling.ResourceMetricStatus)(nil), (*v1.ResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_autoscaling_ResourceMetricStatus_To_v1_ResourceMetricStatus(a.(*autoscaling.ResourceMetricStatus), b.(*v1.ResourceMetricStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ContainerResourceMetricSource)(nil), (*autoscaling.ContainerResourceMetricSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(a.(*v1.ContainerResourceMetricSource), b.(*autoscaling.ContainerResourceMetricSource), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.ContainerResourceMetricStatus)(nil), (*autoscaling.ContainerResourceMetricStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(a.(*v1.ContainerResourceMetricStatus), b.(*autoscaling.ContainerResourceMetricStatus), scope)
 	}); err != nil {
 		return err
 	}
@@ -239,6 +259,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	return nil
+}
+
+func autoConvert_v1_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(in *v1.ContainerResourceMetricSource, out *autoscaling.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	// WARNING: in.TargetAverageUtilization requires manual conversion: does not exist in peer-type
+	// WARNING: in.TargetAverageValue requires manual conversion: does not exist in peer-type
+	out.Container = in.Container
+	return nil
+}
+
+func autoConvert_autoscaling_ContainerResourceMetricSource_To_v1_ContainerResourceMetricSource(in *autoscaling.ContainerResourceMetricSource, out *v1.ContainerResourceMetricSource, s conversion.Scope) error {
+	out.Name = corev1.ResourceName(in.Name)
+	out.Container = in.Container
+	// WARNING: in.Target requires manual conversion: does not exist in peer-type
+	return nil
+}
+
+func autoConvert_v1_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(in *v1.ContainerResourceMetricStatus, out *autoscaling.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = core.ResourceName(in.Name)
+	// WARNING: in.CurrentAverageUtilization requires manual conversion: does not exist in peer-type
+	// WARNING: in.CurrentAverageValue requires manual conversion: does not exist in peer-type
+	out.Container = in.Container
+	return nil
+}
+
+func autoConvert_autoscaling_ContainerResourceMetricStatus_To_v1_ContainerResourceMetricStatus(in *autoscaling.ContainerResourceMetricStatus, out *v1.ContainerResourceMetricStatus, s conversion.Scope) error {
+	out.Name = corev1.ResourceName(in.Name)
+	out.Container = in.Container
+	// WARNING: in.Current requires manual conversion: does not exist in peer-type
 	return nil
 }
 
@@ -455,6 +505,15 @@ func autoConvert_v1_MetricSpec_To_autoscaling_MetricSpec(in *v1.MetricSpec, out 
 	} else {
 		out.Resource = nil
 	}
+	if in.ContainerResource != nil {
+		in, out := &in.ContainerResource, &out.ContainerResource
+		*out = new(autoscaling.ContainerResourceMetricSource)
+		if err := Convert_v1_ContainerResourceMetricSource_To_autoscaling_ContainerResourceMetricSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ContainerResource = nil
+	}
 	if in.External != nil {
 		in, out := &in.External, &out.External
 		*out = new(autoscaling.ExternalMetricSource)
@@ -500,6 +559,15 @@ func autoConvert_autoscaling_MetricSpec_To_v1_MetricSpec(in *autoscaling.MetricS
 		}
 	} else {
 		out.Resource = nil
+	}
+	if in.ContainerResource != nil {
+		in, out := &in.ContainerResource, &out.ContainerResource
+		*out = new(v1.ContainerResourceMetricSource)
+		if err := Convert_autoscaling_ContainerResourceMetricSource_To_v1_ContainerResourceMetricSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ContainerResource = nil
 	}
 	if in.External != nil {
 		in, out := &in.External, &out.External
@@ -547,6 +615,15 @@ func autoConvert_v1_MetricStatus_To_autoscaling_MetricStatus(in *v1.MetricStatus
 	} else {
 		out.Resource = nil
 	}
+	if in.ContainerResource != nil {
+		in, out := &in.ContainerResource, &out.ContainerResource
+		*out = new(autoscaling.ContainerResourceMetricStatus)
+		if err := Convert_v1_ContainerResourceMetricStatus_To_autoscaling_ContainerResourceMetricStatus(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ContainerResource = nil
+	}
 	if in.External != nil {
 		in, out := &in.External, &out.External
 		*out = new(autoscaling.ExternalMetricStatus)
@@ -592,6 +669,15 @@ func autoConvert_autoscaling_MetricStatus_To_v1_MetricStatus(in *autoscaling.Met
 		}
 	} else {
 		out.Resource = nil
+	}
+	if in.ContainerResource != nil {
+		in, out := &in.ContainerResource, &out.ContainerResource
+		*out = new(v1.ContainerResourceMetricStatus)
+		if err := Convert_autoscaling_ContainerResourceMetricStatus_To_v1_ContainerResourceMetricStatus(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.ContainerResource = nil
 	}
 	if in.External != nil {
 		in, out := &in.External, &out.External

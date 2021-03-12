@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 	utilstrings "k8s.io/utils/strings"
 
 	api "k8s.io/api/core/v1"
@@ -161,7 +161,7 @@ func (v *sioVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 
 	if !v.readOnly && mounterArgs.FsGroup != nil {
 		klog.V(4).Info(log("applying  value FSGroup ownership"))
-		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
+		volume.SetVolumeOwnership(v, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(v.plugin, v.spec))
 	}
 
 	klog.V(4).Info(log("successfully setup PV %s: volume %s mapped as %s mounted at %s", v.volSpecName, v.volName, devicePath, dir))
@@ -405,7 +405,7 @@ func (v *sioVolume) setSioMgr() error {
 			klog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset sio manager: %v", err))
@@ -444,8 +444,7 @@ func (v *sioVolume) resetSioMgr() error {
 			klog.Error(log("failed to retrieve sdc guid: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset scaleio mgr: %v", err))
@@ -480,8 +479,7 @@ func (v *sioVolume) setSioMgrFromConfig() error {
 			klog.Error(log("failed to load secret: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(data, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(data, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed while setting scaleio mgr from config: %v", err))
@@ -516,8 +514,7 @@ func (v *sioVolume) setSioMgrFromSpec() error {
 			klog.Error(log("failed to load secret: %v", err))
 			return err
 		}
-
-		mgr, err := newSioMgr(configData, v.plugin.host.GetExec(v.plugin.GetPluginName()))
+		mgr, err := newSioMgr(configData, v.plugin.host, v.plugin.host.GetExec(v.plugin.GetPluginName()))
 
 		if err != nil {
 			klog.Error(log("failed to reset sio manager: %v", err))

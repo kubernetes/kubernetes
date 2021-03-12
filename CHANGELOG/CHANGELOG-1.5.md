@@ -719,7 +719,7 @@ release [38537](https://github.com/kubernetes/kubernetes/issues/38537)
 
 ## Action Required Before Upgrading
 
-* **Important Security-related changes before upgrading
+* Important Security-related changes before upgrading
   * You *MUST* set `--anonymous-auth=false` flag on your kube-apiserver unless you are a developer testing this feature and understand it.
   If you do not, you risk allowing unauthorized users to access your apiserver.
   * You *MUST* set `--anonymous-auth=false` flag on your federation apiserver unless you are a developer testing this feature and understand it.
@@ -873,19 +873,21 @@ filename | sha256 hash
 * kube-dns ([#36775](https://github.com/kubernetes/kubernetes/pull/36775), [@bowei](https://github.com/bowei))
     * Added --config-map and --config-map-namespace command line options.
     * If --config-map is set, kube-dns will load dynamic configuration from the config map
-    * referenced by --config-map-namespace, --config-map. The config-map supports
-    * the following properties: "federations".
+      referenced by --config-map-namespace, --config-map. The config-map supports
+      the following properties: "federations".
     * --federations flag is now deprecated. Prefer to set federations via the config-map.
-    * Federations can be configured by settings the "federations" field to the value currently
-    * set in the command line.
+      Federations can be configured by settings the "federations" field to the value currently
+      set in the command line.
     * Example:
-    *   kind: ConfigMap
-    *   apiVersion: v1
-    *   metadata:
-    *     name: kube-dns
-    *     namespace: kube-system
-    *   data:
-    *     federations: abc=def
+      ```yaml
+      kind: ConfigMap
+      apiVersion: v1
+      metadata:
+        name: kube-dns
+        namespace: kube-system
+      data:
+        federations: abc=def
+      ```
 * azure: support multiple ipconfigs on a NIC ([#36841](https://github.com/kubernetes/kubernetes/pull/36841), [@colemickens](https://github.com/colemickens))
 * Fix issue in converting AWS volume ID from mount paths ([#36840](https://github.com/kubernetes/kubernetes/pull/36840), [@jingxu97](https://github.com/jingxu97))
 * fix leaking memory backed volumes of terminated pods ([#36779](https://github.com/kubernetes/kubernetes/pull/36779), [@sjenning](https://github.com/sjenning))
@@ -1140,7 +1142,7 @@ filename | sha256 hash
 * pvc.Spec.Resources.Requests min and max can be enforced with a LimitRange of type "PersistentVolumeClaim" in the namespace ([#30145](https://github.com/kubernetes/kubernetes/pull/30145), [@markturansky](https://github.com/markturansky))
 * Federated DaemonSet controller. Supports all the API that regular DaemonSet has. ([#34319](https://github.com/kubernetes/kubernetes/pull/34319), [@mwielgus](https://github.com/mwielgus))
 * New federation deployment mechanism now allows non-GCP clusters. ([#34620](https://github.com/kubernetes/kubernetes/pull/34620), [@madhusudancs](https://github.com/madhusudancs))
-        * Writes the federation kubeconfig to the local kubeconfig file.
+  * Writes the federation kubeconfig to the local kubeconfig file.
 * Update the series and the README to reflect the change. ([#30374](https://github.com/kubernetes/kubernetes/pull/30374), [@mbruzek](https://github.com/mbruzek))
 * Replica set conditions API ([#33905](https://github.com/kubernetes/kubernetes/pull/33905), [@kargakis](https://github.com/kargakis))
 * etcd3: avoid unnecessary decoding in etcd3 client  ([#34435](https://github.com/kubernetes/kubernetes/pull/34435), [@wojtek-t](https://github.com/wojtek-t))
@@ -1187,8 +1189,8 @@ binary | sha256 hash
 * kubectl annotate now supports --dry-run ([#34199](https://github.com/kubernetes/kubernetes/pull/34199), [@asalkeld](https://github.com/asalkeld))
 * kubectl: Add external ip information to node when '-o wide' is used ([#33552](https://github.com/kubernetes/kubernetes/pull/33552), [@floreks](https://github.com/floreks))
 * Update GCI base image: ([#34156](https://github.com/kubernetes/kubernetes/pull/34156), [@adityakali](https://github.com/adityakali))
-        * Enabled VXLAN and IP_SET config options in kernel to support some networking tools (ebtools)
-        * OpenSSL CVE fixes
+  * Enabled VXLAN and IP_SET config options in kernel to support some networking tools (ebtools)
+  * OpenSSL CVE fixes
 * ContainerVm/GCI image: try to use ifdown/ifup if available ([#33595](https://github.com/kubernetes/kubernetes/pull/33595), [@freehan](https://github.com/freehan))
 * Use manifest digest (as `docker-pullable://`) as ImageID when available (exposes a canonical, pullable image ID for containers). ([#33014](https://github.com/kubernetes/kubernetes/pull/33014), [@DirectXMan12](https://github.com/DirectXMan12))
 * Add kubelet awareness to taint tolerant match caculator. ([#26501](https://github.com/kubernetes/kubernetes/pull/26501), [@resouer](https://github.com/resouer))
@@ -1245,9 +1247,9 @@ binary | sha256 hash
 * Resolves x509 verification issue with masters dialing nodes when started with --kubelet-certificate-authority ([#33141](https://github.com/kubernetes/kubernetes/pull/33141), [@liggitt](https://github.com/liggitt))
 * Fix possible panic in PodAffinityChecker ([#33086](https://github.com/kubernetes/kubernetes/pull/33086), [@ivan4th](https://github.com/ivan4th))
 * Upgrading Container-VM base image for k8s on GCE. Brief changelog as follows: ([#32738](https://github.com/kubernetes/kubernetes/pull/32738), [@Amey-D](https://github.com/Amey-D))
-    *     - Fixed performance regression in veth device driver
-    *     - Docker and related binaries are statically linked
-    *     - Fixed the issue of systemd being oom-killable
+    * Fixed performance regression in veth device driver
+    * Docker and related binaries are statically linked
+    * Fixed the issue of systemd being oom-killable
 * Move HighWaterMark to the top of the struct in order to fix arm ([#33117](https://github.com/kubernetes/kubernetes/pull/33117), [@luxas](https://github.com/luxas))
 * kubenet: SyncHostports for both running and ready to run pods. ([#31388](https://github.com/kubernetes/kubernetes/pull/31388), [@yifan-gu](https://github.com/yifan-gu))
 * Limit the number of names per image reported in the node status ([#32914](https://github.com/kubernetes/kubernetes/pull/32914), [@yujuhong](https://github.com/yujuhong))
@@ -1308,11 +1310,11 @@ binary | sha256 hash
 * Handle overlapping deployments gracefully ([#30730](https://github.com/kubernetes/kubernetes/pull/30730), [@janetkuo](https://github.com/janetkuo))
 * Remove environment variables and internal Kubernetes Docker labels from cAdvisor Prometheus metric labels. ([#31064](https://github.com/kubernetes/kubernetes/pull/31064), [@grobie](https://github.com/grobie))
     * Old behavior:
-    * - environment variables explicitly whitelisted via --docker-env-metadata-whitelist were exported as `container_env_*=*`. Default is zero so by default non were exported
-    * - all docker labels were exported as `container_label_*=*`
+      * environment variables explicitly whitelisted via --docker-env-metadata-whitelist were exported as `container_env_*=*`. Default is zero so by default non were exported
+      * all docker labels were exported as `container_label_*=*`
     * New behavior:
-    * - Only `container_name`, `pod_name`, `namespace`, `id`, `image`, and `name` labels are exposed
-    * - no environment variables will be exposed ever via /metrics, even if whitelisted
+      * Only `container_name`, `pod_name`, `namespace`, `id`, `image`, and `name` labels are exposed
+      * no environment variables will be exposed ever via /metrics, even if whitelisted
 * Filter duplicate network packets in promiscuous bridge mode (with ebtables) ([#28717](https://github.com/kubernetes/kubernetes/pull/28717), [@freehan](https://github.com/freehan))
 * Refactor to simplify the hard-traveled path of the KubeletConfiguration object ([#29216](https://github.com/kubernetes/kubernetes/pull/29216), [@mtaufen](https://github.com/mtaufen))
 * Fix overflow issue in controller-manager rate limiter ([#31396](https://github.com/kubernetes/kubernetes/pull/31396), [@foxish](https://github.com/foxish))
@@ -1320,8 +1322,6 @@ binary | sha256 hash
 Please see the [Releases Page](https://github.com/kubernetes/kubernetes/releases) for older releases.
 
 Release notes of older releases can be found in:
-- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.2.md)
-- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.3.md)
-- [CHANGELOG-1.4.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.4.md)
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/CHANGELOG.md?pixel)]()
+- [CHANGELOG-1.2.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.2.md)
+- [CHANGELOG-1.3.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.3.md)
+- [CHANGELOG-1.4.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.4.md)

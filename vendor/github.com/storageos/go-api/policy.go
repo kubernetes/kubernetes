@@ -29,7 +29,7 @@ func (n *nopMarshaler) MarshalJSON() ([]byte, error) {
 }
 
 // PolicyCreate creates a policy on the server.
-func (c *Client) PolicyCreate(jsonl []byte, ctx context.Context) error {
+func (c *Client) PolicyCreate(ctx context.Context, jsonl []byte) error {
 	nopm := nopMarshaler(jsonl)
 	_, err := c.do("POST", PolicyAPIPrefix, doOptions{
 		data:    &nopm,

@@ -14,8 +14,8 @@ import (
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/encoding/text"
 	"google.golang.org/protobuf/internal/errors"
-	"google.golang.org/protobuf/internal/fieldnum"
 	"google.golang.org/protobuf/internal/flags"
+	"google.golang.org/protobuf/internal/genid"
 	"google.golang.org/protobuf/internal/mapsort"
 	"google.golang.org/protobuf/internal/pragma"
 	"google.golang.org/protobuf/internal/strs"
@@ -162,7 +162,7 @@ func (e encoder) marshalMessage(m pref.Message, inclDelims bool) error {
 	}
 
 	// Handle Any expansion.
-	if messageDesc.FullName() == "google.protobuf.Any" {
+	if messageDesc.FullName() == genid.Any_message_fullname {
 		if e.marshalAny(m) {
 			return nil
 		}
@@ -295,13 +295,13 @@ func (e encoder) marshalMap(name string, mmap pref.Map, fd pref.FieldDescriptor)
 		e.StartMessage()
 		defer e.EndMessage()
 
-		e.WriteName("key")
+		e.WriteName(string(genid.MapEntry_Key_field_name))
 		err = e.marshalSingular(key.Value(), fd.MapKey())
 		if err != nil {
 			return false
 		}
 
-		e.WriteName("value")
+		e.WriteName(string(genid.MapEntry_Value_field_name))
 		err = e.marshalSingular(val, fd.MapValue())
 		if err != nil {
 			return false
@@ -399,7 +399,7 @@ func (e encoder) marshalUnknown(b []byte) {
 func (e encoder) marshalAny(any pref.Message) bool {
 	// Construct the embedded message.
 	fds := any.Descriptor().Fields()
-	fdType := fds.ByNumber(fieldnum.Any_TypeUrl)
+	fdType := fds.ByNumber(genid.Any_TypeUrl_field_number)
 	typeURL := any.Get(fdType).String()
 	mt, err := e.opts.Resolver.FindMessageByURL(typeURL)
 	if err != nil {
@@ -408,7 +408,7 @@ func (e encoder) marshalAny(any pref.Message) bool {
 	m := mt.New().Interface()
 
 	// Unmarshal bytes into embedded message.
-	fdValue := fds.ByNumber(fieldnum.Any_Value)
+	fdValue := fds.ByNumber(genid.Any_Value_field_number)
 	value := any.Get(fdValue)
 	err = proto.UnmarshalOptions{
 		AllowPartial: true,

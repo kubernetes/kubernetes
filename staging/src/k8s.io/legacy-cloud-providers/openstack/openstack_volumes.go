@@ -491,11 +491,14 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 func (os *OpenStack) GetDevicePathBySerialID(volumeID string) string {
 	// Build a list of candidate device paths.
 	// Certain Nova drivers will set the disk serial ID, including the Cinder volume id.
+	// Newer OpenStacks may not truncate the volumeID to 20 chars.
 	candidateDeviceNodes := []string{
 		// KVM
 		fmt.Sprintf("virtio-%s", volumeID[:20]),
+		fmt.Sprintf("virtio-%s", volumeID),
 		// KVM virtio-scsi
 		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID[:20]),
+		fmt.Sprintf("scsi-0QEMU_QEMU_HARDDISK_%s", volumeID),
 		// ESXi
 		fmt.Sprintf("wwn-0x%s", strings.Replace(volumeID, "-", "", -1)),
 	}
@@ -744,8 +747,12 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 
 	// Construct Volume Labels
 	labels := make(map[string]string)
-	labels[v1.LabelZoneFailureDomain] = volume.AvailabilityZone
-	labels[v1.LabelZoneRegion] = os.region
+	if volume.AvailabilityZone != "" {
+		labels[v1.LabelTopologyZone] = volume.AvailabilityZone
+	}
+	if os.region != "" {
+		labels[v1.LabelTopologyRegion] = os.region
+	}
 	klog.V(4).Infof("The Volume %s has labels %v", pv.Spec.Cinder.VolumeID, labels)
 
 	return labels, nil

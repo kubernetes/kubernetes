@@ -56,7 +56,7 @@ func TestVerbsJsonIterUnmarshalJSON(t *testing.T) {
 		{`{"verbs":["delete"]}`, APIResource{Verbs: Verbs([]string{"delete"})}},
 	}
 
-	iter := json.CaseSensitiveJsonIterator()
+	iter := json.CaseSensitiveJSONIterator()
 	for i, c := range cases {
 		var result APIResource
 		if err := iter.Unmarshal([]byte(c.input), &result); err != nil {

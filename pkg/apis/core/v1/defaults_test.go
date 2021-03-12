@@ -80,6 +80,7 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.Containers[0].TerminationMessagePolicy":              `"File"`,
 		".Spec.DNSPolicy": `"ClusterFirst"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                       `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
@@ -103,6 +104,8 @@ func TestWorkloadDefaults(t *testing.T) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":            "10",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":         "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":           "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                `"/dev/termination-log"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":              `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                `"v1"`,
 		".Spec.InitContainers[0].ImagePullPolicy":                                                     `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                    `"/"`,
@@ -203,6 +206,7 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.DNSPolicy":          `"ClusterFirst"`,
 		".Spec.EnableServiceLinks": `true`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Env[0].ValueFrom.FieldRef.APIVersion":  `"v1"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.ImagePullPolicy":                       `"IfNotPresent"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Path":      `"/"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PostStart.HTTPGet.Scheme":    `"HTTP"`,
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.Lifecycle.PreStop.HTTPGet.Path":        `"/"`,
@@ -226,6 +230,8 @@ func TestPodDefaults(t *testing.T) {
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.PeriodSeconds":            "10",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.SuccessThreshold":         "1",
 		".Spec.EphemeralContainers[0].EphemeralContainerCommon.StartupProbe.TimeoutSeconds":           "1",
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePath":                `"/dev/termination-log"`,
+		".Spec.EphemeralContainers[0].EphemeralContainerCommon.TerminationMessagePolicy":              `"File"`,
 		".Spec.InitContainers[0].Env[0].ValueFrom.FieldRef.APIVersion":                                `"v1"`,
 		".Spec.InitContainers[0].ImagePullPolicy":                                                     `"IfNotPresent"`,
 		".Spec.InitContainers[0].Lifecycle.PostStart.HTTPGet.Path":                                    `"/"`,
@@ -1017,140 +1023,6 @@ func TestSetDefaultService(t *testing.T) {
 	}
 }
 
-func TestSetDefaultServiceIPFamily(t *testing.T) {
-	svc := v1.Service{
-		Spec: v1.ServiceSpec{
-			SessionAffinity: v1.ServiceAffinityNone,
-			Type:            v1.ServiceTypeClusterIP,
-		},
-	}
-	testCases := []struct {
-		name            string
-		inSvcTweak      func(s v1.Service) v1.Service
-		outSvcTweak     func(s v1.Service) v1.Service
-		enableDualStack bool
-	}{
-		{
-			name:            "dualstack off. ipfamily not set",
-			inSvcTweak:      func(s v1.Service) v1.Service { return s },
-			outSvcTweak:     func(s v1.Service) v1.Service { return s },
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack on. ipfamily not set, service is *not* ClusterIP-able",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.Type = v1.ServiceTypeExternalName
-				return s
-			},
-			outSvcTweak:     func(s v1.Service) v1.Service { return s },
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack off. ipfamily set",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack off. ipfamily not set. clusterip set",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				return s
-			},
-			enableDualStack: false,
-		},
-		{
-			name: "dualstack on. ipfamily not set (clusterIP is v4)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily not set (clusterIP is v6)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily set (clusterIP is v4)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				s.Spec.ClusterIP = "1.1.1.1"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv4Service := v1.IPv4Protocol
-				s.Spec.IPFamily = &ipv4Service
-				return s
-			},
-			enableDualStack: true,
-		},
-		{
-			name: "dualstack on. ipfamily set (clusterIP is v6)",
-			inSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
-				return s
-			},
-			outSvcTweak: func(s v1.Service) v1.Service {
-				ipv6Service := v1.IPv6Protocol
-				s.Spec.IPFamily = &ipv6Service
-				return s
-			},
-			enableDualStack: true,
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
-			tweakedIn := tc.inSvcTweak(svc)
-			expectedSvc := tc.outSvcTweak(svc)
-			defaulted := roundTrip(t, runtime.Object(&tweakedIn))
-
-			defaultedSvc := defaulted.(*v1.Service)
-			if expectedSvc.Spec.IPFamily != nil {
-				if defaultedSvc.Spec.IPFamily == nil {
-					t.Fatalf("defaulted service ipfamily is nil while expected is not")
-				}
-				if *(expectedSvc.Spec.IPFamily) != *(defaultedSvc.Spec.IPFamily) {
-					t.Fatalf("defaulted service ipfamily %v does not match expected %v", defaultedSvc.Spec.IPFamily, expectedSvc.Spec.IPFamily)
-				}
-			}
-
-			if expectedSvc.Spec.IPFamily == nil && defaultedSvc.Spec.IPFamily != nil {
-				t.Fatalf("defaulted service ipfamily is not nil, while expected service ipfamily is")
-			}
-		})
-	}
-}
-
 func TestSetDefaultServiceSessionAffinityConfig(t *testing.T) {
 	testCases := map[string]v1.Service{
 		"SessionAffinityConfig is empty": {
@@ -1544,6 +1416,40 @@ func TestSetDefaultNamespace(t *testing.T) {
 	}
 }
 
+func TestSetDefaultNamespaceLabels(t *testing.T) {
+	// Although this is defaulted to true, it's still worth to enable the feature gate during the test
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, true)()
+
+	theNs := "default-ns-labels-are-great"
+	s := &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: theNs,
+		},
+	}
+	obj2 := roundTrip(t, runtime.Object(s))
+	s2 := obj2.(*v1.Namespace)
+
+	if s2.ObjectMeta.Labels[v1.LabelMetadataName] != theNs {
+		t.Errorf("Expected default namespace label value of %v, but got %v", theNs, s2.ObjectMeta.Labels[v1.LabelMetadataName])
+	}
+
+	// And let's disable the FG and check if it still defaults creating the labels
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.NamespaceDefaultLabelName, false)()
+
+	theNs = "default-ns-labels-are-not-that-great"
+	s = &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: theNs,
+		},
+	}
+	obj2 = roundTrip(t, runtime.Object(s))
+	s2 = obj2.(*v1.Namespace)
+
+	if _, ok := s2.ObjectMeta.Labels[v1.LabelMetadataName]; ok {
+		t.Errorf("Default namespace shouldn't exist here, as the feature gate is disabled %v", s)
+	}
+}
+
 func TestSetDefaultPodSpecHostNetwork(t *testing.T) {
 	portNum := int32(8080)
 	s := v1.PodSpec{}
@@ -1927,5 +1833,66 @@ func TestSetDefaultEnableServiceLinks(t *testing.T) {
 	output := roundTrip(t, runtime.Object(pod)).(*v1.Pod)
 	if output.Spec.EnableServiceLinks == nil || *output.Spec.EnableServiceLinks != v1.DefaultEnableServiceLinks {
 		t.Errorf("Expected enableServiceLinks value: %+v\ngot: %+v\n", v1.DefaultEnableServiceLinks, *output.Spec.EnableServiceLinks)
+	}
+}
+
+func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
+	testCases := []struct {
+		name                          string
+		expectedInternalTrafficPolicy v1.ServiceInternalTrafficPolicyType
+		svc                           v1.Service
+		featureGateOn                 bool
+	}{
+		{
+			name:                          "must set default internalTrafficPolicy",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			svc:                           v1.Service{},
+			featureGateOn:                 true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's cluster",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyCluster,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &cluster,
+				},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when it's local",
+			expectedInternalTrafficPolicy: v1.ServiceInternalTrafficPolicyLocal,
+			svc: v1.Service{
+				Spec: v1.ServiceSpec{
+					InternalTrafficPolicy: &local,
+				},
+			},
+			featureGateOn: true,
+		},
+		{
+			name:                          "must not set default internalTrafficPolicy when gate is disabled",
+			expectedInternalTrafficPolicy: "",
+			svc:                           v1.Service{},
+			featureGateOn:                 false,
+		},
+	}
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, test.featureGateOn)()
+			obj := roundTrip(t, runtime.Object(&test.svc))
+			svc := obj.(*v1.Service)
+
+			if test.expectedInternalTrafficPolicy == "" {
+				if svc.Spec.InternalTrafficPolicy != nil {
+					t.Fatalf("expected .spec.internalTrafficPolicy: null, got %v", *svc.Spec.InternalTrafficPolicy)
+				}
+			} else {
+				if *svc.Spec.InternalTrafficPolicy != test.expectedInternalTrafficPolicy {
+					t.Fatalf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, *svc.Spec.InternalTrafficPolicy)
+				}
+			}
+		})
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -852,6 +853,32 @@ func TestNumCPUCheck(t *testing.T) {
 			}
 			if len(errors) != rt.numErrors {
 				t.Errorf("expected %d warning(s) but got %d: %q", rt.numErrors, len(errors), errors)
+			}
+		})
+	}
+}
+
+func TestMemCheck(t *testing.T) {
+	// skip this test, if OS in not Linux, since it will ONLY pass on Linux.
+	if runtime.GOOS != "linux" {
+		t.Skip("unsupported OS for memory check test ")
+	}
+
+	var tests = []struct {
+		minimum        uint64
+		expectedErrors int
+	}{
+		{0, 0},
+		{9999999999999999, 1},
+	}
+
+	for _, rt := range tests {
+		t.Run(fmt.Sprintf("MemoryCheck{%d}", rt.minimum), func(t *testing.T) {
+			warnings, errors := MemCheck{Mem: rt.minimum}.Check()
+			if len(warnings) > 0 {
+				t.Errorf("expected 0 warnings but got %d: %q", len(warnings), warnings)
+			} else if len(errors) != rt.expectedErrors {
+				t.Errorf("expected %d error(s) but got %d: %q", rt.expectedErrors, len(errors), errors)
 			}
 		})
 	}

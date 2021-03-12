@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 	"k8s.io/utils/integer"
 
-	"vbom.ml/util/sortorder"
+	"github.com/fvbommel/sortorder"
 )
 
 // SortingPrinter sorts list types before delegating to another printer.
@@ -206,6 +206,13 @@ func isLess(i, j reflect.Value) (bool, error) {
 		return true, nil
 
 	case reflect.Interface:
+		if i.IsNil() && j.IsNil() {
+			return false, nil
+		} else if i.IsNil() {
+			return true, nil
+		} else if j.IsNil() {
+			return false, nil
+		}
 		switch itype := i.Interface().(type) {
 		case uint8:
 			if jtype, ok := j.Interface().(uint8); ok {

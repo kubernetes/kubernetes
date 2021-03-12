@@ -77,6 +77,12 @@ const (
 	// gmsaWebhookDeployScriptURL is the URL of the deploy script for the GMSA webook
 	// TODO(wk8): we should pin versions.
 	gmsaWebhookDeployScriptURL = "https://raw.githubusercontent.com/kubernetes-sigs/windows-gmsa/master/admission-webhook/deploy/deploy-gmsa-webhook.sh"
+
+	// output from the nltest /query command should have this in it
+	expectedQueryOutput = "The command completed successfully"
+
+	// The name of the expected domain
+	gmsaDomain = "k8sgmsa.lan"
 )
 
 var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
@@ -140,16 +146,33 @@ var _ = SIGDescribe("[Feature:Windows] GMSA Full [Serial] [Slow]", func() {
 			var output string
 			gomega.Eventually(func() bool {
 				output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", "/QUERY")
-				return err == nil
-			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
+				if err != nil {
+					framework.Logf("unable to run command in container via exec: %s", err)
+					return false
+				}
 
-			expectedSubstr := "The command completed successfully"
-			if !strings.Contains(output, expectedSubstr) {
-				framework.Failf("Expected %q to contain %q", output, expectedSubstr)
-			}
+				if !isValidOutput(output) {
+					// try repairing the secure channel by running reset command
+					// https://kubernetes.io/docs/tasks/configure-pod-container/configure-gmsa/#troubleshooting
+					output, err = runKubectlExecInNamespace(f.Namespace.Name, podName, "nltest", fmt.Sprintf("/sc_reset:%s", gmsaDomain))
+					if err != nil {
+						framework.Logf("unable to run command in container via exec: %s", err)
+						return false
+					}
+					framework.Logf("failed to connect to domain; tried resetting the domain, output:\n%s", string(output))
+					return false
+				}
+				return true
+			}, 1*time.Minute, 1*time.Second).Should(gomega.BeTrue())
 		})
 	})
 })
+
+func isValidOutput(output string) bool {
+	return strings.Contains(output, expectedQueryOutput) &&
+		!strings.Contains(output, "ERROR_NO_LOGON_SERVERS") &&
+		!strings.Contains(output, "RPC_S_SERVER_UNAVAILABLE")
+}
 
 // findPreconfiguredGmsaNode finds node with the gmsaFullNodeLabel label on it.
 func findPreconfiguredGmsaNodes(c clientset.Interface) []v1.Node {

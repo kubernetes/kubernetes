@@ -23,6 +23,7 @@ limitations under the License.
 package porter
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -55,6 +56,18 @@ To use a different cert/key, mount them into the pod and set the "CERT_FILE" and
 	Run:  main,
 }
 
+// JSONResponse enables --json-response flag
+var JSONResponse bool
+
+type jsonResponse struct {
+	Method string
+	Body   string
+}
+
+func init() {
+	CmdPorter.Flags().BoolVar(&JSONResponse, "json-response", false, "Responds to requests with a json response that includes the default value with the http.Request Method")
+}
+
 func main(cmd *cobra.Command, args []string) {
 	for _, vk := range os.Environ() {
 		// Put everything before the first = sign in parts[0], and
@@ -81,10 +94,23 @@ func main(cmd *cobra.Command, args []string) {
 }
 
 func servePort(port, value string) {
+
 	s := &http.Server{
 		Addr: "0.0.0.0:" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, value)
+			body := value
+			if JSONResponse {
+				j, err := json.Marshal(&jsonResponse{
+					Method: r.Method,
+					Body:   value})
+				if err != nil {
+					http.Error(w, fmt.Sprintf("Internal Server Error: %v", err), 500)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				body = string(j)
+			}
+			fmt.Fprint(w, body)
 		}),
 	}
 	log.Printf("server on port %q failed: %v", port, s.ListenAndServe())
@@ -94,7 +120,19 @@ func serveTLSPort(port, value string) {
 	s := &http.Server{
 		Addr: "0.0.0.0:" + port,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, value)
+			body := value
+			if JSONResponse {
+				j, err := json.Marshal(&jsonResponse{
+					Method: r.Method,
+					Body:   value})
+				if err != nil {
+					http.Error(w, fmt.Sprintf("Internal Server Error: %v", err), 500)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				body = string(j)
+			}
+			fmt.Fprint(w, body)
 		}),
 	}
 	certFile := os.Getenv("CERT_FILE")

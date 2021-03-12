@@ -38,7 +38,7 @@ import (
 func NewDryRunnableTestStorage(t *testing.T) (DryRunnableStorage, func()) {
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 	sc.Codec = apitesting.TestStorageCodec(codecs, examplev1.SchemeGroupVersion)
-	s, destroy, err := factory.Create(*sc)
+	s, destroy, err := factory.Create(*sc, nil)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestDryRunUpdateMissingObjectFails(t *testing.T) {
 		return input, nil, errors.New("UpdateFunction shouldn't be called")
 	}
 
-	err := s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true)
+	err := s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyNotFound {
 		t.Errorf("Expected key to be not found, error: %v", err)
 	}
@@ -148,12 +148,12 @@ func TestDryRunUpdatePreconditions(t *testing.T) {
 	}
 	wrongID := types.UID("wrong-uid")
 	myID := types.UID("my-uid")
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &wrongID}, updateFunc, true)
+	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &wrongID}, updateFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeInvalidObj {
 		t.Errorf("Expected invalid object, error: %v", err)
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &myID}, updateFunc, true)
+	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, &storage.Preconditions{UID: &myID}, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to update with valid precondition: %v", err)
 	}
@@ -180,12 +180,15 @@ func TestDryRunUpdateDoesntUpdate(t *testing.T) {
 		return u, nil, nil
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true)
+	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
 	out := UnstructuredOrDie(`{}`)
 	err = s.Get(context.Background(), "key", storage.GetOptions{}, out)
+	if err != nil {
+		t.Fatalf("Failed to get storage: %v", err)
+	}
 	if !reflect.DeepEqual(created, out) {
 		t.Fatalf("Returned object %q different from expected %q", created, out)
 	}
@@ -212,7 +215,7 @@ func TestDryRunUpdateReturnsObject(t *testing.T) {
 		return u, nil, nil
 	}
 
-	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true)
+	err = s.GuaranteedUpdate(context.Background(), "key", obj, false, nil, updateFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to dry-run update: %v", err)
 	}
@@ -234,7 +237,7 @@ func TestDryRunDeleteDoesntDelete(t *testing.T) {
 		t.Fatalf("Failed to create new object: %v", err)
 	}
 
-	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true)
+	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to dry-run delete the object: %v", err)
 	}
@@ -250,7 +253,7 @@ func TestDryRunDeleteMissingObjectFails(t *testing.T) {
 	defer destroy()
 
 	out := UnstructuredOrDie(`{}`)
-	err := s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true)
+	err := s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeKeyNotFound {
 		t.Errorf("Expected key to be not found, error: %v", err)
 	}
@@ -270,7 +273,7 @@ func TestDryRunDeleteReturnsObject(t *testing.T) {
 
 	out = UnstructuredOrDie(`{}`)
 	expected := UnstructuredOrDie(`{"kind": "Pod", "metadata": {"resourceVersion": "2"}}`)
-	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true)
+	err = s.Delete(context.Background(), "key", out, nil, rest.ValidateAllObjectFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to delete with valid precondition: %v", err)
 	}
@@ -293,12 +296,12 @@ func TestDryRunDeletePreconditions(t *testing.T) {
 
 	wrongID := types.UID("wrong-uid")
 	myID := types.UID("my-uid")
-	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &wrongID}, rest.ValidateAllObjectFunc, true)
+	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &wrongID}, rest.ValidateAllObjectFunc, true, nil)
 	if e, ok := err.(*storage.StorageError); !ok || e.Code != storage.ErrCodeInvalidObj {
 		t.Errorf("Expected invalid object, error: %v", err)
 	}
 
-	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &myID}, rest.ValidateAllObjectFunc, true)
+	err = s.Delete(context.Background(), "key", out, &storage.Preconditions{UID: &myID}, rest.ValidateAllObjectFunc, true, nil)
 	if err != nil {
 		t.Fatalf("Failed to delete with valid precondition: %v", err)
 	}

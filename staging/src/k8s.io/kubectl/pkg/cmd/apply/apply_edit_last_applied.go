@@ -22,11 +22,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
 var (
-	applyEditLastAppliedLong = templates.LongDesc(`
+	applyEditLastAppliedLong = templates.LongDesc(i18n.T(`
 		Edit the latest last-applied-configuration annotations of resources from the default editor.
 
 		The edit-last-applied command allows you to directly edit any API resource you can retrieve via the
@@ -45,7 +46,7 @@ var (
 		that contains your unapplied changes. The most common error when updating a resource
 		is another editor changing the resource on the server. When this occurs, you will have
 		to apply your changes to the newer version of the resource, or update your temporary
-		saved copy to include the latest resource version.`)
+		saved copy to include the latest resource version.`))
 
 	applyEditLastAppliedExample = templates.Examples(`
 		# Edit the last-applied-configuration annotations by type/name in YAML.
@@ -62,7 +63,7 @@ func NewCmdApplyEditLastApplied(f cmdutil.Factory, ioStreams genericclioptions.I
 	cmd := &cobra.Command{
 		Use:                   "edit-last-applied (RESOURCE/NAME | -f FILENAME)",
 		DisableFlagsInUseLine: true,
-		Short:                 "Edit latest last-applied-configuration annotations of a resource/object",
+		Short:                 i18n.T("Edit latest last-applied-configuration annotations of a resource/object"),
 		Long:                  applyEditLastAppliedLong,
 		Example:               applyEditLastAppliedExample,
 		Run: func(cmd *cobra.Command, args []string) {

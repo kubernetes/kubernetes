@@ -87,6 +87,10 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 				obj.Spec.FSGroupPolicy = new(storage.FSGroupPolicy)
 				*obj.Spec.FSGroupPolicy = storage.ReadWriteOnceWithFSTypeFSGroupPolicy
 			}
+			if obj.Spec.RequiresRepublish == nil {
+				obj.Spec.RequiresRepublish = new(bool)
+				*(obj.Spec.RequiresRepublish) = false
+			}
 			if len(obj.Spec.VolumeLifecycleModes) == 0 {
 				obj.Spec.VolumeLifecycleModes = []storage.VolumeLifecycleMode{
 					storage.VolumeLifecyclePersistent,

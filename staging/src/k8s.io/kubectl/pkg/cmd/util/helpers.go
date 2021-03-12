@@ -86,10 +86,10 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message (if provided) and then exits. If V(2) or greater,
+// fatal prints the message (if provided) and then exits. If V(6) or greater,
 // klog.Fatal is invoked for extended information.
 func fatal(msg string, code int) {
-	if klog.V(2).Enabled() {
+	if klog.V(6).Enabled() {
 		klog.FatalDepth(2, msg)
 	}
 	if len(msg) > 0 {
@@ -432,6 +432,10 @@ func AddDryRunFlag(cmd *cobra.Command) {
 
 func AddFieldManagerFlagVar(cmd *cobra.Command, p *string, defaultFieldManager string) {
 	cmd.Flags().StringVar(p, "field-manager", defaultFieldManager, "Name of the manager used to track field ownership.")
+}
+
+func AddContainerVarFlags(cmd *cobra.Command, p *string, containerName string) {
+	cmd.Flags().StringVarP(p, "container", "c", containerName, "Container name. If omitted, use the kubectl.kubernetes.io/default-container annotation for selecting the container to be attached or the first container in the pod will be chosen")
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {

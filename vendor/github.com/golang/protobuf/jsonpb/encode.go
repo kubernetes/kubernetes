@@ -166,20 +166,25 @@ func (w *jsonWriter) marshalMessage(m protoreflect.Message, indent, typeURL stri
 		fd := fds.ByNumber(1)
 		return w.marshalValue(fd, m.Get(fd), indent)
 	case "Duration":
+		const maxSecondsInDuration = 315576000000
 		// "Generated output always contains 0, 3, 6, or 9 fractional digits,
 		//  depending on required precision."
 		s := m.Get(fds.ByNumber(1)).Int()
 		ns := m.Get(fds.ByNumber(2)).Int()
+		if s < -maxSecondsInDuration || s > maxSecondsInDuration {
+			return fmt.Errorf("seconds out of range %v", s)
+		}
 		if ns <= -secondInNanos || ns >= secondInNanos {
 			return fmt.Errorf("ns out of range (%v, %v)", -secondInNanos, secondInNanos)
 		}
 		if (s > 0 && ns < 0) || (s < 0 && ns > 0) {
 			return errors.New("signs of seconds and nanos do not match")
 		}
-		if s < 0 {
-			ns = -ns
+		var sign string
+		if s < 0 || ns < 0 {
+			sign, s, ns = "-", -1*s, -1*ns
 		}
-		x := fmt.Sprintf("%d.%09d", s, ns)
+		x := fmt.Sprintf("%s%d.%09d", sign, s, ns)
 		x = strings.TrimSuffix(x, "000")
 		x = strings.TrimSuffix(x, "000")
 		x = strings.TrimSuffix(x, ".000")

@@ -4,6 +4,12 @@ package elbv2
 
 const (
 
+	// ErrCodeALPNPolicyNotSupportedException for service response error code
+	// "ALPNPolicyNotFound".
+	//
+	// The specified ALPN policy is not supported.
+	ErrCodeALPNPolicyNotSupportedException = "ALPNPolicyNotFound"
+
 	// ErrCodeAllocationIdNotFoundException for service response error code
 	// "AllocationIdNotFound".
 	//

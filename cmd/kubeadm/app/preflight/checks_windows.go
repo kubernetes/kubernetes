@@ -54,3 +54,9 @@ func (ipuc IsPrivilegedUserCheck) Check() (warnings, errorList []error) {
 func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
 	return nil, nil
 }
+
+// Check number of memory required by kubeadm
+// No-op for Windows.
+func (mc MemCheck) Check() (warnings, errorList []error) {
+	return nil, nil
+}

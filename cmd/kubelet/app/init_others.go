@@ -18,6 +18,6 @@ limitations under the License.
 
 package app
 
-func initForOS(service bool) error {
+func initForOS(service bool, priorityClass string) error {
 	return nil
 }

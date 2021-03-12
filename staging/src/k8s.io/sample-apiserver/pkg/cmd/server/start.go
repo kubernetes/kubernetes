@@ -107,7 +107,7 @@ func (o *WardleServerOptions) Complete() error {
 	// register admission plugins
 	banflunder.Register(o.RecommendedOptions.Admission.Plugins)
 
-	// add admisison plugins to the RecommendedPluginOrder
+	// add admission plugins to the RecommendedPluginOrder
 	o.RecommendedOptions.Admission.RecommendedPluginOrder = append(o.RecommendedOptions.Admission.RecommendedPluginOrder, "BanFlunder")
 
 	return nil

@@ -24,12 +24,12 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	pluginhelper "k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
+	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 const preScoreStateKey = "PreScore" + Name
+const invalidScore = -1
 
 // preScoreState computed at PreScore and used at Score.
 // Fields are exported for comparison during testing.
@@ -61,12 +61,12 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
 		if err != nil {
-			return fmt.Errorf("obtaining pod's soft topology spread constraints: %v", err)
+			return fmt.Errorf("obtaining pod's soft topology spread constraints: %w", err)
 		}
 	} else {
-		s.Constraints, err = pl.defaultConstraints(pod, v1.ScheduleAnyway)
+		s.Constraints, err = pl.buildDefaultConstraints(pod, v1.ScheduleAnyway)
 		if err != nil {
-			return fmt.Errorf("setting default soft topology spread constraints: %v", err)
+			return fmt.Errorf("setting default soft topology spread constraints: %w", err)
 		}
 	}
 	if len(s.Constraints) == 0 {
@@ -113,7 +113,7 @@ func (pl *PodTopologySpread) PreScore(
 ) *framework.Status {
 	allNodes, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("error when getting all nodes: %v", err))
+		return framework.AsStatus(fmt.Errorf("getting all nodes: %w", err))
 	}
 
 	if len(filteredNodes) == 0 || len(allNodes) == 0 {
@@ -127,7 +127,7 @@ func (pl *PodTopologySpread) PreScore(
 	}
 	err = pl.initPreScoreState(state, pod, filteredNodes)
 	if err != nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("error when calculating preScoreState: %v", err))
+		return framework.AsStatus(fmt.Errorf("calculating preScoreState: %w", err))
 	}
 
 	// return if incoming pod doesn't have soft topology spread Constraints.
@@ -136,6 +136,8 @@ func (pl *PodTopologySpread) PreScore(
 		return nil
 	}
 
+	// Ignore parsing errors for backwards compatibility.
+	requiredNodeAffinity := nodeaffinity.GetRequiredNodeAffinity(pod)
 	processAllNode := func(i int) {
 		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
@@ -144,8 +146,8 @@ func (pl *PodTopologySpread) PreScore(
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
 		// (2) All topologyKeys need to be present in `node`
-		if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, node) ||
-			!nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
+		match, _ := requiredNodeAffinity.Match(node)
+		if !match || !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
 			return
 		}
 
@@ -162,7 +164,7 @@ func (pl *PodTopologySpread) PreScore(
 			atomic.AddInt64(tpCount, int64(count))
 		}
 	}
-	parallelize.Until(ctx, len(allNodes), processAllNode)
+	pl.parallelizer.Until(ctx, len(allNodes), processAllNode)
 
 	cycleState.Write(preScoreStateKey, state)
 	return nil
@@ -173,14 +175,14 @@ func (pl *PodTopologySpread) PreScore(
 // it is normalized later.
 func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.sharedLister.NodeInfos().Get(nodeName)
-	if err != nil || nodeInfo.Node() == nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v, node is nil: %v", nodeName, err, nodeInfo.Node() == nil))
+	if err != nil {
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 
 	node := nodeInfo.Node()
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, err.Error())
+		return 0, framework.AsStatus(err)
 	}
 
 	// Return if the node is not qualified.
@@ -210,7 +212,7 @@ func (pl *PodTopologySpread) Score(ctx context.Context, cycleState *framework.Cy
 func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	s, err := getPreScoreState(cycleState)
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 	if s == nil {
 		return nil
@@ -219,9 +221,10 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	// Calculate <minScore> and <maxScore>
 	var minScore int64 = math.MaxInt64
 	var maxScore int64
-	for _, score := range scores {
+	for i, score := range scores {
 		// it's mandatory to check if <score.Name> is present in m.IgnoredNodes
 		if s.IgnoredNodes.Has(score.Name) {
+			scores[i].Score = invalidScore
 			continue
 		}
 		if score.Score < minScore {
@@ -233,22 +236,14 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 	}
 
 	for i := range scores {
-		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
-		if err != nil {
-			return framework.NewStatus(framework.Error, err.Error())
-		}
-		node := nodeInfo.Node()
-
-		if s.IgnoredNodes.Has(node.Name) {
+		if scores[i].Score == invalidScore {
 			scores[i].Score = 0
 			continue
 		}
-
 		if maxScore == 0 {
 			scores[i].Score = framework.MaxNodeScore
 			continue
 		}
-
 		s := scores[i].Score
 		scores[i].Score = framework.MaxNodeScore * (maxScore + minScore - s) / maxScore
 	}
@@ -263,7 +258,7 @@ func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
 func getPreScoreState(cycleState *framework.CycleState) (*preScoreState, error) {
 	c, err := cycleState.Read(preScoreStateKey)
 	if err != nil {
-		return nil, fmt.Errorf("error reading %q from cycleState: %v", preScoreStateKey, err)
+		return nil, fmt.Errorf("error reading %q from cycleState: %w", preScoreStateKey, err)
 	}
 
 	s, ok := c.(*preScoreState)

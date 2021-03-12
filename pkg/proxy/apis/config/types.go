@@ -170,8 +170,9 @@ type KubeProxyConfiguration struct {
 	DetectLocalMode LocalMode
 }
 
-// Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
-// (newer, faster), 'ipvs'(newest, better in performance and scalability).
+// ProxyMode represents modes used by the Kubernetes proxy server. Currently, three modes of proxy are available in
+// Linux platform: 'userspace' (older, going to be EOL), 'iptables' (newer, faster), 'ipvs'(newest, better in performance
+// and scalability).
 //
 // Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
 //
@@ -179,7 +180,7 @@ type KubeProxyConfiguration struct {
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
-
+//
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.

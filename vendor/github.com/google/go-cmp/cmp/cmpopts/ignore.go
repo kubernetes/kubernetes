@@ -14,14 +14,13 @@ import (
 	"github.com/google/go-cmp/cmp/internal/function"
 )
 
-// IgnoreFields returns an Option that ignores exported fields of the
-// given names on a single struct type.
+// IgnoreFields returns an Option that ignores fields of the
+// given names on a single struct type. It respects the names of exported fields
+// that are forwarded due to struct embedding.
 // The struct type is specified by passing in a value of that type.
 //
 // The name may be a dot-delimited string (e.g., "Foo.Bar") to ignore a
 // specific sub-field that is embedded or nested within the parent struct.
-//
-// This does not handle unexported fields; use IgnoreUnexported instead.
 func IgnoreFields(typ interface{}, names ...string) cmp.Option {
 	sf := newStructFilter(typ, names...)
 	return cmp.FilterPath(sf.filter, cmp.Ignore())
@@ -129,7 +128,7 @@ func newUnexportedFilter(typs ...interface{}) unexportedFilter {
 	for _, typ := range typs {
 		t := reflect.TypeOf(typ)
 		if t == nil || t.Kind() != reflect.Struct {
-			panic(fmt.Sprintf("invalid struct type: %T", typ))
+			panic(fmt.Sprintf("%T must be a non-pointer struct", typ))
 		}
 		ux.m[t] = true
 	}

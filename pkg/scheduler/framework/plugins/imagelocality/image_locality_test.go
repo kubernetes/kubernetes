@@ -20,13 +20,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
@@ -334,8 +334,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			snapshot := cache.NewSnapshot(nil, test.nodes)
 
 			state := framework.NewCycleState()
-
-			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(snapshot))
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList
@@ -348,8 +347,8 @@ func TestImageLocalityPriority(t *testing.T) {
 				gotList = append(gotList, framework.NodeScore{Name: nodeName, Score: score})
 			}
 
-			if !reflect.DeepEqual(test.expectedList, gotList) {
-				t.Errorf("expected:\n\t%+v,\ngot:\n\t%+v", test.expectedList, gotList)
+			if diff := cmp.Diff(test.expectedList, gotList); diff != "" {
+				t.Errorf("Unexpected node score list (-want, +got):\n%s", diff)
 			}
 		})
 	}

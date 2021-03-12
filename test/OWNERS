@@ -1,20 +1,23 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
+  - aojea
   - neolit123
   - johnSchnake
   - SataQiu
   - tanjunchen
-  - dims
 approvers:
   - alejandrox1
   - andrewsykim
   - BenTheElder
   - bowei # for test/e2e/{dns*,network}.go
+  - caseydavenport # for test/e2e/{dns*,network}.go
   - cblecker
+  - dims
   - MrHohn
   - deads2k
   - enisoc
+  - enj
   - janetkuo
   - liggitt
   - mikedanese
@@ -30,7 +33,6 @@ approvers:
   - sttts
   - timothysc
 emeritus_approvers:
-  - enj
   - eparis
   - erictune
   - foxish

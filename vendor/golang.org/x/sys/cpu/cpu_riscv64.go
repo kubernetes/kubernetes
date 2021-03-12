@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build riscv64
 // +build riscv64
 
 package cpu
 
 const cacheLineSize = 32
+
+func initOptions() {}

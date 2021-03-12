@@ -18,7 +18,6 @@ package testing
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -51,6 +50,8 @@ import (
 	"k8s.io/kubectl/pkg/util/openapi"
 	openapitesting "k8s.io/kubectl/pkg/util/openapi/testing"
 	"k8s.io/kubectl/pkg/validation"
+
+	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 )
 
 // InternalType is the schema for internal type
@@ -271,8 +272,6 @@ func convertExternalNamespacedType2ToInternalNamespacedType(in *ExternalNamespac
 	return nil
 }
 
-var errInvalidVersion = errors.New("not a version")
-
 // ValidVersion of API
 var ValidVersion = "v1"
 
@@ -401,6 +400,7 @@ type TestFactory struct {
 
 	UnstructuredClientForMappingFunc resource.FakeClientFunc
 	OpenAPISchemaFunc                func() (openapi.Resources, error)
+	FakeOpenAPIGetter                discovery.OpenAPISchemaInterface
 }
 
 // NewTestFactory returns an initialized TestFactory instance
@@ -465,6 +465,25 @@ func (f *TestFactory) ClientForMapping(mapping *meta.RESTMapping) (resource.REST
 	return f.Client, nil
 }
 
+// PathOptions returns a new PathOptions with a temp file
+func (f *TestFactory) PathOptions() *clientcmd.PathOptions {
+	pathOptions := clientcmd.NewDefaultPathOptions()
+	pathOptions.GlobalFile = f.tempConfigFile.Name()
+	pathOptions.EnvVar = ""
+	return pathOptions
+}
+
+// PathOptionsWithConfig writes a config to a temp file and returns PathOptions
+func (f *TestFactory) PathOptionsWithConfig(config clientcmdapi.Config) (*clientcmd.PathOptions, error) {
+	pathOptions := f.PathOptions()
+	err := clientcmd.WriteToFile(config, pathOptions.GlobalFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return pathOptions, nil
+}
+
 // UnstructuredClientForMapping is used to get UnstructuredClient from a TestFactory
 func (f *TestFactory) UnstructuredClientForMapping(mapping *meta.RESTMapping) (resource.RESTClient, error) {
 	if f.UnstructuredClientForMappingFunc != nil {
@@ -484,6 +503,23 @@ func (f *TestFactory) OpenAPISchema() (openapi.Resources, error) {
 		return f.OpenAPISchemaFunc()
 	}
 	return openapitesting.EmptyResources{}, nil
+}
+
+type EmptyOpenAPI struct{}
+
+func (EmptyOpenAPI) OpenAPISchema() (*openapi_v2.Document, error) {
+	return &openapi_v2.Document{}, nil
+}
+
+func (f *TestFactory) OpenAPIGetter() discovery.OpenAPISchemaInterface {
+	if f.FakeOpenAPIGetter != nil {
+		return f.FakeOpenAPIGetter
+	}
+	client, err := f.ToDiscoveryClient()
+	if err != nil {
+		return EmptyOpenAPI{}
+	}
+	return client
 }
 
 // NewBuilder returns an initialized resource.Builder instance
@@ -518,7 +554,6 @@ func (f *TestFactory) KubernetesClientSet() (*kubernetes.Clientset, error) {
 	clientset.AutoscalingV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.AutoscalingV2beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.BatchV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
-	clientset.BatchV2alpha1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.CertificatesV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client
 	clientset.ExtensionsV1beta1().RESTClient().(*restclient.RESTClient).Client = fakeClient.Client

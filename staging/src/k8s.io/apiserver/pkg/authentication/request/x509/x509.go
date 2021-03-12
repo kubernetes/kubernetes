@@ -19,8 +19,10 @@ package x509
 import (
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -33,7 +35,7 @@ import (
 
 /*
  * By default, the following metric is defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -82,6 +84,27 @@ func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Resp
 	return f(chain)
 }
 
+func columnSeparatedHex(d []byte) string {
+	h := strings.ToUpper(hex.EncodeToString(d))
+	var sb strings.Builder
+	for i, r := range h {
+		sb.WriteRune(r)
+		if i%2 == 1 && i != len(h)-1 {
+			sb.WriteRune(':')
+		}
+	}
+	return sb.String()
+}
+
+func certificateIdentifier(c *x509.Certificate) string {
+	return fmt.Sprintf(
+		"SN=%d, SKID=%s, AKID=%s",
+		c.SerialNumber,
+		columnSeparatedHex(c.SubjectKeyId),
+		columnSeparatedHex(c.AuthorityKeyId),
+	)
+}
+
 // VerifyOptionFunc is function which provides a shallow copy of the VerifyOptions to the authenticator.  This allows
 // for cases where the options (particularly the CAs) can change.  If the bool is false, then the returned VerifyOptions
 // are ignored and the authenticator will express "no opinion".  This allows a clear signal for cases where a CertPool
@@ -126,10 +149,14 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	}
 
 	remaining := req.TLS.PeerCertificates[0].NotAfter.Sub(time.Now())
-	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
+	clientCertificateExpirationHistogram.WithContext(req.Context()).Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf(
+			"verifying certificate %s failed: %w",
+			certificateIdentifier(req.TLS.PeerCertificates[0]),
+			err,
+		)
 	}
 
 	var errlist []error

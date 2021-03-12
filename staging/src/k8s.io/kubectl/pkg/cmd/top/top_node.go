@@ -21,13 +21,13 @@ import (
 	"errors"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/klog/v2"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/metricsutil"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -39,10 +39,12 @@ import (
 
 // TopNodeOptions contains all the options for running the top-node cli command.
 type TopNodeOptions struct {
-	ResourceName    string
-	Selector        string
-	SortBy          string
-	NoHeaders       bool
+	ResourceName       string
+	Selector           string
+	SortBy             string
+	NoHeaders          bool
+	UseProtocolBuffers bool
+
 	NodeClient      corev1client.CoreV1Interface
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
@@ -51,20 +53,9 @@ type TopNodeOptions struct {
 	genericclioptions.IOStreams
 }
 
-func heapsterTopOptions(flags *pflag.FlagSet) {
-	flags.String("heapster-namespace", "kube-system", "Namespace Heapster service is located in")
-	flags.MarkDeprecated("heapster-namespace", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-service", "heapster", "Name of Heapster service")
-	flags.MarkDeprecated("heapster-service", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-scheme", "http", "Scheme (http or https) to connect to Heapster as")
-	flags.MarkDeprecated("heapster-scheme", "This flag is currently no-op and will be deleted.")
-	flags.String("heapster-port", "", "Port name in service to use")
-	flags.MarkDeprecated("heapster-port", "This flag is currently no-op and will be deleted.")
-}
-
 var (
 	topNodeLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of nodes.
+		Display Resource (CPU/Memory) usage of nodes.
 
 		The top-node command allows you to see the resource consumption of nodes.`))
 
@@ -86,7 +77,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd := &cobra.Command{
 		Use:                   "node [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of nodes"),
+		Short:                 i18n.T("Display Resource (CPU/Memory) usage of nodes"),
 		Long:                  topNodeLong,
 		Example:               topNodeExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -99,7 +90,7 @@ func NewCmdTopNode(f cmdutil.Factory, o *TopNodeOptions, streams genericclioptio
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().StringVar(&o.SortBy, "sort-by", o.Selector, "If non-empty, sort nodes list using specified field. The field can be either 'cpu' or 'memory'.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers")
-	heapsterTopOptions(cmd.Flags())
+	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "If present, protocol-buffers will be used to request metrics.")
 
 	return cmd
 }
@@ -121,6 +112,11 @@ func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
+	}
+	if o.UseProtocolBuffers {
+		config.ContentType = "application/vnd.kubernetes.protobuf"
+	} else {
+		klog.Warning("Using json format to get metrics. Next release will switch to protocol-buffers, switch early by passing --use-protocol-buffers flag")
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {

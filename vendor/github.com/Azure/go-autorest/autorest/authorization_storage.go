@@ -152,6 +152,9 @@ func buildCanonicalizedResource(accountName, uri string, keyType SharedKeyType) 
 		// the resource's URI should be encoded exactly as it is in the URI.
 		// -- https://msdn.microsoft.com/en-gb/library/azure/dd179428.aspx
 		cr.WriteString(u.EscapedPath())
+	} else {
+		// a slash is required to indicate the root path
+		cr.WriteString("/")
 	}
 
 	params, err := url.ParseQuery(u.RawQuery)

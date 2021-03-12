@@ -25,9 +25,13 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 var (
@@ -63,7 +67,7 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 }
 
 func newResourcePod(usage ...framework.Resource) *v1.Pod {
-	containers := []v1.Container{}
+	var containers []v1.Container
 	for _, req := range usage {
 		containers = append(containers, v1.Container{
 			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
@@ -433,7 +437,7 @@ func TestPreFilterDisabled(t *testing.T) {
 	}
 	cycleState := framework.NewCycleState()
 	gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), cycleState, pod, nodeInfo)
-	wantStatus := framework.NewStatus(framework.Error, `error reading "PreFilterNodeResourcesFit" from cycleState: not found`)
+	wantStatus := framework.AsStatus(fmt.Errorf(`error reading "PreFilterNodeResourcesFit" from cycleState: %w`, framework.ErrNotFound))
 	if !reflect.DeepEqual(gotStatus, wantStatus) {
 		t.Errorf("status does not match: %v, want: %v", gotStatus, wantStatus)
 	}
@@ -501,6 +505,7 @@ func TestStorageRequests(t *testing.T) {
 		pod        *v1.Pod
 		nodeInfo   *framework.NodeInfo
 		name       string
+		features   map[featuregate.Feature]bool
 		wantStatus *framework.Status
 	}{
 		{
@@ -524,6 +529,15 @@ func TestStorageRequests(t *testing.T) {
 			wantStatus: framework.NewStatus(framework.Unschedulable, getErrReason(v1.ResourceEphemeralStorage)),
 		},
 		{
+			pod: newResourceInitPod(newResourcePod(framework.Resource{EphemeralStorage: 25}), framework.Resource{EphemeralStorage: 25}),
+			nodeInfo: framework.NewNodeInfo(
+				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2})),
+			name: "ephemeral local storage request is ignored due to disabled feature gate",
+			features: map[featuregate.Feature]bool{
+				features.LocalStorageCapacityIsolation: false,
+			},
+		},
+		{
 			pod: newResourcePod(framework.Resource{EphemeralStorage: 10}),
 			nodeInfo: framework.NewNodeInfo(
 				newResourcePod(framework.Resource{MilliCPU: 2, Memory: 2})),
@@ -533,6 +547,9 @@ func TestStorageRequests(t *testing.T) {
 
 	for _, test := range storagePodsTests {
 		t.Run(test.name, func(t *testing.T) {
+			for k, v := range test.features {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, k, v)()
+			}
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
@@ -618,8 +635,10 @@ func TestValidateFitArgs(t *testing.T) {
 	}
 
 	for _, test := range argsTest {
-		if err := validateFitArgs(test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
-			t.Errorf("case[%v]: error details do not include %v", test.name, err)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			if err := validateFitArgs(test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+				t.Errorf("case[%v]: error details do not include %v", test.name, err)
+			}
+		})
 	}
 }

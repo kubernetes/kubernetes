@@ -60,7 +60,7 @@ type Process struct {
 	SelinuxLabel string `json:"selinuxLabel,omitempty" platform:"linux"`
 }
 
-// LinuxCapabilities specifies the whitelist of capabilities that are kept for a process.
+// LinuxCapabilities specifies the list of allowed capabilities that are kept for a process.
 // http://man7.org/linux/man-pages/man7/capabilities.7.html
 type LinuxCapabilities struct {
 	// Bounding is the set of capabilities checked by the kernel.
@@ -90,7 +90,7 @@ type User struct {
 	// GID is the group id.
 	GID uint32 `json:"gid" platform:"linux,solaris"`
 	// Umask is the umask for the init process.
-	Umask uint32 `json:"umask,omitempty" platform:"linux,solaris"`
+	Umask *uint32 `json:"umask,omitempty" platform:"linux,solaris"`
 	// AdditionalGids are additional group ids set for the container's process.
 	AdditionalGids []uint32 `json:"additionalGids,omitempty" platform:"linux,solaris"`
 	// Username is the user name.
@@ -354,7 +354,7 @@ type LinuxRdma struct {
 
 // LinuxResources has container runtime resource constraints
 type LinuxResources struct {
-	// Devices configures the device whitelist.
+	// Devices configures the device allowlist.
 	Devices []LinuxDeviceCgroup `json:"devices,omitempty"`
 	// Memory restriction configuration
 	Memory *LinuxMemory `json:"memory,omitempty"`
@@ -372,6 +372,8 @@ type LinuxResources struct {
 	// Limits are a set of key value pairs that define RDMA resource limits,
 	// where the key is device name and value is resource limits.
 	Rdma map[string]LinuxRdma `json:"rdma,omitempty"`
+	// Unified resources.
+	Unified map[string]string `json:"unified,omitempty"`
 }
 
 // LinuxDevice represents the mknod information for a Linux special device file
@@ -392,7 +394,8 @@ type LinuxDevice struct {
 	GID *uint32 `json:"gid,omitempty"`
 }
 
-// LinuxDeviceCgroup represents a device rule for the whitelist controller
+// LinuxDeviceCgroup represents a device rule for the devices specified to
+// the device controller
 type LinuxDeviceCgroup struct {
 	// Allow or deny
 	Allow bool `json:"allow"`
@@ -628,6 +631,7 @@ const (
 	ArchS390X       Arch = "SCMP_ARCH_S390X"
 	ArchPARISC      Arch = "SCMP_ARCH_PARISC"
 	ArchPARISC64    Arch = "SCMP_ARCH_PARISC64"
+	ArchRISCV64     Arch = "SCMP_ARCH_RISCV64"
 )
 
 // LinuxSeccompAction taken upon Seccomp rule match
@@ -635,12 +639,13 @@ type LinuxSeccompAction string
 
 // Define actions for Seccomp rules
 const (
-	ActKill  LinuxSeccompAction = "SCMP_ACT_KILL"
-	ActTrap  LinuxSeccompAction = "SCMP_ACT_TRAP"
-	ActErrno LinuxSeccompAction = "SCMP_ACT_ERRNO"
-	ActTrace LinuxSeccompAction = "SCMP_ACT_TRACE"
-	ActAllow LinuxSeccompAction = "SCMP_ACT_ALLOW"
-	ActLog   LinuxSeccompAction = "SCMP_ACT_LOG"
+	ActKill        LinuxSeccompAction = "SCMP_ACT_KILL"
+	ActKillProcess LinuxSeccompAction = "SCMP_ACT_KILL_PROCESS"
+	ActTrap        LinuxSeccompAction = "SCMP_ACT_TRAP"
+	ActErrno       LinuxSeccompAction = "SCMP_ACT_ERRNO"
+	ActTrace       LinuxSeccompAction = "SCMP_ACT_TRACE"
+	ActAllow       LinuxSeccompAction = "SCMP_ACT_ALLOW"
+	ActLog         LinuxSeccompAction = "SCMP_ACT_LOG"
 )
 
 // LinuxSeccompOperator used to match syscall arguments in Seccomp

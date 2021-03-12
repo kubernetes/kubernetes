@@ -19,7 +19,7 @@ package endpointslice
 import (
 	"sort"
 
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 

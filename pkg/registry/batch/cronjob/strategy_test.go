@@ -96,13 +96,9 @@ func TestCronJobStrategy(t *testing.T) {
 
 	var (
 		v1beta1Ctx      = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v1beta1", Resource: "cronjobs"})
-		v2alpha1Ctx     = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v2alpha1", Resource: "cronjobs"})
 		otherVersionCtx = genericapirequest.WithRequestInfo(genericapirequest.NewContext(), &genericapirequest.RequestInfo{APIGroup: "batch", APIVersion: "v100", Resource: "cronjobs"})
 	)
 	if got, want := gcds.DefaultGarbageCollectionPolicy(v1beta1Ctx), rest.OrphanDependents; got != want {
-		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
-	}
-	if got, want := gcds.DefaultGarbageCollectionPolicy(v2alpha1Ctx), rest.OrphanDependents; got != want {
 		t.Errorf("DefaultGarbageCollectionPolicy() = %#v, want %#v", got, want)
 	}
 	if got, want := gcds.DefaultGarbageCollectionPolicy(otherVersionCtx), rest.DeleteDependents; got != want {

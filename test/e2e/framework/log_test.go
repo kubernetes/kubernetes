@@ -110,9 +110,9 @@ func TestFailureOutput(t *testing.T) {
 		},
 		testResult{
 			name:    "[Top Level] log fails",
-			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)\n\tlog_test.go:56\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
+			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
 			failure: "I'm failing.",
-			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)\n\tlog_test.go:56\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.

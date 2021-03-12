@@ -29,15 +29,16 @@ import (
 	"github.com/vmware/govmomi/sts"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
-	"k8s.io/client-go/pkg/version"
 	"k8s.io/klog/v2"
+
+	"k8s.io/client-go/pkg/version"
 )
 
 // VSphereConnection contains information for connecting to vCenter
 type VSphereConnection struct {
 	Client            *vim25.Client
 	Username          string
-	Password          string
+	Password          string `datapolicy:"password"`
 	Hostname          string
 	Port              string
 	CACert            string
@@ -65,6 +66,7 @@ func (connection *VSphereConnection) Connect(ctx context.Context) error {
 			klog.Errorf("Failed to create govmomi client. err: %+v", err)
 			return err
 		}
+		setVCenterInfoMetric(connection)
 		return nil
 	}
 	m := session.NewManager(connection.Client)
@@ -215,6 +217,13 @@ func (connection *VSphereConnection) NewClient(ctx context.Context) (*vim25.Clie
 		connection.RoundTripperCount = RoundTripperDefaultCount
 	}
 	client.RoundTripper = vim25.Retry(client.RoundTripper, vim25.TemporaryNetworkError(int(connection.RoundTripperCount)))
+	vcdeprecated, err := isvCenterDeprecated(client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	if err != nil {
+		klog.Errorf("failed to check if vCenter version:%v and api version: %s is deprecated. Error: %v", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion, err)
+	}
+	if vcdeprecated {
+		klog.Warningf("vCenter is deprecated. version: %s, api verson: %s Please consider upgrading vCenter and ESXi servers to 6.7u3 or higher", client.ServiceContent.About.Version, client.ServiceContent.About.ApiVersion)
+	}
 	return client, nil
 }
 

@@ -41,13 +41,15 @@ import (
 )
 
 type TopPodOptions struct {
-	ResourceName    string
-	Namespace       string
-	Selector        string
-	SortBy          string
-	AllNamespaces   bool
-	PrintContainers bool
-	NoHeaders       bool
+	ResourceName       string
+	Namespace          string
+	Selector           string
+	SortBy             string
+	AllNamespaces      bool
+	PrintContainers    bool
+	NoHeaders          bool
+	UseProtocolBuffers bool
+
 	PodClient       corev1client.PodsGetter
 	Printer         *metricsutil.TopCmdPrinter
 	DiscoveryClient discovery.DiscoveryInterface
@@ -60,7 +62,7 @@ const metricsCreationDelay = 2 * time.Minute
 
 var (
 	topPodLong = templates.LongDesc(i18n.T(`
-		Display Resource (CPU/Memory/Storage) usage of pods.
+		Display Resource (CPU/Memory) usage of pods.
 
 		The 'top pod' command allows you to see the resource consumption of pods.
 
@@ -91,7 +93,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd := &cobra.Command{
 		Use:                   "pod [NAME | -l label]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Display Resource (CPU/Memory/Storage) usage of pods"),
+		Short:                 i18n.T("Display Resource (CPU/Memory) usage of pods"),
 		Long:                  topPodLong,
 		Example:               topPodExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -106,6 +108,7 @@ func NewCmdTopPod(f cmdutil.Factory, o *TopPodOptions, streams genericclioptions
 	cmd.Flags().BoolVar(&o.PrintContainers, "containers", o.PrintContainers, "If present, print usage of containers within a pod.")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.NoHeaders, "no-headers", o.NoHeaders, "If present, print output without headers.")
+	cmd.Flags().BoolVar(&o.UseProtocolBuffers, "use-protocol-buffers", o.UseProtocolBuffers, "If present, protocol-buffers will be used to request metrics.")
 	return cmd
 }
 
@@ -130,6 +133,11 @@ func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 	config, err := f.ToRESTConfig()
 	if err != nil {
 		return err
+	}
+	if o.UseProtocolBuffers {
+		config.ContentType = "application/vnd.kubernetes.protobuf"
+	} else {
+		klog.Warning("Using json format to get metrics. Next release will switch to protocol-buffers, switch early by passing --use-protocol-buffers flag")
 	}
 	o.MetricsClient, err = metricsclientset.NewForConfig(config)
 	if err != nil {
@@ -179,14 +187,13 @@ func (o TopPodOptions) RunTopPod() error {
 		return err
 	}
 
-	// TODO: Refactor this once Heapster becomes the API server.
 	// First we check why no metrics have been received.
 	if len(metrics.Items) == 0 {
 		// If the API server query is successful but all the pods are newly created,
 		// the metrics are probably not ready yet, so we return the error here in the first place.
-		e := verifyEmptyMetrics(o, selector)
-		if e != nil {
-			return e
+		err := verifyEmptyMetrics(o, selector)
+		if err != nil {
+			return err
 		}
 
 		// if we had no errors, be sure we output something.
@@ -195,9 +202,6 @@ func (o TopPodOptions) RunTopPod() error {
 		} else {
 			fmt.Fprintf(o.ErrOut, "No resources found in %s namespace.\n", o.Namespace)
 		}
-	}
-	if err != nil {
-		return err
 	}
 
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy)
@@ -262,7 +266,6 @@ func checkPodAge(pod *v1.Pod) error {
 	age := time.Since(pod.CreationTimestamp.Time)
 	if age > metricsCreationDelay {
 		message := fmt.Sprintf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
-		klog.Warningf(message)
 		return errors.New(message)
 	} else {
 		klog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())

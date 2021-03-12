@@ -33,11 +33,6 @@ var exceptionMetrics = []string{
 	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/egressselector
 	"apiserver_egress_dialer_dial_failure_count", // counter metrics should have "_total" suffix
 
-	// k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing/queueset
-	"apiserver_flowcontrol_current_inqueue_requests",   // label names should be written in 'snake_case' not 'camelCase',
-	"apiserver_flowcontrol_current_executing_requests", // label names should be written in 'snake_case' not 'camelCase'
-	"apiserver_flowcontrol_rejected_requests_total",    // label names should be written in 'snake_case' not 'camelCase'
-
 	// k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/server/healthz
 	"apiserver_request_total", // label names should be written in 'snake_case' not 'camelCase'
 

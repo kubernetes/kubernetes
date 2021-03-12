@@ -41,9 +41,9 @@ type pruner struct {
 	labelSelector     string
 	fieldSelector     string
 
-	cascade        bool
-	dryRunStrategy cmdutil.DryRunStrategy
-	gracePeriod    int
+	cascadingStrategy metav1.DeletionPropagation
+	dryRunStrategy    cmdutil.DryRunStrategy
+	gracePeriod       int
 
 	toPrinter func(string) (printers.ResourcePrinter, error)
 
@@ -59,9 +59,9 @@ func newPruner(o *ApplyOptions) pruner {
 		visitedUids:       o.VisitedUids,
 		visitedNamespaces: o.VisitedNamespaces,
 
-		cascade:        o.DeleteOptions.Cascade,
-		dryRunStrategy: o.DryRunStrategy,
-		gracePeriod:    o.DeleteOptions.GracePeriod,
+		cascadingStrategy: o.DeleteOptions.CascadingStrategy,
+		dryRunStrategy:    o.DryRunStrategy,
+		gracePeriod:       o.DeleteOptions.GracePeriod,
 
 		toPrinter: o.ToPrinter,
 
@@ -139,27 +139,23 @@ func (p *pruner) prune(namespace string, mapping *meta.RESTMapping) error {
 }
 
 func (p *pruner) delete(namespace, name string, mapping *meta.RESTMapping) error {
-	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascade, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
+	return runDelete(namespace, name, mapping, p.dynamicClient, p.cascadingStrategy, p.gracePeriod, p.dryRunStrategy == cmdutil.DryRunServer)
 }
 
-func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascade bool, gracePeriod int, serverDryRun bool) error {
-	options := asDeleteOptions(cascade, gracePeriod)
+func runDelete(namespace, name string, mapping *meta.RESTMapping, c dynamic.Interface, cascadingStrategy metav1.DeletionPropagation, gracePeriod int, serverDryRun bool) error {
+	options := asDeleteOptions(cascadingStrategy, gracePeriod)
 	if serverDryRun {
 		options.DryRun = []string{metav1.DryRunAll}
 	}
 	return c.Resource(mapping.Resource).Namespace(namespace).Delete(context.TODO(), name, options)
 }
 
-func asDeleteOptions(cascade bool, gracePeriod int) metav1.DeleteOptions {
+func asDeleteOptions(cascadingStrategy metav1.DeletionPropagation, gracePeriod int) metav1.DeleteOptions {
 	options := metav1.DeleteOptions{}
 	if gracePeriod >= 0 {
 		options = *metav1.NewDeleteOptions(int64(gracePeriod))
 	}
-	policy := metav1.DeletePropagationForeground
-	if !cascade {
-		policy = metav1.DeletePropagationOrphan
-	}
-	options.PropagationPolicy = &policy
+	options.PropagationPolicy = &cascadingStrategy
 	return options
 }
 
@@ -176,8 +172,7 @@ func (pr pruneResource) String() string {
 
 func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (namespaced, nonNamespaced []*meta.RESTMapping, err error) {
 	if len(*pruneResources) == 0 {
-		// default whitelist
-		// TODO: need to handle the older api versions - e.g. v1beta1 jobs. Github issue: #35991
+		// default allowlist
 		*pruneResources = []pruneResource{
 			{"", "v1", "ConfigMap", true},
 			{"", "v1", "Endpoints", true},
@@ -190,7 +185,7 @@ func getRESTMappings(mapper meta.RESTMapper, pruneResources *[]pruneResource) (n
 			{"", "v1", "Service", true},
 			{"batch", "v1", "Job", true},
 			{"batch", "v1beta1", "CronJob", true},
-			{"extensions", "v1beta1", "Ingress", true},
+			{"networking.k8s.io", "v1", "Ingress", true},
 			{"apps", "v1", "DaemonSet", true},
 			{"apps", "v1", "Deployment", true},
 			{"apps", "v1", "ReplicaSet", true},

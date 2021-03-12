@@ -18,10 +18,12 @@ package generators
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"k8s.io/gengo/args"
@@ -38,16 +40,45 @@ type CustomArgs struct {
 	ExtraPeerDirs []string // Always consider these as last-ditch possibilities for conversions.
 }
 
+var typeZeroValue = map[string]interface{}{
+	"uint":        0.,
+	"uint8":       0.,
+	"uint16":      0.,
+	"uint32":      0.,
+	"uint64":      0.,
+	"int":         0.,
+	"int8":        0.,
+	"int16":       0.,
+	"int32":       0.,
+	"int64":       0.,
+	"byte":        0.,
+	"float64":     0.,
+	"float32":     0.,
+	"bool":        false,
+	"time.Time":   "",
+	"string":      "",
+	"integer":     0.,
+	"number":      0.,
+	"boolean":     false,
+	"[]byte":      "", // base64 encoded characters
+	"interface{}": interface{}(nil),
+}
+
 // These are the comment tags that carry parameters for defaulter generation.
 const tagName = "k8s:defaulter-gen"
-const intputTagName = "k8s:defaulter-gen-input"
+const inputTagName = "k8s:defaulter-gen-input"
+const defaultTagName = "default"
+
+func extractDefaultTag(comments []string) []string {
+	return types.ExtractCommentTags("+", comments)[defaultTagName]
+}
 
 func extractTag(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
 }
 
 func extractInputTag(comments []string) []string {
-	return types.ExtractCommentTags("+", comments)[intputTagName]
+	return types.ExtractCommentTags("+", comments)[inputTagName]
 }
 
 func checkTag(comments []string, require ...string) bool {
@@ -401,6 +432,112 @@ func newCallTreeForType(existingDefaulters, newDefaulters defaulterFuncMap) *cal
 	}
 }
 
+func resolveTypeAndDepth(t *types.Type) (*types.Type, int) {
+	var prev *types.Type
+	depth := 0
+	for prev != t {
+		prev = t
+		if t.Kind == types.Alias {
+			t = t.Underlying
+		} else if t.Kind == types.Pointer {
+			t = t.Elem
+			depth += 1
+		}
+	}
+	return t, depth
+}
+
+// getNestedDefault returns the first default value when resolving alias types
+func getNestedDefault(t *types.Type) string {
+	var prev *types.Type
+	for prev != t {
+		prev = t
+		defaultMap := extractDefaultTag(t.CommentLines)
+		if len(defaultMap) == 1 && defaultMap[0] != "" {
+			return defaultMap[0]
+		}
+		if t.Kind == types.Alias {
+			t = t.Underlying
+		} else if t.Kind == types.Pointer {
+			t = t.Elem
+		}
+	}
+	return ""
+}
+
+func mustEnforceDefault(t *types.Type, depth int, omitEmpty bool) (interface{}, error) {
+	if depth > 0 {
+		return nil, nil
+	}
+	switch t.Kind {
+	case types.Pointer, types.Map, types.Slice, types.Array, types.Interface:
+		return nil, nil
+	case types.Struct:
+		return map[string]interface{}{}, nil
+	case types.Builtin:
+		if !omitEmpty {
+			if zero, ok := typeZeroValue[t.String()]; ok {
+				return zero, nil
+			} else {
+				return nil, fmt.Errorf("please add type %v to typeZeroValue struct", t)
+			}
+		}
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("not sure how to enforce default for %v", t.Kind)
+	}
+}
+
+func populateDefaultValue(node *callNode, t *types.Type, tags string, commentLines []string) *callNode {
+	defaultMap := extractDefaultTag(commentLines)
+	var defaultString string
+	if len(defaultMap) == 1 {
+		defaultString = defaultMap[0]
+	}
+
+	t, depth := resolveTypeAndDepth(t)
+	if depth > 0 && defaultString == "" {
+		defaultString = getNestedDefault(t)
+	}
+	if len(defaultMap) > 1 {
+		klog.Fatalf("Found more than one default tag for %v", t.Kind)
+	} else if len(defaultMap) == 0 {
+		return node
+	}
+	var defaultValue interface{}
+	if err := json.Unmarshal([]byte(defaultString), &defaultValue); err != nil {
+		klog.Fatalf("Failed to unmarshal default: %v", err)
+	}
+
+	omitEmpty := strings.Contains(reflect.StructTag(tags).Get("json"), "omitempty")
+	if enforced, err := mustEnforceDefault(t, depth, omitEmpty); err != nil {
+		klog.Fatal(err)
+	} else if enforced != nil {
+		if defaultValue != nil {
+			if reflect.DeepEqual(defaultValue, enforced) {
+				// If the default value annotation matches the default value for the type,
+				// do not generate any defaulting function
+				return node
+			} else {
+				enforcedJSON, _ := json.Marshal(enforced)
+				klog.Fatalf("Invalid default value (%#v) for non-pointer/non-omitempty. If specified, must be: %v", defaultValue, string(enforcedJSON))
+			}
+		}
+	}
+
+	// callNodes are not automatically generated for primitive types. Generate one if the callNode does not exist
+	if node == nil {
+		node = &callNode{}
+		node.markerOnly = true
+	}
+
+	node.defaultIsPrimitive = t.IsPrimitive()
+	node.defaultType = t.String()
+	node.defaultValue = defaultString
+	node.defaultDepth = depth
+	return node
+}
+
 // build creates a tree of paths to fields (based on how they would be accessed in Go - pointer, elem,
 // slice, or key) and the functions that should be invoked on each field. An in-order traversal of the resulting tree
 // can be used to generate a Go function that invokes each nested function on the appropriate type. The return
@@ -473,12 +610,19 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 				child.elem = true
 			}
 			parent.children = append(parent.children, *child)
+		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines); member != nil {
+			member.index = true
+			parent.children = append(parent.children, *member)
 		}
 	case types.Map:
 		if child := c.build(t.Elem, false); child != nil {
 			child.key = true
 			parent.children = append(parent.children, *child)
+		} else if member := populateDefaultValue(nil, t.Elem, "", t.Elem.CommentLines); member != nil {
+			member.key = true
+			parent.children = append(parent.children, *member)
 		}
+
 	case types.Struct:
 		for _, field := range t.Members {
 			name := field.Name
@@ -491,7 +635,11 @@ func (c *callTreeForType) build(t *types.Type, root bool) *callNode {
 			}
 			if child := c.build(field.Type, false); child != nil {
 				child.field = name
+				populateDefaultValue(child, field.Type, field.Tags, field.CommentLines)
 				parent.children = append(parent.children, *child)
+			} else if member := populateDefaultValue(nil, field.Type, field.Tags, field.CommentLines); member != nil {
+				member.field = name
+				parent.children = append(parent.children, *member)
 			}
 		}
 	case types.Alias:
@@ -676,6 +824,33 @@ type callNode struct {
 	call []*types.Type
 	// children is the child call nodes that must also be traversed
 	children []callNode
+
+	// defaultValue is the defaultValue of a callNode struct
+	// Only primitive types and pointer types are eligible to have a default value
+	defaultValue string
+
+	// defaultIsPrimitive is used to determine how to assign the default value.
+	// Primitive types will be directly assigned while complex types will use JSON unmarshalling
+	defaultIsPrimitive bool
+
+	// markerOnly is true if the callNode exists solely to fill in a default value
+	markerOnly bool
+
+	// defaultDepth is used to determine pointer level of the default value
+	// For example 1 corresponds to setting a default value and taking its pointer while
+	// 2 corresponds to setting a default value and taking its pointer's pointer
+	// 0 implies that no pointers are used
+	// This is used in situations where a field is a pointer to a primitive value rather than a primitive value itself.
+	//
+	//     type A {
+	//       +default="foo"
+	//       Field *string
+	//     }
+	defaultDepth int
+
+	// defaultType is the type of the default value.
+	// Only populated if defaultIsPrimitive is true
+	defaultType string
 }
 
 // CallNodeVisitorFunc is a function for visiting a call tree. ancestors is the list of all parents
@@ -731,6 +906,95 @@ func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.S
 	}
 }
 
+func getTypeZeroValue(t string) (interface{}, error) {
+	defaultZero, ok := typeZeroValue[t]
+	if !ok {
+		return nil, fmt.Errorf("Cannot find zero value for type %v in typeZeroValue", t)
+	}
+
+	// To generate the code for empty string, they must be quoted
+	if defaultZero == "" {
+		defaultZero = strconv.Quote(defaultZero.(string))
+	}
+	return defaultZero, nil
+}
+
+func (n *callNode) writeDefaulter(varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
+	if n.defaultValue == "" {
+		return
+	}
+	args := generator.Args{
+		"defaultValue": n.defaultValue,
+		"varName":      varName,
+		"index":        index,
+		"varDepth":     n.defaultDepth,
+		"varType":      n.defaultType,
+	}
+
+	variablePlaceholder := ""
+
+	if n.index {
+		// Defaulting for array
+		variablePlaceholder = "$.varName$[$.index$]"
+	} else if n.key {
+		// Defaulting for map
+		variablePlaceholder = "$.varName$[$.index$]"
+		mapDefaultVar := args["index"].(string) + "_default"
+		args["mapDefaultVar"] = mapDefaultVar
+	} else {
+		// Defaulting for primitive type
+		variablePlaceholder = "$.varName$"
+	}
+
+	// defaultIsPrimitive is true if the type or underlying type (in an array/map) is primitive
+	// or is a pointer to a primitive type
+	// (Eg: int, map[string]*string, []int)
+	if n.defaultIsPrimitive {
+		// If the default value is a primitive when the assigned type is a pointer
+		// keep using the address-of operator on the primitive value until the types match
+		if n.defaultDepth > 0 {
+			sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
+			sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
+			// We iterate until a depth of 1 instead of 0 because the following line
+			// `if $.varName$ == &ptrVar1` accounts for 1 level already
+			for i := n.defaultDepth; i > 1; i-- {
+				sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
+			}
+			sw.Do(fmt.Sprintf("%s = &ptrVar1", variablePlaceholder), args)
+		} else {
+			// For primitive types, nil checks cannot be used and the zero value must be determined
+			defaultZero, err := getTypeZeroValue(n.defaultType)
+			if err != nil {
+				klog.Error(err)
+			}
+			args["defaultZero"] = defaultZero
+
+			sw.Do(fmt.Sprintf("if %s == $.defaultZero$ {\n", variablePlaceholder), args)
+			sw.Do(fmt.Sprintf("%s = $.defaultValue$", variablePlaceholder), args)
+		}
+	} else {
+		sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
+		// Map values are not directly addressable and we need a temporary variable to do json unmarshalling
+		// This applies to maps with non-primitive values (eg: map[string]SubStruct)
+		if n.key {
+			sw.Do("$.mapDefaultVar$ := $.varName$[$.index$]\n", args)
+			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
+		} else {
+			variablePointer := variablePlaceholder
+			if !isVarPointer {
+				variablePointer = "&" + variablePointer
+			}
+			sw.Do(fmt.Sprintf("if err := json.Unmarshal([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
+		}
+		sw.Do("panic(err)\n", nil)
+		sw.Do("}\n", nil)
+		if n.key {
+			sw.Do("$.varName$[$.index$] = $.mapDefaultVar$\n", args)
+		}
+	}
+	sw.Do("}\n", nil)
+}
+
 // WriteMethod performs an in-order traversal of the calltree, generating loops and if blocks as necessary
 // to correctly turn the call tree into a method body that invokes all calls on all child nodes of the call tree.
 // Depth is used to generate local variables at the proper depth.
@@ -758,19 +1022,31 @@ func (n *callNode) WriteMethod(varName string, depth int, ancestors []*callNode,
 	switch {
 	case n.index:
 		sw.Do("for $.index$ := range $.var$ {\n", vars)
-		if n.elem {
-			sw.Do("$.local$ := $.var$[$.index$]\n", vars)
-		} else {
-			sw.Do("$.local$ := &$.var$[$.index$]\n", vars)
+		if !n.markerOnly {
+			if n.elem {
+				sw.Do("$.local$ := $.var$[$.index$]\n", vars)
+			} else {
+				sw.Do("$.local$ := &$.var$[$.index$]\n", vars)
+			}
 		}
 
+		n.writeDefaulter(varName, index, isPointer, sw)
 		n.writeCalls(local, true, sw)
 		for i := range n.children {
 			n.children[i].WriteMethod(local, depth+1, append(ancestors, n), sw)
 		}
 		sw.Do("}\n", nil)
 	case n.key:
+		if n.defaultValue != "" {
+			// Map keys are typed and cannot share the same index variable as arrays and other maps
+			index = index + "_" + ancestors[len(ancestors)-1].field
+			vars["index"] = index
+			sw.Do("for $.index$ := range $.var$ {\n", vars)
+			n.writeDefaulter(varName, index, isPointer, sw)
+			sw.Do("}\n", nil)
+		}
 	default:
+		n.writeDefaulter(varName, index, isPointer, sw)
 		n.writeCalls(varName, isPointer, sw)
 		for i := range n.children {
 			n.children[i].WriteMethod(varName, depth, append(ancestors, n), sw)

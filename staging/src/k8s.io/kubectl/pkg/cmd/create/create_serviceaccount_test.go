@@ -17,45 +17,44 @@ limitations under the License.
 package create
 
 import (
-	"net/http"
 	"testing"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/client-go/rest/fake"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
-	"k8s.io/kubectl/pkg/scheme"
+	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestCreateServiceAccount(t *testing.T) {
-	serviceAccountObject := &v1.ServiceAccount{}
-	serviceAccountObject.Name = "my-service-account"
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
-	defer tf.Cleanup()
-
-	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	ns := scheme.Codecs.WithoutConversion()
-
-	tf.Client = &fake.RESTClient{
-		GroupVersion:         schema.GroupVersion{Version: "v1"},
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/serviceaccounts" && m == "POST":
-				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, serviceAccountObject)}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	tests := map[string]struct {
+		options  *ServiceAccountOpts
+		expected *corev1.ServiceAccount
+	}{
+		"service account": {
+			options: &ServiceAccountOpts{
+				Name: "my-service-account",
+			},
+			expected: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ServiceAccount",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "my-service-account",
+				},
+			},
+		},
 	}
-	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
-	cmd := NewCmdCreateServiceAccount(tf, ioStreams)
-	cmd.Flags().Set("output", "name")
-	cmd.Run(cmd, []string{serviceAccountObject.Name})
-	expectedOutput := "serviceaccount/" + serviceAccountObject.Name + "\n"
-	if buf.String() != expectedOutput {
-		t.Errorf("expected output: %s, but got: %s", expectedOutput, buf.String())
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			serviceAccount, err := tc.options.createServiceAccount()
+			if err != nil {
+				t.Errorf("unexpected error:\n%#v\n", err)
+				return
+			}
+			if !apiequality.Semantic.DeepEqual(serviceAccount, tc.expected) {
+				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, serviceAccount)
+			}
+		})
 	}
 }

@@ -17,15 +17,13 @@ limitations under the License.
 package upgrade
 
 import (
-	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/coredns/corefile-migration/migration"
 	"github.com/pkg/errors"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -71,11 +69,6 @@ func RunCoreDNSMigrationCheck(client clientset.Interface, ignorePreflightErrors 
 			client: client,
 			f:      checkMigration,
 		},
-		&CoreDNSCheck{
-			name:   "kubeDNSTranslation",
-			client: client,
-			f:      checkKubeDNSConfigMap,
-		},
 	}
 
 	return preflight.RunChecks(migrationChecks, os.Stderr, ignorePreflightErrors)
@@ -89,6 +82,8 @@ func checkUnsupportedPlugins(client clientset.Interface) error {
 	if err != nil {
 		return err
 	}
+
+	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
 	unsupportedCoreDNS, err := migration.Unsupported(currentInstalledCoreDNSversion, currentInstalledCoreDNSversion, corefile)
 	if err != nil {
 		return err
@@ -116,27 +111,10 @@ func checkMigration(client clientset.Interface) error {
 		return err
 	}
 
-	_, err = migration.Migrate(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile, false)
+	currentInstalledCoreDNSversion = strings.TrimLeft(currentInstalledCoreDNSversion, "v")
+	_, err = migration.Migrate(currentInstalledCoreDNSversion, strings.TrimLeft(kubeadmconstants.CoreDNSVersion, "v"), corefile, false)
 	if err != nil {
 		return errors.Wrap(err, "CoreDNS will not be upgraded")
-	}
-	return nil
-}
-
-// checkKubeDNSConfigMap checks if the translation of kube-dns to CoreDNS ConfigMap is supported
-func checkKubeDNSConfigMap(client clientset.Interface) error {
-	kubeDNSConfigMap, err := client.CoreV1().ConfigMaps(metav1.NamespaceSystem).Get(context.TODO(), kubeadmconstants.KubeDNSConfigMap, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return err
-	}
-	if kubeDNSConfigMap == nil {
-		return nil
-	}
-
-	if _, ok := kubeDNSConfigMap.Data["federations"]; ok {
-		klog.V(1).Infoln("CoreDNS no longer supports Federation and " +
-			"hence will not translate the federation data from kube-dns to CoreDNS ConfigMap")
-		return errors.Wrap(err, "kube-dns Federation data will not be translated")
 	}
 	return nil
 }

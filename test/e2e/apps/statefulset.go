@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -90,7 +92,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
+	ginkgo.Describe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -830,7 +832,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 
 		/*
-			Release: v1.16
+			Release: v1.16, v1.21
 			Testname: StatefulSet resource Replica scaling
 			Description: Create a StatefulSet resource.
 			Newly created StatefulSet resource MUST have a scale of one.
@@ -868,10 +870,28 @@ var _ = SIGDescribe("StatefulSet", func() {
 				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
+
+			ginkgo.By("Patch a scale subresource")
+			scale.ResourceVersion = "" // indicate the scale update should be unconditional
+			scale.Spec.Replicas = 4    // should be 2 after "UpdateScale" operation, now Patch to 4
+			ssScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
+				Spec: autoscalingv1.ScaleSpec{
+					Replicas: scale.Spec.Replicas,
+				},
+			})
+			framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+
+			_, err = c.AppsV1().StatefulSets(ns).Patch(context.TODO(), ssName, types.StrategicMergePatchType, []byte(ssScalePatchPayload), metav1.PatchOptions{}, "scale")
+			framework.ExpectNoError(err, "Failed to patch stateful set: %v", err)
+
+			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
+			ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
+			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
+			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
+	ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 		var appTester *clusterAppTester
 
 		ginkgo.BeforeEach(func() {
@@ -981,18 +1001,16 @@ func (z *zookeeperTester) deploy(ns string) *appsv1.StatefulSet {
 
 func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
 func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
-	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie(z.ss.Namespace, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(framework.RunKubectlOrDie(z.ss.Namespace, "exec", name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {
@@ -1009,7 +1027,7 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 	// TODO: Find a readiness probe for mysql that guarantees writes will
 	// succeed and ditch retries. Current probe only reads, so there's a window
 	// for a race.
-	return kubectlExecWithRetries(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return kubectlExecWithRetries(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *mysqlGaleraTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1049,7 +1067,7 @@ func (m *redisTester) name() string {
 
 func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1080,7 +1098,7 @@ func (c *cockroachDBTester) name() string {
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(ns, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return framework.RunKubectlOrDie(ns, "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1319,7 +1337,7 @@ func deleteStatefulPodAtIndex(c clientset.Interface, index int, ss *appsv1.State
 	}
 }
 
-// getStatefulSetPodNameAtIndex gets formated pod name given index.
+// getStatefulSetPodNameAtIndex gets formatted pod name given index.
 func getStatefulSetPodNameAtIndex(index int, ss *appsv1.StatefulSet) string {
 	// TODO: we won't use "-index" as the name strategy forever,
 	// pull the name out from an identity mapper.

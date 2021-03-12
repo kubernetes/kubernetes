@@ -5,13 +5,14 @@ approvers:
 - derekwaynecarr
 - ConnorDoyle
 - klueska
-- dashpole
 - sjenning
+- mrunalp
 emeritus_approvers:
 - balajismaniam
 - Random-Liu
 - vishh
 - yujuhong
+- dashpole
 reviewers:
 - bart0sh
 - bsdnet

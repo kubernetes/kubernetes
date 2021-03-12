@@ -35,8 +35,8 @@ type Version struct {
 	ClientVersion *apimachineryversion.Info `json:"clientVersion"`
 }
 
-// NewCmdVersion provides the version information of kubeadm.
-func NewCmdVersion(out io.Writer) *cobra.Command {
+// newCmdVersion provides the version information of kubeadm.
+func newCmdVersion(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Print the version of kubeadm",

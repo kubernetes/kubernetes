@@ -3,19 +3,19 @@
 package libcontainer
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/apparmor"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/keys"
 	"github.com/opencontainers/runc/libcontainer/seccomp"
 	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
-
 	"golang.org/x/sys/unix"
 )
 
@@ -40,7 +40,7 @@ func (l *linuxStandardInit) getSessionRingParams() (string, uint32, uint32) {
 
 	// Create a unique per session container name that we can join in setns;
 	// However, other containers can also join it.
-	return fmt.Sprintf("_ses.%s", l.config.ContainerId), 0xffffffff, newperms
+	return "_ses." + l.config.ContainerId, 0xffffffff, newperms
 }
 
 func (l *linuxStandardInit) Init() error {
@@ -185,7 +185,7 @@ func (l *linuxStandardInit) Init() error {
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
 	// was given to us was an O_PATH fd to the fifo itself. Linux allows us to
 	// re-open an O_PATH fd through /proc.
-	fd, err := unix.Open(fmt.Sprintf("/proc/self/fd/%d", l.fifoFd), unix.O_WRONLY|unix.O_CLOEXEC, 0)
+	fd, err := unix.Open("/proc/self/fd/"+strconv.Itoa(l.fifoFd), unix.O_WRONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return newSystemErrorWithCause(err, "open exec fifo")
 	}
@@ -210,7 +210,7 @@ func (l *linuxStandardInit) Init() error {
 
 	s := l.config.SpecState
 	s.Pid = unix.Getpid()
-	s.Status = configs.Created
+	s.Status = specs.StateCreated
 	if err := l.config.Config.Hooks[configs.StartContainer].RunHooks(s); err != nil {
 		return err
 	}

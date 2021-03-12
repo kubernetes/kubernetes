@@ -38,6 +38,7 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
+// DisallowFlunder is a ban flunder admission plugin
 type DisallowFlunder struct {
 	*admission.Handler
 	lister listers.FischerLister

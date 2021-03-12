@@ -76,7 +76,6 @@ func TestServerRunWithSNI(t *testing.T) {
 
 		// optional ip or hostname to pass to NewLoopbackClientConfig
 		LoopbackClientBindAddressOverride string
-		ExpectLoopbackClientError         bool
 	}{
 		"only one cert": {
 			Cert: TestCertSpec{
@@ -314,9 +313,10 @@ func TestServerRunWithSNI(t *testing.T) {
 				return nil
 			})
 			preparedServer := s.PrepareRun()
+			preparedServerErrors := make(chan error)
 			go func() {
 				if err := preparedServer.Run(stopCh); err != nil {
-					t.Fatal(err)
+					preparedServerErrors <- err
 				}
 			}()
 
@@ -356,15 +356,7 @@ func TestServerRunWithSNI(t *testing.T) {
 				host = test.LoopbackClientBindAddressOverride
 			}
 			s.LoopbackClientConfig.Host = net.JoinHostPort(host, strconv.Itoa(secureOptions.BindPort))
-			if test.ExpectLoopbackClientError {
-				if err == nil {
-					t.Fatalf("expected error creating loopback client config")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("failed creating loopback client config: %v", err)
-			}
+
 			client, err := discovery.NewDiscoveryClientForConfig(s.LoopbackClientConfig)
 			if err != nil {
 				t.Fatalf("failed to create loopback client: %v", err)
@@ -375,6 +367,12 @@ func TestServerRunWithSNI(t *testing.T) {
 			}
 			if expected := &v; !reflect.DeepEqual(got, expected) {
 				t.Errorf("loopback client didn't get correct version info: expected=%v got=%v", expected, got)
+			}
+
+			select {
+			case err := <-preparedServerErrors:
+				t.Fatalf("preparedServer failed with error: %v", err)
+			default:
 			}
 		})
 	}

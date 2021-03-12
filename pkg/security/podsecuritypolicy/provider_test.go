@@ -502,6 +502,15 @@ func TestValidatePodFailures(t *testing.T) {
 			psp:           defaultPSP(),
 			expectedError: "ephemeral volumes are not allowed to be used",
 		},
+		"generic ephemeral volumes with other volume type allowed": {
+			pod: failGenericEphemeralPod,
+			psp: func() *policy.PodSecurityPolicy {
+				psp := defaultPSP()
+				psp.Spec.Volumes = []policy.FSType{policy.NFS}
+				return psp
+			}(),
+			expectedError: "ephemeral volumes are not allowed to be used",
+		},
 	}
 	for name, test := range errorCases {
 		t.Run(name, func(t *testing.T) {

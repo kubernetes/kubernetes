@@ -53,18 +53,8 @@ import (
 	utilsexec "k8s.io/utils/exec"
 )
 
-var (
-	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
-	placeholderToken = kubeadmapiv1beta2.BootstrapToken{
-		Token: &kubeadmapiv1beta2.BootstrapTokenString{
-			ID:     "abcdef",
-			Secret: "0123456789abcdef",
-		},
-	}
-)
-
-// NewCmdConfig returns cobra.Command for "kubeadm config" command
-func NewCmdConfig(out io.Writer) *cobra.Command {
+// newCmdConfig returns cobra.Command for "kubeadm config" command
+func newCmdConfig(out io.Writer) *cobra.Command {
 	var kubeConfigFile string
 
 	cmd := &cobra.Command{
@@ -87,15 +77,15 @@ func NewCmdConfig(out io.Writer) *cobra.Command {
 	options.AddKubeConfigFlag(cmd.PersistentFlags(), &kubeConfigFile)
 
 	kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
-	cmd.AddCommand(NewCmdConfigPrint(out))
-	cmd.AddCommand(NewCmdConfigMigrate(out))
-	cmd.AddCommand(NewCmdConfigView(out, &kubeConfigFile))
-	cmd.AddCommand(NewCmdConfigImages(out))
+	cmd.AddCommand(newCmdConfigPrint(out))
+	cmd.AddCommand(newCmdConfigMigrate(out))
+	cmd.AddCommand(newCmdConfigView(out, &kubeConfigFile))
+	cmd.AddCommand(newCmdConfigImages(out))
 	return cmd
 }
 
-// NewCmdConfigPrint returns cobra.Command for "kubeadm config print" command
-func NewCmdConfigPrint(out io.Writer) *cobra.Command {
+// newCmdConfigPrint returns cobra.Command for "kubeadm config print" command
+func newCmdConfigPrint(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "print",
 		Short: "Print configuration",
@@ -104,18 +94,18 @@ func NewCmdConfigPrint(out io.Writer) *cobra.Command {
 			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2`),
 		RunE: cmdutil.SubCmdRunE("print"),
 	}
-	cmd.AddCommand(NewCmdConfigPrintInitDefaults(out))
-	cmd.AddCommand(NewCmdConfigPrintJoinDefaults(out))
+	cmd.AddCommand(newCmdConfigPrintInitDefaults(out))
+	cmd.AddCommand(newCmdConfigPrintJoinDefaults(out))
 	return cmd
 }
 
-// NewCmdConfigPrintInitDefaults returns cobra.Command for "kubeadm config print init-defaults" command
-func NewCmdConfigPrintInitDefaults(out io.Writer) *cobra.Command {
+// newCmdConfigPrintInitDefaults returns cobra.Command for "kubeadm config print init-defaults" command
+func newCmdConfigPrintInitDefaults(out io.Writer) *cobra.Command {
 	return newCmdConfigPrintActionDefaults(out, "init", getDefaultInitConfigBytes)
 }
 
-// NewCmdConfigPrintJoinDefaults returns cobra.Command for "kubeadm config print join-defaults" command
-func NewCmdConfigPrintJoinDefaults(out io.Writer) *cobra.Command {
+// newCmdConfigPrintJoinDefaults returns cobra.Command for "kubeadm config print join-defaults" command
+func newCmdConfigPrintJoinDefaults(out io.Writer) *cobra.Command {
 	return newCmdConfigPrintActionDefaults(out, "join", getDefaultNodeConfigBytes)
 }
 
@@ -129,7 +119,7 @@ func newCmdConfigPrintActionDefaults(out io.Writer, action string, configBytesPr
 
 			Note that sensitive values like the Bootstrap Token fields are replaced with placeholder values like %q in order to pass validation but
 			not perform the real computation for creating a token.
-		`), action, action, placeholderToken),
+		`), action, action, configutil.PlaceholderToken.Token.String()),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			groups, err := mapLegacyKindsToGroups(kinds)
 			if err != nil {
@@ -164,7 +154,7 @@ func runConfigPrintActionDefaults(out io.Writer, componentConfigs []string, conf
 }
 
 func getDefaultComponentConfigBytes(group string) ([]byte, error) {
-	defaultedInitConfig, err := getDefaultedInitConfig()
+	defaultedInitConfig, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -206,22 +196,8 @@ func mapLegacyKindsToGroups(kinds []string) ([]string, error) {
 	return groups, nil
 }
 
-func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{placeholderToken},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
-		},
-	}
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
-	}
-	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
-}
-
 func getDefaultInitConfigBytes() ([]byte, error) {
-	internalcfg, err := getDefaultedInitConfig()
+	internalcfg, err := configutil.DefaultedStaticInitConfiguration()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -233,7 +209,7 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta2.JoinConfiguration{
 		Discovery: kubeadmapiv1beta2.Discovery{
 			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
-				Token:                    placeholderToken.Token.String(),
+				Token:                    configutil.PlaceholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
@@ -249,8 +225,8 @@ func getDefaultNodeConfigBytes() ([]byte, error) {
 	return configutil.MarshalKubeadmConfigObject(internalcfg)
 }
 
-// NewCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
-func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
+// newCmdConfigMigrate returns cobra.Command for "kubeadm config migrate" command
+func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 	var oldCfgPath, newCfgPath string
 	cmd := &cobra.Command{
 		Use:   "migrate",
@@ -300,8 +276,8 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 	return cmd
 }
 
-// NewCmdConfigView returns cobra.Command for "kubeadm config view" command
-func NewCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
+// newCmdConfigView returns cobra.Command for "kubeadm config view" command
+func newCmdConfigView(out io.Writer, kubeConfigFile *string) *cobra.Command {
 	return &cobra.Command{
 		Use:        "view",
 		Short:      "View the kubeadm configuration stored inside the cluster",
@@ -337,20 +313,20 @@ func RunConfigView(out io.Writer, client clientset.Interface) error {
 	return nil
 }
 
-// NewCmdConfigImages returns the "kubeadm config images" command
-func NewCmdConfigImages(out io.Writer) *cobra.Command {
+// newCmdConfigImages returns the "kubeadm config images" command
+func newCmdConfigImages(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "images",
 		Short: "Interact with container images used by kubeadm",
 		RunE:  cmdutil.SubCmdRunE("images"),
 	}
-	cmd.AddCommand(NewCmdConfigImagesList(out, nil))
-	cmd.AddCommand(NewCmdConfigImagesPull())
+	cmd.AddCommand(newCmdConfigImagesList(out, nil))
+	cmd.AddCommand(newCmdConfigImagesPull())
 	return cmd
 }
 
-// NewCmdConfigImagesPull returns the `kubeadm config images pull` command
-func NewCmdConfigImagesPull() *cobra.Command {
+// newCmdConfigImagesPull returns the `kubeadm config images pull` command
+func newCmdConfigImagesPull() *cobra.Command {
 	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
 	externalInitCfg := &kubeadmapiv1beta2.InitConfiguration{}
@@ -410,8 +386,8 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 	return nil
 }
 
-// NewCmdConfigImagesList returns the "kubeadm config images list" command
-func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
+// newCmdConfigImagesList returns the "kubeadm config images list" command
+func newCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
 	externalcfg := &kubeadmapiv1beta2.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
@@ -455,14 +431,7 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
 func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta2.ClusterConfiguration) (*ImagesList, error) {
-	// Avoid running the CRI auto-detection code as we don't need it
-	versionedInitCfg := &kubeadmapiv1beta2.InitConfiguration{
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket,
-		},
-	}
-
-	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, versionedInitCfg, cfg)
+	initcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, cmdutil.DefaultInitConfiguration(), cfg)
 	if err != nil {
 		return nil, errors.Wrap(err, "could not convert cfg to an internal cfg")
 	}

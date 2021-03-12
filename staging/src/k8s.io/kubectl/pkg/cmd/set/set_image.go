@@ -65,14 +65,14 @@ type SetImageOptions struct {
 }
 
 var (
-	imageResources = `
-  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`
+	imageResources = i18n.T(`
+  	pod (po), replicationcontroller (rc), deployment (deploy), daemonset (ds), replicaset (rs)`)
 
-	imageLong = templates.LongDesc(`
+	imageLong = templates.LongDesc(i18n.T(`
 		Update existing container image(s) of resources.
 
 		Possible resources include (case insensitive):
-		` + imageResources)
+		`) + imageResources)
 
 	imageExample = templates.Examples(`
 		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
@@ -149,11 +149,7 @@ func (o *SetImageOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.Output = cmdutil.GetFlagString(cmd, "output")
 	o.ResolveImage = resolveImageFunc
 

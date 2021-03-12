@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 	flowcontrolv1alpha1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1alpha1"
+	flowcontrolv1beta1 "k8s.io/kubernetes/pkg/apis/flowcontrol/v1beta1"
 )
 
 func init() {
@@ -34,5 +35,6 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(flowcontrol.AddToScheme(scheme))
 	utilruntime.Must(flowcontrolv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(scheme.SetVersionPriority(flowcontrolv1alpha1.SchemeGroupVersion))
+	utilruntime.Must(flowcontrolv1beta1.AddToScheme(scheme))
+	utilruntime.Must(scheme.SetVersionPriority(flowcontrolv1beta1.SchemeGroupVersion, flowcontrolv1alpha1.SchemeGroupVersion))
 }

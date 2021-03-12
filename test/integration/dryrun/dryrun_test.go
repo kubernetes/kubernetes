@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/util/retry"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -150,17 +151,18 @@ func DryRunScaleUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name str
 func DryRunUpdateTest(t *testing.T, rsc dynamic.ResourceInterface, name string) {
 	var err error
 	var obj *unstructured.Unstructured
-	for i := 0; i < 3; i++ {
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		obj, err = rsc.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			t.Fatalf("failed to retrieve object: %v", err)
 		}
 		obj.SetAnnotations(map[string]string{"update": "true"})
 		obj, err = rsc.Update(context.TODO(), obj, metav1.UpdateOptions{DryRun: []string{metav1.DryRunAll}})
-		if err == nil || !apierrors.IsConflict(err) {
-			break
+		if apierrors.IsConflict(err) {
+			t.Logf("conflict error: %v", err)
 		}
-	}
+		return err
+	})
 	if err != nil {
 		t.Fatalf("failed to dry-run update resource: %v", err)
 	}

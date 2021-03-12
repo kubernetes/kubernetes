@@ -42,6 +42,7 @@ import (
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var (
@@ -75,6 +76,28 @@ func TestControllerSync(t *testing.T) {
 			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				claim := newClaim("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil)
 				reactor.AddClaimEvent(claim)
+				return nil
+			},
+		},
+		{
+			"5-2-2 - complete bind when PV and PVC both exist",
+			newVolumeArray("volume5-2", "1Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty),
+			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "", v1.ClaimPending, nil),
+			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted),
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
+				return nil
+			},
+		},
+		{
+			"5-2-3 - complete bind when PV and PVC both exist and PV has AnnPreResizeCapacity annotation",
+			volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController)),
+			volumesWithAnnotation(util.AnnPreResizeCapacity, "1Gi", newVolumeArray("volume5-2", "2Gi", "uid5-2", "claim5-2", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, pvutil.AnnBoundByController)),
+			withExpectedCapacity("2Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "", v1.ClaimPending, nil)),
+			withExpectedCapacity("1Gi", newClaimArray("claim5-2", "uid5-2", "2Gi", "volume5-2", v1.ClaimBound, nil, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			noevents, noerrors,
+			func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor, test controllerTest) error {
 				return nil
 			},
 		},
@@ -273,9 +296,7 @@ func TestControllerSync(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		klog.V(4).Infof("starting test %q", test.name)
-
+	doit := func(test controllerTest) {
 		// Initialize the controller
 		client := &fake.Clientset{}
 
@@ -322,13 +343,12 @@ func TestControllerSync(t *testing.T) {
 		// Start the controller
 		stopCh := make(chan struct{})
 		informers.Start(stopCh)
+		informers.WaitForCacheSync(stopCh)
 		go ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		err = wait.Poll(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-			return ctrl.volumeListerSynced() &&
-				ctrl.claimListerSynced() &&
-				len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
+			return len(ctrl.claims.ListKeys()) >= len(test.initialClaims) &&
 				len(ctrl.volumes.store.ListKeys()) >= len(test.initialVolumes), nil
 		})
 		if err != nil {
@@ -352,6 +372,13 @@ func TestControllerSync(t *testing.T) {
 		close(stopCh)
 
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			doit(test)
+		})
 	}
 }
 
@@ -589,7 +616,7 @@ func TestAnnealMigrationAnnotations(t *testing.T) {
 	}
 
 	translator := csitrans.New()
-	cmpm := csimigration.NewPluginManager(translator)
+	cmpm := csimigration.NewPluginManager(translator, utilfeature.DefaultFeatureGate)
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

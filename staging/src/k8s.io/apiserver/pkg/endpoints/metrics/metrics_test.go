@@ -17,7 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"testing"
@@ -106,47 +105,6 @@ func TestCleanVerb(t *testing.T) {
 			cleansedVerb := cleanVerb(tt.initialVerb, req)
 			if cleansedVerb != tt.expectedVerb {
 				t.Errorf("Got %s, but expected %s", cleansedVerb, tt.expectedVerb)
-			}
-		})
-	}
-}
-
-func TestContentType(t *testing.T) {
-	testCases := []struct {
-		rawContentType      string
-		expectedContentType string
-	}{
-		{
-			rawContentType:      "application/json",
-			expectedContentType: "application/json",
-		},
-		{
-			rawContentType:      "image/svg+xml",
-			expectedContentType: "other",
-		},
-		{
-			rawContentType:      "text/plain; charset=utf-8",
-			expectedContentType: "text/plain;charset=utf-8",
-		},
-		{
-			rawContentType:      "application/json;foo=bar",
-			expectedContentType: "other",
-		},
-		{
-			rawContentType:      "application/json;charset=hancoding",
-			expectedContentType: "other",
-		},
-		{
-			rawContentType:      "unknownbutvalidtype",
-			expectedContentType: "other",
-		},
-	}
-
-	for _, tt := range testCases {
-		t.Run(fmt.Sprintf("parse %s", tt.rawContentType), func(t *testing.T) {
-			cleansedContentType := cleanContentType(tt.rawContentType)
-			if cleansedContentType != tt.expectedContentType {
-				t.Errorf("Got %s, but expected %s", cleansedContentType, tt.expectedContentType)
 			}
 		})
 	}

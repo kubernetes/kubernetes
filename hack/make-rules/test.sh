@@ -225,9 +225,10 @@ produceJUnitXMLReport() {
   junit_xml_filename="${junit_filename_prefix}.xml"
 
   if ! command -v gotestsum >/dev/null 2>&1; then
-    kube::log::error "gotestsum not found; please cd to hack/tools and install with " \
-      "GO111MODULE=on go install gotest.tools/gotestsum"
-    return
+    kube::log::status "gotestsum not found; installing from hack/tools"
+    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install gotest.tools/gotestsum
+    popd >/dev/null
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then

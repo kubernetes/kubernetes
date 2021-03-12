@@ -59,10 +59,74 @@ func newUnstructuredWithSpec(spec map[string]interface{}) *unstructured.Unstruct
 	return u
 }
 
+func TestGet(t *testing.T) {
+	scheme := runtime.NewScheme()
+
+	client := NewSimpleDynamicClient(scheme, newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"))
+	get, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).Namespace("ns-foo").Get(context.TODO(), "name-foo", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "group/version",
+			"kind":       "TheKind",
+			"metadata": map[string]interface{}{
+				"name":      "name-foo",
+				"namespace": "ns-foo",
+			},
+		},
+	}
+	if !equality.Semantic.DeepEqual(get, expected) {
+		t.Fatal(diff.ObjectGoPrintDiff(expected, get))
+	}
+}
+
+func TestListDecoding(t *testing.T) {
+	// this the duplication of logic from the real List API.  This will prove that our dynamic client actually returns the gvk
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, []byte(`{"apiVersion": "group/version", "kind": "TheKindList", "items":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := uncastObj.(*unstructured.UnstructuredList)
+	expectedList := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "group/version",
+			"kind":       "TheKindList",
+		},
+		Items: []unstructured.Unstructured{},
+	}
+	if !equality.Semantic.DeepEqual(list, expectedList) {
+		t.Fatal(diff.ObjectGoPrintDiff(expectedList, list))
+	}
+}
+
+func TestGetDecoding(t *testing.T) {
+	// this the duplication of logic from the real Get API.  This will prove that our dynamic client actually returns the gvk
+	uncastObj, err := runtime.Decode(unstructured.UnstructuredJSONScheme, []byte(`{"apiVersion": "group/version", "kind": "TheKind"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	get := uncastObj.(*unstructured.Unstructured)
+	expectedObj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "group/version",
+			"kind":       "TheKind",
+		},
+	}
+	if !equality.Semantic.DeepEqual(get, expectedObj) {
+		t.Fatal(diff.ObjectGoPrintDiff(expectedObj, get))
+	}
+}
+
 func TestList(t *testing.T) {
 	scheme := runtime.NewScheme()
 
-	client := NewSimpleDynamicClient(scheme,
+	client := NewSimpleDynamicClientWithCustomListKinds(scheme,
+		map[schema.GroupVersionResource]string{
+			{Group: "group", Version: "version", Resource: "thekinds"}: "TheKindList",
+		},
 		newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
 		newUnstructured("group2/version", "TheKind", "ns-foo", "name2-foo"),
 		newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
@@ -81,6 +145,49 @@ func TestList(t *testing.T) {
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
 		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
+	}
+}
+
+func Test_ListKind(t *testing.T) {
+	scheme := runtime.NewScheme()
+
+	client := NewSimpleDynamicClientWithCustomListKinds(scheme,
+		map[schema.GroupVersionResource]string{
+			{Group: "group", Version: "version", Resource: "thekinds"}: "TheKindList",
+		},
+		&unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"apiVersion": "group/version",
+				"kind":       "TheKindList",
+			},
+			Items: []unstructured.Unstructured{
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+				*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+			},
+		},
+	)
+	listFirst, err := client.Resource(schema.GroupVersionResource{Group: "group", Version: "version", Resource: "thekinds"}).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedList := &unstructured.UnstructuredList{
+		Object: map[string]interface{}{
+			"apiVersion": "group/version",
+			"kind":       "TheKindList",
+			"metadata": map[string]interface{}{
+				"resourceVersion": "",
+			},
+		},
+		Items: []unstructured.Unstructured{
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-bar"),
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-baz"),
+			*newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+		},
+	}
+	if !equality.Semantic.DeepEqual(listFirst, expectedList) {
+		t.Fatal(diff.ObjectGoPrintDiff(expectedList, listFirst))
 	}
 }
 

@@ -43,7 +43,7 @@ const (
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -75,7 +75,7 @@ func init() {
 type AltTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
-	tokenBody   string
+	tokenBody   string `datapolicy:"token"`
 	throttle    flowcontrol.RateLimiter
 }
 
@@ -104,7 +104,7 @@ func (a *AltTokenSource) token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	var tok struct {
-		AccessToken string    `json:"accessToken"`
+		AccessToken string    `json:"accessToken" datapolicy:"token"`
 		ExpireTime  time.Time `json:"expireTime"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&tok); err != nil {

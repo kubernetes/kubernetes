@@ -30,6 +30,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	"k8s.io/client-go/rest"
 )
@@ -208,14 +209,16 @@ func TestRotateShutsDownConnections(t *testing.T) {
 	// its connections to the server.
 	m.setCurrent(client2CertData.certificate)
 
-	for i := 0; i < 5; i++ {
-		time.Sleep(time.Millisecond * 10)
+	err = wait.PollImmediate(time.Millisecond*50, wait.ForeverTestTimeout, func() (done bool, err error) {
 		client.Get().Do(context.TODO())
 		if firstCertSerial.Cmp(lastSerialNumber()) != 0 {
 			// The certificate changed!
-			return
+			return true, nil
 		}
+		t.Logf("Certificate not changed, will retry.")
+		return false, nil
+	})
+	if err != nil {
+		t.Fatal("certificate rotated but client never reconnected with new cert")
 	}
-
-	t.Errorf("certificate rotated but client never reconnected with new cert")
 }

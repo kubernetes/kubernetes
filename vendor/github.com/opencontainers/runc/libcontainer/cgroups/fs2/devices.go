@@ -6,11 +6,12 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/ebpf"
 	"github.com/opencontainers/runc/libcontainer/cgroups/ebpf/devicefilter"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
 
-func isRWM(perms configs.DevicePermissions) bool {
+func isRWM(perms devices.Permissions) bool {
 	var r, w, m bool
 	for _, perm := range perms {
 		switch perm {
@@ -61,7 +62,7 @@ func setDevices(dirPath string, cgroup *configs.Cgroup) error {
 	//
 	//      The real issue is that BPF_F_ALLOW_MULTI makes it hard to have a
 	//      race-free blacklist because it acts as a whitelist by default, and
-	//      having a deny-everything program cannot be overriden by other
+	//      having a deny-everything program cannot be overridden by other
 	//      programs. You could temporarily insert a deny-everything program
 	//      but that would result in spurrious failures during updates.
 	if _, err := ebpf.LoadAttachCgroupDeviceFilter(insts, license, dirFD); err != nil {

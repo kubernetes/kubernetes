@@ -71,6 +71,9 @@ type Client struct {
 
 	// allow plugging in custom do wrappers
 	do func(*http.Request) (*http.Response, error)
+
+	// allow plugging in custom http client fetcher
+	getClient ClientFunc
 }
 
 var defaultClientOptions = ClientOptions{
@@ -154,6 +157,10 @@ func (c *Client) SetTLSOptions(o *ClientTLSOptions) error {
 	return nil
 }
 
+func (c *Client) SetClientFunc(f ClientFunc) {
+	c.getClient = f
+}
+
 // Simple Hello test to check if the server is up
 func (c *Client) Hello() error {
 	// Create request
@@ -189,13 +196,14 @@ func (c *Client) doBasic(req *http.Request) (*http.Response, error) {
 		<-c.throttle
 	}()
 
-	httpClient := &http.Client{}
-	if c.tlsClientConfig != nil {
-		httpClient.Transport = &http.Transport{
-			TLSClientConfig: c.tlsClientConfig,
-		}
+	getClient := c.getClient
+	if getClient == nil {
+		getClient = HeketiHttpClient
 	}
-	httpClient.CheckRedirect = c.checkRedirect
+	httpClient, err := getClient(c.tlsClientConfig, c.checkRedirect)
+	if err != nil {
+		return nil, err
+	}
 	return httpClient.Do(req)
 }
 
@@ -354,4 +362,31 @@ func (c *ClientOptions) retryDelay(r *http.Response) time.Duration {
 	}
 	s := rand.Intn(max-min) + min
 	return time.Second * time.Duration(s)
+}
+
+// CheckRedirectFunc is an alias for the somewhat complex function signature
+// of the CheckRedirect function of the http.Client.
+type CheckRedirectFunc func(*http.Request, []*http.Request) error
+
+// ClientFunc is an alias for the function signature needed to create custom
+// http clients.
+type ClientFunc func(*tls.Config, CheckRedirectFunc) (HttpPerformer, error)
+
+// HttpPerformer is an interface that the heketi api client needs from the http
+// client.
+type HttpPerformer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// HeketiHttpClient constructs a new http client for use by the heketi
+// api client, using the traditional heketi approach.
+func HeketiHttpClient(tlsConfig *tls.Config, checkRedirect CheckRedirectFunc) (HttpPerformer, error) {
+	httpClient := &http.Client{}
+	if tlsConfig != nil {
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
+	httpClient.CheckRedirect = checkRedirect
+	return httpClient, nil
 }

@@ -316,6 +316,8 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 		for i := numCIDRs / 2; i < numCIDRs; i++ {
 			a.Occupy(cidrs[i])
 		}
+		// occupy the first of the last 128 again
+		a.Occupy(cidrs[numCIDRs/2])
 
 		// allocate the first 128 CIDRs again
 		var rcidrs []*net.IPNet
@@ -338,6 +340,98 @@ func TestCIDRSet_AllocationOccupied(t *testing.T) {
 		if !reflect.DeepEqual(cidrs, rcidrs) {
 			t.Fatalf("expected re-allocated cidrs are the same collection for %v", tc.description)
 		}
+	}
+}
+
+func TestDoubleOccupyRelease(t *testing.T) {
+	// Run a sequence of operations and check the number of occupied CIDRs
+	// after each one.
+	clusterCIDRStr := "10.42.0.0/16"
+	operations := []struct {
+		cidrStr     string
+		operation   string
+		numOccupied int
+	}{
+		// Occupy 1 element: +1
+		{
+			cidrStr:     "10.42.5.0/24",
+			operation:   "occupy",
+			numOccupied: 1,
+		},
+		// Occupy 1 more element: +1
+		{
+			cidrStr:     "10.42.9.0/24",
+			operation:   "occupy",
+			numOccupied: 2,
+		},
+		// Occupy 4 elements overlapping with one from the above: +3
+		{
+			cidrStr:     "10.42.8.0/22",
+			operation:   "occupy",
+			numOccupied: 5,
+		},
+		// Occupy an already-coccupied element: no change
+		{
+			cidrStr:     "10.42.9.0/24",
+			operation:   "occupy",
+			numOccupied: 5,
+		},
+		// Release an coccupied element: -1
+		{
+			cidrStr:     "10.42.9.0/24",
+			operation:   "release",
+			numOccupied: 4,
+		},
+		// Release an unoccupied element: no change
+		{
+			cidrStr:     "10.42.9.0/24",
+			operation:   "release",
+			numOccupied: 4,
+		},
+		// Release 4 elements, only one of which is occupied: -1
+		{
+			cidrStr:     "10.42.4.0/22",
+			operation:   "release",
+			numOccupied: 3,
+		},
+	}
+	// Check that there are exactly that many allocatable CIDRs after all
+	// operations have been executed.
+	numAllocatable24s := (1 << 8) - 3
+
+	_, clusterCIDR, _ := net.ParseCIDR(clusterCIDRStr)
+	a, err := NewCIDRSet(clusterCIDR, 24)
+	if err != nil {
+		t.Fatalf("Error allocating CIDRSet")
+	}
+
+	// Execute the operations
+	for _, op := range operations {
+		_, cidr, _ := net.ParseCIDR(op.cidrStr)
+		switch op.operation {
+		case "occupy":
+			a.Occupy(cidr)
+		case "release":
+			a.Release(cidr)
+		default:
+			t.Fatalf("test error: unknown operation %v", op.operation)
+		}
+		if a.allocatedCIDRs != op.numOccupied {
+			t.Fatalf("Expected %d occupied CIDRS, got %d", op.numOccupied, a.allocatedCIDRs)
+		}
+	}
+
+	// Make sure that we can allocate exactly `numAllocatable24s` elements.
+	for i := 0; i < numAllocatable24s; i++ {
+		_, err := a.AllocateNext()
+		if err != nil {
+			t.Fatalf("Expected to be able to allocate %d CIDRS, failed after %d", numAllocatable24s, i)
+		}
+	}
+
+	_, err = a.AllocateNext()
+	if err == nil {
+		t.Fatalf("Expected to be able to allocate exactly %d CIDRS, got one more", numAllocatable24s)
 	}
 }
 

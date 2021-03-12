@@ -65,6 +65,11 @@ type Call struct {
 	// reference. It's useful when mocking methods such as unmarshalers or
 	// decoders.
 	RunFn func(Arguments)
+
+	// PanicMsg holds msg to be used to mock panic on the function call
+	//  if the PanicMsg is set to a non nil string the function call will panic
+	// irrespective of other settings
+	PanicMsg *string
 }
 
 func newCall(parent *Mock, methodName string, callerInfo []string, methodArguments ...interface{}) *Call {
@@ -77,6 +82,7 @@ func newCall(parent *Mock, methodName string, callerInfo []string, methodArgumen
 		Repeatability:   0,
 		WaitFor:         nil,
 		RunFn:           nil,
+		PanicMsg:        nil,
 	}
 }
 
@@ -96,6 +102,18 @@ func (c *Call) Return(returnArguments ...interface{}) *Call {
 	defer c.unlock()
 
 	c.ReturnArguments = returnArguments
+
+	return c
+}
+
+// Panic specifies if the functon call should fail and the panic message
+//
+//    Mock.On("DoSomething").Panic("test panic")
+func (c *Call) Panic(msg string) *Call {
+	c.lock()
+	defer c.unlock()
+
+	c.PanicMsg = &msg
 
 	return c
 }
@@ -147,10 +165,10 @@ func (c *Call) After(d time.Duration) *Call {
 }
 
 // Run sets a handler to be called before returning. It can be used when
-// mocking a method such as unmarshalers that takes a pointer to a struct and
+// mocking a method (such as an unmarshaler) that takes a pointer to a struct and
 // sets properties in such struct
 //
-//    Mock.On("Unmarshal", AnythingOfType("*map[string]interface{}").Return().Run(func(args Arguments) {
+//    Mock.On("Unmarshal", AnythingOfType("*map[string]interface{}")).Return().Run(func(args Arguments) {
 //    	arg := args.Get(0).(*map[string]interface{})
 //    	arg["foo"] = "bar"
 //    })
@@ -393,6 +411,13 @@ func (m *Mock) MethodCalled(methodName string, arguments ...interface{}) Argumen
 	}
 
 	m.mutex.Lock()
+	panicMsg := call.PanicMsg
+	m.mutex.Unlock()
+	if panicMsg != nil {
+		panic(*panicMsg)
+	}
+
+	m.mutex.Lock()
 	runFn := call.RunFn
 	m.mutex.Unlock()
 
@@ -527,6 +552,45 @@ func (m *Mock) AssertNotCalled(t TestingT, methodName string, arguments ...inter
 	return true
 }
 
+// IsMethodCallable checking that the method can be called
+// If the method was called more than `Repeatability` return false
+func (m *Mock) IsMethodCallable(t TestingT, methodName string, arguments ...interface{}) bool {
+	if h, ok := t.(tHelper); ok {
+		h.Helper()
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	for _, v := range m.ExpectedCalls {
+		if v.Method != methodName {
+			continue
+		}
+		if len(arguments) != len(v.Arguments) {
+			continue
+		}
+		if v.Repeatability < v.totalCalls {
+			continue
+		}
+		if isArgsEqual(v.Arguments, arguments) {
+			return true
+		}
+	}
+	return false
+}
+
+// isArgsEqual compares arguments
+func isArgsEqual(expected Arguments, args []interface{}) bool {
+	if len(expected) != len(args) {
+		return false
+	}
+	for i, v := range args {
+		if !reflect.DeepEqual(expected[i], v) {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *Mock) methodWasCalled(methodName string, expected []interface{}) bool {
 	for _, call := range m.calls() {
 		if call.Method == methodName {
@@ -576,6 +640,23 @@ type AnythingOfTypeArgument string
 //	Assert(t, AnythingOfType("string"), AnythingOfType("int"))
 func AnythingOfType(t string) AnythingOfTypeArgument {
 	return AnythingOfTypeArgument(t)
+}
+
+// IsTypeArgument is a struct that contains the type of an argument
+// for use when type checking.  This is an alternative to AnythingOfType.
+// Used in Diff and Assert.
+type IsTypeArgument struct {
+	t interface{}
+}
+
+// IsType returns an IsTypeArgument object containing the type to check for.
+// You can provide a zero-value of the type to check.  This is an
+// alternative to AnythingOfType.  Used in Diff and Assert.
+//
+// For example:
+// Assert(t, IsType(""), IsType(0))
+func IsType(t interface{}) *IsTypeArgument {
+	return &IsTypeArgument{t: t}
 }
 
 // argumentMatcher performs custom argument matching, returning whether or
@@ -711,6 +792,12 @@ func (args Arguments) Diff(objects []interface{}) (string, int) {
 				output = fmt.Sprintf("%s\t%d: FAIL:  type %s != type %s - %s\n", output, i, expected, reflect.TypeOf(actual).Name(), actualFmt)
 			}
 
+		} else if reflect.TypeOf(expected) == reflect.TypeOf((*IsTypeArgument)(nil)) {
+			t := expected.(*IsTypeArgument).t
+			if reflect.TypeOf(t) != reflect.TypeOf(actual) {
+				differences++
+				output = fmt.Sprintf("%s\t%d: FAIL:  type %s != type %s - %s\n", output, i, reflect.TypeOf(t).Name(), reflect.TypeOf(actual).Name(), actualFmt)
+			}
 		} else {
 
 			// normal checking
@@ -768,7 +855,7 @@ func (args Arguments) String(indexOrNil ...int) string {
 		// normal String() method - return a string representation of the args
 		var argsStr []string
 		for _, arg := range args {
-			argsStr = append(argsStr, fmt.Sprintf("%s", reflect.TypeOf(arg)))
+			argsStr = append(argsStr, fmt.Sprintf("%T", arg)) // handles nil nicely
 		}
 		return strings.Join(argsStr, ",")
 	} else if len(indexOrNil) == 1 {

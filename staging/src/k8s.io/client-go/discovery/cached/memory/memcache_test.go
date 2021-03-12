@@ -95,6 +95,9 @@ func TestClient(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+	if e, a := fake.groupList, g; !reflect.DeepEqual(e, a) {
+		t.Errorf("Expected %#v, got %#v", e, a)
+	}
 	if !c.Fresh() {
 		t.Errorf("Expected fresh.")
 	}

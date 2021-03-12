@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC.
+// Copyright 2020 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -58,6 +58,7 @@ import (
 	googleapi "google.golang.org/api/googleapi"
 	gensupport "google.golang.org/api/internal/gensupport"
 	option "google.golang.org/api/option"
+	internaloption "google.golang.org/api/option/internaloption"
 	htransport "google.golang.org/api/transport/http"
 )
 
@@ -74,6 +75,7 @@ var _ = googleapi.Version
 var _ = errors.New
 var _ = strings.Replace
 var _ = context.Canceled
+var _ = internaloption.WithDefaultEndpoint
 
 const apiId = "monitoring:v3"
 const apiName = "monitoring"
@@ -107,6 +109,7 @@ func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, err
 	)
 	// NOTE: prepend, so we don't override user-specified scopes.
 	opts = append([]option.ClientOption{scopesOption}, opts...)
+	opts = append(opts, internaloption.WithDefaultEndpoint(basePath))
 	client, endpoint, err := htransport.NewClient(ctx, opts...)
 	if err != nil {
 		return nil, err
@@ -316,218 +319,248 @@ type UptimeCheckIpsService struct {
 }
 
 // Aggregation: Describes how to combine multiple time series to provide
-// different views of the data. Aggregation consists of an alignment
-// step on individual time series (alignment_period and
-// per_series_aligner) followed by an optional reduction step of the
-// data across the aligned time series (cross_series_reducer and
-// group_by_fields). For more details, see Aggregation.
+// a different view of the data. Aggregation of time series is done in
+// two steps. First, each time series in the set is aligned to the same
+// time interval boundaries, then the set of time series is optionally
+// reduced in number.Alignment consists of applying the
+// per_series_aligner operation to each time series after its data has
+// been divided into regular alignment_period time intervals. This
+// process takes all of the data points in an alignment period, applies
+// a mathematical transformation such as averaging, minimum, maximum,
+// delta, etc., and converts them into a single data point per
+// period.Reduction is when the aligned and transformed time series can
+// optionally be combined, reducing the number of time series through
+// similar mathematical transformations. Reduction involves applying a
+// cross_series_reducer to all the time series, optionally sorting the
+// time series into subsets with group_by_fields, and applying the
+// reducer to each subset.The raw time series data can contain a huge
+// amount of information from multiple sources. Alignment and reduction
+// transforms this mass of data into a more manageable and
+// representative collection of data, for example "the 95% latency
+// across the average of all tasks in a cluster". This representative
+// data can be more easily graphed and comprehended, and the individual
+// time series data is still available for later drilldown. For more
+// details, see Aggregating Time Series.
 type Aggregation struct {
-	// AlignmentPeriod: The alignment period for per-time series alignment.
-	// If present, alignmentPeriod must be at least 60 seconds. After
-	// per-time series alignment, each time series will contain data points
-	// only on the period boundaries. If perSeriesAligner is not specified
-	// or equals ALIGN_NONE, then this field is ignored. If perSeriesAligner
-	// is specified and does not equal ALIGN_NONE, then this field must be
-	// defined; otherwise an error is returned.
+	// AlignmentPeriod: The alignment_period specifies a time interval, in
+	// seconds, that is used to divide the data in all the time series into
+	// consistent blocks of time. This will be done before the per-series
+	// aligner can be applied to the data.The value must be at least 60
+	// seconds. If a per-series aligner other than ALIGN_NONE is specified,
+	// this field is required or an error is returned. If no per-series
+	// aligner is specified, or the aligner ALIGN_NONE is specified, then
+	// this field is ignored.
 	AlignmentPeriod string `json:"alignmentPeriod,omitempty"`
 
-	// CrossSeriesReducer: The approach to be used to combine time series.
-	// Not all reducer functions may be applied to all time series,
-	// depending on the metric type and the value type of the original time
-	// series. Reduction may change the metric type of value type of the
-	// time series.Time series data must be aligned in order to perform
-	// cross-time series reduction. If crossSeriesReducer is specified, then
-	// perSeriesAligner must be specified and not equal ALIGN_NONE and
-	// alignmentPeriod must be specified; otherwise, an error is returned.
+	// CrossSeriesReducer: The reduction operation to be used to combine
+	// time series into a single time series, where the value of each data
+	// point in the resulting series is a function of all the already
+	// aligned values in the input time series.Not all reducer operations
+	// can be applied to all time series. The valid choices depend on the
+	// metric_kind and the value_type of the original time series. Reduction
+	// can yield a time series with a different metric_kind or value_type
+	// than the input time series.Time series data must first be aligned
+	// (see per_series_aligner) in order to perform cross-time series
+	// reduction. If cross_series_reducer is specified, then
+	// per_series_aligner must be specified, and must not be ALIGN_NONE. An
+	// alignment_period must also be specified; otherwise, an error is
+	// returned.
 	//
 	// Possible values:
 	//   "REDUCE_NONE" - No cross-time series reduction. The output of the
-	// aligner is returned.
-	//   "REDUCE_MEAN" - Reduce by computing the mean across time series for
-	// each alignment period. This reducer is valid for delta and gauge
-	// metrics with numeric or distribution values. The value type of the
-	// output is DOUBLE.
-	//   "REDUCE_MIN" - Reduce by computing the minimum across time series
-	// for each alignment period. This reducer is valid for delta and gauge
-	// metrics with numeric values. The value type of the output is the same
-	// as the value type of the input.
-	//   "REDUCE_MAX" - Reduce by computing the maximum across time series
-	// for each alignment period. This reducer is valid for delta and gauge
-	// metrics with numeric values. The value type of the output is the same
-	// as the value type of the input.
+	// Aligner is returned.
+	//   "REDUCE_MEAN" - Reduce by computing the mean value across time
+	// series for each alignment period. This reducer is valid for DELTA and
+	// GAUGE metrics with numeric or distribution values. The value_type of
+	// the output is DOUBLE.
+	//   "REDUCE_MIN" - Reduce by computing the minimum value across time
+	// series for each alignment period. This reducer is valid for DELTA and
+	// GAUGE metrics with numeric values. The value_type of the output is
+	// the same as the value_type of the input.
+	//   "REDUCE_MAX" - Reduce by computing the maximum value across time
+	// series for each alignment period. This reducer is valid for DELTA and
+	// GAUGE metrics with numeric values. The value_type of the output is
+	// the same as the value_type of the input.
 	//   "REDUCE_SUM" - Reduce by computing the sum across time series for
-	// each alignment period. This reducer is valid for delta and gauge
-	// metrics with numeric and distribution values. The value type of the
-	// output is the same as the value type of the input.
+	// each alignment period. This reducer is valid for DELTA and GAUGE
+	// metrics with numeric and distribution values. The value_type of the
+	// output is the same as the value_type of the input.
 	//   "REDUCE_STDDEV" - Reduce by computing the standard deviation across
 	// time series for each alignment period. This reducer is valid for
-	// delta and gauge metrics with numeric or distribution values. The
-	// value type of the output is DOUBLE.
-	//   "REDUCE_COUNT" - Reduce by computing the count of data points
+	// DELTA and GAUGE metrics with numeric or distribution values. The
+	// value_type of the output is DOUBLE.
+	//   "REDUCE_COUNT" - Reduce by computing the number of data points
 	// across time series for each alignment period. This reducer is valid
-	// for delta and gauge metrics of numeric, Boolean, distribution, and
-	// string value type. The value type of the output is INT64.
-	//   "REDUCE_COUNT_TRUE" - Reduce by computing the count of True-valued
+	// for DELTA and GAUGE metrics of numeric, Boolean, distribution, and
+	// string value_type. The value_type of the output is INT64.
+	//   "REDUCE_COUNT_TRUE" - Reduce by computing the number of True-valued
 	// data points across time series for each alignment period. This
-	// reducer is valid for delta and gauge metrics of Boolean value type.
-	// The value type of the output is INT64.
-	//   "REDUCE_COUNT_FALSE" - Reduce by computing the count of
+	// reducer is valid for DELTA and GAUGE metrics of Boolean value_type.
+	// The value_type of the output is INT64.
+	//   "REDUCE_COUNT_FALSE" - Reduce by computing the number of
 	// False-valued data points across time series for each alignment
-	// period. This reducer is valid for delta and gauge metrics of Boolean
-	// value type. The value type of the output is INT64.
-	//   "REDUCE_FRACTION_TRUE" - Reduce by computing the fraction of
-	// True-valued data points across time series for each alignment period.
-	// This reducer is valid for delta and gauge metrics of Boolean value
-	// type. The output value is in the range 0, 1 and has value type
-	// DOUBLE.
-	//   "REDUCE_PERCENTILE_99" - Reduce by computing 99th percentile of
-	// data points across time series for each alignment period. This
-	// reducer is valid for gauge and delta metrics of numeric and
-	// distribution type. The value of the output is DOUBLE
-	//   "REDUCE_PERCENTILE_95" - Reduce by computing 95th percentile of
-	// data points across time series for each alignment period. This
-	// reducer is valid for gauge and delta metrics of numeric and
-	// distribution type. The value of the output is DOUBLE
-	//   "REDUCE_PERCENTILE_50" - Reduce by computing 50th percentile of
-	// data points across time series for each alignment period. This
-	// reducer is valid for gauge and delta metrics of numeric and
-	// distribution type. The value of the output is DOUBLE
-	//   "REDUCE_PERCENTILE_05" - Reduce by computing 5th percentile of data
-	// points across time series for each alignment period. This reducer is
-	// valid for gauge and delta metrics of numeric and distribution type.
-	// The value of the output is DOUBLE
+	// period. This reducer is valid for DELTA and GAUGE metrics of Boolean
+	// value_type. The value_type of the output is INT64.
+	//   "REDUCE_FRACTION_TRUE" - Reduce by computing the ratio of the
+	// number of True-valued data points to the total number of data points
+	// for each alignment period. This reducer is valid for DELTA and GAUGE
+	// metrics of Boolean value_type. The output value is in the range 0.0,
+	// 1.0 and has value_type DOUBLE.
+	//   "REDUCE_PERCENTILE_99" - Reduce by computing the 99th percentile
+	// (https://en.wikipedia.org/wiki/Percentile) of data points across time
+	// series for each alignment period. This reducer is valid for GAUGE and
+	// DELTA metrics of numeric and distribution type. The value of the
+	// output is DOUBLE.
+	//   "REDUCE_PERCENTILE_95" - Reduce by computing the 95th percentile
+	// (https://en.wikipedia.org/wiki/Percentile) of data points across time
+	// series for each alignment period. This reducer is valid for GAUGE and
+	// DELTA metrics of numeric and distribution type. The value of the
+	// output is DOUBLE.
+	//   "REDUCE_PERCENTILE_50" - Reduce by computing the 50th percentile
+	// (https://en.wikipedia.org/wiki/Percentile) of data points across time
+	// series for each alignment period. This reducer is valid for GAUGE and
+	// DELTA metrics of numeric and distribution type. The value of the
+	// output is DOUBLE.
+	//   "REDUCE_PERCENTILE_05" - Reduce by computing the 5th percentile
+	// (https://en.wikipedia.org/wiki/Percentile) of data points across time
+	// series for each alignment period. This reducer is valid for GAUGE and
+	// DELTA metrics of numeric and distribution type. The value of the
+	// output is DOUBLE.
 	CrossSeriesReducer string `json:"crossSeriesReducer,omitempty"`
 
-	// GroupByFields: The set of fields to preserve when crossSeriesReducer
-	// is specified. The groupByFields determine how the time series are
-	// partitioned into subsets prior to applying the aggregation function.
-	// Each subset contains time series that have the same value for each of
-	// the grouping fields. Each individual time series is a member of
-	// exactly one subset. The crossSeriesReducer is applied to each subset
-	// of time series. It is not possible to reduce across different
-	// resource types, so this field implicitly contains resource.type.
-	// Fields not specified in groupByFields are aggregated away. If
-	// groupByFields is not specified and all the time series have the same
-	// resource type, then the time series are aggregated into a single
-	// output time series. If crossSeriesReducer is not defined, this field
-	// is ignored.
+	// GroupByFields: The set of fields to preserve when
+	// cross_series_reducer is specified. The group_by_fields determine how
+	// the time series are partitioned into subsets prior to applying the
+	// aggregation operation. Each subset contains time series that have the
+	// same value for each of the grouping fields. Each individual time
+	// series is a member of exactly one subset. The cross_series_reducer is
+	// applied to each subset of time series. It is not possible to reduce
+	// across different resource types, so this field implicitly contains
+	// resource.type. Fields not specified in group_by_fields are aggregated
+	// away. If group_by_fields is not specified and all the time series
+	// have the same resource type, then the time series are aggregated into
+	// a single output time series. If cross_series_reducer is not defined,
+	// this field is ignored.
 	GroupByFields []string `json:"groupByFields,omitempty"`
 
-	// PerSeriesAligner: The approach to be used to align individual time
-	// series. Not all alignment functions may be applied to all time
-	// series, depending on the metric type and value type of the original
-	// time series. Alignment may change the metric type or the value type
-	// of the time series.Time series data must be aligned in order to
-	// perform cross-time series reduction. If crossSeriesReducer is
-	// specified, then perSeriesAligner must be specified and not equal
-	// ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error
-	// is returned.
+	// PerSeriesAligner: An Aligner describes how to bring the data points
+	// in a single time series into temporal alignment. Except for
+	// ALIGN_NONE, all alignments cause all the data points in an
+	// alignment_period to be mathematically grouped together, resulting in
+	// a single data point for each alignment_period with end timestamp at
+	// the end of the period.Not all alignment operations may be applied to
+	// all time series. The valid choices depend on the metric_kind and
+	// value_type of the original time series. Alignment can change the
+	// metric_kind or the value_type of the time series.Time series data
+	// must be aligned in order to perform cross-time series reduction. If
+	// cross_series_reducer is specified, then per_series_aligner must be
+	// specified and not equal to ALIGN_NONE and alignment_period must be
+	// specified; otherwise, an error is returned.
 	//
 	// Possible values:
 	//   "ALIGN_NONE" - No alignment. Raw data is returned. Not valid if
-	// cross-time series reduction is requested. The value type of the
-	// result is the same as the value type of the input.
-	//   "ALIGN_DELTA" - Align and convert to delta metric type. This
-	// alignment is valid for cumulative metrics and delta metrics. Aligning
-	// an existing delta metric to a delta metric requires that the
-	// alignment period be increased. The value type of the result is the
-	// same as the value type of the input.One can think of this aligner as
-	// a rate but without time units; that is, the output is conceptually
-	// (second_point - first_point).
-	//   "ALIGN_RATE" - Align and convert to a rate. This alignment is valid
-	// for cumulative metrics and delta metrics with numeric values. The
-	// output is a gauge metric with value type DOUBLE.One can think of this
-	// aligner as conceptually providing the slope of the line that passes
-	// through the value at the start and end of the window. In other words,
-	// this is conceptually ((y1 - y0)/(t1 - t0)), and the output unit is
-	// one that has a "/time" dimension.If, by rate, you are looking for
-	// percentage change, see the ALIGN_PERCENT_CHANGE aligner option.
+	// cross-series reduction is requested. The value_type of the result is
+	// the same as the value_type of the input.
+	//   "ALIGN_DELTA" - Align and convert to DELTA. The output is delta =
+	// y1 - y0.This alignment is valid for CUMULATIVE and DELTA metrics. If
+	// the selected alignment period results in periods with no data, then
+	// the aligned value for such a period is created by interpolation. The
+	// value_type of the aligned result is the same as the value_type of the
+	// input.
+	//   "ALIGN_RATE" - Align and convert to a rate. The result is computed
+	// as rate = (y1 - y0)/(t1 - t0), or "delta over time". Think of this
+	// aligner as providing the slope of the line that passes through the
+	// value at the start and at the end of the alignment_period.This
+	// aligner is valid for CUMULATIVE and DELTA metrics with numeric
+	// values. If the selected alignment period results in periods with no
+	// data, then the aligned value for such a period is created by
+	// interpolation. The output is a GAUGE metric with value_type
+	// DOUBLE.If, by "rate", you mean "percentage change", see the
+	// ALIGN_PERCENT_CHANGE aligner instead.
 	//   "ALIGN_INTERPOLATE" - Align by interpolating between adjacent
-	// points around the period boundary. This alignment is valid for gauge
-	// metrics with numeric values. The value type of the result is the same
-	// as the value type of the input.
-	//   "ALIGN_NEXT_OLDER" - Align by shifting the oldest data point before
-	// the period boundary to the boundary. This alignment is valid for
-	// gauge metrics. The value type of the result is the same as the value
-	// type of the input.
-	//   "ALIGN_MIN" - Align time series via aggregation. The resulting data
-	// point in the alignment period is the minimum of all data points in
-	// the period. This alignment is valid for gauge and delta metrics with
-	// numeric values. The value type of the result is the same as the value
-	// type of the input.
-	//   "ALIGN_MAX" - Align time series via aggregation. The resulting data
-	// point in the alignment period is the maximum of all data points in
-	// the period. This alignment is valid for gauge and delta metrics with
-	// numeric values. The value type of the result is the same as the value
-	// type of the input.
-	//   "ALIGN_MEAN" - Align time series via aggregation. The resulting
-	// data point in the alignment period is the average or arithmetic mean
-	// of all data points in the period. This alignment is valid for gauge
-	// and delta metrics with numeric values. The value type of the output
-	// is DOUBLE.
-	//   "ALIGN_COUNT" - Align time series via aggregation. The resulting
-	// data point in the alignment period is the count of all data points in
-	// the period. This alignment is valid for gauge and delta metrics with
-	// numeric or Boolean values. The value type of the output is INT64.
-	//   "ALIGN_SUM" - Align time series via aggregation. The resulting data
-	// point in the alignment period is the sum of all data points in the
-	// period. This alignment is valid for gauge and delta metrics with
-	// numeric and distribution values. The value type of the output is the
-	// same as the value type of the input.
-	//   "ALIGN_STDDEV" - Align time series via aggregation. The resulting
-	// data point in the alignment period is the standard deviation of all
-	// data points in the period. This alignment is valid for gauge and
-	// delta metrics with numeric values. The value type of the output is
+	// points around the alignment period boundary. This aligner is valid
+	// for GAUGE metrics with numeric values. The value_type of the aligned
+	// result is the same as the value_type of the input.
+	//   "ALIGN_NEXT_OLDER" - Align by moving the most recent data point
+	// before the end of the alignment period to the boundary at the end of
+	// the alignment period. This aligner is valid for GAUGE metrics. The
+	// value_type of the aligned result is the same as the value_type of the
+	// input.
+	//   "ALIGN_MIN" - Align the time series by returning the minimum value
+	// in each alignment period. This aligner is valid for GAUGE and DELTA
+	// metrics with numeric values. The value_type of the aligned result is
+	// the same as the value_type of the input.
+	//   "ALIGN_MAX" - Align the time series by returning the maximum value
+	// in each alignment period. This aligner is valid for GAUGE and DELTA
+	// metrics with numeric values. The value_type of the aligned result is
+	// the same as the value_type of the input.
+	//   "ALIGN_MEAN" - Align the time series by returning the mean value in
+	// each alignment period. This aligner is valid for GAUGE and DELTA
+	// metrics with numeric values. The value_type of the aligned result is
 	// DOUBLE.
-	//   "ALIGN_COUNT_TRUE" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the count of
-	// True-valued data points in the period. This alignment is valid for
-	// gauge metrics with Boolean values. The value type of the output is
+	//   "ALIGN_COUNT" - Align the time series by returning the number of
+	// values in each alignment period. This aligner is valid for GAUGE and
+	// DELTA metrics with numeric or Boolean values. The value_type of the
+	// aligned result is INT64.
+	//   "ALIGN_SUM" - Align the time series by returning the sum of the
+	// values in each alignment period. This aligner is valid for GAUGE and
+	// DELTA metrics with numeric and distribution values. The value_type of
+	// the aligned result is the same as the value_type of the input.
+	//   "ALIGN_STDDEV" - Align the time series by returning the standard
+	// deviation of the values in each alignment period. This aligner is
+	// valid for GAUGE and DELTA metrics with numeric values. The value_type
+	// of the output is DOUBLE.
+	//   "ALIGN_COUNT_TRUE" - Align the time series by returning the number
+	// of True values in each alignment period. This aligner is valid for
+	// GAUGE metrics with Boolean values. The value_type of the output is
 	// INT64.
-	//   "ALIGN_COUNT_FALSE" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the count of
-	// False-valued data points in the period. This alignment is valid for
-	// gauge metrics with Boolean values. The value type of the output is
+	//   "ALIGN_COUNT_FALSE" - Align the time series by returning the number
+	// of False values in each alignment period. This aligner is valid for
+	// GAUGE metrics with Boolean values. The value_type of the output is
 	// INT64.
-	//   "ALIGN_FRACTION_TRUE" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the fraction of
-	// True-valued data points in the period. This alignment is valid for
-	// gauge metrics with Boolean values. The output value is in the range
-	// 0, 1 and has value type DOUBLE.
-	//   "ALIGN_PERCENTILE_99" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the 99th percentile
-	// of all data points in the period. This alignment is valid for gauge
-	// and delta metrics with distribution values. The output is a gauge
-	// metric with value type DOUBLE.
-	//   "ALIGN_PERCENTILE_95" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the 95th percentile
-	// of all data points in the period. This alignment is valid for gauge
-	// and delta metrics with distribution values. The output is a gauge
-	// metric with value type DOUBLE.
-	//   "ALIGN_PERCENTILE_50" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the 50th percentile
-	// of all data points in the period. This alignment is valid for gauge
-	// and delta metrics with distribution values. The output is a gauge
-	// metric with value type DOUBLE.
-	//   "ALIGN_PERCENTILE_05" - Align time series via aggregation. The
-	// resulting data point in the alignment period is the 5th percentile of
-	// all data points in the period. This alignment is valid for gauge and
-	// delta metrics with distribution values. The output is a gauge metric
-	// with value type DOUBLE.
+	//   "ALIGN_FRACTION_TRUE" - Align the time series by returning the
+	// ratio of the number of True values to the total number of values in
+	// each alignment period. This aligner is valid for GAUGE metrics with
+	// Boolean values. The output value is in the range 0.0, 1.0 and has
+	// value_type DOUBLE.
+	//   "ALIGN_PERCENTILE_99" - Align the time series by using percentile
+	// aggregation (https://en.wikipedia.org/wiki/Percentile). The resulting
+	// data point in each alignment period is the 99th percentile of all
+	// data points in the period. This aligner is valid for GAUGE and DELTA
+	// metrics with distribution values. The output is a GAUGE metric with
+	// value_type DOUBLE.
+	//   "ALIGN_PERCENTILE_95" - Align the time series by using percentile
+	// aggregation (https://en.wikipedia.org/wiki/Percentile). The resulting
+	// data point in each alignment period is the 95th percentile of all
+	// data points in the period. This aligner is valid for GAUGE and DELTA
+	// metrics with distribution values. The output is a GAUGE metric with
+	// value_type DOUBLE.
+	//   "ALIGN_PERCENTILE_50" - Align the time series by using percentile
+	// aggregation (https://en.wikipedia.org/wiki/Percentile). The resulting
+	// data point in each alignment period is the 50th percentile of all
+	// data points in the period. This aligner is valid for GAUGE and DELTA
+	// metrics with distribution values. The output is a GAUGE metric with
+	// value_type DOUBLE.
+	//   "ALIGN_PERCENTILE_05" - Align the time series by using percentile
+	// aggregation (https://en.wikipedia.org/wiki/Percentile). The resulting
+	// data point in each alignment period is the 5th percentile of all data
+	// points in the period. This aligner is valid for GAUGE and DELTA
+	// metrics with distribution values. The output is a GAUGE metric with
+	// value_type DOUBLE.
 	//   "ALIGN_PERCENT_CHANGE" - Align and convert to a percentage change.
-	// This alignment is valid for gauge and delta metrics with numeric
-	// values. This alignment conceptually computes the equivalent of
-	// "((current - previous)/previous)*100" where previous value is
-	// determined based on the alignmentPeriod. In the event that previous
-	// is 0 the calculated value is infinity with the exception that if both
-	// (current - previous) and previous are 0 the calculated value is 0. A
-	// 10 minute moving mean is computed at each point of the time window
-	// prior to the above calculation to smooth the metric and prevent false
-	// positives from very short lived spikes. Only applicable for data that
-	// is >= 0. Any values < 0 are treated as no data. While delta metrics
-	// are accepted by this alignment special care should be taken that the
-	// values for the metric will always be positive. The output is a gauge
-	// metric with value type DOUBLE.
+	// This aligner is valid for GAUGE and DELTA metrics with numeric
+	// values. This alignment returns ((current - previous)/previous) * 100,
+	// where the value of previous is determined based on the
+	// alignment_period.If the values of current and previous are both 0,
+	// then the returned value is 0. If only previous is 0, the returned
+	// value is infinity.A 10-minute moving mean is computed at each point
+	// of the alignment period prior to the above calculation to smooth the
+	// metric and prevent false positives from very short-lived spikes. The
+	// moving mean is only applicable for data whose values are >= 0. Any
+	// values < 0 are treated as a missing datapoint, and are ignored. While
+	// DELTA metrics are accepted by this alignment, special care should be
+	// taken that the values for the metric will always be positive. The
+	// output is a GAUGE metric with value_type DOUBLE.
 	PerSeriesAligner string `json:"perSeriesAligner,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "AlignmentPeriod") to
@@ -567,9 +600,9 @@ type AlertPolicy struct {
 	// Possible values:
 	//   "COMBINE_UNSPECIFIED" - An unspecified combiner.
 	//   "AND" - Combine conditions using the logical AND operator. An
-	// incident is created only if all conditions are met simultaneously.
-	// This combiner is satisfied if all conditions are met, even if they
-	// are met on completely different resources.
+	// incident is created only if all the conditions are met
+	// simultaneously. This combiner is satisfied if all conditions are met,
+	// even if they are met on completely different resources.
 	//   "OR" - Combine conditions using the logical OR operator. An
 	// incident is created if any of the listed conditions is met.
 	//   "AND_WITH_MATCHING_RESOURCE" - Combine conditions using logical AND
@@ -582,8 +615,8 @@ type AlertPolicy struct {
 	// combined by AND or OR according to the combiner field. If the
 	// combined conditions evaluate to true, then an incident is created. A
 	// policy can have from one to six conditions. If
-	// |condition_time_series_uery_language| is present, it must be the only
-	// |condition|.
+	// condition_time_series_query_language is present, it must be the only
+	// condition.
 	Conditions []*Condition `json:"conditions,omitempty"`
 
 	// CreationRecord: A read-only record of the creation of the alerting
@@ -619,13 +652,14 @@ type AlertPolicy struct {
 	MutationRecord *MutationRecord `json:"mutationRecord,omitempty"`
 
 	// Name: Required if the policy exists. The resource name for this
-	// policy. The syntax
+	// policy. The format
 	// is:
-	// projects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]
-	// [ALERT_POLIC
-	// Y_ID] is assigned by Stackdriver Monitoring when the policy is
-	// created. When calling the alertPolicies.create method, do not include
-	// the name field in the alerting policy passed as part of the request.
+	// projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]
+	// [A
+	// LERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy
+	// is created. When calling the alertPolicies.create method, do not
+	// include the name field in the alerting policy passed as part of the
+	// request.
 	Name string `json:"name,omitempty"`
 
 	// NotificationChannels: Identifies the notification channels to which
@@ -633,9 +667,10 @@ type AlertPolicy struct {
 	// when new violations occur on an already opened incident. Each element
 	// of this array corresponds to the name field in each of the
 	// NotificationChannel objects that are returned from the
-	// ListNotificationChannels method. The syntax of the entries in this
-	// field is:
-	// projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]
+	// ListNotificationChannels method. The format of the entries in this
+	// field
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID]
 	//
 	NotificationChannels []string `json:"notificationChannels,omitempty"`
 
@@ -892,7 +927,8 @@ func (s *CloudEndpoints) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// ClusterIstio: Istio service. Learn more at http://istio.io.
+// ClusterIstio: Istio service scoped to a single Kubernetes cluster.
+// Learn more at http://istio.io.
 type ClusterIstio struct {
 	// ClusterName: The name of the Kubernetes cluster in which this Istio
 	// service is defined. Corresponds to the cluster_name resource label in
@@ -1128,10 +1164,10 @@ type Condition struct {
 	DisplayName string `json:"displayName,omitempty"`
 
 	// Name: Required if the condition exists. The unique resource name for
-	// this condition. Its syntax
+	// this condition. Its format
 	// is:
-	// projects/[PROJECT_ID]/alertPolicies/[POLICY_ID]/conditions/[CONDIT
-	// ION_ID]
+	// projects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[POLICY_ID]/conditio
+	// ns/[CONDITION_ID]
 	// [CONDITION_ID] is assigned by Stackdriver Monitoring when the
 	// condition is created as part of a new or updated alerting policy.When
 	// calling the alertPolicies.create method, do not include the name
@@ -1311,11 +1347,11 @@ func (s *CreateCollectdTimeSeriesResponse) MarshalJSON() ([]byte, error) {
 
 // CreateTimeSeriesRequest: The CreateTimeSeries request.
 type CreateTimeSeriesRequest struct {
-	// TimeSeries: The new data to be added to a list of time series. Adds
-	// at most one data point to each of several time series. The new data
-	// point must be more recent than any other point in its time series.
-	// Each TimeSeries value must fully specify a unique time series by
-	// supplying all label values for the metric and the monitored
+	// TimeSeries: Required. The new data to be added to a list of time
+	// series. Adds at most one data point to each of several time series.
+	// The new data point must be more recent than any other point in its
+	// time series. Each TimeSeries value must fully specify a unique time
+	// series by supplying all label values for the metric and the monitored
 	// resource.The maximum number of TimeSeries objects per Create request
 	// is 200.
 	TimeSeries []*TimeSeries `json:"timeSeries,omitempty"`
@@ -2050,16 +2086,18 @@ type Group struct {
 	// are clusters.
 	IsCluster bool `json:"isCluster,omitempty"`
 
-	// Name: Output only. The name of this group. The format is
-	// "projects/{project_id_or_number}/groups/{group_id}". When creating a
-	// group, this field is ignored and a new name is created consisting of
-	// the project specified in the call to CreateGroup and a unique
-	// {group_id} that is generated automatically.
+	// Name: Output only. The name of this group. The format
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]
+	// When creating a group, this field is ignored and a new name is
+	// created consisting of the project specified in the call to
+	// CreateGroup and a unique [GROUP_ID] that is generated automatically.
 	Name string `json:"name,omitempty"`
 
 	// ParentName: The name of the group's parent, if it has one. The format
-	// is "projects/{project_id_or_number}/groups/{group_id}". For groups
-	// with no parent, parentName is the empty string, "".
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]
+	// For groups with no parent, parent_name is the empty string, "".
 	ParentName string `json:"parentName,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2173,9 +2211,11 @@ type InternalChecker struct {
 	GcpZone string `json:"gcpZone,omitempty"`
 
 	// Name: A unique resource name for this InternalChecker. The format
-	// is:projects/[PROJECT_ID]/internalCheckers/[INTERNAL_CHECKER_ID].[PROJE
-	// CT_ID] is the Stackdriver Workspace project for the Uptime check
-	// config associated with the internal checker.
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/internalCheckers/[INTERNAL_CHECKER
+	// _ID]
+	// [PROJECT_ID_OR_NUMBER] is the Stackdriver Workspace project for the
+	// Uptime check config associated with the internal checker.
 	Name string `json:"name,omitempty"`
 
 	// Network: The GCP VPC network (https://cloud.google.com/vpc/docs/vpc)
@@ -2367,7 +2407,8 @@ type ListAlertPoliciesResponse struct {
 
 	// NextPageToken: If there might be more results than were returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2404,7 +2445,8 @@ type ListGroupMembersResponse struct {
 
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// TotalSize: The total number of elements matching this request.
@@ -2444,7 +2486,8 @@ type ListGroupsResponse struct {
 
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2482,7 +2525,8 @@ type ListMetricDescriptorsResponse struct {
 
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
@@ -2518,7 +2562,8 @@ func (s *ListMetricDescriptorsResponse) MarshalJSON() ([]byte, error) {
 type ListMonitoredResourceDescriptorsResponse struct {
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// ResourceDescriptors: The monitored resource descriptors that are
@@ -2638,7 +2683,8 @@ func (s *ListNotificationChannelsResponse) MarshalJSON() ([]byte, error) {
 type ListServiceLevelObjectivesResponse struct {
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// ServiceLevelObjectives: The ServiceLevelObjectives matching the
@@ -2676,7 +2722,8 @@ func (s *ListServiceLevelObjectivesResponse) MarshalJSON() ([]byte, error) {
 type ListServicesResponse struct {
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// Services: The Services matching the specified filter.
@@ -2717,7 +2764,8 @@ type ListTimeSeriesResponse struct {
 
 	// NextPageToken: If there are more results than have been returned,
 	// then this field is set to a non-empty value. To see the additional
-	// results, use that value as pageToken in the next call to this method.
+	// results, use that value as page_token in the next call to this
+	// method.
 	NextPageToken string `json:"nextPageToken,omitempty"`
 
 	// TimeSeries: One or more time series that match the filter included in
@@ -2838,6 +2886,45 @@ func (s *ListUptimeCheckIpsResponse) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
+// MeshIstio: Istio service scoped to an Istio mesh
+type MeshIstio struct {
+	// MeshUid: Identifier for the mesh in which this Istio service is
+	// defined. Corresponds to the mesh_uid metric label in Istio metrics.
+	MeshUid string `json:"meshUid,omitempty"`
+
+	// ServiceName: The name of the Istio service underlying this service.
+	// Corresponds to the destination_service_name metric label in Istio
+	// metrics.
+	ServiceName string `json:"serviceName,omitempty"`
+
+	// ServiceNamespace: The namespace of the Istio service underlying this
+	// service. Corresponds to the destination_service_namespace metric
+	// label in Istio metrics.
+	ServiceNamespace string `json:"serviceNamespace,omitempty"`
+
+	// ForceSendFields is a list of field names (e.g. "MeshUid") to
+	// unconditionally include in API requests. By default, fields with
+	// empty values are omitted from API requests. However, any non-pointer,
+	// non-interface field appearing in ForceSendFields will be sent to the
+	// server regardless of whether the field is empty or not. This may be
+	// used to include empty fields in Patch requests.
+	ForceSendFields []string `json:"-"`
+
+	// NullFields is a list of field names (e.g. "MeshUid") to include in
+	// API requests with the JSON null value. By default, fields with empty
+	// values are omitted from API requests. However, any field with an
+	// empty value appearing in NullFields will be sent to the server as
+	// null. It is an error if a field in this list has a non-empty value.
+	// This may be used to include null fields in Patch requests.
+	NullFields []string `json:"-"`
+}
+
+func (s *MeshIstio) MarshalJSON() ([]byte, error) {
+	type NoMethod MeshIstio
+	raw := NoMethod(*s)
+	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
+}
+
 // Metric: A specific metric, identified by specifying values for all of
 // the labels of a MetricDescriptor.
 type Metric struct {
@@ -2895,13 +2982,14 @@ type MetricAbsence struct {
 	// Duration.nanos field is ignored.
 	Duration string `json:"duration,omitempty"`
 
-	// Filter: A filter that identifies which time series should be compared
-	// with the threshold.The filter is similar to the one that is specified
-	// in the ListTimeSeries request (that call is useful to verify the time
-	// series that will be retrieved / processed) and must specify the
-	// metric type and optionally may contain restrictions on resource type,
-	// resource labels, and metric labels. This field may not exceed 2048
-	// Unicode characters in length.
+	// Filter: A filter (https://cloud.google.com/monitoring/api/v3/filters)
+	// that identifies which time series should be compared with the
+	// threshold.The filter is similar to the one that is specified in the
+	// ListTimeSeries request (that call is useful to verify the time series
+	// that will be retrieved / processed) and must specify the metric type
+	// and optionally may contain restrictions on resource type, resource
+	// labels, and metric labels. This field may not exceed 2048 Unicode
+	// characters in length.
 	Filter string `json:"filter,omitempty"`
 
 	// Trigger: The number/percent of time series for which the comparison
@@ -3030,7 +3118,47 @@ type MetricDescriptor struct {
 	//
 	Type string `json:"type,omitempty"`
 
-	// Unit: Ki kibi (2^10)
+	// Unit: The units in which the metric value is reported. It is only
+	// applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The
+	// unit defines the representation of the stored metric values.Different
+	// systems may scale the values to be more easily displayed (so a value
+	// of 0.02KBy might be displayed as 20By, and a value of 3523KBy might
+	// be displayed as 3.5MBy). However, if the unit is KBy, then the value
+	// of the metric is always in thousands of bytes, no matter how it may
+	// be displayed..If you want a custom metric to record the exact number
+	// of CPU-seconds used by a job, you can create an INT64 CUMULATIVE
+	// metric whose unit is s{CPU} (or equivalently 1s{CPU} or just s). If
+	// the job uses 12,005 CPU-seconds, then the value is written as
+	// 12005.Alternatively, if you want a custom metric to record data in a
+	// more granular way, you can create a DOUBLE CUMULATIVE metric whose
+	// unit is ks{CPU}, and then write the value 12.005 (which is
+	// 12005/1000), or use Kis{CPU} and write 11.723 (which is
+	// 12005/1024).The supported units are a subset of The Unified Code for
+	// Units of Measure (http://unitsofmeasure.org/ucum.html) standard:Basic
+	// units (UNIT)
+	// bit bit
+	// By byte
+	// s second
+	// min minute
+	// h hour
+	// d dayPrefixes (PREFIX)
+	// k kilo (10^3)
+	// M mega (10^6)
+	// G giga (10^9)
+	// T tera (10^12)
+	// P peta (10^15)
+	// E exa (10^18)
+	// Z zetta (10^21)
+	// Y yotta (10^24)
+	// m milli (10^-3)
+	// u micro (10^-6)
+	// n nano (10^-9)
+	// p pico (10^-12)
+	// f femto (10^-15)
+	// a atto (10^-18)
+	// z zepto (10^-21)
+	// y yocto (10^-24)
+	// Ki kibi (2^10)
 	// Mi mebi (2^20)
 	// Gi gibi (2^30)
 	// Ti tebi (2^40)
@@ -3246,17 +3374,18 @@ type MetricThreshold struct {
 	//
 	// Possible values:
 	//   "COMPARISON_UNSPECIFIED" - No ordering relationship is specified.
-	//   "COMPARISON_GT" - The left argument is greater than the right
-	// argument.
-	//   "COMPARISON_GE" - The left argument is greater than or equal to the
+	//   "COMPARISON_GT" - True if the left argument is greater than the
 	// right argument.
-	//   "COMPARISON_LT" - The left argument is less than the right
+	//   "COMPARISON_GE" - True if the left argument is greater than or
+	// equal to the right argument.
+	//   "COMPARISON_LT" - True if the left argument is less than the right
 	// argument.
-	//   "COMPARISON_LE" - The left argument is less than or equal to the
+	//   "COMPARISON_LE" - True if the left argument is less than or equal
+	// to the right argument.
+	//   "COMPARISON_EQ" - True if the left argument is equal to the right
+	// argument.
+	//   "COMPARISON_NE" - True if the left argument is not equal to the
 	// right argument.
-	//   "COMPARISON_EQ" - The left argument is equal to the right argument.
-	//   "COMPARISON_NE" - The left argument is not equal to the right
-	// argument.
 	Comparison string `json:"comparison,omitempty"`
 
 	// DenominatorAggregations: Specifies the alignment of data points in
@@ -3269,13 +3398,15 @@ type MetricThreshold struct {
 	// and produce time series that have the same periodicity and labels.
 	DenominatorAggregations []*Aggregation `json:"denominatorAggregations,omitempty"`
 
-	// DenominatorFilter: A filter that identifies a time series that should
-	// be used as the denominator of a ratio that will be compared with the
-	// threshold. If a denominator_filter is specified, the time series
-	// specified by the filter field will be used as the numerator.The
-	// filter must specify the metric type and optionally may contain
-	// restrictions on resource type, resource labels, and metric labels.
-	// This field may not exceed 2048 Unicode characters in length.
+	// DenominatorFilter: A filter
+	// (https://cloud.google.com/monitoring/api/v3/filters) that identifies
+	// a time series that should be used as the denominator of a ratio that
+	// will be compared with the threshold. If a denominator_filter is
+	// specified, the time series specified by the filter field will be used
+	// as the numerator.The filter must specify the metric type and
+	// optionally may contain restrictions on resource type, resource
+	// labels, and metric labels. This field may not exceed 2048 Unicode
+	// characters in length.
 	DenominatorFilter string `json:"denominatorFilter,omitempty"`
 
 	// Duration: The amount of time that a time series must violate the
@@ -3290,13 +3421,14 @@ type MetricThreshold struct {
 	// alerted on quickly.
 	Duration string `json:"duration,omitempty"`
 
-	// Filter: A filter that identifies which time series should be compared
-	// with the threshold.The filter is similar to the one that is specified
-	// in the ListTimeSeries request (that call is useful to verify the time
-	// series that will be retrieved / processed) and must specify the
-	// metric type and optionally may contain restrictions on resource type,
-	// resource labels, and metric labels. This field may not exceed 2048
-	// Unicode characters in length.
+	// Filter: A filter (https://cloud.google.com/monitoring/api/v3/filters)
+	// that identifies which time series should be compared with the
+	// threshold.The filter is similar to the one that is specified in the
+	// ListTimeSeries request (that call is useful to verify the time series
+	// that will be retrieved / processed) and must specify the metric type
+	// and optionally may contain restrictions on resource type, resource
+	// labels, and metric labels. This field may not exceed 2048 Unicode
+	// characters in length.
 	Filter string `json:"filter,omitempty"`
 
 	// ThresholdValue: A value against which to compare the time series.
@@ -3606,9 +3738,10 @@ type NotificationChannel struct {
 	// NotificationChannelDescriptor corresponding to the type field.
 	Labels map[string]string `json:"labels,omitempty"`
 
-	// Name: The full REST resource name for this channel. The syntax
+	// Name: The full REST resource name for this channel. The format
 	// is:
-	// projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]
+	// projects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID]
+	//
 	// The [CHANNEL_ID] is automatically assigned by the server on creation.
 	Name string `json:"name,omitempty"`
 
@@ -3700,9 +3833,43 @@ type NotificationChannelDescriptor struct {
 	// description for how that field should be populated.
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
 
-	// Name: The full REST resource name for this descriptor. The syntax
+	// LaunchStage: The product launch stage for channels of this type.
+	//
+	// Possible values:
+	//   "LAUNCH_STAGE_UNSPECIFIED" - Do not use this default value.
+	//   "EARLY_ACCESS" - Early Access features are limited to a closed
+	// group of testers. To use these features, you must sign up in advance
+	// and sign a Trusted Tester agreement (which includes confidentiality
+	// provisions). These features may be unstable, changed in
+	// backward-incompatible ways, and are not guaranteed to be released.
+	//   "ALPHA" - Alpha is a limited availability test for releases before
+	// they are cleared for widespread use. By Alpha, all significant design
+	// issues are resolved and we are in the process of verifying
+	// functionality. Alpha customers need to apply for access, agree to
+	// applicable terms, and have their projects whitelisted. Alpha releases
+	// don’t have to be feature complete, no SLAs are provided, and there
+	// are no technical support obligations, but they will be far enough
+	// along that customers can actually use them in test environments or
+	// for limited-use tests -- just like they would in normal production
+	// cases.
+	//   "BETA" - Beta is the point at which we are ready to open a release
+	// for any customer to use. There are no SLA or technical support
+	// obligations in a Beta release. Products will be complete from a
+	// feature perspective, but may have some open outstanding issues. Beta
+	// releases are suitable for limited production use cases.
+	//   "GA" - GA features are open to all developers and are considered
+	// stable and fully qualified for production use.
+	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
+	// and removed. For more information, see the “Deprecation Policy”
+	// section of our Terms of Service (https://cloud.google.com/terms/) and
+	// the Google Cloud Platform Subject to the Deprecation Policy
+	// (https://cloud.google.com/terms/deprecation) documentation.
+	LaunchStage string `json:"launchStage,omitempty"`
+
+	// Name: The full REST resource name for this descriptor. The format
 	// is:
-	// projects/[PROJECT_ID]/notificationChannelDescriptors/[TYPE]
+	// projects/[PROJECT_ID_OR_NUMBER]/notificationChannelDescriptors/[TY
+	// PE]
 	// In the above, [TYPE] is the value of the type field.
 	Name string `json:"name,omitempty"`
 
@@ -3956,7 +4123,7 @@ func (s *RequestBasedSli) MarshalJSON() ([]byte, error) {
 type ResourceGroup struct {
 	// GroupId: The group of resources being monitored. Should be only the
 	// [GROUP_ID], and not the full-path
-	// projects/[PROJECT_ID]/groups/[GROUP_ID].
+	// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID].
 	GroupId string `json:"groupId,omitempty"`
 
 	// ResourceType: The resource type of the group members.
@@ -4018,8 +4185,13 @@ type MService struct {
 	// DisplayName: Name used for UI elements listing this Service.
 	DisplayName string `json:"displayName,omitempty"`
 
-	// Name: Resource name for this Service. Of the form
-	// projects/{project_id}/services/{service_id}.
+	// MeshIstio: Type used for Istio services scoped to an Istio mesh.
+	MeshIstio *MeshIstio `json:"meshIstio,omitempty"`
+
+	// Name: Resource name for this Service. The format
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID}
+	//
 	Name string `json:"name,omitempty"`
 
 	// Telemetry: Configuration for how to query telemetry on a Service.
@@ -4136,9 +4308,11 @@ type ServiceLevelObjective struct {
 	// objective to be met. 0 < goal <= 0.999.
 	Goal float64 `json:"goal,omitempty"`
 
-	// Name: Resource name for this ServiceLevelObjective. Of the form
-	// projects/{project_id}/services/{service_id}/serviceLevelObjectives/{sl
-	// o_name}.
+	// Name: Resource name for this ServiceLevelObjective. The format
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevel
+	// Objectives/[SLO_NAME]
+	//
 	Name string `json:"name,omitempty"`
 
 	// RollingPeriod: A rolling time period, semantically "in the past
@@ -4224,17 +4398,20 @@ func (s *SourceContext) MarshalJSON() ([]byte, error) {
 	return gensupport.MarshalJSON(raw, s.ForceSendFields, s.NullFields)
 }
 
-// SpanContext: The context of a span, attached to
-// google.api.Distribution.Exemplars in google.api.Distribution values
-// during aggregation.It contains the name of a span with format:
-// projects/PROJECT_ID/traces/TRACE_ID/spans/SPAN_ID
+// SpanContext: The context of a span, attached to Exemplars in
+// Distribution values during aggregation.It contains the name of a span
+// with
+// format:
+// projects/[PROJECT_ID_OR_NUMBER]/traces/[TRACE_ID]/spans/[SPAN_
+// ID]
+//
 type SpanContext struct {
-	// SpanName: The resource name of the span in the following
-	// format:
-	// projects/[PROJECT_ID]/traces/[TRACE_ID]/spans/[SPAN_ID]
-	// TRACE_
-	// ID is a unique identifier for a trace within a project; it is a
-	// 32-character hexadecimal encoding of a 16-byte array.SPAN_ID is a
+	// SpanName: The resource name of the span. The format
+	// is:
+	// projects/[PROJECT_ID_OR_NUMBER]/traces/[TRACE_ID]/spans/[SPAN_ID]
+	//
+	// [TRACE_ID] is a unique identifier for a trace within a project; it is
+	// a 32-character hexadecimal encoding of a 16-byte array.[SPAN_ID] is a
 	// unique identifier for a span within a trace; it is a 16-character
 	// hexadecimal encoding of an 8-byte array.
 	SpanName string `json:"spanName,omitempty"`
@@ -4758,11 +4935,13 @@ type UptimeCheckConfig struct {
 	MonitoredResource *MonitoredResource `json:"monitoredResource,omitempty"`
 
 	// Name: A unique resource name for this Uptime check configuration. The
-	// format
-	// is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This
-	// field should be omitted when creating the Uptime check configuration;
-	// on create, the resource name is assigned by the server and included
-	// in the response.
+	// format is:
+	//
+	// projects/[PROJECT_ID_OR_NUMBER]/uptimeCheckConfigs/[UPTIME_CHECK_ID]
+	// T
+	// his field should be omitted when creating the Uptime check
+	// configuration; on create, the resource name is assigned by the server
+	// and included in the response.
 	Name string `json:"name,omitempty"`
 
 	// Period: How often, in seconds, the Uptime check is performed.
@@ -4886,9 +5065,10 @@ func (s *UptimeCheckIp) MarshalJSON() ([]byte, error) {
 // VerifyNotificationChannelRequest: The VerifyNotificationChannel
 // request.
 type VerifyNotificationChannelRequest struct {
-	// Code: The verification code that was delivered to the channel as a
-	// result of invoking the SendNotificationChannelVerificationCode API
-	// method or that was retrieved from a verified channel via
+	// Code: Required. The verification code that was delivered to the
+	// channel as a result of invoking the
+	// SendNotificationChannelVerificationCode API method or that was
+	// retrieved from a verified channel via
 	// GetNotificationChannelVerificationCode. For example, one might have
 	// "G-123456" or "TKNZGhhd2EyN3I1MnRnMjRv" (in general, one is only
 	// guaranteed that the code is valid UTF-8; one should not make any
@@ -5015,7 +5195,7 @@ func (c *ProjectsAlertPoliciesCreateCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5088,7 +5268,7 @@ func (c *ProjectsAlertPoliciesCreateCall) Do(opts ...googleapi.CallOption) (*Ale
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project in which to create the alerting policy. The format is projects/[PROJECT_ID].Note that this field names the parent container in which the alerting policy will be written, not the name of the created policy. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[POLICY_ID], identifying the policy in the container.",
+	//       "description": "Required. The project in which to create the alerting policy. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\nNote that this field names the parent container in which the alerting policy will be written, not the name of the created policy. The alerting policy that is returned will have a name that contains a normalized representation of this name as a prefix but adds a suffix of the form /alertPolicies/[ALERT_POLICY_ID], identifying the policy in the container.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -5154,7 +5334,7 @@ func (c *ProjectsAlertPoliciesDeleteCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5222,7 +5402,7 @@ func (c *ProjectsAlertPoliciesDeleteCall) Do(opts ...googleapi.CallOption) (*Emp
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The alerting policy to delete. The format is:\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\nFor more information, see AlertPolicy.",
+	//       "description": "Required. The alerting policy to delete. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]\nFor more information, see AlertPolicy.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
 	//       "required": true,
@@ -5296,7 +5476,7 @@ func (c *ProjectsAlertPoliciesGetCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5367,7 +5547,7 @@ func (c *ProjectsAlertPoliciesGetCall) Do(opts ...googleapi.CallOption) (*AlertP
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The alerting policy to retrieve. The format is\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\n",
+	//       "description": "Required. The alerting policy to retrieve. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
 	//       "required": true,
@@ -5407,7 +5587,8 @@ func (r *ProjectsAlertPoliciesService) List(name string) *ProjectsAlertPoliciesL
 
 // Filter sets the optional parameter "filter": If provided, this field
 // specifies the criteria that must be met by alert policies to be
-// included in the response.For more details, see sorting and filtering.
+// included in the response.For more details, see sorting and filtering
+// (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).
 func (c *ProjectsAlertPoliciesListCall) Filter(filter string) *ProjectsAlertPoliciesListCall {
 	c.urlParams_.Set("filter", filter)
 	return c
@@ -5417,7 +5598,8 @@ func (c *ProjectsAlertPoliciesListCall) Filter(filter string) *ProjectsAlertPoli
 // of fields by which to sort the result. Supports the same set of field
 // references as the filter field. Entries can be prefixed with a minus
 // sign to sort by the field in descending order.For more details, see
-// sorting and filtering.
+// sorting and filtering
+// (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).
 func (c *ProjectsAlertPoliciesListCall) OrderBy(orderBy string) *ProjectsAlertPoliciesListCall {
 	c.urlParams_.Set("orderBy", orderBy)
 	return c
@@ -5476,7 +5658,7 @@ func (c *ProjectsAlertPoliciesListCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5547,19 +5729,19 @@ func (c *ProjectsAlertPoliciesListCall) Do(opts ...googleapi.CallOption) (*ListA
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "If provided, this field specifies the criteria that must be met by alert policies to be included in the response.For more details, see sorting and filtering.",
+	//       "description": "If provided, this field specifies the criteria that must be met by alert policies to be included in the response.For more details, see sorting and filtering (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project whose alert policies are to be listed. The format is\nprojects/[PROJECT_ID]\nNote that this field names the parent container in which the alerting policies to be listed are stored. To retrieve a single alerting policy by name, use the GetAlertPolicy operation, instead.",
+	//       "description": "Required. The project whose alert policies are to be listed. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\nNote that this field names the parent container in which the alerting policies to be listed are stored. To retrieve a single alerting policy by name, use the GetAlertPolicy operation, instead.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "orderBy": {
-	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of field references as the filter field. Entries can be prefixed with a minus sign to sort by the field in descending order.For more details, see sorting and filtering.",
+	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of field references as the filter field. Entries can be prefixed with a minus sign to sort by the field in descending order.For more details, see sorting and filtering (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -5682,7 +5864,7 @@ func (c *ProjectsAlertPoliciesPatchCall) Header() http.Header {
 
 func (c *ProjectsAlertPoliciesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5755,7 +5937,7 @@ func (c *ProjectsAlertPoliciesPatchCall) Do(opts ...googleapi.CallOption) (*Aler
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Required if the policy exists. The resource name for this policy. The syntax is:\nprojects/[PROJECT_ID]/alertPolicies/[ALERT_POLICY_ID]\n[ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
+	//       "description": "Required if the policy exists. The resource name for this policy. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/alertPolicies/[ALERT_POLICY_ID]\n[ALERT_POLICY_ID] is assigned by Stackdriver Monitoring when the policy is created. When calling the alertPolicies.create method, do not include the name field in the alerting policy passed as part of the request.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/alertPolicies/[^/]+$",
 	//       "required": true,
@@ -5832,7 +6014,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Header() http.Header {
 
 func (c *ProjectsCollectdTimeSeriesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -5905,7 +6087,7 @@ func (c *ProjectsCollectdTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) 
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project in which to create the time series. The format is \"projects/PROJECT_ID_OR_NUMBER\".",
+	//       "description": "The project in which to create the time series. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -5981,7 +6163,7 @@ func (c *ProjectsGroupsCreateCall) Header() http.Header {
 
 func (c *ProjectsGroupsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6054,7 +6236,7 @@ func (c *ProjectsGroupsCreateCall) Do(opts ...googleapi.CallOption) (*Group, err
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project in which to create the group. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project in which to create the group. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -6134,7 +6316,7 @@ func (c *ProjectsGroupsDeleteCall) Header() http.Header {
 
 func (c *ProjectsGroupsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6202,7 +6384,7 @@ func (c *ProjectsGroupsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, err
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The group to delete. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+	//       "description": "Required. The group to delete. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/groups/[^/]+$",
 	//       "required": true,
@@ -6281,7 +6463,7 @@ func (c *ProjectsGroupsGetCall) Header() http.Header {
 
 func (c *ProjectsGroupsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6352,7 +6534,7 @@ func (c *ProjectsGroupsGetCall) Do(opts ...googleapi.CallOption) (*Group, error)
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The group to retrieve. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+	//       "description": "Required. The group to retrieve. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/groups/[^/]+$",
 	//       "required": true,
@@ -6391,7 +6573,9 @@ func (r *ProjectsGroupsService) List(name string) *ProjectsGroupsListCall {
 }
 
 // AncestorsOfGroup sets the optional parameter "ancestorsOfGroup": A
-// group name: "projects/{project_id_or_number}/groups/{group_id}".
+// group name. The format
+// is:
+// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]
 // Returns groups that are ancestors of the specified group. The groups
 // are returned in order, starting with the immediate parent and ending
 // with the most distant ancestor. If the specified group has no
@@ -6402,8 +6586,10 @@ func (c *ProjectsGroupsListCall) AncestorsOfGroup(ancestorsOfGroup string) *Proj
 }
 
 // ChildrenOfGroup sets the optional parameter "childrenOfGroup": A
-// group name: "projects/{project_id_or_number}/groups/{group_id}".
-// Returns groups whose parentName field contains the group name. If no
+// group name. The format
+// is:
+// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]
+// Returns groups whose parent_name field contains the group name. If no
 // groups have this parent, the results are empty.
 func (c *ProjectsGroupsListCall) ChildrenOfGroup(childrenOfGroup string) *ProjectsGroupsListCall {
 	c.urlParams_.Set("childrenOfGroup", childrenOfGroup)
@@ -6411,9 +6597,11 @@ func (c *ProjectsGroupsListCall) ChildrenOfGroup(childrenOfGroup string) *Projec
 }
 
 // DescendantsOfGroup sets the optional parameter "descendantsOfGroup":
-// A group name: "projects/{project_id_or_number}/groups/{group_id}".
+// A group name. The format
+// is:
+// projects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]
 // Returns the descendants of the specified group. This is a superset of
-// the results returned by the childrenOfGroup filter, and includes
+// the results returned by the children_of_group filter, and includes
 // children-of-children, and so forth.
 func (c *ProjectsGroupsListCall) DescendantsOfGroup(descendantsOfGroup string) *ProjectsGroupsListCall {
 	c.urlParams_.Set("descendantsOfGroup", descendantsOfGroup)
@@ -6428,8 +6616,8 @@ func (c *ProjectsGroupsListCall) PageSize(pageSize int64) *ProjectsGroupsListCal
 }
 
 // PageToken sets the optional parameter "pageToken": If this field is
-// not empty then it must contain the nextPageToken value returned by a
-// previous call to this method. Using this field causes the method to
+// not empty then it must contain the next_page_token value returned by
+// a previous call to this method. Using this field causes the method to
 // return additional results from the previous method call.
 func (c *ProjectsGroupsListCall) PageToken(pageToken string) *ProjectsGroupsListCall {
 	c.urlParams_.Set("pageToken", pageToken)
@@ -6473,7 +6661,7 @@ func (c *ProjectsGroupsListCall) Header() http.Header {
 
 func (c *ProjectsGroupsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6544,22 +6732,22 @@ func (c *ProjectsGroupsListCall) Do(opts ...googleapi.CallOption) (*ListGroupsRe
 	//   ],
 	//   "parameters": {
 	//     "ancestorsOfGroup": {
-	//       "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns groups that are ancestors of the specified group. The groups are returned in order, starting with the immediate parent and ending with the most distant ancestor. If the specified group has no immediate parent, the results are empty.",
+	//       "description": "A group name. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\nReturns groups that are ancestors of the specified group. The groups are returned in order, starting with the immediate parent and ending with the most distant ancestor. If the specified group has no immediate parent, the results are empty.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "childrenOfGroup": {
-	//       "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns groups whose parentName field contains the group name. If no groups have this parent, the results are empty.",
+	//       "description": "A group name. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\nReturns groups whose parent_name field contains the group name. If no groups have this parent, the results are empty.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "descendantsOfGroup": {
-	//       "description": "A group name: \"projects/{project_id_or_number}/groups/{group_id}\". Returns the descendants of the specified group. This is a superset of the results returned by the childrenOfGroup filter, and includes children-of-children, and so forth.",
+	//       "description": "A group name. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\nReturns the descendants of the specified group. This is a superset of the results returned by the children_of_group filter, and includes children-of-children, and so forth.",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project whose groups are to be listed. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project whose groups are to be listed. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -6572,7 +6760,7 @@ func (c *ProjectsGroupsListCall) Do(opts ...googleapi.CallOption) (*ListGroupsRe
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+	//       "description": "If this field is not empty then it must contain the next_page_token value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
 	//       "location": "query",
 	//       "type": "string"
 	//     }
@@ -6665,7 +6853,7 @@ func (c *ProjectsGroupsUpdateCall) Header() http.Header {
 
 func (c *ProjectsGroupsUpdateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6738,7 +6926,7 @@ func (c *ProjectsGroupsUpdateCall) Do(opts ...googleapi.CallOption) (*Group, err
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Output only. The name of this group. The format is \"projects/{project_id_or_number}/groups/{group_id}\". When creating a group, this field is ignored and a new name is created consisting of the project specified in the call to CreateGroup and a unique {group_id} that is generated automatically.",
+	//       "description": "Output only. The name of this group. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\nWhen creating a group, this field is ignored and a new name is created consisting of the project specified in the call to CreateGroup and a unique [GROUP_ID] that is generated automatically.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/groups/[^/]+$",
 	//       "required": true,
@@ -6784,11 +6972,12 @@ func (r *ProjectsGroupsMembersService) List(name string) *ProjectsGroupsMembersL
 }
 
 // Filter sets the optional parameter "filter": An optional list filter
+// (https://cloud.google.com/monitoring/api/learn_more#filtering)
 // describing the members to be returned. The filter may reference the
 // type, labels, and metadata of monitored resources that comprise the
 // group. For example, to return only resources representing Compute
 // Engine VM instances, use this filter:
-// resource.type = "gce_instance"
+// `resource.type = "gce_instance"
 func (c *ProjectsGroupsMembersListCall) Filter(filter string) *ProjectsGroupsMembersListCall {
 	c.urlParams_.Set("filter", filter)
 	return c
@@ -6818,8 +7007,8 @@ func (c *ProjectsGroupsMembersListCall) PageSize(pageSize int64) *ProjectsGroups
 }
 
 // PageToken sets the optional parameter "pageToken": If this field is
-// not empty then it must contain the nextPageToken value returned by a
-// previous call to this method. Using this field causes the method to
+// not empty then it must contain the next_page_token value returned by
+// a previous call to this method. Using this field causes the method to
 // return additional results from the previous method call.
 func (c *ProjectsGroupsMembersListCall) PageToken(pageToken string) *ProjectsGroupsMembersListCall {
 	c.urlParams_.Set("pageToken", pageToken)
@@ -6863,7 +7052,7 @@ func (c *ProjectsGroupsMembersListCall) Header() http.Header {
 
 func (c *ProjectsGroupsMembersListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -6934,7 +7123,7 @@ func (c *ProjectsGroupsMembersListCall) Do(opts ...googleapi.CallOption) (*ListG
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "An optional list filter describing the members to be returned. The filter may reference the type, labels, and metadata of monitored resources that comprise the group. For example, to return only resources representing Compute Engine VM instances, use this filter:\nresource.type = \"gce_instance\"\n",
+	//       "description": "An optional list filter (https://cloud.google.com/monitoring/api/learn_more#filtering) describing the members to be returned. The filter may reference the type, labels, and metadata of monitored resources that comprise the group. For example, to return only resources representing Compute Engine VM instances, use this filter:\n`resource.type = \"gce_instance\"`\n",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -6951,7 +7140,7 @@ func (c *ProjectsGroupsMembersListCall) Do(opts ...googleapi.CallOption) (*ListG
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The group whose members are listed. The format is \"projects/{project_id_or_number}/groups/{group_id}\".",
+	//       "description": "Required. The group whose members are listed. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/groups/[GROUP_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/groups/[^/]+$",
 	//       "required": true,
@@ -6964,7 +7153,7 @@ func (c *ProjectsGroupsMembersListCall) Do(opts ...googleapi.CallOption) (*ListG
 	//       "type": "integer"
 	//     },
 	//     "pageToken": {
-	//       "description": "If this field is not empty then it must contain the nextPageToken value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
+	//       "description": "If this field is not empty then it must contain the next_page_token value returned by a previous call to this method. Using this field causes the method to return additional results from the previous method call.",
 	//       "location": "query",
 	//       "type": "string"
 	//     }
@@ -7015,7 +7204,8 @@ type ProjectsMetricDescriptorsCreateCall struct {
 }
 
 // Create: Creates a new metric descriptor. User-created metric
-// descriptors define custom metrics.
+// descriptors define custom metrics
+// (https://cloud.google.com/monitoring/custom-metrics).
 func (r *ProjectsMetricDescriptorsService) Create(name string, metricdescriptor *MetricDescriptor) *ProjectsMetricDescriptorsCreateCall {
 	c := &ProjectsMetricDescriptorsCreateCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.name = name
@@ -7050,7 +7240,7 @@ func (c *ProjectsMetricDescriptorsCreateCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7114,7 +7304,7 @@ func (c *ProjectsMetricDescriptorsCreateCall) Do(opts ...googleapi.CallOption) (
 	}
 	return ret, nil
 	// {
-	//   "description": "Creates a new metric descriptor. User-created metric descriptors define custom metrics.",
+	//   "description": "Creates a new metric descriptor. User-created metric descriptors define custom metrics (https://cloud.google.com/monitoring/custom-metrics).",
 	//   "flatPath": "v3/projects/{projectsId}/metricDescriptors",
 	//   "httpMethod": "POST",
 	//   "id": "monitoring.projects.metricDescriptors.create",
@@ -7123,7 +7313,7 @@ func (c *ProjectsMetricDescriptorsCreateCall) Do(opts ...googleapi.CallOption) (
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -7157,7 +7347,7 @@ type ProjectsMetricDescriptorsDeleteCall struct {
 }
 
 // Delete: Deletes a metric descriptor. Only user-created custom metrics
-// can be deleted.
+// (https://cloud.google.com/monitoring/custom-metrics) can be deleted.
 func (r *ProjectsMetricDescriptorsService) Delete(name string) *ProjectsMetricDescriptorsDeleteCall {
 	c := &ProjectsMetricDescriptorsDeleteCall{s: r.s, urlParams_: make(gensupport.URLParams)}
 	c.name = name
@@ -7191,7 +7381,7 @@ func (c *ProjectsMetricDescriptorsDeleteCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7250,7 +7440,7 @@ func (c *ProjectsMetricDescriptorsDeleteCall) Do(opts ...googleapi.CallOption) (
 	}
 	return ret, nil
 	// {
-	//   "description": "Deletes a metric descriptor. Only user-created custom metrics can be deleted.",
+	//   "description": "Deletes a metric descriptor. Only user-created custom metrics (https://cloud.google.com/monitoring/custom-metrics) can be deleted.",
 	//   "flatPath": "v3/projects/{projectsId}/metricDescriptors/{metricDescriptorsId}",
 	//   "httpMethod": "DELETE",
 	//   "id": "monitoring.projects.metricDescriptors.delete",
@@ -7259,9 +7449,9 @@ func (c *ProjectsMetricDescriptorsDeleteCall) Do(opts ...googleapi.CallOption) (
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The metric descriptor on which to execute the request. The format is \"projects/{project_id_or_number}/metricDescriptors/{metric_id}\". An example of {metric_id} is: \"custom.googleapis.com/my_test_metric\".",
+	//       "description": "Required. The metric descriptor on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/metricDescriptors/[METRIC_ID]\nAn example of [METRIC_ID] is: \"custom.googleapis.com/my_test_metric\".",
 	//       "location": "path",
-	//       "pattern": "^projects/[^/]+/metricDescriptors/.+$",
+	//       "pattern": "^projects/[^/]+/metricDescriptors/.*$",
 	//       "required": true,
 	//       "type": "string"
 	//     }
@@ -7334,7 +7524,7 @@ func (c *ProjectsMetricDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7405,9 +7595,9 @@ func (c *ProjectsMetricDescriptorsGetCall) Do(opts ...googleapi.CallOption) (*Me
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The metric descriptor on which to execute the request. The format is \"projects/{project_id_or_number}/metricDescriptors/{metric_id}\". An example value of {metric_id} is \"compute.googleapis.com/instance/disk/read_bytes_count\".",
+	//       "description": "Required. The metric descriptor on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/metricDescriptors/[METRIC_ID]\nAn example value of [METRIC_ID] is \"compute.googleapis.com/instance/disk/read_bytes_count\".",
 	//       "location": "path",
-	//       "pattern": "^projects/[^/]+/metricDescriptors/.+$",
+	//       "pattern": "^projects/[^/]+/metricDescriptors/.*$",
 	//       "required": true,
 	//       "type": "string"
 	//     }
@@ -7447,9 +7637,11 @@ func (r *ProjectsMetricDescriptorsService) List(name string) *ProjectsMetricDesc
 
 // Filter sets the optional parameter "filter": If this field is empty,
 // all custom and system-defined metric descriptors are returned.
-// Otherwise, the filter specifies which metric descriptors are to be
-// returned. For example, the following filter matches all custom
-// metrics:
+// Otherwise, the filter
+// (https://cloud.google.com/monitoring/api/v3/filters) specifies which
+// metric descriptors are to be returned. For example, the following
+// filter matches all custom metrics
+// (https://cloud.google.com/monitoring/custom-metrics):
 // metric.type = starts_with("custom.googleapis.com/")
 func (c *ProjectsMetricDescriptorsListCall) Filter(filter string) *ProjectsMetricDescriptorsListCall {
 	c.urlParams_.Set("filter", filter)
@@ -7509,7 +7701,7 @@ func (c *ProjectsMetricDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsMetricDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7580,12 +7772,12 @@ func (c *ProjectsMetricDescriptorsListCall) Do(opts ...googleapi.CallOption) (*L
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "If this field is empty, all custom and system-defined metric descriptors are returned. Otherwise, the filter specifies which metric descriptors are to be returned. For example, the following filter matches all custom metrics:\nmetric.type = starts_with(\"custom.googleapis.com/\")\n",
+	//       "description": "If this field is empty, all custom and system-defined metric descriptors are returned. Otherwise, the filter (https://cloud.google.com/monitoring/api/v3/filters) specifies which metric descriptors are to be returned. For example, the following filter matches all custom metrics (https://cloud.google.com/monitoring/custom-metrics):\nmetric.type = starts_with(\"custom.googleapis.com/\")\n",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -7694,7 +7886,7 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsMonitoredResourceDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7765,9 +7957,9 @@ func (c *ProjectsMonitoredResourceDescriptorsGetCall) Do(opts ...googleapi.CallO
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The monitored resource descriptor to get. The format is \"projects/{project_id_or_number}/monitoredResourceDescriptors/{resource_type}\". The {resource_type} is a predefined type, such as cloudsql_database.",
+	//       "description": "Required. The monitored resource descriptor to get. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/monitoredResourceDescriptors/[RESOURCE_TYPE]\nThe [RESOURCE_TYPE] is a predefined type, such as cloudsql_database.",
 	//       "location": "path",
-	//       "pattern": "^projects/[^/]+/monitoredResourceDescriptors/[^/]+$",
+	//       "pattern": "^projects/[^/]+/monitoredResourceDescriptors/.*$",
 	//       "required": true,
 	//       "type": "string"
 	//     }
@@ -7806,9 +7998,10 @@ func (r *ProjectsMonitoredResourceDescriptorsService) List(name string) *Project
 }
 
 // Filter sets the optional parameter "filter": An optional filter
-// describing the descriptors to be returned. The filter can reference
-// the descriptor's type and labels. For example, the following filter
-// returns only Google Compute Engine descriptors that have an id
+// (https://cloud.google.com/monitoring/api/v3/filters) describing the
+// descriptors to be returned. The filter can reference the descriptor's
+// type and labels. For example, the following filter returns only
+// Google Compute Engine descriptors that have an id
 // label:
 // resource.type = starts_with("gce_") AND resource.label:id
 func (c *ProjectsMonitoredResourceDescriptorsListCall) Filter(filter string) *ProjectsMonitoredResourceDescriptorsListCall {
@@ -7869,7 +8062,7 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsMonitoredResourceDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -7942,12 +8135,12 @@ func (c *ProjectsMonitoredResourceDescriptorsListCall) Do(opts ...googleapi.Call
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "An optional filter describing the descriptors to be returned. The filter can reference the descriptor's type and labels. For example, the following filter returns only Google Compute Engine descriptors that have an id label:\nresource.type = starts_with(\"gce_\") AND resource.label:id\n",
+	//       "description": "An optional filter (https://cloud.google.com/monitoring/api/v3/filters) describing the descriptors to be returned. The filter can reference the descriptor's type and labels. For example, the following filter returns only Google Compute Engine descriptors that have an id label:\nresource.type = starts_with(\"gce_\") AND resource.label:id\n",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -8057,7 +8250,7 @@ func (c *ProjectsNotificationChannelDescriptorsGetCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelDescriptorsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8128,7 +8321,7 @@ func (c *ProjectsNotificationChannelDescriptorsGetCall) Do(opts ...googleapi.Cal
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The channel type for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannelDescriptors/{channel_type}.",
+	//       "description": "Required. The channel type for which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/notificationChannelDescriptors/[CHANNEL_TYPE]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannelDescriptors/[^/]+$",
 	//       "required": true,
@@ -8221,7 +8414,7 @@ func (c *ProjectsNotificationChannelDescriptorsListCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelDescriptorsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8294,7 +8487,7 @@ func (c *ProjectsNotificationChannelDescriptorsListCall) Do(opts ...googleapi.Ca
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The REST resource name of the parent from which to retrieve the notification channel descriptors. The expected syntax is:\nprojects/[PROJECT_ID]\nNote that this names the parent container in which to look for the descriptors; to retrieve a single descriptor by name, use the GetNotificationChannelDescriptor operation, instead.",
+	//       "description": "Required. The REST resource name of the parent from which to retrieve the notification channel descriptors. The expected syntax is:\nprojects/[PROJECT_ID_OR_NUMBER]\nNote that this names the parent container in which to look for the descriptors; to retrieve a single descriptor by name, use the GetNotificationChannelDescriptor operation, instead.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -8394,7 +8587,7 @@ func (c *ProjectsNotificationChannelsCreateCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8467,7 +8660,7 @@ func (c *ProjectsNotificationChannelsCreateCall) Do(opts ...googleapi.CallOption
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is:\nprojects/[PROJECT_ID]\nNote that this names the container into which the channel will be written. This does not name the newly created channel. The resulting channel's name will have a normalized version of this field as a prefix, but will add /notificationChannels/[CHANNEL_ID] to identify the channel.",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\nThis names the container into which the channel will be written, this does not name the newly created channel. The resulting channel's name will have a normalized version of this field as a prefix, but will add /notificationChannels/[CHANNEL_ID] to identify the channel.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -8543,7 +8736,7 @@ func (c *ProjectsNotificationChannelsDeleteCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8616,7 +8809,7 @@ func (c *ProjectsNotificationChannelsDeleteCall) Do(opts ...googleapi.CallOption
 	//       "type": "boolean"
 	//     },
 	//     "name": {
-	//       "description": "The channel for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID].",
+	//       "description": "Required. The channel for which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -8695,7 +8888,7 @@ func (c *ProjectsNotificationChannelsGetCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8766,7 +8959,7 @@ func (c *ProjectsNotificationChannelsGetCall) Do(opts ...googleapi.CallOption) (
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The channel for which to execute the request. The format is projects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID].",
+	//       "description": "Required. The channel for which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -8852,7 +9045,7 @@ func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Header() http.Head
 
 func (c *ProjectsNotificationChannelsGetVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -8927,7 +9120,7 @@ func (c *ProjectsNotificationChannelsGetVerificationCodeCall) Do(opts ...googlea
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The notification channel for which a verification code is to be generated and retrieved. This must name a channel that is already verified; if the specified channel is not verified, the request will fail.",
+	//       "description": "Required. The notification channel for which a verification code is to be generated and retrieved. This must name a channel that is already verified; if the specified channel is not verified, the request will fail.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -8971,7 +9164,8 @@ func (r *ProjectsNotificationChannelsService) List(name string) *ProjectsNotific
 // Filter sets the optional parameter "filter": If provided, this field
 // specifies the criteria that must be met by notification channels to
 // be included in the response.For more details, see sorting and
-// filtering.
+// filtering
+// (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).
 func (c *ProjectsNotificationChannelsListCall) Filter(filter string) *ProjectsNotificationChannelsListCall {
 	c.urlParams_.Set("filter", filter)
 	return c
@@ -8981,7 +9175,8 @@ func (c *ProjectsNotificationChannelsListCall) Filter(filter string) *ProjectsNo
 // of fields by which to sort the result. Supports the same set of
 // fields as in filter. Entries can be prefixed with a minus sign to
 // sort in descending rather than ascending order.For more details, see
-// sorting and filtering.
+// sorting and filtering
+// (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).
 func (c *ProjectsNotificationChannelsListCall) OrderBy(orderBy string) *ProjectsNotificationChannelsListCall {
 	c.urlParams_.Set("orderBy", orderBy)
 	return c
@@ -9040,7 +9235,7 @@ func (c *ProjectsNotificationChannelsListCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9111,19 +9306,19 @@ func (c *ProjectsNotificationChannelsListCall) Do(opts ...googleapi.CallOption) 
 	//   ],
 	//   "parameters": {
 	//     "filter": {
-	//       "description": "If provided, this field specifies the criteria that must be met by notification channels to be included in the response.For more details, see sorting and filtering.",
+	//       "description": "If provided, this field specifies the criteria that must be met by notification channels to be included in the response.For more details, see sorting and filtering (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is projects/[PROJECT_ID]. That is, this names the container in which to look for the notification channels; it does not name a specific channel. To query a specific channel by REST resource name, use the GetNotificationChannel operation.",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\nThis names the container in which to look for the notification channels; it does not name a specific channel. To query a specific channel by REST resource name, use the GetNotificationChannel operation.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "orderBy": {
-	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of fields as in filter. Entries can be prefixed with a minus sign to sort in descending rather than ascending order.For more details, see sorting and filtering.",
+	//       "description": "A comma-separated list of fields by which to sort the result. Supports the same set of fields as in filter. Entries can be prefixed with a minus sign to sort in descending rather than ascending order.For more details, see sorting and filtering (https://cloud.google.com/monitoring/api/v3/sorting-and-filtering).",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -9227,7 +9422,7 @@ func (c *ProjectsNotificationChannelsPatchCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9300,7 +9495,7 @@ func (c *ProjectsNotificationChannelsPatchCall) Do(opts ...googleapi.CallOption)
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The full REST resource name for this channel. The syntax is:\nprojects/[PROJECT_ID]/notificationChannels/[CHANNEL_ID]\nThe [CHANNEL_ID] is automatically assigned by the server on creation.",
+	//       "description": "The full REST resource name for this channel. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/notificationChannels/[CHANNEL_ID]\nThe [CHANNEL_ID] is automatically assigned by the server on creation.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -9376,7 +9571,7 @@ func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Header() http.Hea
 
 func (c *ProjectsNotificationChannelsSendVerificationCodeCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9449,7 +9644,7 @@ func (c *ProjectsNotificationChannelsSendVerificationCodeCall) Do(opts ...google
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The notification channel to which to send a verification code.",
+	//       "description": "Required. The notification channel to which to send a verification code.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -9519,7 +9714,7 @@ func (c *ProjectsNotificationChannelsVerifyCall) Header() http.Header {
 
 func (c *ProjectsNotificationChannelsVerifyCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9592,7 +9787,7 @@ func (c *ProjectsNotificationChannelsVerifyCall) Do(opts ...googleapi.CallOption
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The notification channel to verify.",
+	//       "description": "Required. The notification channel to verify.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/notificationChannels/[^/]+$",
 	//       "required": true,
@@ -9663,7 +9858,7 @@ func (c *ProjectsTimeSeriesCreateCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -9736,7 +9931,7 @@ func (c *ProjectsTimeSeriesCreateCall) Do(opts ...googleapi.CallOption) (*Empty,
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -9779,29 +9974,33 @@ func (r *ProjectsTimeSeriesService) List(name string) *ProjectsTimeSeriesListCal
 }
 
 // AggregationAlignmentPeriod sets the optional parameter
-// "aggregation.alignmentPeriod": The alignment period for per-time
-// series alignment. If present, alignmentPeriod must be at least 60
-// seconds. After per-time series alignment, each time series will
-// contain data points only on the period boundaries. If
-// perSeriesAligner is not specified or equals ALIGN_NONE, then this
-// field is ignored. If perSeriesAligner is specified and does not equal
-// ALIGN_NONE, then this field must be defined; otherwise an error is
-// returned.
+// "aggregation.alignmentPeriod": The alignment_period specifies a time
+// interval, in seconds, that is used to divide the data in all the time
+// series into consistent blocks of time. This will be done before the
+// per-series aligner can be applied to the data.The value must be at
+// least 60 seconds. If a per-series aligner other than ALIGN_NONE is
+// specified, this field is required or an error is returned. If no
+// per-series aligner is specified, or the aligner ALIGN_NONE is
+// specified, then this field is ignored.
 func (c *ProjectsTimeSeriesListCall) AggregationAlignmentPeriod(aggregationAlignmentPeriod string) *ProjectsTimeSeriesListCall {
 	c.urlParams_.Set("aggregation.alignmentPeriod", aggregationAlignmentPeriod)
 	return c
 }
 
 // AggregationCrossSeriesReducer sets the optional parameter
-// "aggregation.crossSeriesReducer": The approach to be used to combine
-// time series. Not all reducer functions may be applied to all time
-// series, depending on the metric type and the value type of the
-// original time series. Reduction may change the metric type of value
-// type of the time series.Time series data must be aligned in order to
-// perform cross-time series reduction. If crossSeriesReducer is
-// specified, then perSeriesAligner must be specified and not equal
-// ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error
-// is returned.
+// "aggregation.crossSeriesReducer": The reduction operation to be used
+// to combine time series into a single time series, where the value of
+// each data point in the resulting series is a function of all the
+// already aligned values in the input time series.Not all reducer
+// operations can be applied to all time series. The valid choices
+// depend on the metric_kind and the value_type of the original time
+// series. Reduction can yield a time series with a different
+// metric_kind or value_type than the input time series.Time series data
+// must first be aligned (see per_series_aligner) in order to perform
+// cross-time series reduction. If cross_series_reducer is specified,
+// then per_series_aligner must be specified, and must not be
+// ALIGN_NONE. An alignment_period must also be specified; otherwise, an
+// error is returned.
 //
 // Possible values:
 //   "REDUCE_NONE"
@@ -9825,33 +10024,37 @@ func (c *ProjectsTimeSeriesListCall) AggregationCrossSeriesReducer(aggregationCr
 
 // AggregationGroupByFields sets the optional parameter
 // "aggregation.groupByFields": The set of fields to preserve when
-// crossSeriesReducer is specified. The groupByFields determine how the
-// time series are partitioned into subsets prior to applying the
-// aggregation function. Each subset contains time series that have the
+// cross_series_reducer is specified. The group_by_fields determine how
+// the time series are partitioned into subsets prior to applying the
+// aggregation operation. Each subset contains time series that have the
 // same value for each of the grouping fields. Each individual time
-// series is a member of exactly one subset. The crossSeriesReducer is
+// series is a member of exactly one subset. The cross_series_reducer is
 // applied to each subset of time series. It is not possible to reduce
 // across different resource types, so this field implicitly contains
-// resource.type. Fields not specified in groupByFields are aggregated
-// away. If groupByFields is not specified and all the time series have
-// the same resource type, then the time series are aggregated into a
-// single output time series. If crossSeriesReducer is not defined, this
-// field is ignored.
+// resource.type. Fields not specified in group_by_fields are aggregated
+// away. If group_by_fields is not specified and all the time series
+// have the same resource type, then the time series are aggregated into
+// a single output time series. If cross_series_reducer is not defined,
+// this field is ignored.
 func (c *ProjectsTimeSeriesListCall) AggregationGroupByFields(aggregationGroupByFields ...string) *ProjectsTimeSeriesListCall {
 	c.urlParams_.SetMulti("aggregation.groupByFields", append([]string{}, aggregationGroupByFields...))
 	return c
 }
 
 // AggregationPerSeriesAligner sets the optional parameter
-// "aggregation.perSeriesAligner": The approach to be used to align
-// individual time series. Not all alignment functions may be applied to
-// all time series, depending on the metric type and value type of the
-// original time series. Alignment may change the metric type or the
-// value type of the time series.Time series data must be aligned in
-// order to perform cross-time series reduction. If crossSeriesReducer
-// is specified, then perSeriesAligner must be specified and not equal
-// ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error
-// is returned.
+// "aggregation.perSeriesAligner": An Aligner describes how to bring the
+// data points in a single time series into temporal alignment. Except
+// for ALIGN_NONE, all alignments cause all the data points in an
+// alignment_period to be mathematically grouped together, resulting in
+// a single data point for each alignment_period with end timestamp at
+// the end of the period.Not all alignment operations may be applied to
+// all time series. The valid choices depend on the metric_kind and
+// value_type of the original time series. Alignment can change the
+// metric_kind or the value_type of the time series.Time series data
+// must be aligned in order to perform cross-time series reduction. If
+// cross_series_reducer is specified, then per_series_aligner must be
+// specified and not equal to ALIGN_NONE and alignment_period must be
+// specified; otherwise, an error is returned.
 //
 // Possible values:
 //   "ALIGN_NONE"
@@ -9878,7 +10081,8 @@ func (c *ProjectsTimeSeriesListCall) AggregationPerSeriesAligner(aggregationPerS
 	return c
 }
 
-// Filter sets the optional parameter "filter": A monitoring filter that
+// Filter sets the optional parameter "filter": Required. A monitoring
+// filter (https://cloud.google.com/monitoring/api/v3/filters) that
 // specifies which time series should be returned. The filter must
 // specify a single metric type, and can additionally specify metric
 // labels and other information. For example:
@@ -9933,8 +10137,8 @@ func (c *ProjectsTimeSeriesListCall) PageToken(pageToken string) *ProjectsTimeSe
 	return c
 }
 
-// View sets the optional parameter "view": Specifies which information
-// is returned about the time series.
+// View sets the optional parameter "view": Required. Specifies which
+// information is returned about the time series.
 //
 // Possible values:
 //   "FULL"
@@ -9981,7 +10185,7 @@ func (c *ProjectsTimeSeriesListCall) Header() http.Header {
 
 func (c *ProjectsTimeSeriesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10052,13 +10256,13 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//   ],
 	//   "parameters": {
 	//     "aggregation.alignmentPeriod": {
-	//       "description": "The alignment period for per-time series alignment. If present, alignmentPeriod must be at least 60 seconds. After per-time series alignment, each time series will contain data points only on the period boundaries. If perSeriesAligner is not specified or equals ALIGN_NONE, then this field is ignored. If perSeriesAligner is specified and does not equal ALIGN_NONE, then this field must be defined; otherwise an error is returned.",
+	//       "description": "The alignment_period specifies a time interval, in seconds, that is used to divide the data in all the time series into consistent blocks of time. This will be done before the per-series aligner can be applied to the data.The value must be at least 60 seconds. If a per-series aligner other than ALIGN_NONE is specified, this field is required or an error is returned. If no per-series aligner is specified, or the aligner ALIGN_NONE is specified, then this field is ignored.",
 	//       "format": "google-duration",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
 	//     "aggregation.crossSeriesReducer": {
-	//       "description": "The approach to be used to combine time series. Not all reducer functions may be applied to all time series, depending on the metric type and the value type of the original time series. Reduction may change the metric type of value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned.",
+	//       "description": "The reduction operation to be used to combine time series into a single time series, where the value of each data point in the resulting series is a function of all the already aligned values in the input time series.Not all reducer operations can be applied to all time series. The valid choices depend on the metric_kind and the value_type of the original time series. Reduction can yield a time series with a different metric_kind or value_type than the input time series.Time series data must first be aligned (see per_series_aligner) in order to perform cross-time series reduction. If cross_series_reducer is specified, then per_series_aligner must be specified, and must not be ALIGN_NONE. An alignment_period must also be specified; otherwise, an error is returned.",
 	//       "enum": [
 	//         "REDUCE_NONE",
 	//         "REDUCE_MEAN",
@@ -10079,13 +10283,13 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "aggregation.groupByFields": {
-	//       "description": "The set of fields to preserve when crossSeriesReducer is specified. The groupByFields determine how the time series are partitioned into subsets prior to applying the aggregation function. Each subset contains time series that have the same value for each of the grouping fields. Each individual time series is a member of exactly one subset. The crossSeriesReducer is applied to each subset of time series. It is not possible to reduce across different resource types, so this field implicitly contains resource.type. Fields not specified in groupByFields are aggregated away. If groupByFields is not specified and all the time series have the same resource type, then the time series are aggregated into a single output time series. If crossSeriesReducer is not defined, this field is ignored.",
+	//       "description": "The set of fields to preserve when cross_series_reducer is specified. The group_by_fields determine how the time series are partitioned into subsets prior to applying the aggregation operation. Each subset contains time series that have the same value for each of the grouping fields. Each individual time series is a member of exactly one subset. The cross_series_reducer is applied to each subset of time series. It is not possible to reduce across different resource types, so this field implicitly contains resource.type. Fields not specified in group_by_fields are aggregated away. If group_by_fields is not specified and all the time series have the same resource type, then the time series are aggregated into a single output time series. If cross_series_reducer is not defined, this field is ignored.",
 	//       "location": "query",
 	//       "repeated": true,
 	//       "type": "string"
 	//     },
 	//     "aggregation.perSeriesAligner": {
-	//       "description": "The approach to be used to align individual time series. Not all alignment functions may be applied to all time series, depending on the metric type and value type of the original time series. Alignment may change the metric type or the value type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If crossSeriesReducer is specified, then perSeriesAligner must be specified and not equal ALIGN_NONE and alignmentPeriod must be specified; otherwise, an error is returned.",
+	//       "description": "An Aligner describes how to bring the data points in a single time series into temporal alignment. Except for ALIGN_NONE, all alignments cause all the data points in an alignment_period to be mathematically grouped together, resulting in a single data point for each alignment_period with end timestamp at the end of the period.Not all alignment operations may be applied to all time series. The valid choices depend on the metric_kind and value_type of the original time series. Alignment can change the metric_kind or the value_type of the time series.Time series data must be aligned in order to perform cross-time series reduction. If cross_series_reducer is specified, then per_series_aligner must be specified and not equal to ALIGN_NONE and alignment_period must be specified; otherwise, an error is returned.",
 	//       "enum": [
 	//         "ALIGN_NONE",
 	//         "ALIGN_DELTA",
@@ -10111,7 +10315,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "filter": {
-	//       "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.labels.instance_name = \"my-instance-name\"\n",
+	//       "description": "Required. A monitoring filter (https://cloud.google.com/monitoring/api/v3/filters) that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.labels.instance_name = \"my-instance-name\"\n",
 	//       "location": "query",
 	//       "type": "string"
 	//     },
@@ -10128,7 +10332,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "name": {
-	//       "description": "The project on which to execute the request. The format is \"projects/{project_id_or_number}\".",
+	//       "description": "Required. The project on which to execute the request. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -10151,7 +10355,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "view": {
-	//       "description": "Specifies which information is returned about the time series.",
+	//       "description": "Required. Specifies which information is returned about the time series.",
 	//       "enum": [
 	//         "FULL",
 	//         "HEADERS"
@@ -10240,7 +10444,7 @@ func (c *ProjectsUptimeCheckConfigsCreateCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10313,7 +10517,7 @@ func (c *ProjectsUptimeCheckConfigsCreateCall) Do(opts ...googleapi.CallOption) 
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "The project in which to create the Uptime check. The format  is projects/[PROJECT_ID].",
+	//       "description": "Required. The project in which to create the Uptime check. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -10382,7 +10586,7 @@ func (c *ProjectsUptimeCheckConfigsDeleteCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10450,7 +10654,7 @@ func (c *ProjectsUptimeCheckConfigsDeleteCall) Do(opts ...googleapi.CallOption) 
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The Uptime check configuration to delete. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+	//       "description": "Required. The Uptime check configuration to delete. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/uptimeCheckConfigs/[UPTIME_CHECK_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
 	//       "required": true,
@@ -10524,7 +10728,7 @@ func (c *ProjectsUptimeCheckConfigsGetCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10595,7 +10799,7 @@ func (c *ProjectsUptimeCheckConfigsGetCall) Do(opts ...googleapi.CallOption) (*U
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "The Uptime check configuration to retrieve. The format  is projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].",
+	//       "description": "Required. The Uptime check configuration to retrieve. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/uptimeCheckConfigs/[UPTIME_CHECK_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
 	//       "required": true,
@@ -10690,7 +10894,7 @@ func (c *ProjectsUptimeCheckConfigsListCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10772,7 +10976,7 @@ func (c *ProjectsUptimeCheckConfigsListCall) Do(opts ...googleapi.CallOption) (*
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "The project whose Uptime check configurations are listed. The format  is projects/[PROJECT_ID].",
+	//       "description": "Required. The project whose Uptime check configurations are listed. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+$",
 	//       "required": true,
@@ -10872,7 +11076,7 @@ func (c *ProjectsUptimeCheckConfigsPatchCall) Header() http.Header {
 
 func (c *ProjectsUptimeCheckConfigsPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -10945,7 +11149,7 @@ func (c *ProjectsUptimeCheckConfigsPatchCall) Do(opts ...googleapi.CallOption) (
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "A unique resource name for this Uptime check configuration. The format is:projects/[PROJECT_ID]/uptimeCheckConfigs/[UPTIME_CHECK_ID].This field should be omitted when creating the Uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
+	//       "description": "A unique resource name for this Uptime check configuration. The format is:\n projects/[PROJECT_ID_OR_NUMBER]/uptimeCheckConfigs/[UPTIME_CHECK_ID]\nThis field should be omitted when creating the Uptime check configuration; on create, the resource name is assigned by the server and included in the response.",
 	//       "location": "path",
 	//       "pattern": "^projects/[^/]+/uptimeCheckConfigs/[^/]+$",
 	//       "required": true,
@@ -10994,7 +11198,7 @@ func (r *ServicesService) Create(parent string, service *MService) *ServicesCrea
 
 // ServiceId sets the optional parameter "serviceId": The Service id to
 // use for this Service. If omitted, an id will be generated instead.
-// Must match the pattern a-z0-9-+
+// Must match the pattern [a-z0-9\-]+
 func (c *ServicesCreateCall) ServiceId(serviceId string) *ServicesCreateCall {
 	c.urlParams_.Set("serviceId", serviceId)
 	return c
@@ -11027,7 +11231,7 @@ func (c *ServicesCreateCall) Header() http.Header {
 
 func (c *ServicesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11100,14 +11304,14 @@ func (c *ServicesCreateCall) Do(opts ...googleapi.CallOption) (*MService, error)
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "Resource name of the parent workspace. Of the form projects/{project_id}.",
+	//       "description": "Required. Resource name of the parent workspace. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "serviceId": {
-	//       "description": "Optional. The Service id to use for this Service. If omitted, an id will be generated instead. Must match the pattern a-z0-9-+",
+	//       "description": "Optional. The Service id to use for this Service. If omitted, an id will be generated instead. Must match the pattern [a-z0-9\\-]+",
 	//       "location": "query",
 	//       "type": "string"
 	//     }
@@ -11171,7 +11375,7 @@ func (c *ServicesDeleteCall) Header() http.Header {
 
 func (c *ServicesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11239,7 +11443,7 @@ func (c *ServicesDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, error) {
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name of the Service to delete. Of the form projects/{project_id}/service/{service_id}.",
+	//       "description": "Required. Resource name of the Service to delete. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
@@ -11313,7 +11517,7 @@ func (c *ServicesGetCall) Header() http.Header {
 
 func (c *ServicesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11384,7 +11588,7 @@ func (c *ServicesGetCall) Do(opts ...googleapi.CallOption) (*MService, error) {
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name of the Service. Of the form projects/{project_id}/services/{service_id}.",
+	//       "description": "Required. Resource name of the Service. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
@@ -11495,7 +11699,7 @@ func (c *ServicesListCall) Header() http.Header {
 
 func (c *ServicesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11582,7 +11786,7 @@ func (c *ServicesListCall) Do(opts ...googleapi.CallOption) (*ListServicesRespon
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Resource name of the parent Workspace. Of the form projects/{project_id}.",
+	//       "description": "Required. Resource name of the parent containing the listed services, either a project or Stackdriver Account (workspace). The formats are:\nprojects/[PROJECT_ID_OR_NUMBER]\nworkspaces/[HOST_PROJECT_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+$",
 	//       "required": true,
@@ -11676,7 +11880,7 @@ func (c *ServicesPatchCall) Header() http.Header {
 
 func (c *ServicesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11749,7 +11953,7 @@ func (c *ServicesPatchCall) Do(opts ...googleapi.CallOption) (*MService, error) 
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name for this Service. Of the form projects/{project_id}/services/{service_id}.",
+	//       "description": "Resource name for this Service. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID}\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
@@ -11799,7 +12003,7 @@ func (r *ServicesServiceLevelObjectivesService) Create(parent string, servicelev
 // ServiceLevelObjectiveId sets the optional parameter
 // "serviceLevelObjectiveId": The ServiceLevelObjective id to use for
 // this ServiceLevelObjective. If omitted, an id will be generated
-// instead. Must match the pattern a-z0-9-+
+// instead. Must match the pattern [a-z0-9\-]+
 func (c *ServicesServiceLevelObjectivesCreateCall) ServiceLevelObjectiveId(serviceLevelObjectiveId string) *ServicesServiceLevelObjectivesCreateCall {
 	c.urlParams_.Set("serviceLevelObjectiveId", serviceLevelObjectiveId)
 	return c
@@ -11832,7 +12036,7 @@ func (c *ServicesServiceLevelObjectivesCreateCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesCreateCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -11905,14 +12109,14 @@ func (c *ServicesServiceLevelObjectivesCreateCall) Do(opts ...googleapi.CallOpti
 	//   ],
 	//   "parameters": {
 	//     "parent": {
-	//       "description": "Resource name of the parent Service. Of the form projects/{project_id}/services/{service_id}.",
+	//       "description": "Required. Resource name of the parent Service. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
 	//     },
 	//     "serviceLevelObjectiveId": {
-	//       "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern a-z0-9-+",
+	//       "description": "Optional. The ServiceLevelObjective id to use for this ServiceLevelObjective. If omitted, an id will be generated instead. Must match the pattern [a-z0-9\\-]+",
 	//       "location": "query",
 	//       "type": "string"
 	//     }
@@ -11976,7 +12180,7 @@ func (c *ServicesServiceLevelObjectivesDeleteCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesDeleteCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12044,7 +12248,7 @@ func (c *ServicesServiceLevelObjectivesDeleteCall) Do(opts ...googleapi.CallOpti
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name of the ServiceLevelObjective to delete. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+	//       "description": "Required. Resource name of the ServiceLevelObjective to delete. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevelObjectives/[SLO_NAME]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
 	//       "required": true,
@@ -12133,7 +12337,7 @@ func (c *ServicesServiceLevelObjectivesGetCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesGetCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12204,7 +12408,7 @@ func (c *ServicesServiceLevelObjectivesGetCall) Do(opts ...googleapi.CallOption)
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name of the ServiceLevelObjective to get. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+	//       "description": "Required. Resource name of the ServiceLevelObjective to get. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevelObjectives/[SLO_NAME]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
 	//       "required": true,
@@ -12328,7 +12532,7 @@ func (c *ServicesServiceLevelObjectivesListCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12416,7 +12620,7 @@ func (c *ServicesServiceLevelObjectivesListCall) Do(opts ...googleapi.CallOption
 	//       "type": "string"
 	//     },
 	//     "parent": {
-	//       "description": "Resource name of the parent Service. Of the form projects/{project_id}/services/{service_id}.",
+	//       "description": "Required. Resource name of the parent Service. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+$",
 	//       "required": true,
@@ -12520,7 +12724,7 @@ func (c *ServicesServiceLevelObjectivesPatchCall) Header() http.Header {
 
 func (c *ServicesServiceLevelObjectivesPatchCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}
@@ -12593,7 +12797,7 @@ func (c *ServicesServiceLevelObjectivesPatchCall) Do(opts ...googleapi.CallOptio
 	//   ],
 	//   "parameters": {
 	//     "name": {
-	//       "description": "Resource name for this ServiceLevelObjective. Of the form projects/{project_id}/services/{service_id}/serviceLevelObjectives/{slo_name}.",
+	//       "description": "Resource name for this ServiceLevelObjective. The format is:\nprojects/[PROJECT_ID_OR_NUMBER]/services/[SERVICE_ID]/serviceLevelObjectives/[SLO_NAME]\n",
 	//       "location": "path",
 	//       "pattern": "^[^/]+/[^/]+/services/[^/]+/serviceLevelObjectives/[^/]+$",
 	//       "required": true,
@@ -12694,7 +12898,7 @@ func (c *UptimeCheckIpsListCall) Header() http.Header {
 
 func (c *UptimeCheckIpsListCall) doRequest(alt string) (*http.Response, error) {
 	reqHeaders := make(http.Header)
-	reqHeaders.Set("x-goog-api-client", "gl-go/1.13.1 gdcl/20191217")
+	reqHeaders.Set("x-goog-api-client", "gl-go/"+gensupport.GoVersion()+" gdcl/20200302")
 	for k, v := range c.header_ {
 		reqHeaders[k] = v
 	}

@@ -36,7 +36,6 @@ import (
 )
 
 var supportedEndpointSliceAddressTypes = sets.NewString(
-	string(discovery.AddressTypeIP), // IP is a deprecated address type
 	string(discovery.AddressTypeIPv4),
 	string(discovery.AddressTypeIPv6),
 )
@@ -50,6 +49,26 @@ type BaseEndpointInfo struct {
 	// IsLocal indicates whether the endpoint is running in same host as kube-proxy.
 	IsLocal  bool
 	Topology map[string]string
+
+	// ZoneHints represent the zone hints for the endpoint. This is based on
+	// endpoint.hints.forZones[*].name in the EndpointSlice API.
+	ZoneHints sets.String
+	// Ready indicates whether this endpoint is ready and NOT terminating.
+	// For pods, this is true if a pod has a ready status and a nil deletion timestamp.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// true since only ready endpoints are read from Endpoints.
+	// TODO: Ready can be inferred from Serving and Terminating below when enabled by default.
+	Ready bool
+	// Serving indiciates whether this endpoint is ready regardless of its terminating state.
+	// For pods this is true if it has a ready status regardless of its deletion timestamp.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// true since only ready endpoints are read from Endpoints.
+	Serving bool
+	// Terminating indicates whether this endpoint is terminating.
+	// For pods this is true if it has a non-nil deletion timestamp.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// false since terminating endpoints are always excluded from Endpoints.
+	Terminating bool
 }
 
 var _ Endpoint = &BaseEndpointInfo{}
@@ -64,9 +83,31 @@ func (info *BaseEndpointInfo) GetIsLocal() bool {
 	return info.IsLocal
 }
 
+// IsReady returns true if an endpoint is ready and not terminating.
+func (info *BaseEndpointInfo) IsReady() bool {
+	return info.Ready
+}
+
+// IsServing returns true if an endpoint is ready, regardless of if the
+// endpoint is terminating.
+func (info *BaseEndpointInfo) IsServing() bool {
+	return info.Serving
+}
+
+// IsTerminating retruns true if an endpoint is terminating. For pods,
+// that is any pod with a deletion timestamp.
+func (info *BaseEndpointInfo) IsTerminating() bool {
+	return info.Terminating
+}
+
 // GetTopology returns the topology information of the endpoint.
 func (info *BaseEndpointInfo) GetTopology() map[string]string {
 	return info.Topology
+}
+
+// GetZoneHints returns the zone hint for the endpoint.
+func (info *BaseEndpointInfo) GetZoneHints() sets.String {
+	return info.ZoneHints
 }
 
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
@@ -84,11 +125,16 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 	return info.String() == other.String() && info.GetIsLocal() == other.GetIsLocal()
 }
 
-func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string) *BaseEndpointInfo {
+func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string,
+	ready, serving, terminating bool, zoneHints sets.String) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
-		Endpoint: net.JoinHostPort(IP, strconv.Itoa(port)),
-		IsLocal:  isLocal,
-		Topology: topology,
+		Endpoint:    net.JoinHostPort(IP, strconv.Itoa(port)),
+		IsLocal:     isLocal,
+		Topology:    topology,
+		Ready:       ready,
+		Serving:     serving,
+		Terminating: terminating,
+		ZoneHints:   zoneHints,
 	}
 }
 
@@ -112,27 +158,27 @@ type EndpointChangeTracker struct {
 	processEndpointsMapChange processEndpointsMapChangeFunc
 	// endpointSliceCache holds a simplified version of endpoint slices.
 	endpointSliceCache *EndpointSliceCache
-	// isIPv6Mode indicates if change tracker is under IPv6/IPv4 mode. Nil means not applicable.
-	isIPv6Mode *bool
-	recorder   record.EventRecorder
+	// ipfamily identify the ip family on which the tracker is operating on
+	ipFamily v1.IPFamily
+	recorder record.EventRecorder
 	// Map from the Endpoints namespaced-name to the times of the triggers that caused the endpoints
 	// object to change. Used to calculate the network-programming-latency.
 	lastChangeTriggerTimes map[types.NamespacedName][]time.Time
 }
 
 // NewEndpointChangeTracker initializes an EndpointsChangeMap
-func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, isIPv6Mode *bool, recorder record.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
+func NewEndpointChangeTracker(hostname string, makeEndpointInfo makeEndpointFunc, ipFamily v1.IPFamily, recorder record.EventRecorder, endpointSlicesEnabled bool, processEndpointsMapChange processEndpointsMapChangeFunc) *EndpointChangeTracker {
 	ect := &EndpointChangeTracker{
 		hostname:                  hostname,
 		items:                     make(map[types.NamespacedName]*endpointsChange),
 		makeEndpointInfo:          makeEndpointInfo,
-		isIPv6Mode:                isIPv6Mode,
+		ipFamily:                  ipFamily,
 		recorder:                  recorder,
 		lastChangeTriggerTimes:    make(map[types.NamespacedName][]time.Time),
 		processEndpointsMapChange: processEndpointsMapChange,
 	}
 	if endpointSlicesEnabled {
-		ect.endpointSliceCache = NewEndpointSliceCache(hostname, isIPv6Mode, recorder, makeEndpointInfo)
+		ect.endpointSliceCache = NewEndpointSliceCache(hostname, ipFamily, recorder, makeEndpointInfo)
 	}
 	return ect
 }
@@ -167,7 +213,10 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		ect.items[namespacedName] = change
 	}
 
-	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() {
+	// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+	// by-definition coming from the time of last update, which is not what
+	// we want to measure. So we simply ignore it in this cases.
+	if t := getLastChangeTriggerTime(endpoints.Annotations); !t.IsZero() && current != nil {
 		ect.lastChangeTriggerTimes[namespacedName] = append(ect.lastChangeTriggerTimes[namespacedName], t)
 	}
 
@@ -222,7 +271,12 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 
 	if changeNeeded {
 		metrics.EndpointChangesPending.Inc()
-		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() {
+		// In case of Endpoints deletion, the LastChangeTriggerTime annotation is
+		// by-definition coming from the time of last update, which is not what
+		// we want to measure. So we simply ignore it in this cases.
+		// TODO(wojtek-t, robscott): Address the problem for EndpointSlice deletion
+		// when other EndpointSlice for that service still exist.
+		if t := getLastChangeTriggerTime(endpointSlice.Annotations); !t.IsZero() && !removeSlice {
 			ect.lastChangeTriggerTimes[namespacedName] =
 				append(ect.lastChangeTriggerTimes[namespacedName], t)
 		}
@@ -324,7 +378,7 @@ func (em EndpointsMap) Update(changes *EndpointChangeTracker) (result UpdateEndp
 	// TODO: If this will appear to be computationally expensive, consider
 	// computing this incrementally similarly to endpointsMap.
 	result.HCEndpointsLocalIPSize = make(map[types.NamespacedName]int)
-	localIPs := em.getLocalEndpointIPs()
+	localIPs := em.getLocalReadyEndpointIPs()
 	for nsn, ips := range localIPs {
 		result.HCEndpointsLocalIPSize[nsn] = len(ips)
 	}
@@ -366,16 +420,26 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 					klog.Warningf("ignoring invalid endpoint port %s with empty host", port.Name)
 					continue
 				}
+
 				// Filter out the incorrect IP version case.
 				// Any endpoint port that contains incorrect IP version will be ignored.
-				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
+				if (ect.ipFamily == v1.IPv6Protocol) != utilnet.IsIPv6String(addr.IP) {
 					// Emit event on the corresponding service which had a different
 					// IP version than the endpoint.
 					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Namespace, endpoints.Name, "")
 					continue
 				}
+
+				// it is safe to assume that any address in endpoints.subsets[*].addresses is
+				// ready and NOT terminating
+				isReady := true
+				isServing := true
+				isTerminating := false
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil)
+				// Only supported with EndpointSlice API
+				zoneHints := sets.String{}
+
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, isReady, isServing, isTerminating, zoneHints)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {
@@ -428,10 +492,16 @@ func (em EndpointsMap) unmerge(other EndpointsMap) {
 }
 
 // GetLocalEndpointIPs returns endpoints IPs if given endpoint is local - local means the endpoint is running in same host as kube-proxy.
-func (em EndpointsMap) getLocalEndpointIPs() map[types.NamespacedName]sets.String {
+func (em EndpointsMap) getLocalReadyEndpointIPs() map[types.NamespacedName]sets.String {
 	localIPs := make(map[types.NamespacedName]sets.String)
 	for svcPortName, epList := range em {
 		for _, ep := range epList {
+			// Only add ready endpoints for health checking. Terminating endpoints may still serve traffic
+			// but the health check signal should fail if there are only terminating endpoints on a node.
+			if !ep.IsReady() {
+				continue
+			}
+
 			if ep.GetIsLocal() {
 				nsn := svcPortName.NamespacedName
 				if localIPs[nsn] == nil {

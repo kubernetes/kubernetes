@@ -67,6 +67,8 @@ type FakeRuntimeService struct {
 	Containers         map[string]*FakeContainer
 	Sandboxes          map[string]*FakePodSandbox
 	FakeContainerStats map[string]*runtimeapi.ContainerStats
+
+	ErrorOnSandboxCreate bool
 }
 
 // GetContainerID returns the unique container ID from the FakeRuntimeService.
@@ -196,6 +198,10 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, 
 	r.Called = append(r.Called, "RunPodSandbox")
 	if err := r.popError("RunPodSandbox"); err != nil {
 		return "", err
+	}
+
+	if r.ErrorOnSandboxCreate {
+		return "", fmt.Errorf("error on sandbox create")
 	}
 
 	// PodSandboxID should be randomized for real container runtime, but here just use

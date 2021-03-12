@@ -62,8 +62,8 @@ function configure-etcd-params {
 #   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
-  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
-  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}"
+  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
+  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -92,6 +92,9 @@ function start-kube-apiserver {
     fi
     params+=" --tls-sni-cert-key=${OLD_MASTER_CERT_PATH},${OLD_MASTER_KEY_PATH}:${old_ips}"
   fi
+  if [[ -n "${TLS_CIPHER_SUITES:-}" ]]; then
+    params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
+  fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
@@ -110,7 +113,11 @@ function start-kube-apiserver {
   if [[ -n "${SERVICEACCOUNT_CERT_PATH:-}" ]]; then
     params+=" --service-account-key-file=${SERVICEACCOUNT_CERT_PATH}"
   fi
-  params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  local known_tokens_file='/etc/srv/kubernetes/known_tokens.csv'
+  if [[ -f "${known_tokens_file}" ]]; then
+    chown "${KUBE_API_SERVER_RUNASUSER:-0}":"${KUBE_API_SERVER_RUNASGROUP:-0}" "${known_tokens_file}"
+  fi
+  params+=" --token-auth-file=${known_tokens_file}"
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"
@@ -332,16 +339,18 @@ function start-kube-apiserver {
   local csc_config_volume=""
   local default_konnectivity_socket_vol=""
   local default_konnectivity_socket_mnt=""
-  if [[ "${ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
+  if [[ "${PREPARE_KONNECTIVITY_SERVICE:-false}" == "true" ]]; then
     # Create the EgressSelectorConfiguration yaml file to control the Egress Selector.
     csc_config_mount="{\"name\": \"cscconfigmount\",\"mountPath\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"readOnly\": false},"
     csc_config_volume="{\"name\": \"cscconfigmount\",\"hostPath\": {\"path\": \"/etc/srv/kubernetes/egress_selector_configuration.yaml\", \"type\": \"FileOrCreate\"}},"
-    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
 
     # UDS socket for communication between apiserver and konnectivity-server
-    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity"
+    local default_konnectivity_socket_path="/etc/srv/kubernetes/konnectivity-server"
     default_konnectivity_socket_vol="{ \"name\": \"konnectivity-socket\", \"hostPath\": {\"path\": \"${default_konnectivity_socket_path}\", \"type\": \"DirectoryOrCreate\"}},"
     default_konnectivity_socket_mnt="{ \"name\": \"konnectivity-socket\", \"mountPath\": \"${default_konnectivity_socket_path}\", \"readOnly\": false},"
+  fi
+  if [[ "${EGRESS_VIA_KONNECTIVITY:-false}" == "true" ]]; then
+    params+=" --egress-selector-config-file=/etc/srv/kubernetes/egress_selector_configuration.yaml"
   fi
 
   local container_env=""
@@ -362,6 +371,11 @@ function start-kube-apiserver {
 
   # params is passed by reference, so no "$"
   setup-etcd-encryption "${src_file}" params
+
+  local healthcheck_ip="127.0.0.1"
+  if [[ ${KUBE_APISERVER_HEALTHCHECK_ON_HOST_IP:-} == "true" ]]; then
+    healthcheck_ip=$(hostname -i)
+  fi
 
   params="$(convert-manifest-params "${params}")"
   # Evaluate variables.
@@ -393,6 +407,28 @@ function start-kube-apiserver {
   sed -i -e "s@{{webhook_exec_auth_plugin_volume}}@${webhook_exec_auth_plugin_volume}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
+  sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
+
+  if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" && -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
+    sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_API_SERVER_RUNASUSER},@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@\"runAsGroup\": ${KUBE_API_SERVER_RUNASGROUP},@g" "${src_file}"
+    sed -i -e "s@{{capabilities}}@\"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"]},@g" "${src_file}"
+    sed -i -e "s@{{allowPrivilegeEscalation}}@\"allowPrivilegeEscalation\": false,@g" "${src_file}"
+    local supplementalGroups="${KUBE_PKI_READERS_GROUP}"
+    if [[ -n "${KMS_PLUGIN_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KMS_PLUGIN_SOCKET_WRITER_GROUP}"
+    fi
+    if [[ -n "${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP}"
+    fi
+    sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${supplementalGroups} ],@g" "${src_file}"
+  else
+    sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+    sed -i -e "s@{{capabilities}}@@g" "${src_file}"
+    sed -i -e "s@{{allowPrivilegeEscalation}}@@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
+  fi
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

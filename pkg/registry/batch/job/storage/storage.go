@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // JobStorage includes dummy storage for Job.
@@ -63,9 +64,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		PredicateFunc:            job.MatchJob,
 		DefaultQualifiedResource: batch.Resource("jobs"),
 
-		CreateStrategy: job.Strategy,
-		UpdateStrategy: job.Strategy,
-		DeleteStrategy: job.Strategy,
+		CreateStrategy:      job.Strategy,
+		UpdateStrategy:      job.Strategy,
+		DeleteStrategy:      job.Strategy,
+		ResetFieldsStrategy: job.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -76,6 +78,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = job.StatusStrategy
+	statusStore.ResetFieldsStrategy = job.StatusStrategy
 
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
@@ -108,4 +111,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

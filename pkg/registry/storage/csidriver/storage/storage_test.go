@@ -48,13 +48,17 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 func validNewCSIDriver(name string) *storageapi.CSIDriver {
 	attachRequired := true
 	podInfoOnMount := true
+	requiresRepublish := true
+	storageCapacity := true
 	return &storageapi.CSIDriver{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
 		Spec: storageapi.CSIDriverSpec{
-			AttachRequired: &attachRequired,
-			PodInfoOnMount: &podInfoOnMount,
+			AttachRequired:    &attachRequired,
+			PodInfoOnMount:    &podInfoOnMount,
+			RequiresRepublish: &requiresRepublish,
+			StorageCapacity:   &storageCapacity,
 		},
 	}
 }
@@ -68,6 +72,8 @@ func TestCreate(t *testing.T) {
 	csiDriver.ObjectMeta = metav1.ObjectMeta{GenerateName: "foo"}
 	attachNotRequired := false
 	notPodInfoOnMount := false
+	notRequiresRepublish := false
+	notStorageCapacity := false
 	test.TestCreate(
 		// valid
 		csiDriver,
@@ -75,8 +81,10 @@ func TestCreate(t *testing.T) {
 		&storageapi.CSIDriver{
 			ObjectMeta: metav1.ObjectMeta{Name: "*BadName!"},
 			Spec: storageapi.CSIDriverSpec{
-				AttachRequired: &attachNotRequired,
-				PodInfoOnMount: &notPodInfoOnMount,
+				AttachRequired:    &attachNotRequired,
+				PodInfoOnMount:    &notPodInfoOnMount,
+				RequiresRepublish: &notRequiresRepublish,
+				StorageCapacity:   &notStorageCapacity,
 			},
 		},
 	)

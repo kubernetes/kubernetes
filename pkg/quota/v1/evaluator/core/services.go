@@ -24,10 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	quota "k8s.io/apiserver/pkg/quota/v1"
+	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/quota/v1"
-	"k8s.io/kubernetes/pkg/quota/v1/generic"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // the name used for object count quota
@@ -128,12 +130,31 @@ func (p *serviceEvaluator) Usage(item runtime.Object) (corev1.ResourceList, erro
 		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
 		result[corev1.ResourceServicesNodePorts] = *value
 	case corev1.ServiceTypeLoadBalancer:
-		// load balancer services need to count node ports and load balancers
-		value := resource.NewQuantity(int64(ports), resource.DecimalSI)
-		result[corev1.ResourceServicesNodePorts] = *value
+		// load balancer services need to count node ports. If creation of node ports
+		// is suppressed only ports with explicit NodePort values are counted.
+		// nodeports won't be allocated yet, so we can't simply count the actual values.
+		// We need to look at the intent.
+		if feature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) &&
+			svc.Spec.AllocateLoadBalancerNodePorts != nil &&
+			*svc.Spec.AllocateLoadBalancerNodePorts == false {
+			result[corev1.ResourceServicesNodePorts] = *portsWithNodePorts(svc)
+		} else {
+			value := resource.NewQuantity(int64(ports), resource.DecimalSI)
+			result[corev1.ResourceServicesNodePorts] = *value
+		}
 		result[corev1.ResourceServicesLoadBalancers] = *(resource.NewQuantity(1, resource.DecimalSI))
 	}
 	return result, nil
+}
+
+func portsWithNodePorts(svc *corev1.Service) *resource.Quantity {
+	count := 0
+	for _, p := range svc.Spec.Ports {
+		if p.NodePort != 0 {
+			count++
+		}
+	}
+	return resource.NewQuantity(int64(count), resource.DecimalSI)
 }
 
 // UsageStats calculates aggregate usage for the object.

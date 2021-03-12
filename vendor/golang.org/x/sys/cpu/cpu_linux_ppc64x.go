@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build linux && (ppc64 || ppc64le)
 // +build linux
 // +build ppc64 ppc64le
 
 package cpu
-
-const cacheLineSize = 128
 
 // HWCAP/HWCAP2 bits. These are exposed by the kernel.
 const (

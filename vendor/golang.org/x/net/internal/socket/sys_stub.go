@@ -2,15 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build !aix,!darwin,!dragonfly,!freebsd,!linux,!netbsd,!openbsd,!solaris,!windows
+//go:build !aix && !darwin && !dragonfly && !freebsd && !linux && !netbsd && !openbsd && !solaris && !windows && !zos
+// +build !aix,!darwin,!dragonfly,!freebsd,!linux,!netbsd,!openbsd,!solaris,!windows,!zos
 
 package socket
 
-import (
-	"net"
-	"runtime"
-	"unsafe"
-)
+import "net"
 
 const (
 	sysAF_UNSPEC = 0x0
@@ -19,16 +16,6 @@ const (
 
 	sysSOCK_RAW = 0x3
 )
-
-func probeProtocolStack() int {
-	switch runtime.GOARCH {
-	case "amd64p32", "mips64p32":
-		return 4
-	default:
-		var p uintptr
-		return int(unsafe.Sizeof(p))
-	}
-}
 
 func marshalInetAddr(ip net.IP, port int, zone string) []byte {
 	return nil

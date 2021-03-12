@@ -24,26 +24,26 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
-POD_RESOURCES_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/podresources/v1alpha1/"
+POD_RESOURCES="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
 function cleanup {
-	rm -rf "${POD_RESOURCES_ALPHA}/_tmp/"
+	rm -rf "${POD_RESOURCES}/_tmp/"
 }
 
 trap cleanup EXIT
 
-mkdir -p "${POD_RESOURCES_ALPHA}/_tmp"
-cp "${POD_RESOURCES_ALPHA}/api.pb.go" "${POD_RESOURCES_ALPHA}/_tmp/"
+mkdir -p "${POD_RESOURCES}/_tmp"
+cp "${POD_RESOURCES}/api.pb.go" "${POD_RESOURCES}/_tmp/"
 
 ret=0
 KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-pod-resources.sh"
-diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr "${POD_RESOURCES_ALPHA}/_tmp/api.pb.go" "${POD_RESOURCES_ALPHA}/api.pb.go" || ret=$?
+diff -I "gzipped FileDescriptorProto" -I "0x" -Naupr "${POD_RESOURCES}/_tmp/api.pb.go" "${POD_RESOURCES}/api.pb.go" || ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "Generated pod resources api is up to date."
-    cp "${POD_RESOURCES_ALPHA}/_tmp/api.pb.go" "${POD_RESOURCES_ALPHA}/"
+    cp "${POD_RESOURCES}/_tmp/api.pb.go" "${POD_RESOURCES}/"
 else
     echo "Generated pod resources api is out of date. Please run hack/update-generated-pod-resources.sh"
     exit 1

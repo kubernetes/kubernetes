@@ -40,7 +40,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	status, found, err := gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
 	assert.Nil(t, status)
 	assert.False(t, found)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	nodeNames := []string{"test-node-1"}
 	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
@@ -51,7 +51,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	status, found, err = gce.GetLoadBalancer(context.Background(), vals.ClusterName, apiService)
 	assert.Equal(t, expectedStatus, status)
 	assert.True(t, found)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestEnsureLoadBalancerCreatesExternalLb(t *testing.T) {

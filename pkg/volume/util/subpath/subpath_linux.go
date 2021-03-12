@@ -30,7 +30,7 @@ import (
 	"golang.org/x/sys/unix"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -210,7 +210,7 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	// Do the bind mount
 	options := []string{"bind"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
+	if err = mounter.MountSensitiveWithoutSystemd(mountSource, bindPathTarget, "" /*fstype*/, options, nil); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true
@@ -433,29 +433,29 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		}
 		parentFD = childFD
 		childFD = -1
+
+		// Everything was created. mkdirat(..., perm) above was affected by current
+		// umask and we must apply the right permissions to the all created directory.
+		// (that's the one that will be available to the container as subpath)
+		// so user can read/write it.
+		// parentFD is the last created directory.
+
+		// Translate perm (os.FileMode) to uint32 that fchmod() expects
+		kernelPerm := uint32(perm & os.ModePerm)
+		if perm&os.ModeSetgid > 0 {
+			kernelPerm |= syscall.S_ISGID
+		}
+		if perm&os.ModeSetuid > 0 {
+			kernelPerm |= syscall.S_ISUID
+		}
+		if perm&os.ModeSticky > 0 {
+			kernelPerm |= syscall.S_ISVTX
+		}
+		if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
+			return fmt.Errorf("chmod %q failed: %s", currentPath, err)
+		}
 	}
 
-	// Everything was created. mkdirat(..., perm) above was affected by current
-	// umask and we must apply the right permissions to the last directory
-	// (that's the one that will be available to the container as subpath)
-	// so user can read/write it. This is the behavior of previous code.
-	// TODO: chmod all created directories, not just the last one.
-	// parentFD is the last created directory.
-
-	// Translate perm (os.FileMode) to uint32 that fchmod() expects
-	kernelPerm := uint32(perm & os.ModePerm)
-	if perm&os.ModeSetgid > 0 {
-		kernelPerm |= syscall.S_ISGID
-	}
-	if perm&os.ModeSetuid > 0 {
-		kernelPerm |= syscall.S_ISUID
-	}
-	if perm&os.ModeSticky > 0 {
-		kernelPerm |= syscall.S_ISVTX
-	}
-	if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
-		return fmt.Errorf("chmod %q failed: %s", currentPath, err)
-	}
 	return nil
 }
 
@@ -557,11 +557,11 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
-			return -1, fmt.Errorf("Error running fstat on %s with %v", currentPath, err)
+			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)
 		}
 		fileFmt := deviceStat.Mode & syscall.S_IFMT
 		if fileFmt == syscall.S_IFLNK {
-			return -1, fmt.Errorf("Unexpected symlink found %s", currentPath)
+			return -1, fmt.Errorf("unexpected symlink found %s", currentPath)
 		}
 
 		// Close parentFD

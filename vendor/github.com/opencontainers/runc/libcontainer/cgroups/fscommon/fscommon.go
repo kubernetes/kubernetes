@@ -3,46 +3,47 @@
 package fscommon
 
 import (
-	"io/ioutil"
+	"bytes"
 	"os"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
+// WriteFile writes data to a cgroup file in dir.
+// It is supposed to be used for cgroup files only.
 func WriteFile(dir, file, data string) error {
-	if dir == "" {
-		return errors.Errorf("no directory specified for %s", file)
-	}
-	path, err := securejoin.SecureJoin(dir, file)
+	fd, err := OpenFile(dir, file, unix.O_WRONLY)
 	if err != nil {
 		return err
 	}
-	if err := retryingWriteFile(path, []byte(data), 0700); err != nil {
-		return errors.Wrapf(err, "failed to write %q to %q", data, path)
+	defer fd.Close()
+	if err := retryingWriteFile(fd, data); err != nil {
+		return errors.Wrapf(err, "failed to write %q", data)
 	}
 	return nil
 }
 
+// ReadFile reads data from a cgroup file in dir.
+// It is supposed to be used for cgroup files only.
 func ReadFile(dir, file string) (string, error) {
-	if dir == "" {
-		return "", errors.Errorf("no directory specified for %s", file)
-	}
-	path, err := securejoin.SecureJoin(dir, file)
+	fd, err := OpenFile(dir, file, unix.O_RDONLY)
 	if err != nil {
 		return "", err
 	}
-	data, err := ioutil.ReadFile(path)
-	return string(data), err
+	defer fd.Close()
+	var buf bytes.Buffer
+
+	_, err = buf.ReadFrom(fd)
+	return buf.String(), err
 }
 
-func retryingWriteFile(filename string, data []byte, perm os.FileMode) error {
+func retryingWriteFile(fd *os.File, data string) error {
 	for {
-		err := ioutil.WriteFile(filename, data, perm)
+		_, err := fd.Write([]byte(data))
 		if errors.Is(err, unix.EINTR) {
-			logrus.Infof("interrupted while writing %s to %s", string(data), filename)
+			logrus.Infof("interrupted while writing %s to %s", data, fd.Name())
 			continue
 		}
 		return err

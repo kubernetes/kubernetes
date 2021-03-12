@@ -38,6 +38,8 @@ import (
 	"k8s.io/legacy-cloud-providers/azure/clients/interfaceclient/mockinterfaceclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/publicipclient/mockpublicipclient"
 	"k8s.io/legacy-cloud-providers/azure/clients/vmclient/mockvmclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmssclient/mockvmssclient"
+	"k8s.io/legacy-cloud-providers/azure/clients/vmssvmclient/mockvmssvmclient"
 	"k8s.io/legacy-cloud-providers/azure/retry"
 )
 
@@ -633,6 +635,58 @@ func TestInstanceExistsByProviderID(t *testing.T) {
 		assert.Equal(t, test.expectedErrMsg, err, test.name)
 		assert.Equal(t, test.expected, exist, test.name)
 	}
+
+	vmssTestCases := []struct {
+		name       string
+		providerID string
+		scaleSet   string
+		vmList     []string
+		expected   bool
+		rerr       *retry.Error
+	}{
+		{
+			name:       "InstanceExistsByProviderID should return true if VMSS and VM exist",
+			providerID: "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmssee6c2/virtualMachines/0",
+			scaleSet:   "vmssee6c2",
+			vmList:     []string{"vmssee6c2000000"},
+			expected:   true,
+		},
+		{
+			name:       "InstanceExistsByProviderID should return false if VMSS exist but VM doesn't",
+			providerID: "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/vmssee6c2/virtualMachines/0",
+			scaleSet:   "vmssee6c2",
+			expected:   false,
+		},
+		{
+			name:       "InstanceExistsByProviderID should return false if VMSS doesn't exist",
+			providerID: "azure:///subscriptions/script/resourceGroups/rg/providers/Microsoft.Compute/virtualMachineScaleSets/missing-vmss/virtualMachines/0",
+			rerr:       &retry.Error{HTTPStatusCode: 404},
+			expected:   false,
+		},
+	}
+
+	for _, test := range vmssTestCases {
+		ss, err := newTestScaleSet(ctrl)
+		assert.NoError(t, err, test.name)
+		cloud.VMSet = ss
+
+		mockVMSSClient := mockvmssclient.NewMockInterface(ctrl)
+		mockVMSSVMClient := mockvmssvmclient.NewMockInterface(ctrl)
+		ss.cloud.VirtualMachineScaleSetsClient = mockVMSSClient
+		ss.cloud.VirtualMachineScaleSetVMsClient = mockVMSSVMClient
+
+		expectedScaleSet := buildTestVMSS(test.scaleSet, test.scaleSet)
+		mockVMSSClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachineScaleSet{expectedScaleSet}, test.rerr).AnyTimes()
+
+		expectedVMs, _, _ := buildTestVirtualMachineEnv(ss.cloud, test.scaleSet, "", 0, test.vmList, "succeeded", false)
+		mockVMSSVMClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(expectedVMs, test.rerr).AnyTimes()
+
+		mockVMsClient := ss.cloud.VirtualMachinesClient.(*mockvmclient.MockInterface)
+		mockVMsClient.EXPECT().List(gomock.Any(), gomock.Any()).Return([]compute.VirtualMachine{}, nil).AnyTimes()
+
+		exist, _ := cloud.InstanceExistsByProviderID(context.Background(), test.providerID)
+		assert.Equal(t, test.expected, exist, test.name)
+	}
 }
 
 func TestNodeAddressesByProviderID(t *testing.T) {
@@ -729,5 +783,5 @@ func TestCurrentNodeName(t *testing.T) {
 	hostname := "testvm"
 	nodeName, err := cloud.CurrentNodeName(context.Background(), hostname)
 	assert.Equal(t, types.NodeName(hostname), nodeName)
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }

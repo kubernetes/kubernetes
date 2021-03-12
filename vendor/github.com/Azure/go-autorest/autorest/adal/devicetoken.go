@@ -222,6 +222,10 @@ func CheckForUserCompletionWithContext(ctx context.Context, sender Sender, code 
 	case "code_expired":
 		return nil, ErrDeviceCodeExpired
 	default:
+		// return a more meaningful error message if available
+		if token.ErrorDescription != nil {
+			return nil, fmt.Errorf("%s %s: %s", logPrefix, *token.Error, *token.ErrorDescription)
+		}
 		return nil, ErrDeviceGeneric
 	}
 }

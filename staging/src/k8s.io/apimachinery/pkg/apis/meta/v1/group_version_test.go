@@ -47,7 +47,7 @@ func TestGroupVersionUnmarshalJSON(t *testing.T) {
 			t.Errorf("JSON codec failed to unmarshal input '%s': expected %+v, got %+v", c.input, c.expect, result.GV)
 		}
 		// test the json-iterator codec
-		iter := json.CaseSensitiveJsonIterator()
+		iter := json.CaseSensitiveJSONIterator()
 		if err := iter.Unmarshal(c.input, &result); err != nil {
 			t.Errorf("json-iterator codec failed to unmarshal input '%v': %v", c.input, err)
 		}

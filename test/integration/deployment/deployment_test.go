@@ -224,12 +224,11 @@ func TestDeploymentSelectorImmutability(t *testing.T) {
 	}
 
 	// test to ensure apps/v1 selector is immutable
-	newSelectorLabels := map[string]string{"name_apps_v1beta1": "test_apps_v1beta1"}
 	deploymentAppsV1, err := c.AppsV1().Deployments(ns.Name).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("failed to get apps/v1 deployment %s: %v", name, err)
 	}
-	newSelectorLabels = map[string]string{"name_apps_v1": "test_apps_v1"}
+	newSelectorLabels := map[string]string{"name_apps_v1": "test_apps_v1"}
 	deploymentAppsV1.Spec.Selector.MatchLabels = newSelectorLabels
 	deploymentAppsV1.Spec.Template.Labels = newSelectorLabels
 	_, err = c.AppsV1().Deployments(ns.Name).Update(context.TODO(), deploymentAppsV1, metav1.UpdateOptions{})

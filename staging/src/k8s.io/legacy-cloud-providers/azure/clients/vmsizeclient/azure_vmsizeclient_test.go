@@ -70,7 +70,7 @@ func TestList(t *testing.T) {
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	vmsizeList := []compute.VirtualMachineSize{getTestVMSize("Standard_D2s_v3"), getTestVMSize("Standard_D4s_v3"), getTestVMSize("Standard_D8s_v3")}
 	responseBody, err := json.Marshal(compute.VirtualMachineSizeListResult{Value: &vmsizeList})
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	armClient.EXPECT().GetResource(gomock.Any(), resourceID, "").Return(
 		&http.Response{
 			StatusCode: http.StatusOK,

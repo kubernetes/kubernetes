@@ -18,12 +18,11 @@ package devicemanager
 
 import (
 	v1 "k8s.io/api/core/v1"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // ManagerStub provides a simple stub implementation for the Device Manager.
@@ -74,8 +73,18 @@ func (h *ManagerStub) GetTopologyHints(pod *v1.Pod, container *v1.Container) map
 	return map[string][]topologymanager.TopologyHint{}
 }
 
+// GetPodTopologyHints returns an empty TopologyHint map
+func (h *ManagerStub) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return map[string][]topologymanager.TopologyHint{}
+}
+
 // GetDevices returns nil
-func (h *ManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+func (h *ManagerStub) GetDevices(_, _ string) ResourceDeviceInstances {
+	return nil
+}
+
+// GetAllocatableDevices returns nothing
+func (h *ManagerStub) GetAllocatableDevices() ResourceDeviceInstances {
 	return nil
 }
 

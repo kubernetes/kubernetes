@@ -44,6 +44,7 @@ func NewManagedFieldsUpdater(fieldManager Manager) Manager {
 // Update implements Manager.
 func (f *managedFieldsUpdater) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
 	self := "current-operation"
+	formerSet := managed.Fields()[manager]
 	object, managed, err := f.fieldManager.Update(liveObj, newObj, managed, self)
 	if err != nil {
 		return object, managed, err
@@ -54,11 +55,14 @@ func (f *managedFieldsUpdater) Update(liveObj, newObj runtime.Object, managed Ma
 	if vs, ok := managed.Fields()[self]; ok {
 		delete(managed.Fields(), self)
 
-		managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
 		if previous, ok := managed.Fields()[manager]; ok {
 			managed.Fields()[manager] = fieldpath.NewVersionedSet(vs.Set().Union(previous.Set()), vs.APIVersion(), vs.Applied())
 		} else {
 			managed.Fields()[manager] = vs
+		}
+		// Update the time only if the manager's fieldSet has changed.
+		if formerSet == nil || !managed.Fields()[manager].Set().Equals(formerSet.Set()) {
+			managed.Times()[manager] = &metav1.Time{Time: time.Now().UTC()}
 		}
 	}
 

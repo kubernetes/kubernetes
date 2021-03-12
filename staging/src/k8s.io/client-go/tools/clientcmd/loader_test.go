@@ -865,3 +865,46 @@ func TestDeduplicate(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadingGetLoadingPrecedence(t *testing.T) {
+	testCases := map[string]struct {
+		rules      *ClientConfigLoadingRules
+		env        string
+		precedence []string
+	}{
+		"default": {
+			precedence: []string{filepath.Join(os.Getenv("HOME"), ".kube/config")},
+		},
+		"explicit": {
+			rules: &ClientConfigLoadingRules{
+				ExplicitPath: "/explicit/kubeconfig",
+			},
+			precedence: []string{"/explicit/kubeconfig"},
+		},
+		"envvar-single": {
+			env:        "/env/kubeconfig",
+			precedence: []string{"/env/kubeconfig"},
+		},
+		"envvar-multiple": {
+			env:        "/env/kubeconfig:/other/kubeconfig",
+			precedence: []string{"/env/kubeconfig", "/other/kubeconfig"},
+		},
+	}
+
+	kubeconfig := os.Getenv("KUBECONFIG")
+	defer os.Setenv("KUBECONFIG", kubeconfig)
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			os.Setenv("KUBECONFIG", test.env)
+			rules := test.rules
+			if rules == nil {
+				rules = NewDefaultClientConfigLoadingRules()
+			}
+			actual := rules.GetLoadingPrecedence()
+			if !reflect.DeepEqual(actual, test.precedence) {
+				t.Errorf("expect %v, got %v", test.precedence, actual)
+			}
+		})
+	}
+}

@@ -1,0 +1,5 @@
+linux/amd64=perl:5.26
+linux/arm=arm32v7/perl:5.26
+linux/arm64=arm64v8/perl:5.26
+linux/ppc64le=ppc64le/perl:5.26
+linux/s390x=s390x/perl:5.26

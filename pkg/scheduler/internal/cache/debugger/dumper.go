@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"k8s.io/api/core/v1"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 )
@@ -70,11 +70,11 @@ func (d *CacheDumper) printNodeInfo(name string, n *framework.NodeInfo) string {
 		nodeData.WriteString(printPod(p.Pod))
 	}
 	// Dumping nominated pods info on the node
-	nominatedPods := d.podQueue.NominatedPodsForNode(name)
-	if len(nominatedPods) != 0 {
-		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPods)))
-		for _, p := range nominatedPods {
-			nodeData.WriteString(printPod(p))
+	nominatedPodInfos := d.podQueue.NominatedPodsForNode(name)
+	if len(nominatedPodInfos) != 0 {
+		nodeData.WriteString(fmt.Sprintf("Nominated Pods(number: %v):\n", len(nominatedPodInfos)))
+		for _, pi := range nominatedPodInfos {
+			nodeData.WriteString(printPod(pi.Pod))
 		}
 	}
 	return nodeData.String()

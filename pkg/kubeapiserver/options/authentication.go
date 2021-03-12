@@ -27,11 +27,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -39,7 +39,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
@@ -104,6 +103,11 @@ type WebHookAuthenticationOptions struct {
 	ConfigFile string
 	Version    string
 	CacheTTL   time.Duration
+
+	// RetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
+	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
+	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
+	RetryBackoff *wait.Backoff
 }
 
 // NewBuiltInAuthenticationOptions create a new BuiltInAuthenticationOptions, just set default token cache TTL
@@ -159,7 +163,7 @@ func (o *BuiltInAuthenticationOptions) WithRequestHeader() *BuiltInAuthenticatio
 
 // WithServiceAccounts set default value for service account authentication
 func (o *BuiltInAuthenticationOptions) WithServiceAccounts() *BuiltInAuthenticationOptions {
-	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true}
+	o.ServiceAccounts = &ServiceAccountAuthenticationOptions{Lookup: true, ExtendExpiration: true}
 	return o
 }
 
@@ -172,8 +176,9 @@ func (o *BuiltInAuthenticationOptions) WithTokenFile() *BuiltInAuthenticationOpt
 // WithWebHook set default value for web hook authentication
 func (o *BuiltInAuthenticationOptions) WithWebHook() *BuiltInAuthenticationOptions {
 	o.WebHook = &WebHookAuthenticationOptions{
-		Version:  "v1beta1",
-		CacheTTL: 2 * time.Minute,
+		Version:      "v1beta1",
+		CacheTTL:     2 * time.Minute,
+		RetryBackoff: genericoptions.DefaultAuthWebhookRetryBackoff(),
 	}
 	return o
 }
@@ -191,32 +196,30 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, fmt.Errorf("service-account-issuer contained a ':' but was not a valid URL: %v", err))
 		}
 	}
-	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) || !utilfeature.DefaultFeatureGate.Enabled(features.TokenRequestProjection) {
-			allErrors = append(allErrors, errors.New("if the BoundServiceAccountTokenVolume feature is enabled,"+
-				" the TokenRequest and TokenRequestProjection features must also be enabled"))
-		}
+
+	if o.ServiceAccounts != nil {
 		if len(o.ServiceAccounts.Issuer) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag when BoundServiceAccountTokenVolume is enabled"))
+			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
 		}
 		if len(o.ServiceAccounts.KeyFiles) == 0 {
-			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag when BoundServiceAccountTokenVolume is enabled"))
+			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
+		}
+
+		// Validate the JWKS URI when it is explicitly set.
+		// When unset, it is later derived from ExternalHost.
+		if o.ServiceAccounts.JWKSURI != "" {
+			if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
+			} else if u.Scheme != "https" {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
+			}
 		}
 	}
 
-	if o.ServiceAccounts != nil {
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-			// Validate the JWKS URI when it is explicitly set.
-			// When unset, it is later derived from ExternalHost.
-			if o.ServiceAccounts.JWKSURI != "" {
-				if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
-				} else if u.Scheme != "https" {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
-				}
-			}
-		} else if len(o.ServiceAccounts.JWKSURI) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
+	if o.WebHook != nil {
+		retryBackoff := o.WebHook.RetryBackoff
+		if retryBackoff != nil && retryBackoff.Steps <= 0 {
+			allErrors = append(allErrors, fmt.Errorf("number of webhook retry attempts must be greater than 1, but is: %d", retryBackoff.Steps))
 		}
 	}
 
@@ -313,7 +316,7 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 			"that this value comply with the OpenID spec: https://openid.net/specs/openid-connect-discovery-1_0.html. "+
 			"In practice, this means that service-account-issuer must be an https URL. It is also highly "+
 			"recommended that this URL be capable of serving OpenID discovery documents at "+
-			"`{service-account-issuer}/.well-known/openid-configuration`.")
+			"{service-account-issuer}/.well-known/openid-configuration.")
 
 		fs.StringVar(&o.ServiceAccounts.JWKSURI, "service-account-jwks-uri", o.ServiceAccounts.JWKSURI, ""+
 			"Overrides the URI for the JSON Web Key Set in the discovery doc served at "+
@@ -419,6 +422,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.WebhookTokenAuthnConfigFile = o.WebHook.ConfigFile
 		ret.WebhookTokenAuthnVersion = o.WebHook.Version
 		ret.WebhookTokenAuthnCacheTTL = o.WebHook.CacheTTL
+		ret.WebhookRetryBackoff = o.WebHook.RetryBackoff
 
 		if len(o.WebHook.ConfigFile) > 0 && o.WebHook.CacheTTL > 0 {
 			if o.TokenSuccessCacheTTL > 0 && o.WebHook.CacheTTL < o.TokenSuccessCacheTTL {
@@ -464,20 +468,19 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		authInfo.APIAudiences = authenticator.Audiences{o.ServiceAccounts.Issuer}
 	}
 
-	if o.ServiceAccounts.Lookup || utilfeature.DefaultFeatureGate.Enabled(features.TokenRequest) {
-		authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
-			extclient,
-			versionedInformer.Core().V1().Secrets().Lister(),
-			versionedInformer.Core().V1().ServiceAccounts().Lister(),
-			versionedInformer.Core().V1().Pods().Lister(),
-		)
-	}
+	authenticatorConfig.ServiceAccountTokenGetter = serviceaccountcontroller.NewGetterFromClient(
+		extclient,
+		versionedInformer.Core().V1().Secrets().Lister(),
+		versionedInformer.Core().V1().ServiceAccounts().Lister(),
+		versionedInformer.Core().V1().Pods().Lister(),
+	)
+
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
 		versionedInformer.Core().V1().Secrets().Lister().Secrets(metav1.NamespaceSystem),
 	)
 
 	if egressSelector != nil {
-		egressDialer, err := egressSelector.Lookup(egressselector.Master.AsNetworkContext())
+		egressDialer, err := egressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 		if err != nil {
 			return err
 		}

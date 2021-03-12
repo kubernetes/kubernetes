@@ -16,14 +16,14 @@
 
 # This script generates `*/api.pb.go` from the protobuf file `*/api.proto`.
 # Example:
-#   kube::protoc::generate_proto "${POD_RESOURCES_ALPHA}"
+#   kube::protoc::generate_proto "${POD_RESOURCES}"
 
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
-POD_RESOURCES_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/podresources/v1alpha1/"
+POD_RESOURCES="${KUBE_ROOT}/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto "${POD_RESOURCES_ALPHA}"
+kube::protoc::generate_proto "${POD_RESOURCES}"

@@ -1,6 +1,7 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
+- cheftako
 - deads2k
 - lavalamp
 - mikedanese
@@ -17,7 +18,6 @@ reviewers:
 - erictune
 - errordeveloper
 - feiskyer
-- gmarek
 - humblec
 - ingvagabund
 - janetkuo
@@ -29,11 +29,9 @@ reviewers:
 - lavalamp
 - liggitt
 - luxas
-- madhusudancs
 - mikedanese
 - mml
 - mwielgus
-- nikhiljindal
 - ping035627
 - piosz
 - pmorie

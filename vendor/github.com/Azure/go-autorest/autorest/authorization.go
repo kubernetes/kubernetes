@@ -138,6 +138,11 @@ func (ba *BearerAuthorizer) WithAuthorization() PrepareDecorator {
 	}
 }
 
+// TokenProvider returns OAuthTokenProvider so that it can be used for authorization outside the REST.
+func (ba *BearerAuthorizer) TokenProvider() adal.OAuthTokenProvider {
+	return ba.tokenProvider
+}
+
 // BearerAuthorizerCallbackFunc is the authentication callback signature.
 type BearerAuthorizerCallbackFunc func(tenantID, resource string) (*BearerAuthorizer, error)
 
@@ -294,18 +299,24 @@ type MultiTenantServicePrincipalTokenAuthorizer interface {
 
 // NewMultiTenantServicePrincipalTokenAuthorizer crates a BearerAuthorizer using the given token provider
 func NewMultiTenantServicePrincipalTokenAuthorizer(tp adal.MultitenantOAuthTokenProvider) MultiTenantServicePrincipalTokenAuthorizer {
-	return &multiTenantSPTAuthorizer{tp: tp}
+	return NewMultiTenantBearerAuthorizer(tp)
 }
 
-type multiTenantSPTAuthorizer struct {
+// MultiTenantBearerAuthorizer implements bearer authorization across multiple tenants.
+type MultiTenantBearerAuthorizer struct {
 	tp adal.MultitenantOAuthTokenProvider
+}
+
+// NewMultiTenantBearerAuthorizer creates a MultiTenantBearerAuthorizer using the given token provider.
+func NewMultiTenantBearerAuthorizer(tp adal.MultitenantOAuthTokenProvider) *MultiTenantBearerAuthorizer {
+	return &MultiTenantBearerAuthorizer{tp: tp}
 }
 
 // WithAuthorization returns a PrepareDecorator that adds an HTTP Authorization header using the
 // primary token along with the auxiliary authorization header using the auxiliary tokens.
 //
 // By default, the token will be automatically refreshed through the Refresher interface.
-func (mt multiTenantSPTAuthorizer) WithAuthorization() PrepareDecorator {
+func (mt *MultiTenantBearerAuthorizer) WithAuthorization() PrepareDecorator {
 	return func(p Preparer) Preparer {
 		return PreparerFunc(func(r *http.Request) (*http.Request, error) {
 			r, err := p.Prepare(r)
@@ -331,7 +342,12 @@ func (mt multiTenantSPTAuthorizer) WithAuthorization() PrepareDecorator {
 			for i := range auxTokens {
 				auxTokens[i] = fmt.Sprintf("Bearer %s", auxTokens[i])
 			}
-			return Prepare(r, WithHeader(headerAuxAuthorization, strings.Join(auxTokens, "; ")))
+			return Prepare(r, WithHeader(headerAuxAuthorization, strings.Join(auxTokens, ", ")))
 		})
 	}
+}
+
+// TokenProvider returns the underlying MultitenantOAuthTokenProvider for this authorizer.
+func (mt *MultiTenantBearerAuthorizer) TokenProvider() adal.MultitenantOAuthTokenProvider {
+	return mt.tp
 }

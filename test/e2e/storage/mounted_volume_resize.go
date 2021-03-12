@@ -78,6 +78,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		test := testsuites.StorageClassTest{
 			Name:                 "default",
+			Timeouts:             f.Timeouts,
 			ClaimSize:            "2Gi",
 			AllowVolumeExpansion: true,
 			DelayBinding:         true,

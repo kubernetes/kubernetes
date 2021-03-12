@@ -32,9 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
-const (
-	nodePollInterval = 100 * time.Millisecond
-)
+const testNodePollInterval = 10 * time.Millisecond
 
 var alwaysReady = func() bool { return true }
 
@@ -320,6 +318,13 @@ func TestOccupyPreExistingCIDR(t *testing.T) {
 }
 
 func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	// all tests operate on a single node
 	testCases := []testCase{
 		{
@@ -486,12 +491,55 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 				NodeCIDRMaskSizes:    []int{24, 98, 24},
 			},
 		},
+		{
+			description: "no double counting",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Existing: []*v1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node0",
+						},
+						Spec: v1.NodeSpec{
+							PodCIDRs: []string{"10.10.0.0/24"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node1",
+						},
+						Spec: v1.NodeSpec{
+							PodCIDRs: []string{"10.10.2.0/24"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			allocatorParams: CIDRAllocatorParams{
+				ClusterCIDRs: func() []*net.IPNet {
+					_, clusterCIDR, _ := net.ParseCIDR("10.10.0.0/22")
+					return []*net.IPNet{clusterCIDR}
+				}(),
+				ServiceCIDR:          nil,
+				SecondaryServiceCIDR: nil,
+				NodeCIDRMaskSizes:    []int{24},
+			},
+			expectedAllocatedCIDR: map[int]string{
+				0: "10.10.1.0/24",
+			},
+		},
 	}
 
 	// test function
 	testFunc := func(tc testCase) {
+		fakeNodeInformer := getFakeNodeInformer(tc.fakeNodeHandler)
+		nodeList, _ := tc.fakeNodeHandler.List(context.TODO(), metav1.ListOptions{})
 		// Initialize the range allocator.
-		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, getFakeNodeInformer(tc.fakeNodeHandler), tc.allocatorParams, nil)
+		allocator, err := NewCIDRRangeAllocator(tc.fakeNodeHandler, fakeNodeInformer, tc.allocatorParams, nodeList)
 		if err != nil {
 			t.Errorf("%v: failed to create CIDRRangeAllocator with error %v", tc.description, err)
 			return
@@ -517,12 +565,22 @@ func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
 					t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
 				}
 			}
-			if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err != nil {
+		}
+
+		updateCount := 0
+		for _, node := range tc.fakeNodeHandler.Existing {
+			if node.Spec.PodCIDRs == nil {
+				updateCount++
+			}
+			if err := allocator.AllocateOrOccupyCIDR(node); err != nil {
 				t.Errorf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 			}
-			if err := waitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
-				t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
-			}
+		}
+		if updateCount != 1 {
+			t.Fatalf("test error: all tests must update exactly one node")
+		}
+		if err := waitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, updateCount, wait.ForeverTestTimeout); err != nil {
+			t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
 		}
 
 		if len(tc.expectedAllocatedCIDR) == 0 {
@@ -647,6 +705,13 @@ type releaseTestCase struct {
 }
 
 func TestReleaseCIDRSuccess(t *testing.T) {
+	// Non-parallel test (overrides global var)
+	oldNodePollInterval := nodePollInterval
+	nodePollInterval = testNodePollInterval
+	defer func() {
+		nodePollInterval = oldNodePollInterval
+	}()
+
 	testCases := []releaseTestCase{
 		{
 			description: "Correctly release preallocated CIDR",

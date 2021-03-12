@@ -71,6 +71,11 @@ func (tv TypedValue) AsValue() value.Value {
 	return tv.value
 }
 
+// Schema gets the schema from the TypedValue.
+func (tv TypedValue) Schema() *schema.Schema {
+	return tv.schema
+}
+
 // Validate returns an error with a list of every spec violation.
 func (tv TypedValue) Validate() error {
 	w := tv.walker()
@@ -145,7 +150,13 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef)
+	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef, false)
+	return &tv
+}
+
+// ExtractItems returns a value with only the provided list or map items extracted from the value.
+func (tv TypedValue) ExtractItems(items *fieldpath.Set) *TypedValue {
+	tv.value = removeItemsWithSchema(tv.value, items, tv.schema, tv.typeRef, true)
 	return &tv
 }
 

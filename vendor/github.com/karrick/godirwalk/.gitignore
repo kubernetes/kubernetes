@@ -12,3 +12,8 @@
 
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
+
+examples/remove-empty-directories/remove-empty-directories
+examples/sizes/sizes
+examples/walk-fast/walk-fast
+examples/walk-stdlib/walk-stdlib

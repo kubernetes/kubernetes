@@ -30,5 +30,5 @@ func GetInfo() (info.NVMInfo, error) {
 // Finalize un-initializes libipmctl. See https://github.com/google/cadvisor/issues/2457.
 // When libipmctl is not available it just logs that it's being called.
 func Finalize() {
-	klog.V(4).Info("libimpctl not available, doing nothing.")
+	klog.V(4).Info("libipmctl not available, doing nothing.")
 }

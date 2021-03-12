@@ -29,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -381,6 +381,15 @@ func TestParseThresholdConfig(t *testing.T) {
 		"hard-signal-negative-percentage": {
 			allocatableConfig:       []string{},
 			evictionHard:            map[string]string{"memory.available": "-15%"},
+			evictionSoft:            map[string]string{},
+			evictionSoftGracePeriod: map[string]string{},
+			evictionMinReclaim:      map[string]string{},
+			expectErr:               true,
+			expectThresholds:        []evictionapi.Threshold{},
+		},
+		"hard-signal-percentage-greater-than-100%": {
+			allocatableConfig:       []string{},
+			evictionHard:            map[string]string{"memory.available": "150%"},
 			evictionSoft:            map[string]string{},
 			evictionSoftGracePeriod: map[string]string{},
 			evictionMinReclaim:      map[string]string{},

@@ -33,7 +33,7 @@ import (
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -44,6 +44,7 @@ import (
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -79,6 +80,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 		CreateStrategy:      registrypod.Strategy,
 		UpdateStrategy:      registrypod.Strategy,
 		DeleteStrategy:      registrypod.Strategy,
+		ResetFieldsStrategy: registrypod.Strategy,
 		ReturnDeletedObject: true,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
@@ -95,6 +97,7 @@ func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGet
 
 	statusStore := *store
 	statusStore.UpdateStrategy = registrypod.StatusStrategy
+	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
 	ephemeralContainersStore := *store
 	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
@@ -214,7 +217,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		})
 		finalPod = pod
 		return pod, nil
-	}), dryRun)
+	}), dryRun, nil)
 	return finalPod, err
 }
 
@@ -276,6 +279,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
@@ -346,11 +354,24 @@ func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objIn
 		return newPod, nil
 	})
 
-	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, createValidation, updateValidation, false, options)
+	// Validation should be passed the API kind (EphemeralContainers) rather than the storage kind.
+	obj, _, err = r.store.Update(ctx, name, updatedPodInfo, toEphemeralContainersCreateValidation(createValidation), toEphemeralContainersUpdateValidation(updateValidation), false, options)
 	if err != nil {
 		return nil, false, err
 	}
 	return ephemeralContainersInPod(obj.(*api.Pod)), false, err
+}
+
+func toEphemeralContainersCreateValidation(f rest.ValidateObjectFunc) rest.ValidateObjectFunc {
+	return func(ctx context.Context, obj runtime.Object) error {
+		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)))
+	}
+}
+
+func toEphemeralContainersUpdateValidation(f rest.ValidateObjectUpdateFunc) rest.ValidateObjectUpdateFunc {
+	return func(ctx context.Context, obj, old runtime.Object) error {
+		return f(ctx, ephemeralContainersInPod(obj.(*api.Pod)), ephemeralContainersInPod(old.(*api.Pod)))
+	}
 }
 
 // Extract the list of Ephemeral Containers from a Pod

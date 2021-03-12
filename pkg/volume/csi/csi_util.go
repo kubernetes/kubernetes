@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	api "k8s.io/api/core/v1"
@@ -175,4 +176,30 @@ func getPVSourceFromSpec(spec *volume.Spec) (*api.CSIPersistentVolumeSource, err
 // GetCSIMounterPath returns the mounter path given the base path.
 func GetCSIMounterPath(path string) string {
 	return filepath.Join(path, "/mount")
+}
+
+// GetCSIDriverName returns the csi driver name
+func GetCSIDriverName(spec *volume.Spec) (string, error) {
+	volSrc, pvSrc, err := getSourceFromSpec(spec)
+	if err != nil {
+		return "", err
+	}
+
+	switch {
+	case volSrc != nil && utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume):
+		return volSrc.Driver, nil
+	case pvSrc != nil:
+		return pvSrc.Driver, nil
+	default:
+		return "", errors.New(log("volume source not found in volume.Spec"))
+	}
+}
+
+func createCSIOperationContext(volumeSpec *volume.Spec, timeout time.Duration) (context.Context, context.CancelFunc) {
+	migrated := false
+	if volumeSpec != nil {
+		migrated = volumeSpec.Migrated
+	}
+	ctx := context.WithValue(context.Background(), additionalInfoKey, additionalInfo{Migrated: strconv.FormatBool(migrated)})
+	return context.WithTimeout(ctx, timeout)
 }

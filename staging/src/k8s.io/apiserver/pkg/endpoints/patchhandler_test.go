@@ -25,7 +25,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapitesting "k8s.io/apiserver/pkg/endpoints/testing"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 )
 
 func TestPatch(t *testing.T) {
@@ -67,8 +69,8 @@ func TestPatch(t *testing.T) {
 	if simpleStorage.updated == nil || simpleStorage.updated.Labels["foo"] != "bar" {
 		t.Errorf("Unexpected update value %#v, expected %#v.", simpleStorage.updated, item)
 	}
-	if !selfLinker.called {
-		t.Errorf("Never set self link")
+	if utilfeature.DefaultFeatureGate.Enabled(features.RemoveSelfLink) == selfLinker.called {
+		t.Errorf("unexpected selfLinker.called: %v", selfLinker.called)
 	}
 }
 

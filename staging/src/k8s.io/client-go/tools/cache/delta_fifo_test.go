@@ -633,6 +633,15 @@ func TestDeltaFIFO_HasSynced(t *testing.T) {
 			},
 			expectedSynced: true,
 		},
+		{
+			// This test case won't happen in practice since a Reflector, the only producer for delta_fifo today, always passes a complete snapshot consistent in time;
+			// there cannot be duplicate keys in the list or apiserver is broken.
+			actions: []func(f *DeltaFIFO){
+				func(f *DeltaFIFO) { f.Replace([]interface{}{mkFifoObj("a", 1), mkFifoObj("a", 2)}, "0") },
+				func(f *DeltaFIFO) { Pop(f) },
+			},
+			expectedSynced: true,
+		},
 	}
 
 	for i, test := range tests {

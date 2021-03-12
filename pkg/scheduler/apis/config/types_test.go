@@ -32,14 +32,14 @@ func TestPluginsAppend(t *testing.T) {
 		{
 			name: "AppendPlugin",
 			customPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "CustomPlugin"},
 					},
 				},
 			},
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -47,23 +47,13 @@ func TestPluginsAppend(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: &PluginSet{},
-				PreFilter: &PluginSet{},
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
 						{Name: "CustomPlugin"},
 					},
 				},
-				PostFilter: &PluginSet{},
-				PreScore:   &PluginSet{},
-				Score:      &PluginSet{},
-				Reserve:    &PluginSet{},
-				Permit:     &PluginSet{},
-				PreBind:    &PluginSet{},
-				Bind:       &PluginSet{},
-				PostBind:   &PluginSet{},
 			},
 		},
 		{
@@ -93,14 +83,14 @@ func TestPluginsApply(t *testing.T) {
 		{
 			name: "AppendCustomPlugin",
 			customPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "CustomPlugin"},
 					},
 				},
 			},
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -108,29 +98,19 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: &PluginSet{Enabled: []Plugin{}},
-				PreFilter: &PluginSet{Enabled: []Plugin{}},
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
 						{Name: "CustomPlugin"},
 					},
 				},
-				PostFilter: &PluginSet{Enabled: []Plugin{}},
-				PreScore:   &PluginSet{Enabled: []Plugin{}},
-				Score:      &PluginSet{Enabled: []Plugin{}},
-				Reserve:    &PluginSet{Enabled: []Plugin{}},
-				Permit:     &PluginSet{Enabled: []Plugin{}},
-				PreBind:    &PluginSet{Enabled: []Plugin{}},
-				Bind:       &PluginSet{Enabled: []Plugin{}},
-				PostBind:   &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
 			name: "InsertAfterDefaultPlugins2",
 			customPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "CustomPlugin"},
 						{Name: "DefaultPlugin2"},
@@ -141,7 +121,7 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -149,29 +129,19 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: &PluginSet{Enabled: []Plugin{}},
-				PreFilter: &PluginSet{Enabled: []Plugin{}},
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "CustomPlugin"},
 						{Name: "DefaultPlugin2"},
 					},
 				},
-				PostFilter: &PluginSet{Enabled: []Plugin{}},
-				PreScore:   &PluginSet{Enabled: []Plugin{}},
-				Score:      &PluginSet{Enabled: []Plugin{}},
-				Reserve:    &PluginSet{Enabled: []Plugin{}},
-				Permit:     &PluginSet{Enabled: []Plugin{}},
-				PreBind:    &PluginSet{Enabled: []Plugin{}},
-				Bind:       &PluginSet{Enabled: []Plugin{}},
-				PostBind:   &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
 			name: "InsertBeforeAllPlugins",
 			customPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "CustomPlugin"},
 						{Name: "DefaultPlugin1"},
@@ -183,7 +153,7 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -191,29 +161,19 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: &PluginSet{Enabled: []Plugin{}},
-				PreFilter: &PluginSet{Enabled: []Plugin{}},
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "CustomPlugin"},
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
 					},
 				},
-				PostFilter: &PluginSet{Enabled: []Plugin{}},
-				PreScore:   &PluginSet{Enabled: []Plugin{}},
-				Score:      &PluginSet{Enabled: []Plugin{}},
-				Reserve:    &PluginSet{Enabled: []Plugin{}},
-				Permit:     &PluginSet{Enabled: []Plugin{}},
-				PreBind:    &PluginSet{Enabled: []Plugin{}},
-				Bind:       &PluginSet{Enabled: []Plugin{}},
-				PostBind:   &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
 			name: "ReorderDefaultPlugins",
 			customPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin2"},
 						{Name: "DefaultPlugin1"},
@@ -224,7 +184,7 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -232,29 +192,19 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: &PluginSet{Enabled: []Plugin{}},
-				PreFilter: &PluginSet{Enabled: []Plugin{}},
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin2"},
 						{Name: "DefaultPlugin1"},
 					},
 				},
-				PostFilter: &PluginSet{Enabled: []Plugin{}},
-				PreScore:   &PluginSet{Enabled: []Plugin{}},
-				Score:      &PluginSet{Enabled: []Plugin{}},
-				Reserve:    &PluginSet{Enabled: []Plugin{}},
-				Permit:     &PluginSet{Enabled: []Plugin{}},
-				PreBind:    &PluginSet{Enabled: []Plugin{}},
-				Bind:       &PluginSet{Enabled: []Plugin{}},
-				PostBind:   &PluginSet{Enabled: []Plugin{}},
 			},
 		},
 		{
 			name:          "ApplyNilCustomPlugin",
 			customPlugins: nil,
 			defaultPlugins: &Plugins{
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
@@ -262,21 +212,12 @@ func TestPluginsApply(t *testing.T) {
 				},
 			},
 			expectedPlugins: &Plugins{
-				QueueSort: nil,
-				PreFilter: nil,
-				Filter: &PluginSet{
+				Filter: PluginSet{
 					Enabled: []Plugin{
 						{Name: "DefaultPlugin1"},
 						{Name: "DefaultPlugin2"},
 					},
 				},
-				PreScore: nil,
-				Score:    nil,
-				Reserve:  nil,
-				Permit:   nil,
-				PreBind:  nil,
-				Bind:     nil,
-				PostBind: nil,
 			},
 		},
 	}

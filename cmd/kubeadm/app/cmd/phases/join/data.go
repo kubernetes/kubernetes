@@ -35,6 +35,5 @@ type JoinData interface {
 	ClientSet() (*clientset.Clientset, error)
 	IgnorePreflightErrors() sets.String
 	OutputWriter() io.Writer
-	KustomizeDir() string
 	PatchesDir() string
 }

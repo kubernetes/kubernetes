@@ -31,7 +31,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -599,6 +599,7 @@ func TestWatchControllers(t *testing.T) {
 		BurstReplicas,
 	)
 	informers.Start(stopCh)
+	informers.WaitForCacheSync(stopCh)
 
 	var testRSSpec apps.ReplicaSet
 	received := make(chan string)
@@ -1124,7 +1125,11 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	manager.deleteRS(rs)
 	manager.syncReplicaSet(GetKey(rs, t))
 
-	if _, exists, err = manager.expectations.GetExpectations(rsKey); exists {
+	_, exists, err = manager.expectations.GetExpectations(rsKey)
+	if err != nil {
+		t.Errorf("Failed to get controllee expectations: %v", err)
+	}
+	if exists {
 		t.Errorf("Found expectations, expected none since the ReplicaSet has been deleted.")
 	}
 
@@ -1151,6 +1156,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		100,
 	)
 	f.Start(stopCh)
+	f.WaitForCacheSync(stopCh)
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 

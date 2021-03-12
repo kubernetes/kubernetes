@@ -103,7 +103,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Create Persistent Volume
 	ginkgo.By("Creating Storage Class With Fstype")
-	pvclaim, persistentvolumes := createVolume(client, namespace, scParameters)
+	pvclaim, persistentvolumes := createVolume(client, f.Timeouts, namespace, scParameters)
 
 	// Create Pod and verify the persistent volume is accessible
 	pod := createPodAndVerifyVolumeAccessible(client, namespace, pvclaim, persistentvolumes)
@@ -113,7 +113,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
 	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 }
 
 func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string) {
@@ -122,7 +122,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 
 	// Create Persistent Volume
 	ginkgo.By("Creating Storage Class With Invalid Fstype")
-	pvclaim, persistentvolumes := createVolume(client, namespace, scParameters)
+	pvclaim, persistentvolumes := createVolume(client, f.Timeouts, namespace, scParameters)
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	var pvclaims []*v1.PersistentVolumeClaim
@@ -137,7 +137,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
 	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 
 	gomega.Expect(eventList.Items).NotTo(gomega.BeEmpty())
 	errorMsg := `MountVolume.MountDevice failed for volume "` + persistentvolumes[0].Name + `" : executable file not found`
@@ -150,7 +150,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	framework.ExpectEqual(isFound, true, "Unable to verify MountVolume.MountDevice failure")
 }
 
-func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
+func createVolume(client clientset.Interface, timeouts *framework.TimeoutContext, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
 	storageclass, err := client.StorageV1().StorageClasses().Create(context.TODO(), getVSphereStorageClassSpec("fstype", scParameters, nil, ""), metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 	defer client.StorageV1().StorageClasses().Delete(context.TODO(), storageclass.Name, metav1.DeleteOptions{})
@@ -162,7 +162,7 @@ func createVolume(client clientset.Interface, namespace string, scParameters map
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 	return pvclaim, persistentvolumes
 }
@@ -184,7 +184,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 // detachVolume delete the volume passed in the argument and wait until volume is detached from the node,
 func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Pod, volPath string) {
 	pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
-	gomega.Expect(err).To(gomega.BeNil())
+	framework.ExpectNoError(err)
 	nodeName := pod.Spec.NodeName
 	ginkgo.By("Deleting pod")
 	e2epod.DeletePodWithWait(client, pod)

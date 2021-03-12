@@ -72,8 +72,10 @@ type ProcStatus struct {
 	// Number of involuntary context switches.
 	NonVoluntaryCtxtSwitches uint64
 
-	// UIDs of the process (Real, effective, saved set, and filesystem UIDs (GIDs))
+	// UIDs of the process (Real, effective, saved set, and filesystem UIDs)
 	UIDs [4]string
+	// GIDs of the process (Real, effective, saved set, and filesystem GIDs)
+	GIDs [4]string
 }
 
 // NewStatus returns the current status information of the process.
@@ -119,6 +121,8 @@ func (s *ProcStatus) fillStatus(k string, vString string, vUint uint64, vUintByt
 		s.Name = vString
 	case "Uid":
 		copy(s.UIDs[:], strings.Split(vString, "\t"))
+	case "Gid":
+		copy(s.GIDs[:], strings.Split(vString, "\t"))
 	case "VmPeak":
 		s.VmPeak = vUintBytes
 	case "VmSize":

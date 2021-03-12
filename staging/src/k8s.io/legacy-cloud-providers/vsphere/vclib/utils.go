@@ -22,9 +22,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/blang/semver"
 	"github.com/vmware/govmomi/find"
 	"github.com/vmware/govmomi/object"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"k8s.io/klog/v2"
@@ -181,14 +181,6 @@ func IsInvalidCredentialsError(err error) bool {
 	return isInvalidCredentialsError
 }
 
-// VerifyVolumePathsForVM verifies if the volume paths (volPaths) are attached to VM.
-func VerifyVolumePathsForVM(vmMo mo.VirtualMachine, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
-	// Verify if the volume paths are present on the VM backing virtual disk devices
-	vmDevices := object.VirtualDeviceList(vmMo.Config.Hardware.Device)
-	VerifyVolumePathsForVMDevices(vmDevices, volPaths, nodeName, nodeVolumeMap)
-
-}
-
 // VerifyVolumePathsForVMDevices verifies if the volume paths (volPaths) are attached to VM.
 func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths []string, nodeName string, nodeVolumeMap map[string]map[string]bool) {
 	volPathsMap := make(map[string]bool)
@@ -207,4 +199,35 @@ func VerifyVolumePathsForVMDevices(vmDevices object.VirtualDeviceList, volPaths 
 		}
 	}
 
+}
+
+// isvCenterDeprecated takes vCenter version and vCenter API version as input and return true if vCenter is deprecated
+func isvCenterDeprecated(vCenterVersion string, vCenerAPIVersion string) (bool, error) {
+	minvcversion, err := semver.New(MinvCenterVersion)
+	vcdeprecated := false
+	if err != nil {
+		return false, fmt.Errorf("failed to get parse vCenter version: %s. err: %+v", MinvCenterVersion, err)
+	} else {
+		vcversion, err := semver.New(vCenterVersion)
+		if err != nil {
+			return false, fmt.Errorf("failed to parse vCenter version: %s. err: %+v", vCenterVersion, err)
+		} else {
+			result := vcversion.Compare(*minvcversion)
+			if result == -1 {
+				// vcversion is less than minvcversion
+				vcdeprecated = true
+			} else if result == 0 {
+				// vcversion is equal to minvcversion
+				// check patch version
+				vcapiversion, err := semver.ParseTolerant(vCenerAPIVersion)
+				if err != nil {
+					return false, fmt.Errorf("failed to parse vCenter api version: %s. err: %+v", vCenerAPIVersion, err)
+				}
+				if vcapiversion.Patch < 3 {
+					vcdeprecated = true
+				}
+			}
+		}
+	}
+	return vcdeprecated, nil
 }

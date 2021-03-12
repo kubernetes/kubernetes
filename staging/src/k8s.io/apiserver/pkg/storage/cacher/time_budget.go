@@ -39,7 +39,12 @@ const (
 // NOTE: It's not recommended to be used concurrently from multiple threads -
 // if first user takes the whole timeout, the second one will get 0 timeout
 // even though the first one may return something later.
-type timeBudget struct {
+type timeBudget interface {
+	takeAvailable() time.Duration
+	returnUnused(unused time.Duration)
+}
+
+type timeBudgetImpl struct {
 	sync.Mutex
 	budget time.Duration
 
@@ -47,8 +52,8 @@ type timeBudget struct {
 	maxBudget time.Duration
 }
 
-func newTimeBudget(stopCh <-chan struct{}) *timeBudget {
-	result := &timeBudget{
+func newTimeBudget(stopCh <-chan struct{}) timeBudget {
+	result := &timeBudgetImpl{
 		budget:    time.Duration(0),
 		refresh:   refreshPerSecond,
 		maxBudget: maxBudget,
@@ -57,7 +62,7 @@ func newTimeBudget(stopCh <-chan struct{}) *timeBudget {
 	return result
 }
 
-func (t *timeBudget) periodicallyRefresh(stopCh <-chan struct{}) {
+func (t *timeBudgetImpl) periodicallyRefresh(stopCh <-chan struct{}) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
@@ -74,7 +79,7 @@ func (t *timeBudget) periodicallyRefresh(stopCh <-chan struct{}) {
 	}
 }
 
-func (t *timeBudget) takeAvailable() time.Duration {
+func (t *timeBudgetImpl) takeAvailable() time.Duration {
 	t.Lock()
 	defer t.Unlock()
 	result := t.budget
@@ -82,7 +87,7 @@ func (t *timeBudget) takeAvailable() time.Duration {
 	return result
 }
 
-func (t *timeBudget) returnUnused(unused time.Duration) {
+func (t *timeBudgetImpl) returnUnused(unused time.Duration) {
 	t.Lock()
 	defer t.Unlock()
 	if unused < 0 {

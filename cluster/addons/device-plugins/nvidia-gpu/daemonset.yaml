@@ -5,7 +5,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: nvidia-gpu-device-plugin
-    addonmanager.kubernetes.io/mode: Reconcile
+    addonmanager.kubernetes.io/mode: EnsureExists
 spec:
   selector:
     matchLabels:
@@ -36,7 +36,7 @@ spec:
         hostPath:
           path: /dev
       containers:
-      - image: "k8s.gcr.io/nvidia-gpu-device-plugin@sha256:4b036e8844920336fa48f36edeb7d4398f426d6a934ba022848deed2edbf09aa"
+      - image: "gcr.io/gke-release/nvidia-gpu-device-plugin@sha256:a75ec0caa9e3038bd9886b3f36641a624574ff34b064974de6ee45048de3372b"
         command: ["/usr/bin/nvidia-gpu-device-plugin", "-logtostderr"]
         name: nvidia-gpu-device-plugin
         resources:

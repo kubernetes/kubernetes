@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 	utilpath "k8s.io/utils/path"
 
 	v1 "k8s.io/api/core/v1"
@@ -356,7 +356,10 @@ func udevadmChangeToDrive(drivePath string) error {
 // Checks whether the given GCE PD volume spec is associated with a regional PD.
 func isRegionalPD(spec *volume.Spec) bool {
 	if spec.PersistentVolume != nil {
-		zonesLabel := spec.PersistentVolume.Labels[v1.LabelZoneFailureDomain]
+		zonesLabel := spec.PersistentVolume.Labels[v1.LabelTopologyZone]
+		if zonesLabel == "" {
+			zonesLabel = spec.PersistentVolume.Labels[v1.LabelFailureDomainBetaZone]
+		}
 		zones := strings.Split(zonesLabel, cloudvolume.LabelMultiZoneDelimiter)
 		return len(zones) > 1
 	}
