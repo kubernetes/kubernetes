@@ -1273,9 +1273,9 @@ function create-kubeconfig {
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
     gke-internal-create-kubeconfig ${component} ${token}
   else
-  echo "Creating kubeconfig file for component ${component}"
-  mkdir -p "/etc/srv/kubernetes/${component}"
-  cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
+    echo "Creating kubeconfig file for component ${component}"
+    mkdir -p "/etc/srv/kubernetes/${component}"
+    cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
 apiVersion: v1
 kind: Config
 users:
