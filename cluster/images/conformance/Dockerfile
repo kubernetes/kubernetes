@@ -13,13 +13,14 @@
 # limitations under the License.
 
 ARG BASEIMAGE
+ARG RUNNERIMAGE
 
-FROM gcr.io/k8s-staging-build-image/debian-base:v2.1.3 as base
+FROM ${BASEIMAGE} as debbase
 
-FROM ${BASEIMAGE}
+FROM ${RUNNERIMAGE}
 
 # This is a dependency for `kubectl diff` tests
-COPY --from=base /usr/bin/diff /usr/local/bin/
+COPY --from=debbase /usr/bin/diff /usr/local/bin/
 
 COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/
