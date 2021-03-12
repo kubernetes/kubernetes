@@ -1271,7 +1271,7 @@ function create-kubeconfig {
   local token=$2
 
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
-    gke-internal-create-kubeconfig ${component} ${token}
+    gke-internal-create-kubeconfig "${component}" "${token}"
   else
     echo "Creating kubeconfig file for component ${component}"
     mkdir -p "/etc/srv/kubernetes/${component}"
