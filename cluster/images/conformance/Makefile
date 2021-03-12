@@ -31,6 +31,9 @@ E2E_GO_RUNNER_BIN?=$(shell test -f $(LOCAL_OUTPUT_PATH)/go-runner && echo $(LOCA
 
 CLUSTER_DIR?=$(shell pwd)/../../../cluster/
 
+# This is defined in root Makefile, but some build contexts do not refer to them
+KUBE_BASE_IMAGE_REGISTRY?=k8s.gcr.io
+
 ifeq ($(ARCH),amd64)
     BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base:v2.1.3
 else
