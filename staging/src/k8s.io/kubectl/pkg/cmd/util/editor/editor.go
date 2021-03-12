@@ -98,7 +98,7 @@ func defaultEnvEditor(envs []string) ([]string, bool) {
 }
 
 func (e Editor) args(path string) []string {
-	args := make([]string, len(e.Args))
+	args := make([]string, len(e.Args), len(e.Args)+1)
 	copy(args, e.Args)
 	if e.Shell {
 		last := args[len(args)-1]

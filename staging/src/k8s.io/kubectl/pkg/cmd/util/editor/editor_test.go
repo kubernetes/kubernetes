@@ -35,6 +35,12 @@ func TestArgs(t *testing.T) {
 	if e, a := []string{"/bin/bash", "-i -c \"test\""}, (Editor{Args: []string{"/bin/bash", "-i -c"}, Shell: true}).args("test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
+	if e, a := []string{"/bin/bash", "-c \"test space\""}, (Editor{Args: []string{"/bin/bash", "-c"}, Shell: true}).args("test space"); !reflect.DeepEqual(e, a) {
+		t.Errorf("unexpected args: %v", a)
+	}
+	if e, a := []string{"/bin/bash", "-c", "test space"}, (Editor{Args: []string{"/bin/bash", "-c"}, Shell: false}).args("test space"); !reflect.DeepEqual(e, a) {
+		t.Errorf("unexpected args: %v", a)
+	}
 	if e, a := []string{"/test", "test"}, (Editor{Args: []string{"/test"}}).args("test"); !reflect.DeepEqual(e, a) {
 		t.Errorf("unexpected args: %v", a)
 	}
