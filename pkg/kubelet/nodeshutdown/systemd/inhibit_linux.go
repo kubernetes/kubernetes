@@ -56,7 +56,7 @@ func (bus *DBusCon) CurrentInhibitDelay() (time.Duration, error) {
 	obj := bus.SystemBus.Object(logindService, logindObject)
 	res, err := obj.GetProperty(logindInterface + ".InhibitDelayMaxUSec")
 	if err != nil {
-		return 0, fmt.Errorf("failed reading InhibitDelayMaxUSec property from logind: %v", err)
+		return 0, fmt.Errorf("failed reading InhibitDelayMaxUSec property from logind: %w", err)
 	}
 
 	delay, ok := res.Value().(uint64)
@@ -80,13 +80,13 @@ func (bus *DBusCon) InhibitShutdown() (InhibitLock, error) {
 
 	call := obj.Call("org.freedesktop.login1.Manager.Inhibit", 0, what, who, why, mode)
 	if call.Err != nil {
-		return InhibitLock(0), fmt.Errorf("failed creating systemd inhibitor: %v", call.Err)
+		return InhibitLock(0), fmt.Errorf("failed creating systemd inhibitor: %w", call.Err)
 	}
 
 	var fd uint32
 	err := call.Store(&fd)
 	if err != nil {
-		return InhibitLock(0), fmt.Errorf("failed storing inhibit lock file descriptor: %v", err)
+		return InhibitLock(0), fmt.Errorf("failed storing inhibit lock file descriptor: %w", err)
 	}
 
 	return InhibitLock(fd), nil
@@ -97,7 +97,7 @@ func (bus *DBusCon) ReleaseInhibitLock(lock InhibitLock) error {
 	err := syscall.Close(int(lock))
 
 	if err != nil {
-		return fmt.Errorf("unable to close systemd inhibitor lock: %v", err)
+		return fmt.Errorf("unable to close systemd inhibitor lock: %w", err)
 	}
 
 	return nil
@@ -116,7 +116,7 @@ func (bus *DBusCon) ReloadLogindConf() error {
 
 	call := obj.Call(systemdInterface+".KillUnit", 0, unit, who, signal)
 	if call.Err != nil {
-		return fmt.Errorf("unable to reload logind conf: %v", call.Err)
+		return fmt.Errorf("unable to reload logind conf: %w", call.Err)
 	}
 
 	return nil
@@ -166,7 +166,7 @@ const (
 func (bus *DBusCon) OverrideInhibitDelay(inhibitDelayMax time.Duration) error {
 	err := os.MkdirAll(logindConfigDirectory, 0755)
 	if err != nil {
-		return fmt.Errorf("failed creating %v directory: %v", logindConfigDirectory, err)
+		return fmt.Errorf("failed creating %v directory: %w", logindConfigDirectory, err)
 	}
 
 	// This attempts to set the `InhibitDelayMaxUSec` dbus property of logind which is MaxInhibitDelay measured in microseconds.
@@ -180,7 +180,7 @@ InhibitDelayMaxSec=%.0f
 
 	logindOverridePath := filepath.Join(logindConfigDirectory, kubeletLogindConf)
 	if err := ioutil.WriteFile(logindOverridePath, []byte(inhibitOverride), 0644); err != nil {
-		return fmt.Errorf("failed writing logind shutdown inhibit override file %v: %v", logindOverridePath, err)
+		return fmt.Errorf("failed writing logind shutdown inhibit override file %v: %w", logindOverridePath, err)
 	}
 
 	return nil

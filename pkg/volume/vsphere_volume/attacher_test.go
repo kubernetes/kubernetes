@@ -20,6 +20,7 @@ package vsphere_volume
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,6 +30,13 @@ import (
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
 
 	"k8s.io/klog/v2"
+)
+
+var (
+	// diskNameErr is the error when disk name is wrong.
+	diskNameErr = errors.New("wrong diskName")
+	// nodeNameErr is the error when node name is wrong.
+	nodeNameErr = errors.New("wrong nodeName")
 )
 
 func TestGetDeviceName_Volume(t *testing.T) {
@@ -247,12 +255,12 @@ func (testcase *testcase) AttachDisk(diskName string, storagePolicyName string, 
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return "", errors.New("Unexpected AttachDisk call: wrong diskName")
+		return "", fmt.Errorf(`Unexpected AttachDisk call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return "", errors.New("Unexpected AttachDisk call: wrong nodeName")
+		return "", fmt.Errorf(`Unexpected AttachDisk call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceUUID, expected.ret)
@@ -272,12 +280,12 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return errors.New("Unexpected DetachDisk call: wrong diskName")
+		return fmt.Errorf(`Unexpected DetachDisk call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return errors.New("Unexpected DetachDisk call: wrong nodeName")
+		return fmt.Errorf(`Unexpected DetachDisk call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
@@ -297,12 +305,12 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected diskName %s, got %s", expected.diskName, diskName)
-		return false, diskName, errors.New("Unexpected DiskIsAttached call: wrong diskName")
+		return false, diskName, fmt.Errorf(`Unexpected DiskIsAttached call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return false, diskName, errors.New("Unexpected DiskIsAttached call: wrong nodeName")
+		return false, diskName, fmt.Errorf(`Unexpected DiskIsAttached call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)

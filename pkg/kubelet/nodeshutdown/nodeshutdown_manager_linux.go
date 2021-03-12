@@ -126,7 +126,7 @@ func (m *Manager) Start() error {
 	if m.shutdownGracePeriodRequested > currentInhibitDelay {
 		err := m.dbusCon.OverrideInhibitDelay(m.shutdownGracePeriodRequested)
 		if err != nil {
-			return fmt.Errorf("unable to override inhibit delay by shutdown manager: %v", err)
+			return fmt.Errorf("unable to override inhibit delay by shutdown manager: %w", err)
 		}
 
 		err = m.dbusCon.ReloadLogindConf()
@@ -154,9 +154,9 @@ func (m *Manager) Start() error {
 	if err != nil {
 		releaseErr := m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
 		if releaseErr != nil {
-			return fmt.Errorf("failed releasing inhibitLock: %v and failed monitoring shutdown: %v", releaseErr, err)
+			return fmt.Errorf("failed releasing inhibitLock: %v and failed monitoring shutdown: %w", releaseErr, err)
 		}
-		return fmt.Errorf("failed to monitor shutdown: %v", err)
+		return fmt.Errorf("failed to monitor shutdown: %w", err)
 	}
 
 	go func() {
