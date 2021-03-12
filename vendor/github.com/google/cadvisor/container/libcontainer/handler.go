@@ -29,14 +29,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/container"
-	info "github.com/google/cadvisor/info/v1"
-	"golang.org/x/sys/unix"
-
 	"github.com/opencontainers/runc/libcontainer"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	fs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"k8s.io/klog/v2"
+
+	"github.com/google/cadvisor/container"
+	info "github.com/google/cadvisor/info/v1"
 )
 
 var (
@@ -758,16 +757,6 @@ func (h *Handler) GetProcesses() ([]int, error) {
 	return pids, nil
 }
 
-func minUint32(x, y uint32) uint32 {
-	if x < y {
-		return x
-	}
-	return y
-}
-
-// var to allow unit tests to stub it out
-var numCpusFunc = getNumberOnlineCPUs
-
 // Convert libcontainer stats to info.ContainerStats.
 func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
@@ -785,37 +774,7 @@ func setCPUStats(s *cgroups.Stats, ret *info.ContainerStats, withPerCPU bool) {
 		// cpuacct subsystem.
 		return
 	}
-
-	numPossible := uint32(len(s.CpuStats.CpuUsage.PercpuUsage))
-	// Note that as of https://patchwork.kernel.org/patch/8607101/ (kernel v4.7),
-	// the percpu usage information includes extra zero values for all additional
-	// possible CPUs. This is to allow statistic collection after CPU-hotplug.
-	// We intentionally ignore these extra zeroes.
-	numActual, err := numCpusFunc()
-	if err != nil {
-		klog.Errorf("unable to determine number of actual cpus; defaulting to maximum possible number: errno %v", err)
-		numActual = numPossible
-	}
-	if numActual > numPossible {
-		// The real number of cores should never be greater than the number of
-		// datapoints reported in cpu usage.
-		klog.Errorf("PercpuUsage had %v cpus, but the actual number is %v; ignoring extra CPUs", numPossible, numActual)
-	}
-	numActual = minUint32(numPossible, numActual)
-	ret.Cpu.Usage.PerCpu = make([]uint64, numActual)
-
-	for i := uint32(0); i < numActual; i++ {
-		ret.Cpu.Usage.PerCpu[i] = s.CpuStats.CpuUsage.PercpuUsage[i]
-	}
-
-}
-
-func getNumberOnlineCPUs() (uint32, error) {
-	var availableCPUs unix.CPUSet
-	if err := unix.SchedGetaffinity(0, &availableCPUs); err != nil {
-		return 0, err
-	}
-	return uint32(availableCPUs.Count()), nil
+	ret.Cpu.Usage.PerCpu = s.CpuStats.CpuUsage.PercpuUsage
 }
 
 func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
