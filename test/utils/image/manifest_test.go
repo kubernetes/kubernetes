@@ -83,13 +83,6 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"gcr.io/gke-release/test:latest",
-		result{
-			result: "test.io/gke-release/test:latest",
-			err:    nil,
-		},
-	},
-	{
 		"gcr.io/google-samples/test:latest",
 		result{
 			result: "test.io/google-samples/test:latest",
@@ -119,7 +112,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	e2eRegistry = "test.io/kubernetes-e2e-test-images"
 	e2eVolumeRegistry = "test.io/kubernetes-e2e-test-images/volume"
 	gcRegistry = "test.io"
-	gcrReleaseRegistry = "test.io/gke-release"
 	PrivateRegistry = "test.io/k8s-authenticated-test"
 	sampleRegistry = "test.io/google-samples"
 	sigStorageRegistry = "test.io/sig-storage"
