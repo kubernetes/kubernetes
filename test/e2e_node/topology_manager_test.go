@@ -593,6 +593,8 @@ func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.
 	sd := setupSRIOVConfigOrFail(f, configMap)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
+	waitForSRIOVResources(f, sd)
+
 	envInfo := &testEnvInfo{
 		numaNodes:         numaNodes,
 		sriovResourceName: sd.resourceName,
