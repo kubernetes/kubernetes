@@ -836,7 +836,7 @@ func probeGracePeriodInUse(podSpec *api.PodSpec) bool {
 	VisitContainers(podSpec, AllContainers, func(c *api.Container, containerType ContainerType) bool {
 		// cannot be set for readiness probes
 		if (c.LivenessProbe != nil && c.LivenessProbe.TerminationGracePeriodSeconds != nil) ||
-		   (c.StartupProbe != nil && c.StartupProbe.TerminationGracePeriodSeconds != nil) {
+			(c.StartupProbe != nil && c.StartupProbe.TerminationGracePeriodSeconds != nil) {
 			inUse = true
 			return false
 		}

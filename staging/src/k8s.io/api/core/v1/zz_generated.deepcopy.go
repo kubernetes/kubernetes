@@ -4190,6 +4190,11 @@ func (in *PreferredSchedulingTerm) DeepCopy() *PreferredSchedulingTerm {
 func (in *Probe) DeepCopyInto(out *Probe) {
 	*out = *in
 	in.Handler.DeepCopyInto(&out.Handler)
+	if in.TerminationGracePeriodSeconds != nil {
+		in, out := &in.TerminationGracePeriodSeconds, &out.TerminationGracePeriodSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 

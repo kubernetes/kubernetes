@@ -1146,8 +1146,8 @@ func TestDropProbeGracePeriod(t *testing.T) {
 	podWithProbeGracePeriod := func() *api.Pod {
 		return &api.Pod{
 			Spec: api.PodSpec{
-				RestartPolicy:  api.RestartPolicyNever,
-				Containers:     []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &probe, StartupProbe: &probe}},
+				RestartPolicy: api.RestartPolicyNever,
+				Containers:    []api.Container{{Name: "container1", Image: "testimage", LivenessProbe: &probe, StartupProbe: &probe}},
 			},
 		}
 	}
@@ -1176,11 +1176,11 @@ func TestDropProbeGracePeriod(t *testing.T) {
 		{
 			description:    "only has liveness probe-level terminationGracePeriod",
 			hasGracePeriod: true,
-			pod:            func() *api.Pod {
-						p := podWithProbeGracePeriod()
-						p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
-						return p
-					},
+			pod: func() *api.Pod {
+				p := podWithProbeGracePeriod()
+				p.Spec.Containers[0].StartupProbe.TerminationGracePeriodSeconds = nil
+				return p
+			},
 		},
 		{
 			description:    "is nil",
