@@ -511,6 +511,13 @@ func (c *Cacher) Watch(ctx context.Context, key string, opts storage.ListOptions
 		return newErrWatcher(err), nil
 	}
 
+	// FIXME: Change the condition to ensure that we're not allocating memory for initEvents
+	//   without any reasonable boundary.
+	if false {
+		// TODO: See above - can 429 be returned as error - or the above argument holds here too?
+		return nil, errors.NewTooManyRequests("<TODO>", 1)
+	}
+
 	// With some events already sent, update resourceVersion so that
 	// events that were buffered and not yet processed won't be delivered
 	// to this watcher second time causing going back in time.
