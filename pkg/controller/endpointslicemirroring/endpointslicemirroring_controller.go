@@ -316,6 +316,10 @@ func (c *Controller) syncEndpoints(key string) error {
 		return err
 	}
 
+	if c.endpointSliceTracker.StaleSlices(svc, endpointSlices) {
+		return &StaleInformerCache{"EndpointSlice informer cache is out of date"}
+	}
+
 	err = c.reconciler.reconcile(endpoints, endpointSlices)
 	if err != nil {
 		return err
@@ -439,7 +443,7 @@ func (c *Controller) onEndpointSliceAdd(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceAdd() expected type discovery.EndpointSlice, got %T", obj))
 		return
 	}
-	if managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice) {
+	if managedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -455,7 +459,18 @@ func (c *Controller) onEndpointSliceUpdate(prevObj, obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("onEndpointSliceUpdated() expected type discovery.EndpointSlice, got %T, %T", prevObj, obj))
 		return
 	}
-	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.Stale(endpointSlice)) {
+	// EndpointSlice generation does not change when labels change. Although the
+	// controller will never change LabelServiceName, users might. This check
+	// ensures that we handle changes to this label.
+	svcName := endpointSlice.Labels[discovery.LabelServiceName]
+	prevSvcName := prevEndpointSlice.Labels[discovery.LabelServiceName]
+	if svcName != prevSvcName {
+		klog.Warningf("%s label changed from %s  to %s for %s", discovery.LabelServiceName, prevSvcName, svcName, endpointSlice.Name)
+		c.queueEndpointsForEndpointSlice(endpointSlice)
+		c.queueEndpointsForEndpointSlice(prevEndpointSlice)
+		return
+	}
+	if managedByChanged(prevEndpointSlice, endpointSlice) || (managedByController(endpointSlice) && c.endpointSliceTracker.ShouldSync(endpointSlice)) {
 		c.queueEndpointsForEndpointSlice(endpointSlice)
 	}
 }
@@ -470,7 +485,11 @@ func (c *Controller) onEndpointSliceDelete(obj interface{}) {
 		return
 	}
 	if managedByController(endpointSlice) && c.endpointSliceTracker.Has(endpointSlice) {
-		c.queueEndpointsForEndpointSlice(endpointSlice)
+		// This returns false if we didn't expect the EndpointSlice to be
+		// deleted. If that is the case, we queue the Service for another sync.
+		if !c.endpointSliceTracker.HandleDeletion(endpointSlice) {
+			c.queueEndpointsForEndpointSlice(endpointSlice)
+		}
 	}
 }
 
