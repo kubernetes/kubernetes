@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -445,13 +446,20 @@ func addAllEventHandlers(
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	informerFactory.Core().V1().Services().Informer().AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc:    sched.onServiceAdd,
-			UpdateFunc: sched.onServiceUpdate,
-			DeleteFunc: sched.onServiceDelete,
-		},
-	)
+	svcInformer := informerFactory.Core().V1().Services().Informer()
+	for name := range svcInformer.GetIndexer().GetIndexers() {
+		if name == serviceaffinity.Name {
+			delete(svcInformer.GetIndexer().GetIndexers(), serviceaffinity.Name)
+			svcInformer.AddEventHandler(
+				cache.ResourceEventHandlerFuncs{
+					AddFunc:    sched.onServiceAdd,
+					UpdateFunc: sched.onServiceUpdate,
+					DeleteFunc: sched.onServiceDelete,
+				},
+			)
+			break
+		}
+	}
 
 	informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{

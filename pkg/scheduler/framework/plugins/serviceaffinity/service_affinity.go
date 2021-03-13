@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
@@ -68,11 +69,15 @@ func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, erro
 	if err != nil {
 		return nil, err
 	}
-	serviceLister := handle.SharedInformerFactory().Core().V1().Services().Lister()
+	svcs := handle.SharedInformerFactory().Core().V1().Services()
+	// HACK, add a no-op indexer
+	svcs.Informer().GetIndexer().AddIndexers(cache.Indexers{
+		Name: func(_ interface{}) ([]string, error) { return nil, nil },
+	})
 
 	return &ServiceAffinity{
 		sharedLister:  handle.SnapshotSharedLister(),
-		serviceLister: serviceLister,
+		serviceLister: svcs.Lister(),
 		args:          args,
 	}, nil
 }
