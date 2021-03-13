@@ -313,13 +313,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		volDataKey.volHandle:  csiSource.VolumeHandle,
 		volDataKey.driverName: csiSource.Driver,
 	}
-	if err = saveVolumeData(dataDir, volDataFileName, data); err != nil {
-		klog.Error(log("failed to save volume info data: %v", err))
-		if cleanErr := os.RemoveAll(dataDir); cleanErr != nil {
-			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, cleanErr))
-		}
-		return err
-	}
+
+	err = saveVolumeData(dataDir, volDataFileName, data)
 	defer func() {
 		// Only if there was an error and volume operation was considered
 		// finished, we should remove the directory.
@@ -331,6 +326,12 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 			}
 		}
 	}()
+
+	if err != nil {
+		errMsg := log("failed to save volume info data: %v", err)
+		klog.Error(errMsg)
+		return errors.New(errMsg)
+	}
 
 	if !stageUnstageSet {
 		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
