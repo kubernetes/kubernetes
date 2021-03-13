@@ -40,7 +40,7 @@ else
     BASEIMAGE?=${KUBE_BASE_IMAGE_REGISTRY}/build-image/debian-base-${ARCH}:v2.1.3
 endif
 
-RUNNERIMAGE?=gcr.io/distroless/static:latest
+RUNNERIMAGE?=gcr.io/distroless/base:latest
 
 TEMP_DIR:=$(shell mktemp -d -t conformance-XXXXXX)
 
