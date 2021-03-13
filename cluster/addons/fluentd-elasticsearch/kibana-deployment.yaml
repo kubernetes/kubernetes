@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana-logging
-  namespace: kube-system
+  namespace: logging
   labels:
     k8s-app: kibana-logging
     addonmanager.kubernetes.io/mode: Reconcile
@@ -34,7 +34,7 @@ spec:
             - name: SERVER_NAME
               value: kibana-logging
             - name: SERVER_BASEPATH
-              value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy
+              value: /api/v1/namespaces/logging/services/kibana-logging/proxy
             - name: SERVER_REWRITEBASEPATH
               value: "false"
           ports:
