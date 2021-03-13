@@ -478,7 +478,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the PVC. Deletion MUST succeed and resource usage count against its PVC and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
 	*/
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]", func() {
+	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -528,7 +528,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Delete the PVC. Deletion MUST succeed and resource usage count against  PVC, storageClass and storage object MUST be released from ResourceQuotaStatus of the ResourceQuota.
 		[NotConformancePromotable] as test suite do not have any e2e at this moment which are explicitly verifying PV and PVC behaviour.
 	*/
-	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]", func() {
+	ginkgo.It("should create a ResourceQuota and capture the life of a persistent volume claim with a storage class", func() {
 		ginkgo.By("Counting existing ResourceQuota")
 		c, err := countResourceQuota(f.ClientSet, f.Namespace.Name)
 		framework.ExpectNoError(err)
