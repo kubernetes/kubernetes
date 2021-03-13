@@ -81,6 +81,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -433,7 +434,7 @@ func InitFlags(flagset *flag.FlagSet) {
 	flagset.Var(&logging.verbosity, "v", "number for the log level verbosity")
 	flagset.BoolVar(&logging.addDirHeader, "add_dir_header", logging.addDirHeader, "If true, adds the file directory to the header of the log messages")
 	flagset.BoolVar(&logging.skipHeaders, "skip_headers", logging.skipHeaders, "If true, avoid header prefixes in the log messages")
-	flagset.BoolVar(&logging.oneOutput, "one_output", logging.oneOutput, "If true, only write logs to their native severity level (vs also writing to each lower severity level")
+	flagset.BoolVar(&logging.oneOutput, "one_output", logging.oneOutput, "If true, only write logs to their native severity level (vs also writing to each lower severity level)")
 	flagset.BoolVar(&logging.skipLogHeaders, "skip_log_headers", logging.skipLogHeaders, "If true, avoid headers when opening log files")
 	flagset.Var(&logging.stderrThreshold, "stderrthreshold", "logs at or above this threshold go to stderr")
 	flagset.Var(&logging.vmodule, "vmodule", "comma-separated list of pattern=N settings for file-filtered logging")
@@ -780,7 +781,7 @@ func (l *loggingT) errorS(err error, loggr logr.Logger, filter LogFilter, depth 
 		loggr.Error(err, msg, keysAndValues...)
 		return
 	}
-	l.printS(err, depth+1, msg, keysAndValues...)
+	l.printS(err, errorLog, depth+1, msg, keysAndValues...)
 }
 
 // if loggr is specified, will call loggr.Info, otherwise output with logging module.
@@ -792,12 +793,12 @@ func (l *loggingT) infoS(loggr logr.Logger, filter LogFilter, depth int, msg str
 		loggr.Info(msg, keysAndValues...)
 		return
 	}
-	l.printS(nil, depth+1, msg, keysAndValues...)
+	l.printS(nil, infoLog, depth+1, msg, keysAndValues...)
 }
 
 // printS is called from infoS and errorS if loggr is not specified.
-// if err arguments is specified, will output to errorLog severity
-func (l *loggingT) printS(err error, depth int, msg string, keysAndValues ...interface{}) {
+// set log severity by s
+func (l *loggingT) printS(err error, s severity, depth int, msg string, keysAndValues ...interface{}) {
 	b := &bytes.Buffer{}
 	b.WriteString(fmt.Sprintf("%q", msg))
 	if err != nil {
@@ -805,12 +806,6 @@ func (l *loggingT) printS(err error, depth int, msg string, keysAndValues ...int
 		b.WriteString(fmt.Sprintf("err=%q", err.Error()))
 	}
 	kvListFormat(b, keysAndValues...)
-	var s severity
-	if err == nil {
-		s = infoLog
-	} else {
-		s = errorLog
-	}
 	l.printDepth(s, logging.logr, nil, depth+1, b)
 }
 
@@ -1583,6 +1578,13 @@ type KMetadata interface {
 
 // KObj returns ObjectRef from ObjectMeta
 func KObj(obj KMetadata) ObjectRef {
+	if obj == nil {
+		return ObjectRef{}
+	}
+	if val := reflect.ValueOf(obj); val.Kind() == reflect.Ptr && val.IsNil() {
+		return ObjectRef{}
+	}
+
 	return ObjectRef{
 		Name:      obj.GetName(),
 		Namespace: obj.GetNamespace(),
