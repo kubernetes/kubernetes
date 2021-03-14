@@ -18,6 +18,7 @@ package diff
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -62,7 +63,13 @@ func (f *FakeObject) Live() runtime.Object {
 }
 
 func TestDiffProgram(t *testing.T) {
-	externalDiffCommands := [3]string{"diff", "diff -ruN", "diff --report-identical-files"}
+	const show_function_line_switch = "--show-function-line='^.*:'"
+	externalDiffCommands := [5]string{"diff", "diff -ruN", "diff --report-identical-files",
+		"diff --color=auto",                 // equal sign
+		"diff " + show_function_line_switch, // illegal characters
+	}
+	const test_report_identical_files = 2
+	const test_show_function_line = 4
 
 	if oriLang := os.Getenv("LANG"); oriLang != "C" {
 		os.Setenv("LANG", "C")
@@ -82,10 +89,17 @@ func TestDiffProgram(t *testing.T) {
 		}
 
 		// Testing diff --report-identical-files
-		if i == 2 {
+		if i == test_report_identical_files {
 			output_msg := "Files /dev/zero and /dev/zero are identical\n"
 			if output := stdout.String(); output != output_msg {
 				t.Fatalf(`stdout = %q, expected = %s"`, output, output_msg)
+			}
+		}
+		// Testing diff --show-function-line='^.*:'
+		if i == test_show_function_line {
+			_, cmd := diff.getCommand()
+			if strings.Contains(fmt.Sprintf("%v", cmd), show_function_line_switch) {
+				t.Fatalf("%v is used but it should not.", show_function_line_switch)
 			}
 		}
 	}

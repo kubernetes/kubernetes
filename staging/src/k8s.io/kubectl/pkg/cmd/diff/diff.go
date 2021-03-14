@@ -185,10 +185,15 @@ func (d *DiffProgram) getCommand(args ...string) (string, exec.Cmd) {
 
 		if len(diffCommand) > 1 {
 			// Regex accepts: Alphanumeric (case-insensitive), dash and equal
-			isValidChar := regexp.MustCompile(`^[a-zA-Z0-9-=]+$`).MatchString
+			pattern := `^[a-zA-Z0-9-=]+$`
+			isValidChar := regexp.MustCompile(pattern).MatchString
 			for i := 1; i < len(diffCommand); i++ {
 				if isValidChar(diffCommand[i]) {
 					args = append(args, diffCommand[i])
+				} else {
+					klog.Warningf(
+						"KUBECTL_EXTERNAL_DIFF command argument \"%v\" is ignored due to illegal characters. "+
+							"Acceptable characters must match %v.", diffCommand[i], pattern)
 				}
 			}
 		}
