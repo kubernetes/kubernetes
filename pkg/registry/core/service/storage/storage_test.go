@@ -35,6 +35,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
+	netutils "k8s.io/utils/net"
 )
 
 func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTestServer) {
@@ -45,7 +46,7 @@ func newStorage(t *testing.T) (*GenericREST, *StatusREST, *etcd3testing.EtcdTest
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "services",
 	}
-	serviceStorage, statusStorage, err := NewGenericREST(restOptions, *makeIPNet(t), false)
+	serviceStorage, statusStorage, err := NewGenericREST(restOptions, api.IPv4Protocol, false)
 	if err != nil {
 		t.Fatalf("unexpected error from REST storage: %v", err)
 	}
@@ -421,7 +422,11 @@ func TestServiceDefaultOnRead(t *testing.T) {
 				t.Fatalf("failed to parse CIDR")
 			}
 
-			serviceStorage, _, err := NewGenericREST(restOptions, *cidr, false)
+			ipFamily := api.IPv4Protocol
+			if netutils.IsIPv6CIDR(cidr) {
+				ipFamily = api.IPv6Protocol
+			}
+			serviceStorage, _, err := NewGenericREST(restOptions, ipFamily, false)
 			if err != nil {
 				t.Fatalf("unexpected error from REST storage: %v", err)
 			}
@@ -479,7 +484,11 @@ func TestServiceDefaulting(t *testing.T) {
 			t.Fatalf("failed to parse CIDR %s", primaryCIDR)
 		}
 
-		serviceStorage, statusStorage, err := NewGenericREST(restOptions, *(cidr), isDualStack)
+		ipFamily := api.IPv4Protocol
+		if netutils.IsIPv6CIDR(cidr) {
+			ipFamily = api.IPv6Protocol
+		}
+		serviceStorage, statusStorage, err := NewGenericREST(restOptions, ipFamily, isDualStack)
 		if err != nil {
 			t.Fatalf("unexpected error from REST storage: %v", err)
 		}

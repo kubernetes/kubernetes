@@ -252,7 +252,7 @@ func NewTestRESTWithPods(t *testing.T, endpoints *api.EndpointsList, pods *api.P
 		t.Fatalf("cannot create port allocator %v", err)
 	}
 
-	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary, rSecondary, portAllocator, nil)
+	rest, _ := NewREST(serviceStorage, endpointStorage, podStorage.Pod, rPrimary, ipFamilies[0], rSecondary, portAllocator, nil)
 
 	return rest, serviceStorage, server
 }
