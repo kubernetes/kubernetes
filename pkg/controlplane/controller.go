@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"time"
 
-	allocationv1alpha1 "k8s.io/api/allocation/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,13 +38,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/features"
-	ipallocator "k8s.io/kubernetes/pkg/registry/allocation"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/core/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/core/service/portallocator/controller"
 	"k8s.io/kubernetes/pkg/util/async"
-	k8sutilnet "k8s.io/utils/net"
 )
 
 const kubernetesServiceName = "kubernetes"
@@ -56,7 +53,7 @@ const kubernetesServiceName = "kubernetes"
 // repair check on service IPs
 type Controller struct {
 	ServiceClient   corev1client.ServicesGetter
-	AllocatorClient allocationclient.IPRangesGetter
+	AllocatorClient allocationclient.IPRequestsGetter
 	NamespaceClient corev1client.NamespacesGetter
 	EventClient     corev1client.EventsGetter
 	readyzClient    rest.Interface
@@ -92,7 +89,7 @@ type Controller struct {
 }
 
 // NewBootstrapController returns a controller for watching the core capabilities of the master
-func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, allocatorClient allocationclient.IPRangesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) *Controller {
+func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, allocatorClient allocationclient.IPRequestsGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) *Controller {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
 		klog.Fatalf("failed to get listener address: %v", err)
@@ -251,17 +248,6 @@ func (c *Controller) UpdateKubernetesService(reconcile bool) error {
 		return err
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ClusterIPAllocatorAPI) {
-		if err := createAllocatorIfNeeded(c.AllocatorClient, c.ServiceClusterIPRange); err != nil {
-			return err
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceClusterIPRange.IP != nil {
-			if err := createAllocatorIfNeeded(c.AllocatorClient, c.SecondaryServiceClusterIPRange); err != nil {
-				return err
-			}
-		}
-	}
-
 	servicePorts, serviceType := createPortAndServiceSpec(c.ServicePort, c.PublicServicePort, c.KubernetesServiceNodePort, "https", c.ExtraServicePorts)
 	if err := c.CreateOrUpdateMasterServiceIfNeeded(kubernetesServiceName, c.ServiceIP, servicePorts, serviceType, reconcile); err != nil {
 		return err
@@ -340,33 +326,6 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 	_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Create(context.TODO(), svc, metav1.CreateOptions{})
 	if errors.IsAlreadyExists(err) {
 		return c.CreateOrUpdateMasterServiceIfNeeded(serviceName, serviceIP, servicePorts, serviceType, reconcile)
-	}
-	return err
-}
-
-func createAllocatorIfNeeded(allocatorClient allocationclient.IPRangesGetter, cidr net.IPNet) error {
-	name := ipallocator.DefaultIPv4Allocator
-	if k8sutilnet.IsIPv6CIDR(&cidr) {
-		name = ipallocator.DefaultIPv6Allocator
-	}
-	if _, err := allocatorClient.IPRanges().Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
-		// the IP range allocator already exists
-		return nil
-	}
-
-	// create IPRange object
-	ipRange := allocationv1alpha1.IPRange{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-		},
-		Spec: allocationv1alpha1.IPRangeSpec{
-			Range: cidr.String(),
-		},
-	}
-	ctx := context.Background()
-	_, err := allocatorClient.IPRanges().Create(ctx, &ipRange, metav1.CreateOptions{})
-	if err != nil && errors.IsAlreadyExists(err) {
-		err = nil
 	}
 	return err
 }
