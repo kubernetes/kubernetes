@@ -21,6 +21,7 @@ package fake
 import (
 	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	allocationv1alpha1 "k8s.io/api/allocation/v1alpha1"
 	internalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
@@ -75,6 +76,7 @@ var codecs = serializer.NewCodecFactory(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	admissionregistrationv1.AddToScheme,
 	admissionregistrationv1beta1.AddToScheme,
+	allocationv1alpha1.AddToScheme,
 	internalv1alpha1.AddToScheme,
 	appsv1.AddToScheme,
 	appsv1beta1.AddToScheme,
