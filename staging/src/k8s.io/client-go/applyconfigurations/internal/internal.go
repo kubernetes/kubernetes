@@ -411,6 +411,29 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.allocation.v1alpha1.IPRequest
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.allocation.v1alpha1.IPRequestStatus
+      default: {}
+- name: io.k8s.api.allocation.v1alpha1.IPRequestStatus
+  map:
+    fields:
+    - name: allocated
+      type:
+        scalar: boolean
 - name: io.k8s.api.apiserverinternal.v1alpha1.ServerStorageVersion
   map:
     fields:
