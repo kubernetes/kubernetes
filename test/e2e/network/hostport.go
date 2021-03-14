@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -71,8 +72,11 @@ var _ = common.SIGDescribe("HostPort", func() {
 		framework.ExpectNoError(err)
 		if len(nodes.Items) == 0 {
 			framework.Failf("No nodes available")
-
 		}
+		if len(nodes.Items) < 2 {
+			e2eskipper.Skipf("Test requires >= 2 Ready nodes, but there are only 1 node")
+		}
+
 		randomNode := &nodes.Items[rand.Intn(len(nodes.Items))]
 
 		ips := e2enode.GetAddressesByTypeAndFamily(randomNode, v1.NodeInternalIP, family)
