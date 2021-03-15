@@ -2065,6 +2065,7 @@ func TestDescribeDeployment(t *testing.T) {
 }
 
 func TestDescribeJob(t *testing.T) {
+	indexedCompletion := batchv1.IndexedCompletion
 	cases := map[string]struct {
 		job                  *batchv1.Job
 		wantCompletedIndexes string
@@ -2075,9 +2076,7 @@ func TestDescribeJob(t *testing.T) {
 					Name:      "bar",
 					Namespace: "foo",
 				},
-				Spec: batchv1.JobSpec{
-					CompletionMode: batchv1.NonIndexedCompletion,
-				},
+				Spec: batchv1.JobSpec{},
 			},
 		},
 		"no indexes": {
@@ -2087,7 +2086,7 @@ func TestDescribeJob(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: batchv1.JobSpec{
-					CompletionMode: batchv1.IndexedCompletion,
+					CompletionMode: &indexedCompletion,
 				},
 			},
 			wantCompletedIndexes: "<none>",
@@ -2099,7 +2098,7 @@ func TestDescribeJob(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: batchv1.JobSpec{
-					CompletionMode: batchv1.IndexedCompletion,
+					CompletionMode: &indexedCompletion,
 				},
 				Status: batchv1.JobStatus{
 					CompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32",
@@ -2114,7 +2113,7 @@ func TestDescribeJob(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: batchv1.JobSpec{
-					CompletionMode: batchv1.IndexedCompletion,
+					CompletionMode: &indexedCompletion,
 				},
 				Status: batchv1.JobStatus{
 					CompletedIndexes: "0-5,7,9,10,12,13,15,16,18,20,21,23,24,26,27,29,30,32-34,36,37",

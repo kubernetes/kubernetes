@@ -99,7 +99,7 @@ func testJobStrategy(t *testing.T) {
 			// Set gated values.
 			Suspend:                 pointer.BoolPtr(true),
 			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
-			CompletionMode:          batch.IndexedCompletion,
+			CompletionMode:          completionModePtr(batch.IndexedCompletion),
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -117,11 +117,11 @@ func testJobStrategy(t *testing.T) {
 	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil) {
 		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished only when %v feature is enabled", features.TTLAfterFinished)
 	}
-	if indexedJobEnabled != (job.Spec.CompletionMode != batch.NonIndexedCompletion) {
-		t.Errorf("Job should allow setting .spec.completionMode=Indexed only when %v feature is enabled", features.IndexedJob)
+	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
+		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
 	}
-	if !suspendJobEnabled && *job.Spec.Suspend {
-		t.Errorf("[SuspendJob=%v] .spec.suspend should be set to true", suspendJobEnabled)
+	if !suspendJobEnabled && (job.Spec.Suspend != nil) {
+		t.Errorf("Job should allow setting .spec.suspend only when %v feature is enabled", features.SuspendJob)
 	}
 
 	parallelism := int32(10)
@@ -132,7 +132,7 @@ func testJobStrategy(t *testing.T) {
 			Completions: pointer.Int32Ptr(2),
 			// Update gated features.
 			TTLSecondsAfterFinished: pointer.Int32Ptr(1),
-			CompletionMode:          batch.IndexedCompletion, // No change because field is immutable.
+			CompletionMode:          completionModePtr(batch.IndexedCompletion), // No change because field is immutable.
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -153,21 +153,10 @@ func testJobStrategy(t *testing.T) {
 		t.Errorf("Expected a validation error")
 	}
 
-	// Existing gated fields should be preserved
-	job.Spec.TTLSecondsAfterFinished = pointer.Int32Ptr(1)
-	job.Spec.CompletionMode = batch.IndexedCompletion
-	updatedJob.Spec.TTLSecondsAfterFinished = pointer.Int32Ptr(2)
-	updatedJob.Spec.CompletionMode = batch.IndexedCompletion
 	// Test updating suspend false->true and nil-> true when the feature gate is
 	// disabled. We don't care about other combinations.
 	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.BoolPtr(false), pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
-		t.Errorf("existing .spec.ttlSecondsAfterFinished should be preserved")
-	}
-	if job.Spec.CompletionMode == "" || updatedJob.Spec.CompletionMode == "" {
-		t.Errorf("existing completionMode should be preserved")
-	}
 	if !suspendJobEnabled && *updatedJob.Spec.Suspend {
 		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from false to true", suspendJobEnabled)
 	}
@@ -323,4 +312,8 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		JobToSelectableFields(&batch.Job{}),
 		nil,
 	)
+}
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
 }

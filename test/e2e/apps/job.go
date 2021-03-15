@@ -156,7 +156,8 @@ var _ = SIGDescribe("Job", func() {
 	ginkgo.It("[Feature:IndexedJob] should create pods for an Indexed job with completion indexes", func() {
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
-		job.Spec.CompletionMode = batchv1.IndexedCompletion
+		mode := batchv1.IndexedCompletion
+		job.Spec.CompletionMode = &mode
 		job, err := e2ejob.CreateJob(f.ClientSet, f.Namespace.Name, job)
 		framework.ExpectNoError(err, "failed to create indexed job in namespace %s", f.Namespace.Name)
 

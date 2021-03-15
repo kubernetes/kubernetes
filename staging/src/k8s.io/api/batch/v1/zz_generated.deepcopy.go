@@ -271,6 +271,11 @@ func (in *JobSpec) DeepCopyInto(out *JobSpec) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.CompletionMode != nil {
+		in, out := &in.CompletionMode, &out.CompletionMode
+		*out = new(CompletionMode)
+		**out = **in
+	}
 	if in.Suspend != nil {
 		in, out := &in.Suspend, &out.Suspend
 		*out = new(bool)

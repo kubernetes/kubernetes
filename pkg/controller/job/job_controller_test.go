@@ -64,7 +64,6 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"foo": "bar"},
 			},
-			CompletionMode: completionMode,
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
@@ -78,6 +77,9 @@ func newJob(parallelism, completions, backoffLimit int32, completionMode batch.C
 				},
 			},
 		},
+	}
+	if completionMode != "" {
+		j.Spec.CompletionMode = &completionMode
 	}
 	// Special case: -1 for either completions or parallelism means leave nil (negative is not allowed
 	// in practice by validation.

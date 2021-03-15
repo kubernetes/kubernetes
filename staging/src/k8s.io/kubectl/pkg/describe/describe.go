@@ -2165,7 +2165,7 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 		} else {
 			w.Write(LEVEL_0, "Completions:\t<unset>\n")
 		}
-		if job.Spec.CompletionMode != "" {
+		if job.Spec.CompletionMode != nil {
 			w.Write(LEVEL_0, "Completion Mode:\t%s\n", job.Spec.CompletionMode)
 		}
 		if job.Status.StartTime != nil {
@@ -2181,7 +2181,7 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Active Deadline Seconds:\t%ds\n", *job.Spec.ActiveDeadlineSeconds)
 		}
 		w.Write(LEVEL_0, "Pods Statuses:\t%d Running / %d Succeeded / %d Failed\n", job.Status.Active, job.Status.Succeeded, job.Status.Failed)
-		if job.Spec.CompletionMode == batchv1.IndexedCompletion {
+		if job.Spec.CompletionMode != nil && *job.Spec.CompletionMode == batchv1.IndexedCompletion {
 			w.Write(LEVEL_0, "Completed Indexes:\t%s\n", capIndexesListOrNone(job.Status.CompletedIndexes, 50))
 		}
 		DescribePodTemplate(&job.Spec.Template, w)
