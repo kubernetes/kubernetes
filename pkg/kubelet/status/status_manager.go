@@ -598,10 +598,8 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 
 	m.apiStatusVersions[kubetypes.MirrorPodUID(pod.UID)] = status.version
 
-	// We don't handle graceful deletion of mirror pods.
 	if m.canBeDeleted(pod, status.status) {
 		deleteOptions := metav1.DeleteOptions{
-			GracePeriodSeconds: new(int64),
 			// Use the pod UID as the precondition for deletion to prevent deleting a
 			// newly created pod with the same name and namespace.
 			Preconditions: metav1.NewUIDPreconditions(string(pod.UID)),
