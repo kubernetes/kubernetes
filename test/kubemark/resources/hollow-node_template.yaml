@@ -49,8 +49,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         command: [
-          "/kubemark",
-          "--morph=kubelet",
+          "/hollow-kubelet",
           "--name=$(NODE_NAME)",
           "--kubeconfig=/kubeconfig/kubelet.kubeconfig",
           "--log-file=/var/log/kubelet-$(NODE_NAME).log",
@@ -80,8 +79,7 @@ spec:
             fieldRef:
               fieldPath: metadata.name
         command: [
-          "/kubemark",
-          "--morph=proxy",
+          "/hollow-proxy",
           "--name=$(NODE_NAME)",
           "--kubeconfig=/kubeconfig/kubeproxy.kubeconfig",
           "--log-file=/var/log/kubeproxy-$(NODE_NAME).log",

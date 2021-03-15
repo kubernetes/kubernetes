@@ -296,7 +296,8 @@ readonly KUBE_TEST_PORTABLE=(
 # If you update this list, please also update build/BUILD.
 kube::golang::server_test_targets() {
   local targets=(
-    cmd/kubemark
+    cmd/kubemark/hollow-kubelet
+    cmd/kubemark/hollow-proxy
     vendor/github.com/onsi/ginkgo/ginkgo
   )
 
