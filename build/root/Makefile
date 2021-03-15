@@ -506,6 +506,7 @@ ifeq ($(PRINT_HELP),y)
 cross cross-in-a-container:
 	@echo "$$CROSS_HELP_INFO"
 else
+cross cross-in-a-container: KUBE_BUILD_CONFORMANCE = y
 cross:
 	hack/make-rules/cross.sh
 cross-in-a-container: KUBE_OUTPUT_SUBPATH = $(OUT_DIR)/dockerized
