@@ -2214,6 +2214,8 @@ func (kl *Kubelet) updateRuntimeUp() {
 	networkReady := s.GetRuntimeCondition(kubecontainer.NetworkReady)
 	if networkReady == nil || !networkReady.Status {
 		klog.Errorf("Container runtime network not ready: %v", networkReady)
+		klog.Errorf("Container runtime (%v) is reporting network not ready: %v", kl.containerRuntime, networkReady)
+
 		kl.runtimeState.setNetworkState(fmt.Errorf("runtime network not ready: %v", networkReady))
 	} else {
 		// Set nil if the container runtime network is ready.
