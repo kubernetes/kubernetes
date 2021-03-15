@@ -30,10 +30,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"k8s.io/kubernetes/pkg/features"
 	quota "k8s.io/kubernetes/pkg/quota/v1"
 	"k8s.io/kubernetes/pkg/quota/v1/generic"
 )
@@ -351,6 +353,10 @@ func PodUsageFunc(obj runtime.Object, clock clock.Clock) (corev1.ResourceList, e
 		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
+	if feature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		requests = quota.Add(requests, pod.Spec.Overhead)
+		limits = quota.Add(limits, pod.Spec.Overhead)
+	}
 	result = quota.Add(result, podComputeUsageHelper(requests, limits))
 	return result, nil
 }
