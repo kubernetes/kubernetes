@@ -19,6 +19,7 @@ package apps
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -137,7 +138,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		c = f.ClientSet
 
-		updatedNS, err := updateNamespaceAnnotations(c, ns)
+		updatedNS, err := patchNamespaceAnnotations(c, ns)
 		framework.ExpectNoError(err)
 
 		ns = updatedNS.Name
@@ -884,24 +885,24 @@ func clearDaemonSetNodeLabels(c clientset.Interface) error {
 	return nil
 }
 
-// updateNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
-func updateNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
+// patchNamespaceAnnotations sets node selectors related annotations on tests namespaces to empty
+func patchNamespaceAnnotations(c clientset.Interface, nsName string) (*v1.Namespace, error) {
 	nsClient := c.CoreV1().Namespaces()
 
-	ns, err := nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
+	annotations := make(map[string]string)
+	for _, n := range NamespaceNodeSelectors {
+		annotations[n] = ""
+	}
+	nsPatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": annotations,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	if ns.Annotations == nil {
-		ns.Annotations = make(map[string]string)
-	}
-
-	for _, n := range NamespaceNodeSelectors {
-		ns.Annotations[n] = ""
-	}
-
-	return nsClient.Update(context.TODO(), ns, metav1.UpdateOptions{})
+	return nsClient.Patch(context.TODO(), nsName, types.StrategicMergePatchType, nsPatch, metav1.PatchOptions{})
 }
 
 func setDaemonSetNodeLabels(c clientset.Interface, nodeName string, labels map[string]string) (*v1.Node, error) {
