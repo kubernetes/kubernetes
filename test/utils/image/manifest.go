@@ -32,7 +32,6 @@ import (
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
-	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
@@ -71,7 +70,6 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
@@ -109,7 +107,6 @@ var (
 	// Preconfigured image configs
 	dockerLibraryRegistry   = "docker.io/library"
 	e2eRegistry             = registry.E2eRegistry
-	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
@@ -387,8 +384,6 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":
 		registryAndUser = e2eRegistry
-	case "gcr.io/kubernetes-e2e-test-images/volume":
-		registryAndUser = e2eVolumeRegistry
 	case "k8s.gcr.io":
 		registryAndUser = gcRegistry
 	case "k8s.gcr.io/sig-storage":
