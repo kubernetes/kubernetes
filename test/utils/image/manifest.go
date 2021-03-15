@@ -76,7 +76,6 @@ func initReg() RegistryList {
 		GcEtcdRegistry:          "k8s.gcr.io",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
 		MicrosoftRegistry:       "mcr.microsoft.com",
@@ -113,7 +112,6 @@ var (
 	gcEtcdRegistry          = registry.GcEtcdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
-	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	sampleRegistry          = registry.SampleRegistry
 	microsoftRegistry       = registry.MicrosoftRegistry
@@ -392,8 +390,6 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = PrivateRegistry
 	case "gcr.io/google-samples":
 		registryAndUser = sampleRegistry
-	case "gcr.io/gke-release":
-		registryAndUser = gcrReleaseRegistry
 	case "docker.io/library":
 		registryAndUser = dockerLibraryRegistry
 	default:
