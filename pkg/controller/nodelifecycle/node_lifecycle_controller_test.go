@@ -3532,10 +3532,8 @@ func TestReconcileNodeLabels(t *testing.T) {
 				},
 			},
 			ExpectedLabels: map[string]string{
-				kubeletapis.LabelOS:   "linux",
-				kubeletapis.LabelArch: "amd64",
-				v1.LabelOSStable:      "linux",
-				v1.LabelArchStable:    "amd64",
+				v1.LabelOSStable:   "linux",
+				v1.LabelArchStable: "amd64",
 			},
 		},
 		{

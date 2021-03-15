@@ -144,6 +144,8 @@ func setAllowedUpdateLabels(node *api.Node, value string) *api.Node {
 	node.Labels["topology.kubernetes.io/region"] = value
 	node.Labels["beta.kubernetes.io/instance-type"] = value
 	node.Labels["node.kubernetes.io/instance-type"] = value
+	node.Labels["beta.kubernetes.io/os"] = value
+	node.Labels["beta.kubernetes.io/arch"] = value
 	node.Labels["kubernetes.io/os"] = value
 	node.Labels["kubernetes.io/arch"] = value
 
