@@ -2205,7 +2205,16 @@ var _ = common.SIGDescribe("Services", func() {
 		framework.ExpectError(err, "should not be able to fetch Endpoint")
 	})
 
-	ginkgo.It("should complete a service status lifecycle", func() {
+	/*
+		Release: v1.21
+		Testname: Service, complete ServiceStatus lifecycle
+		Description: Create a service, the service MUST exist.
+		When retrieving /status the action MUST be validated.
+		When patching /status the action MUST be validated.
+		When updating /status the action MUST be validated.
+		When patching a service the action MUST be validated.
+	*/
+	framework.ConformanceIt("should complete a service status lifecycle", func() {
 
 		ns := f.Namespace.Name
 		svcResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "services"}
