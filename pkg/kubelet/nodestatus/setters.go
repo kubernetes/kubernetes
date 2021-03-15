@@ -191,11 +191,11 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 
 				if existingHostnameAddress == nil {
 					// no existing Hostname address found, add it
-					klog.InfoS("adding overridden hostname to cloudprovider-reported addresses", "hostname", hostname)
+					klog.InfoS("Adding overridden hostname to cloudprovider-reported addresses", "hostname", hostname)
 					nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
 				} else if existingHostnameAddress.Address != hostname {
 					// override the Hostname address reported by the cloud provider
-					klog.InfoS("replacing cloudprovider-reported hostname with overridden hostname", "cloudproviderHostname", existingHostnameAddress.Address, "overrideHostname", hostname)
+					klog.InfoS("Replacing cloudprovider-reported hostname with overridden hostname", "cloudProviderHostname", existingHostnameAddress.Address, "overriddenHostname", hostname)
 					existingHostnameAddress.Address = hostname
 				}
 			}
