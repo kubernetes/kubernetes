@@ -704,9 +704,10 @@
   description: PodDisruptionBudget API must support list and deletecollection operations.
   release: v1.21
   file: test/e2e/apps/disruption.go
-- testname: 'PodDisruptionBudget: create and delete object'
+- testname: 'PodDisruptionBudget: create, update, patch, and delete object'
   codename: '[sig-apps] DisruptionController should create a PodDisruptionBudget [Conformance]'
-  description: PodDisruptionBudget API must support create and delete operations.
+  description: PodDisruptionBudget API must support create, update, patch, and delete
+    operations.
   release: v1.21
   file: test/e2e/apps/disruption.go
 - testname: 'PodDisruptionBudget: Status updates'
