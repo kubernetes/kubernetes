@@ -105,7 +105,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 		flowcontrolClientSet := flowcontrolclient.NewForConfigOrDie(hookContext.LoopbackClientConfig)
 		go func() {
 			const retryCreatingSuggestedSettingsInterval = time.Second
-			_ = wait.PollImmediateUntil(
+			err := wait.PollImmediateUntil(
 				retryCreatingSuggestedSettingsInterval,
 				func() (bool, error) {
 					should, err := shouldEnsureSuggested(flowcontrolClientSet)
@@ -127,6 +127,17 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 					return true, nil
 				},
 				hookContext.StopCh)
+			if err != nil {
+				klog.ErrorS(err, "Ensuring suggested configuration failed")
+
+				// We should not attempt creation of mandatory objects if ensuring the suggested
+				// configuration resulted in an error.
+				// This only happens when the stop channel is closed.
+				// We rely on the presence of the "exempt" priority level configuration object in the cluster
+				// to indicate whether we should ensure suggested configuration.
+				return
+			}
+
 			const retryCreatingMandatorySettingsInterval = time.Minute
 			_ = wait.PollImmediateUntil(
 				retryCreatingMandatorySettingsInterval,
@@ -134,7 +145,7 @@ func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStart
 					if err := upgrade(
 						flowcontrolClientSet,
 						flowcontrolbootstrap.MandatoryFlowSchemas,
-						// Note: the "exempt" priority-level is supposed tobe the last item in the pre-defined
+						// Note: the "exempt" priority-level is supposed to be the last item in the pre-defined
 						// list, so that a crash in the midst of the first kube-apiserver startup does not prevent
 						// the full initial set of objects from being created.
 						flowcontrolbootstrap.MandatoryPriorityLevelConfigurations,
