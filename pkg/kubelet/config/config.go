@@ -94,7 +94,7 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	if c.pods == nil {
 		return false
 	}
-	klog.V(5).Infof("Looking for %v, have seen %v", c.sources.List(), seenSources)
+	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
 	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
 }
 
@@ -254,16 +254,16 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
-			klog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", format.Pods(update.Pods))
 		} else if update.Op == kubetypes.DELETE {
-			klog.V(4).Infof("Graceful deleting pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", format.Pods(update.Pods))
 		} else {
-			klog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", format.Pods(update.Pods))
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		klog.V(4).Infof("Removing pods from source %s : %v", source, update.Pods)
+		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", format.Pods(update.Pods))
 		for _, value := range update.Pods {
 			if existing, found := pods[value.UID]; found {
 				// this is a delete
@@ -275,7 +275,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubetypes.SET:
-		klog.V(4).Infof("Setting pods for source %s", source)
+		klog.V(4).InfoS("Setting pods for source", "source", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
@@ -289,7 +289,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	default:
-		klog.Warningf("Received invalid update type: %v", update)
+		klog.InfoS("Received invalid update type", "type", update)
 
 	}
 
@@ -323,7 +323,7 @@ func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecor
 		// This function only checks if there is any naming conflict.
 		name := kubecontainer.GetPodFullName(pod)
 		if names.Has(name) {
-			klog.Warningf("Pod[%d] (%s) from %s failed validation due to duplicate pod name %q, ignoring", i+1, format.Pod(pod), source, pod.Name)
+			klog.InfoS("Pod failed validation due to duplicate pod name, ignoring", "index", i, "pod", klog.KObj(pod), "source", source)
 			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
 		} else {
@@ -380,7 +380,7 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 
 // recordFirstSeenTime records the first seen time of this pod.
 func recordFirstSeenTime(pod *v1.Pod) {
-	klog.V(4).Infof("Receiving a new pod %q", format.Pod(pod))
+	klog.V(4).InfoS("Receiving a new pod", "pod", klog.KObj(pod))
 	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 }
 
