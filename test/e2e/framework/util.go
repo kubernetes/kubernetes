@@ -65,6 +65,7 @@ import (
 	uexec "k8s.io/utils/exec"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+
 	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -811,21 +812,27 @@ func (f *Framework) MatchContainerOutput(
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
 	ns := pod.ObjectMeta.Namespace
 	if ns == "" {
-		ns = f.Namespace.Name
+		ns = f.GetNamespace().Name
 	}
-	podClient := f.PodClientNS(ns)
 
-	createdPod := podClient.Create(pod)
+	// apply test-suite specific transformation to the pod spec
+	mungeSpec(pod)
+	scopedClientSet := f.GetClientSet().CoreV1().Pods(ns)
+	createdPod, err := scopedClientSet.Create(context.TODO(), pod, metav1.CreateOptions{})
+	ExpectNoError(err, "Error creating Pod")
 	defer func() {
 		ginkgo.By("delete the pod")
-		podClient.DeleteSync(createdPod.Name, metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
+
+		scopedClientSet.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+		gomega.Expect(waitForPodToDisappear(f.GetClientSet(), ns, pod.Name, labels.Everything(),
+			2*time.Second, DefaultPodDeletionTimeout)).To(gomega.Succeed(), "wait for pod %q to disappear", createdPod.Name)
 	}()
 
 	// Wait for client pod to complete.
 	podErr := e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, createdPod.Name, ns, f.Timeouts.PodStart)
 
-	// Grab its logs.  Get host first.
-	podStatus, err := podClient.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
+	// Grab its logs. Get host first.
+	podStatus, err := scopedClientSet.Get(context.TODO(), createdPod.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get pod status: %v", err)
 	}
@@ -867,6 +874,66 @@ func (f *Framework) MatchContainerOutput(
 	}
 
 	return nil
+}
+
+// mungeSpec apply test-suite specific transformations to the pod spec.
+func mungeSpec(pod *v1.Pod) {
+	if !TestContext.NodeE2E {
+		return
+	}
+
+	gomega.Expect(pod.Spec.NodeName).To(gomega.Or(gomega.BeZero(), gomega.Equal(TestContext.NodeName)), "Test misconfigured")
+	pod.Spec.NodeName = TestContext.NodeName
+	// Node e2e does not support the default DNSClusterFirst policy. Set
+	// the policy to DNSDefault, which is configured per node.
+	pod.Spec.DNSPolicy = v1.DNSDefault
+
+	// PrepullImages only works for node e2e now. For cluster e2e, image prepull is not enforced,
+	// we should not munge ImagePullPolicy for cluster e2e pods.
+	if !TestContext.PrepullImages {
+		return
+	}
+	// If prepull is enabled, munge the container spec to make sure the images are not pulled
+	// during the test.
+	for i := range pod.Spec.Containers {
+		c := &pod.Spec.Containers[i]
+		if c.ImagePullPolicy == v1.PullAlways {
+			// If the image pull policy is PullAlways, the image doesn't need to be in
+			// the white list or pre-pulled, because the image is expected to be pulled
+			// in the test anyway.
+			continue
+		}
+		// If the image policy is not PullAlways, the image must be in the pre-pull list and
+		// pre-pulled.
+		gomega.Expect(ImagePrePullList.Has(c.Image)).To(gomega.BeTrue(), "Image %q is not in the pre-pull list, consider adding it to PrePulledImages in test/e2e/common/util.go or NodePrePullImageList in test/e2e_node/image_list.go", c.Image)
+		// Do not pull images during the tests because the images in pre-pull list should have
+		// been prepulled.
+		c.ImagePullPolicy = v1.PullNever
+	}
+}
+
+func waitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
+	return wait.PollImmediate(interval, timeout, func() (bool, error) {
+		Logf("Waiting for pod %s to disappear", podName)
+		options := metav1.ListOptions{LabelSelector: label.String()}
+		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
+		if err != nil {
+			return false, err
+		}
+		found := false
+		for _, pod := range pods.Items {
+			if pod.Name == podName {
+				Logf("Pod %s still exists", podName)
+				found = true
+				break
+			}
+		}
+		if !found {
+			Logf("Pod %s no longer exists", podName)
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
 // EventsLister is a func that lists events.

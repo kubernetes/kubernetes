@@ -28,6 +28,8 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+
+	e2epodclient "k8s.io/kubernetes/test/e2e/framework/pod/client"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -85,6 +87,7 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
 			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
+			e2epodclient.MakePodClientNS(f, kubeapi.NamespaceSystem).CreateSync(criticalPod)
 
 			// Check that non-critical pods other than the besteffort have been evicted
 			updatedPodList, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})

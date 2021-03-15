@@ -188,6 +188,16 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 	return f
 }
 
+// GetClientSet gets the client set to interact with the client-go api.
+func (f *Framework) GetClientSet() clientset.Interface {
+	return f.ClientSet
+}
+
+// GetNamespace gets the namespace associated with the current client
+func (f *Framework) GetNamespace() *v1.Namespace {
+	return f.Namespace
+}
+
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
 	f.beforeEachStarted = true
