@@ -18,6 +18,7 @@ package store
 
 import (
 	"fmt"
+	"k8s.io/klog/v2"
 	"path/filepath"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/configfiles"
 	utilfiles "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/files"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
@@ -56,7 +56,7 @@ func NewFsStore(fs utilfs.Filesystem, dir string) Store {
 }
 
 func (s *fsStore) Initialize() error {
-	utillog.Infof("initializing config checkpoints directory %q", s.dir)
+	klog.InfoS("Kubelet config controller initializing config checkpoints directory", "path", s.dir)
 	// ensure top-level dir for store
 	if err := utilfiles.EnsureDir(s.fs, s.dir); err != nil {
 		return err
@@ -113,7 +113,7 @@ func (s *fsStore) Load(source checkpoint.RemoteConfigSource) (*kubeletconfig.Kub
 		return nil, fmt.Errorf("no checkpoint for source %s", sourceFmt)
 	}
 	// load the kubelet config file
-	utillog.Infof("loading Kubelet configuration checkpoint for source %s", sourceFmt)
+	klog.InfoS("Kubelet config controller loading Kubelet configuration checkpoint for source", "apiPath", source.APIPath(), "sourceUID", source.UID(), "resourceVersion", source.ResourceVersion())
 	loader, err := configfiles.NewFsLoader(s.fs, filepath.Join(s.checkpointPath(source.UID(), source.ResourceVersion()), source.KubeletFilename()))
 	if err != nil {
 		return nil, err
