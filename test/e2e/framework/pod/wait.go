@@ -215,7 +215,7 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-				return err
+				continue
 			}
 			e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			continue
