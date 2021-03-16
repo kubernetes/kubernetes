@@ -492,6 +492,20 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 	return pods, err
 }
 
+// WaitForPodReady waits for a pod to become ready.
+func WaitForPodReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
+	return wait.Poll(poll, 5*time.Minute, func() (bool, error) {
+		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if err != nil {
+			return false, nil
+		}
+		if !podutils.IsPodAvailable(pod, int32(minReadySeconds), metav1.Now()) {
+			return false, nil
+		}
+		return true, nil
+	})
+}
+
 // WaitForPodsReady waits for the pods to become ready.
 func WaitForPodsReady(c clientset.Interface, ns, name string, minReadySeconds int) error {
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
