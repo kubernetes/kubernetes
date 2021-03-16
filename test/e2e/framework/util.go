@@ -823,7 +823,8 @@ func (f *Framework) MatchContainerOutput(
 	defer func() {
 		ginkgo.By("delete the pod")
 
-		scopedClientSet.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+		err := scopedClientSet.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
+		ExpectNoError(err)
 		gomega.Expect(WaitForPodToDisappear(f.GetClientSet(), ns, pod.Name, labels.Everything(),
 			2*time.Second, DefaultPodDeletionTimeout)).To(gomega.Succeed(), "wait for pod %q to disappear", createdPod.Name)
 	}()
