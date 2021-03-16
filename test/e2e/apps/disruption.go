@@ -98,11 +98,33 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 	/*
 		Release : v1.21
-		Testname: PodDisruptionBudget: create and delete object
-		Description: PodDisruptionBudget API must support create and delete operations.
+		Testname: PodDisruptionBudget: create, update, patch, and delete object
+		Description: PodDisruptionBudget API must support create, update, patch, and delete operations.
 	*/
 	framework.ConformanceIt("should create a PodDisruptionBudget", func() {
+		ginkgo.By("creating the pdb")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromString("1%"), defaultLabels)
+
+		ginkgo.By("updating the pdb")
+		updatedPDB := updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
+			newMinAvailable := intstr.FromString("2%")
+			pdb.Spec.MinAvailable = &newMinAvailable
+			return pdb
+		}, cs.PolicyV1().PodDisruptionBudgets(ns).Update)
+		framework.ExpectEqual(updatedPDB.Spec.MinAvailable.String(), "2%")
+
+		ginkgo.By("patching the pdb")
+		patchedPDB := patchPDBOrDie(cs, dc, ns, defaultName, func(old *policyv1.PodDisruptionBudget) (bytes []byte, err error) {
+			newBytes, err := json.Marshal(map[string]interface{}{
+				"spec": map[string]interface{}{
+					"minAvailable": "3%",
+				},
+			})
+			framework.ExpectNoError(err, "failed to marshal JSON for new data")
+			return newBytes, nil
+		})
+		framework.ExpectEqual(patchedPDB.Spec.MinAvailable.String(), "3%")
+
 		deletePDBOrDie(cs, ns, defaultName)
 	})
 
