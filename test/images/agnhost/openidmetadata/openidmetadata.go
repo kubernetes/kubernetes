@@ -23,12 +23,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
+	"runtime"
+	"time"
 
 	oidc "github.com/coreos/go-oidc"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
 )
 
@@ -79,6 +84,12 @@ func main(cmd *cobra.Command, args []string) {
 	}
 	log.Printf("OK: got issuer %s", unsafeClaims.Issuer)
 	log.Printf("Full, not-validated claims: \n%#v", unsafeClaims)
+
+	if runtime.GOOS == "windows" {
+		if err := ensureWindowsDNSAvailability(unsafeClaims.Issuer); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	iss, err := oidc.NewProvider(ctx, unsafeClaims.Issuer)
 	if err != nil {
@@ -161,4 +172,28 @@ func withOAuth2Client(context.Context) (context.Context, error) {
 			Transport: rt,
 		})
 	return ctx, nil
+}
+
+// DNS can be available sometime after the container starts due to the way
+// networking is set up for Windows nodes with dockershim as the container runtime.
+// In this case, we should make sure we are able to resolve the issuer before
+// invoking oidc.NewProvider.
+// See https://github.com/kubernetes/kubernetes/issues/99470 for more details.
+func ensureWindowsDNSAvailability(issuer string) error {
+	log.Println("Ensuring Windows DNS availability")
+
+	u, err := url.Parse(issuer)
+	if err != nil {
+		return err
+	}
+
+	return wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+		ips, err := net.LookupHost(u.Host)
+		if err != nil {
+			log.Println(err)
+			return false, nil
+		}
+		log.Printf("OK: Resolved host %s: %v", u.Host, ips)
+		return true, nil
+	})
 }
