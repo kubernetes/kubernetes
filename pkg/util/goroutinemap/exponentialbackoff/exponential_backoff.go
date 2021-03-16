@@ -70,7 +70,7 @@ func (expBackoff *ExponentialBackoff) Update(err *error) {
 }
 
 func (expBackoff *ExponentialBackoff) GenerateNoRetriesPermittedMsg(operationName string) string {
-	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %q",
+	return fmt.Sprintf("Operation for %q failed. No retries permitted until %v (durationBeforeRetry %v). Error: %v",
 		operationName,
 		expBackoff.lastErrorTime.Add(expBackoff.durationBeforeRetry),
 		expBackoff.durationBeforeRetry,
