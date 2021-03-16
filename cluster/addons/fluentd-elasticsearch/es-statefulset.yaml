@@ -51,7 +51,7 @@ metadata:
   namespace: logging
   labels:
     k8s-app: elasticsearch-logging
-    version: v7.4.3
+    version: v7.4.4
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   serviceName: elasticsearch-logging
@@ -59,12 +59,12 @@ spec:
   selector:
     matchLabels:
       k8s-app: elasticsearch-logging
-      version: v7.4.3
+      version: v7.4.4
   template:
     metadata:
       labels:
         k8s-app: elasticsearch-logging
-        version: v7.4.3
+        version: v7.4.4
     spec:
       serviceAccountName: elasticsearch-logging
       containers:
