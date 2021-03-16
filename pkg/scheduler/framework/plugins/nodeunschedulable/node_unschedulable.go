@@ -18,6 +18,7 @@ package nodeunschedulable
 
 import (
 	"context"
+	"kubernetes/pkg/scheduler/framework"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,7 +48,7 @@ const (
 // failed by this plugin schedulable.
 func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
-		{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel},
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
 	}
 }
 
