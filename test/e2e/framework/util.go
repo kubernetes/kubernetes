@@ -824,7 +824,7 @@ func (f *Framework) MatchContainerOutput(
 		ginkgo.By("delete the pod")
 
 		scopedClientSet.Delete(context.TODO(), createdPod.Name, metav1.DeleteOptions{})
-		gomega.Expect(waitForPodToDisappear(f.GetClientSet(), ns, pod.Name, labels.Everything(),
+		gomega.Expect(WaitForPodToDisappear(f.GetClientSet(), ns, pod.Name, labels.Everything(),
 			2*time.Second, DefaultPodDeletionTimeout)).To(gomega.Succeed(), "wait for pod %q to disappear", createdPod.Name)
 	}()
 
@@ -877,6 +877,9 @@ func (f *Framework) MatchContainerOutput(
 }
 
 // mungeSpec apply test-suite specific transformations to the pod spec.
+// NOTE: this is cloned from framework/pod/client/client.go, the initial
+// version was in framework/pod_client.go but it's in the process of getting
+// migrated to remove subpackages dependencies in #81245
 func mungeSpec(pod *v1.Pod) {
 	if !TestContext.NodeE2E {
 		return
@@ -912,7 +915,10 @@ func mungeSpec(pod *v1.Pod) {
 	}
 }
 
-func waitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
+// WaitForPodToDisappear waits until a pod disappears.
+// NOTE: this is cloned from framework/pod/, because it's in the process
+// of getting migrated to remove subpackages dependencies in #81245
+func WaitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		Logf("Waiting for pod %s to disappear", podName)
 		options := metav1.ListOptions{LabelSelector: label.String()}

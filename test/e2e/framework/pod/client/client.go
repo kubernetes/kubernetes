@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/kubectl/pkg/scheme"
@@ -109,7 +108,7 @@ func (c *PodClient) Create(pod *v1.Pod) *v1.Pod {
 func (c *PodClient) CreateSync(pod *v1.Pod) *v1.Pod {
 	namespace := c.f.GetNamespace().Name
 	p := c.Create(pod)
-	framework.ExpectNoError(WaitTimeoutForPodReadyInNamespace(c.f.GetClientSet(), p.Name, namespace, framework.PodStartTimeout))
+	framework.ExpectNoError(e2epod.WaitTimeoutForPodReadyInNamespace(c.f.GetClientSet(), p.Name, namespace, framework.PodStartTimeout))
 	// Get the newest pod after it becomes running and ready, some status may change after pod created, such as pod ip.
 	p, err := c.Get(context.TODO(), p.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
@@ -163,7 +162,7 @@ func (c *PodClient) DeleteSync(name string, options metav1.DeleteOptions, timeou
 	if err != nil && !apierrors.IsNotFound(err) {
 		framework.Failf("Failed to delete pod %q: %v", name, err)
 	}
-	gomega.Expect(waitForPodToDisappear(c.f.GetClientSet(), namespace, name, labels.Everything(),
+	gomega.Expect(e2epod.WaitForPodToDisappear(c.f.GetClientSet(), namespace, name, labels.Everything(),
 		2*time.Second, timeout)).To(gomega.Succeed(), "wait for pod %q to disappear", name)
 }
 
@@ -207,7 +206,7 @@ func (c *PodClient) mungeSpec(pod *v1.Pod) {
 // TODO(random-liu): Move pod wait function into this file
 func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 	f := c.f
-	gomega.Expect(WaitForPodCondition(f.GetClientSet(), f.GetNamespace().Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(f.GetClientSet(), f.GetNamespace().Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -224,7 +223,7 @@ func (c *PodClient) WaitForSuccess(name string, timeout time.Duration) {
 // WaitForFinish waits for pod to finish running, regardless of success or failure.
 func (c *PodClient) WaitForFinish(name string, timeout time.Duration) {
 	f := c.f
-	gomega.Expect(WaitForPodCondition(f.GetClientSet(), f.GetNamespace().Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
+	gomega.Expect(e2epod.WaitForPodCondition(f.GetClientSet(), f.GetNamespace().Name, name, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout,
 		func(pod *v1.Pod) (bool, error) {
 			switch pod.Status.Phase {
 			case v1.PodFailed:
@@ -265,7 +264,7 @@ func (c *PodClient) WaitForErrorEventOrSuccess(pod *v1.Pod) (*v1.Event, error) {
 // MatchContainerOutput gets output of a container and match expected regexp in the output.
 func (c *PodClient) MatchContainerOutput(name string, containerName string, expectedRegexp string) error {
 	f := c.f
-	output, err := GetPodLogs(f.GetClientSet(), f.GetNamespace().Name, name, containerName)
+	output, err := e2epod.GetPodLogs(f.GetClientSet(), f.GetNamespace().Name, name, containerName)
 	if err != nil {
 		return fmt.Errorf("failed to get output for container %q of pod %q", containerName, name)
 	}
@@ -284,198 +283,4 @@ func (c *PodClient) PodIsReady(name string) bool {
 	pod, err := c.Get(context.TODO(), name, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	return podutils.IsPodReady(pod)
-}
-
-//
-// These functions are duplicated from framework/pods and will be eventually eliminated
-//
-func waitForPodToDisappear(c clientset.Interface, ns, podName string, label labels.Selector, interval, timeout time.Duration) error {
-	return wait.PollImmediate(interval, timeout, func() (bool, error) {
-		framework.Logf("Waiting for pod %s to disappear", podName)
-		options := metav1.ListOptions{LabelSelector: label.String()}
-		pods, err := c.CoreV1().Pods(ns).List(context.TODO(), options)
-		if err != nil {
-			return false, err
-		}
-		found := false
-		for _, pod := range pods.Items {
-			if pod.Name == podName {
-				framework.Logf("Pod %s still exists", podName)
-				found = true
-				break
-			}
-		}
-		if !found {
-			framework.Logf("Pod %s no longer exists", podName)
-			return true, nil
-		}
-		return false, nil
-	})
-}
-
-const (
-	// poll is how often to poll pods, nodes and claims.
-	poll = 2 * time.Second
-)
-
-var errPodCompleted = fmt.Errorf("pod ran to completion")
-
-// WaitTimeoutForPodReadyInNamespace waits the given timeout duration for the
-// specified pod to be ready and running.
-func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
-	return wait.PollImmediate(poll, timeout, podRunningAndReady(c, podName, namespace))
-}
-
-func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
-	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		switch pod.Status.Phase {
-		case v1.PodFailed, v1.PodSucceeded:
-			framework.Logf("The status of Pod %s is %s which is unexpected", podName, pod.Status.Phase)
-			return false, errPodCompleted
-		case v1.PodRunning:
-			framework.Logf("The status of Pod %s is %s (Ready = %v)", podName, pod.Status.Phase, podutils.IsPodReady(pod))
-			return podutils.IsPodReady(pod), nil
-		}
-		framework.Logf("The status of Pod %s is %s, waiting for it to be Running (with Ready = true)", podName, pod.Status.Phase)
-		return false, nil
-	}
-}
-
-type podCondition func(pod *v1.Pod) (bool, error)
-
-// WaitForPodCondition waits a pods to be matched to the given condition.
-func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
-	framework.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
-		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				framework.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-				return err
-			}
-			framework.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
-			continue
-		}
-		// log now so that current pod info is reported before calling `condition()`
-		framework.Logf("Pod %q: Phase=%q, Reason=%q, readiness=%t. Elapsed: %v",
-			podName, pod.Status.Phase, pod.Status.Reason, podutils.IsPodReady(pod), time.Since(start))
-		if done, err := condition(pod); done {
-			if err == nil {
-				framework.Logf("Pod %q satisfied condition %q", podName, desc)
-			}
-			return err
-		}
-	}
-	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
-}
-
-// GetPodLogs returns the logs of the specified container (namespace/pod/container).
-func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
-	return getPodLogsInternal(c, namespace, podName, containerName, false, nil)
-}
-
-// utility function for gomega Eventually
-func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName string, previous bool, sinceTime *metav1.Time) (string, error) {
-	request := c.CoreV1().RESTClient().Get().
-		Resource("pods").
-		Namespace(namespace).
-		Name(podName).SubResource("log").
-		Param("container", containerName).
-		Param("previous", strconv.FormatBool(previous))
-	if sinceTime != nil {
-		request.Param("sinceTime", sinceTime.Format(time.RFC3339))
-	}
-	logs, err := request.Do(context.TODO()).Raw()
-	if err != nil {
-		return "", err
-	}
-	if strings.Contains(string(logs), "Internal Error") {
-		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
-	}
-	return string(logs), err
-}
-
-// WaitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func WaitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
-	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
-		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
-			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
-		}
-		switch pod.Status.Phase {
-		case v1.PodSucceeded:
-			ginkgo.By("Saw pod success")
-			return true, nil
-		case v1.PodFailed:
-			return true, fmt.Errorf("pod %q failed with status: %+v", podName, pod.Status)
-		default:
-			return false, nil
-		}
-	})
-}
-
-// DumpAllPodInfoForNamespace logs all pod information for a given namespace.
-func DumpAllPodInfoForNamespace(c clientset.Interface, namespace string) {
-	pods, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		framework.Logf("unable to fetch pod debug info: %v", err)
-	}
-	LogPodStates(pods.Items)
-	logPodTerminationMessages(pods.Items)
-}
-
-// LogPodStates logs basic info of provided pods for debugging.
-func LogPodStates(pods []v1.Pod) {
-	// Find maximum widths for pod, node, and phase strings for column printing.
-	maxPodW, maxNodeW, maxPhaseW, maxGraceW := len("POD"), len("NODE"), len("PHASE"), len("GRACE")
-	for i := range pods {
-		pod := &pods[i]
-		if len(pod.ObjectMeta.Name) > maxPodW {
-			maxPodW = len(pod.ObjectMeta.Name)
-		}
-		if len(pod.Spec.NodeName) > maxNodeW {
-			maxNodeW = len(pod.Spec.NodeName)
-		}
-		if len(pod.Status.Phase) > maxPhaseW {
-			maxPhaseW = len(pod.Status.Phase)
-		}
-	}
-	// Increase widths by one to separate by a single space.
-	maxPodW++
-	maxNodeW++
-	maxPhaseW++
-	maxGraceW++
-
-	// Log pod info. * does space padding, - makes them left-aligned.
-	framework.Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
-		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", maxGraceW, "GRACE", "CONDITIONS")
-	for _, pod := range pods {
-		grace := ""
-		if pod.DeletionGracePeriodSeconds != nil {
-			grace = fmt.Sprintf("%ds", *pod.DeletionGracePeriodSeconds)
-		}
-		framework.Logf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s",
-			maxPodW, pod.ObjectMeta.Name, maxNodeW, pod.Spec.NodeName, maxPhaseW, pod.Status.Phase, maxGraceW, grace, pod.Status.Conditions)
-	}
-	framework.Logf("") // Final empty line helps for readability.
-}
-
-// logPodTerminationMessages logs termination messages for failing pods.  It's a short snippet (much smaller than full logs), but it often shows
-// why pods crashed and since it is in the API, it's fast to retrieve.
-func logPodTerminationMessages(pods []v1.Pod) {
-	for _, pod := range pods {
-		for _, status := range pod.Status.InitContainerStatuses {
-			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
-				framework.Logf("%s[%s].initContainer[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
-			}
-		}
-		for _, status := range pod.Status.ContainerStatuses {
-			if status.LastTerminationState.Terminated != nil && len(status.LastTerminationState.Terminated.Message) > 0 {
-				framework.Logf("%s[%s].container[%s]=%s", pod.Name, pod.Namespace, status.Name, status.LastTerminationState.Terminated.Message)
-			}
-		}
-	}
 }
