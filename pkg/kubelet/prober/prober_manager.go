@@ -30,7 +30,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 // ProberResults stores the cumulative number of a probe by result as prometheus metrics.
@@ -162,8 +161,8 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Startup probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.ErrorS(nil, "Startup probe already exists for container",
+					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, startup, pod, c)
@@ -174,8 +173,8 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.ReadinessProbe != nil {
 			key.probeType = readiness
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Readiness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.ErrorS(nil, "Readiness probe already exists for container",
+					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, readiness, pod, c)
@@ -186,8 +185,8 @@ func (m *manager) AddPod(pod *v1.Pod) {
 		if c.LivenessProbe != nil {
 			key.probeType = liveness
 			if _, ok := m.workers[key]; ok {
-				klog.Errorf("Liveness probe already exists! %v - %v",
-					format.Pod(pod), c.Name)
+				klog.ErrorS(nil, "Liveness probe already exists for container",
+					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
 			w := newWorker(m, liveness, pod, c)
