@@ -259,7 +259,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 		}
 		difference := neededControllers.Difference(enabledControllers)
 		if difference.Len() > 0 {
-			klog.V(4).Infof("The Cgroup %v has some missing controllers: %v", name, difference)
+			klog.V(4).InfoS("The cgroup has some missing controllers", "cgroupName", name, "controllers", difference)
 			return false
 		}
 		return true
@@ -292,7 +292,7 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 	}
 
 	if len(missingPaths) > 0 {
-		klog.V(4).Infof("The Cgroup %v has some missing paths: %v", name, missingPaths)
+		klog.V(4).InfoS("The cgroup has some missing paths", "cgroupName", name, "paths", missingPaths)
 		return false
 	}
 
@@ -367,7 +367,7 @@ func setSupportedSubsystemsV1(cgroupConfig *libcontainerconfigs.Cgroup) error {
 				return fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
-			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
 			continue
 		}
 		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
@@ -485,7 +485,7 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	if !supportedControllers.Has("hugetlb") {
 		cgroupConfig.Resources.HugetlbLimit = nil
 		// the cgroup is not present, but its not required so skip it
-		klog.V(6).Infof("Optional subsystem not supported: hugetlb")
+		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 	}
 
 	manager, err := cgroupfs2.NewManager(cgroupConfig, filepath.Join(cmutil.CgroupRoot, cgroupConfig.Path), false)
@@ -539,7 +539,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	for pageSize, limit := range resourceConfig.HugePageLimit {
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		if err != nil {
-			klog.Warningf("pageSize is invalid: %v", err)
+			klog.InfoS("Invalid pageSize", "err", err)
 			continue
 		}
 		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
@@ -680,7 +680,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// WalkFunc which is called for each file and directory in the pod cgroup dir
 		visitor := func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				klog.V(4).Infof("cgroup manager encountered error scanning cgroup path %q: %v", path, err)
+				klog.V(4).InfoS("Cgroup manager encountered error scanning cgroup path", "path", path, "err", err)
 				return filepath.SkipDir
 			}
 			if !info.IsDir() {
@@ -688,7 +688,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 			}
 			pids, err = getCgroupProcs(path)
 			if err != nil {
-				klog.V(4).Infof("cgroup manager encountered error getting procs for cgroup path %q: %v", path, err)
+				klog.V(4).InfoS("Cgroup manager encountered error getting procs for cgroup path", "path", path, "err", err)
 				return filepath.SkipDir
 			}
 			pidsToKill.Insert(pids...)
@@ -698,7 +698,7 @@ func (m *cgroupManagerImpl) Pids(name CgroupName) []int {
 		// container cgroups haven't been GCed yet. Get attached processes to
 		// all such unwanted containers under the pod cgroup
 		if err = filepath.Walk(dir, visitor); err != nil {
-			klog.V(4).Infof("cgroup manager encountered error scanning pids for directory: %q: %v", dir, err)
+			klog.V(4).InfoS("Cgroup manager encountered error scanning pids for directory", "path", dir, "err", err)
 		}
 	}
 	return pidsToKill.List()
@@ -726,7 +726,7 @@ func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercg
 				return nil, fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
 			}
 			// the cgroup is not mounted, but its not required so continue...
-			klog.V(6).Infof("Unable to find subsystem mount for optional subsystem: %v", sys.Name())
+			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
 			continue
 		}
 		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
