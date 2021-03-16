@@ -19,6 +19,7 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -278,7 +279,8 @@ func (s CPUSet) String() string {
 func MustParse(s string) CPUSet {
 	res, err := Parse(s)
 	if err != nil {
-		klog.Fatalf("unable to parse [%s] as CPUSet: %v", s, err)
+		klog.ErrorS(err, "Failed to parse input as CPUSet", "input", s)
+		os.Exit(1)
 	}
 	return res
 }
