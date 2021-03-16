@@ -1250,6 +1250,66 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 	})
+
+	ginkgo.Context("NetworkPolicy between server and client using port range", func() {
+
+		ginkgo.AfterEach(func() {
+			if !useFixedNamespaces {
+				k8s := newKubeManager(f)
+				framework.ExpectNoError(k8s.deleteNamespaces(model.NamespaceNames), "unable to clean up netpol namespaces")
+			}
+		})
+
+		ginkgo.It("should enforce policy to allow ingress traffic using port range [Feature:NetworkPolicy]", func() {
+			nsX, _, _, k8s := getK8sNamespaces(f)
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{111, 112, 113, 114, 115}
+			model = initializeResourcesByFixedNS(f, protocols, ports)
+
+			ingressRule := networkingv1.NetworkPolicyIngressRule{}
+			endPort := int32(115)
+			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 111}, EndPort: &endPort})
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-ingress-use-port-range", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
+			CreatePolicy(k8s, policy, nsX)
+			reachability111To115 := NewReachability(model.AllPods(), true)
+			reachability111To115.ExpectAllIngress(NewPodString(nsX, "a"), true)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 111, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 112, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 113, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 114, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 115, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+
+			reachability116 := NewReachability(model.AllPods(), true)
+			reachability116.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 116, Protocol: v1.ProtocolTCP, Reachability: reachability116})
+		})
+
+		ginkgo.It("should enforce policy to allow egress traffic using port range [Feature:NetworkPolicy]", func() {
+			nsX, _, _, k8s := getK8sNamespaces(f)
+			protocols := []v1.Protocol{protocolTCP}
+			ports := []int32{111, 112, 113, 114, 115}
+			model = initializeResourcesByFixedNS(f, protocols, ports)
+
+			egressRule := networkingv1.NetworkPolicyEgressRule{}
+			endPort := int32(115)
+			egressRule.Ports = append(egressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 111}, EndPort: &endPort})
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-egress-use-port-range", map[string]string{"pod": "a"}, SetSpecEgressRules(egressRule))
+			CreatePolicy(k8s, policy, nsX)
+			reachability111To115 := NewReachability(model.AllPods(), true)
+			reachability111To115.ExpectAllEgress(NewPodString(nsX, "a"), true)
+
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 111, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 112, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 113, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 114, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 115, Protocol: v1.ProtocolTCP, Reachability: reachability111To115})
+
+			reachability116 := NewReachability(model.AllPods(), true)
+			reachability116.ExpectAllEgress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 116, Protocol: v1.ProtocolTCP, Reachability: reachability116})
+		})
+	})
 })
 
 var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
