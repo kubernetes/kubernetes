@@ -160,7 +160,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    least a socket's-worth of CPUs.
 	if acc.needs(acc.topo.CPUsPerSocket()) {
 		for _, s := range acc.freeSockets() {
-			klog.V(4).Infof("[cpumanager] takeByTopology: claiming socket [%d]", s)
+			klog.V(4).InfoS("takeByTopology: claiming socket", "socket", s)
 			acc.take(acc.details.CPUsInSockets(s))
 			if acc.isSatisfied() {
 				return acc.result, nil
@@ -175,7 +175,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    a core's-worth of CPUs.
 	if acc.needs(acc.topo.CPUsPerCore()) {
 		for _, c := range acc.freeCores() {
-			klog.V(4).Infof("[cpumanager] takeByTopology: claiming core [%d]", c)
+			klog.V(4).InfoS("takeByTopology: claiming core", "core", c)
 			acc.take(acc.details.CPUsInCores(c))
 			if acc.isSatisfied() {
 				return acc.result, nil
@@ -190,7 +190,7 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	for _, c := range acc.freeCPUs() {
-		klog.V(4).Infof("[cpumanager] takeByTopology: claiming CPU [%d]", c)
+		klog.V(4).InfoS("takeByTopology: claiming CPU", "cpu", c)
 		if acc.needs(1) {
 			acc.take(cpuset.NewCPUSet(c))
 		}
