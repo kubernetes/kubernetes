@@ -28,9 +28,10 @@ package v1beta1
 
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CertificateSigningRequest = map[string]string{
-	"":       "Describes a certificate signing request",
-	"spec":   "spec contains the certificate request, and is immutable after creation. Only the request, signerName, expirationSeconds, and usages fields can be set on creation. Other fields are derived by Kubernetes and cannot be modified by users.",
-	"status": "Derived information about the request.",
+	"":         "Describes a certificate signing request",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"spec":     "spec contains the certificate request, and is immutable after creation. Only the request, signerName, expirationSeconds, and usages fields can be set on creation. Other fields are derived by Kubernetes and cannot be modified by users.",
+	"status":   "Derived information about the request.",
 }
 
 func (CertificateSigningRequest) SwaggerDoc() map[string]string {
@@ -38,6 +39,7 @@ func (CertificateSigningRequest) SwaggerDoc() map[string]string {
 }
 
 var map_CertificateSigningRequestCondition = map[string]string{
+	"":                   "CertificateSigningRequestCondition describes a condition of a CertificateSigningRequest object",
 	"type":               "type of the condition. Known conditions include \"Approved\", \"Denied\", and \"Failed\".",
 	"status":             "Status of the condition, one of True, False, Unknown. Approved, Denied, and Failed conditions may not be \"False\" or \"Unknown\". Defaults to \"True\". If unset, should be treated as \"True\".",
 	"reason":             "brief reason for the request state",
@@ -48,6 +50,16 @@ var map_CertificateSigningRequestCondition = map[string]string{
 
 func (CertificateSigningRequestCondition) SwaggerDoc() map[string]string {
 	return map_CertificateSigningRequestCondition
+}
+
+var map_CertificateSigningRequestList = map[string]string{
+	"":         "CertificateSigningRequestList is a collection of CertificateSigningRequest objects",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
+	"items":    "items is a collection of CertificateSigningRequest objects",
+}
+
+func (CertificateSigningRequestList) SwaggerDoc() map[string]string {
+	return map_CertificateSigningRequestList
 }
 
 var map_CertificateSigningRequestSpec = map[string]string{
@@ -67,6 +79,7 @@ func (CertificateSigningRequestSpec) SwaggerDoc() map[string]string {
 }
 
 var map_CertificateSigningRequestStatus = map[string]string{
+	"":            "CertificateSigningRequestStatus contains conditions used to indicate approved/denied/failed status of the request, and the issued certificate.",
 	"conditions":  "Conditions applied to the request, such as approval or denial.",
 	"certificate": "If request was approved, the controller will place the issued certificate here.",
 }

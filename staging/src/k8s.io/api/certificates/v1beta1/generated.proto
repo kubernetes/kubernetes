@@ -31,6 +31,8 @@ option go_package = "v1beta1";
 
 // Describes a certificate signing request
 message CertificateSigningRequest {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -44,6 +46,7 @@ message CertificateSigningRequest {
   optional CertificateSigningRequestStatus status = 3;
 }
 
+// CertificateSigningRequestCondition describes a condition of a CertificateSigningRequest object
 message CertificateSigningRequestCondition {
   // type of the condition. Known conditions include "Approved", "Denied", and "Failed".
   optional string type = 1;
@@ -74,10 +77,14 @@ message CertificateSigningRequestCondition {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 5;
 }
 
+// CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 message CertificateSigningRequestList {
+  // Standard list metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // items is a collection of CertificateSigningRequest objects
   repeated CertificateSigningRequest items = 2;
 }
 
@@ -177,6 +184,8 @@ message CertificateSigningRequestSpec {
   map<string, ExtraValue> extra = 6;
 }
 
+// CertificateSigningRequestStatus contains conditions used to indicate
+// approved/denied/failed status of the request, and the issued certificate.
 message CertificateSigningRequestStatus {
   // Conditions applied to the request, such as approval or denial.
   // +listType=map

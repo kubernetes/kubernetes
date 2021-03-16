@@ -33,6 +33,8 @@ import (
 // Describes a certificate signing request
 type CertificateSigningRequest struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -170,6 +172,8 @@ func (t ExtraValue) String() string {
 	return fmt.Sprintf("%v", []string(t))
 }
 
+// CertificateSigningRequestStatus contains conditions used to indicate
+// approved/denied/failed status of the request, and the issued certificate.
 type CertificateSigningRequestStatus struct {
 	// Conditions applied to the request, such as approval or denial.
 	// +listType=map
@@ -192,6 +196,7 @@ const (
 	CertificateFailed   RequestConditionType = "Failed"
 )
 
+// CertificateSigningRequestCondition describes a condition of a CertificateSigningRequest object
 type CertificateSigningRequestCondition struct {
 	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RequestConditionType"`
@@ -222,11 +227,15 @@ type CertificateSigningRequestCondition struct {
 // +k8s:prerelease-lifecycle-gen:deprecated=1.19
 // +k8s:prerelease-lifecycle-gen:replacement=certificates.k8s.io,v1,CertificateSigningRequestList
 
+// CertificateSigningRequestList is a collection of CertificateSigningRequest objects
 type CertificateSigningRequestList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// items is a collection of CertificateSigningRequest objects
 	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
