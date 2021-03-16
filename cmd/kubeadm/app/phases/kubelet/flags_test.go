@@ -119,11 +119,11 @@ func TestBuildKubeletArgMap(t *testing.T) {
 				nodeRegOpts: &kubeadmapi.NodeRegistrationOptions{
 					CRISocket: "/var/run/dockershim.sock",
 				},
-				pauseImage: "gcr.io/pause:3.4.1",
+				pauseImage: "gcr.io/pause:3.5",
 			},
 			expected: map[string]string{
 				"network-plugin":            "cni",
-				"pod-infra-container-image": "gcr.io/pause:3.4.1",
+				"pod-infra-container-image": "gcr.io/pause:3.5",
 			},
 		},
 	}
