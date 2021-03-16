@@ -626,3 +626,7 @@ func forceUmount(path string) error {
 	}
 	return nil
 }
+
+func EvalSymlinks(path string) (string, error) {
+	return filepath.EvalSymlinks(path)
+}

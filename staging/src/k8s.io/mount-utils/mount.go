@@ -197,7 +197,7 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 	// FIXME if multiple devices mounted on the same mount path, only the first one is returned.
 	device := ""
 	// If mountPath is symlink, need get its target path.
-	slTarget, err := filepath.EvalSymlinks(mountPath)
+	slTarget, err := EvalSymlinks(mountPath)
 	if err != nil {
 		slTarget = mountPath
 	}
@@ -244,7 +244,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
-	resolvedFile, err := filepath.EvalSymlinks(file)
+	resolvedFile, err := EvalSymlinks(file)
 	if err != nil {
 		return true, err
 	}

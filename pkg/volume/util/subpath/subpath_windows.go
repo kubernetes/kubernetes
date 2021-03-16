@@ -86,9 +86,9 @@ func isLinkPath(path string) (bool, error) {
 	return false, nil
 }
 
-// evalSymlink returns the path name after the evaluation of any symbolic links.
+// EvalSymlinks returns the path name after the evaluation of any symbolic links.
 // If the path after evaluation is a device path or network connection, the original path is returned
-func evalSymlink(path string) (string, error) {
+func EvalSymlinks(path string) (string, error) {
 	path = mount.NormalizeWindowsPath(path)
 	if isDeviceOrUncPath(path) || isDriveLetterorEmptyPath(path) {
 		klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
@@ -128,7 +128,7 @@ func evalSymlink(path string) (string, error) {
 	if !filepath.IsAbs(linkedPath) {
 		linkedPath = filepath.Join(getUpperPath(upperpath), linkedPath)
 	}
-	nextLink, err := evalSymlink(linkedPath)
+	nextLink, err := EvalSymlinks(linkedPath)
 	if err != nil {
 		return path, err
 	}
@@ -142,12 +142,12 @@ func lockAndCheckSubPath(volumePath, hostPath string) ([]uintptr, error) {
 		return []uintptr{}, nil
 	}
 
-	finalSubPath, err := evalSymlink(hostPath)
+	finalSubPath, err := EvalSymlinks(hostPath)
 	if err != nil {
 		return []uintptr{}, fmt.Errorf("cannot evaluate link %s: %s", hostPath, err)
 	}
 
-	finalVolumePath, err := evalSymlink(volumePath)
+	finalVolumePath, err := EvalSymlinks(volumePath)
 	if err != nil {
 		return []uintptr{}, fmt.Errorf("cannot read link %s: %s", volumePath, err)
 	}
@@ -255,7 +255,7 @@ func (sp *subpath) CleanSubPaths(podDir string, volumeName string) error {
 
 // SafeMakeDir makes sure that the created directory does not escape given base directory mis-using symlinks.
 func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) error {
-	realBase, err := evalSymlink(base)
+	realBase, err := EvalSymlinks(base)
 	if err != nil {
 		return fmt.Errorf("error resolving symlinks in %s: %s", base, err)
 	}
@@ -294,11 +294,11 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	}
 
 	// Ensure the existing directory is inside allowed base
-	fullExistingPath, err := evalSymlink(existingPath)
+	fullExistingPath, err := EvalSymlinks(existingPath)
 	if err != nil {
 		return fmt.Errorf("error opening existing directory %s: %s", existingPath, err)
 	}
-	fullBasePath, err := evalSymlink(base)
+	fullBasePath, err := EvalSymlinks(base)
 	if err != nil {
 		return fmt.Errorf("cannot read link %s: %s", base, err)
 	}

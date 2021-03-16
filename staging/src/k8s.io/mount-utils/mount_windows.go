@@ -33,6 +33,10 @@ const (
 	accessDenied string = "access is denied"
 )
 
+// MaxPathLength is the maximum length of Windows path. Normally, it is 260, but if long path is enable,
+// the max number is 32,767
+const MaxPathLength = 32767
+
 // Mounter provides the default implementation of mount.Interface
 // for the windows platform.  This implementation assumes that the
 // kubelet is running in the host's root mount namespace.
@@ -327,4 +331,91 @@ func getAllParentLinks(path string) ([]string, error) {
 	}
 
 	return links, nil
+}
+
+// isDriveLetterPath returns true if the given path is empty or it ends with ":" or ":\" or ":\\"
+func isDriveLetterorEmptyPath(path string) bool {
+	if path == "" || strings.HasSuffix(path, ":\\\\") || strings.HasSuffix(path, ":") || strings.HasSuffix(path, ":\\") {
+		return true
+	}
+	return false
+}
+
+// isVolumePrefix returns true if the given path name starts with "Volume" or volume prefix including
+// "\\.\", "\\?\" for device path or "UNC" or "\\" for UNC path. Otherwise, it returns false.
+func isDeviceOrUncPath(path string) bool {
+	if strings.HasPrefix(path, "Volume") || strings.HasPrefix(path, "\\\\?\\") || strings.HasPrefix(path, "\\\\.\\") || strings.HasPrefix(path, "UNC") {
+		return true
+	}
+	return false
+}
+
+// getUpperPath removes the last level of directory.
+func getUpperPath(path string) string {
+	sep := fmt.Sprintf("%c", filepath.Separator)
+	upperpath := strings.TrimSuffix(path, sep)
+	return filepath.Dir(upperpath)
+}
+
+// Check whether a directory/file is a link type or not
+// LinkType could be SymbolicLink, Junction, or HardLink
+func isLinkPath(path string) (bool, error) {
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).LinkType", path)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return false, err
+	}
+	if strings.TrimSpace(string(output)) != "" {
+		return true, nil
+	}
+	return false, nil
+}
+
+// EvalSymlinks returns the path name after the evaluation of any symbolic links.
+// If the path after evaluation is a device path or network connection, the original path is returned
+func EvalSymlinks(path string) (string, error) {
+	path = NormalizeWindowsPath(path)
+	if isDeviceOrUncPath(path) || isDriveLetterorEmptyPath(path) {
+		klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+		return path, nil
+	}
+	upperpath := path
+	base := ""
+	for i := 0; i < MaxPathLength; i++ {
+		isLink, err := isLinkPath(upperpath)
+		if err != nil {
+			return "", err
+		}
+		if isLink {
+			break
+		}
+		// continue to check next layer
+		base = filepath.Join(filepath.Base(upperpath), base)
+		upperpath = getUpperPath(upperpath)
+		if isDriveLetterorEmptyPath(upperpath) {
+			klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+			return path, nil
+		}
+	}
+	// This command will give the target path of a given symlink
+	cmd := fmt.Sprintf("(Get-Item -LiteralPath %q).Target", upperpath)
+	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	klog.V(4).Infof("evaluate path %s: symlink from %s to %s", path, upperpath, string(output))
+	linkedPath := strings.TrimSpace(string(output))
+	if linkedPath == "" || isDeviceOrUncPath(linkedPath) {
+		klog.V(4).Infof("Path '%s' has a target %s. Return its original form.", path, linkedPath)
+		return path, nil
+	}
+	// If the target is not an absoluate path, join iit with the current upperpath
+	if !filepath.IsAbs(linkedPath) {
+		linkedPath = filepath.Join(getUpperPath(upperpath), linkedPath)
+	}
+	nextLink, err := EvalSymlinks(linkedPath)
+	if err != nil {
+		return path, err
+	}
+	return filepath.Join(nextLink, base), nil
 }
