@@ -46,6 +46,12 @@ const queueMetricMetadata = `
 		# TYPE scheduler_queue_incoming_pods_total counter
 	`
 
+var (
+	TestEvent    = framework.ClusterEvent{Resource: "test"}
+	NodeAllEvent = framework.ClusterEvent{Resource: framework.Node, ActionType: framework.All}
+	EmptyEvent   = framework.ClusterEvent{}
+)
+
 var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 var mediumPriority = (lowPriority + highPriority) / 2
 var highPriorityPodInfo, highPriNominatedPodInfo, medPriorityPodInfo, unschedulablePodInfo = framework.NewPodInfo(&v1.Pod{
@@ -239,7 +245,7 @@ func TestPriorityQueue_AddUnschedulableIfNotPresent_Backoff(t *testing.T) {
 	}
 
 	// move all pods to active queue when we were trying to schedule them
-	q.MoveAllToActiveOrBackoffQueue("test", nil)
+	q.MoveAllToActiveOrBackoffQueue(TestEvent, nil)
 	oldCycle := q.SchedulingCycle()
 
 	firstPod, _ := q.Pop()
@@ -397,9 +403,10 @@ func TestPriorityQueue_Delete(t *testing.T) {
 }
 
 func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
+
 	tests := []struct {
 		name      string
-		moveEvent string
+		moveEvent framework.ClusterEvent
 	}{
 		{
 			name:      "baseline",
@@ -419,8 +426,22 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 		highPriorityPodInfo.Pod, highPriNominatedPodInfo.Pod,
 		medPriorityPodInfo.Pod, unschedulablePodInfo.Pod,
 	}
-	events := []string{NodeAdd, NodeTaintChange, NodeAllocatableChange, NodeConditionChange, NodeLabelChange, PodAdd,
-		PvcAdd, PvcUpdate, PvAdd, PvUpdate, StorageClassAdd, CSINodeAdd, CSINodeUpdate}
+
+	events := []framework.ClusterEvent{
+		NodeAdd,
+		NodeTaintChange,
+		NodeAllocatableChange,
+		NodeConditionChange,
+		NodeLabelChange,
+		PvcAdd,
+		PvcUpdate,
+		PvAdd,
+		PvUpdate,
+		StorageClassAdd,
+		CSINodeAdd,
+		CSINodeUpdate,
+	}
+
 	pluginNum := 20
 	var plugins []string
 	// Mimic that we have 20 plugins loaded in runtime.
@@ -441,10 +462,10 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					// - 1/3 of plugins registered for events[2]
 					// - ...
 					for j := 0; j < len(events); j++ {
-						m[clusterEventReg[events[j]]] = sets.NewString()
+						m[events[j]] = sets.NewString()
 						for k := 0; k < len(plugins); k++ {
 							if (k+1)%(j+1) == 0 {
-								m[clusterEventReg[events[j]]].Insert(plugins[k])
+								m[events[j]].Insert(plugins[k])
 							}
 						}
 					}
@@ -478,7 +499,7 @@ func BenchmarkMoveAllToActiveOrBackoffQueue(b *testing.B) {
 					}
 
 					b.StartTimer()
-					if tt.moveEvent != "" {
+					if tt.moveEvent.Resource != "" {
 						q.MoveAllToActiveOrBackoffQueue(tt.moveEvent, nil)
 					} else {
 						// Random case.
@@ -581,9 +602,7 @@ func TestPriorityQueue_AssignedPodAdded(t *testing.T) {
 	}
 
 	c := clock.NewFakeClock(time.Now())
-	m := map[framework.ClusterEvent]sets.String{
-		{Resource: framework.Pod, ActionType: framework.Add}: sets.NewString("fakePlugin"),
-	}
+	m := map[framework.ClusterEvent]sets.String{AssignedPodAdd: sets.NewString("fakePlugin")}
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
 	q.Add(medPriorityPodInfo.Pod)
 	// Add a couple of pods to the unschedulableQ.
@@ -643,7 +662,7 @@ func TestPriorityQueue_PendingPods(t *testing.T) {
 		t.Error("Unexpected list of pending Pods.")
 	}
 	// Move all to active queue. We should still see the same set of pods.
-	q.MoveAllToActiveOrBackoffQueue("test", nil)
+	q.MoveAllToActiveOrBackoffQueue(TestEvent, nil)
 	if !reflect.DeepEqual(expectedSet, makeSet(q.PendingPods())) {
 		t.Error("Unexpected list of pending Pods...")
 	}
@@ -1106,7 +1125,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 	// Put in the unschedulable queue.
 	q.AddUnschedulableIfNotPresent(p, q.SchedulingCycle())
 	// Move all unschedulable pods to the active queue.
-	q.MoveAllToActiveOrBackoffQueue("test", nil)
+	q.MoveAllToActiveOrBackoffQueue(TestEvent, nil)
 
 	p, err = q.Pop()
 	if err != nil {
@@ -1122,7 +1141,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	c := clock.NewFakeClock(time.Now())
 	m := map[framework.ClusterEvent]sets.String{
-		{Resource: framework.Node, ActionType: framework.Add}: sets.NewString("fakePlugin"),
+		NodeAdd: sets.NewString("fakePlugin"),
 	}
 	q := NewTestQueue(context.Background(), newDefaultQueueSort(), WithClock(c), WithClusterEventMap(m))
 	midPod := v1.Pod{
@@ -1727,34 +1746,34 @@ func TestPodMatchesEvent(t *testing.T) {
 	tests := []struct {
 		name            string
 		podInfo         *framework.QueuedPodInfo
-		event           string
+		event           framework.ClusterEvent
 		clusterEventMap map[framework.ClusterEvent]sets.String
 		want            bool
 	}{
 		{
 			name:    "event not registered",
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}),
-			event:   "ClusterTearDown",
+			event:   EmptyEvent,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}: sets.NewString("foo"),
+				NodeAllEvent: sets.NewString("foo"),
 			},
 			want: false,
 		},
 		{
 			name:    "pod's failed plugin matches but event does not match",
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "bar"),
-			event:   PodAdd,
+			event:   AssignedPodAdd,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}: sets.NewString("foo", "bar"),
+				NodeAllEvent: sets.NewString("foo", "bar"),
 			},
 			want: false,
 		},
 		{
 			name:    "wildcard event wins regardless of event matching",
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "bar"),
-			event:   UnschedulableTimeout,
+			event:   WildCardEvent,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}: sets.NewString("foo"),
+				NodeAllEvent: sets.NewString("foo"),
 			},
 			want: true,
 		},
@@ -1763,7 +1782,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "bar"),
 			event:   NodeTaintChange,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}: sets.NewString("foo", "bar"),
+				NodeAllEvent: sets.NewString("foo", "bar"),
 			},
 			want: true,
 		},
@@ -1772,8 +1791,8 @@ func TestPodMatchesEvent(t *testing.T) {
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "bar"),
 			event:   NodeTaintChange,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}:             sets.NewString("foo"),
-				{Resource: framework.Node, ActionType: framework.UpdateNodeTaint}: sets.NewString("bar"),
+				NodeAllEvent:    sets.NewString("foo"),
+				NodeTaintChange: sets.NewString("bar"),
 			},
 			want: true,
 		},
@@ -1782,7 +1801,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "foo", "bar"),
 			event:   NodeAdd,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Node, ActionType: framework.All}: sets.NewString("bar"),
+				NodeAllEvent: sets.NewString("bar"),
 			},
 			want: true,
 		},
@@ -1791,7 +1810,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "foo"),
 			event:   PvAdd,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				framework.WildCardEvent: sets.NewString("foo"),
+				WildCardEvent: sets.NewString("foo"),
 			},
 			want: true,
 		},
@@ -1800,7 +1819,7 @@ func TestPodMatchesEvent(t *testing.T) {
 			podInfo: newQueuedPodInfoForLookup(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p"}}, "foo"),
 			event:   PvAdd,
 			clusterEventMap: map[framework.ClusterEvent]sets.String{
-				framework.WildCardEvent: sets.NewString("bar"),
+				WildCardEvent: sets.NewString("bar"),
 			},
 			want: false,
 		},
@@ -1867,7 +1886,7 @@ func TestMoveAllToActiveOrBackoffQueue_PreEnqueueChecks(t *testing.T) {
 			for _, podInfo := range tt.podInfos {
 				q.AddUnschedulableIfNotPresent(podInfo, q.schedulingCycle)
 			}
-			q.MoveAllToActiveOrBackoffQueue("test", tt.preEnqueueCheck)
+			q.MoveAllToActiveOrBackoffQueue(TestEvent, tt.preEnqueueCheck)
 			var got []string
 			for q.podBackoffQ.Len() != 0 {
 				obj, err := q.podBackoffQ.Pop()

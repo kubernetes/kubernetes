@@ -90,7 +90,7 @@ type SchedulingQueue interface {
 	Pop() (*framework.QueuedPodInfo, error)
 	Update(oldPod, newPod *v1.Pod) error
 	Delete(pod *v1.Pod) error
-	MoveAllToActiveOrBackoffQueue(event string, preCheck PreEnqueueCheck)
+	MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck)
 	AssignedPodAdded(pod *v1.Pod)
 	AssignedPodUpdated(pod *v1.Pod)
 	PendingPods() []*v1.Pod
@@ -531,7 +531,7 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 // This function adds all pods and then signals the condition variable to ensure that
 // if Pop() is waiting for an item, it receives it after all the pods are in the
 // queue and the head is the highest priority pod.
-func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string, preCheck PreEnqueueCheck) {
+func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event framework.ClusterEvent, preCheck PreEnqueueCheck) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	unschedulablePods := make([]*framework.QueuedPodInfo, 0, len(p.unschedulableQ.podInfoMap))
@@ -544,7 +544,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string, preCheck Pre
 }
 
 // NOTE: this function assumes lock has been acquired in caller
-func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event string) {
+func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.QueuedPodInfo, event framework.ClusterEvent) {
 	moved := false
 	for _, pInfo := range podInfoList {
 		// If the event doesn't help making the Pod schedulable, continue.
@@ -560,14 +560,14 @@ func (p *PriorityQueue) movePodsToActiveOrBackoffQueue(podInfoList []*framework.
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.ErrorS(err, "Error adding pod to the backoff queue", "pod", klog.KObj(pod))
 			} else {
-				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event).Inc()
+				metrics.SchedulerQueueIncomingPods.WithLabelValues("backoff", event.Label).Inc()
 				p.unschedulableQ.delete(pod)
 			}
 		} else {
 			if err := p.activeQ.Add(pInfo); err != nil {
 				klog.ErrorS(err, "Error adding pod to the scheduling queue", "pod", klog.KObj(pod))
 			} else {
-				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event).Inc()
+				metrics.SchedulerQueueIncomingPods.WithLabelValues("active", event.Label).Inc()
 				p.unschedulableQ.delete(pod)
 			}
 		}
@@ -869,12 +869,9 @@ func podInfoKeyFunc(obj interface{}) (string, error) {
 
 // Checks if the Pod may become schedulable upon the event.
 // This is achieved by looking up the global clusterEventMap registry.
-func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, event string) bool {
-	clusterEvent, ok := clusterEventReg[event]
-	if !ok {
-		return false
-	}
-	if clusterEvent == framework.WildCardEvent {
+func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, clusterEvent framework.ClusterEvent) bool {
+
+	if clusterEvent.IsWildCard() {
 		return true
 	}
 
@@ -885,7 +882,7 @@ func (p *PriorityQueue) podMatchesEvent(podInfo *framework.QueuedPodInfo, event 
 		//   Note the ActionTypes don't need to be *identical*. We check if the ANDed value
 		//   is zero or not. In this way, it's easy to tell Update&Delete is not compatible,
 		//   but Update&All is.
-		evtMatch := evt == framework.WildCardEvent ||
+		evtMatch := evt.IsWildCard() ||
 			(evt.Resource == clusterEvent.Resource && evt.ActionType&clusterEvent.ActionType != 0)
 
 		// Secondly verify the plugin name matches.
