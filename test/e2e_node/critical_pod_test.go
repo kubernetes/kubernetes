@@ -86,7 +86,6 @@ var _ = SIGDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]
 
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
-			f.PodClientNS(kubeapi.NamespaceSystem).CreateSync(criticalPod)
 			e2epodclient.MakePodClientNS(f, kubeapi.NamespaceSystem).CreateSync(criticalPod)
 
 			// Check that non-critical pods other than the besteffort have been evicted
