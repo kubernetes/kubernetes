@@ -78,6 +78,7 @@ func initReg() RegistryList {
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
 		MicrosoftRegistry:       "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
@@ -112,6 +113,7 @@ var (
 	gcEtcdRegistry          = registry.GcEtcdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
+	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
 	sampleRegistry          = registry.SampleRegistry
 	microsoftRegistry       = registry.MicrosoftRegistry
@@ -390,6 +392,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = PrivateRegistry
 	case "gcr.io/google-samples":
 		registryAndUser = sampleRegistry
+	case "gcr.io/gke-release":
+		registryAndUser = gcrReleaseRegistry
 	case "docker.io/library":
 		registryAndUser = dockerLibraryRegistry
 	default:
