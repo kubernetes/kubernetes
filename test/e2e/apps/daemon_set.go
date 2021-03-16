@@ -1083,7 +1083,7 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 		podHash := pod.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
 		gomega.Expect(len(podHash)).To(gomega.BeNumerically(">", 0))
 		if len(hash) > 0 {
-			framework.ExpectEqual(podHash, hash)
+			framework.ExpectEqual(podHash, hash, "unexpected hash for pod %s", pod.Name)
 		}
 	}
 }
