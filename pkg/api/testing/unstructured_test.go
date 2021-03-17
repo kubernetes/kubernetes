@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	jsoniter "github.com/json-iterator/go"
 
@@ -33,7 +34,6 @@ import (
 	metaunstruct "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -96,7 +96,7 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 		return
 	}
 	if !apiequality.Semantic.DeepEqual(item, unmarshalledObj) {
-		t.Errorf("Object changed during JSON operations, diff: %v", diff.ObjectReflectDiff(item, unmarshalledObj))
+		t.Errorf("Object changed during JSON operations, diff: %v", cmp.Diff(item, unmarshalledObj))
 		return
 	}
 
@@ -114,7 +114,7 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 	}
 
 	if !apiequality.Semantic.DeepEqual(item, newObj) {
-		t.Errorf("Object changed, diff: %v", diff.ObjectReflectDiff(item, newObj))
+		t.Errorf("Object changed, diff: %v", cmp.Diff(item, newObj))
 	}
 }
 

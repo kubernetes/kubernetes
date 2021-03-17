@@ -22,6 +22,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -30,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
@@ -235,7 +235,7 @@ func TestDefaulting(t *testing.T) {
 			if !reflect.DeepEqual(original, withDefaults) {
 				changedOnce = true
 				if !expectedChanged {
-					t.Errorf("{Group: \"%s\", Version: \"%s\", Kind: \"%s\"} did not expect defaults to be set - update expected or check defaulter registering: %s", gvk.Group, gvk.Version, gvk.Kind, diff.ObjectReflectDiff(original, withDefaults))
+					t.Errorf("{Group: \"%s\", Version: \"%s\", Kind: \"%s\"} did not expect defaults to be set - update expected or check defaulter registering: %s", gvk.Group, gvk.Version, gvk.Kind, cmp.Diff(original, withDefaults))
 				}
 			}
 		}
