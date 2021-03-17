@@ -509,11 +509,6 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	}
 
 	flags := cmds.PersistentFlags()
-	flags.SetNormalizeFunc(cliflag.WarnWordSepNormalizeFunc) // Warn for "_" flags
-
-	// Normalize all flags that are coming from other packages or pre-configurations
-	// a.k.a. change all "_" to "-". e.g. glog package
-	flags.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
 
 	addProfilingFlags(flags)
 
@@ -538,7 +533,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	i18n.LoadTranslations("kubectl", nil)
 
 	// From this point and forward we get warnings on flags that contain "_" separators
-	cmds.SetGlobalNormalizationFunc(cliflag.WarnWordSepNormalizeFunc)
+	cmds.SetGlobalNormalizationFunc(cliflag.WordSepNormalizeFunc)
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
