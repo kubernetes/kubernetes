@@ -1050,6 +1050,10 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *appsv1.Daemo
 		unavailablePods := 0
 		nodesToUpdatedPodCount := make(map[string]int)
 		for _, pod := range pods {
+			// Ignore the pod on the node that is supposed to be deleted
+			if pod.DeletionTimestamp != nil {
+				continue
+			}
 			if !metav1.IsControlledBy(&pod, ds) {
 				continue
 			}
@@ -1080,6 +1084,10 @@ func checkDaemonPodsImageAndAvailability(c clientset.Interface, ds *appsv1.Daemo
 
 func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 	for _, pod := range podList.Items {
+		// Ignore all the DS pods that will be deleted
+		if pod.DeletionTimestamp != nil {
+			continue
+		}
 		podHash := pod.Labels[appsv1.DefaultDaemonSetUniqueLabelKey]
 		gomega.Expect(len(podHash)).To(gomega.BeNumerically(">", 0))
 		if len(hash) > 0 {
