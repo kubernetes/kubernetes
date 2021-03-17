@@ -480,7 +480,7 @@ function update-coredns-config() {
   fi
 
   echo "== Fetching the latest installed CoreDNS version =="
-  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+  NEW_COREDNS_VERSION=$("${KUBE_ROOT}"/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 
   case "$(uname -m)" in
       x86_64*)
@@ -552,7 +552,7 @@ function update-coredns-config() {
 }
 
 echo "Fetching the previously installed CoreDNS version"
-CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | cut -d ":" -f 2)
+CURRENT_COREDNS_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.spec.template.spec.containers[:1].image}' | sed -r 's/.+:v?(.+)/\1/')
 COREDNS_DEPLOY_RESOURCE_VERSION=$("${KUBE_ROOT}/cluster/kubectl.sh" -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}')
 
 master_upgrade=true
