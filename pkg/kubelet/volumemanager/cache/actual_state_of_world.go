@@ -461,9 +461,7 @@ func (asw *actualStateOfWorld) addVolume(
 	} else {
 		// If volume object already exists, update the fields such as device path
 		volumeObj.devicePath = devicePath
-		klog.V(2).Infof("Volume %q is already added to attachedVolume list, update device path %q",
-			volumeName,
-			devicePath)
+		klog.V(2).InfoS("Volume is already added to attachedVolume list, update device path", "volumeName", volumeName, "path", devicePath)
 	}
 	asw.attachedVolumes[volumeName] = volumeObj
 
@@ -530,9 +528,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsResized(
 			podName,
 			volumeName)
 	}
-
-	klog.V(5).Infof("Volume %s(OuterVolumeSpecName %s) of pod %s has been resized",
-		volumeName, podObj.outerVolumeSpecName, podName)
+	klog.V(5).InfoS("Pod volume has been resized", "uniquePodName", podName, "volumeName", volumeName, "outerVolumeSpecName", podObj.outerVolumeSpecName)
 	podObj.fsResizeRequired = false
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
 	return nil
@@ -548,12 +544,7 @@ func (asw *actualStateOfWorld) MarkRemountRequired(
 				asw.volumePluginMgr.FindPluginBySpec(podObj.volumeSpec)
 			if err != nil || volumePlugin == nil {
 				// Log and continue processing
-				klog.Errorf(
-					"MarkRemountRequired failed to FindPluginBySpec for pod %q (podUid %q) volume: %q (volSpecName: %q)",
-					podObj.podName,
-					podObj.podUID,
-					volumeObj.volumeName,
-					podObj.volumeSpec.Name())
+				klog.ErrorS(nil, "MarkRemountRequired failed to FindPluginBySpec for volume", "uniquePodName", podObj.podName, "podUID", podObj.podUID, "volumeName", volumeName, "volumeSpecName", podObj.volumeSpec.Name())
 				continue
 			}
 
@@ -572,14 +563,13 @@ func (asw *actualStateOfWorld) MarkFSResizeRequired(
 	defer asw.Unlock()
 	volumeObj, volumeExists := asw.attachedVolumes[volumeName]
 	if !volumeExists {
-		klog.Warningf("MarkFSResizeRequired for volume %s failed as volume not exist", volumeName)
+		klog.InfoS("MarkFSResizeRequired for volume failed as volume does not exist", "volumeName", volumeName)
 		return
 	}
 
 	podObj, podExists := volumeObj.mountedPods[podName]
 	if !podExists {
-		klog.Warningf("MarkFSResizeRequired for volume %s failed "+
-			"as pod(%s) not exist", volumeName, podName)
+		klog.InfoS("MarkFSResizeRequired for volume failed because the pod does not exist", "uniquePodName", podName, "volumeName", volumeName)
 		return
 	}
 
@@ -587,18 +577,13 @@ func (asw *actualStateOfWorld) MarkFSResizeRequired(
 		asw.volumePluginMgr.FindNodeExpandablePluginBySpec(podObj.volumeSpec)
 	if err != nil || volumePlugin == nil {
 		// Log and continue processing
-		klog.Errorf(
-			"MarkFSResizeRequired failed to find expandable plugin for pod %q volume: %q (volSpecName: %q)",
-			podObj.podName,
-			volumeObj.volumeName,
-			podObj.volumeSpec.Name())
+		klog.ErrorS(nil, "MarkFSResizeRequired failed to find expandable plugin for volume", "uniquePodName", podObj.podName, "volumeName", volumeObj.volumeName, "volumeSpecName", podObj.volumeSpec.Name())
 		return
 	}
 
 	if volumePlugin.RequiresFSResize() {
 		if !podObj.fsResizeRequired {
-			klog.V(3).Infof("PVC volume %s(OuterVolumeSpecName %s) of pod %s requires file system resize",
-				volumeName, podObj.outerVolumeSpecName, podName)
+			klog.V(3).InfoS("PVC volume of the pod requires file system resize", "uniquePodName", podName, "volumeName", volumeName, "outerVolumeSpecName", podObj.outerVolumeSpecName)
 			podObj.fsResizeRequired = true
 		}
 		asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
