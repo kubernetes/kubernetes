@@ -187,7 +187,7 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 			return nil
 		}
 	}
-	klog.Info("Deprecation file not found. Invoke registration")
+	klog.InfoS("Deprecation file not found. Invoke registration")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

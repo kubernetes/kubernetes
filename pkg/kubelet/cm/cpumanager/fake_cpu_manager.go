@@ -32,7 +32,7 @@ type fakeManager struct {
 }
 
 func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Info("Start()")
+	klog.InfoS("Start()")
 	return nil
 }
 

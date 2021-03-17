@@ -1259,7 +1259,7 @@ func (pk *podKillerWithChannel) KillPod(podPair *kubecontainer.PodPair) {
 		if apiPodExists && runningPodExists {
 			klog.V(4).InfoS("Api pod and running pod are pending termination", "apiPodUID", podPair.APIPod.UID, "runningPodUID", podPair.RunningPod.ID)
 		} else if apiPodExists {
-			klog.V(4).Infof("Api pod is pending termination", "podUID", podPair.APIPod.UID)
+			klog.V(4).InfoS("Api pod is pending termination", "podUID", podPair.APIPod.UID)
 		} else {
 			klog.V(4).InfoS("Running pod is pending termination", "podUID", podPair.RunningPod.ID)
 		}
