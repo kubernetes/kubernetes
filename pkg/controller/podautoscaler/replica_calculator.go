@@ -406,8 +406,13 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 					// Ignore sample if pod is unready or one window of metric wasn't collected since last state transition.
 					unready = condition.Status == v1.ConditionFalse || metric.Timestamp.Before(condition.LastTransitionTime.Time.Add(metric.Window))
 				} else {
-					// Ignore metric if pod is unready and it has never been ready.
-					unready = condition.Status == v1.ConditionFalse && pod.Status.StartTime.Add(delayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
+					if condition.Status == v1.ConditionTrue {
+						// Ignore metric if pod is ready but metric wasn't collected since last state transition.
+						unready = metric.Timestamp.Before(condition.LastTransitionTime.Time)
+					} else if condition.Status == v1.ConditionFalse {
+						// Ignore metric if pod is unready and it has never been ready.
+						unready = pod.Status.StartTime.Add(delayOfInitialReadinessStatus).After(condition.LastTransitionTime.Time)
+					}
 				}
 			}
 			if unready {
