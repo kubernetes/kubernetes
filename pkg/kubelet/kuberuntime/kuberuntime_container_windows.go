@@ -97,7 +97,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if wc.Resources.CpuCount > 0 {
 		if wc.Resources.CpuMaximum > 0 {
 			wc.Resources.CpuMaximum = 0
-			klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
