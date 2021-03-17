@@ -187,7 +187,7 @@ func ensureWindowsDNSAvailability(issuer string) error {
 		return err
 	}
 
-	return wait.PollImmediate(1*time.Second, 5*time.Second, func() (bool, error) {
+	return wait.PollImmediate(5*time.Second, 20*time.Second, func() (bool, error) {
 		ips, err := net.LookupHost(u.Host)
 		if err != nil {
 			log.Println(err)
