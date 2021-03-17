@@ -694,13 +694,13 @@ func selectVictimsOnNode(
 // - Clear the low-priority pods' nominatedNodeName status if needed
 func PrepareCandidate(c Candidate, fh framework.Handle, cs kubernetes.Interface, pod *v1.Pod, pluginName string) *framework.Status {
 	for _, victim := range c.Victims().Pods {
-		if err := util.DeletePod(cs, victim); err != nil {
-			klog.ErrorS(err, "preempting pod", "pod", klog.KObj(victim))
-			return framework.AsStatus(err)
-		}
-		// If the victim is a WaitingPod, send a reject message to the PermitPlugin
+		// If the victim is a WaitingPod, send a reject message to the PermitPlugin.
+		// Otherwise we should delete the victim.
 		if waitingPod := fh.GetWaitingPod(victim.UID); waitingPod != nil {
 			waitingPod.Reject(pluginName, "preempted")
+		} else if err := util.DeletePod(cs, victim); err != nil {
+			klog.ErrorS(err, "Preempting pod", "pod", klog.KObj(victim), "preemptor", klog.KObj(pod))
+			return framework.AsStatus(err)
 		}
 		fh.EventRecorder().Eventf(victim, pod, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v",
 			pod.Namespace, pod.Name, c.Name())
