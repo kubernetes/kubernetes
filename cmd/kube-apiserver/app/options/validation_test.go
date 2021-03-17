@@ -107,14 +107,14 @@ func TestClusterServiceIPRange(t *testing.T) {
 			options:         makeOptionsWithCIDRs("10.0.0.0/16", "3000::/64"),
 			enableDualStack: true,
 		},
+
+		/* success cases */
 		{
 			name:            "valid v6-v4 dual stack + gate on + endpointSlice gate is on",
 			expectErrors:    false,
 			options:         makeOptionsWithCIDRs("3000::/108", "10.0.0.0/16"),
 			enableDualStack: true,
 		},
-
-		/* success cases */
 		{
 			name:            "valid primary",
 			expectErrors:    false,
