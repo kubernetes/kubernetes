@@ -40,7 +40,7 @@ func ValidateClusterResourceQuota(clusterquota *quotav1.ClusterResourceQuota) fi
 		panic(err)
 	}
 
-	allErrs = append(allErrs, validation.ValidateResourceQuotaSpec(internalQuota, field.NewPath("spec", "quota"))...)
+	allErrs = append(allErrs, validation.ValidateResourceQuotaSpec(internalQuota, validation.ResourceQuotaValidationOptions{}, field.NewPath("spec", "quota"))...)
 	allErrs = append(allErrs, validation.ValidateResourceQuotaStatus(internalStatus, field.NewPath("status", "overall"))...)
 
 	orderedNamespaces := clusterquota.Status.Namespaces.DeepCopy()
