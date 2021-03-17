@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -286,7 +287,8 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	// or the kubeadm preferred one for the desired Kubernetes version
 	var desiredEtcdVersion *version.Version
 	if cfg.Etcd.Local.ImageTag != "" {
-		desiredEtcdVersion, err = version.ParseSemantic(cfg.Etcd.Local.ImageTag)
+		desiredEtcdVersion, err = version.ParseSemantic(
+			ConvertImageTagMetadataToSemver(cfg.Etcd.Local.ImageTag))
 		if err != nil {
 			return true, errors.Wrapf(err, "failed to parse tag %q as a semantic version", cfg.Etcd.Local.ImageTag)
 		}
@@ -643,5 +645,14 @@ func GetEtcdImageTagFromStaticPod(manifestDir string) (string, error) {
 		return "", err
 	}
 
-	return image.TagFromImage(pod.Spec.Containers[0].Image), nil
+	return ConvertImageTagMetadataToSemver(image.TagFromImage(pod.Spec.Containers[0].Image)), nil
+}
+
+// ConvertImageTagMetadataToSemver converts imagetag in the format of semver_metadata to semver+metadata
+func ConvertImageTagMetadataToSemver(tag string) string {
+	// Container registries do not support `+` characters in tag names. This prevents imagetags from
+	// correctly representing semantic versions which use the plus symbol to delimit build metadata.
+	// Kubernetes uses the the convention of using an underscore in image registries to preserve
+	// build metadata information in imagetags.
+	return strings.Replace(tag, "_", "+", 1)
 }
