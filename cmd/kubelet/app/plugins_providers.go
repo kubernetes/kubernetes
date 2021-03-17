@@ -52,7 +52,7 @@ func appendPluginBasedOnFeatureFlags(plugins []volume.VolumePlugin, inTreePlugin
 		return plugins, nil
 	}
 	if featureGate.Enabled(pluginInfo.pluginUnregisterFeature) {
-		klog.Infof("Skipped registration of plugin since feature flag is enabled", "pluginName", inTreePluginName, "featureFlag", pluginInfo.pluginUnregisterFeature)
+		klog.InfoS("Skipped registration of plugin since feature flag is enabled", "pluginName", inTreePluginName, "featureFlag", pluginInfo.pluginUnregisterFeature)
 		return plugins, nil
 	}
 

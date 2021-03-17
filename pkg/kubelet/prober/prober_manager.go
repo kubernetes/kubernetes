@@ -252,7 +252,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 					select {
 					case w.manualTriggerCh <- struct{}{}:
 					default: // Non-blocking.
-						klog.Warningf("Failed to trigger a manual run of %s probe", w.probeType.String())
+						klog.InfoS("Failed to trigger a manual run", "probe", w.probeType.String())
 					}
 				}
 			}

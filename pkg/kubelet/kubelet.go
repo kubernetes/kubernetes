@@ -1952,7 +1952,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			klog.V(4).InfoS("SyncLoop RECONCILE", "source", u.Source, "pods", format.Pods(u.Pods))
 			handler.HandlePodReconcile(u.Pods)
 		case kubetypes.DELETE:
-			klog.V(2).Infof("SyncLoop DELETE", "source", u.Source, "pods", format.Pods(u.Pods))
+			klog.V(2).InfoS("SyncLoop DELETE", "source", u.Source, "pods", format.Pods(u.Pods))
 			// DELETE is treated as a UPDATE because of graceful deletion.
 			handler.HandlePodUpdates(u.Pods)
 		case kubetypes.SET:
@@ -2023,18 +2023,14 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 }
 
 func handleProbeSync(kl *Kubelet, update proberesults.Update, handler SyncHandler, probe, status string) {
-	probeAndStatus := probe
-	if len(status) > 0 {
-		probeAndStatus = fmt.Sprintf("%s (container %s)", probe, status)
-	}
 	// We should not use the pod from manager, because it is never updated after initialization.
 	pod, ok := kl.podManager.GetPodByUID(update.PodUID)
 	if !ok {
 		// If the pod no longer exists, ignore the update.
-		klog.V(4).Infof("SyncLoop %s: ignore irrelevant update: %#v", probeAndStatus, update)
+		klog.V(4).InfoS("SyncLoop (probe): ignore irrelevant update", "probe", probe, "status", status, "update", update)
 		return
 	}
-	klog.V(1).Infof("SyncLoop %s: %q", probeAndStatus, format.Pod(pod))
+	klog.V(1).InfoS("SyncLoop (probe)", "probe", probe, "status", status, "pod", klog.KObj(pod))
 	handler.HandlePodSyncs([]*v1.Pod{pod})
 }
 
@@ -2044,7 +2040,7 @@ func (kl *Kubelet) dispatchWork(pod *v1.Pod, syncType kubetypes.SyncPodType, mir
 	// check whether we are ready to delete the pod from the API server (all status up to date)
 	containersTerminal, podWorkerTerminal := kl.podAndContainersAreTerminal(pod)
 	if pod.DeletionTimestamp != nil && containersTerminal {
-		klog.V(4).Infof("Pod has completed execution and should be deleted from the API server", "pod", klog.KObj(pod), "syncType", syncType)
+		klog.V(4).InfoS("Pod has completed execution and should be deleted from the API server", "pod", klog.KObj(pod), "syncType", syncType)
 		kl.statusManager.TerminatePod(pod)
 		return
 	}

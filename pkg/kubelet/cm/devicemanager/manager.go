@@ -582,7 +582,7 @@ func (m *ManagerImpl) writeCheckpoint() error {
 	err := m.checkpointManager.CreateCheckpoint(kubeletDeviceManagerCheckpoint, data)
 	if err != nil {
 		err2 := fmt.Errorf("failed to write checkpoint file %q: %v", kubeletDeviceManagerCheckpoint, err)
-		klog.Warning(err2)
+		klog.InfoS("Failed to write checkpoint file", "err", err)
 		return err2
 	}
 	return nil
@@ -1071,7 +1071,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	m.mutex.Lock()
 	resp := m.allDevices.Clone()
 	m.mutex.Unlock()
-	klog.V(4).Infof("known devices: %d", len(resp))
+	klog.V(4).InfoS("known devices", "numDevices", len(resp))
 	return resp
 }
 

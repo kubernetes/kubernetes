@@ -285,10 +285,9 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				config.StaticPodURLHeader[k] = []string{"<masked>"}
 			}
 			// log the kubelet's config for inspection
-			klog.V(5).Infof("KubeletConfiguration: %#v", config)
+			klog.V(5).InfoS("KubeletConfiguration", "configuration", kubeletServer.KubeletConfiguration)
 
 			// run the kubelet
-			klog.V(5).InfoS("KubeletConfiguration", "configuration", kubeletServer.KubeletConfiguration)
 			if err := Run(ctx, kubeletServer, kubeletDeps, utilfeature.DefaultFeatureGate); err != nil {
 				klog.ErrorS(err, "Failed to run kubelet")
 				os.Exit(1)
