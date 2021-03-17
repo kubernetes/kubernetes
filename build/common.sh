@@ -396,11 +396,11 @@ function kube::build::docker_build() {
   local build_args
   IFS=" " read -r -a build_args <<< "$4"
   readonly build_args
-  local -ra build_cmd=("${DOCKER[@]}" build -t "${image}" "--pull=${pull}" "${build_args[@]}" "${context_dir}")
+  local -ra build_cmd=("${DOCKER[@]}" buildx build --load -t "${image}" "--pull=${pull}" "${build_args[@]}" "${context_dir}")
 
   kube::log::status "Building Docker image ${image}"
   local docker_output
-  docker_output=$("${build_cmd[@]}" 2>&1) || {
+  docker_output=$(DOCKER_CLI_EXPERIMENTAL=enabled "${build_cmd[@]}" 2>&1) || {
     cat <<EOF >&2
 +++ Docker build command failed for ${image}
 
@@ -408,7 +408,7 @@ ${docker_output}
 
 To retry manually, run:
 
-${build_cmd[*]}
+DOCKER_CLI_EXPERIMENTAL=enabled ${build_cmd[*]}
 
 EOF
     return 1
