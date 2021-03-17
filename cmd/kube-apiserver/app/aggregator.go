@@ -66,6 +66,9 @@ func createAggregatorConfig(
 	genericConfig := kubeAPIServerConfig
 	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
 	genericConfig.RESTOptionsGetter = nil
+	// prevent generic API server from installing the OpenAPI handler. Aggregator server
+	// has its own customized OpenAPI handler.
+	genericConfig.SkipOpenAPIInstallation = true
 
 	// override genericConfig.AdmissionControl with kube-aggregator's scheme,
 	// because aggregator apiserver should use its own scheme to convert its own resources.
