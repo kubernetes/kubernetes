@@ -109,7 +109,7 @@ func TestTimeout(t *testing.T) {
 			gotPanic <- err
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
 		}, nil),
-	)
+	))
 	defer ts.Close()
 
 	// No timeouts
