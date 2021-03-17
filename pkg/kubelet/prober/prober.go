@@ -81,7 +81,7 @@ func newProber(
 func (pb *prober) recordContainerEvent(pod *v1.Pod, container *v1.Container, eventType, reason, message string, args ...interface{}) {
 	ref, err := kubecontainer.GenerateContainerRef(pod, container)
 	if err != nil {
-		klog.Errorf("Can't make a ref to pod %q, container %v: %v", format.Pod(pod), container.Name, err)
+		klog.ErrorS(err, "Can't make a ref to pod and container", "pod", klog.KObj(pod), "containerName", container.Name)
 		return
 	}
 	pb.recorder.Eventf(ref, eventType, reason, message, args...)
@@ -155,7 +155,7 @@ func buildHeader(headerList []v1.HTTPHeader) http.Header {
 func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status v1.PodStatus, container v1.Container, containerID kubecontainer.ContainerID) (probe.Result, string, error) {
 	timeout := time.Duration(p.TimeoutSeconds) * time.Second
 	if p.Exec != nil {
-		klog.V(4).Infof("Exec-Probe Pod: %v, Container: %v, Command: %v", pod.Name, container.Name, p.Exec.Command)
+		klog.V(4).InfoS("Exec-Probe runProbe", "pod", klog.KObj(pod), "containerName", container.Name, "execCommand", p.Exec.Command)
 		command := kubecontainer.ExpandContainerCommandOnlyStatic(p.Exec.Command, container.Env)
 		return pb.exec.Probe(pb.newExecInContainer(container, containerID, command, timeout))
 	}
@@ -170,10 +170,10 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 			return probe.Unknown, "", err
 		}
 		path := p.HTTPGet.Path
-		klog.V(4).Infof("HTTP-Probe Host: %v://%v, Port: %v, Path: %v", scheme, host, port, path)
+		klog.V(4).InfoS("HTTP-Probe Host", "scheme", scheme, "host", host, "port", port, "path", path)
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
-		klog.V(4).Infof("HTTP-Probe Headers: %v", headers)
+		klog.V(4).InfoS("HTTP-Probe Headers", "headers", headers)
 		switch probeType {
 		case liveness:
 			return pb.livenessHTTP.Probe(url, headers, timeout)
@@ -192,7 +192,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		if host == "" {
 			host = status.PodIP
 		}
-		klog.V(4).Infof("TCP-Probe Host: %v, Port: %v, Timeout: %v", host, port, timeout)
+		klog.V(4).InfoS("TCP-Probe Host", "host", host, "port", port, "timeout", timeout)
 		return pb.tcp.Probe(host, port, timeout)
 	}
 	klog.InfoS("Failed to find probe builder for container", "container", container.Name)

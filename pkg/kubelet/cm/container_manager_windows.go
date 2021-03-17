@@ -73,7 +73,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
-	klog.V(2).Infof("Starting Windows container manager")
+	klog.V(2).InfoS("Starting Windows container manager")
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
@@ -112,7 +112,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	cm.topologyManager = topologymanager.NewFakeManager()
 
-	klog.Infof("Creating device plugin manager: %t", devicePluginEnabled)
+	klog.InfoS("Creating device plugin manager", "devicePluginEnabled", devicePluginEnabled)
 	if devicePluginEnabled {
 		cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
 		cm.topologyManager.AddHintProvider(cm.deviceManager)

@@ -555,7 +555,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 	// TODO: make me easier to express from client code
 	pod, err := m.kubeClient.CoreV1().Pods(status.podNamespace).Get(context.TODO(), status.podName, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		klog.V(3).Infof("Pod does not exist on the server",
+		klog.V(3).InfoS("Pod does not exist on the server",
 			"podUID", uid,
 			"pod", klog.KRef(status.podNamespace, status.podName))
 		// If the Pod is deleted the status will be cleared in
