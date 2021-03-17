@@ -18,14 +18,18 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
+
+type getClustersOptions struct {
+	genericclioptions.IOStreams
+}
 
 var (
 	getClustersExample = templates.Examples(`
@@ -35,29 +39,30 @@ var (
 
 // NewCmdConfigGetClusters creates a command object for the "get-clusters" action, which
 // lists all clusters defined in the kubeconfig.
-func NewCmdConfigGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigGetClusters(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &getClustersOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:     "get-clusters",
 		Short:   i18n.T("Display clusters defined in the kubeconfig"),
 		Long:    i18n.T("Display clusters defined in the kubeconfig."),
 		Example: getClustersExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runGetClusters(out, configAccess))
+			cmdutil.CheckErr(options.runGetClusters(configAccess))
 		},
 	}
 
 	return cmd
 }
 
-func runGetClusters(out io.Writer, configAccess clientcmd.ConfigAccess) error {
+func (o *getClustersOptions) runGetClusters(configAccess clientcmd.ConfigAccess) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(out, "NAME\n")
+	fmt.Fprintf(o.Out, "NAME\n")
 	for name := range config.Clusters {
-		fmt.Fprintf(out, "%s\n", name)
+		fmt.Fprintf(o.Out, "%s\n", name)
 	}
 
 	return nil

@@ -17,11 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -70,14 +70,15 @@ func (test getClustersTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigGetClusters(buf, pathOptions)
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdConfigGetClusters(ioStreams, pathOptions)
+	cmd.SetOut(out)
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)
 	}
 	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("expected %v, but got %v", test.expected, buf.String())
+		if out.String() != test.expected {
+			t.Errorf("expected %v, but got %v", test.expected, out.String())
 		}
 		return
 	}

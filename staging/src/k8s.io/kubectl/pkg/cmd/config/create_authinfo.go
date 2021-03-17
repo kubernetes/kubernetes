@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -54,6 +55,8 @@ type createAuthInfoOptions struct {
 	execArgs        []string
 	execEnv         map[string]string
 	execEnvToRemove []string
+
+	genericclioptions.IOStreams
 }
 
 const (
@@ -117,12 +120,15 @@ var (
 )
 
 // NewCmdConfigSetAuthInfo returns an Command option instance for 'config set-credentials' sub command
-func NewCmdConfigSetAuthInfo(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createAuthInfoOptions{configAccess: configAccess}
-	return newCmdConfigSetAuthInfo(out, options)
+func NewCmdConfigSetAuthInfo(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &createAuthInfoOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
+	return newCmdConfigSetAuthInfo(options)
 }
 
-func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cobra.Command {
+func newCmdConfigSetAuthInfo(options *createAuthInfoOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use: fmt.Sprintf(
 			"set-credentials NAME [--%v=path/to/certfile] "+
@@ -153,13 +159,13 @@ func newCmdConfigSetAuthInfo(out io.Writer, options *createAuthInfoOptions) *cob
 		Long:                  createAuthInfoLong,
 		Example:               createAuthInfoExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := options.complete(cmd, out)
+			err := options.complete(cmd, options.Out)
 			if err != nil {
 				cmd.Help()
 				cmdutil.CheckErr(err)
 			}
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "User %q set.\n", options.name)
+			fmt.Fprintf(options.Out, "User %q set.\n", options.name)
 		},
 	}
 

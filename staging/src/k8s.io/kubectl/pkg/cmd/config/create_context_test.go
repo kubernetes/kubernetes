@@ -17,11 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -120,8 +120,9 @@ func (test createContextTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetContext(buf, pathOptions)
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdConfigSetContext(ioStreams, pathOptions)
+	cmd.SetOut(out)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
@@ -132,8 +133,8 @@ func (test createContextTest) run(t *testing.T) {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
 	}
 	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, buf.String())
+		if out.String() != test.expected {
+			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, out.String())
 		}
 	}
 	if test.expectedConfig.Contexts != nil {

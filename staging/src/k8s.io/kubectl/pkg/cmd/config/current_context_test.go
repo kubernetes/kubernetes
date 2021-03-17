@@ -17,12 +17,12 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -70,12 +70,13 @@ func (test currentContextTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
 	options := CurrentContextOptions{
 		ConfigAccess: pathOptions,
+		IOStreams:    ioStreams,
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-	err = RunCurrentContext(buf, &options)
+	err = options.RunCurrentContext()
 	if len(test.expectedError) != 0 {
 		if err == nil {
 			t.Errorf("Did not get %v", test.expectedError)

@@ -20,12 +20,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -38,6 +38,8 @@ type setOptions struct {
 	propertyName  string
 	propertyValue string
 	setRawBytes   cliflag.Tristate
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -65,8 +67,11 @@ var (
 )
 
 // NewCmdConfigSet returns a Command instance for 'config set' sub command
-func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &setOptions{configAccess: configAccess}
+func NewCmdConfigSet(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &setOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   "set PROPERTY_NAME PROPERTY_VALUE",
@@ -77,7 +82,7 @@ func NewCmdConfigSet(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Property %q set.\n", options.propertyName)
+			fmt.Fprintf(options.Out, "Property %q set.\n", options.propertyName)
 		},
 	}
 

@@ -18,14 +18,18 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
+
+type deleteContextOptions struct {
+	genericclioptions.IOStreams
+}
 
 var (
 	deleteContextExample = templates.Examples(`
@@ -34,7 +38,8 @@ var (
 )
 
 // NewCmdConfigDeleteContext returns a Command instance for 'config delete-context' sub command
-func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &deleteContextOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:                   "delete-context NAME",
 		DisableFlagsInUseLine: true,
@@ -42,14 +47,14 @@ func NewCmdConfigDeleteContext(out, errOut io.Writer, configAccess clientcmd.Con
 		Long:                  i18n.T("Delete the specified context from the kubeconfig"),
 		Example:               deleteContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteContext(out, errOut, configAccess, cmd))
+			cmdutil.CheckErr(options.runDeleteContext(configAccess, cmd))
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
+func (o *deleteContextOptions) runDeleteContext(configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -73,7 +78,7 @@ func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess
 	}
 
 	if config.CurrentContext == name {
-		fmt.Fprint(errOut, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
+		fmt.Fprint(o.ErrOut, "warning: this removed your active context, use \"kubectl config use-context\" to select a different one\n")
 	}
 
 	delete(config.Contexts, name)
@@ -82,7 +87,7 @@ func runDeleteContext(out, errOut io.Writer, configAccess clientcmd.ConfigAccess
 		return err
 	}
 
-	fmt.Fprintf(out, "deleted context %s from %s\n", name, configFile)
+	fmt.Fprintf(o.Out, "deleted context %s from %s\n", name, configFile)
 
 	return nil
 }

@@ -18,14 +18,19 @@ package config
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
+
+type deleteClusterOptions struct {
+	genericclioptions.IOStreams
+}
 
 var (
 	deleteClusterExample = templates.Examples(`
@@ -34,7 +39,8 @@ var (
 )
 
 // NewCmdConfigDeleteCluster returns a Command instance for 'config delete-cluster' sub command
-func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
+func NewCmdConfigDeleteCluster(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &deleteClusterOptions{IOStreams: streams}
 	cmd := &cobra.Command{
 		Use:                   "delete-cluster NAME",
 		DisableFlagsInUseLine: true,
@@ -42,14 +48,14 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Long:                  i18n.T("Delete the specified cluster from the kubeconfig"),
 		Example:               deleteClusterExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
+			cmdutil.CheckErr(options.runDeleteCluster(configAccess, cmd))
 		},
 	}
 
 	return cmd
 }
 
-func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
+func (o *deleteClusterOptions) runDeleteCluster(configAccess clientcmd.ConfigAccess, cmd *cobra.Command) error {
 	config, err := configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -78,7 +84,7 @@ func runDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAccess, cmd *c
 		return err
 	}
 
-	fmt.Fprintf(out, "deleted cluster %s from %s\n", name, configFile)
+	fmt.Fprintf(o.Out, "deleted cluster %s from %s\n", name, configFile)
 
 	return nil
 }

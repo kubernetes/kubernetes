@@ -17,13 +17,13 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -113,17 +113,19 @@ func (test renameContextTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
 	options := RenameContextOptions{
 		configAccess: pathOptions,
 		contextName:  test.args[0],
 		newName:      test.args[1],
+		IOStreams:    ioStreams,
 	}
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigRenameContext(buf, options.configAccess)
+	cmd := NewCmdConfigRenameContext(ioStreams, options.configAccess)
+	cmd.SetOut(out)
 
-	options.Complete(cmd, test.args, buf)
+	options.Complete(cmd, test.args)
 	options.Validate()
-	err = options.RunRenameContext(buf)
+	err = options.RunRenameContext()
 
 	if len(test.expectedErr) != 0 {
 		if err == nil {
@@ -149,8 +151,8 @@ func (test renameContextTest) run(t *testing.T) {
 	}
 
 	if len(test.expectedOut) != 0 {
-		if buf.String() != test.expectedOut {
-			t.Errorf("Failed in:%q\n expected out %v\n but got %v", test.description, test.expectedOut, buf.String())
+		if out.String() != test.expectedOut {
+			t.Errorf("Failed in:%q\n expected out %v\n but got %v", test.description, test.expectedOut, out.String())
 		}
 	}
 }

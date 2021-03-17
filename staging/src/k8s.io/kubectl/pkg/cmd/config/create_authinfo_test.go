@@ -17,12 +17,12 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -202,29 +202,30 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
-
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
 			opts := new(createAuthInfoOptions)
-			cmd := newCmdConfigSetAuthInfo(buff, opts)
+			opts.IOStreams = ioStreams
+			cmd := newCmdConfigSetAuthInfo(opts)
+			cmd.SetOut(out)
 			if err := cmd.ParseFlags(tt.flags); err != nil {
 				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, out)
 				}
 				return
 			}
 			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, out)
 				return
 			}
 
-			if err := opts.complete(cmd, buff); err != nil {
+			if err := opts.complete(cmd, out); err != nil {
 				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, out)
 				}
 				return
 			}
 			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, out)
 				return
 			}
 
@@ -240,6 +241,12 @@ func TestCreateAuthInfoOptions(t *testing.T) {
 				return
 			}
 
+			// clean stream before deep equal check
+			opts.IOStreams = genericclioptions.IOStreams{
+				In:     nil,
+				Out:    nil,
+				ErrOut: nil,
+			}
 			if !reflect.DeepEqual(opts, tt.wantOptions) {
 				t.Errorf("case %s: flags %q: mis-matched options,\nwanted=%#v\ngot=   %#v", tt.name, tt.flags, tt.wantOptions, opts)
 			}
@@ -379,29 +386,30 @@ func TestModifyExistingAuthInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			buff := new(bytes.Buffer)
-
 			opts := new(createAuthInfoOptions)
-			cmd := newCmdConfigSetAuthInfo(buff, opts)
+			ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+			opts.IOStreams = ioStreams
+			cmd := newCmdConfigSetAuthInfo(opts)
+			cmd.SetOut(out)
 			if err := cmd.ParseFlags(tt.flags); err != nil {
 				if !tt.wantParseErr {
-					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, buff)
+					t.Errorf("case %s: parsing error for flags %q: %v: %s", tt.name, tt.flags, err, out)
 				}
 				return
 			}
 			if tt.wantParseErr {
-				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: expected parsing error for flags %q: %s", tt.name, tt.flags, out)
 				return
 			}
 
-			if err := opts.complete(cmd, buff); err != nil {
+			if err := opts.complete(cmd, out); err != nil {
 				if !tt.wantCompleteErr {
-					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, buff)
+					t.Errorf("case %s: complete() error for flags %q: %s", tt.name, tt.flags, out)
 				}
 				return
 			}
 			if tt.wantCompleteErr {
-				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, buff)
+				t.Errorf("case %s: complete() expected errors for flags %q: %s", tt.name, tt.flags, out)
 				return
 			}
 
@@ -467,8 +475,9 @@ func (test createAuthInfoTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigSetAuthInfo(buf, pathOptions)
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdConfigSetAuthInfo(ioStreams, pathOptions)
+	cmd.SetOut(out)
 	cmd.SetArgs(test.args)
 	cmd.Flags().Parse(test.flags)
 	if err := cmd.Execute(); err != nil {
@@ -479,8 +488,8 @@ func (test createAuthInfoTest) run(t *testing.T) {
 		t.Fatalf("unexpected error loading kubeconfig file: %v", err)
 	}
 	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, buf.String())
+		if out.String() != test.expected {
+			t.Errorf("Fail in %q:\n expected %v\n but got %v\n", test.description, test.expected, out.String())
 		}
 	}
 	if test.expectedConfig.AuthInfos != nil {

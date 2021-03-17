@@ -17,11 +17,11 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"io/ioutil"
 	"os"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -118,12 +118,16 @@ func (test unsetConfigTest) run(t *testing.T) {
 	pathOptions := clientcmd.NewDefaultPathOptions()
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigUnset(buf, pathOptions)
-	opts := &unsetOptions{configAccess: pathOptions}
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdConfigUnset(ioStreams, pathOptions)
+	cmd.SetOut(out)
+	opts := &unsetOptions{
+		configAccess: pathOptions,
+		IOStreams:    ioStreams,
+	}
 	err = opts.complete(cmd, test.args)
 	if err == nil {
-		err = opts.run(buf)
+		err = opts.run()
 	}
 	if test.expectedErr == "" && err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -137,8 +141,8 @@ func (test unsetConfigTest) run(t *testing.T) {
 		t.Fatalf("expected error:\n %v\nbut got error:\n%v", test.expectedErr, err)
 	}
 	if len(test.expected) != 0 {
-		if buf.String() != test.expected {
-			t.Errorf("Failed in :%q\n expected %v\n but got %v", test.description, test.expected, buf.String())
+		if out.String() != test.expected {
+			t.Errorf("Failed in :%q\n expected %v\n but got %v", test.description, test.expected, out.String())
 		}
 	}
 	if test.args[0] == "current-context" {

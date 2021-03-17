@@ -17,13 +17,13 @@ limitations under the License.
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -67,16 +67,17 @@ func (test deleteClusterTest) run(t *testing.T) {
 	pathOptions.GlobalFile = fakeKubeFile.Name()
 	pathOptions.EnvVar = ""
 
-	buf := bytes.NewBuffer([]byte{})
-	cmd := NewCmdConfigDeleteCluster(buf, pathOptions)
+	ioStreams, _, out, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdConfigDeleteCluster(ioStreams, pathOptions)
+	cmd.SetOut(out)
 	cmd.SetArgs([]string{test.clusterToDelete})
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("unexpected error executing command: %v", err)
 	}
 
 	expectedOutWithFile := fmt.Sprintf(test.expectedOut, fakeKubeFile.Name())
-	if expectedOutWithFile != buf.String() {
-		t.Errorf("expected output %s, but got %s", expectedOutWithFile, buf.String())
+	if expectedOutWithFile != out.String() {
+		t.Errorf("expected output %s, but got %s", expectedOutWithFile, out.String())
 		return
 	}
 

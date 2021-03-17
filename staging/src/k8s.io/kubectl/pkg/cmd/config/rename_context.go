@@ -19,10 +19,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -34,6 +34,8 @@ type RenameContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	contextName  string
 	newName      string
+
+	genericclioptions.IOStreams
 }
 
 const (
@@ -58,8 +60,11 @@ var (
 )
 
 // NewCmdConfigRenameContext creates a command object for the "rename-context" action
-func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &RenameContextOptions{configAccess: configAccess}
+func NewCmdConfigRenameContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &RenameContextOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   renameContextUse,
@@ -68,16 +73,16 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Long:                  renameContextLong,
 		Example:               renameContextExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(options.Complete(cmd, args, out))
+			cmdutil.CheckErr(options.Complete(cmd, args))
 			cmdutil.CheckErr(options.Validate())
-			cmdutil.CheckErr(options.RunRenameContext(out))
+			cmdutil.CheckErr(options.RunRenameContext())
 		},
 	}
 	return cmd
 }
 
 // Complete assigns RenameContextOptions from the args.
-func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *RenameContextOptions) Complete(cmd *cobra.Command, args []string) error {
 	if len(args) != 2 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
@@ -96,7 +101,7 @@ func (o RenameContextOptions) Validate() error {
 }
 
 // RunRenameContext performs the execution for 'config rename-context' sub command
-func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
+func (o RenameContextOptions) RunRenameContext() error {
 	config, err := o.configAccess.GetStartingConfig()
 	if err != nil {
 		return err
@@ -128,6 +133,6 @@ func (o RenameContextOptions) RunRenameContext(out io.Writer) error {
 		return err
 	}
 
-	fmt.Fprintf(out, "Context %q renamed to %q.\n", o.contextName, o.newName)
+	fmt.Fprintf(o.Out, "Context %q renamed to %q.\n", o.contextName, o.newName)
 	return nil
 }

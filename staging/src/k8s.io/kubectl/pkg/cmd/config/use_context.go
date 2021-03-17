@@ -19,10 +19,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
@@ -39,11 +39,16 @@ var (
 type useContextOptions struct {
 	configAccess clientcmd.ConfigAccess
 	contextName  string
+
+	genericclioptions.IOStreams
 }
 
 // NewCmdConfigUseContext returns a Command instance for 'config use-context' sub command
-func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &useContextOptions{configAccess: configAccess}
+func NewCmdConfigUseContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &useContextOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   "use-context CONTEXT_NAME",
@@ -55,7 +60,7 @@ func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Switched to context %q.\n", options.contextName)
+			fmt.Fprintf(options.Out, "Switched to context %q.\n", options.contextName)
 		},
 	}
 

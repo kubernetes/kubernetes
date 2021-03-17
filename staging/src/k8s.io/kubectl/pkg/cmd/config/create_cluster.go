@@ -19,12 +19,12 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -41,6 +41,8 @@ type createClusterOptions struct {
 	insecureSkipTLSVerify cliflag.Tristate
 	certificateAuthority  cliflag.StringFlag
 	embedCAData           cliflag.Tristate
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -64,8 +66,11 @@ var (
 )
 
 // NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
-func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createClusterOptions{configAccess: configAccess}
+func NewCmdConfigSetCluster(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &createClusterOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=example.com]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
@@ -76,7 +81,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Cluster %q set.\n", options.name)
+			fmt.Fprintf(options.Out, "Cluster %q set.\n", options.name)
 		},
 	}
 

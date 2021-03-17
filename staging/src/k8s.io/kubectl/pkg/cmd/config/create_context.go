@@ -19,10 +19,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -38,6 +38,8 @@ type createContextOptions struct {
 	cluster      cliflag.StringFlag
 	authInfo     cliflag.StringFlag
 	namespace    cliflag.StringFlag
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -52,8 +54,11 @@ var (
 )
 
 // NewCmdConfigSetContext returns a Command instance for 'config set-context' sub command
-func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createContextOptions{configAccess: configAccess}
+func NewCmdConfigSetContext(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &createContextOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-context [NAME | --current] [--%v=cluster_nickname] [--%v=user_nickname] [--%v=namespace]", clientcmd.FlagClusterName, clientcmd.FlagAuthInfoName, clientcmd.FlagNamespace),
@@ -66,9 +71,9 @@ func NewCmdConfigSetContext(out io.Writer, configAccess clientcmd.ConfigAccess) 
 			name, exists, err := options.run()
 			cmdutil.CheckErr(err)
 			if exists {
-				fmt.Fprintf(out, "Context %q modified.\n", name)
+				fmt.Fprintf(options.Out, "Context %q modified.\n", name)
 			} else {
-				fmt.Fprintf(out, "Context %q created.\n", name)
+				fmt.Fprintf(options.Out, "Context %q created.\n", name)
 			}
 		},
 	}
