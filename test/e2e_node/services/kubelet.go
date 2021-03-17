@@ -203,8 +203,6 @@ func (e *E2EServices) startKubelet(featureGates map[string]bool) (*server, error
 	kc.Authentication.Webhook.Enabled = false
 	// --authorization-mode
 	kc.Authorization.Mode = kubeletconfig.KubeletAuthorizationModeAlwaysAllow
-	// --read-only-port
-	kc.ReadOnlyPort = ports.KubeletReadOnlyPort
 
 	// Static Pods are in a per-test location, so we override them for tests.
 	kc.StaticPodPath = podPath

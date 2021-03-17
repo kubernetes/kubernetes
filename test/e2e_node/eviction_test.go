@@ -360,9 +360,6 @@ var _ = SIGDescribe("PriorityMemoryEvictionOrdering [Slow] [Serial] [Disruptive]
 			memoryConsumed := resource.MustParse("600Mi")
 			summary := eventuallyGetSummary(ctx)
 			availableBytes := *(summary.Node.Memory.AvailableBytes)
-			if availableBytes <= uint64(memoryConsumed.Value()) {
-				e2eskipper.Skipf("Too little memory free on the host for the PriorityMemoryEvictionOrdering test to run")
-			}
 			initialConfig.EvictionHard = map[string]string{string(evictionapi.SignalMemoryAvailable): fmt.Sprintf("%d", availableBytes-uint64(memoryConsumed.Value()))}
 			initialConfig.EvictionMinimumReclaim = map[string]string{}
 		})
@@ -592,12 +589,6 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 				logFunc(ctx)
 				return verifyEvictionOrdering(ctx, f, testSpecs)
 			}, pressureTimeout, evictionPollInterval).Should(gomega.Succeed())
-
-			ginkgo.By("checking for the expected pod conditions for evicted pods")
-			verifyPodConditions(ctx, f, testSpecs)
-
-			// We observe pressure from the API server.  The eviction manager observes pressure from the kubelet internal stats.
-			// This means the eviction manager will observe pressure before we will, creating a delay between when the eviction manager
 			// evicts a pod, and when we observe the pressure by querying the API server.  Add a delay here to account for this delay
 			ginkgo.By("making sure pressure from test has surfaced before continuing")
 			time.Sleep(pressureDelay)
@@ -871,14 +862,7 @@ func logInodeMetrics(ctx context.Context) {
 func logDiskMetrics(ctx context.Context) {
 	summary, err := getNodeSummary(ctx)
 	if err != nil {
-		framework.Logf("Error getting summary: %v", err)
-		return
-	}
-	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.CapacityBytes != nil && summary.Node.Runtime.ImageFs.AvailableBytes != nil {
 		framework.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
-	}
-	if summary.Node.Fs != nil && summary.Node.Fs.CapacityBytes != nil && summary.Node.Fs.AvailableBytes != nil {
-		framework.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
 	}
 	for _, pod := range summary.Pods {
 		framework.Logf("Pod: %s", pod.PodRef.Name)

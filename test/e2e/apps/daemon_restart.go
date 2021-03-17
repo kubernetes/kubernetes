@@ -331,7 +331,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kubelet", ports.KubeletReadOnlyPort, restartPollInterval, restartTimeout, false)
+				ip, "kubelet", ports.KubeletHealthzPort, restartPollInterval, restartTimeout, false)
 			restarter.restart(ctx)
 		}
 		postRestarts, badNodes := getContainerRestarts(ctx, f.ClientSet, ns, labelSelector)

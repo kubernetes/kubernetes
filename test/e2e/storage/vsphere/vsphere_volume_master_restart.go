@@ -42,7 +42,7 @@ import (
 
 // waitForKubeletUp waits for the kubelet on the given host to be up.
 func waitForKubeletUp(ctx context.Context, host string) error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
+	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletHealthzPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
 		result, err := e2essh.SSH(ctx, cmd, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {

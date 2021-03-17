@@ -212,7 +212,8 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		nodeAddr := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
 		if nodeAddr != "" {
 			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
-			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
+			// kubelet readonly port 10255 is by default closed, and it should be removed in later release.
+			assertNotReachableHTTPTimeout(nodeAddr, "/", 10255, firewallTestTCPTimeout, false)
 			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 		}
 

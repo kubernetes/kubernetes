@@ -72,7 +72,7 @@ func NewServerRunOptions() *ServerRunOptions {
 			EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 			KubeletConfig: kubeletclient.KubeletClientConfig{
 				Port:         ports.KubeletPort,
-				ReadOnlyPort: ports.KubeletReadOnlyPort,
+				ReadOnlyPort: 0,
 				PreferredAddressTypes: []string{
 					// --override-hostname
 					string(api.NodeHostName),

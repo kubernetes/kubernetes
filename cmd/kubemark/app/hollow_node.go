@@ -91,7 +91,7 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&c.BootstrapKubeconfigPath, "bootstrap-kubeconfig", "", "Path to bootstrap kubeconfig file.")
 	fs.StringVar(&c.CertDirectory, "cert-dir", "/etc/srv/", "Path to cert directory for bootstraping.")
 	fs.IntVar(&c.KubeletPort, "kubelet-port", ports.KubeletPort, "Port on which HollowKubelet should be listening.")
-	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", ports.KubeletReadOnlyPort, "Read-only port on which Kubelet is listening.")
+	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", 0, "Read-only port on which Kubelet is listening. The value `0` indicates that the port is disabled.")
 	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")
 	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
 	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
