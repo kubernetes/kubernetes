@@ -38,12 +38,16 @@ var _ goflag.Value = &StringSlice{}
 var _ pflag.Value = &StringSlice{}
 
 func (s *StringSlice) String() string {
+	if s == nil || s.value == nil {
+		return ""
+	}
 	return strings.Join(*s.value, " ")
 }
 
 func (s *StringSlice) Set(val string) error {
 	if s.value == nil || !s.changed {
-		*s.value = make([]string, 0)
+		v := make([]string, 0)
+		s.value = &v
 	}
 	*s.value = append(*s.value, val)
 	s.changed = true
