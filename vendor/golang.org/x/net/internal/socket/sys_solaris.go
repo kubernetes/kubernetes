@@ -5,20 +5,9 @@
 package socket
 
 import (
-	"runtime"
 	"syscall"
 	"unsafe"
 )
-
-func probeProtocolStack() int {
-	switch runtime.GOARCH {
-	case "amd64":
-		return 4
-	default:
-		var p uintptr
-		return int(unsafe.Sizeof(p))
-	}
-}
 
 //go:cgo_import_dynamic libc___xnet_getsockopt __xnet_getsockopt "libsocket.so"
 //go:cgo_import_dynamic libc_setsockopt setsockopt "libsocket.so"

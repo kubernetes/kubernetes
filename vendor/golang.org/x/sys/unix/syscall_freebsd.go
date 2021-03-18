@@ -54,6 +54,10 @@ type SockaddrDatalink struct {
 	raw    RawSockaddrDatalink
 }
 
+func anyToSockaddrGOOS(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
+	return nil, EAFNOSUPPORT
+}
+
 // Translate "kern.hostname" to []_C_int{0,1,2,3}.
 func nametomib(name string) (mib []_C_int, err error) {
 	const siz = unsafe.Sizeof(mib[0])
@@ -140,22 +144,7 @@ func Accept4(fd, flags int) (nfd int, sa Sockaddr, err error) {
 	return
 }
 
-const ImplementsGetwd = true
-
 //sys	Getcwd(buf []byte) (n int, err error) = SYS___GETCWD
-
-func Getwd() (string, error) {
-	var buf [PathMax]byte
-	_, err := Getcwd(buf[0:])
-	if err != nil {
-		return "", err
-	}
-	n := clen(buf[:])
-	if n < 1 {
-		return "", EINVAL
-	}
-	return string(buf[:n]), nil
-}
 
 func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 	var (
@@ -201,42 +190,7 @@ func setattrlistTimes(path string, times []Timespec, flags int) error {
 
 //sys   ioctl(fd int, req uint, arg uintptr) (err error)
 
-// ioctl itself should not be exposed directly, but additional get/set
-// functions for specific types are permissible.
-
-// IoctlSetInt performs an ioctl operation which sets an integer value
-// on fd, using the specified request number.
-func IoctlSetInt(fd int, req uint, value int) error {
-	return ioctl(fd, req, uintptr(value))
-}
-
-func ioctlSetWinsize(fd int, req uint, value *Winsize) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
-func ioctlSetTermios(fd int, req uint, value *Termios) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
-// IoctlGetInt performs an ioctl operation which gets an integer value
-// from fd, using the specified request number.
-func IoctlGetInt(fd int, req uint) (int, error) {
-	var value int
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return value, err
-}
-
-func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
-	var value Winsize
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
-
-func IoctlGetTermios(fd int, req uint) (*Termios, error) {
-	var value Termios
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
+//sys   sysctl(mib []_C_int, old *byte, oldlen *uintptr, new *byte, newlen uintptr) (err error) = SYS___SYSCTL
 
 func Uname(uname *Utsname) error {
 	mib := []_C_int{CTL_KERN, KERN_OSTYPE}
@@ -497,8 +451,12 @@ func convertFromDirents11(buf []byte, old []byte) int {
 	dstPos := 0
 	srcPos := 0
 	for dstPos+fixedSize < len(buf) && srcPos+oldFixedSize < len(old) {
-		dstDirent := (*Dirent)(unsafe.Pointer(&buf[dstPos]))
-		srcDirent := (*dirent_freebsd11)(unsafe.Pointer(&old[srcPos]))
+		var dstDirent Dirent
+		var srcDirent dirent_freebsd11
+
+		// If multiple direntries are written, sometimes when we reach the final one,
+		// we may have cap of old less than size of dirent_freebsd11.
+		copy((*[unsafe.Sizeof(srcDirent)]byte)(unsafe.Pointer(&srcDirent))[:], old[srcPos:])
 
 		reclen := roundup(fixedSize+int(srcDirent.Namlen)+1, 8)
 		if dstPos+reclen > len(buf) {
@@ -514,6 +472,7 @@ func convertFromDirents11(buf []byte, old []byte) int {
 		dstDirent.Pad1 = 0
 
 		copy(dstDirent.Name[:], srcDirent.Name[:srcDirent.Namlen])
+		copy(buf[dstPos:], (*[unsafe.Sizeof(dstDirent)]byte)(unsafe.Pointer(&dstDirent))[:])
 		padding := buf[dstPos+fixedSize+int(dstDirent.Namlen) : dstPos+reclen]
 		for i := range padding {
 			padding[i] = 0
@@ -551,18 +510,8 @@ func PtraceGetFpRegs(pid int, fpregsout *FpReg) (err error) {
 	return ptrace(PTRACE_GETFPREGS, pid, uintptr(unsafe.Pointer(fpregsout)), 0)
 }
 
-func PtraceGetFsBase(pid int, fsbase *int64) (err error) {
-	return ptrace(PTRACE_GETFSBASE, pid, uintptr(unsafe.Pointer(fsbase)), 0)
-}
-
 func PtraceGetRegs(pid int, regsout *Reg) (err error) {
 	return ptrace(PTRACE_GETREGS, pid, uintptr(unsafe.Pointer(regsout)), 0)
-}
-
-func PtraceIO(req int, pid int, addr uintptr, out []byte, countin int) (count int, err error) {
-	ioDesc := PtraceIoDesc{Op: int32(req), Offs: (*byte)(unsafe.Pointer(addr)), Addr: (*byte)(unsafe.Pointer(&out[0])), Len: uint(countin)}
-	err = ptrace(PTRACE_IO, pid, uintptr(unsafe.Pointer(&ioDesc)), 0)
-	return int(ioDesc.Len), err
 }
 
 func PtraceLwpEvents(pid int, enable int) (err error) {
@@ -688,7 +637,7 @@ func PtraceSingleStep(pid int) (err error) {
 //sys	Revoke(path string) (err error)
 //sys	Rmdir(path string) (err error)
 //sys	Seek(fd int, offset int64, whence int) (newoffset int64, err error) = SYS_LSEEK
-//sys	Select(n int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (err error)
+//sys	Select(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (n int, err error)
 //sysnb	Setegid(egid int) (err error)
 //sysnb	Seteuid(euid int) (err error)
 //sysnb	Setgid(gid int) (err error)

@@ -377,6 +377,7 @@ filegroup(
         "//vendor/golang.org/x/sync/errgroup:all-srcs",
         "//vendor/golang.org/x/sync/singleflight:all-srcs",
         "//vendor/golang.org/x/sys/cpu:all-srcs",
+        "//vendor/golang.org/x/sys/internal/unsafeheader:all-srcs",
         "//vendor/golang.org/x/sys/unix:all-srcs",
         "//vendor/golang.org/x/sys/windows:all-srcs",
         "//vendor/golang.org/x/text/encoding:all-srcs",
