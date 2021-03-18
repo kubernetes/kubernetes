@@ -51,9 +51,6 @@ func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.Cycle
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.NewStatus(framework.Error, "node not found")
-	}
 
 	controllerRef := metav1.GetControllerOf(pod)
 	if controllerRef != nil {
