@@ -531,6 +531,18 @@ EOF
   fi
 }
 
+# A function to download in-place component manifests if in-place agent is
+# present.
+function inplace-run-once {
+  if [[ -f "${KUBE_HOME}/bin/inplace" ]]; then
+    echo "inplace-run-once: using inplace to download inplace component manefists"
+    local dst_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
+    mkdir -p "${dst_dir}/in-place"
+    mkdir -p "${dst_dir}/gce-extras/in-place"
+    ${KUBE_HOME}/bin/inplace --mode=run-once --in_place_addon_path="${dst_dir}/gce-extras/in-place" --master_pod_path="${dst_dir}/in-place"
+  fi
+}
+
 # A helper function for loading a docker image. It keeps trying up to 5 times.
 #
 # $1: Full path of the docker image
@@ -1049,6 +1061,11 @@ log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 
 # binaries and kube-system manifests
 log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
+
+# download inplace component manifests
+if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
+  log-wrap 'InplaceRunOnce' retry-forever 30 inplace-run-once
+fi
 
 echo "Done for installing kubernetes files"
 log-end 'ConfigureMain'

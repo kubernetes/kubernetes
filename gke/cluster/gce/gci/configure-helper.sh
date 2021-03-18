@@ -3489,6 +3489,7 @@ function main() {
     log-wrap 'UpdateLegacyAddonNodeLabels' update-legacy-addon-node-labels &
     if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
       if [[ -f "${KUBE_HOME}/bin/inplace" ]]; then
+        log-wrap 'SetupInplaceMasterPodManifests' setup-inplace-master-pod-manifests
         log-wrap 'GKESetupInplace' gke-setup-inplace
       fi
     fi
