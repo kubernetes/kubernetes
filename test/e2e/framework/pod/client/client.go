@@ -80,10 +80,7 @@ type FrameworkShim interface {
 // possibly applying test-suite specific transformations to the pod spec, e.g. for
 // node e2e pod scheduling.
 func MakePodClient(f FrameworkShim) *PodClient {
-	return &PodClient{
-		f:            f,
-		PodInterface: f.GetClientSet().CoreV1().Pods(f.GetNamespace().Name),
-	}
+	return MakePodClientNS(f, f.GetNamespace().Name)
 }
 
 // MakePodClientNS is a convenience method for getting a pod client interface in an alternative namespace,
