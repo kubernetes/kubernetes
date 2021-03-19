@@ -319,5 +319,4 @@ push:
     - kube-apiserver
     - kube-controller-manager
     - kube-scheduler
-    architectures:
-    - amd64
+

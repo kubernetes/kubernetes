@@ -102,10 +102,8 @@ Below is a list of supported options and their descriptions.
   string artifact.
 - `INJECT_DEV_VERSION_MARKER`: Decides whether to inject a '-gke.99.99+' string.
   Used to guarantee that the final build artifacts look like CI/dev builds.
-- `PLATFORMS`: CSV of different platforms to build during the `compile` step.
-  Platforms are `linux/amd64` and `windows/amd64`. E.g., `make_custom.sh
-  PLATFORMS=linux/amd64` or `make_custom.sh
-  PLATFORMS=linux/amd64,windows/amd64`.
+- `TARGET_PLATFORMS`: CSV of different platforms to for all build actions. E.g.,
+  `make_custom.sh TARGET_PLATFORMS=linux/amd64,linux/arm64,windows/amd64`.
 - `GCR_REPO`: The GCR repository to name images, during the `package` step. If
   defined, it will override anything set in the `package.gcr.repo` field in the
   CSV of YAMLs defined in `GKE_BUILD_CONFIG`.
