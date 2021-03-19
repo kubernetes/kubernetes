@@ -1608,7 +1608,7 @@ function Configure_Containerd {
 # Register if needed and start containerd service.
 function Start_Containerd {
   # Do the registration only if the containerd service does not exist.
-  if (Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'" -eq $null) {
+  if ((Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'") -eq $null) {
     Log-Output "Creating containerd service"
     & containerd.exe --register-service --log-file "${env:LOGS_DIR}/containerd.log"
   }
