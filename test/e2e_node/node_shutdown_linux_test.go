@@ -178,6 +178,24 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 				return nil
 			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
 		})
+
+		ginkgo.It("after restart dbus, should be able to gracefully shutdown", func() {
+			ginkgo.By("Restart Dbus")
+			err := restartDbus()
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Emitting Shutdown signal")
+			err = emitSignalPrepareForShutdown(true)
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(func() error {
+				isReady := getNodeReadyStatus(f)
+				if isReady {
+					return fmt.Errorf("node did not become shutdown as expected")
+				}
+				return nil
+			}, nodeStatusUpdateTimeout, pollInterval).Should(gomega.BeNil())
+		})
 	})
 })
 
@@ -236,4 +254,10 @@ func getNodeReadyStatus(f *framework.Framework) bool {
 	// Assuming that there is only one node, because this is a node e2e test.
 	framework.ExpectEqual(len(nodeList.Items), 1)
 	return isNodeReady(&nodeList.Items[0])
+}
+
+func restartDbus() error {
+	cmd := "systemctl restart dbus"
+	_, err := runCommand("sh", "-c", cmd)
+	return err
 }
