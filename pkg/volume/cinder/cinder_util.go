@@ -30,7 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -231,7 +231,13 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 		if volumeAZ != "" {
 			volumeLabels[v1.LabelTopologyZone] = volumeAZ
 		}
-		if volumeRegion != "" {
+		// if volume region was not empty or volume zone was not empty (but region was)
+		// then we will set region to empty value, so as admission controller does not
+		// tries to "fix" the label.
+		// When admission controller tries to "fix" the label with missing region value
+		// it does so by reading the metadata of the current host, which could be very
+		// different from zone in which volume was provisioned.
+		if volumeRegion != "" || volumeAZ != "" {
 			volumeLabels[v1.LabelTopologyRegion] = volumeRegion
 		}
 	}
