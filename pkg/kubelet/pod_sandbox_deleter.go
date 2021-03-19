@@ -48,7 +48,7 @@ func newPodSandboxDeleter(runtime kubecontainer.Runtime) *podSandboxDeleter {
 	go wait.Forever(func() {
 		for id := range buffer {
 			if err := runtime.DeleteSandbox(id); err != nil {
-				klog.Warningf("[pod_sandbox_deleter] DeleteSandbox returned error for (id=%v): %v", id, err)
+				klog.InfoS("[pod_sandbox_deleter] DeleteSandbox returned error", "sandboxId", id, "err", err)
 			}
 		}
 	}, 0)
@@ -75,7 +75,7 @@ func (p *podSandboxDeleter) deleteSandboxesInPod(podStatus *kubecontainer.PodSta
 			select {
 			case p.worker <- sandboxStatuses[i].Id:
 			default:
-				klog.Warningf("Failed to issue the request to remove sandbox %v", sandboxStatuses[i].Id)
+				klog.InfoS("Failed to issue the request to remove sandbox", "sandboxId", sandboxStatuses[i].Id)
 			}
 		}
 	}

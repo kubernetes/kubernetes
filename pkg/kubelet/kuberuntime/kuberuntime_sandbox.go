@@ -370,7 +370,7 @@ func (m *kubeGenericRuntimeManager) GetPortForward(podName, podNamespace string,
 
 // DeleteSandbox removes the sandbox by sandboxID.
 func (m *kubeGenericRuntimeManager) DeleteSandbox(sandboxID string) error {
-	klog.V(4).Infof("Removing sandbox %q", sandboxID)
+	klog.V(4).InfoS("Removing sandbox", "sandboxId", sandboxID)
 	// stop sandbox is called as part of kill pod function but the error is ignored. So,
 	// we have to call stop sandbox again to make sure that all the resources like network
 	// are cleaned by runtime.

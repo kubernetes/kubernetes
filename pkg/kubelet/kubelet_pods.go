@@ -987,7 +987,7 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		for _, sandbox := range runtimeStatus.SandboxStatuses {
 			sandboxStr += fmt.Sprintf("%+v ", *sandbox)
 		}
-		klog.V(3).Infof("Pod %q is terminated, but some pod sandboxes have not been cleaned up: %s", format.Pod(pod), sandboxStr)
+		klog.V(3).InfoS("Pod is terminated, but some pod sandboxes have not been cleaned up", "pod", klog.KObj(pod), "status", sandboxStr)
 		return false
 	}
 
