@@ -224,8 +224,6 @@ func (nm *NodeManager) DiscoverNode(node *v1.Node) error {
 					nodeZone := &cloudprovider.Zone{FailureDomain: nodeFd, Region: nodeRegion}
 					nodeInfo := &NodeInfo{dataCenter: res.datacenter, vm: vm, vcServer: res.vc, vmUUID: nodeUUID, zone: nodeZone}
 					nm.addNodeInfo(node.ObjectMeta.Name, nodeInfo)
-					for range queueChannel {
-					}
 					setVMFound(true)
 					cancel()
 					break
