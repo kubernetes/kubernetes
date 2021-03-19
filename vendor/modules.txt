@@ -685,6 +685,7 @@ github.com/pmezard/go-difflib/difflib
 # github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 github.com/pquerna/cachecontrol
 github.com/pquerna/cachecontrol/cacheobject
+# github.com/pquerna/ffjson => github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20
 # github.com/prometheus/client_golang v1.7.1 => github.com/prometheus/client_golang v1.7.1
 github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
@@ -703,6 +704,10 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/prometheus/prometheus v2.5.0+incompatible => github.com/prometheus/prometheus v2.5.0+incompatible
+## explicit
+# github.com/prometheus/prometheus => github.com/prometheus/prometheus v2.5.0+incompatible
+github.com/prometheus/prometheus/util/promlint
 # github.com/quobyte/api v0.1.8 => github.com/quobyte/api v0.1.8
 ## explicit
 github.com/quobyte/api
