@@ -22,7 +22,9 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/logs"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilpointer "k8s.io/utils/pointer"
@@ -199,9 +201,14 @@ func TestValidateKubeletConfiguration(t *testing.T) {
 		},
 		MemorySwap: kubeletconfig.MemorySwapConfiguration{SwapBehavior: kubetypes.UnlimitedSwap},
 	}
-	const numErrsErrorCase1 = 30
+	const numErrsErrorCase1 = 29
 	if allErrors := ValidateKubeletConfiguration(errorCase1); len(allErrors.(utilerrors.Aggregate).Errors()) != numErrsErrorCase1 {
 		t.Errorf("expect %d errors, got %v", numErrsErrorCase1, len(allErrors.(utilerrors.Aggregate).Errors()))
+	}
+
+	const numErrsLoggingErrorCase = 1
+	if allErrors := logs.ValidateLoggingConfiguration(&errorCase1.Logging, field.NewPath("logging")); len(allErrors) != numErrsLoggingErrorCase {
+		t.Errorf("logging validate expect %d errors, got %v", numErrsLoggingErrorCase, len(allErrors))
 	}
 
 	errorCase2 := &kubeletconfig.KubeletConfiguration{

@@ -46,6 +46,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -159,6 +160,15 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 				cmd.Usage()
 				os.Exit(1)
 			}
+
+			// logging config should be validate and apply early
+			if errs := logs.ValidateLoggingConfiguration(&kubeletConfig.Logging, field.NewPath("logging")); len(errs) > 0 {
+				klog.ErrorS(err, "Failed to validate kubelet logging config")
+				os.Exit(1)
+			}
+
+			logOption := &logs.Options{Config: kubeletConfig.Logging}
+			logOption.Apply()
 
 			// check if there are non-flag arguments in the command line
 			cmds := cleanFlagSet.Args()
@@ -434,8 +444,6 @@ func UnsecuredDependencies(s *options.KubeletServer, featureGate featuregate.Fea
 // Otherwise, the caller is assumed to have set up the Dependencies object and a default one will
 // not be generated.
 func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Dependencies, featureGate featuregate.FeatureGate) error {
-	logOption := &logs.Options{Config: s.Logging}
-	logOption.Apply()
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
 	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
