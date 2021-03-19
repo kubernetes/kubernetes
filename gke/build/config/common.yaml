@@ -119,26 +119,55 @@ package:
     # pushing it up into GCR.
     repo: "gke.gcr.io"
     # Images which we must guarantee are built and generated as an output of the
-    # build. These images are then possibly modified with source/license
+    # build. These images are first loaded from Docker tarball files located at
+    # ${KUBE_ROOT}/_output/release-images/{arch}/{name}.tar.
+    # These images are then possibly modified with source/license
     # injection. Each image starts out as a tarball, from which we `docker load`
     # it and tag it as a particular gcr-repo + image + tag combination.
+
+    # The "compile" step already saves image tarballs locally which are tagged
+    # with "gke.gcr.io" or $KUBE_DOCKER_REGISTRY. The "package" step does the
+    # following:
+    # - Re-save the image tarball to another location ready for GCS upload.
+    # - Re-tag the image to a new list of GCR repos to be pushed to, Typically
+    #   they are pushed to gke-release-staging and gke-on-prem-staging.
+    # - Run additional decorations on the images such as license and source code
+    #   injection for legal reasons.
+    # Each build-steps contains an action to decorate the image, and can contain
+    # addtional GCR repos to tag the image. If local_tarball is set, the script
+    # also saves the image to a local tarball. Note that image tarball is still
+    # tagged with $KUBE_DOCKER_REGISTRY.
+    # The following configuration makes sure that images exposed outside of
+    # Google have both license and source code injected. Concretely, these are
+    # images on the node (kube-proxy) and on-prem images.
+    # Context: https://groups.google.com/a/google.com/g/gke-release-team/c/WXE2ZjcwT8w/m/Kc_5mS4dAwAJ
     images:
     - name: kube-proxy
-      build-steps:
+      # The default-step only comes into play if there are *NO* other build
+      # steps for this image. This can be the case if we pass in both
+      # SKIP_DOCKER_LICENSE_INJECTION=1 and SKIP_DOCKER_SOURCE_INJECTION=1 when
+      # running one of the make_*.sh files.
+      default-step:
         # Load image from tarball.
         #
         # NOTE: The initial tags that this container will use, once loaded up
         # with 'docker load', is discoverable by inspecting the 'RepoTags' field
         # inside the toplevel 'manifest.json' in the tarball.
-      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar"
-        # These outputs (as part of the very first build step) only come into
-        # play if there are *NO* other build steps for this image. This can be
-        # the case if we pass in both SKIP_DOCKER_LICENSE_INJECTION=1 and
-        # SKIP_DOCKER_SOURCE_INJECTION=1 when running one of the make_*.sh
-        # files.
+        from: "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar"
+        # "outputs" is a list of GCR repos to tag the image. The same GCR repo
+        # should also be configured at push.gcr.repos in order for this image
+        # to be pushed to the corresponding GCR.
         outputs:
         - gcr.io/gke-release-staging/kube-proxy-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
+        # If "local_tarball" is set, the image will be saved locally as tarball to
+        # "${KUBE_ROOT}/_output/release-stage/server/{os}-{arch}/kubernetes/server/bin/{name}.tar"
+        # We can't use the same path as the original
+        # "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar"
+        # because it is *not* used by arrange_for_gcs() function in lib_gke.sh
+        # for final GCS upload preparation. So instead we use a different path
+        # that *will* be used by it for final GCS upload.
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
+      build-steps:
       - action: inject-licenses
         # Save as this "local/with-licenses/kube-proxy:local". Image names
         # without a tag will just use the underlying tag used in the build
@@ -169,14 +198,7 @@ package:
 
         # Prepare for pushing to on-prem as well.
         - gcr.io/gke-on-prem-staging/kube-proxy-amd64
-
-        # Finally, save it back out into another Docker tarball. We can't use
-        # the same path as the original
-        # "${KUBE_ROOT}/_output/release-images/amd64/kube-proxy.tar" line above
-        # because it is *not* used by arrange_for_gcs() function in lib_gke.sh
-        # for final GCS upload preparation. So instead we use a different path
-        # that *will* be used by it for final GCS upload.
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-proxy.tar"
 
     # Generate images that run only on master nodes.
     # For GKE, these images are public but not distributed, so they shouldn't include source.
@@ -184,45 +206,50 @@ package:
     # This won't matter once private releases are ready.
     # See b/117953899.
     - name: kube-apiserver
-      build-steps:
-      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-apiserver.tar"
+      default-step:
+        from: "${KUBE_ROOT}/_output/release-images/amd64/kube-apiserver.tar"
         outputs:
         - gcr.io/gke-release-staging/kube-apiserver-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
+      build-steps:
       - action: inject-licenses
         outputs:
         - gcr.io/gke-release-staging/kube-apiserver-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-apiserver.tar"
       - action: inject-source-code
         params:
           archive-name: source.tar.xz
         outputs:
         - gcr.io/gke-on-prem-staging/kube-apiserver-amd64
+
     - name: kube-controller-manager
-      build-steps:
-      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-controller-manager.tar"
+      default-step:
+        from: "${KUBE_ROOT}/_output/release-images/amd64/kube-controller-manager.tar"
         outputs:
         - gcr.io/gke-release-staging/kube-controller-manager-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
+      build-steps:
       - action: inject-licenses
         outputs:
         - gcr.io/gke-release-staging/kube-controller-manager-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-controller-manager.tar"
       - action: inject-source-code
         params:
           archive-name: source.tar.xz
         outputs:
         - gcr.io/gke-on-prem-staging/kube-controller-manager-amd64
+
     - name: kube-scheduler
-      build-steps:
-      - from: "${KUBE_ROOT}/_output/release-images/amd64/kube-scheduler.tar"
+      default-step:
+        from: "${KUBE_ROOT}/_output/release-images/amd64/kube-scheduler.tar"
         outputs:
         - gcr.io/gke-release-staging/kube-scheduler-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
+      build-steps:
       - action: inject-licenses
         outputs:
         - gcr.io/gke-release-staging/kube-scheduler-amd64
-        - "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
+        local_tarball: "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kube-scheduler.tar"
       - action: inject-source-code
         params:
           archive-name: source.tar.xz

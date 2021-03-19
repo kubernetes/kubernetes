@@ -1283,7 +1283,7 @@ validate_licenses()
   # that we requested to build. This information is in the configuration YAML.
   log.info "checking for expected binary paths"
   for platform in "${__target_platforms[@]}"; do
-     # Split platform into os and arch. The platform string format is os/arch.
+    # Split platform into os and arch. The platform string format is os/arch.
     local os="${platform%%/*}"
     case "${os}" in
       linux)
@@ -1446,7 +1446,7 @@ build_docker_images()
     # We need to figure out which steps to skip. Build up an array of step
     # numbers to skip over. Later on when we hit a number in the array, we skip
     # it.
-    for ((j=1; j<total_steps; ++j)); do
+    for ((j=0; j<total_steps; ++j)); do
       action=$(get_val "package.gcr.images[$i].build-steps[$j].action")
       if [[ "${action}" == "inject-licenses" ]]; then
         if (( ${__SKIP_DOCKER_LICENSE_INJECTION:-0} )); then
@@ -1464,11 +1464,10 @@ build_docker_images()
 
     # Determine how many *actual* steps will be executed.
     total_active_steps=$((total_steps - ${#to_skip[@]}))
-
-    log.info "running step 1/$total_steps"
+    log.info "total active steps: $total_active_steps"
 
     # Load docker image from tarball.
-    tarball_path="$(get_val "package.gcr.images[$i].build-steps[0].from")"
+    tarball_path="$(get_val "package.gcr.images[$i].default-step.from")"
     tarball_path="${tarball_path/\${KUBE_ROOT\}/${KUBE_ROOT}}"
 
     # After this, the local Docker daemon gets populated with all image tags
@@ -1488,13 +1487,12 @@ build_docker_images()
     # it as-is. This is essentially an empty action, and serves to save the
     # image back into a different tarball path or a new docker image name in the
     # local Docker daemon.
-    if (( total_active_steps == 1 )); then
-      tag_output_images "package.gcr.images[$i].build-steps[0]" "${FROM_image}"
+    if (( total_active_steps == 0 )); then
+      tag_output_images "package.gcr.images[$i].default-step" "${FROM_image}"
     fi
 
-    # Process all actions (steps 2+ in total_steps) to be performed for this
-    # image.
-    for ((j=1; j<total_steps; ++j)); do
+    # Process all actions to be performed for this image.
+    for ((j=0; j<total_steps; ++j)); do
       log.info "running step $((j+1))/$total_steps"
       action=$(get_val "package.gcr.images[$i].build-steps[$j].action")
       # Perform the action. Use the resulting name to overwrite
@@ -1506,17 +1504,12 @@ build_docker_images()
       #   - inject_licenses
       #   - inject_source_code
       #
-      # Each action is expected to modify __OUTPUT_image, so that it can
-      # be reused by the next action as the next FROM_image.
       if [[ "${to_skip[@]}" =~ $j ]]; then
         log.info "skipping step $((j+1)) (${action})"
         continue
       fi
-      ${action//-/_} "package.gcr.images[$i].build-steps[$j]" "${__OUTPUT_image:-${FROM_image}}"
+      ${action//-/_} "package.gcr.images[$i].build-steps[$j]" "${FROM_image}"
     done
-    # Clear __OUTPUT_image just to guarantee scope boundaries across loop
-    # iterations.
-    __OUTPUT_image=""
   done
 
   log.info "finished building all Docker images"
@@ -1653,6 +1646,7 @@ inject_source_code()
   rm -rf "${tmp_dir}"
 }
 
+# Tags FROM_image to multiple GCR repos to prepare for final push.
 tag_output_images()
 {
   local config_key
@@ -1688,31 +1682,18 @@ tag_output_images()
   if [[ -n "${outputs}" ]]; then
     for ((i=0; i<$(get_val "${config_key}.outputs" -l); ++i)); do
       output_image="$(get_val "${config_key}.outputs[$i]")"
-      # If the output is a tarball path, just save it into that path.
-      if [[ "${output_image}" =~ \.tar$ ]]; then
-        # Replace any "${KUBE_ROOT}" literal with the actual value of
-        # $KUBE_ROOT.
-        tarball_path="${output_image/\${KUBE_ROOT\}/${KUBE_ROOT}}"
-        log.info "saving to ${tarball_path}"
-        docker save -o "${tarball_path}" "${FROM_image}"
-      else
-        log.info "saving to ${output_image}:${tag}"
-        docker tag "${FROM_image}" "${output_image}:${tag}"
-      fi
+      log.info "saving to ${output_image}:${tag}"
+      docker tag "${FROM_image}" "${output_image}:${tag}"
     done
   fi
 
-  # Save the name of the newly-built docker image into a global __OUTPUT_image
-  # variable, which we can use in other image-building actions elsewhere.
-  if [[ -n "${outputs}" ]]; then
-    __OUTPUT_image=$(get_val "${config_key}.outputs[0]:${tag}")
-  else
-    # If there were no designated output images, then we replaced the
-    # original "${FROM_image}", so print that.
-    __OUTPUT_image="${FROM_image}"
+  # If local_tarball is set, also save image locally as tarball.
+  local_tarball=$(get_val "${config_key}.local_tarball")
+  if [[ -n "${local_tarball}" ]]; then
+    tarball_path="${local_tarball/\${KUBE_ROOT\}/${KUBE_ROOT}}"
+    log.info "saving image to ${tarball_path}"
+    docker save -o "${tarball_path}" "${FROM_image}"
   fi
-
-  log.debugvar __OUTPUT_image
 }
 
 # Arrange already-built files in a particular way in preparation for upload to
