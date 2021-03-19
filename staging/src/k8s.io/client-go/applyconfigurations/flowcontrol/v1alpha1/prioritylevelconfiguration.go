@@ -58,8 +58,19 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1alpha1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "")
+}
+
+// ExtractPriorityLevelConfigurationStatus is the same as ExtractPriorityLevelConfiguration except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPriorityLevelConfigurationStatus(priorityLevelConfiguration *flowcontrolv1alpha1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+	return extractPriorityLevelConfiguration(priorityLevelConfiguration, fieldManager, "status")
+}
+
+func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1alpha1.PriorityLevelConfiguration, fieldManager string, subresource string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1alpha1.PriorityLevelConfiguration"), fieldManager, b)
+	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1alpha1.PriorityLevelConfiguration"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -57,8 +57,19 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "")
+}
+
+// ExtractMutatingWebhookConfigurationStatus is the same as ExtractMutatingWebhookConfiguration except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractMutatingWebhookConfigurationStatus(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+	return extractMutatingWebhookConfiguration(mutatingWebhookConfiguration, fieldManager, "status")
+}
+
+func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *admissionregistrationv1beta1.MutatingWebhookConfiguration, fieldManager string, subresource string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingWebhookConfiguration"), fieldManager, b)
+	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1beta1.MutatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

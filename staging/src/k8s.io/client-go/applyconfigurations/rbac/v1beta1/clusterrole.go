@@ -58,8 +58,19 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+	return extractClusterRole(clusterRole, fieldManager, "")
+}
+
+// ExtractClusterRoleStatus is the same as ExtractClusterRole except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractClusterRoleStatus(clusterRole *rbacv1beta1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+	return extractClusterRole(clusterRole, fieldManager, "status")
+}
+
+func extractClusterRole(clusterRole *rbacv1beta1.ClusterRole, fieldManager string, subresource string) (*ClusterRoleApplyConfiguration, error) {
 	b := &ClusterRoleApplyConfiguration{}
-	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1beta1.ClusterRole"), fieldManager, b)
+	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1beta1.ClusterRole"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

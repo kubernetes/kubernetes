@@ -58,8 +58,19 @@ func NetworkPolicy(name, namespace string) *NetworkPolicyApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+	return extractNetworkPolicy(networkPolicy, fieldManager, "")
+}
+
+// ExtractNetworkPolicyStatus is the same as ExtractNetworkPolicy except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractNetworkPolicyStatus(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string) (*NetworkPolicyApplyConfiguration, error) {
+	return extractNetworkPolicy(networkPolicy, fieldManager, "status")
+}
+
+func extractNetworkPolicy(networkPolicy *apinetworkingv1.NetworkPolicy, fieldManager string, subresource string) (*NetworkPolicyApplyConfiguration, error) {
 	b := &NetworkPolicyApplyConfiguration{}
-	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b)
+	err := managedfields.ExtractInto(networkPolicy, internal.Parser().Type("io.k8s.api.networking.v1.NetworkPolicy"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -57,8 +57,19 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "")
+}
+
+// ExtractValidatingWebhookConfigurationStatus is the same as ExtractValidatingWebhookConfiguration except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractValidatingWebhookConfigurationStatus(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+	return extractValidatingWebhookConfiguration(validatingWebhookConfiguration, fieldManager, "status")
+}
+
+func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string, subresource string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
-	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b)
+	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

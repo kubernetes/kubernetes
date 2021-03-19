@@ -58,8 +58,19 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCertificateSigningRequest(certificateSigningRequest *apicertificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
+	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "")
+}
+
+// ExtractCertificateSigningRequestStatus is the same as ExtractCertificateSigningRequest except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCertificateSigningRequestStatus(certificateSigningRequest *apicertificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
+	return extractCertificateSigningRequest(certificateSigningRequest, fieldManager, "status")
+}
+
+func extractCertificateSigningRequest(certificateSigningRequest *apicertificatesv1.CertificateSigningRequest, fieldManager string, subresource string) (*CertificateSigningRequestApplyConfiguration, error) {
 	b := &CertificateSigningRequestApplyConfiguration{}
-	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1.CertificateSigningRequest"), fieldManager, b)
+	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1.CertificateSigningRequest"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

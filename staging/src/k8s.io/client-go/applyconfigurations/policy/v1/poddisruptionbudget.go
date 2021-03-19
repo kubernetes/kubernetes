@@ -59,8 +59,19 @@ func PodDisruptionBudget(name, namespace string) *PodDisruptionBudgetApplyConfig
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "")
+}
+
+// ExtractPodDisruptionBudgetStatus is the same as ExtractPodDisruptionBudget except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractPodDisruptionBudgetStatus(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string) (*PodDisruptionBudgetApplyConfiguration, error) {
+	return extractPodDisruptionBudget(podDisruptionBudget, fieldManager, "status")
+}
+
+func extractPodDisruptionBudget(podDisruptionBudget *apipolicyv1.PodDisruptionBudget, fieldManager string, subresource string) (*PodDisruptionBudgetApplyConfiguration, error) {
 	b := &PodDisruptionBudgetApplyConfiguration{}
-	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1.PodDisruptionBudget"), fieldManager, b)
+	err := managedfields.ExtractInto(podDisruptionBudget, internal.Parser().Type("io.k8s.api.policy.v1.PodDisruptionBudget"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

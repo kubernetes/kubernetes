@@ -58,8 +58,19 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+	return extractLimitRange(limitRange, fieldManager, "")
+}
+
+// ExtractLimitRangeStatus is the same as ExtractLimitRange except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractLimitRangeStatus(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+	return extractLimitRange(limitRange, fieldManager, "status")
+}
+
+func extractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string, subresource string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
-	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b)
+	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

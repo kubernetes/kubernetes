@@ -57,8 +57,19 @@ func CSIDriver(name string) *CSIDriverApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	return extractCSIDriver(cSIDriver, fieldManager, "")
+}
+
+// ExtractCSIDriverStatus is the same as ExtractCSIDriver except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCSIDriverStatus(cSIDriver *storagev1beta1.CSIDriver, fieldManager string) (*CSIDriverApplyConfiguration, error) {
+	return extractCSIDriver(cSIDriver, fieldManager, "status")
+}
+
+func extractCSIDriver(cSIDriver *storagev1beta1.CSIDriver, fieldManager string, subresource string) (*CSIDriverApplyConfiguration, error) {
 	b := &CSIDriverApplyConfiguration{}
-	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b)
+	err := managedfields.ExtractInto(cSIDriver, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIDriver"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

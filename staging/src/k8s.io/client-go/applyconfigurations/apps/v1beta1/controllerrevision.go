@@ -60,8 +60,19 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractControllerRevision(controllerRevision *v1beta1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	return extractControllerRevision(controllerRevision, fieldManager, "")
+}
+
+// ExtractControllerRevisionStatus is the same as ExtractControllerRevision except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractControllerRevisionStatus(controllerRevision *v1beta1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+	return extractControllerRevision(controllerRevision, fieldManager, "status")
+}
+
+func extractControllerRevision(controllerRevision *v1beta1.ControllerRevision, fieldManager string, subresource string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
-	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta1.ControllerRevision"), fieldManager, b)
+	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1beta1.ControllerRevision"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

@@ -58,8 +58,19 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return extractEviction(eviction, fieldManager, "")
+}
+
+// ExtractEvictionStatus is the same as ExtractEviction except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEvictionStatus(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+	return extractEviction(eviction, fieldManager, "status")
+}
+
+func extractEviction(eviction *v1beta1.Eviction, fieldManager string, subresource string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
-	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b)
+	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

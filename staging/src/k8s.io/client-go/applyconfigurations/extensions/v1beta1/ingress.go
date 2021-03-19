@@ -59,8 +59,19 @@ func Ingress(name, namespace string) *IngressApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIngress(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+	return extractIngress(ingress, fieldManager, "")
+}
+
+// ExtractIngressStatus is the same as ExtractIngress except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractIngressStatus(ingress *extensionsv1beta1.Ingress, fieldManager string) (*IngressApplyConfiguration, error) {
+	return extractIngress(ingress, fieldManager, "status")
+}
+
+func extractIngress(ingress *extensionsv1beta1.Ingress, fieldManager string, subresource string) (*IngressApplyConfiguration, error) {
 	b := &IngressApplyConfiguration{}
-	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Ingress"), fieldManager, b)
+	err := managedfields.ExtractInto(ingress, internal.Parser().Type("io.k8s.api.extensions.v1beta1.Ingress"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

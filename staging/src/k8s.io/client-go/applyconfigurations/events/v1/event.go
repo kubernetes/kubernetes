@@ -72,8 +72,19 @@ func Event(name, namespace string) *EventApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractEvent(event *apieventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return extractEvent(event, fieldManager, "")
+}
+
+// ExtractEventStatus is the same as ExtractEvent except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractEventStatus(event *apieventsv1.Event, fieldManager string) (*EventApplyConfiguration, error) {
+	return extractEvent(event, fieldManager, "status")
+}
+
+func extractEvent(event *apieventsv1.Event, fieldManager string, subresource string) (*EventApplyConfiguration, error) {
 	b := &EventApplyConfiguration{}
-	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1.Event"), fieldManager, b)
+	err := managedfields.ExtractInto(event, internal.Parser().Type("io.k8s.api.events.v1.Event"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

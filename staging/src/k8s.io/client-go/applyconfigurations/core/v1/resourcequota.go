@@ -59,8 +59,19 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return extractResourceQuota(resourceQuota, fieldManager, "")
+}
+
+// ExtractResourceQuotaStatus is the same as ExtractResourceQuota except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractResourceQuotaStatus(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+	return extractResourceQuota(resourceQuota, fieldManager, "status")
+}
+
+func extractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string, subresource string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
-	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b)
+	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}
