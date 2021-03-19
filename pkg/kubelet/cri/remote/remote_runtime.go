@@ -402,7 +402,6 @@ func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	}
 
 	klog.V(10).InfoS("[RemoteRuntimeService] ExecSync Response", "containerID", containerID, "exitCode", resp.ExitCode)
-	err = nil
 	if resp.ExitCode != 0 {
 		err = utilexec.CodeExitError{
 			Err:  fmt.Errorf("command '%s' exited with %d: %s", strings.Join(cmd, " "), resp.ExitCode, resp.Stderr),
