@@ -398,7 +398,7 @@ func TestDecode(t *testing.T) {
 
 		switch {
 		case err == nil && test.errFn != nil:
-			t.Errorf("%d: failed: %v", i, err)
+			t.Errorf("%d: failed: not getting the expected error", i)
 			continue
 		case err != nil && test.errFn == nil:
 			t.Errorf("%d: failed: %v", i, err)
