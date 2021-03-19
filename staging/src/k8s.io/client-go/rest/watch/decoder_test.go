@@ -51,26 +51,33 @@ func TestDecoder(t *testing.T) {
 		expect := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}}
 		encoder := json.NewEncoder(in)
 		eType := eventType
+		errCh := make(chan error)
 		go func() {
 			data, err := runtime.Encode(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), expect)
 			if err != nil {
-				t.Fatalf("Unexpected error %v", err)
+				errCh <- err
 			}
 			event := metav1.WatchEvent{
 				Type:   string(eType),
 				Object: runtime.RawExtension{Raw: json.RawMessage(data)},
 			}
+			close(errCh)
 			if err := encoder.Encode(&event); err != nil {
 				t.Errorf("Unexpected error %v", err)
 			}
 			in.Close()
 		}()
 
+		if err := <-errCh; err != nil {
+			t.Fatalf("Encoder: Unexpected error: %v", err)
+		}
+
+		errCh = make(chan error)
 		done := make(chan struct{})
 		go func() {
 			action, got, err := decoder.Decode()
 			if err != nil {
-				t.Fatalf("Unexpected error %v", err)
+				errCh <- err
 			}
 			if e, a := eType, action; e != a {
 				t.Errorf("Expected %v, got %v", e, a)
@@ -81,7 +88,11 @@ func TestDecoder(t *testing.T) {
 			t.Logf("Exited read")
 			close(done)
 		}()
-		<-done
+		select {
+		case <-done:
+		case err := <-errCh:
+			t.Fatalf("Decoder: Unexpected error: %v", err)
+		}
 
 		done = make(chan struct{})
 		go func() {
