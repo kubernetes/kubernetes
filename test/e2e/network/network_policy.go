@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -1033,7 +1034,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("client-b should not be able to communicate with server port 81 in namespace-a", func() {
 				testCannotConnect(f, nsB, "client-b", service, notAllowedPort)
 			})
-
 		})
 
 		ginkgo.It("should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]", func() {
@@ -1158,7 +1158,7 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating a network policy for the server which allows traffic from all clients.")
 			policyIngressAllowAll := &networkingv1.NetworkPolicy{
 				ObjectMeta: metav1.ObjectMeta{
-					//Namespace: f.Namespace.Name,
+					// Namespace: f.Namespace.Name,
 					Name: "allow-all",
 				},
 				Spec: networkingv1.NetworkPolicySpec{
@@ -1333,7 +1333,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating client-a which should be able to contact the server.", func() {
 				testCanConnect(f, f.Namespace, "client-a", service, 80)
 			})
-
 		})
 
 		ginkgo.It("should allow egress access to server in CIDR block [Feature:NetworkPolicy]", func() {
@@ -1580,7 +1579,6 @@ var _ = SIGDescribe("NetworkPolicy [LinuxOnly]", func() {
 			ginkgo.By("Creating client-a which should still be able to contact the server after recreating the network policy with except clause.", func() {
 				testCanConnect(f, f.Namespace, "client-a", service, 80)
 			})
-
 		})
 
 		ginkgo.It("should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]", func() {
@@ -2144,7 +2142,7 @@ func createNetworkClientPodWithRestartPolicy(f *framework.Framework, namespace *
 					Command: []string{"/bin/sh"},
 					Args: []string{
 						"-c",
-						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s:%d --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", targetService.Spec.ClusterIP, targetPort, connectProtocol),
+						fmt.Sprintf("for i in $(seq 1 5); do /agnhost connect %s --protocol %s --timeout 8s && exit 0 || sleep 1; done; exit 1", net.JoinHostPort(targetService.Spec.ClusterIP, strconv.Itoa(targetPort)), connectProtocol),
 					},
 				},
 			},
@@ -2200,10 +2198,12 @@ var _ = SIGDescribe("NetworkPolicy API", func() {
 		npVersion := "v1"
 		npClient := f.ClientSet.NetworkingV1().NetworkPolicies(ns)
 		npTemplate := &networkingv1.NetworkPolicy{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-example-netpol",
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "e2e-example-netpol",
 				Labels: map[string]string{
 					"special-label": f.UniqueName,
-				}},
+				},
+			},
 			Spec: networkingv1.NetworkPolicySpec{
 				// Apply this policy to the Server
 				PodSelector: metav1.LabelSelector{
