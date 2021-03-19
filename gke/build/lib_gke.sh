@@ -1466,49 +1466,60 @@ build_docker_images()
     total_active_steps=$((total_steps - ${#to_skip[@]}))
     log.info "total active steps: $total_active_steps"
 
-    # Load docker image from tarball.
-    tarball_path="$(get_val "package.gcr.images[$i].default-step.from")"
-    tarball_path="${tarball_path/\${KUBE_ROOT\}/${KUBE_ROOT}}"
-
-    # After this, the local Docker daemon gets populated with all image tags
-    # (names) stipulated inside the image tarball's manifest.json's `RepoTags'
-    # array.
-    docker load -i "${tarball_path}"
-
-    # Get unique image name from within the tarball. This is the very first
-    # image to use as the argument for the "FROM" directive in a Dockerfile. We
-    # pick out the very first name in `RepoTags' because it doesn't matter which
-    # one we choose (and because this array might only have 1 element in it).
-    log.info "reading tarred manifest.json at ${tarball_path}"
-    FROM_image=$(tar xf "${tarball_path}" manifest.json -O \
-      | _yq read --stripComments - '[0].RepoTags[0]')
-
-    # If there are no actions other than just the initial "from:" action, save
-    # it as-is. This is essentially an empty action, and serves to save the
-    # image back into a different tarball path or a new docker image name in the
-    # local Docker daemon.
-    if (( total_active_steps == 0 )); then
-      tag_output_images "package.gcr.images[$i].default-step" "${FROM_image}"
-    fi
-
-    # Process all actions to be performed for this image.
-    for ((j=0; j<total_steps; ++j)); do
-      log.info "running step $((j+1))/$total_steps"
-      action=$(get_val "package.gcr.images[$i].build-steps[$j].action")
-      # Perform the action. Use the resulting name to overwrite
-      # FROM_image, so that we can re-use it in the next iteration as
-      # the basis for its FROM image.
-      #
-      # Supported actions are:
-      #
-      #   - inject_licenses
-      #   - inject_source_code
-      #
-      if [[ "${to_skip[@]}" =~ $j ]]; then
-        log.info "skipping step $((j+1)) (${action})"
+    for platform in "${__target_platforms[@]}"; do
+      # Split platform into os and arch. The platform string format is os/arch.
+      local os="${platform%%/*}"
+      local arch="${platform##*/}"
+      # Currently only linux images are built in the "compile" action, see
+      # https://github.com/kubernetes/kubernetes/blob/1a983bb958ba663e5d86983c55a187fb8c429c51/build/lib/release.sh#L384
+      if [[ "${os}"  != "linux" ]]; then
+        log.info "skipping non-linux images"
         continue
       fi
-      ${action//-/_} "package.gcr.images[$i].build-steps[$j]" "${FROM_image}"
+
+      # Load docker image from tarball.
+      tarball_path="${KUBE_ROOT}/_output/release-images/${arch}/${image_shortname}.tar"
+
+      # After this, the local Docker daemon gets populated with all image tags
+      # (names) stipulated inside the image tarball's manifest.json's `RepoTags'
+      # array.
+      docker load -i "${tarball_path}"
+
+      # Get unique image name from within the tarball. This is the very first
+      # image to use as the argument for the "FROM" directive in a Dockerfile. We
+      # pick out the very first name in `RepoTags' because it doesn't matter which
+      # one we choose (and because this array might only have 1 element in it).
+      log.info "reading tarred manifest.json at ${tarball_path}"
+      FROM_image=$(tar xf "${tarball_path}" manifest.json -O \
+        | _yq read --stripComments - '[0].RepoTags[0]')
+
+      # If there are no actions other than just the initial "from:" action, save
+      # it as-is. This is essentially an empty action, and serves to save the
+      # image back into a different tarball path or a new docker image name in the
+      # local Docker daemon.
+      if (( total_active_steps == 0 )); then
+        tag_output_images "package.gcr.images[$i].default-step" "${FROM_image}" "${image_shortname}" "${os}" "${arch}"
+      fi
+
+      # Process all actions to be performed for this image.
+      for ((j=0; j<total_steps; ++j)); do
+        log.info "running step $((j+1))/$total_steps"
+        action=$(get_val "package.gcr.images[$i].build-steps[$j].action")
+        # Perform the action. Use the resulting name to overwrite
+        # FROM_image, so that we can re-use it in the next iteration as
+        # the basis for its FROM image.
+        #
+        # Supported actions are:
+        #
+        #   - inject_licenses
+        #   - inject_source_code
+        #
+        if [[ "${to_skip[@]}" =~ $j ]]; then
+          log.info "skipping step $((j+1)) (${action})"
+          continue
+        fi
+        ${action//-/_} "package.gcr.images[$i].build-steps[$j]" "${FROM_image}"  "${image_shortname}" "${os}" "${arch}"
+      done
     done
   done
 
@@ -1519,12 +1530,18 @@ inject_licenses()
 {
   local config_key
   local FROM_image
+  local image_shortname
+  local os
+  local arch
   local outputs
   local licenses_path
   local licenses_path_candidates
   local tmp_dir
   config_key="${1:-}"
   FROM_image="${2:-}"
+  image_shortname="${3:-}"
+  os="${4:-}"
+  arch="${5:-}"
 
   if [[ -z "${config_key}" ]]; then
     log.fail "\`\$config_key' cannot be empty"
@@ -1532,6 +1549,18 @@ inject_licenses()
 
   if [[ -z "${FROM_image}" ]]; then
     log.fail "\`\$FROM_image' cannot be empty"
+  fi
+
+  if [[ -z "${image_shortname}" ]]; then
+    log.fail "\`\$image_shortname' cannot be empty"
+  fi
+
+  if [[ -z "${os}" ]]; then
+    log.fail "\`\$os' cannot be empty"
+  fi
+
+  if [[ -z "${arch}" ]]; then
+    log.fail "\`\$arch' cannot be empty"
   fi
 
   log.info "appending license layer to ${FROM_image}"
@@ -1578,7 +1607,7 @@ EOF
     -t "${FROM_image}" \
     --label "INCLUDES_NOTICES=/THIRD_PARTY_NOTICES"
 
-  tag_output_images "${config_key}" "${FROM_image}"
+  tag_output_images "${config_key}" "${FROM_image}" "${image_shortname}" "${os}" "${arch}"
 
   rm -rf "${tmp_dir}"
 }
@@ -1589,12 +1618,18 @@ inject_source_code()
   # shellcheck disable=SC2034
   local config_val
   local FROM_image
+  local image_shortname
+  local os
+  local arch
   local archive_name
   local total_git_archive_ignore_paths
   local tmp_dir
   local i
   config_key="${1:-}"
   FROM_image="${2:-}"
+  image_shortname="${3:-}"
+  os="${4:-}"
+  arch="${5:-}"
 
   if [[ -z "${config_key}" ]]; then
     log.fail "\`\$config_key' cannot be empty"
@@ -1602,6 +1637,18 @@ inject_source_code()
 
   if [[ -z "${FROM_image}" ]]; then
     log.fail "\`\$FROM_image' cannot be empty"
+  fi
+
+  if [[ -z "${image_shortname}" ]]; then
+    log.fail "\`\$image_shortname' cannot be empty"
+  fi
+
+  if [[ -z "${os}" ]]; then
+    log.fail "\`\$os' cannot be empty"
+  fi
+
+  if [[ -z "${arch}" ]]; then
+    log.fail "\`\$arch' cannot be empty"
   fi
 
   # shellcheck disable=SC2034
@@ -1641,7 +1688,7 @@ inject_source_code()
     --label "INCLUDES_SOURCE=/${archive_name}" \
     --label "SOURCES_INCLUDED=."
 
-  tag_output_images "${config_key}" "${FROM_image}"
+  tag_output_images "${config_key}" "${FROM_image}" "${image_shortname}" "${os}" "${arch}"
 
   rm -rf "${tmp_dir}"
 }
@@ -1651,14 +1698,21 @@ tag_output_images()
 {
   local config_key
   local FROM_image
+  local image_shortname
+  local os
+  local arch
   local tag
   local outputs
   local output_image
   local tarball_path
   local i
+  local local_tarball
 
   config_key="${1:-}"
   FROM_image="${2:-}"
+  image_shortname="${3:-}"
+  os="${4:-}"
+  arch="${5:-}"
 
   if [[ -z "${config_key}" ]]; then
     log.fail "\`\$config_key' cannot be empty"
@@ -1666,6 +1720,18 @@ tag_output_images()
 
   if [[ -z "${FROM_image}" ]]; then
     log.fail "\`\$FROM_image' cannot be empty"
+  fi
+
+  if [[ -z "${image_shortname}" ]]; then
+    log.fail "\`\$image_shortname' cannot be empty"
+  fi
+
+  if [[ -z "${os}" ]]; then
+    log.fail "\`\$os' cannot be empty"
+  fi
+
+  if [[ -z "${arch}" ]]; then
+    log.fail "\`\$arch' cannot be empty"
   fi
 
   # Retrieve the Docker tag (everything after the colon ':') from the
@@ -1681,16 +1747,18 @@ tag_output_images()
   outputs=$(get_val "${config_key}.outputs" -l)
   if [[ -n "${outputs}" ]]; then
     for ((i=0; i<$(get_val "${config_key}.outputs" -l); ++i)); do
-      output_image="$(get_val "${config_key}.outputs[$i]")"
+      output_gcr_repo="$(get_val "${config_key}.outputs[$i]")"
+      # Currently windows images are not pushed to GCR and ${os} is not included
+      # in gcr repo path. See https://github.com/kubernetes/kubernetes/blob/1a983bb958ba663e5d86983c55a187fb8c429c51/build/lib/release.sh#L384
+      output_image="${output_gcr_repo}/${image_shortname}-${arch}"
       log.info "saving to ${output_image}:${tag}"
       docker tag "${FROM_image}" "${output_image}:${tag}"
     done
   fi
-
-  # If local_tarball is set, also save image locally as tarball.
+  # If local_tarball is true, also save image locally as tarball.
   local_tarball=$(get_val "${config_key}.local_tarball")
-  if [[ -n "${local_tarball}" ]]; then
-    tarball_path="${local_tarball/\${KUBE_ROOT\}/${KUBE_ROOT}}"
+  if [[ "${local_tarball}" == "true" ]]; then
+    tarball_path="${KUBE_ROOT}/_output/release-stage/server/${os}-${arch}/kubernetes/server/bin/${image_shortname}.tar"
     log.info "saving image to ${tarball_path}"
     docker save -o "${tarball_path}" "${FROM_image}"
   fi
