@@ -19,7 +19,6 @@ package core
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -453,9 +452,7 @@ func QuotaV1Pod(pod *corev1.Pod, clock clock.Clock) bool {
 	// scaling up new pods to service their application.
 	if pod.DeletionTimestamp != nil && pod.DeletionGracePeriodSeconds != nil {
 		now := clock.Now()
-		deletionTime := pod.DeletionTimestamp.Time
-		gracePeriod := time.Duration(*pod.DeletionGracePeriodSeconds) * time.Second
-		if now.After(deletionTime.Add(gracePeriod)) {
+		if now.After(pod.DeletionTimestamp.Time) {
 			return false
 		}
 	}
