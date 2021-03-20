@@ -95,5 +95,5 @@ func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string
 	if !ok {
 		return nil, false, nil
 	}
-	return &authenticator.Response{User: user}, true, nil
+	return &authenticator.Response{User: user, AuthenticatorName: "token-file"}, true, nil
 }

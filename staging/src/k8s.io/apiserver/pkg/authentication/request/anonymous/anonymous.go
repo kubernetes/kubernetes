@@ -37,7 +37,8 @@ func NewAuthenticator() authenticator.Request {
 				Name:   anonymousUser,
 				Groups: []string{unauthenticatedGroup},
 			},
-			Audiences: auds,
+			Audiences:         auds,
+			AuthenticatorName: "anonymous",
 		}, true, nil
 	})
 }

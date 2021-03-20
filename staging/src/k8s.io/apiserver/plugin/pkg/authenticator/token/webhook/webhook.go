@@ -152,7 +152,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 			Groups: r.Status.User.Groups,
 			Extra:  extra,
 		},
-		Audiences: auds,
+		Audiences:         auds,
+		AuthenticatorName: "webhook",
 	}, true, nil
 }
 

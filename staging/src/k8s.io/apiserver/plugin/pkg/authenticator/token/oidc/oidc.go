@@ -618,7 +618,7 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		}
 	}
 
-	return &authenticator.Response{User: info}, true, nil
+	return &authenticator.Response{User: info, AuthenticatorName: "oidc"}, true, nil
 }
 
 // getClaimJWT gets a distributed claim JWT from url, using the supplied access

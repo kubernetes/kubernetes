@@ -47,16 +47,17 @@ func TestMetrics(t *testing.T) {
 		{
 			desc: "auth ok",
 			response: &authenticator.Response{
-				User: &user.DefaultInfo{Name: "admin"},
+				User:              &user.DefaultInfo{Name: "admin"},
+				AuthenticatorName: "test-authenticator",
 			},
 			status: true,
 			want: `
 				# HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="test-authenticator",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="test-authenticator",result="success"} 1
 				`,
 		},
 		{
@@ -65,7 +66,7 @@ func TestMetrics(t *testing.T) {
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="error"} 1
+        authentication_attempts{authenticator="",result="error"} 1
 				`,
 		},
 		{
@@ -73,53 +74,56 @@ func TestMetrics(t *testing.T) {
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="failure"} 1
+        authentication_attempts{authenticator="",result="failure"} 1
 				`,
 		},
 		{
 			desc: "auth failed due to audiences not intersecting",
 			response: &authenticator.Response{
-				User:      &user.DefaultInfo{Name: "admin"},
-				Audiences: authenticator.Audiences{"audience-x"},
+				User:              &user.DefaultInfo{Name: "admin"},
+				Audiences:         authenticator.Audiences{"audience-x"},
+				AuthenticatorName: "test-authenticator",
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
 			want: `
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="error"} 1
+        authentication_attempts{authenticator="test-authenticator",result="error"} 1
 				`,
 		},
 		{
 			desc: "audiences not supplied in the response",
 			response: &authenticator.Response{
-				User: &user.DefaultInfo{Name: "admin"},
+				User:              &user.DefaultInfo{Name: "admin"},
+				AuthenticatorName: "test-authenticator",
 			},
 			status:      true,
 			apiAudience: authenticator.Audiences{"audience-y"},
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="test-authenticator",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="test-authenticator",result="success"} 1
 				`,
 		},
 		{
 			desc: "audiences not supplied to the handler",
 			response: &authenticator.Response{
-				User:      &user.DefaultInfo{Name: "admin"},
-				Audiences: authenticator.Audiences{"audience-x"},
+				User:              &user.DefaultInfo{Name: "admin"},
+				Audiences:         authenticator.Audiences{"audience-x"},
+				AuthenticatorName: "test-authenticator",
 			},
 			status: true,
 			want: `
         # HELP authenticated_user_requests [ALPHA] Counter of authenticated requests broken out by username.
 				# TYPE authenticated_user_requests counter
-				authenticated_user_requests{username="admin"} 1
+				authenticated_user_requests{authenticator="test-authenticator",username="admin"} 1
         # HELP authentication_attempts [ALPHA] Counter of authenticated attempts.
         # TYPE authentication_attempts counter
-        authentication_attempts{result="success"} 1
+        authentication_attempts{authenticator="test-authenticator",result="success"} 1
 				`,
 		},
 	}

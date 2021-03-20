@@ -313,8 +313,9 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 	}
 
 	return &authenticator.Response{
-		User:      sa.UserInfo(),
-		Audiences: auds,
+		User:              sa.UserInfo(),
+		Audiences:         auds,
+		AuthenticatorName: "service-account",
 	}, true, nil
 }
 

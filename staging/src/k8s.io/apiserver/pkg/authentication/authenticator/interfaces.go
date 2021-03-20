@@ -62,4 +62,6 @@ type Response struct {
 	Audiences Audiences
 	// User is the UserInfo associated with the authentication context.
 	User user.Info
+	// AuthenticatorName is the name of the authenticator that produced the response.
+	AuthenticatorName string
 }
