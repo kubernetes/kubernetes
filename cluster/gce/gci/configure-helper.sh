@@ -1676,10 +1676,18 @@ function prepare-log-file {
   touch "$1"
   if [[ -n "${KUBE_POD_LOG_READERS_GROUP:-}" ]]; then
     chmod 640 "$1"
-    chown "${2:-root}":"${KUBE_POD_LOG_READERS_GROUP}" "$1"
-  else
+    LOG_USER="${2:-root}"
+    if ! chown "$LOG_USER":"${KUBE_POD_LOG_READERS_GROUP}" "$1"; then
+	echo "failed at chowning log directory... make sure user id $USER can chown to $LOG_USER"
+	exit 1
+    fi
+ else
     chmod 644 "$1"
-    chown "${2:-${LOG_OWNER_USER:-root}}":"${3:-${LOG_OWNER_GROUP:-root}}" "$1"
+    LOG_USER="${2:-${LOG_OWNER_USER:-root}}"
+    if ! chown "$LOG_USER":"${3:-${LOG_OWNER_GROUP:-root}}" "$1" ; then
+	echo "failed at chowning log directory... make sure user id $USER can chown to $LOG_USER"
+	exit 1
+    fi
   fi
 }
 
