@@ -2865,28 +2865,43 @@ func TestGetExec(t *testing.T) {
 	)
 	var (
 		podFullName = kubecontainer.GetPodFullName(podWithUIDNameNs(podUID, podName, podNamespace))
-		command     = []string{"ls"}
 	)
 
 	testcases := []struct {
 		description string
 		podFullName string
 		container   string
+		command     []string
 		expectError bool
 	}{{
 		description: "success case",
 		podFullName: podFullName,
 		container:   containerID,
+		command:     []string{"ls"},
+		expectError: false,
 	}, {
 		description: "no such pod",
 		podFullName: "bar" + podFullName,
 		container:   containerID,
+		command:     []string{"ls"},
 		expectError: true,
 	}, {
 		description: "no such container",
 		podFullName: podFullName,
 		container:   "containerBar",
+		command:     []string{"ls"},
 		expectError: true,
+	}, {
+		description: "null exec command",
+		podFullName: podFullName,
+		container:   containerID,
+		expectError: false,
+	}, {
+		description: "multi exec commands",
+		podFullName: podFullName,
+		container:   containerID,
+		command:     []string{"bash", "-c", "ls"},
+		expectError: false,
 	}}
 
 	for _, tc := range testcases {
@@ -2911,7 +2926,7 @@ func TestGetExec(t *testing.T) {
 		kubelet.containerRuntime = fakeRuntime
 		kubelet.streamingRuntime = fakeRuntime
 
-		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, command, remotecommand.Options{})
+		redirect, err := kubelet.GetExec(tc.podFullName, podUID, tc.container, tc.command, remotecommand.Options{})
 		if tc.expectError {
 			assert.Error(t, err, description)
 		} else {
