@@ -68,8 +68,8 @@ type IPRegistryShard struct {
 
 var _ ipallocator.Interface = &IPRegistry{}
 
-// NewAllocatorIPRegistry creates a IPRegistry using a net.IPNet
-func NewAllocatorIPRegistry(cidr *net.IPNet, client allocationclient.AllocationV1alpha1Interface) (*IPRegistry, error) {
+// NewShardedIPAllocator creates a IPRegistry using a net.IPNet
+func NewShardedIPAllocator(cidr *net.IPNet, client allocationclient.AllocationV1alpha1Interface) (*IPRegistry, error) {
 	return &IPRegistry{
 		client: client,
 		Pool: IPRegistryPool{

@@ -204,7 +204,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 
 	var serviceClusterIPAllocator, secondaryServiceClusterIPAllocator ipallocator.Interface
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ShardedClusterIPAllocator) {
-		serviceClusterIPAllocator, err = ipallocator.NewAllocatorIPRegistry(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+		serviceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
 			etcd, err := serviceallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
@@ -221,7 +221,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		// allocator for secondary service ip range
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
 			var secondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
-			secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorIPRegistry(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
+			secondaryServiceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 				mem := allocator.NewAllocationMap(max, rangeSpec)
 				// TODO etcdallocator package to return a storage interface via the storageFactory
 				etcd, err := serviceallocator.NewEtcd(mem, "/ranges/secondaryserviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
@@ -241,12 +241,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 		}
-		serviceClusterIPAllocator, err = ipapiallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, allocationClient)
+		serviceClusterIPAllocator, err = ipapiallocator.NewShardedIPAllocator(&serviceClusterIPRange, allocationClient)
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
-			secondaryServiceClusterIPAllocator, err = ipapiallocator.NewAllocatorCIDRRange(&c.SecondaryServiceIPRange, allocationClient)
+			secondaryServiceClusterIPAllocator, err = ipapiallocator.NewShardedIPAllocator(&c.SecondaryServiceIPRange, allocationClient)
 			if err != nil {
 				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 			}
