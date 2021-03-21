@@ -663,7 +663,8 @@ func TestCacherNoLeakWithMultipleWatchers(t *testing.T) {
 				ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
 				w, err := cacher.Watch(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
 				if err != nil {
-					t.Fatalf("Failed to create watch: %v", err)
+					t.Errorf("Failed to create watch: %v", err)
+					return
 				}
 				w.Stop()
 			}
@@ -731,7 +732,8 @@ func testCacherSendBookmarkEvents(t *testing.T, allowWatchBookmarks, expectedBoo
 					ResourceVersion: fmt.Sprintf("%v", resourceVersion+uint64(i)),
 				}})
 			if err != nil {
-				t.Fatalf("failed to add a pod: %v", err)
+				t.Errorf("failed to add a pod: %v", err)
+				return
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -924,9 +926,9 @@ func TestDispatchingBookmarkEventsWithConcurrentStop(t *testing.T) {
 
 		select {
 		case <-done:
-			break
 		case <-time.After(time.Second):
-			t.Fatal("receive result timeout")
+			t.Errorf("receive result timeout")
+			return
 		}
 		w.Stop()
 		wg.Wait()
@@ -980,7 +982,8 @@ func TestBookmarksOnResourceVersionUpdates(t *testing.T) {
 		for {
 			event, ok := <-w.ResultChan()
 			if !ok {
-				t.Fatalf("Unexpected closed channel")
+				t.Errorf("Unexpected closed channel")
+				return
 			}
 			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
 			if err != nil {
