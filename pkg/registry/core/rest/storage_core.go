@@ -29,13 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	apiserverfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	allocationclient "k8s.io/client-go/kubernetes/typed/allocation/v1alpha1"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -203,7 +203,20 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 	}
 
 	var serviceClusterIPAllocator, secondaryServiceClusterIPAllocator ipallocator.Interface
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ShardedClusterIPAllocator) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.ShardedClusterIPAllocator) &&
+		utilfeature.DefaultFeatureGate.Enabled(apiserverfeatures.APIServerIdentity) {
+
+		serviceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&serviceClusterIPRange, c.LoopbackClientConfi)
+		if err != nil {
+			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
+			secondaryServiceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&c.SecondaryServiceIPRange, allocationClient)
+			if err != nil {
+				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
+			}
+		}
+	} else {
 		serviceClusterIPAllocator, err = ipallocator.NewAllocatorCIDRRange(&serviceClusterIPRange, func(max int, rangeSpec string) (allocator.Interface, error) {
 			mem := allocator.NewAllocationMap(max, rangeSpec)
 			// TODO etcdallocator package to return a storage interface via the storageFactory
@@ -235,21 +248,6 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, fmt.Errorf("cannot create cluster secondary IP allocator: %v", err)
 			}
 			restStorage.SecondaryServiceClusterIPAllocator = secondaryServiceClusterIPRegistry
-		}
-	} else {
-		allocationClient, err := allocationclient.NewForConfig(c.LoopbackClientConfig)
-		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-		}
-		serviceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&serviceClusterIPRange, allocationClient)
-		if err != nil {
-			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
-			secondaryServiceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&c.SecondaryServiceIPRange, allocationClient)
-			if err != nil {
-				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
-			}
 		}
 	}
 

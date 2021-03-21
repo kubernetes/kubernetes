@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	allocationclient "k8s.io/client-go/kubernetes/typed/allocation/v1alpha1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	utilnet "k8s.io/utils/net"
 )
@@ -38,6 +39,9 @@ type IPRegistry struct {
 	Pool   IPRegistryPool
 	Shard  IPRegistryShard
 	client allocationclient.AllocationV1alpha1Interface
+	// shardController manages the shard, rebalancing them between the
+	// different apiservers
+	shardController *controller
 }
 
 // A shard is defined by its size and the index
@@ -69,9 +73,14 @@ type IPRegistryShard struct {
 var _ ipallocator.Interface = &IPRegistry{}
 
 // NewShardedIPAllocator creates a IPRegistry using a net.IPNet
-func NewShardedIPAllocator(cidr *net.IPNet, client allocationclient.AllocationV1alpha1Interface) (*IPRegistry, error) {
+func NewShardedIPAllocator(cidr *net.IPNet, clientConfig *restclient.Config) (*IPRegistry, error) {
+	allocationClient, err := allocationclient.NewForConfig(clientConfig)
+	if err != nil {
+		return &IPRegistry{}, err
+	}
+
 	return &IPRegistry{
-		client: client,
+		client: allocationClient,
 		Pool: IPRegistryPool{
 			IPPool: sets.String{},
 			cidr:   cidr,
