@@ -412,8 +412,7 @@ function start-kube-apiserver {
   if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" && -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
     sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_API_SERVER_RUNASUSER},@g" "${src_file}"
     sed -i -e "s@{{runAsGroup}}@\"runAsGroup\": ${KUBE_API_SERVER_RUNASGROUP},@g" "${src_file}"
-    sed -i -e "s@{{capabilities}}@\"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"]},@g" "${src_file}"
-    sed -i -e "s@{{allowPrivilegeEscalation}}@\"allowPrivilegeEscalation\": false,@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@\"securityContext\": { \"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"] } },@g" "${src_file}"
     local supplementalGroups="${KUBE_PKI_READERS_GROUP}"
     if [[ -n "${KMS_PLUGIN_SOCKET_WRITER_GROUP:-}" ]]; then
       supplementalGroups+=",${KMS_PLUGIN_SOCKET_WRITER_GROUP}"
@@ -425,8 +424,7 @@ function start-kube-apiserver {
   else
     sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
     sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
-    sed -i -e "s@{{capabilities}}@@g" "${src_file}"
-    sed -i -e "s@{{allowPrivilegeEscalation}}@@g" "${src_file}"
+    sed -i -e "s@{{containerSecurityContext}}@@g" "${src_file}"
     sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
   fi
 
