@@ -43,7 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
-	ipapiallocator "k8s.io/kubernetes/pkg/registry/allocation"
+	shardedipallocator "k8s.io/kubernetes/pkg/registry/allocation/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
 	configmapstore "k8s.io/kubernetes/pkg/registry/core/configmap/storage"
 	endpointsstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
@@ -241,12 +241,12 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 		}
-		serviceClusterIPAllocator, err = ipapiallocator.NewShardedIPAllocator(&serviceClusterIPRange, allocationClient)
+		serviceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&serviceClusterIPRange, allocationClient)
 		if err != nil {
 			return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && c.SecondaryServiceIPRange.IP != nil {
-			secondaryServiceClusterIPAllocator, err = ipapiallocator.NewShardedIPAllocator(&c.SecondaryServiceIPRange, allocationClient)
+			secondaryServiceClusterIPAllocator, err = shardedipallocator.NewShardedIPAllocator(&c.SecondaryServiceIPRange, allocationClient)
 			if err != nil {
 				return LegacyRESTStorage{}, genericapiserver.APIGroupInfo{}, err
 			}
