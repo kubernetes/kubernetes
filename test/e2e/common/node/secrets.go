@@ -18,19 +18,18 @@ package node
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
+	"github.com/onsi/ginkgo"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-
-	"encoding/base64"
-
-	"github.com/onsi/ginkgo"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var _ = SIGDescribe("Secrets", func() {
@@ -92,7 +91,7 @@ var _ = SIGDescribe("Secrets", func() {
 	*/
 	framework.ConformanceIt("should be consumable via the environment [NodeConformance]", func() {
 		name := "secret-test-" + string(uuid.NewUUID())
-		secret := newEnvFromSecret(f.Namespace.Name, name)
+		secret := secretForTest(f.Namespace.Name, name)
 		ginkgo.By(fmt.Sprintf("creating secret %v/%v", f.Namespace.Name, secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
@@ -114,7 +113,7 @@ var _ = SIGDescribe("Secrets", func() {
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 							{
-								Prefix:    "p_",
+								Prefix:    "p-",
 								SecretRef: &v1.SecretEnvSource{LocalObjectReference: v1.LocalObjectReference{Name: name}},
 							},
 						},
@@ -125,8 +124,8 @@ var _ = SIGDescribe("Secrets", func() {
 		}
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
-			"data_1=value-1", "data_2=value-2", "data_3=value-3",
-			"p_data_1=value-1", "p_data_2=value-2", "p_data_3=value-3",
+			"data-1=value-1", "data-2=value-2", "data-3=value-3",
+			"p-data-1=value-1", "p-data-2=value-2", "p-data-3=value-3",
 		})
 	})
 
@@ -243,21 +242,6 @@ func secretForTest(namespace, name string) *v1.Secret {
 			"data-1": []byte("value-1\n"),
 			"data-2": []byte("value-2\n"),
 			"data-3": []byte("value-3\n"),
-		},
-	}
-}
-
-// TODO: Unify with secretForTest.
-func newEnvFromSecret(namespace, name string) *v1.Secret {
-	return &v1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: namespace,
-			Name:      name,
-		},
-		Data: map[string][]byte{
-			"data_1": []byte("value-1\n"),
-			"data_2": []byte("value-2\n"),
-			"data_3": []byte("value-3\n"),
 		},
 	}
 }
