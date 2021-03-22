@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/cache/memory"
@@ -102,6 +103,8 @@ type containerData struct {
 
 	// resctrlCollector updates stats for resctrl controller.
 	resctrlCollector stats.Collector
+
+	oomEvents uint64
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,
@@ -668,6 +671,9 @@ func (cd *containerData) updateStats() error {
 			klog.V(2).Infof("Failed to add summary stats for %q: %v", cd.info.Name, err)
 		}
 	}
+
+	stats.OOMEvents = atomic.LoadUint64(&cd.oomEvents)
+
 	var customStatsErr error
 	cm := cd.collectorManager.(*collector.GenericCollectorManager)
 	if len(cm.Collectors) > 0 {

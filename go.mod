@@ -276,7 +276,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.0
-	github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
+	github.com/google/cadvisor => github.com/saschagrunert/cadvisor v0.34.1-0.20210322120913-8b03147e6286
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.2
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible
