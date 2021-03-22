@@ -57,7 +57,8 @@ func Role(name, namespace string) *RoleApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRole(role *apirbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractRole(role *apirbacv1.Role, fieldManager string) (*RoleApplyConfiguration, error) {
 	b := &RoleApplyConfiguration{}
 	err := managedfields.ExtractInto(role, internal.Parser().Type("io.k8s.api.rbac.v1.Role"), fieldManager, b)
 	if err != nil {

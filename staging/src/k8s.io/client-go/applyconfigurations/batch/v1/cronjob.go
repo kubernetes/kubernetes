@@ -58,7 +58,8 @@ func CronJob(name, namespace string) *CronJobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCronJob(cronJob *apibatchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractCronJob(cronJob *apibatchv1.CronJob, fieldManager string) (*CronJobApplyConfiguration, error) {
 	b := &CronJobApplyConfiguration{}
 	err := managedfields.ExtractInto(cronJob, internal.Parser().Type("io.k8s.api.batch.v1.CronJob"), fieldManager, b)
 	if err != nil {

@@ -58,7 +58,8 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStatefulSet(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractStatefulSet(statefulSet *appsv1beta1.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
 	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta1.StatefulSet"), fieldManager, b)
 	if err != nil {

@@ -57,7 +57,8 @@ func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
 	b := &VolumeAttachmentApplyConfiguration{}
 	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b)
 	if err != nil {

@@ -58,7 +58,8 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDaemonSet(daemonSet *appsv1beta2.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractDaemonSet(daemonSet *appsv1beta2.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
 	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.DaemonSet"), fieldManager, b)
 	if err != nil {

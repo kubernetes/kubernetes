@@ -57,7 +57,8 @@ func StorageVersion(name string) *StorageVersionApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractStorageVersion(storageVersion *v1alpha1.StorageVersion, fieldManager string) (*StorageVersionApplyConfiguration, error) {
 	b := &StorageVersionApplyConfiguration{}
 	err := managedfields.ExtractInto(storageVersion, internal.Parser().Type("io.k8s.api.apiserverinternal.v1alpha1.StorageVersion"), fieldManager, b)
 	if err != nil {

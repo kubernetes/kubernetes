@@ -58,7 +58,8 @@ func ResourceQuota(name, namespace string) *ResourceQuotaApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractResourceQuota(resourceQuota *apicorev1.ResourceQuota, fieldManager string) (*ResourceQuotaApplyConfiguration, error) {
 	b := &ResourceQuotaApplyConfiguration{}
 	err := managedfields.ExtractInto(resourceQuota, internal.Parser().Type("io.k8s.api.core.v1.ResourceQuota"), fieldManager, b)
 	if err != nil {

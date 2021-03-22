@@ -57,7 +57,8 @@ func Endpoints(name, namespace string) *EndpointsApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractEndpoints(endpoints *apicorev1.Endpoints, fieldManager string) (*EndpointsApplyConfiguration, error) {
 	b := &EndpointsApplyConfiguration{}
 	err := managedfields.ExtractInto(endpoints, internal.Parser().Type("io.k8s.api.core.v1.Endpoints"), fieldManager, b)
 	if err != nil {

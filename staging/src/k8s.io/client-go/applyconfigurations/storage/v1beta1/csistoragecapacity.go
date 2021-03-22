@@ -61,7 +61,8 @@ func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfigur
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCSIStorageCapacity(cSIStorageCapacity *v1beta1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractCSIStorageCapacity(cSIStorageCapacity *v1beta1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
 	b := &CSIStorageCapacityApplyConfiguration{}
 	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIStorageCapacity"), fieldManager, b)
 	if err != nil {

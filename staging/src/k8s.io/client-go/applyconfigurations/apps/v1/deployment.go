@@ -58,7 +58,8 @@ func Deployment(name, namespace string) *DeploymentApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractDeployment(deployment *apiappsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractDeployment(deployment *apiappsv1.Deployment, fieldManager string) (*DeploymentApplyConfiguration, error) {
 	b := &DeploymentApplyConfiguration{}
 	err := managedfields.ExtractInto(deployment, internal.Parser().Type("io.k8s.api.apps.v1.Deployment"), fieldManager, b)
 	if err != nil {

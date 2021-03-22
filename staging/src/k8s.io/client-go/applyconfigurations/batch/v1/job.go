@@ -58,7 +58,8 @@ func Job(name, namespace string) *JobApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
 	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b)
 	if err != nil {

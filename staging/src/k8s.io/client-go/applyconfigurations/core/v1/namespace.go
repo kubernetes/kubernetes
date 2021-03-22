@@ -57,7 +57,8 @@ func Namespace(name string) *NamespaceApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractNamespace(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractNamespace(namespace *apicorev1.Namespace, fieldManager string) (*NamespaceApplyConfiguration, error) {
 	b := &NamespaceApplyConfiguration{}
 	err := managedfields.ExtractInto(namespace, internal.Parser().Type("io.k8s.api.core.v1.Namespace"), fieldManager, b)
 	if err != nil {

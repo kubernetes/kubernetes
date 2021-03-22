@@ -57,7 +57,8 @@ func LimitRange(name, namespace string) *LimitRangeApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractLimitRange(limitRange *apicorev1.LimitRange, fieldManager string) (*LimitRangeApplyConfiguration, error) {
 	b := &LimitRangeApplyConfiguration{}
 	err := managedfields.ExtractInto(limitRange, internal.Parser().Type("io.k8s.api.core.v1.LimitRange"), fieldManager, b)
 	if err != nil {

@@ -56,7 +56,8 @@ func ComponentStatus(name string) *ComponentStatusApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractComponentStatus(componentStatus *apicorev1.ComponentStatus, fieldManager string) (*ComponentStatusApplyConfiguration, error) {
 	b := &ComponentStatusApplyConfiguration{}
 	err := managedfields.ExtractInto(componentStatus, internal.Parser().Type("io.k8s.api.core.v1.ComponentStatus"), fieldManager, b)
 	if err != nil {

@@ -58,7 +58,8 @@ func RoleBinding(name, namespace string) *RoleBindingApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRoleBinding(roleBinding *rbacv1alpha1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractRoleBinding(roleBinding *rbacv1alpha1.RoleBinding, fieldManager string) (*RoleBindingApplyConfiguration, error) {
 	b := &RoleBindingApplyConfiguration{}
 	err := managedfields.ExtractInto(roleBinding, internal.Parser().Type("io.k8s.api.rbac.v1alpha1.RoleBinding"), fieldManager, b)
 	if err != nil {

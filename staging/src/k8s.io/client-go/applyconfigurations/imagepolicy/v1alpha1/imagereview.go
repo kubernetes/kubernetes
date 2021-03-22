@@ -57,7 +57,8 @@ func ImageReview(name string) *ImageReviewApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractImageReview(imageReview *imagepolicyv1alpha1.ImageReview, fieldManager string) (*ImageReviewApplyConfiguration, error) {
 	b := &ImageReviewApplyConfiguration{}
 	err := managedfields.ExtractInto(imageReview, internal.Parser().Type("io.k8s.api.imagepolicy.v1alpha1.ImageReview"), fieldManager, b)
 	if err != nil {

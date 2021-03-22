@@ -59,7 +59,8 @@ func ServiceAccount(name, namespace string) *ServiceAccountApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractServiceAccount(serviceAccount *apicorev1.ServiceAccount, fieldManager string) (*ServiceAccountApplyConfiguration, error) {
 	b := &ServiceAccountApplyConfiguration{}
 	err := managedfields.ExtractInto(serviceAccount, internal.Parser().Type("io.k8s.api.core.v1.ServiceAccount"), fieldManager, b)
 	if err != nil {

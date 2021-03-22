@@ -56,7 +56,8 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
 	b := &IngressClassApplyConfiguration{}
 	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b)
 	if err != nil {

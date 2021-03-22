@@ -56,7 +56,8 @@ func MutatingWebhookConfiguration(name string) *MutatingWebhookConfigurationAppl
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractMutatingWebhookConfiguration(mutatingWebhookConfiguration *apiadmissionregistrationv1.MutatingWebhookConfiguration, fieldManager string) (*MutatingWebhookConfigurationApplyConfiguration, error) {
 	b := &MutatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(mutatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.MutatingWebhookConfiguration"), fieldManager, b)
 	if err != nil {

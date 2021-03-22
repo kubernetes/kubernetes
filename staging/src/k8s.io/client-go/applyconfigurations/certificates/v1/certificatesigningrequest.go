@@ -57,7 +57,8 @@ func CertificateSigningRequest(name string) *CertificateSigningRequestApplyConfi
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractCertificateSigningRequest(certificateSigningRequest *apicertificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractCertificateSigningRequest(certificateSigningRequest *apicertificatesv1.CertificateSigningRequest, fieldManager string) (*CertificateSigningRequestApplyConfiguration, error) {
 	b := &CertificateSigningRequestApplyConfiguration{}
 	err := managedfields.ExtractInto(certificateSigningRequest, internal.Parser().Type("io.k8s.api.certificates.v1.CertificateSigningRequest"), fieldManager, b)
 	if err != nil {

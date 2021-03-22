@@ -56,7 +56,8 @@ func ValidatingWebhookConfiguration(name string) *ValidatingWebhookConfiguration
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractValidatingWebhookConfiguration(validatingWebhookConfiguration *apiadmissionregistrationv1.ValidatingWebhookConfiguration, fieldManager string) (*ValidatingWebhookConfigurationApplyConfiguration, error) {
 	b := &ValidatingWebhookConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(validatingWebhookConfiguration, internal.Parser().Type("io.k8s.api.admissionregistration.v1.ValidatingWebhookConfiguration"), fieldManager, b)
 	if err != nil {

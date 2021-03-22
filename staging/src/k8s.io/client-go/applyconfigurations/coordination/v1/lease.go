@@ -57,7 +57,8 @@ func Lease(name, namespace string) *LeaseApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractLease(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractLease(lease *apicoordinationv1.Lease, fieldManager string) (*LeaseApplyConfiguration, error) {
 	b := &LeaseApplyConfiguration{}
 	err := managedfields.ExtractInto(lease, internal.Parser().Type("io.k8s.api.coordination.v1.Lease"), fieldManager, b)
 	if err != nil {

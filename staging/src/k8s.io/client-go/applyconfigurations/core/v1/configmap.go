@@ -59,7 +59,8 @@ func ConfigMap(name, namespace string) *ConfigMapApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractConfigMap(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractConfigMap(configMap *corev1.ConfigMap, fieldManager string) (*ConfigMapApplyConfiguration, error) {
 	b := &ConfigMapApplyConfiguration{}
 	err := managedfields.ExtractInto(configMap, internal.Parser().Type("io.k8s.api.core.v1.ConfigMap"), fieldManager, b)
 	if err != nil {

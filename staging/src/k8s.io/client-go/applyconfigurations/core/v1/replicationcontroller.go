@@ -58,7 +58,8 @@ func ReplicationController(name, namespace string) *ReplicationControllerApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractReplicationController(replicationController *apicorev1.ReplicationController, fieldManager string) (*ReplicationControllerApplyConfiguration, error) {
 	b := &ReplicationControllerApplyConfiguration{}
 	err := managedfields.ExtractInto(replicationController, internal.Parser().Type("io.k8s.api.core.v1.ReplicationController"), fieldManager, b)
 	if err != nil {

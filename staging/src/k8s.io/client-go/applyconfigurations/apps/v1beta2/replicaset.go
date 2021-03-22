@@ -58,7 +58,8 @@ func ReplicaSet(name, namespace string) *ReplicaSetApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractReplicaSet(replicaSet *appsv1beta2.ReplicaSet, fieldManager string) (*ReplicaSetApplyConfiguration, error) {
 	b := &ReplicaSetApplyConfiguration{}
 	err := managedfields.ExtractInto(replicaSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.ReplicaSet"), fieldManager, b)
 	if err != nil {

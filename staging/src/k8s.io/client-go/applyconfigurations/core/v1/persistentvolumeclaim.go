@@ -58,7 +58,8 @@ func PersistentVolumeClaim(name, namespace string) *PersistentVolumeClaimApplyCo
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractPersistentVolumeClaim(persistentVolumeClaim *apicorev1.PersistentVolumeClaim, fieldManager string) (*PersistentVolumeClaimApplyConfiguration, error) {
 	b := &PersistentVolumeClaimApplyConfiguration{}
 	err := managedfields.ExtractInto(persistentVolumeClaim, internal.Parser().Type("io.k8s.api.core.v1.PersistentVolumeClaim"), fieldManager, b)
 	if err != nil {

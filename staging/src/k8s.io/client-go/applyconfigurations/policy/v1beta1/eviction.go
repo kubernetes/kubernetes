@@ -57,7 +57,8 @@ func Eviction(name, namespace string) *EvictionApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractEviction(eviction *v1beta1.Eviction, fieldManager string) (*EvictionApplyConfiguration, error) {
 	b := &EvictionApplyConfiguration{}
 	err := managedfields.ExtractInto(eviction, internal.Parser().Type("io.k8s.api.policy.v1beta1.Eviction"), fieldManager, b)
 	if err != nil {

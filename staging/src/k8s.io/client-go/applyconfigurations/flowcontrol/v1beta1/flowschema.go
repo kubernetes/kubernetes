@@ -57,7 +57,8 @@ func FlowSchema(name string) *FlowSchemaApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractFlowSchema(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractFlowSchema(flowSchema *flowcontrolv1beta1.FlowSchema, fieldManager string) (*FlowSchemaApplyConfiguration, error) {
 	b := &FlowSchemaApplyConfiguration{}
 	err := managedfields.ExtractInto(flowSchema, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.FlowSchema"), fieldManager, b)
 	if err != nil {

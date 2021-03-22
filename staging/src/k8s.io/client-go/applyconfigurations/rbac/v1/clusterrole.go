@@ -57,7 +57,8 @@ func ClusterRole(name string) *ClusterRoleApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractClusterRole(clusterRole *apirbacv1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractClusterRole(clusterRole *apirbacv1.ClusterRole, fieldManager string) (*ClusterRoleApplyConfiguration, error) {
 	b := &ClusterRoleApplyConfiguration{}
 	err := managedfields.ExtractInto(clusterRole, internal.Parser().Type("io.k8s.api.rbac.v1.ClusterRole"), fieldManager, b)
 	if err != nil {

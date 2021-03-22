@@ -57,7 +57,8 @@ func PriorityLevelConfiguration(name string) *PriorityLevelConfigurationApplyCon
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1beta1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractPriorityLevelConfiguration(priorityLevelConfiguration *flowcontrolv1beta1.PriorityLevelConfiguration, fieldManager string) (*PriorityLevelConfigurationApplyConfiguration, error) {
 	b := &PriorityLevelConfigurationApplyConfiguration{}
 	err := managedfields.ExtractInto(priorityLevelConfiguration, internal.Parser().Type("io.k8s.api.flowcontrol.v1beta1.PriorityLevelConfiguration"), fieldManager, b)
 	if err != nil {

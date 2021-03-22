@@ -330,7 +330,8 @@ func (g *applyConfigurationGenerator) generateClientgenExtract(sw *generator.Sni
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func Extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$ , error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extract$.ApplyConfig.Type|public$($.Struct|private$ *$.Struct|raw$, fieldManager string) (*$.ApplyConfig.ApplyConfiguration|public$ , error) {
 	b := &$.ApplyConfig.ApplyConfiguration|public${}
 	err := $.ExtractInto|raw$($.Struct|private$, $.ParserFunc|raw$().Type("$.OpenAPIType$"), fieldManager, b)
 	if err != nil {

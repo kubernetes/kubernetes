@@ -58,7 +58,8 @@ func HorizontalPodAutoscaler(name, namespace string) *HorizontalPodAutoscalerApp
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractHorizontalPodAutoscaler(horizontalPodAutoscaler *apiautoscalingv1.HorizontalPodAutoscaler, fieldManager string) (*HorizontalPodAutoscalerApplyConfiguration, error) {
 	b := &HorizontalPodAutoscalerApplyConfiguration{}
 	err := managedfields.ExtractInto(horizontalPodAutoscaler, internal.Parser().Type("io.k8s.api.autoscaling.v1.HorizontalPodAutoscaler"), fieldManager, b)
 	if err != nil {

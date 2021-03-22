@@ -59,7 +59,8 @@ func ControllerRevision(name, namespace string) *ControllerRevisionApplyConfigur
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractControllerRevision(controllerRevision *appsv1.ControllerRevision, fieldManager string) (*ControllerRevisionApplyConfiguration, error) {
 	b := &ControllerRevisionApplyConfiguration{}
 	err := managedfields.ExtractInto(controllerRevision, internal.Parser().Type("io.k8s.api.apps.v1.ControllerRevision"), fieldManager, b)
 	if err != nil {

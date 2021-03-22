@@ -56,7 +56,8 @@ func RuntimeClass(name string) *RuntimeClassApplyConfiguration {
 // Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
-func ExtractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
+// Disabled until subresource field is added to managed fields (https://github.com/kubernetes/kubernetes/pull/98377).
+func extractRuntimeClass(runtimeClass *nodev1alpha1.RuntimeClass, fieldManager string) (*RuntimeClassApplyConfiguration, error) {
 	b := &RuntimeClassApplyConfiguration{}
 	err := managedfields.ExtractInto(runtimeClass, internal.Parser().Type("io.k8s.api.node.v1alpha1.RuntimeClass"), fieldManager, b)
 	if err != nil {
