@@ -38,6 +38,8 @@ type PluginNameMapper interface {
 type PluginManager struct {
 	PluginNameMapper
 	featureGate featuregate.FeatureGate
+
+	useADCPluginManagerFeatureGates bool
 }
 
 // NewPluginManager returns a new PluginManager instance
@@ -81,9 +83,7 @@ func (pm PluginManager) IsMigrationCompleteForPlugin(pluginName string) bool {
 	}
 }
 
-// IsMigrationEnabledForPlugin indicates whether CSI migration has been enabled
-// for a particular storage plugin
-func (pm PluginManager) IsMigrationEnabledForPlugin(pluginName string) bool {
+func (pm PluginManager) isMigrationEnabledForPlugin(pluginName string) bool {
 	// CSIMigration feature should be enabled along with the plugin-specific one
 	if !pm.featureGate.Enabled(features.CSIMigration) {
 		return false
