@@ -1015,10 +1015,6 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// Ingress resource create/read/update/watch verbs
 		ginkgo.By("creating")
-		_, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-		_, err = ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
 		createdIngress, err := ingClient.Create(context.TODO(), ingTemplate, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
