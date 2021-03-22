@@ -9,6 +9,8 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/admission/quota/clusterresourcequota"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission"
 	apiclientv1 "github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configv1informer "github.com/openshift/client-go/config/informers/externalversions"
 	quotaclient "github.com/openshift/client-go/quota/clientset/versioned"
 	quotainformer "github.com/openshift/client-go/quota/informers/externalversions"
 	quotav1informer "github.com/openshift/client-go/quota/informers/externalversions/quota/v1"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers/usercache"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managementcpusoverride"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv"
 	"k8s.io/kubernetes/openshift-kube-apiserver/enablement"
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
@@ -73,6 +76,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 		),
 		nodeenv.NewInitializer(enablement.OpenshiftConfig().ProjectConfig.DefaultNodeSelector),
 		admissionrestconfig.NewInitializer(*rest.CopyConfig(genericConfig.LoopbackClientConfig)),
+		managementcpusoverride.NewInitializer(openshiftInformers.getOpenshiftInfraInformers().Config().V1().Infrastructures()),
 	)
 	// END ADMISSION
 
@@ -149,6 +153,10 @@ func newInformers(loopbackClientConfig *rest.Config) (*kubeAPIServerInformers, e
 	if err != nil {
 		return nil, err
 	}
+	configClient, err := configclient.NewForConfig(loopbackClientConfig)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO find a single place to create and start informers.  During the 1.7 rebase this will come more naturally in a config object,
 	// before then we should try to eliminate our direct to storage access.  It's making us do weird things.
@@ -158,6 +166,7 @@ func newInformers(loopbackClientConfig *rest.Config) (*kubeAPIServerInformers, e
 		OpenshiftQuotaInformers:    quotainformer.NewSharedInformerFactory(quotaClient, defaultInformerResyncPeriod),
 		OpenshiftSecurityInformers: securityv1informer.NewSharedInformerFactory(securityClient, defaultInformerResyncPeriod),
 		OpenshiftUserInformers:     userinformer.NewSharedInformerFactory(userClient, defaultInformerResyncPeriod),
+		OpenshiftConfigInformers:   configv1informer.NewSharedInformerFactory(configClient, defaultInformerResyncPeriod),
 	}
 	if err := ret.OpenshiftUserInformers.User().V1().Groups().Informer().AddIndexers(cache.Indexers{
 		usercache.ByUserIndexName: usercache.ByUserIndexKeys,
@@ -172,6 +181,7 @@ type kubeAPIServerInformers struct {
 	OpenshiftQuotaInformers    quotainformer.SharedInformerFactory
 	OpenshiftSecurityInformers securityv1informer.SharedInformerFactory
 	OpenshiftUserInformers     userinformer.SharedInformerFactory
+	OpenshiftConfigInformers   configv1informer.SharedInformerFactory
 }
 
 func (i *kubeAPIServerInformers) getOpenshiftQuotaInformers() quotainformer.SharedInformerFactory {
@@ -183,11 +193,15 @@ func (i *kubeAPIServerInformers) getOpenshiftSecurityInformers() securityv1infor
 func (i *kubeAPIServerInformers) getOpenshiftUserInformers() userinformer.SharedInformerFactory {
 	return i.OpenshiftUserInformers
 }
+func (i *kubeAPIServerInformers) getOpenshiftInfraInformers() configv1informer.SharedInformerFactory {
+	return i.OpenshiftConfigInformers
+}
 
 func (i *kubeAPIServerInformers) Start(stopCh <-chan struct{}) {
 	i.OpenshiftQuotaInformers.Start(stopCh)
 	i.OpenshiftSecurityInformers.Start(stopCh)
 	i.OpenshiftUserInformers.Start(stopCh)
+	i.OpenshiftConfigInformers.Start(stopCh)
 }
 
 func newClusterQuotaMappingController(nsInternalInformer corev1informers.NamespaceInformer, clusterQuotaInformer quotav1informer.ClusterResourceQuotaInformer) *clusterquotamapping.ClusterQuotaMappingController {
