@@ -16,9 +16,15 @@ limitations under the License.
 
 package oom
 
-import v1 "k8s.io/api/core/v1"
+import (
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+)
+
+// ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
+type GetPodByUIDFunc func(uid types.UID) (*v1.Pod, bool)
 
 // Watcher defines the interface of OOM watchers.
 type Watcher interface {
-	Start(ref *v1.ObjectReference) error
+	Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFunc) error
 }

@@ -19,7 +19,7 @@ limitations under the License.
 package oom
 
 import (
-	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -27,6 +27,9 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/google/cadvisor/utils/oomparser"
+
+	"fmt"
+	"regexp"
 )
 
 type streamer interface {
@@ -40,7 +43,10 @@ type realWatcher struct {
 	oomStreamer streamer
 }
 
-var _ Watcher = &realWatcher{}
+var (
+	_               Watcher = &realWatcher{}
+	containerRegexp         = regexp.MustCompile(`^\/kubepods\/(?:burstable\/)?pod([a-z0-9-]+)`)
+)
 
 // NewWatcher creates and initializes a OOMWatcher backed by Cadvisor as
 // the oom streamer.
@@ -59,12 +65,12 @@ func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
 }
 
 const (
-	systemOOMEvent           = "SystemOOM"
-	recordEventContainerName = "/"
+	systemOOMEvent                 = "SystemOOM"
+	legacyRecordEventContainerName = "/"
 )
 
 // Start watches for system oom's and records an event for every system oom encountered.
-func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
+func (ow *realWatcher) Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFunc) error {
 	outStream := make(chan *oomparser.OomInstance, 10)
 	go ow.oomStreamer.StreamOoms(outStream)
 
@@ -72,12 +78,22 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 		defer runtime.HandleCrash()
 
 		for event := range outStream {
-			if event.VictimContainerName == recordEventContainerName {
-				klog.V(1).InfoS("Got sys oom event", "event", event)
-				eventMsg := "System OOM encountered"
-				if event.ProcessName != "" && event.Pid != 0 {
-					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
+			eventMsg := "System OOM encountered"
+			if event.ProcessName != "" && event.Pid != 0 {
+				eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
+			}
+
+			parsedContainer := containerRegexp.FindStringSubmatch(event.VictimContainerName)
+			if parsedContainer != nil && event.ContainerName != legacyRecordEventContainerName {
+				klog.V(1).Infof("Got sys oom event: %v", event)
+				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				if pod, ok := getPodByUID(types.UID(parsedContainer[1])); ok {
+					ow.recorder.Eventf(pod, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 				}
+			}
+
+			if event.ContainerName == legacyRecordEventContainerName {
+				klog.V(1).Infof("Got sys oom event: %v", event)
 				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 			}
 		}

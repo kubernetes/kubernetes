@@ -212,6 +212,12 @@ func (kl *Kubelet) GetPodByName(namespace, name string) (*v1.Pod, bool) {
 	return kl.podManager.GetPodByName(namespace, name)
 }
 
+// GetPodByUID gets the pod that matches pod UID, as well as
+// whether the pod is found.
+func (kl *Kubelet) GetPodByUID(uid types.UID) (*v1.Pod, bool) {
+	return kl.podManager.GetPodByUID(uid)
+}
+
 // GetPodByCgroupfs provides the pod that maps to the specified cgroup, as well
 // as whether the pod was found.
 func (kl *Kubelet) GetPodByCgroupfs(cgroupfs string) (*v1.Pod, bool) {

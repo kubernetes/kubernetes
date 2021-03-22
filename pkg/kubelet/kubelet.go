@@ -1357,7 +1357,7 @@ func (kl *Kubelet) initializeModules() error {
 	}
 
 	// Start out of memory watcher.
-	if err := kl.oomWatcher.Start(kl.nodeRef); err != nil {
+	if err := kl.oomWatcher.Start(kl.nodeRef, kl.GetPodByUID); err != nil {
 		return fmt.Errorf("failed to start OOM watcher %v", err)
 	}
 
