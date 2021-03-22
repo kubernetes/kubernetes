@@ -732,11 +732,22 @@ func (f *frameworkImpl) RunPreScorePlugins(
 	defer func() {
 		metrics.FrameworkExtensionPointDuration.WithLabelValues(preScore, status.Code().String(), f.profileName).Observe(metrics.SinceInSeconds(startTime))
 	}()
-	for _, pl := range f.preScorePlugins {
-		status = f.runPreScorePlugin(ctx, pl, state, pod, nodes)
+
+	ctx, cancel := context.WithCancel(ctx)
+	errCh := parallelize.NewErrorChannel()
+	// Run PreScore method in parallel.
+	// Stops processing PreScore once an error occurs.
+	f.Parallelizer().Until(ctx, len(f.preScorePlugins), func(index int) {
+		pl := f.preScorePlugins[index]
+		status := f.runPreScorePlugin(ctx, pl, state, pod, nodes)
 		if !status.IsSuccess() {
-			return framework.AsStatus(fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError()))
+			err := fmt.Errorf("running PreScore plugin %q: %w", pl.Name(), status.AsError())
+			errCh.SendErrorWithCancel(err, cancel)
+			return
 		}
+	})
+	if err := errCh.ReceiveError(); err != nil {
+		return framework.AsStatus(err)
 	}
 
 	return nil
