@@ -441,6 +441,11 @@ func volumeAttachmentRecoveryTestCase(t *testing.T, tc vaTest) {
 	} else {
 		plugins = controllervolumetesting.CreateTestPlugin()
 	}
+
+	// OCP Carry: disable ADCCSIMigrationGCEPD feature in this unit test when necessary.
+	// OCP forces CSI migration in ADC "on", this unit test may need it "off".
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ADCCSIMigrationGCEPD, tc.csiMigration)()
+
 	nodeInformer := informerFactory.Core().V1().Nodes().Informer()
 	podInformer := informerFactory.Core().V1().Pods().Informer()
 	pvInformer := informerFactory.Core().V1().PersistentVolumes().Informer()
