@@ -70,6 +70,13 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr: exampleErr,
 		},
 		{
+			name:    "No expected error or object or panic",
+			timeout: timeoutFunc,
+			fn: func() (runtime.Object, error) {
+				return nil, nil
+			},
+		},
+		{
 			name:    "Successful status object is returned as expected",
 			timeout: timeoutFunc,
 			fn: func() (runtime.Object, error) {
