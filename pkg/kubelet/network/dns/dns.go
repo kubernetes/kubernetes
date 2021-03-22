@@ -121,9 +121,9 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 	}
 
 	if limitsExceeded {
-		log := fmt.Sprintf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
-		klog.ErrorS(nil, "eventlog", log)
+		err := fmt.Errorf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		klog.ErrorS(err, "Search Line limits exceeded")
 	}
 	return composedSearch
 }
@@ -131,9 +131,9 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.Pod) []string {
 	if len(nameservers) > validation.MaxDNSNameservers {
 		nameservers = nameservers[0:validation.MaxDNSNameservers]
-		log := fmt.Sprintf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", log)
-		klog.ErrorS(nil, "eventlog", log)
+		err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
+		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		klog.ErrorS(err, "Nameserver limits exceeded")
 	}
 	return nameservers
 }
