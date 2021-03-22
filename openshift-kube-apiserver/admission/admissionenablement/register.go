@@ -12,6 +12,7 @@ import (
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission"
 	authorizationrestrictusers "k8s.io/kubernetes/openshift-kube-apiserver/admission/authorization/restrictusers"
 	quotaclusterresourceoverride "k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/clusterresourceoverride"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/managementcpusoverride"
 	quotarunonceduration "k8s.io/kubernetes/openshift-kube-apiserver/admission/autoscaling/runonceduration"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/customresourcevalidationregistration"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/network/externalipranger"
@@ -25,6 +26,7 @@ func RegisterOpenshiftKubeAdmissionPlugins(plugins *admission.Plugins) {
 	authorizationrestrictusers.Register(plugins)
 	imagepolicy.Register(plugins)
 	ingressadmission.Register(plugins)
+	managementcpusoverride.Register(plugins)
 	projectnodeenv.Register(plugins)
 	quotaclusterresourceoverride.Register(plugins)
 	quotaclusterresourcequota.Register(plugins)
@@ -52,6 +54,7 @@ var (
 	// openshiftAdmissionPluginsForKubeBeforeMutating are the admission plugins to add after kube admission, before mutating webhooks
 	openshiftAdmissionPluginsForKubeBeforeMutating = []string{
 		"autoscaling.openshift.io/ClusterResourceOverride",
+		managementcpusoverride.PluginName, // "autoscaling.openshift.io/ManagementCPUsOverride"
 		"authorization.openshift.io/RestrictSubjectBindings",
 		"autoscaling.openshift.io/RunOnceDuration",
 		"scheduling.openshift.io/PodNodeConstraints",
