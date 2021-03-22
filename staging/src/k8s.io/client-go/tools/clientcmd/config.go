@@ -169,15 +169,23 @@ func NewDefaultPathOptions() *PathOptions {
 // modified element.
 func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, relativizePaths bool) error {
 	if UseModifyConfigLock {
-		possibleSources := configAccess.GetLoadingPrecedence()
-		// sort the possible kubeconfig files so we always "lock" in the same order
-		// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
-		sort.Strings(possibleSources)
-		for _, filename := range possibleSources {
+		if configAccess.IsExplicitFile() {
+			filename := configAccess.GetExplicitFile()
 			if err := lockFile(filename); err != nil {
 				return err
 			}
 			defer unlockFile(filename)
+		} else {
+			possibleSources := configAccess.GetLoadingPrecedence()
+			// sort the possible kubeconfig files so we always "lock" in the same order
+			// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
+			sort.Strings(possibleSources)
+			for _, filename := range possibleSources {
+				if err := lockFile(filename); err != nil {
+					return err
+				}
+				defer unlockFile(filename)
+			}
 		}
 	}
 
