@@ -1143,21 +1143,39 @@ type SidecarsStatus struct {
 }
 
 // GetSidecarsStatus returns the SidecarsStatus for the given pod
+// We assume the worst: if we are unable to determine the status of all containers we make defensive assumptions that
+// there are sidecars, they are not ready, and that there are non-sidecars waiting. This is to prevent starting non-
+// -sidecars accidentally.
 func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
+	var containerStatusesCopy []v1.ContainerStatus
 	if pod == nil {
-		klog.Infof("Pod was nil, returning empty sidecar status")
-		return SidecarsStatus{}
+		klog.Infof("Pod was nil, returning sidecar status that prevents progress")
+		return SidecarsStatus{SidecarsPresent: true, SidecarsReady: false, ContainersWaiting: true}
 	}
-	if pod.Spec.Containers == nil || pod.Status.ContainerStatuses == nil {
-		klog.Infof("Pod Containers or Container status was nil, returning empty sidecar status")
-		return SidecarsStatus{}
+	if pod.Spec.Containers == nil {
+		klog.Infof("Pod %s: Containers was nil, returning sidecar status that prevents progress", format.Pod(pod))
+		return SidecarsStatus{SidecarsPresent: true, SidecarsReady: false, ContainersWaiting: true}
 	}
+	if pod.Status.ContainerStatuses == nil {
+		klog.Infof("Pod %s: ContainerStatuses was nil, doing best effort using spec", format.Pod(pod))
+	} else {
+		// Make a copy of ContainerStatuses to avoid having the carpet pulled from under our feet
+		containerStatusesCopy = make([]v1.ContainerStatus, len(pod.Status.ContainerStatuses))
+		copy(containerStatusesCopy, pod.Status.ContainerStatuses)
+	}
+
 	sidecarsStatus := SidecarsStatus{SidecarsPresent: false, SidecarsReady: true, ContainersWaiting: false}
 	for _, container := range pod.Spec.Containers {
-		for _, status := range pod.Status.ContainerStatuses {
+		foundStatus := false
+		isSidecar := false
+		if pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", container.Name)] == "Sidecar" {
+			isSidecar = true
+			sidecarsStatus.SidecarsPresent = true
+		}
+		for _, status := range containerStatusesCopy {
 			if status.Name == container.Name {
-				if pod.Annotations[fmt.Sprintf("sidecars.lyft.net/container-lifecycle-%s", container.Name)] == "Sidecar" {
-					sidecarsStatus.SidecarsPresent = true
+				foundStatus = true
+				if isSidecar {
 					if !status.Ready {
 						klog.Infof("Pod %s: %s: sidecar not ready", format.Pod(pod), container.Name)
 						sidecarsStatus.SidecarsReady = false
@@ -1169,6 +1187,16 @@ func GetSidecarsStatus(pod *v1.Pod) SidecarsStatus {
 					klog.Infof("Pod: %s: %s: non-sidecar waiting", format.Pod(pod), container.Name)
 					sidecarsStatus.ContainersWaiting = true
 				}
+				break
+			}
+		}
+		if !foundStatus {
+			if isSidecar {
+				klog.Infof("Pod %s: %s (sidecar): status not found, assuming not ready", format.Pod(pod), container.Name)
+				sidecarsStatus.SidecarsReady = false
+			} else {
+				klog.Infof("Pod: %s: %s (non-sidecar): status not found, assuming waiting", format.Pod(pod), container.Name)
+				sidecarsStatus.ContainersWaiting = true
 			}
 		}
 	}

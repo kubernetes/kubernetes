@@ -2641,6 +2641,7 @@ func (kl *Kubelet) HandlePodReconcile(pods []*v1.Pod) {
 		kl.podManager.UpdatePod(pod)
 
 		sidecarsStatus := status.GetSidecarsStatus(pod)
+		klog.Infof("Pod: %s, status: Present=%v,Ready=%v,ContainersWaiting=%v", format.Pod(pod), sidecarsStatus.SidecarsPresent, sidecarsStatus.SidecarsReady, sidecarsStatus.ContainersWaiting)
 
 		// Reconcile Pod "Ready" condition if necessary. Trigger sync pod for reconciliation.
 		// TODO: this should be unnecessary today - determine what is the cause for this to
