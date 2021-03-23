@@ -365,6 +365,13 @@ function start-kube-apiserver {
     fi
     container_env+="{\"name\": \"KUBE_PATCH_CONVERSION_DETECTOR\", \"value\": \"${ENABLE_PATCH_CONVERSION_DETECTOR}\"}"
   fi
+
+  # b/183135115
+  if [[ -n "${container_env}" ]]; then
+    container_env="${container_env}, "
+  fi
+  container_env+='{"name": "GODEBUG", "value": "x509ignoreCN=0"}'
+
   if [[ -n "${container_env}" ]]; then
     container_env="\"env\":[${container_env}],"
   fi
