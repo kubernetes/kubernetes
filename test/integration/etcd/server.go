@@ -122,6 +122,9 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	kubeClientConfig.QPS = 99999
 	kubeClientConfig.Burst = 9999
 
+	// we make requests to all resources, don't log warnings about deprecated ones
+	restclient.SetDefaultWarningHandler(restclient.NoWarnings{})
+
 	kubeClient := clientset.NewForConfigOrDie(kubeClientConfig)
 
 	go func() {

@@ -767,3 +767,7 @@ func gvr(g, v, r string) schema.GroupVersionResource {
 func gvkP(g, v, k string) *schema.GroupVersionKind {
 	return &schema.GroupVersionKind{Group: g, Version: v, Kind: k}
 }
+
+func gvk(g, v, k string) schema.GroupVersionKind {
+	return schema.GroupVersionKind{Group: g, Version: v, Kind: k}
+}
