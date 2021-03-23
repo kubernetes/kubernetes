@@ -452,7 +452,11 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 				return false, nil
 			}
 		}
-		return strings.EqualFold(status, w.conditionStatus), nil
+		conditionMet := false
+		for _,conditionStatus:=range strings.Split(w.conditionStatus,","){
+			conditionMet = conditionMet || strings.EqualFold(status, conditionStatus)
+		}
+		return conditionMet, nil
 	}
 
 	return false, nil
