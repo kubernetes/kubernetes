@@ -18,11 +18,6 @@ package app
 
 // This file exists to force the desired plugin implementations to be linked.
 import (
-	// Credential providers
-	_ "k8s.io/kubernetes/pkg/credentialprovider/aws"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/azure"
-	_ "k8s.io/kubernetes/pkg/credentialprovider/gcp"
-
 	"k8s.io/component-base/featuregate"
 	"k8s.io/utils/exec"
 
