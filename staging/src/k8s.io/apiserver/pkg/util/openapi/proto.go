@@ -20,9 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/go-openapi/spec"
-	"github.com/googleapis/gnostic/compiler"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
-	yaml "gopkg.in/yaml.v2"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -34,13 +32,7 @@ func ToProtoModels(openAPISpec *spec.Swagger) (proto.Models, error) {
 		return nil, err
 	}
 
-	var info yaml.MapSlice
-	err = yaml.Unmarshal(specBytes, &info)
-	if err != nil {
-		return nil, err
-	}
-
-	doc, err := openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
+	doc, err := openapi_v2.ParseDocument(specBytes)
 	if err != nil {
 		return nil, err
 	}

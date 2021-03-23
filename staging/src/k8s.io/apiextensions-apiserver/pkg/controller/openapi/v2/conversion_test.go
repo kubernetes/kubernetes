@@ -28,7 +28,6 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
-	"github.com/googleapis/gnostic/compiler"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	"gopkg.in/yaml.v2"
 
@@ -777,14 +776,8 @@ func TestKubeOpenapiRejectionFiltering(t *testing.T) {
 			t.Fatalf("failed to encode filtered to JSON: %v", err)
 		}
 
-		// unmarshal as yaml
-		var yml yaml.MapSlice
-		if err := yaml.Unmarshal(bs, &yml); err != nil {
-			t.Fatalf("failed to decode filtered JSON by into memory: %v", err)
-		}
-
 		// create gnostic doc
-		doc, err := openapi_v2.NewDocument(yml, compiler.NewContext("$root", nil))
+		doc, err := openapi_v2.ParseDocument(bs)
 		if err != nil {
 			t.Fatalf("failed to create gnostic doc: %v", err)
 		}

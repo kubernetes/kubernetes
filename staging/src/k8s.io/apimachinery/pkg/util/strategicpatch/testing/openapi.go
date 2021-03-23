@@ -21,9 +21,6 @@ import (
 	"os"
 	"sync"
 
-	"gopkg.in/yaml.v2"
-
-	"github.com/googleapis/gnostic/compiler"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	openapi "k8s.io/kube-openapi/pkg/util/proto"
 )
@@ -51,13 +48,7 @@ func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
 			f.err = err
 			return
 		}
-		var info yaml.MapSlice
-		err = yaml.Unmarshal(spec, &info)
-		if err != nil {
-			f.err = err
-			return
-		}
-		f.document, f.err = openapi_v2.NewDocument(info, compiler.NewContext("$root", nil))
+		f.document, f.err = openapi_v2.ParseDocument(spec)
 	})
 	return f.document, f.err
 }

@@ -235,10 +235,13 @@ func yaml_emitter_increase_indent(emitter *yaml_emitter_t, flow, indentless bool
 			emitter.indent = 0
 		}
 	} else if !indentless {
-		emitter.indent += emitter.best_indent
-		// [Go] If inside a block sequence item, discount the space taken by the indicator.
-		if emitter.best_indent > 2 && emitter.states[len(emitter.states)-1] == yaml_EMIT_BLOCK_SEQUENCE_ITEM_STATE {
-			emitter.indent -= 2
+		// [Go] This was changed so that indentations are more regular.
+		if emitter.states[len(emitter.states)-1] == yaml_EMIT_BLOCK_SEQUENCE_ITEM_STATE {
+			// The first indent inside a sequence will just skip the "- " indicator.
+			emitter.indent += 2
+		} else {
+			// Everything else aligns to the chosen indentation.
+			emitter.indent = emitter.best_indent*((emitter.indent+emitter.best_indent)/emitter.best_indent)
 		}
 	}
 	return true
@@ -725,15 +728,8 @@ func yaml_emitter_emit_flow_mapping_value(emitter *yaml_emitter_t, event *yaml_e
 // Expect a block item node.
 func yaml_emitter_emit_block_sequence_item(emitter *yaml_emitter_t, event *yaml_event_t, first bool) bool {
 	if first {
-		// [Go] The original logic here would not indent the sequence when inside a mapping.
-		// In Go we always indent it, but take the sequence indicator out of the indentation.
-		indentless := emitter.best_indent == 2 && emitter.mapping_context && (emitter.column == 0 || !emitter.indention)
-		original := emitter.indent
-		if !yaml_emitter_increase_indent(emitter, false, indentless) {
+		if !yaml_emitter_increase_indent(emitter, false, false) {
 			return false
-		}
-		if emitter.indent > original+2 {
-			emitter.indent -= 2
 		}
 	}
 	if event.typ == yaml_SEQUENCE_END_EVENT {
@@ -785,6 +781,13 @@ func yaml_emitter_emit_block_mapping_key(emitter *yaml_emitter_t, event *yaml_ev
 	if !yaml_emitter_write_indent(emitter) {
 		return false
 	}
+	if len(emitter.line_comment) > 0 {
+		// [Go] A line comment was provided for the key. That's unusual as the
+		//      scanner associates line comments with the value. Either way,
+		//      save the line comment and render it appropriately later.
+		emitter.key_line_comment = emitter.line_comment
+		emitter.line_comment = nil
+	}
 	if yaml_emitter_check_simple_key(emitter) {
 		emitter.states = append(emitter.states, yaml_EMIT_BLOCK_MAPPING_SIMPLE_VALUE_STATE)
 		return yaml_emitter_emit_node(emitter, event, false, false, true, true)
@@ -810,6 +813,29 @@ func yaml_emitter_emit_block_mapping_value(emitter *yaml_emitter_t, event *yaml_
 			return false
 		}
 	}
+	if len(emitter.key_line_comment) > 0 {
+		// [Go] A line comment was previously provided for the key. Handle it before
+		//      the value so the inline comments are placed correctly.
+		if yaml_emitter_silent_nil_event(emitter, event) && len(emitter.line_comment) == 0 {
+			// Nothing other than the line comment will be written on the line.
+			emitter.line_comment = emitter.key_line_comment
+			emitter.key_line_comment = nil
+		} else {
+			// An actual value is coming, so emit the comment line.
+			emitter.line_comment, emitter.key_line_comment = emitter.key_line_comment, emitter.line_comment
+			if !yaml_emitter_process_line_comment(emitter) {
+				return false
+			}
+			emitter.line_comment, emitter.key_line_comment = emitter.key_line_comment, emitter.line_comment
+			// Indent in unless it's a block that will reindent anyway.
+			if event.sequence_style() == yaml_FLOW_SEQUENCE_STYLE || (event.typ != yaml_MAPPING_START_EVENT && event.typ != yaml_SEQUENCE_START_EVENT) {
+				emitter.indent = emitter.best_indent*((emitter.indent+emitter.best_indent)/emitter.best_indent)
+				if !yaml_emitter_write_indent(emitter) {
+					return false
+				}
+			}
+		}
+	}
 	emitter.states = append(emitter.states, yaml_EMIT_BLOCK_MAPPING_KEY_STATE)
 	if !yaml_emitter_emit_node(emitter, event, false, false, true, false) {
 		return false
@@ -821,6 +847,10 @@ func yaml_emitter_emit_block_mapping_value(emitter *yaml_emitter_t, event *yaml_
 		return false
 	}
 	return true
+}
+
+func yaml_emitter_silent_nil_event(emitter *yaml_emitter_t, event *yaml_event_t) bool {
+	return event.typ == yaml_SCALAR_EVENT && event.implicit && !emitter.canonical && len(emitter.scalar_data.value) == 0
 }
 
 // Expect a node.

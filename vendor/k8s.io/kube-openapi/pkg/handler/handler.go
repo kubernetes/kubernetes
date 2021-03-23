@@ -30,7 +30,6 @@ import (
 	"github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 	"github.com/golang/protobuf/proto"
-	"github.com/googleapis/gnostic/compiler"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
@@ -108,11 +107,7 @@ func (o *OpenAPIService) UpdateSpec(openapiSpec *spec.Swagger) (err error) {
 	if err != nil {
 		return err
 	}
-	var json map[string]interface{}
-	if err := jsoniter.ConfigCompatibleWithStandardLibrary.Unmarshal(specBytes, &json); err != nil {
-		return err
-	}
-	specPb, err := ToProtoBinary(json)
+	specPb, err := ToProtoBinary(specBytes)
 	if err != nil {
 		return err
 	}
@@ -180,8 +175,8 @@ func jsonToYAMLValue(j interface{}) interface{} {
 	return j
 }
 
-func ToProtoBinary(json map[string]interface{}) ([]byte, error) {
-	document, err := openapi_v2.NewDocument(jsonToYAML(json), compiler.NewContext("$root", nil))
+func ToProtoBinary(json []byte) ([]byte, error) {
+	document, err := openapi_v2.ParseDocument(json)
 	if err != nil {
 		return nil, err
 	}

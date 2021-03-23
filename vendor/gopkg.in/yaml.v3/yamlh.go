@@ -787,6 +787,8 @@ type yaml_emitter_t struct {
 	foot_comment []byte
 	tail_comment []byte
 
+	key_line_comment []byte
+
 	// Dumper stuff
 
 	opened bool // If the stream was already opened?
