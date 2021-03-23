@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"go.etcd.io/etcd/clientv3"
 	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog/v2"
 

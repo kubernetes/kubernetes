@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/integration"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/tests/v3/integration"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing
@@ -44,6 +44,7 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 
 // NewUnsecuredEtcd3TestClientServer creates a new client and server for testing
 func NewUnsecuredEtcd3TestClientServer(t *testing.T) (*EtcdTestServer, *storagebackend.Config) {
+	integration.BeforeTestExternal(t)
 	server := &EtcdTestServer{
 		v3Cluster: integration.NewClusterV3(t, &integration.ClusterConfig{Size: 1}),
 	}
