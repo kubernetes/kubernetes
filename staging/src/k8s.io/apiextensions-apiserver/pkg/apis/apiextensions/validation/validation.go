@@ -1366,7 +1366,7 @@ func validateAPIApproval(newCRD, oldCRD *apiextensions.CustomResourceDefinition,
 	var oldApprovalState *apihelpers.APIApprovalState
 	if oldCRD != nil {
 		t, _ := apihelpers.GetAPIApprovalState(oldCRD.Annotations)
-		oldApprovalState = &t
+		oldApprovalState = &t // +k8s:verify-mutation:reason=clone
 	}
 	newApprovalState, reason := apihelpers.GetAPIApprovalState(newCRD.Annotations)
 
