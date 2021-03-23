@@ -182,9 +182,15 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	if oldPod.ResourceVersion == newPod.ResourceVersion {
 		return
 	}
-	if sched.skipPodUpdate(newPod) {
+
+	isAssumed, err := sched.SchedulerCache.IsAssumedPod(newPod)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", newPod.Namespace, newPod.Name, err))
+	}
+	if isAssumed {
 		return
 	}
+
 	if err := sched.SchedulingQueue.Update(oldPod, newPod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
@@ -305,60 +311,6 @@ func assignedPod(pod *v1.Pod) bool {
 // responsibleForPod returns true if the pod has asked to be scheduled by the given scheduler.
 func responsibleForPod(pod *v1.Pod, profiles profile.Map) bool {
 	return profiles.HandlesSchedulerName(pod.Spec.SchedulerName)
-}
-
-// skipPodUpdate checks whether the specified pod update should be ignored.
-// This function will return true if
-//   - The pod has already been assumed, AND
-//   - The pod has only its ResourceVersion, Spec.NodeName, Annotations,
-//     ManagedFields, Finalizers and/or Conditions updated.
-func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
-	// Non-assumed pods should never be skipped.
-	isAssumed, err := sched.SchedulerCache.IsAssumedPod(pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
-		return false
-	}
-	if !isAssumed {
-		return false
-	}
-
-	// Gets the assumed pod from the cache.
-	assumedPod, err := sched.SchedulerCache.GetPod(pod)
-	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("failed to get assumed pod %s/%s from cache: %v", pod.Namespace, pod.Name, err))
-		return false
-	}
-
-	// Compares the assumed pod in the cache with the pod update. If they are
-	// equal (with certain fields excluded), this pod update will be skipped.
-	f := func(pod *v1.Pod) *v1.Pod {
-		p := pod.DeepCopy()
-		// ResourceVersion must be excluded because each object update will
-		// have a new resource version.
-		p.ResourceVersion = ""
-		// Spec.NodeName must be excluded because the pod assumed in the cache
-		// is expected to have a node assigned while the pod update may nor may
-		// not have this field set.
-		p.Spec.NodeName = ""
-		// Annotations must be excluded for the reasons described in
-		// https://github.com/kubernetes/kubernetes/issues/52914.
-		p.Annotations = nil
-		// Same as above, when annotations are modified with ServerSideApply,
-		// ManagedFields may also change and must be excluded
-		p.ManagedFields = nil
-		// The following might be changed by external controllers, but they don't
-		// affect scheduling decisions.
-		p.Finalizers = nil
-		p.Status.Conditions = nil
-		return p
-	}
-	assumedPodCopy, podCopy := f(assumedPod), f(pod)
-	if !reflect.DeepEqual(assumedPodCopy, podCopy) {
-		return false
-	}
-	klog.V(3).Infof("Skipping pod %s/%s update", pod.Namespace, pod.Name)
-	return true
 }
 
 // addAllEventHandlers is a helper function used in tests and in Scheduler
