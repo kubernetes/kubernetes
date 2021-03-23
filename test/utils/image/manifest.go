@@ -69,7 +69,7 @@ func (i *Config) SetVersion(version string) {
 func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
+		E2eRegistry:             "k8s.gcr.io/e2e-test-images",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
@@ -382,7 +382,7 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	}
 
 	switch registryAndUser {
-	case "gcr.io/kubernetes-e2e-test-images":
+	case "k8s.gcr.io/e2e-test-images":
 		registryAndUser = e2eRegistry
 	case "k8s.gcr.io":
 		registryAndUser = gcRegistry

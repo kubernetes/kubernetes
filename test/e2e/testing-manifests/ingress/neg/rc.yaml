@@ -15,7 +15,7 @@ spec:
         run: hostname
     spec:
       containers:
-      - image: gcr.io/kubernetes-e2e-test-images/serve-hostname:1.1
+      - image: k8s.gcr.io/e2e-test-images/serve-hostname:1.1
         imagePullPolicy: IfNotPresent
         name: hostname
       terminationGracePeriodSeconds: 120

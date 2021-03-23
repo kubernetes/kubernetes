@@ -55,7 +55,7 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"gcr.io/kubernetes-e2e-test-images/test:123",
+		"k8s.gcr.io/e2e-test-images/test:123",
 		result{
 			result: "test.io/kubernetes-e2e-test-images/test:123",
 			err:    nil,
