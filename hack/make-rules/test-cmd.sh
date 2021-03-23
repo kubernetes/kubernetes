@@ -75,7 +75,7 @@ function run_kube_apiserver() {
     --runtime-config=api/v1 \
     --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
     --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
-    --service-account-issuer="https://kubernetes.default.svc" \
+    --service-account-issuer="https://kubernetes.default.svc.cluster.local" \
     --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
     --storage-media-type="${KUBE_TEST_API_STORAGE_TYPE-}" \
     --cert-dir="${TMPDIR:-/tmp/}" \

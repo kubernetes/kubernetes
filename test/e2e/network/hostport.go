@@ -120,13 +120,13 @@ var _ = common.SIGDescribe("HostPort", func() {
 		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
 		// try 5 times to connect to the exposed ports
 		for i := 0; i < 5; i++ {
-			// check pod1
-			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
-			hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
-			if err != nil {
-				framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
-				continue
-			}
+			//// check pod1
+			//ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, localhost, port))
+			//hostname1, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod1...)
+			//if err != nil {
+			//	framework.Logf("Can not connect from %s to pod(pod1) to serverIP: %s, port: %d", hostExecPod.Name, localhost, port)
+			//	continue
+			//}
 			// check pod2
 			ginkgo.By(fmt.Sprintf("checking connectivity from pod %s to serverIP: %s, port: %d", hostExecPod.Name, hostIP, port))
 			hostname2, _, err := f.ExecCommandInContainerWithFullOutput(hostExecPod.Name, "e2e-host-exec", cmdPod2...)
