@@ -360,7 +360,7 @@ func (c *AvailableConditionController) sync(key string) error {
 	// actually try to hit the discovery endpoint when it isn't local and when we're routing as a service.
 	if apiService.Spec.Service != nil && c.serviceResolver != nil {
 		attempts := 5
-		results := make(chan error, attempts)
+		results := make(chan error)
 		for i := 0; i < attempts; i++ {
 			go func() {
 				discoveryURL, err := c.serviceResolver.ResolveEndpoint(apiService.Spec.Service.Namespace, apiService.Spec.Service.Name, *apiService.Spec.Service.Port)
@@ -415,29 +415,25 @@ func (c *AvailableConditionController) sync(key string) error {
 
 				results <- nil
 			}()
-		}
 
-		var lastError error
-		for i := 0; i < attempts; i++ {
-			lastError = <-results
-			// if we had at least one success, we are successful overall and we can return now
+			lastError := <-results
 			if lastError == nil {
+				// if we had at least one success, we are successful overall and we can return now
 				break
-			}
-		}
+			} else {
 
-		if lastError != nil {
-			availableCondition.Status = apiregistrationv1.ConditionFalse
-			availableCondition.Reason = "FailedDiscoveryCheck"
-			availableCondition.Message = lastError.Error()
-			apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
-			_, updateErr := c.updateAPIServiceStatus(originalAPIService, apiService)
-			if updateErr != nil {
-				return updateErr
+				availableCondition.Status = apiregistrationv1.ConditionFalse
+				availableCondition.Reason = "FailedDiscoveryCheck"
+				availableCondition.Message = lastError.Error()
+				apiregistrationv1apihelper.SetAPIServiceCondition(apiService, availableCondition)
+				_, updateErr := c.updateAPIServiceStatus(originalAPIService, apiService)
+				if updateErr != nil {
+					return updateErr
+				}
+				// force a requeue to make it very obvious that this will be retried at some point in the future
+				// along with other requeues done via service change, endpoint change, and resync
+				return lastError
 			}
-			// force a requeue to make it very obvious that this will be retried at some point in the future
-			// along with other requeues done via service change, endpoint change, and resync
-			return lastError
 		}
 	}
 
