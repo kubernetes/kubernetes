@@ -285,6 +285,7 @@ aliases:
 
   sig-network-approvers:
     - andrewsykim
+    - aojea
     - bowei
     - caseydavenport
     - cmluciano
