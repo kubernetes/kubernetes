@@ -75,7 +75,7 @@ func TestWatcherRecordsEventsForLegacyOomEvents(t *testing.T) {
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnFalse))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 }
 
@@ -113,11 +113,11 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnTrue))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 }
 
-func getRecordedEvents(t *testing.T, fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
+func getRecordedEvents(fakeRecorder *record.FakeRecorder, numExpectedOomEvents int) []string {
 	done := false
 	eventsRecorded := []string{}
 
@@ -125,7 +125,6 @@ func getRecordedEvents(t *testing.T, fakeRecorder *record.FakeRecorder, numExpec
 		select {
 		case event := <-fakeRecorder.Events:
 			eventsRecorded = append(eventsRecorded, event)
-			t.Log(event)
 			if len(eventsRecorded) == numExpectedOomEvents {
 				done = true
 			}
@@ -175,7 +174,7 @@ func TestWatcherRecordsEventsForLegacyOomEventsCorrectContainerName(t *testing.T
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnFalse))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 }
 
@@ -224,7 +223,7 @@ func TestWatcherRecordsEventsForOomEventsCorrectContainerName(t *testing.T) {
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnTrue))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 }
 
@@ -259,7 +258,7 @@ func TestWatcherRecordsEventsForLegacyOomEventsWithAdditionalInfo(t *testing.T) 
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnFalse))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
@@ -309,7 +308,7 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnTrue))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
@@ -367,7 +366,7 @@ func TestWatcherRecordsEventsForOomEventsWithPodNotFound(t *testing.T) {
 	}
 	assert.NoError(t, oomWatcher.Start(node, GetPodByUIDReturnFalse))
 
-	eventsRecorded := getRecordedEvents(t, fakeRecorder, numExpectedOomEvents)
+	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
 	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
 	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("pid: %d", eventPid1))

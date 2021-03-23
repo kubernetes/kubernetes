@@ -85,7 +85,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFun
 
 			parsedContainer := containerRegexp.FindStringSubmatch(event.VictimContainerName)
 			if parsedContainer != nil && event.ContainerName != legacyRecordEventContainerName {
-				klog.V(1).Infof("Got sys oom event: %v", event)
+				klog.V(1).InfoS("Got sys oom event", "event", event)
 				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 				if pod, ok := getPodByUID(types.UID(parsedContainer[1])); ok {
 					ow.recorder.Eventf(pod, v1.EventTypeWarning, systemOOMEvent, eventMsg)
@@ -93,7 +93,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFun
 			}
 
 			if event.ContainerName == legacyRecordEventContainerName {
-				klog.V(1).Infof("Got sys oom event: %v", event)
+				klog.V(1).InfoS("Got sys oom event", "event", event)
 				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 			}
 		}
