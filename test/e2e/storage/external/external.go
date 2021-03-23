@@ -356,7 +356,6 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 	f := e2econfig.Framework
 	snapshotter := d.DriverInfo.Name
 	ns := e2econfig.Framework.Namespace.Name
-	suffix := "vsc"
 
 	switch {
 	case d.SnapshotClass.FromName:
@@ -389,7 +388,7 @@ func (d *driverDefinition) GetSnapshotClass(e2econfig *storageframework.PerTestC
 		}
 	}
 
-	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns, suffix)
+	return utils.GenerateSnapshotClassSpec(snapshotter, parameters, ns)
 }
 
 func (d *driverDefinition) GetVolume(e2econfig *storageframework.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
