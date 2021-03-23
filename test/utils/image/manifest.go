@@ -31,7 +31,6 @@ import (
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
-	E2eRegistry              string `yaml:"e2eRegistry"`
 	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry       string `yaml:"buildImageRegistry"`
 	InvalidRegistry          string `yaml:"invalidRegistry"`
@@ -91,7 +90,6 @@ func initReg() RegistryList {
 var (
 	initRegistry = RegistryList{
 		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
-		E2eRegistry:              "gcr.io/kubernetes-e2e-test-images",
 		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:       "k8s.gcr.io/build-image",
 		InvalidRegistry:          "invalid.com/invalid",
@@ -212,7 +210,7 @@ func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.3"}
 	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-1"}
 	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
-	configs[CudaVectorAdd] = Config{list.E2eRegistry, "cuda-vector-add", "1.0"}
+	configs[CudaVectorAdd] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
 	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.5"}
 	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.3"}
@@ -383,8 +381,6 @@ func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (strin
 	}
 
 	switch registryAndUser {
-	case initRegistry.E2eRegistry:
-		registryAndUser = reg.E2eRegistry
 	case initRegistry.GcRegistry:
 		registryAndUser = reg.GcRegistry
 	case initRegistry.SigStorageRegistry:
