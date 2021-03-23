@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 
-	"go.etcd.io/etcd/clientv3"
-	"go.etcd.io/etcd/integration"
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/tests/v3/integration"
 )
 
 // EtcdTestServer encapsulates the datastructures needed to start local instance for testing

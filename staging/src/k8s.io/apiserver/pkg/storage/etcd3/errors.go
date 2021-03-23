@@ -19,7 +19,7 @@ package etcd3
 import (
 	"k8s.io/apimachinery/pkg/api/errors"
 
-	etcdrpc "go.etcd.io/etcd/etcdserver/api/v3rpc/rpctypes"
+	etcdrpc "go.etcd.io/etcd/api/v3/v3rpc/rpctypes"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
