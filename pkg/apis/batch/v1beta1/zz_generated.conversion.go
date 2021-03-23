@@ -120,6 +120,12 @@ func Convert_v1beta1_CronJob_To_batch_CronJob(in *v1beta1.CronJob, out *batch.Cr
 }
 
 func autoConvert_batch_CronJob_To_v1beta1_CronJob(in *batch.CronJob, out *v1beta1.CronJob, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1beta1"
+	out.Kind = "CronJob"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_CronJobSpec_To_v1beta1_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -157,6 +163,12 @@ func Convert_v1beta1_CronJobList_To_batch_CronJobList(in *v1beta1.CronJobList, o
 }
 
 func autoConvert_batch_CronJobList_To_v1beta1_CronJobList(in *batch.CronJobList, out *v1beta1.CronJobList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1beta1"
+	out.Kind = "CronJobList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -251,6 +263,12 @@ func Convert_v1beta1_JobTemplate_To_batch_JobTemplate(in *v1beta1.JobTemplate, o
 }
 
 func autoConvert_batch_JobTemplate_To_v1beta1_JobTemplate(in *batch.JobTemplate, out *v1beta1.JobTemplate, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1beta1"
+	out.Kind = "JobTemplate"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_JobTemplateSpec_To_v1beta1_JobTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err

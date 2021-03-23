@@ -125,6 +125,12 @@ func Convert_v1alpha1_NodeMetrics_To_metrics_NodeMetrics(in *NodeMetrics, out *m
 }
 
 func autoConvert_metrics_NodeMetrics_To_v1alpha1_NodeMetrics(in *metrics.NodeMetrics, out *NodeMetrics, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "metrics.k8s.io/v1alpha1"
+	out.Kind = "NodeMetrics"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Timestamp = in.Timestamp
 	out.Window = in.Window
@@ -139,7 +145,17 @@ func Convert_metrics_NodeMetrics_To_v1alpha1_NodeMetrics(in *metrics.NodeMetrics
 
 func autoConvert_v1alpha1_NodeMetricsList_To_metrics_NodeMetricsList(in *NodeMetricsList, out *metrics.NodeMetricsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]metrics.NodeMetrics)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]metrics.NodeMetrics, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_NodeMetrics_To_metrics_NodeMetrics(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -149,8 +165,24 @@ func Convert_v1alpha1_NodeMetricsList_To_metrics_NodeMetricsList(in *NodeMetrics
 }
 
 func autoConvert_metrics_NodeMetricsList_To_v1alpha1_NodeMetricsList(in *metrics.NodeMetricsList, out *NodeMetricsList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "metrics.k8s.io/v1alpha1"
+	out.Kind = "NodeMetricsList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]NodeMetrics)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]NodeMetrics, len(*in))
+		for i := range *in {
+			if err := Convert_metrics_NodeMetrics_To_v1alpha1_NodeMetrics(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -173,6 +205,12 @@ func Convert_v1alpha1_PodMetrics_To_metrics_PodMetrics(in *PodMetrics, out *metr
 }
 
 func autoConvert_metrics_PodMetrics_To_v1alpha1_PodMetrics(in *metrics.PodMetrics, out *PodMetrics, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "metrics.k8s.io/v1alpha1"
+	out.Kind = "PodMetrics"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Timestamp = in.Timestamp
 	out.Window = in.Window
@@ -187,7 +225,17 @@ func Convert_metrics_PodMetrics_To_v1alpha1_PodMetrics(in *metrics.PodMetrics, o
 
 func autoConvert_v1alpha1_PodMetricsList_To_metrics_PodMetricsList(in *PodMetricsList, out *metrics.PodMetricsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]metrics.PodMetrics)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]metrics.PodMetrics, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_PodMetrics_To_metrics_PodMetrics(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -197,8 +245,24 @@ func Convert_v1alpha1_PodMetricsList_To_metrics_PodMetricsList(in *PodMetricsLis
 }
 
 func autoConvert_metrics_PodMetricsList_To_v1alpha1_PodMetricsList(in *metrics.PodMetricsList, out *PodMetricsList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "metrics.k8s.io/v1alpha1"
+	out.Kind = "PodMetricsList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]PodMetrics)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]PodMetrics, len(*in))
+		for i := range *in {
+			if err := Convert_metrics_PodMetrics_To_v1alpha1_PodMetrics(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

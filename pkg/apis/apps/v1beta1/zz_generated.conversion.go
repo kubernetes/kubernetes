@@ -269,6 +269,12 @@ func Convert_v1beta1_ControllerRevision_To_apps_ControllerRevision(in *v1beta1.C
 }
 
 func autoConvert_apps_ControllerRevision_To_v1beta1_ControllerRevision(in *apps.ControllerRevision, out *v1beta1.ControllerRevision, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "ControllerRevision"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Data, &out.Data, s); err != nil {
 		return err
@@ -304,6 +310,12 @@ func Convert_v1beta1_ControllerRevisionList_To_apps_ControllerRevisionList(in *v
 }
 
 func autoConvert_apps_ControllerRevisionList_To_v1beta1_ControllerRevisionList(in *apps.ControllerRevisionList, out *v1beta1.ControllerRevisionList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "ControllerRevisionList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -341,6 +353,12 @@ func Convert_v1beta1_Deployment_To_apps_Deployment(in *v1beta1.Deployment, out *
 }
 
 func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *v1beta1.Deployment, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "Deployment"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -408,6 +426,12 @@ func Convert_v1beta1_DeploymentList_To_apps_DeploymentList(in *v1beta1.Deploymen
 }
 
 func autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *v1beta1.DeploymentList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "DeploymentList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -443,6 +467,12 @@ func Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *v1beta1.D
 }
 
 func autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *v1beta1.DeploymentRollback, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "DeploymentRollback"
+
 	out.Name = in.Name
 	out.UpdatedAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
 	if err := Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
@@ -667,6 +697,12 @@ func Convert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscal
 }
 
 func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "Scale"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -732,6 +768,12 @@ func Convert_v1beta1_StatefulSet_To_apps_StatefulSet(in *v1beta1.StatefulSet, ou
 }
 
 func autoConvert_apps_StatefulSet_To_v1beta1_StatefulSet(in *apps.StatefulSet, out *v1beta1.StatefulSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "StatefulSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -797,6 +839,12 @@ func Convert_v1beta1_StatefulSetList_To_apps_StatefulSetList(in *v1beta1.Statefu
 }
 
 func autoConvert_apps_StatefulSetList_To_v1beta1_StatefulSetList(in *apps.StatefulSetList, out *v1beta1.StatefulSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "StatefulSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -825,7 +873,17 @@ func autoConvert_v1beta1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1beta1.Sta
 	if err := corev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]core.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := corev1.Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_v1beta1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -843,7 +901,17 @@ func autoConvert_apps_StatefulSetSpec_To_v1beta1_StatefulSetSpec(in *apps.Statef
 	if err := corev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]v1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := corev1.Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = v1beta1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1beta1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {

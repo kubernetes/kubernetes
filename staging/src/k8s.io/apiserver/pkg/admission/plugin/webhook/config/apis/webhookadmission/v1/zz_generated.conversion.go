@@ -57,6 +57,12 @@ func Convert_v1_WebhookAdmission_To_webhookadmission_WebhookAdmission(in *Webhoo
 }
 
 func autoConvert_webhookadmission_WebhookAdmission_To_v1_WebhookAdmission(in *webhookadmission.WebhookAdmission, out *WebhookAdmission, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiserver.config.k8s.io/v1"
+	out.Kind = "WebhookAdmission"
+
 	out.KubeConfigFile = in.KubeConfigFile
 	return nil
 }

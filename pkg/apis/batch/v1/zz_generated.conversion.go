@@ -160,6 +160,12 @@ func Convert_v1_CronJob_To_batch_CronJob(in *v1.CronJob, out *batch.CronJob, s c
 }
 
 func autoConvert_batch_CronJob_To_v1_CronJob(in *batch.CronJob, out *v1.CronJob, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1"
+	out.Kind = "CronJob"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_CronJobSpec_To_v1_CronJobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -197,6 +203,12 @@ func Convert_v1_CronJobList_To_batch_CronJobList(in *v1.CronJobList, out *batch.
 }
 
 func autoConvert_batch_CronJobList_To_v1_CronJobList(in *batch.CronJobList, out *v1.CronJobList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1"
+	out.Kind = "CronJobList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -294,6 +306,12 @@ func Convert_v1_Job_To_batch_Job(in *v1.Job, out *batch.Job, s conversion.Scope)
 }
 
 func autoConvert_batch_Job_To_v1_Job(in *batch.Job, out *v1.Job, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1"
+	out.Kind = "Job"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_batch_JobSpec_To_v1_JobSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -361,6 +379,12 @@ func Convert_v1_JobList_To_batch_JobList(in *v1.JobList, out *batch.JobList, s c
 }
 
 func autoConvert_batch_JobList_To_v1_JobList(in *batch.JobList, out *v1.JobList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "batch/v1"
+	out.Kind = "JobList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

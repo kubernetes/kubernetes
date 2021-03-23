@@ -110,6 +110,12 @@ func Convert_v1alpha1_Fischer_To_wardle_Fischer(in *Fischer, out *wardle.Fischer
 }
 
 func autoConvert_wardle_Fischer_To_v1alpha1_Fischer(in *wardle.Fischer, out *Fischer, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1alpha1"
+	out.Kind = "Fischer"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.DisallowedFlunders = *(*[]string)(unsafe.Pointer(&in.DisallowedFlunders))
 	return nil
@@ -122,7 +128,17 @@ func Convert_wardle_Fischer_To_v1alpha1_Fischer(in *wardle.Fischer, out *Fischer
 
 func autoConvert_v1alpha1_FischerList_To_wardle_FischerList(in *FischerList, out *wardle.FischerList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]wardle.Fischer)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]wardle.Fischer, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_Fischer_To_wardle_Fischer(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -132,8 +148,24 @@ func Convert_v1alpha1_FischerList_To_wardle_FischerList(in *FischerList, out *wa
 }
 
 func autoConvert_wardle_FischerList_To_v1alpha1_FischerList(in *wardle.FischerList, out *FischerList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1alpha1"
+	out.Kind = "FischerList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Fischer)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Fischer, len(*in))
+		for i := range *in {
+			if err := Convert_wardle_Fischer_To_v1alpha1_Fischer(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -159,6 +191,12 @@ func Convert_v1alpha1_Flunder_To_wardle_Flunder(in *Flunder, out *wardle.Flunder
 }
 
 func autoConvert_wardle_Flunder_To_v1alpha1_Flunder(in *wardle.Flunder, out *Flunder, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1alpha1"
+	out.Kind = "Flunder"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_wardle_FlunderSpec_To_v1alpha1_FlunderSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -196,6 +234,12 @@ func Convert_v1alpha1_FlunderList_To_wardle_FlunderList(in *FlunderList, out *wa
 }
 
 func autoConvert_wardle_FlunderList_To_v1alpha1_FlunderList(in *wardle.FlunderList, out *FlunderList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1alpha1"
+	out.Kind = "FlunderList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

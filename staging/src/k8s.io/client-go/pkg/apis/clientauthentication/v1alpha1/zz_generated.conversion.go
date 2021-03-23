@@ -93,6 +93,12 @@ func Convert_v1alpha1_ExecCredential_To_clientauthentication_ExecCredential(in *
 }
 
 func autoConvert_clientauthentication_ExecCredential_To_v1alpha1_ExecCredential(in *clientauthentication.ExecCredential, out *ExecCredential, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "client.authentication.k8s.io/v1alpha1"
+	out.Kind = "ExecCredential"
+
 	if err := Convert_clientauthentication_ExecCredentialSpec_To_v1alpha1_ExecCredentialSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

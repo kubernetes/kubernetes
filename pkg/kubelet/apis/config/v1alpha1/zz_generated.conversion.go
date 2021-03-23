@@ -111,6 +111,12 @@ func Convert_v1alpha1_CredentialProviderConfig_To_config_CredentialProviderConfi
 }
 
 func autoConvert_config_CredentialProviderConfig_To_v1alpha1_CredentialProviderConfig(in *config.CredentialProviderConfig, out *v1alpha1.CredentialProviderConfig, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubelet.config.k8s.io/v1alpha1"
+	out.Kind = "CredentialProviderConfig"
+
 	out.Providers = *(*[]v1alpha1.CredentialProvider)(unsafe.Pointer(&in.Providers))
 	return nil
 }

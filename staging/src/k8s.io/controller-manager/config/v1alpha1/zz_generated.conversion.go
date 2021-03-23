@@ -148,6 +148,12 @@ func Convert_v1alpha1_LeaderMigrationConfiguration_To_config_LeaderMigrationConf
 }
 
 func autoConvert_config_LeaderMigrationConfiguration_To_v1alpha1_LeaderMigrationConfiguration(in *config.LeaderMigrationConfiguration, out *LeaderMigrationConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "controllermanager.config.k8s.io/v1alpha1"
+	out.Kind = "LeaderMigrationConfiguration"
+
 	out.LeaderName = in.LeaderName
 	out.ResourceLock = in.ResourceLock
 	out.ControllerLeaders = *(*[]ControllerLeaderConfiguration)(unsafe.Pointer(&in.ControllerLeaders))

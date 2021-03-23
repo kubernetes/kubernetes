@@ -84,6 +84,12 @@ func Convert_v1_ReplicaSet_To_example_ReplicaSet(in *ReplicaSet, out *example.Re
 }
 
 func autoConvert_example_ReplicaSet_To_v1_ReplicaSet(in *example.ReplicaSet, out *ReplicaSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "example2.apiserver.k8s.io/v1"
+	out.Kind = "ReplicaSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_example_ReplicaSetSpec_To_v1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

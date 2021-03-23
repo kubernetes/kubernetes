@@ -336,6 +336,12 @@ func Convert_v1beta1_CustomResourceDefinition_To_apiextensions_CustomResourceDef
 }
 
 func autoConvert_apiextensions_CustomResourceDefinition_To_v1beta1_CustomResourceDefinition(in *apiextensions.CustomResourceDefinition, out *CustomResourceDefinition, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiextensions.k8s.io/v1beta1"
+	out.Kind = "CustomResourceDefinition"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiextensions_CustomResourceDefinitionSpec_To_v1beta1_CustomResourceDefinitionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -401,6 +407,12 @@ func Convert_v1beta1_CustomResourceDefinitionList_To_apiextensions_CustomResourc
 }
 
 func autoConvert_apiextensions_CustomResourceDefinitionList_To_v1beta1_CustomResourceDefinitionList(in *apiextensions.CustomResourceDefinitionList, out *CustomResourceDefinitionList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiextensions.k8s.io/v1beta1"
+	out.Kind = "CustomResourceDefinitionList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

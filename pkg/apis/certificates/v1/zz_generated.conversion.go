@@ -108,6 +108,12 @@ func Convert_v1_CertificateSigningRequest_To_certificates_CertificateSigningRequ
 }
 
 func autoConvert_certificates_CertificateSigningRequest_To_v1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *v1.CertificateSigningRequest, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "certificates.k8s.io/v1"
+	out.Kind = "CertificateSigningRequest"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_certificates_CertificateSigningRequestSpec_To_v1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -155,7 +161,17 @@ func Convert_certificates_CertificateSigningRequestCondition_To_v1_CertificateSi
 
 func autoConvert_v1_CertificateSigningRequestList_To_certificates_CertificateSigningRequestList(in *v1.CertificateSigningRequestList, out *certificates.CertificateSigningRequestList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]certificates.CertificateSigningRequest)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]certificates.CertificateSigningRequest, len(*in))
+		for i := range *in {
+			if err := Convert_v1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -165,8 +181,24 @@ func Convert_v1_CertificateSigningRequestList_To_certificates_CertificateSigning
 }
 
 func autoConvert_certificates_CertificateSigningRequestList_To_v1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *v1.CertificateSigningRequestList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "certificates.k8s.io/v1"
+	out.Kind = "CertificateSigningRequestList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.CertificateSigningRequest)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.CertificateSigningRequest, len(*in))
+		for i := range *in {
+			if err := Convert_certificates_CertificateSigningRequest_To_v1_CertificateSigningRequest(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

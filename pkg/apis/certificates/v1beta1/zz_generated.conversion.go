@@ -109,6 +109,12 @@ func Convert_v1beta1_CertificateSigningRequest_To_certificates_CertificateSignin
 }
 
 func autoConvert_certificates_CertificateSigningRequest_To_v1beta1_CertificateSigningRequest(in *certificates.CertificateSigningRequest, out *v1beta1.CertificateSigningRequest, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "certificates.k8s.io/v1beta1"
+	out.Kind = "CertificateSigningRequest"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_certificates_CertificateSigningRequestSpec_To_v1beta1_CertificateSigningRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -176,6 +182,12 @@ func Convert_v1beta1_CertificateSigningRequestList_To_certificates_CertificateSi
 }
 
 func autoConvert_certificates_CertificateSigningRequestList_To_v1beta1_CertificateSigningRequestList(in *certificates.CertificateSigningRequestList, out *v1beta1.CertificateSigningRequestList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "certificates.k8s.io/v1beta1"
+	out.Kind = "CertificateSigningRequestList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

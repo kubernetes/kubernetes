@@ -259,6 +259,12 @@ func Convert_v1beta1_DefaultPreemptionArgs_To_config_DefaultPreemptionArgs(in *v
 }
 
 func autoConvert_config_DefaultPreemptionArgs_To_v1beta1_DefaultPreemptionArgs(in *config.DefaultPreemptionArgs, out *v1beta1.DefaultPreemptionArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "DefaultPreemptionArgs"
+
 	if err := v1.Convert_int32_To_Pointer_int32(&in.MinCandidateNodesPercentage, &out.MinCandidateNodesPercentage, s); err != nil {
 		return err
 	}
@@ -328,6 +334,12 @@ func Convert_v1beta1_InterPodAffinityArgs_To_config_InterPodAffinityArgs(in *v1b
 }
 
 func autoConvert_config_InterPodAffinityArgs_To_v1beta1_InterPodAffinityArgs(in *config.InterPodAffinityArgs, out *v1beta1.InterPodAffinityArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "InterPodAffinityArgs"
+
 	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinityWeight, &out.HardPodAffinityWeight, s); err != nil {
 		return err
 	}
@@ -383,6 +395,12 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 }
 
 func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfiguration(in *config.KubeSchedulerConfiguration, out *v1beta1.KubeSchedulerConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "KubeSchedulerConfiguration"
+
 	if err := v1.Convert_int32_To_Pointer_int32(&in.Parallelism, &out.Parallelism, s); err != nil {
 		return err
 	}
@@ -501,6 +519,12 @@ func Convert_v1beta1_NodeAffinityArgs_To_config_NodeAffinityArgs(in *v1beta1.Nod
 }
 
 func autoConvert_config_NodeAffinityArgs_To_v1beta1_NodeAffinityArgs(in *config.NodeAffinityArgs, out *v1beta1.NodeAffinityArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "NodeAffinityArgs"
+
 	out.AddedAffinity = (*corev1.NodeAffinity)(unsafe.Pointer(in.AddedAffinity))
 	return nil
 }
@@ -524,6 +548,12 @@ func Convert_v1beta1_NodeLabelArgs_To_config_NodeLabelArgs(in *v1beta1.NodeLabel
 }
 
 func autoConvert_config_NodeLabelArgs_To_v1beta1_NodeLabelArgs(in *config.NodeLabelArgs, out *v1beta1.NodeLabelArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "NodeLabelArgs"
+
 	out.PresentLabels = *(*[]string)(unsafe.Pointer(&in.PresentLabels))
 	out.AbsentLabels = *(*[]string)(unsafe.Pointer(&in.AbsentLabels))
 	out.PresentLabelsPreference = *(*[]string)(unsafe.Pointer(&in.PresentLabelsPreference))
@@ -548,6 +578,12 @@ func Convert_v1beta1_NodeResourcesFitArgs_To_config_NodeResourcesFitArgs(in *v1b
 }
 
 func autoConvert_config_NodeResourcesFitArgs_To_v1beta1_NodeResourcesFitArgs(in *config.NodeResourcesFitArgs, out *v1beta1.NodeResourcesFitArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "NodeResourcesFitArgs"
+
 	out.IgnoredResources = *(*[]string)(unsafe.Pointer(&in.IgnoredResources))
 	out.IgnoredResourceGroups = *(*[]string)(unsafe.Pointer(&in.IgnoredResourceGroups))
 	return nil
@@ -569,6 +605,12 @@ func Convert_v1beta1_NodeResourcesLeastAllocatedArgs_To_config_NodeResourcesLeas
 }
 
 func autoConvert_config_NodeResourcesLeastAllocatedArgs_To_v1beta1_NodeResourcesLeastAllocatedArgs(in *config.NodeResourcesLeastAllocatedArgs, out *v1beta1.NodeResourcesLeastAllocatedArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "NodeResourcesLeastAllocatedArgs"
+
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
@@ -589,6 +631,12 @@ func Convert_v1beta1_NodeResourcesMostAllocatedArgs_To_config_NodeResourcesMostA
 }
 
 func autoConvert_config_NodeResourcesMostAllocatedArgs_To_v1beta1_NodeResourcesMostAllocatedArgs(in *config.NodeResourcesMostAllocatedArgs, out *v1beta1.NodeResourcesMostAllocatedArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "NodeResourcesMostAllocatedArgs"
+
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
 }
@@ -749,6 +797,12 @@ func Convert_v1beta1_PodTopologySpreadArgs_To_config_PodTopologySpreadArgs(in *v
 }
 
 func autoConvert_config_PodTopologySpreadArgs_To_v1beta1_PodTopologySpreadArgs(in *config.PodTopologySpreadArgs, out *v1beta1.PodTopologySpreadArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "PodTopologySpreadArgs"
+
 	out.DefaultConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.DefaultConstraints))
 	out.DefaultingType = v1beta1.PodTopologySpreadConstraintsDefaulting(in.DefaultingType)
 	return nil
@@ -771,6 +825,12 @@ func Convert_v1beta1_RequestedToCapacityRatioArgs_To_config_RequestedToCapacityR
 }
 
 func autoConvert_config_RequestedToCapacityRatioArgs_To_v1beta1_RequestedToCapacityRatioArgs(in *config.RequestedToCapacityRatioArgs, out *v1beta1.RequestedToCapacityRatioArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "RequestedToCapacityRatioArgs"
+
 	out.Shape = *(*[]v1beta1.UtilizationShapePoint)(unsafe.Pointer(&in.Shape))
 	out.Resources = *(*[]v1beta1.ResourceSpec)(unsafe.Pointer(&in.Resources))
 	return nil
@@ -815,6 +875,12 @@ func Convert_v1beta1_ServiceAffinityArgs_To_config_ServiceAffinityArgs(in *v1bet
 }
 
 func autoConvert_config_ServiceAffinityArgs_To_v1beta1_ServiceAffinityArgs(in *config.ServiceAffinityArgs, out *v1beta1.ServiceAffinityArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "ServiceAffinityArgs"
+
 	out.AffinityLabels = *(*[]string)(unsafe.Pointer(&in.AffinityLabels))
 	out.AntiAffinityLabelsPreference = *(*[]string)(unsafe.Pointer(&in.AntiAffinityLabelsPreference))
 	return nil
@@ -860,6 +926,12 @@ func Convert_v1beta1_VolumeBindingArgs_To_config_VolumeBindingArgs(in *v1beta1.V
 }
 
 func autoConvert_config_VolumeBindingArgs_To_v1beta1_VolumeBindingArgs(in *config.VolumeBindingArgs, out *v1beta1.VolumeBindingArgs, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1beta1"
+	out.Kind = "VolumeBindingArgs"
+
 	if err := v1.Convert_int64_To_Pointer_int64(&in.BindTimeoutSeconds, &out.BindTimeoutSeconds, s); err != nil {
 		return err
 	}

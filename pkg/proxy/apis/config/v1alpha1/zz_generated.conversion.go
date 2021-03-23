@@ -132,6 +132,12 @@ func Convert_v1alpha1_KubeProxyConfiguration_To_config_KubeProxyConfiguration(in
 }
 
 func autoConvert_config_KubeProxyConfiguration_To_v1alpha1_KubeProxyConfiguration(in *config.KubeProxyConfiguration, out *v1alpha1.KubeProxyConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubeproxy.config.k8s.io/v1alpha1"
+	out.Kind = "KubeProxyConfiguration"
+
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.BindAddress = in.BindAddress
 	out.HealthzBindAddress = in.HealthzBindAddress

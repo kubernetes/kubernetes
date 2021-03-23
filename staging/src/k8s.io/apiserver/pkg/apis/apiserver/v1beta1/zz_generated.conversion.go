@@ -167,6 +167,12 @@ func Convert_v1beta1_EgressSelectorConfiguration_To_apiserver_EgressSelectorConf
 }
 
 func autoConvert_apiserver_EgressSelectorConfiguration_To_v1beta1_EgressSelectorConfiguration(in *apiserver.EgressSelectorConfiguration, out *EgressSelectorConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiserver.k8s.io/v1beta1"
+	out.Kind = "EgressSelectorConfiguration"
+
 	out.EgressSelections = *(*[]EgressSelection)(unsafe.Pointer(&in.EgressSelections))
 	return nil
 }

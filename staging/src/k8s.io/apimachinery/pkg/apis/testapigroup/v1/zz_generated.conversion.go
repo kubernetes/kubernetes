@@ -106,6 +106,12 @@ func Convert_v1_Carp_To_testapigroup_Carp(in *Carp, out *testapigroup.Carp, s co
 }
 
 func autoConvert_testapigroup_Carp_To_v1_Carp(in *testapigroup.Carp, out *Carp, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "testapigroup.apimachinery.k8s.io/v1"
+	out.Kind = "Carp"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_testapigroup_CarpSpec_To_v1_CarpSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -173,6 +179,12 @@ func Convert_v1_CarpList_To_testapigroup_CarpList(in *CarpList, out *testapigrou
 }
 
 func autoConvert_testapigroup_CarpList_To_v1_CarpList(in *testapigroup.CarpList, out *CarpList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "testapigroup.apimachinery.k8s.io/v1"
+	out.Kind = "CarpList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

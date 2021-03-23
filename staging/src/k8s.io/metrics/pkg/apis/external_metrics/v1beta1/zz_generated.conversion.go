@@ -73,6 +73,12 @@ func Convert_v1beta1_ExternalMetricValue_To_external_metrics_ExternalMetricValue
 }
 
 func autoConvert_external_metrics_ExternalMetricValue_To_v1beta1_ExternalMetricValue(in *externalmetrics.ExternalMetricValue, out *ExternalMetricValue, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "external_metrics/v1beta1"
+	out.Kind = "ExternalMetricValue"
+
 	out.MetricName = in.MetricName
 	out.MetricLabels = *(*map[string]string)(unsafe.Pointer(&in.MetricLabels))
 	out.Timestamp = in.Timestamp
@@ -88,7 +94,17 @@ func Convert_external_metrics_ExternalMetricValue_To_v1beta1_ExternalMetricValue
 
 func autoConvert_v1beta1_ExternalMetricValueList_To_external_metrics_ExternalMetricValueList(in *ExternalMetricValueList, out *externalmetrics.ExternalMetricValueList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]externalmetrics.ExternalMetricValue)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]externalmetrics.ExternalMetricValue, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_ExternalMetricValue_To_external_metrics_ExternalMetricValue(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -98,8 +114,24 @@ func Convert_v1beta1_ExternalMetricValueList_To_external_metrics_ExternalMetricV
 }
 
 func autoConvert_external_metrics_ExternalMetricValueList_To_v1beta1_ExternalMetricValueList(in *externalmetrics.ExternalMetricValueList, out *ExternalMetricValueList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "external_metrics/v1beta1"
+	out.Kind = "ExternalMetricValueList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]ExternalMetricValue)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]ExternalMetricValue, len(*in))
+		for i := range *in {
+			if err := Convert_external_metrics_ExternalMetricValue_To_v1beta1_ExternalMetricValue(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

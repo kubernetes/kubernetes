@@ -76,6 +76,12 @@ func Convert_v1alpha1_PriorityClass_To_scheduling_PriorityClass(in *v1alpha1.Pri
 }
 
 func autoConvert_scheduling_PriorityClass_To_v1alpha1_PriorityClass(in *scheduling.PriorityClass, out *v1alpha1.PriorityClass, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "scheduling.k8s.io/v1alpha1"
+	out.Kind = "PriorityClass"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Value = in.Value
 	out.GlobalDefault = in.GlobalDefault
@@ -91,7 +97,17 @@ func Convert_scheduling_PriorityClass_To_v1alpha1_PriorityClass(in *scheduling.P
 
 func autoConvert_v1alpha1_PriorityClassList_To_scheduling_PriorityClassList(in *v1alpha1.PriorityClassList, out *scheduling.PriorityClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]scheduling.PriorityClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]scheduling.PriorityClass, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_PriorityClass_To_scheduling_PriorityClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -101,8 +117,24 @@ func Convert_v1alpha1_PriorityClassList_To_scheduling_PriorityClassList(in *v1al
 }
 
 func autoConvert_scheduling_PriorityClassList_To_v1alpha1_PriorityClassList(in *scheduling.PriorityClassList, out *v1alpha1.PriorityClassList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "scheduling.k8s.io/v1alpha1"
+	out.Kind = "PriorityClassList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.PriorityClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha1.PriorityClass, len(*in))
+		for i := range *in {
+			if err := Convert_scheduling_PriorityClass_To_v1alpha1_PriorityClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

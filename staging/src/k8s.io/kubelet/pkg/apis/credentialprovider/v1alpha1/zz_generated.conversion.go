@@ -102,6 +102,12 @@ func Convert_v1alpha1_CredentialProviderRequest_To_credentialprovider_Credential
 }
 
 func autoConvert_credentialprovider_CredentialProviderRequest_To_v1alpha1_CredentialProviderRequest(in *credentialprovider.CredentialProviderRequest, out *CredentialProviderRequest, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "credentialprovider.kubelet.k8s.io/v1alpha1"
+	out.Kind = "CredentialProviderRequest"
+
 	out.Image = in.Image
 	return nil
 }
@@ -124,6 +130,12 @@ func Convert_v1alpha1_CredentialProviderResponse_To_credentialprovider_Credentia
 }
 
 func autoConvert_credentialprovider_CredentialProviderResponse_To_v1alpha1_CredentialProviderResponse(in *credentialprovider.CredentialProviderResponse, out *CredentialProviderResponse, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "credentialprovider.kubelet.k8s.io/v1alpha1"
+	out.Kind = "CredentialProviderResponse"
+
 	out.CacheKeyType = PluginCacheKeyType(in.CacheKeyType)
 	out.CacheDuration = (*v1.Duration)(unsafe.Pointer(in.CacheDuration))
 	out.Auth = *(*map[string]AuthConfig)(unsafe.Pointer(&in.Auth))

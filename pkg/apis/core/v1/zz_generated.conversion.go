@@ -1091,16 +1091,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PersistentVolumeClaim)(nil), (*core.PersistentVolumeClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(a.(*v1.PersistentVolumeClaim), b.(*core.PersistentVolumeClaim), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PersistentVolumeClaim)(nil), (*v1.PersistentVolumeClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(a.(*core.PersistentVolumeClaim), b.(*v1.PersistentVolumeClaim), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.PersistentVolumeClaimCondition)(nil), (*core.PersistentVolumeClaimCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PersistentVolumeClaimCondition_To_core_PersistentVolumeClaimCondition(a.(*v1.PersistentVolumeClaimCondition), b.(*core.PersistentVolumeClaimCondition), scope)
 	}); err != nil {
@@ -2086,6 +2076,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*core.PersistentVolumeClaim)(nil), (*v1.PersistentVolumeClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(a.(*core.PersistentVolumeClaim), b.(*v1.PersistentVolumeClaim), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*core.PersistentVolumeSpec)(nil), (*v1.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(a.(*core.PersistentVolumeSpec), b.(*v1.PersistentVolumeSpec), scope)
 	}); err != nil {
@@ -2128,6 +2123,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*v1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*v1.NodeSpec), b.(*core.NodeSpec), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.PersistentVolumeClaim)(nil), (*core.PersistentVolumeClaim)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(a.(*v1.PersistentVolumeClaim), b.(*core.PersistentVolumeClaim), scope)
 	}); err != nil {
 		return err
 	}
@@ -2380,6 +2380,12 @@ func Convert_v1_Binding_To_core_Binding(in *v1.Binding, out *core.Binding, s con
 }
 
 func autoConvert_core_Binding_To_v1_Binding(in *core.Binding, out *v1.Binding, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Binding"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_ObjectReference_To_v1_ObjectReference(&in.Target, &out.Target, s); err != nil {
 		return err
@@ -2648,6 +2654,12 @@ func Convert_v1_ComponentStatus_To_core_ComponentStatus(in *v1.ComponentStatus, 
 }
 
 func autoConvert_core_ComponentStatus_To_v1_ComponentStatus(in *core.ComponentStatus, out *v1.ComponentStatus, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ComponentStatus"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Conditions = *(*[]v1.ComponentCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
@@ -2660,7 +2672,17 @@ func Convert_core_ComponentStatus_To_v1_ComponentStatus(in *core.ComponentStatus
 
 func autoConvert_v1_ComponentStatusList_To_core_ComponentStatusList(in *v1.ComponentStatusList, out *core.ComponentStatusList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.ComponentStatus)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.ComponentStatus, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ComponentStatus_To_core_ComponentStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2670,8 +2692,24 @@ func Convert_v1_ComponentStatusList_To_core_ComponentStatusList(in *v1.Component
 }
 
 func autoConvert_core_ComponentStatusList_To_v1_ComponentStatusList(in *core.ComponentStatusList, out *v1.ComponentStatusList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ComponentStatusList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ComponentStatus)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ComponentStatus, len(*in))
+		for i := range *in {
+			if err := Convert_core_ComponentStatus_To_v1_ComponentStatus(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2694,6 +2732,12 @@ func Convert_v1_ConfigMap_To_core_ConfigMap(in *v1.ConfigMap, out *core.ConfigMa
 }
 
 func autoConvert_core_ConfigMap_To_v1_ConfigMap(in *core.ConfigMap, out *v1.ConfigMap, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ConfigMap"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Immutable = (*bool)(unsafe.Pointer(in.Immutable))
 	out.Data = *(*map[string]string)(unsafe.Pointer(&in.Data))
@@ -2762,7 +2806,17 @@ func Convert_core_ConfigMapKeySelector_To_v1_ConfigMapKeySelector(in *core.Confi
 
 func autoConvert_v1_ConfigMapList_To_core_ConfigMapList(in *v1.ConfigMapList, out *core.ConfigMapList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.ConfigMap)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.ConfigMap, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ConfigMap_To_core_ConfigMap(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -2772,8 +2826,24 @@ func Convert_v1_ConfigMapList_To_core_ConfigMapList(in *v1.ConfigMapList, out *c
 }
 
 func autoConvert_core_ConfigMapList_To_v1_ConfigMapList(in *core.ConfigMapList, out *v1.ConfigMapList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ConfigMapList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ConfigMap)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ConfigMap, len(*in))
+		for i := range *in {
+			if err := Convert_core_ConfigMap_To_v1_ConfigMap(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -3324,6 +3394,12 @@ func Convert_v1_Endpoints_To_core_Endpoints(in *v1.Endpoints, out *core.Endpoint
 }
 
 func autoConvert_core_Endpoints_To_v1_Endpoints(in *core.Endpoints, out *v1.Endpoints, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Endpoints"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Subsets = *(*[]v1.EndpointSubset)(unsafe.Pointer(&in.Subsets))
 	return nil
@@ -3336,7 +3412,17 @@ func Convert_core_Endpoints_To_v1_Endpoints(in *core.Endpoints, out *v1.Endpoint
 
 func autoConvert_v1_EndpointsList_To_core_EndpointsList(in *v1.EndpointsList, out *core.EndpointsList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.Endpoints)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.Endpoints, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Endpoints_To_core_Endpoints(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -3346,8 +3432,24 @@ func Convert_v1_EndpointsList_To_core_EndpointsList(in *v1.EndpointsList, out *c
 }
 
 func autoConvert_core_EndpointsList_To_v1_EndpointsList(in *core.EndpointsList, out *v1.EndpointsList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "EndpointsList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Endpoints)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Endpoints, len(*in))
+		for i := range *in {
+			if err := Convert_core_Endpoints_To_v1_Endpoints(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -3534,6 +3636,12 @@ func Convert_v1_EphemeralContainers_To_core_EphemeralContainers(in *v1.Ephemeral
 }
 
 func autoConvert_core_EphemeralContainers_To_v1_EphemeralContainers(in *core.EphemeralContainers, out *v1.EphemeralContainers, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "EphemeralContainers"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.EphemeralContainers = *(*[]v1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	return nil
@@ -3593,6 +3701,12 @@ func Convert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s conversion.
 }
 
 func autoConvert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Event"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_ObjectReference_To_v1_ObjectReference(&in.InvolvedObject, &out.InvolvedObject, s); err != nil {
 		return err
@@ -3622,7 +3736,17 @@ func Convert_core_Event_To_v1_Event(in *core.Event, out *v1.Event, s conversion.
 
 func autoConvert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.Event)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.Event, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Event_To_core_Event(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -3632,8 +3756,24 @@ func Convert_v1_EventList_To_core_EventList(in *v1.EventList, out *core.EventLis
 }
 
 func autoConvert_core_EventList_To_v1_EventList(in *core.EventList, out *v1.EventList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "EventList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Event)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Event, len(*in))
+		for i := range *in {
+			if err := Convert_core_Event_To_v1_Event(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4170,6 +4310,12 @@ func Convert_v1_LimitRange_To_core_LimitRange(in *v1.LimitRange, out *core.Limit
 }
 
 func autoConvert_core_LimitRange_To_v1_LimitRange(in *core.LimitRange, out *v1.LimitRange, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "LimitRange"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_LimitRangeSpec_To_v1_LimitRangeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -4214,7 +4360,17 @@ func Convert_core_LimitRangeItem_To_v1_LimitRangeItem(in *core.LimitRangeItem, o
 
 func autoConvert_v1_LimitRangeList_To_core_LimitRangeList(in *v1.LimitRangeList, out *core.LimitRangeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.LimitRange)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.LimitRange, len(*in))
+		for i := range *in {
+			if err := Convert_v1_LimitRange_To_core_LimitRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4224,8 +4380,24 @@ func Convert_v1_LimitRangeList_To_core_LimitRangeList(in *v1.LimitRangeList, out
 }
 
 func autoConvert_core_LimitRangeList_To_v1_LimitRangeList(in *core.LimitRangeList, out *v1.LimitRangeList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "LimitRangeList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.LimitRange)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.LimitRange, len(*in))
+		for i := range *in {
+			if err := Convert_core_LimitRange_To_v1_LimitRange(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4276,6 +4448,12 @@ func Convert_v1_List_To_core_List(in *v1.List, out *core.List, s conversion.Scop
 }
 
 func autoConvert_core_List_To_v1_List(in *core.List, out *v1.List, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "List"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -4413,6 +4591,12 @@ func Convert_v1_Namespace_To_core_Namespace(in *v1.Namespace, out *core.Namespac
 }
 
 func autoConvert_core_Namespace_To_v1_Namespace(in *core.Namespace, out *v1.Namespace, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Namespace"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_NamespaceSpec_To_v1_NamespaceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -4458,7 +4642,17 @@ func Convert_core_NamespaceCondition_To_v1_NamespaceCondition(in *core.Namespace
 
 func autoConvert_v1_NamespaceList_To_core_NamespaceList(in *v1.NamespaceList, out *core.NamespaceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.Namespace)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.Namespace, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Namespace_To_core_Namespace(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4468,8 +4662,24 @@ func Convert_v1_NamespaceList_To_core_NamespaceList(in *v1.NamespaceList, out *c
 }
 
 func autoConvert_core_NamespaceList_To_v1_NamespaceList(in *core.NamespaceList, out *v1.NamespaceList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "NamespaceList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Namespace)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Namespace, len(*in))
+		for i := range *in {
+			if err := Convert_core_Namespace_To_v1_Namespace(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -4537,6 +4747,12 @@ func Convert_v1_Node_To_core_Node(in *v1.Node, out *core.Node, s conversion.Scop
 }
 
 func autoConvert_core_Node_To_v1_Node(in *core.Node, out *v1.Node, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Node"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_NodeSpec_To_v1_NodeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -4718,6 +4934,12 @@ func Convert_v1_NodeList_To_core_NodeList(in *v1.NodeList, out *core.NodeList, s
 }
 
 func autoConvert_core_NodeList_To_v1_NodeList(in *core.NodeList, out *v1.NodeList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "NodeList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -4749,6 +4971,12 @@ func Convert_v1_NodeProxyOptions_To_core_NodeProxyOptions(in *v1.NodeProxyOption
 }
 
 func autoConvert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in *core.NodeProxyOptions, out *v1.NodeProxyOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "NodeProxyOptions"
+
 	out.Path = in.Path
 	return nil
 }
@@ -5040,6 +5268,12 @@ func Convert_v1_PersistentVolume_To_core_PersistentVolume(in *v1.PersistentVolum
 }
 
 func autoConvert_core_PersistentVolume_To_v1_PersistentVolume(in *core.PersistentVolume, out *v1.PersistentVolume, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PersistentVolume"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -5066,12 +5300,13 @@ func autoConvert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(in *v1.P
 	return nil
 }
 
-// Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim is an autogenerated conversion function.
-func Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(in *v1.PersistentVolumeClaim, out *core.PersistentVolumeClaim, s conversion.Scope) error {
-	return autoConvert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(in, out, s)
-}
-
 func autoConvert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *core.PersistentVolumeClaim, out *v1.PersistentVolumeClaim, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PersistentVolumeClaim"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_PersistentVolumeClaimSpec_To_v1_PersistentVolumeClaimSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -5080,11 +5315,6 @@ func autoConvert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *core
 		return err
 	}
 	return nil
-}
-
-// Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim is an autogenerated conversion function.
-func Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in *core.PersistentVolumeClaim, out *v1.PersistentVolumeClaim, s conversion.Scope) error {
-	return autoConvert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(in, out, s)
 }
 
 func autoConvert_v1_PersistentVolumeClaimCondition_To_core_PersistentVolumeClaimCondition(in *v1.PersistentVolumeClaimCondition, out *core.PersistentVolumeClaimCondition, s conversion.Scope) error {
@@ -5119,7 +5349,17 @@ func Convert_core_PersistentVolumeClaimCondition_To_v1_PersistentVolumeClaimCond
 
 func autoConvert_v1_PersistentVolumeClaimList_To_core_PersistentVolumeClaimList(in *v1.PersistentVolumeClaimList, out *core.PersistentVolumeClaimList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -5129,8 +5369,24 @@ func Convert_v1_PersistentVolumeClaimList_To_core_PersistentVolumeClaimList(in *
 }
 
 func autoConvert_core_PersistentVolumeClaimList_To_v1_PersistentVolumeClaimList(in *core.PersistentVolumeClaimList, out *v1.PersistentVolumeClaimList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PersistentVolumeClaimList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.PersistentVolumeClaim)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -5271,6 +5527,12 @@ func Convert_v1_PersistentVolumeList_To_core_PersistentVolumeList(in *v1.Persist
 }
 
 func autoConvert_core_PersistentVolumeList_To_v1_PersistentVolumeList(in *core.PersistentVolumeList, out *v1.PersistentVolumeList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PersistentVolumeList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -5441,6 +5703,12 @@ func autoConvert_v1_Pod_To_core_Pod(in *v1.Pod, out *core.Pod, s conversion.Scop
 }
 
 func autoConvert_core_Pod_To_v1_Pod(in *core.Pod, out *v1.Pod, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Pod"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -5536,6 +5804,12 @@ func Convert_v1_PodAttachOptions_To_core_PodAttachOptions(in *v1.PodAttachOption
 }
 
 func autoConvert_core_PodAttachOptions_To_v1_PodAttachOptions(in *core.PodAttachOptions, out *v1.PodAttachOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodAttachOptions"
+
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5687,6 +5961,12 @@ func Convert_v1_PodExecOptions_To_core_PodExecOptions(in *v1.PodExecOptions, out
 }
 
 func autoConvert_core_PodExecOptions_To_v1_PodExecOptions(in *core.PodExecOptions, out *v1.PodExecOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodExecOptions"
+
 	out.Stdin = in.Stdin
 	out.Stdout = in.Stdout
 	out.Stderr = in.Stderr
@@ -5794,6 +6074,12 @@ func Convert_v1_PodList_To_core_PodList(in *v1.PodList, out *core.PodList, s con
 }
 
 func autoConvert_core_PodList_To_v1_PodList(in *core.PodList, out *v1.PodList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -5833,6 +6119,12 @@ func Convert_v1_PodLogOptions_To_core_PodLogOptions(in *v1.PodLogOptions, out *c
 }
 
 func autoConvert_core_PodLogOptions_To_v1_PodLogOptions(in *core.PodLogOptions, out *v1.PodLogOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodLogOptions"
+
 	out.Container = in.Container
 	out.Follow = in.Follow
 	out.Previous = in.Previous
@@ -5935,6 +6227,12 @@ func Convert_v1_PodPortForwardOptions_To_core_PodPortForwardOptions(in *v1.PodPo
 }
 
 func autoConvert_core_PodPortForwardOptions_To_v1_PodPortForwardOptions(in *core.PodPortForwardOptions, out *v1.PodPortForwardOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodPortForwardOptions"
+
 	out.Ports = *(*[]int32)(unsafe.Pointer(&in.Ports))
 	return nil
 }
@@ -5973,6 +6271,12 @@ func Convert_v1_PodProxyOptions_To_core_PodProxyOptions(in *v1.PodProxyOptions, 
 }
 
 func autoConvert_core_PodProxyOptions_To_v1_PodProxyOptions(in *core.PodProxyOptions, out *v1.PodProxyOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodProxyOptions"
+
 	out.Path = in.Path
 	return nil
 }
@@ -6238,6 +6542,12 @@ func Convert_v1_PodStatusResult_To_core_PodStatusResult(in *v1.PodStatusResult, 
 }
 
 func autoConvert_core_PodStatusResult_To_v1_PodStatusResult(in *core.PodStatusResult, out *v1.PodStatusResult, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodStatusResult"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_PodStatus_To_v1_PodStatus(&in.Status, &out.Status, s); err != nil {
 		return err
@@ -6264,6 +6574,12 @@ func Convert_v1_PodTemplate_To_core_PodTemplate(in *v1.PodTemplate, out *core.Po
 }
 
 func autoConvert_core_PodTemplate_To_v1_PodTemplate(in *core.PodTemplate, out *v1.PodTemplate, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodTemplate"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
@@ -6298,6 +6614,12 @@ func Convert_v1_PodTemplateList_To_core_PodTemplateList(in *v1.PodTemplateList, 
 }
 
 func autoConvert_core_PodTemplateList_To_v1_PodTemplateList(in *core.PodTemplateList, out *v1.PodTemplateList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "PodTemplateList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -6647,6 +6969,12 @@ func Convert_v1_RangeAllocation_To_core_RangeAllocation(in *v1.RangeAllocation, 
 }
 
 func autoConvert_core_RangeAllocation_To_v1_RangeAllocation(in *core.RangeAllocation, out *v1.RangeAllocation, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "RangeAllocation"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Range = in.Range
 	out.Data = *(*[]byte)(unsafe.Pointer(&in.Data))
@@ -6675,6 +7003,12 @@ func Convert_v1_ReplicationController_To_core_ReplicationController(in *v1.Repli
 }
 
 func autoConvert_core_ReplicationController_To_v1_ReplicationController(in *core.ReplicationController, out *v1.ReplicationController, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ReplicationController"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -6740,6 +7074,12 @@ func Convert_v1_ReplicationControllerList_To_core_ReplicationControllerList(in *
 }
 
 func autoConvert_core_ReplicationControllerList_To_v1_ReplicationControllerList(in *core.ReplicationControllerList, out *v1.ReplicationControllerList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ReplicationControllerList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -6867,6 +7207,12 @@ func Convert_v1_ResourceQuota_To_core_ResourceQuota(in *v1.ResourceQuota, out *c
 }
 
 func autoConvert_core_ResourceQuota_To_v1_ResourceQuota(in *core.ResourceQuota, out *v1.ResourceQuota, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ResourceQuota"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_ResourceQuotaSpec_To_v1_ResourceQuotaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -6884,7 +7230,17 @@ func Convert_core_ResourceQuota_To_v1_ResourceQuota(in *core.ResourceQuota, out 
 
 func autoConvert_v1_ResourceQuotaList_To_core_ResourceQuotaList(in *v1.ResourceQuotaList, out *core.ResourceQuotaList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.ResourceQuota)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.ResourceQuota, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ResourceQuota_To_core_ResourceQuota(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -6894,8 +7250,24 @@ func Convert_v1_ResourceQuotaList_To_core_ResourceQuotaList(in *v1.ResourceQuota
 }
 
 func autoConvert_core_ResourceQuotaList_To_v1_ResourceQuotaList(in *core.ResourceQuotaList, out *v1.ResourceQuotaList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ResourceQuotaList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ResourceQuota)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ResourceQuota, len(*in))
+		for i := range *in {
+			if err := Convert_core_ResourceQuota_To_v1_ResourceQuota(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -7150,6 +7522,12 @@ func autoConvert_v1_Secret_To_core_Secret(in *v1.Secret, out *core.Secret, s con
 }
 
 func autoConvert_core_Secret_To_v1_Secret(in *core.Secret, out *v1.Secret, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Secret"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Immutable = (*bool)(unsafe.Pointer(in.Immutable))
 	out.Data = *(*map[string][]byte)(unsafe.Pointer(&in.Data))
@@ -7238,6 +7616,12 @@ func Convert_v1_SecretList_To_core_SecretList(in *v1.SecretList, out *core.Secre
 }
 
 func autoConvert_core_SecretList_To_v1_SecretList(in *core.SecretList, out *v1.SecretList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "SecretList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -7387,6 +7771,12 @@ func Convert_v1_SerializedReference_To_core_SerializedReference(in *v1.Serialize
 }
 
 func autoConvert_core_SerializedReference_To_v1_SerializedReference(in *core.SerializedReference, out *v1.SerializedReference, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "SerializedReference"
+
 	if err := Convert_core_ObjectReference_To_v1_ObjectReference(&in.Reference, &out.Reference, s); err != nil {
 		return err
 	}
@@ -7415,6 +7805,12 @@ func Convert_v1_Service_To_core_Service(in *v1.Service, out *core.Service, s con
 }
 
 func autoConvert_core_Service_To_v1_Service(in *core.Service, out *v1.Service, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Service"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_core_ServiceSpec_To_v1_ServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -7444,6 +7840,12 @@ func Convert_v1_ServiceAccount_To_core_ServiceAccount(in *v1.ServiceAccount, out
 }
 
 func autoConvert_core_ServiceAccount_To_v1_ServiceAccount(in *core.ServiceAccount, out *v1.ServiceAccount, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ServiceAccount"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Secrets = *(*[]v1.ObjectReference)(unsafe.Pointer(&in.Secrets))
 	out.ImagePullSecrets = *(*[]v1.LocalObjectReference)(unsafe.Pointer(&in.ImagePullSecrets))
@@ -7458,7 +7860,17 @@ func Convert_core_ServiceAccount_To_v1_ServiceAccount(in *core.ServiceAccount, o
 
 func autoConvert_v1_ServiceAccountList_To_core_ServiceAccountList(in *v1.ServiceAccountList, out *core.ServiceAccountList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]core.ServiceAccount)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]core.ServiceAccount, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ServiceAccount_To_core_ServiceAccount(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -7468,8 +7880,24 @@ func Convert_v1_ServiceAccountList_To_core_ServiceAccountList(in *v1.ServiceAcco
 }
 
 func autoConvert_core_ServiceAccountList_To_v1_ServiceAccountList(in *core.ServiceAccountList, out *v1.ServiceAccountList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ServiceAccountList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ServiceAccount)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ServiceAccount, len(*in))
+		for i := range *in {
+			if err := Convert_core_ServiceAccount_To_v1_ServiceAccount(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -7528,6 +7956,12 @@ func Convert_v1_ServiceList_To_core_ServiceList(in *v1.ServiceList, out *core.Se
 }
 
 func autoConvert_core_ServiceList_To_v1_ServiceList(in *core.ServiceList, out *v1.ServiceList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ServiceList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -7589,6 +8023,12 @@ func Convert_v1_ServiceProxyOptions_To_core_ServiceProxyOptions(in *v1.ServicePr
 }
 
 func autoConvert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *core.ServiceProxyOptions, out *v1.ServiceProxyOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "ServiceProxyOptions"
+
 	out.Path = in.Path
 	return nil
 }

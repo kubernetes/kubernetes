@@ -483,6 +483,12 @@ func autoConvert_v2beta2_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAut
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta2_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *v2beta2.HorizontalPodAutoscaler, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "autoscaling/v2beta2"
+	out.Kind = "HorizontalPodAutoscaler"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta2_HorizontalPodAutoscalerSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -565,6 +571,12 @@ func Convert_v2beta2_HorizontalPodAutoscalerList_To_autoscaling_HorizontalPodAut
 }
 
 func autoConvert_autoscaling_HorizontalPodAutoscalerList_To_v2beta2_HorizontalPodAutoscalerList(in *autoscaling.HorizontalPodAutoscalerList, out *v2beta2.HorizontalPodAutoscalerList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "autoscaling/v2beta2"
+	out.Kind = "HorizontalPodAutoscalerList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

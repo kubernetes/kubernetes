@@ -137,6 +137,12 @@ func Convert_v1_Event_To_audit_Event(in *Event, out *audit.Event, s conversion.S
 }
 
 func autoConvert_audit_Event_To_v1_Event(in *audit.Event, out *Event, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "audit.k8s.io/v1"
+	out.Kind = "Event"
+
 	out.Level = Level(in.Level)
 	out.AuditID = types.UID(in.AuditID)
 	out.Stage = Stage(in.Stage)
@@ -163,7 +169,17 @@ func Convert_audit_Event_To_v1_Event(in *audit.Event, out *Event, s conversion.S
 
 func autoConvert_v1_EventList_To_audit_EventList(in *EventList, out *audit.EventList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]audit.Event)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]audit.Event, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Event_To_audit_Event(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -173,8 +189,24 @@ func Convert_v1_EventList_To_audit_EventList(in *EventList, out *audit.EventList
 }
 
 func autoConvert_audit_EventList_To_v1_EventList(in *audit.EventList, out *EventList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "audit.k8s.io/v1"
+	out.Kind = "EventList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Event)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Event, len(*in))
+		for i := range *in {
+			if err := Convert_audit_Event_To_v1_Event(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -254,6 +286,12 @@ func Convert_v1_Policy_To_audit_Policy(in *Policy, out *audit.Policy, s conversi
 }
 
 func autoConvert_audit_Policy_To_v1_Policy(in *audit.Policy, out *Policy, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "audit.k8s.io/v1"
+	out.Kind = "Policy"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]PolicyRule)(unsafe.Pointer(&in.Rules))
 	out.OmitStages = *(*[]Stage)(unsafe.Pointer(&in.OmitStages))
@@ -267,7 +305,17 @@ func Convert_audit_Policy_To_v1_Policy(in *audit.Policy, out *Policy, s conversi
 
 func autoConvert_v1_PolicyList_To_audit_PolicyList(in *PolicyList, out *audit.PolicyList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]audit.Policy)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]audit.Policy, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Policy_To_audit_Policy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -277,8 +325,24 @@ func Convert_v1_PolicyList_To_audit_PolicyList(in *PolicyList, out *audit.Policy
 }
 
 func autoConvert_audit_PolicyList_To_v1_PolicyList(in *audit.PolicyList, out *PolicyList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "audit.k8s.io/v1"
+	out.Kind = "PolicyList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Policy)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Policy, len(*in))
+		for i := range *in {
+			if err := Convert_audit_Policy_To_v1_Policy(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

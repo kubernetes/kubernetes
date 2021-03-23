@@ -296,6 +296,12 @@ func Convert_v1beta1_FlowSchema_To_flowcontrol_FlowSchema(in *v1beta1.FlowSchema
 }
 
 func autoConvert_flowcontrol_FlowSchema_To_v1beta1_FlowSchema(in *flowcontrol.FlowSchema, out *v1beta1.FlowSchema, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "flowcontrol.apiserver.k8s.io/v1beta1"
+	out.Kind = "FlowSchema"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_flowcontrol_FlowSchemaSpec_To_v1beta1_FlowSchemaSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -341,7 +347,17 @@ func Convert_flowcontrol_FlowSchemaCondition_To_v1beta1_FlowSchemaCondition(in *
 
 func autoConvert_v1beta1_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *v1beta1.FlowSchemaList, out *flowcontrol.FlowSchemaList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]flowcontrol.FlowSchema)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]flowcontrol.FlowSchema, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_FlowSchema_To_flowcontrol_FlowSchema(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -351,8 +367,24 @@ func Convert_v1beta1_FlowSchemaList_To_flowcontrol_FlowSchemaList(in *v1beta1.Fl
 }
 
 func autoConvert_flowcontrol_FlowSchemaList_To_v1beta1_FlowSchemaList(in *flowcontrol.FlowSchemaList, out *v1beta1.FlowSchemaList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "flowcontrol.apiserver.k8s.io/v1beta1"
+	out.Kind = "FlowSchemaList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.FlowSchema)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.FlowSchema, len(*in))
+		for i := range *in {
+			if err := Convert_flowcontrol_FlowSchema_To_v1beta1_FlowSchema(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -542,6 +574,12 @@ func Convert_v1beta1_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConf
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfiguration_To_v1beta1_PriorityLevelConfiguration(in *flowcontrol.PriorityLevelConfiguration, out *v1beta1.PriorityLevelConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "flowcontrol.apiserver.k8s.io/v1beta1"
+	out.Kind = "PriorityLevelConfiguration"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_flowcontrol_PriorityLevelConfigurationSpec_To_v1beta1_PriorityLevelConfigurationSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -587,7 +625,17 @@ func Convert_flowcontrol_PriorityLevelConfigurationCondition_To_v1beta1_Priority
 
 func autoConvert_v1beta1_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevelConfigurationList(in *v1beta1.PriorityLevelConfigurationList, out *flowcontrol.PriorityLevelConfigurationList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]flowcontrol.PriorityLevelConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]flowcontrol.PriorityLevelConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_PriorityLevelConfiguration_To_flowcontrol_PriorityLevelConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -597,8 +645,24 @@ func Convert_v1beta1_PriorityLevelConfigurationList_To_flowcontrol_PriorityLevel
 }
 
 func autoConvert_flowcontrol_PriorityLevelConfigurationList_To_v1beta1_PriorityLevelConfigurationList(in *flowcontrol.PriorityLevelConfigurationList, out *v1beta1.PriorityLevelConfigurationList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "flowcontrol.apiserver.k8s.io/v1beta1"
+	out.Kind = "PriorityLevelConfigurationList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.PriorityLevelConfiguration)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.PriorityLevelConfiguration, len(*in))
+		for i := range *in {
+			if err := Convert_flowcontrol_PriorityLevelConfiguration_To_v1beta1_PriorityLevelConfiguration(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

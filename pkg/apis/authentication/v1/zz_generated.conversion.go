@@ -164,6 +164,12 @@ func Convert_v1_TokenRequest_To_authentication_TokenRequest(in *v1.TokenRequest,
 }
 
 func autoConvert_authentication_TokenRequest_To_v1_TokenRequest(in *authentication.TokenRequest, out *v1.TokenRequest, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authentication.k8s.io/v1"
+	out.Kind = "TokenRequest"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authentication_TokenRequestSpec_To_v1_TokenRequestSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -246,6 +252,12 @@ func Convert_v1_TokenReview_To_authentication_TokenReview(in *v1.TokenReview, ou
 }
 
 func autoConvert_authentication_TokenReview_To_v1_TokenReview(in *authentication.TokenReview, out *v1.TokenReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authentication.k8s.io/v1"
+	out.Kind = "TokenReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authentication_TokenReviewSpec_To_v1_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

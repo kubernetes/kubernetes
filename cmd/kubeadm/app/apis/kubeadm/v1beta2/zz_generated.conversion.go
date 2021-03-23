@@ -413,6 +413,12 @@ func Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 }
 
 func autoConvert_kubeadm_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubeadm.k8s.io/v1beta2"
+	out.Kind = "ClusterConfiguration"
+
 	// INFO: in.ComponentConfigs opted out of conversion generation
 	if err := Convert_kubeadm_Etcd_To_v1beta2_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
 		return err
@@ -459,6 +465,12 @@ func Convert_v1beta2_ClusterStatus_To_kubeadm_ClusterStatus(in *ClusterStatus, o
 }
 
 func autoConvert_kubeadm_ClusterStatus_To_v1beta2_ClusterStatus(in *kubeadm.ClusterStatus, out *ClusterStatus, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubeadm.k8s.io/v1beta2"
+	out.Kind = "ClusterStatus"
+
 	out.APIEndpoints = *(*map[string]APIEndpoint)(unsafe.Pointer(&in.APIEndpoints))
 	return nil
 }
@@ -673,6 +685,12 @@ func autoConvert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 }
 
 func autoConvert_kubeadm_InitConfiguration_To_v1beta2_InitConfiguration(in *kubeadm.InitConfiguration, out *InitConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubeadm.k8s.io/v1beta2"
+	out.Kind = "InitConfiguration"
+
 	// WARNING: in.ClusterConfiguration requires manual conversion: does not exist in peer-type
 	out.BootstrapTokens = *(*[]BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
@@ -703,6 +721,12 @@ func Convert_v1beta2_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConf
 }
 
 func autoConvert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubeadm.k8s.io/v1beta2"
+	out.Kind = "JoinConfiguration"
+
 	if err := Convert_kubeadm_NodeRegistrationOptions_To_v1beta2_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}

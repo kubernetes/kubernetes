@@ -338,6 +338,12 @@ func Convert_v1_ControllerRevision_To_apps_ControllerRevision(in *v1.ControllerR
 }
 
 func autoConvert_apps_ControllerRevision_To_v1_ControllerRevision(in *apps.ControllerRevision, out *v1.ControllerRevision, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "ControllerRevision"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := runtime.Convert_runtime_Object_To_runtime_RawExtension(&in.Data, &out.Data, s); err != nil {
 		return err
@@ -373,6 +379,12 @@ func Convert_v1_ControllerRevisionList_To_apps_ControllerRevisionList(in *v1.Con
 }
 
 func autoConvert_apps_ControllerRevisionList_To_v1_ControllerRevisionList(in *apps.ControllerRevisionList, out *v1.ControllerRevisionList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "ControllerRevisionList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -405,6 +417,12 @@ func autoConvert_v1_DaemonSet_To_apps_DaemonSet(in *v1.DaemonSet, out *apps.Daem
 }
 
 func autoConvert_apps_DaemonSet_To_v1_DaemonSet(in *apps.DaemonSet, out *v1.DaemonSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "DaemonSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -465,6 +483,12 @@ func Convert_v1_DaemonSetList_To_apps_DaemonSetList(in *v1.DaemonSetList, out *a
 }
 
 func autoConvert_apps_DaemonSetList_To_v1_DaemonSetList(in *apps.DaemonSetList, out *v1.DaemonSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "DaemonSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -605,6 +629,12 @@ func autoConvert_v1_Deployment_To_apps_Deployment(in *v1.Deployment, out *apps.D
 }
 
 func autoConvert_apps_Deployment_To_v1_Deployment(in *apps.Deployment, out *v1.Deployment, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "Deployment"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -667,6 +697,12 @@ func Convert_v1_DeploymentList_To_apps_DeploymentList(in *v1.DeploymentList, out
 }
 
 func autoConvert_apps_DeploymentList_To_v1_DeploymentList(in *apps.DeploymentList, out *v1.DeploymentList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "DeploymentList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -818,6 +854,12 @@ func Convert_v1_ReplicaSet_To_apps_ReplicaSet(in *v1.ReplicaSet, out *apps.Repli
 }
 
 func autoConvert_apps_ReplicaSet_To_v1_ReplicaSet(in *apps.ReplicaSet, out *v1.ReplicaSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "ReplicaSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_ReplicaSetSpec_To_v1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -883,6 +925,12 @@ func Convert_v1_ReplicaSetList_To_apps_ReplicaSetList(in *v1.ReplicaSetList, out
 }
 
 func autoConvert_apps_ReplicaSetList_To_v1_ReplicaSetList(in *apps.ReplicaSetList, out *v1.ReplicaSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "ReplicaSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1068,6 +1116,12 @@ func Convert_v1_StatefulSet_To_apps_StatefulSet(in *v1.StatefulSet, out *apps.St
 }
 
 func autoConvert_apps_StatefulSet_To_v1_StatefulSet(in *apps.StatefulSet, out *v1.StatefulSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "StatefulSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1133,6 +1187,12 @@ func Convert_v1_StatefulSetList_To_apps_StatefulSetList(in *v1.StatefulSetList, 
 }
 
 func autoConvert_apps_StatefulSetList_To_v1_StatefulSetList(in *apps.StatefulSetList, out *v1.StatefulSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1"
+	out.Kind = "StatefulSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1161,7 +1221,17 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSp
 	if err := apiscorev1.Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]core.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]core.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := apiscorev1.Convert_v1_PersistentVolumeClaim_To_core_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = apps.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_v1_StatefulSetUpdateStrategy_To_apps_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {
@@ -1179,7 +1249,17 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 	if err := apiscorev1.Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(&in.Template, &out.Template, s); err != nil {
 		return err
 	}
-	out.VolumeClaimTemplates = *(*[]corev1.PersistentVolumeClaim)(unsafe.Pointer(&in.VolumeClaimTemplates))
+	if in.VolumeClaimTemplates != nil {
+		in, out := &in.VolumeClaimTemplates, &out.VolumeClaimTemplates
+		*out = make([]corev1.PersistentVolumeClaim, len(*in))
+		for i := range *in {
+			if err := apiscorev1.Convert_core_PersistentVolumeClaim_To_v1_PersistentVolumeClaim(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.VolumeClaimTemplates = nil
+	}
 	out.ServiceName = in.ServiceName
 	out.PodManagementPolicy = v1.PodManagementPolicyType(in.PodManagementPolicy)
 	if err := Convert_apps_StatefulSetUpdateStrategy_To_v1_StatefulSetUpdateStrategy(&in.UpdateStrategy, &out.UpdateStrategy, s); err != nil {

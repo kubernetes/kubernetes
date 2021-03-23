@@ -140,6 +140,12 @@ func Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(in *v1a
 }
 
 func autoConvert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(in *apiserverinternal.StorageVersion, out *v1alpha1.StorageVersion, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "internal.apiserver.k8s.io/v1alpha1"
+	out.Kind = "StorageVersion"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiserverinternal_StorageVersionSpec_To_v1alpha1_StorageVersionSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -187,7 +193,17 @@ func Convert_apiserverinternal_StorageVersionCondition_To_v1alpha1_StorageVersio
 
 func autoConvert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList(in *v1alpha1.StorageVersionList, out *apiserverinternal.StorageVersionList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]apiserverinternal.StorageVersion)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]apiserverinternal.StorageVersion, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_StorageVersion_To_apiserverinternal_StorageVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -197,8 +213,24 @@ func Convert_v1alpha1_StorageVersionList_To_apiserverinternal_StorageVersionList
 }
 
 func autoConvert_apiserverinternal_StorageVersionList_To_v1alpha1_StorageVersionList(in *apiserverinternal.StorageVersionList, out *v1alpha1.StorageVersionList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "internal.apiserver.k8s.io/v1alpha1"
+	out.Kind = "StorageVersionList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1alpha1.StorageVersion)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1alpha1.StorageVersion, len(*in))
+		for i := range *in {
+			if err := Convert_apiserverinternal_StorageVersion_To_v1alpha1_StorageVersion(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

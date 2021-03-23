@@ -21,8 +21,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	unsafe "unsafe"
-
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	wardle "k8s.io/sample-apiserver/pkg/apis/wardle"
@@ -95,6 +93,12 @@ func Convert_v1beta1_Flunder_To_wardle_Flunder(in *Flunder, out *wardle.Flunder,
 }
 
 func autoConvert_wardle_Flunder_To_v1beta1_Flunder(in *wardle.Flunder, out *Flunder, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1beta1"
+	out.Kind = "Flunder"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_wardle_FlunderSpec_To_v1beta1_FlunderSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -112,7 +116,17 @@ func Convert_wardle_Flunder_To_v1beta1_Flunder(in *wardle.Flunder, out *Flunder,
 
 func autoConvert_v1beta1_FlunderList_To_wardle_FlunderList(in *FlunderList, out *wardle.FlunderList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]wardle.Flunder)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]wardle.Flunder, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_Flunder_To_wardle_Flunder(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -122,8 +136,24 @@ func Convert_v1beta1_FlunderList_To_wardle_FlunderList(in *FlunderList, out *war
 }
 
 func autoConvert_wardle_FlunderList_To_v1beta1_FlunderList(in *wardle.FlunderList, out *FlunderList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "wardle.example.com/v1beta1"
+	out.Kind = "FlunderList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]Flunder)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]Flunder, len(*in))
+		for i := range *in {
+			if err := Convert_wardle_Flunder_To_v1beta1_Flunder(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

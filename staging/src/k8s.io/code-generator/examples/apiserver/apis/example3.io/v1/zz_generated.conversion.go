@@ -21,8 +21,6 @@ limitations under the License.
 package v1
 
 import (
-	unsafe "unsafe"
-
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	example3io "k8s.io/code-generator/examples/apiserver/apis/example3.io"
@@ -82,6 +80,12 @@ func Convert_v1_TestType_To_example3io_TestType(in *TestType, out *example3io.Te
 }
 
 func autoConvert_example3io_TestType_To_v1_TestType(in *example3io.TestType, out *TestType, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "example.dots.apiserver.code-generator.k8s.io/v1"
+	out.Kind = "TestType"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_example3io_TestTypeStatus_To_v1_TestTypeStatus(&in.Status, &out.Status, s); err != nil {
 		return err
@@ -96,7 +100,17 @@ func Convert_example3io_TestType_To_v1_TestType(in *example3io.TestType, out *Te
 
 func autoConvert_v1_TestTypeList_To_example3io_TestTypeList(in *TestTypeList, out *example3io.TestTypeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]example3io.TestType)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]example3io.TestType, len(*in))
+		for i := range *in {
+			if err := Convert_v1_TestType_To_example3io_TestType(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -106,8 +120,24 @@ func Convert_v1_TestTypeList_To_example3io_TestTypeList(in *TestTypeList, out *e
 }
 
 func autoConvert_example3io_TestTypeList_To_v1_TestTypeList(in *example3io.TestTypeList, out *TestTypeList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "example.dots.apiserver.code-generator.k8s.io/v1"
+	out.Kind = "TestTypeList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]TestType)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]TestType, len(*in))
+		for i := range *in {
+			if err := Convert_example3io_TestType_To_v1_TestType(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

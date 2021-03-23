@@ -84,6 +84,12 @@ func Convert_v1beta1_Scale_To_scheme_Scale(in *v1beta1.Scale, out *scheme.Scale,
 }
 
 func autoConvert_scheme_Scale_To_v1beta1_Scale(in *scheme.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apps/v1beta1"
+	out.Kind = "Scale"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_scheme_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

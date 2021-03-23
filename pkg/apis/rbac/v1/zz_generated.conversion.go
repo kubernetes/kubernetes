@@ -193,6 +193,12 @@ func Convert_v1_ClusterRole_To_rbac_ClusterRole(in *v1.ClusterRole, out *rbac.Cl
 }
 
 func autoConvert_rbac_ClusterRole_To_v1_ClusterRole(in *rbac.ClusterRole, out *v1.ClusterRole, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "ClusterRole"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]v1.PolicyRule)(unsafe.Pointer(&in.Rules))
 	out.AggregationRule = (*v1.AggregationRule)(unsafe.Pointer(in.AggregationRule))
@@ -219,6 +225,12 @@ func Convert_v1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(in *v1.ClusterRole
 }
 
 func autoConvert_rbac_ClusterRoleBinding_To_v1_ClusterRoleBinding(in *rbac.ClusterRoleBinding, out *v1.ClusterRoleBinding, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "ClusterRoleBinding"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Subjects = *(*[]v1.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_rbac_RoleRef_To_v1_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
@@ -234,7 +246,17 @@ func Convert_rbac_ClusterRoleBinding_To_v1_ClusterRoleBinding(in *rbac.ClusterRo
 
 func autoConvert_v1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1.ClusterRoleBindingList, out *rbac.ClusterRoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.ClusterRoleBinding, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ClusterRoleBinding_To_rbac_ClusterRoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -244,8 +266,24 @@ func Convert_v1_ClusterRoleBindingList_To_rbac_ClusterRoleBindingList(in *v1.Clu
 }
 
 func autoConvert_rbac_ClusterRoleBindingList_To_v1_ClusterRoleBindingList(in *rbac.ClusterRoleBindingList, out *v1.ClusterRoleBindingList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "ClusterRoleBindingList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ClusterRoleBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ClusterRoleBinding, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_ClusterRoleBinding_To_v1_ClusterRoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -256,7 +294,17 @@ func Convert_rbac_ClusterRoleBindingList_To_v1_ClusterRoleBindingList(in *rbac.C
 
 func autoConvert_v1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1.ClusterRoleList, out *rbac.ClusterRoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.ClusterRole)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.ClusterRole, len(*in))
+		for i := range *in {
+			if err := Convert_v1_ClusterRole_To_rbac_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -266,8 +314,24 @@ func Convert_v1_ClusterRoleList_To_rbac_ClusterRoleList(in *v1.ClusterRoleList, 
 }
 
 func autoConvert_rbac_ClusterRoleList_To_v1_ClusterRoleList(in *rbac.ClusterRoleList, out *v1.ClusterRoleList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "ClusterRoleList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.ClusterRole)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.ClusterRole, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_ClusterRole_To_v1_ClusterRole(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -316,6 +380,12 @@ func Convert_v1_Role_To_rbac_Role(in *v1.Role, out *rbac.Role, s conversion.Scop
 }
 
 func autoConvert_rbac_Role_To_v1_Role(in *rbac.Role, out *v1.Role, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "Role"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Rules = *(*[]v1.PolicyRule)(unsafe.Pointer(&in.Rules))
 	return nil
@@ -341,6 +411,12 @@ func Convert_v1_RoleBinding_To_rbac_RoleBinding(in *v1.RoleBinding, out *rbac.Ro
 }
 
 func autoConvert_rbac_RoleBinding_To_v1_RoleBinding(in *rbac.RoleBinding, out *v1.RoleBinding, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "RoleBinding"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Subjects = *(*[]v1.Subject)(unsafe.Pointer(&in.Subjects))
 	if err := Convert_rbac_RoleRef_To_v1_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
@@ -356,7 +432,17 @@ func Convert_rbac_RoleBinding_To_v1_RoleBinding(in *rbac.RoleBinding, out *v1.Ro
 
 func autoConvert_v1_RoleBindingList_To_rbac_RoleBindingList(in *v1.RoleBindingList, out *rbac.RoleBindingList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.RoleBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.RoleBinding, len(*in))
+		for i := range *in {
+			if err := Convert_v1_RoleBinding_To_rbac_RoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -366,8 +452,24 @@ func Convert_v1_RoleBindingList_To_rbac_RoleBindingList(in *v1.RoleBindingList, 
 }
 
 func autoConvert_rbac_RoleBindingList_To_v1_RoleBindingList(in *rbac.RoleBindingList, out *v1.RoleBindingList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "RoleBindingList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.RoleBinding)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.RoleBinding, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_RoleBinding_To_v1_RoleBinding(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -378,7 +480,17 @@ func Convert_rbac_RoleBindingList_To_v1_RoleBindingList(in *rbac.RoleBindingList
 
 func autoConvert_v1_RoleList_To_rbac_RoleList(in *v1.RoleList, out *rbac.RoleList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]rbac.Role)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]rbac.Role, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Role_To_rbac_Role(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -388,8 +500,24 @@ func Convert_v1_RoleList_To_rbac_RoleList(in *v1.RoleList, out *rbac.RoleList, s
 }
 
 func autoConvert_rbac_RoleList_To_v1_RoleList(in *rbac.RoleList, out *v1.RoleList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "rbac.authorization.k8s.io/v1"
+	out.Kind = "RoleList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Role)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Role, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_Role_To_v1_Role(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

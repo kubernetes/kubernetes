@@ -312,6 +312,12 @@ func Convert_v1_Config_To_api_Config(in *Config, out *api.Config, s conversion.S
 }
 
 func autoConvert_api_Config_To_v1_Config(in *api.Config, out *Config, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "v1"
+	out.Kind = "Config"
+
 	// INFO: in.Kind opted out of conversion generation
 	// INFO: in.APIVersion opted out of conversion generation
 	if err := Convert_api_Preferences_To_v1_Preferences(&in.Preferences, &out.Preferences, s); err != nil {

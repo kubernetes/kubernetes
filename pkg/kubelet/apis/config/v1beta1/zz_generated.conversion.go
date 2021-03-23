@@ -380,6 +380,12 @@ func Convert_v1beta1_KubeletConfiguration_To_config_KubeletConfiguration(in *v1b
 }
 
 func autoConvert_config_KubeletConfiguration_To_v1beta1_KubeletConfiguration(in *config.KubeletConfiguration, out *v1beta1.KubeletConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubelet.config.k8s.io/v1beta1"
+	out.Kind = "KubeletConfiguration"
+
 	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableServer, &out.EnableServer, s); err != nil {
 		return err
 	}
@@ -641,6 +647,12 @@ func Convert_v1beta1_SerializedNodeConfigSource_To_config_SerializedNodeConfigSo
 }
 
 func autoConvert_config_SerializedNodeConfigSource_To_v1beta1_SerializedNodeConfigSource(in *config.SerializedNodeConfigSource, out *v1beta1.SerializedNodeConfigSource, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubelet.config.k8s.io/v1beta1"
+	out.Kind = "SerializedNodeConfigSource"
+
 	out.Source = in.Source
 	return nil
 }

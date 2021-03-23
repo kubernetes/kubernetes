@@ -96,6 +96,12 @@ func Convert_v1beta1_TokenReview_To_authentication_TokenReview(in *v1beta1.Token
 }
 
 func autoConvert_authentication_TokenReview_To_v1beta1_TokenReview(in *authentication.TokenReview, out *v1beta1.TokenReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authentication.k8s.io/v1beta1"
+	out.Kind = "TokenReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authentication_TokenReviewSpec_To_v1beta1_TokenReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

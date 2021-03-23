@@ -226,6 +226,12 @@ func Convert_v1_CSIDriver_To_storage_CSIDriver(in *v1.CSIDriver, out *storage.CS
 }
 
 func autoConvert_storage_CSIDriver_To_v1_CSIDriver(in *storage.CSIDriver, out *v1.CSIDriver, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "CSIDriver"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_storage_CSIDriverSpec_To_v1_CSIDriverSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -260,6 +266,12 @@ func Convert_v1_CSIDriverList_To_storage_CSIDriverList(in *v1.CSIDriverList, out
 }
 
 func autoConvert_storage_CSIDriverList_To_v1_CSIDriverList(in *storage.CSIDriverList, out *v1.CSIDriverList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "CSIDriverList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -326,6 +338,12 @@ func Convert_v1_CSINode_To_storage_CSINode(in *v1.CSINode, out *storage.CSINode,
 }
 
 func autoConvert_storage_CSINode_To_v1_CSINode(in *storage.CSINode, out *v1.CSINode, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "CSINode"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_storage_CSINodeSpec_To_v1_CSINodeSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -366,7 +384,17 @@ func Convert_storage_CSINodeDriver_To_v1_CSINodeDriver(in *storage.CSINodeDriver
 
 func autoConvert_v1_CSINodeList_To_storage_CSINodeList(in *v1.CSINodeList, out *storage.CSINodeList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storage.CSINode)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storage.CSINode, len(*in))
+		for i := range *in {
+			if err := Convert_v1_CSINode_To_storage_CSINode(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -376,8 +404,24 @@ func Convert_v1_CSINodeList_To_storage_CSINodeList(in *v1.CSINodeList, out *stor
 }
 
 func autoConvert_storage_CSINodeList_To_v1_CSINodeList(in *storage.CSINodeList, out *v1.CSINodeList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "CSINodeList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.CSINode)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.CSINode, len(*in))
+		for i := range *in {
+			if err := Convert_storage_CSINode_To_v1_CSINode(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -424,6 +468,12 @@ func Convert_v1_StorageClass_To_storage_StorageClass(in *v1.StorageClass, out *s
 }
 
 func autoConvert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClass, out *v1.StorageClass, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "StorageClass"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.Provisioner = in.Provisioner
 	out.Parameters = *(*map[string]string)(unsafe.Pointer(&in.Parameters))
@@ -442,7 +492,17 @@ func Convert_storage_StorageClass_To_v1_StorageClass(in *storage.StorageClass, o
 
 func autoConvert_v1_StorageClassList_To_storage_StorageClassList(in *v1.StorageClassList, out *storage.StorageClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]storage.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]storage.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_v1_StorageClass_To_storage_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -452,8 +512,24 @@ func Convert_v1_StorageClassList_To_storage_StorageClassList(in *v1.StorageClass
 }
 
 func autoConvert_storage_StorageClassList_To_v1_StorageClassList(in *storage.StorageClassList, out *v1.StorageClassList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "StorageClassList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.StorageClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.StorageClass, len(*in))
+		for i := range *in {
+			if err := Convert_storage_StorageClass_To_v1_StorageClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -501,6 +577,12 @@ func Convert_v1_VolumeAttachment_To_storage_VolumeAttachment(in *v1.VolumeAttach
 }
 
 func autoConvert_storage_VolumeAttachment_To_v1_VolumeAttachment(in *storage.VolumeAttachment, out *v1.VolumeAttachment, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "VolumeAttachment"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_storage_VolumeAttachmentSpec_To_v1_VolumeAttachmentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -538,6 +620,12 @@ func Convert_v1_VolumeAttachmentList_To_storage_VolumeAttachmentList(in *v1.Volu
 }
 
 func autoConvert_storage_VolumeAttachmentList_To_v1_VolumeAttachmentList(in *storage.VolumeAttachmentList, out *v1.VolumeAttachmentList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "storage.k8s.io/v1"
+	out.Kind = "VolumeAttachmentList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

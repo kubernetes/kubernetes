@@ -267,6 +267,12 @@ func Convert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *net
 }
 
 func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "networking.k8s.io/v1beta1"
+	out.Kind = "Ingress"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -309,6 +315,12 @@ func Convert_v1beta1_IngressClass_To_networking_IngressClass(in *v1beta1.Ingress
 }
 
 func autoConvert_networking_IngressClass_To_v1beta1_IngressClass(in *networking.IngressClass, out *v1beta1.IngressClass, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "networking.k8s.io/v1beta1"
+	out.Kind = "IngressClass"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressClassSpec_To_v1beta1_IngressClassSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -323,7 +335,17 @@ func Convert_networking_IngressClass_To_v1beta1_IngressClass(in *networking.Ingr
 
 func autoConvert_v1beta1_IngressClassList_To_networking_IngressClassList(in *v1beta1.IngressClassList, out *networking.IngressClassList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]networking.IngressClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]networking.IngressClass, len(*in))
+		for i := range *in {
+			if err := Convert_v1beta1_IngressClass_To_networking_IngressClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -333,8 +355,24 @@ func Convert_v1beta1_IngressClassList_To_networking_IngressClassList(in *v1beta1
 }
 
 func autoConvert_networking_IngressClassList_To_v1beta1_IngressClassList(in *networking.IngressClassList, out *v1beta1.IngressClassList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "networking.k8s.io/v1beta1"
+	out.Kind = "IngressClassList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1beta1.IngressClass)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1beta1.IngressClass, len(*in))
+		for i := range *in {
+			if err := Convert_networking_IngressClass_To_v1beta1_IngressClass(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -415,6 +453,12 @@ func Convert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressLi
 }
 
 func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "networking.k8s.io/v1beta1"
+	out.Kind = "IngressList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

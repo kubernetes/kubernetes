@@ -69,6 +69,12 @@ func Convert_v1alpha1_Configuration_To_eventratelimit_Configuration(in *Configur
 }
 
 func autoConvert_eventratelimit_Configuration_To_v1alpha1_Configuration(in *eventratelimit.Configuration, out *Configuration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "eventratelimit.admission.k8s.io/v1alpha1"
+	out.Kind = "Configuration"
+
 	out.Limits = *(*[]Limit)(unsafe.Pointer(&in.Limits))
 	return nil
 }

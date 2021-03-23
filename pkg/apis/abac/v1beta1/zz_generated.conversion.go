@@ -64,6 +64,12 @@ func autoConvert_v1beta1_Policy_To_abac_Policy(in *Policy, out *abac.Policy, s c
 }
 
 func autoConvert_abac_Policy_To_v1beta1_Policy(in *abac.Policy, out *Policy, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "abac.authorization.kubernetes.io/v1beta1"
+	out.Kind = "Policy"
+
 	if err := Convert_abac_PolicySpec_To_v1beta1_PolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}

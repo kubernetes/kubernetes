@@ -99,6 +99,12 @@ func Convert_v1alpha1_BootstrapToken_To_output_BootstrapToken(in *BootstrapToken
 }
 
 func autoConvert_output_BootstrapToken_To_v1alpha1_BootstrapToken(in *output.BootstrapToken, out *BootstrapToken, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "output.kubeadm.k8s.io/v1alpha1"
+	out.Kind = "BootstrapToken"
+
 	out.BootstrapToken = in.BootstrapToken
 	return nil
 }
@@ -169,6 +175,12 @@ func Convert_v1alpha1_Images_To_output_Images(in *Images, out *output.Images, s 
 }
 
 func autoConvert_output_Images_To_v1alpha1_Images(in *output.Images, out *Images, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "output.kubeadm.k8s.io/v1alpha1"
+	out.Kind = "Images"
+
 	out.Images = *(*[]string)(unsafe.Pointer(&in.Images))
 	return nil
 }

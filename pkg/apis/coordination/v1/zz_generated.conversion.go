@@ -84,6 +84,12 @@ func Convert_v1_Lease_To_coordination_Lease(in *v1.Lease, out *coordination.Leas
 }
 
 func autoConvert_coordination_Lease_To_v1_Lease(in *coordination.Lease, out *v1.Lease, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "coordination.k8s.io/v1"
+	out.Kind = "Lease"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_coordination_LeaseSpec_To_v1_LeaseSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -98,7 +104,17 @@ func Convert_coordination_Lease_To_v1_Lease(in *coordination.Lease, out *v1.Leas
 
 func autoConvert_v1_LeaseList_To_coordination_LeaseList(in *v1.LeaseList, out *coordination.LeaseList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]coordination.Lease)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]coordination.Lease, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Lease_To_coordination_Lease(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -108,8 +124,24 @@ func Convert_v1_LeaseList_To_coordination_LeaseList(in *v1.LeaseList, out *coord
 }
 
 func autoConvert_coordination_LeaseList_To_v1_LeaseList(in *coordination.LeaseList, out *v1.LeaseList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "coordination.k8s.io/v1"
+	out.Kind = "LeaseList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.Lease)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.Lease, len(*in))
+		for i := range *in {
+			if err := Convert_coordination_Lease_To_v1_Lease(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

@@ -232,6 +232,12 @@ func Convert_v1beta1_EndpointSlice_To_discovery_EndpointSlice(in *v1beta1.Endpoi
 }
 
 func autoConvert_discovery_EndpointSlice_To_v1beta1_EndpointSlice(in *discovery.EndpointSlice, out *v1beta1.EndpointSlice, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "discovery.k8s.io/v1beta1"
+	out.Kind = "EndpointSlice"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.AddressType = v1beta1.AddressType(in.AddressType)
 	if in.Endpoints != nil {
@@ -276,6 +282,12 @@ func Convert_v1beta1_EndpointSliceList_To_discovery_EndpointSliceList(in *v1beta
 }
 
 func autoConvert_discovery_EndpointSliceList_To_v1beta1_EndpointSliceList(in *discovery.EndpointSliceList, out *v1beta1.EndpointSliceList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "discovery.k8s.io/v1beta1"
+	out.Kind = "EndpointSliceList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

@@ -80,6 +80,12 @@ func Convert_v1beta1_MetricListOptions_To_custom_metrics_MetricListOptions(in *M
 }
 
 func autoConvert_custom_metrics_MetricListOptions_To_v1beta1_MetricListOptions(in *custommetrics.MetricListOptions, out *MetricListOptions, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "custom_metrics/v1beta1"
+	out.Kind = "MetricListOptions"
+
 	out.LabelSelector = in.LabelSelector
 	out.MetricLabelSelector = in.MetricLabelSelector
 	return nil
@@ -103,6 +109,12 @@ func autoConvert_v1beta1_MetricValue_To_custom_metrics_MetricValue(in *MetricVal
 }
 
 func autoConvert_custom_metrics_MetricValue_To_v1beta1_MetricValue(in *custommetrics.MetricValue, out *MetricValue, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "custom_metrics/v1beta1"
+	out.Kind = "MetricValue"
+
 	if err := custommetrics.Convert_custom_metrics_ObjectReference_To_v1_ObjectReference(&in.DescribedObject, &out.DescribedObject, s); err != nil {
 		return err
 	}
@@ -135,6 +147,12 @@ func Convert_v1beta1_MetricValueList_To_custom_metrics_MetricValueList(in *Metri
 }
 
 func autoConvert_custom_metrics_MetricValueList_To_v1beta1_MetricValueList(in *custommetrics.MetricValueList, out *MetricValueList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "custom_metrics/v1beta1"
+	out.Kind = "MetricValueList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

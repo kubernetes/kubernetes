@@ -108,6 +108,12 @@ func autoConvert_v1alpha1_RuntimeClass_To_node_RuntimeClass(in *v1alpha1.Runtime
 }
 
 func autoConvert_node_RuntimeClass_To_v1alpha1_RuntimeClass(in *node.RuntimeClass, out *v1alpha1.RuntimeClass, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "node.k8s.io/v1alpha1"
+	out.Kind = "RuntimeClass"
+
 	out.ObjectMeta = in.ObjectMeta
 	// WARNING: in.Handler requires manual conversion: does not exist in peer-type
 	// WARNING: in.Overhead requires manual conversion: does not exist in peer-type
@@ -137,6 +143,12 @@ func Convert_v1alpha1_RuntimeClassList_To_node_RuntimeClassList(in *v1alpha1.Run
 }
 
 func autoConvert_node_RuntimeClassList_To_v1alpha1_RuntimeClassList(in *node.RuntimeClassList, out *v1alpha1.RuntimeClassList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "node.k8s.io/v1alpha1"
+	out.Kind = "RuntimeClassList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

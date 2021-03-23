@@ -116,6 +116,12 @@ func Convert_v1_APIService_To_apiregistration_APIService(in *APIService, out *ap
 }
 
 func autoConvert_apiregistration_APIService_To_v1_APIService(in *apiregistration.APIService, out *APIService, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiregistration.k8s.io/v1"
+	out.Kind = "APIService"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apiregistration_APIServiceSpec_To_v1_APIServiceSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -181,6 +187,12 @@ func Convert_v1_APIServiceList_To_apiregistration_APIServiceList(in *APIServiceL
 }
 
 func autoConvert_apiregistration_APIServiceList_To_v1_APIServiceList(in *apiregistration.APIServiceList, out *APIServiceList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiregistration.k8s.io/v1"
+	out.Kind = "APIServiceList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

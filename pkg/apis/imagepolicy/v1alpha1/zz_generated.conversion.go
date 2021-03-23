@@ -96,6 +96,12 @@ func Convert_v1alpha1_ImageReview_To_imagepolicy_ImageReview(in *v1alpha1.ImageR
 }
 
 func autoConvert_imagepolicy_ImageReview_To_v1alpha1_ImageReview(in *imagepolicy.ImageReview, out *v1alpha1.ImageReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "imagepolicy.k8s.io/v1alpha1"
+	out.Kind = "ImageReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_imagepolicy_ImageReviewSpec_To_v1alpha1_ImageReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

@@ -314,6 +314,12 @@ func Convert_v1_Policy_To_config_Policy(in *v1.Policy, out *config.Policy, s con
 }
 
 func autoConvert_config_Policy_To_v1_Policy(in *config.Policy, out *v1.Policy, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubescheduler.config.k8s.io/v1"
+	out.Kind = "Policy"
+
 	out.Predicates = *(*[]v1.PredicatePolicy)(unsafe.Pointer(&in.Predicates))
 	out.Priorities = *(*[]v1.PriorityPolicy)(unsafe.Pointer(&in.Priorities))
 	if in.Extenders != nil {

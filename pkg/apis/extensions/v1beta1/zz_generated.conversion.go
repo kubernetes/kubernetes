@@ -686,6 +686,12 @@ func Convert_v1beta1_DaemonSet_To_apps_DaemonSet(in *v1beta1.DaemonSet, out *app
 }
 
 func autoConvert_apps_DaemonSet_To_v1beta1_DaemonSet(in *apps.DaemonSet, out *v1beta1.DaemonSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "DaemonSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DaemonSetSpec_To_v1beta1_DaemonSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -751,6 +757,12 @@ func Convert_v1beta1_DaemonSetList_To_apps_DaemonSetList(in *v1beta1.DaemonSetLi
 }
 
 func autoConvert_apps_DaemonSetList_To_v1beta1_DaemonSetList(in *apps.DaemonSetList, out *v1beta1.DaemonSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "DaemonSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -902,6 +914,12 @@ func Convert_v1beta1_Deployment_To_apps_Deployment(in *v1beta1.Deployment, out *
 }
 
 func autoConvert_apps_Deployment_To_v1beta1_Deployment(in *apps.Deployment, out *v1beta1.Deployment, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "Deployment"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_DeploymentSpec_To_v1beta1_DeploymentSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -969,6 +987,12 @@ func Convert_v1beta1_DeploymentList_To_apps_DeploymentList(in *v1beta1.Deploymen
 }
 
 func autoConvert_apps_DeploymentList_To_v1beta1_DeploymentList(in *apps.DeploymentList, out *v1beta1.DeploymentList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "DeploymentList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1004,6 +1028,12 @@ func Convert_v1beta1_DeploymentRollback_To_apps_DeploymentRollback(in *v1beta1.D
 }
 
 func autoConvert_apps_DeploymentRollback_To_v1beta1_DeploymentRollback(in *apps.DeploymentRollback, out *v1beta1.DeploymentRollback, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "DeploymentRollback"
+
 	out.Name = in.Name
 	out.UpdatedAnnotations = *(*map[string]string)(unsafe.Pointer(&in.UpdatedAnnotations))
 	if err := Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(&in.RollbackTo, &out.RollbackTo, s); err != nil {
@@ -1300,6 +1330,12 @@ func Convert_v1beta1_Ingress_To_networking_Ingress(in *v1beta1.Ingress, out *net
 }
 
 func autoConvert_networking_Ingress_To_v1beta1_Ingress(in *networking.Ingress, out *v1beta1.Ingress, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "Ingress"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_IngressSpec_To_v1beta1_IngressSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1350,6 +1386,12 @@ func Convert_v1beta1_IngressList_To_networking_IngressList(in *v1beta1.IngressLi
 }
 
 func autoConvert_networking_IngressList_To_v1beta1_IngressList(in *networking.IngressList, out *v1beta1.IngressList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "IngressList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1528,6 +1570,12 @@ func Convert_v1beta1_NetworkPolicy_To_networking_NetworkPolicy(in *v1beta1.Netwo
 }
 
 func autoConvert_networking_NetworkPolicy_To_v1beta1_NetworkPolicy(in *networking.NetworkPolicy, out *v1beta1.NetworkPolicy, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "NetworkPolicy"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_networking_NetworkPolicySpec_To_v1beta1_NetworkPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1626,6 +1674,12 @@ func Convert_v1beta1_NetworkPolicyList_To_networking_NetworkPolicyList(in *v1bet
 }
 
 func autoConvert_networking_NetworkPolicyList_To_v1beta1_NetworkPolicyList(in *networking.NetworkPolicyList, out *v1beta1.NetworkPolicyList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "NetworkPolicyList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1780,6 +1834,12 @@ func Convert_v1beta1_PodSecurityPolicy_To_policy_PodSecurityPolicy(in *v1beta1.P
 }
 
 func autoConvert_policy_PodSecurityPolicy_To_v1beta1_PodSecurityPolicy(in *policy.PodSecurityPolicy, out *v1beta1.PodSecurityPolicy, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "PodSecurityPolicy"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_policy_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -1814,6 +1874,12 @@ func Convert_v1beta1_PodSecurityPolicyList_To_policy_PodSecurityPolicyList(in *v
 }
 
 func autoConvert_policy_PodSecurityPolicyList_To_v1beta1_PodSecurityPolicyList(in *policy.PodSecurityPolicyList, out *v1beta1.PodSecurityPolicyList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "PodSecurityPolicyList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -1937,6 +2003,12 @@ func Convert_v1beta1_ReplicaSet_To_apps_ReplicaSet(in *v1beta1.ReplicaSet, out *
 }
 
 func autoConvert_apps_ReplicaSet_To_v1beta1_ReplicaSet(in *apps.ReplicaSet, out *v1beta1.ReplicaSet, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "ReplicaSet"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_apps_ReplicaSetSpec_To_v1beta1_ReplicaSetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -2002,6 +2074,12 @@ func Convert_v1beta1_ReplicaSetList_To_apps_ReplicaSetList(in *v1beta1.ReplicaSe
 }
 
 func autoConvert_apps_ReplicaSetList_To_v1beta1_ReplicaSetList(in *apps.ReplicaSetList, out *v1beta1.ReplicaSetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "ReplicaSetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -2271,6 +2349,12 @@ func Convert_v1beta1_Scale_To_autoscaling_Scale(in *v1beta1.Scale, out *autoscal
 }
 
 func autoConvert_autoscaling_Scale_To_v1beta1_Scale(in *autoscaling.Scale, out *v1beta1.Scale, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "extensions/v1beta1"
+	out.Kind = "Scale"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_autoscaling_ScaleSpec_To_v1beta1_ScaleSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

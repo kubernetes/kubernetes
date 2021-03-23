@@ -150,6 +150,12 @@ func Convert_v1_EncryptionConfiguration_To_config_EncryptionConfiguration(in *En
 }
 
 func autoConvert_config_EncryptionConfiguration_To_v1_EncryptionConfiguration(in *config.EncryptionConfiguration, out *EncryptionConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiserver.config.k8s.io/v1"
+	out.Kind = "EncryptionConfiguration"
+
 	out.Resources = *(*[]ResourceConfiguration)(unsafe.Pointer(&in.Resources))
 	return nil
 }

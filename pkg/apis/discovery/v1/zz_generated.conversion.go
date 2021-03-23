@@ -233,6 +233,12 @@ func Convert_v1_EndpointSlice_To_discovery_EndpointSlice(in *v1.EndpointSlice, o
 }
 
 func autoConvert_discovery_EndpointSlice_To_v1_EndpointSlice(in *discovery.EndpointSlice, out *v1.EndpointSlice, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "discovery.k8s.io/v1"
+	out.Kind = "EndpointSlice"
+
 	out.ObjectMeta = in.ObjectMeta
 	out.AddressType = v1.AddressType(in.AddressType)
 	out.Endpoints = *(*[]v1.Endpoint)(unsafe.Pointer(&in.Endpoints))
@@ -247,7 +253,17 @@ func Convert_discovery_EndpointSlice_To_v1_EndpointSlice(in *discovery.EndpointS
 
 func autoConvert_v1_EndpointSliceList_To_discovery_EndpointSliceList(in *v1.EndpointSliceList, out *discovery.EndpointSliceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]discovery.EndpointSlice)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]discovery.EndpointSlice, len(*in))
+		for i := range *in {
+			if err := Convert_v1_EndpointSlice_To_discovery_EndpointSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 
@@ -257,8 +273,24 @@ func Convert_v1_EndpointSliceList_To_discovery_EndpointSliceList(in *v1.Endpoint
 }
 
 func autoConvert_discovery_EndpointSliceList_To_v1_EndpointSliceList(in *discovery.EndpointSliceList, out *v1.EndpointSliceList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "discovery.k8s.io/v1"
+	out.Kind = "EndpointSliceList"
+
 	out.ListMeta = in.ListMeta
-	out.Items = *(*[]v1.EndpointSlice)(unsafe.Pointer(&in.Items))
+	if in.Items != nil {
+		in, out := &in.Items, &out.Items
+		*out = make([]v1.EndpointSlice, len(*in))
+		for i := range *in {
+			if err := Convert_discovery_EndpointSlice_To_v1_EndpointSlice(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Items = nil
+	}
 	return nil
 }
 

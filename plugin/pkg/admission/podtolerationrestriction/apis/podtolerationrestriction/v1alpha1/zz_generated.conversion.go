@@ -62,6 +62,12 @@ func Convert_v1alpha1_Configuration_To_podtolerationrestriction_Configuration(in
 }
 
 func autoConvert_podtolerationrestriction_Configuration_To_v1alpha1_Configuration(in *podtolerationrestriction.Configuration, out *Configuration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "podtolerationrestriction.admission.k8s.io/v1alpha1"
+	out.Kind = "Configuration"
+
 	out.Default = *(*[]v1.Toleration)(unsafe.Pointer(&in.Default))
 	out.Whitelist = *(*[]v1.Toleration)(unsafe.Pointer(&in.Whitelist))
 	return nil

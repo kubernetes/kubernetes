@@ -90,6 +90,12 @@ func autoConvert_v1beta1_Event_To_core_Event(in *v1beta1.Event, out *core.Event,
 }
 
 func autoConvert_core_Event_To_v1beta1_Event(in *core.Event, out *v1beta1.Event, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "events.k8s.io/v1beta1"
+	out.Kind = "Event"
+
 	out.ObjectMeta = in.ObjectMeta
 	// WARNING: in.InvolvedObject requires manual conversion: does not exist in peer-type
 	out.Reason = in.Reason
@@ -130,6 +136,12 @@ func Convert_v1beta1_EventList_To_core_EventList(in *v1beta1.EventList, out *cor
 }
 
 func autoConvert_core_EventList_To_v1beta1_EventList(in *core.EventList, out *v1beta1.EventList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "events.k8s.io/v1beta1"
+	out.Kind = "EventList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

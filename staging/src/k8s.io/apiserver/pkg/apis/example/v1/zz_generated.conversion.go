@@ -106,6 +106,12 @@ func Convert_v1_Pod_To_example_Pod(in *Pod, out *example.Pod, s conversion.Scope
 }
 
 func autoConvert_example_Pod_To_v1_Pod(in *example.Pod, out *Pod, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "example.apiserver.k8s.io/v1"
+	out.Kind = "Pod"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_example_PodSpec_To_v1_PodSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -173,6 +179,12 @@ func Convert_v1_PodList_To_example_PodList(in *PodList, out *example.PodList, s 
 }
 
 func autoConvert_example_PodList_To_v1_PodList(in *example.PodList, out *PodList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "example.apiserver.k8s.io/v1"
+	out.Kind = "PodList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

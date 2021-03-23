@@ -93,6 +93,12 @@ func autoConvert_v1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *v1.Pod
 }
 
 func autoConvert_policy_PodDisruptionBudget_To_v1_PodDisruptionBudget(in *policy.PodDisruptionBudget, out *v1.PodDisruptionBudget, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "policy/v1"
+	out.Kind = "PodDisruptionBudget"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_policy_PodDisruptionBudgetSpec_To_v1_PodDisruptionBudgetSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -130,6 +136,12 @@ func Convert_v1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList(in *v1
 }
 
 func autoConvert_policy_PodDisruptionBudgetList_To_v1_PodDisruptionBudgetList(in *policy.PodDisruptionBudgetList, out *v1.PodDisruptionBudgetList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "policy/v1"
+	out.Kind = "PodDisruptionBudgetList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

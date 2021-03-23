@@ -69,6 +69,12 @@ func Convert_v1_AdmissionConfiguration_To_apiserver_AdmissionConfiguration(in *A
 }
 
 func autoConvert_apiserver_AdmissionConfiguration_To_v1_AdmissionConfiguration(in *apiserver.AdmissionConfiguration, out *AdmissionConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "apiserver.config.k8s.io/v1"
+	out.Kind = "AdmissionConfiguration"
+
 	out.Plugins = *(*[]AdmissionPluginConfiguration)(unsafe.Pointer(&in.Plugins))
 	return nil
 }

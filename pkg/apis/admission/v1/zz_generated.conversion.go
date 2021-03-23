@@ -188,6 +188,12 @@ func Convert_v1_AdmissionReview_To_admission_AdmissionReview(in *v1.AdmissionRev
 }
 
 func autoConvert_admission_AdmissionReview_To_v1_AdmissionReview(in *admission.AdmissionReview, out *v1.AdmissionReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "admission.k8s.io/v1"
+	out.Kind = "AdmissionReview"
+
 	if in.Request != nil {
 		in, out := &in.Request, &out.Request
 		*out = new(v1.AdmissionRequest)

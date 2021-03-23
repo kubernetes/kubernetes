@@ -70,6 +70,12 @@ func Convert_v1alpha1_Configuration_To_resourcequota_Configuration(in *Configura
 }
 
 func autoConvert_resourcequota_Configuration_To_v1alpha1_Configuration(in *resourcequota.Configuration, out *Configuration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "resourcequota.admission.k8s.io/v1alpha1"
+	out.Kind = "Configuration"
+
 	out.LimitedResources = *(*[]LimitedResource)(unsafe.Pointer(&in.LimitedResources))
 	return nil
 }

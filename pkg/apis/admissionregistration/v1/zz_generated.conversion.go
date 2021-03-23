@@ -206,6 +206,12 @@ func Convert_v1_MutatingWebhookConfiguration_To_admissionregistration_MutatingWe
 }
 
 func autoConvert_admissionregistration_MutatingWebhookConfiguration_To_v1_MutatingWebhookConfiguration(in *admissionregistration.MutatingWebhookConfiguration, out *v1.MutatingWebhookConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "admissionregistration.k8s.io/v1"
+	out.Kind = "MutatingWebhookConfiguration"
+
 	out.ObjectMeta = in.ObjectMeta
 	if in.Webhooks != nil {
 		in, out := &in.Webhooks, &out.Webhooks
@@ -248,6 +254,12 @@ func Convert_v1_MutatingWebhookConfigurationList_To_admissionregistration_Mutati
 }
 
 func autoConvert_admissionregistration_MutatingWebhookConfigurationList_To_v1_MutatingWebhookConfigurationList(in *admissionregistration.MutatingWebhookConfigurationList, out *v1.MutatingWebhookConfigurationList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "admissionregistration.k8s.io/v1"
+	out.Kind = "MutatingWebhookConfigurationList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -414,6 +426,12 @@ func Convert_v1_ValidatingWebhookConfiguration_To_admissionregistration_Validati
 }
 
 func autoConvert_admissionregistration_ValidatingWebhookConfiguration_To_v1_ValidatingWebhookConfiguration(in *admissionregistration.ValidatingWebhookConfiguration, out *v1.ValidatingWebhookConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "admissionregistration.k8s.io/v1"
+	out.Kind = "ValidatingWebhookConfiguration"
+
 	out.ObjectMeta = in.ObjectMeta
 	if in.Webhooks != nil {
 		in, out := &in.Webhooks, &out.Webhooks
@@ -456,6 +474,12 @@ func Convert_v1_ValidatingWebhookConfigurationList_To_admissionregistration_Vali
 }
 
 func autoConvert_admissionregistration_ValidatingWebhookConfigurationList_To_v1_ValidatingWebhookConfigurationList(in *admissionregistration.ValidatingWebhookConfigurationList, out *v1.ValidatingWebhookConfigurationList, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "admissionregistration.k8s.io/v1"
+	out.Kind = "ValidatingWebhookConfigurationList"
+
 	out.ListMeta = in.ListMeta
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items

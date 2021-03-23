@@ -186,6 +186,12 @@ func Convert_v1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessRevi
 }
 
 func autoConvert_authorization_LocalSubjectAccessReview_To_v1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *v1.LocalSubjectAccessReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authorization.k8s.io/v1"
+	out.Kind = "LocalSubjectAccessReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -320,6 +326,12 @@ func Convert_v1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessReview
 }
 
 func autoConvert_authorization_SelfSubjectAccessReview_To_v1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *v1.SelfSubjectAccessReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authorization.k8s.io/v1"
+	out.Kind = "SelfSubjectAccessReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SelfSubjectAccessReviewSpec_To_v1_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -374,6 +386,12 @@ func Convert_v1_SelfSubjectRulesReview_To_authorization_SelfSubjectRulesReview(i
 }
 
 func autoConvert_authorization_SelfSubjectRulesReview_To_v1_SelfSubjectRulesReview(in *authorization.SelfSubjectRulesReview, out *v1.SelfSubjectRulesReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authorization.k8s.io/v1"
+	out.Kind = "SelfSubjectRulesReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SelfSubjectRulesReviewSpec_To_v1_SelfSubjectRulesReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
@@ -426,6 +444,12 @@ func Convert_v1_SubjectAccessReview_To_authorization_SubjectAccessReview(in *v1.
 }
 
 func autoConvert_authorization_SubjectAccessReview_To_v1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *v1.SubjectAccessReview, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "authorization.k8s.io/v1"
+	out.Kind = "SubjectAccessReview"
+
 	out.ObjectMeta = in.ObjectMeta
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err

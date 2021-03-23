@@ -227,6 +227,12 @@ func Convert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeControlle
 }
 
 func autoConvert_config_KubeControllerManagerConfiguration_To_v1alpha1_KubeControllerManagerConfiguration(in *config.KubeControllerManagerConfiguration, out *v1alpha1.KubeControllerManagerConfiguration, s conversion.Scope) error {
+	// Auto-generated external APIVersion/Kind
+	// Disable with a `+k8s:conversion-gen:set-api-version-kind=false` comment
+	// Customize with `+groupName`, `+version`, or `+kind` comments
+	out.APIVersion = "kubecontrollermanager.config.k8s.io/v1alpha1"
+	out.Kind = "KubeControllerManagerConfiguration"
+
 	if err := configv1alpha1.Convert_config_GenericControllerManagerConfiguration_To_v1alpha1_GenericControllerManagerConfiguration(&in.Generic, &out.Generic, s); err != nil {
 		return err
 	}
