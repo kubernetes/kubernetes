@@ -116,7 +116,7 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 
 	rt, ok := t.roundTripperFuncMap[saName]
 	if ok {
-		configCopy.WrapTransport = rt
+		configCopy.Wrap(rt)
 	} else {
 		cachedTokenSource := transport.NewCachedTokenSource(&tokenSourceImpl{
 			namespace:          t.Namespace,
@@ -125,7 +125,7 @@ func (t *DynamicControllerClientBuilder) Config(saName string) (*restclient.Conf
 			expirationSeconds:  t.expirationSeconds,
 			leewayPercent:      t.leewayPercent,
 		})
-		configCopy.WrapTransport = transport.ResettableTokenSourceWrapTransport(cachedTokenSource)
+		configCopy.Wrap(transport.ResettableTokenSourceWrapTransport(cachedTokenSource))
 		t.roundTripperFuncMap[saName] = configCopy.WrapTransport
 	}
 
