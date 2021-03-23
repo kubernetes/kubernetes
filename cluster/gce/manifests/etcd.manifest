@@ -54,7 +54,7 @@
         "value": "{{ etcd_apiserver_creds }}"
       },
       { "name": "ETCD_SNAPSHOT_COUNT",
-        "value": "10000"
+        "value": "100000"
       },
       { "name": "ETCD_HOSTNAME",
         "value": "{{ hostname }}"
