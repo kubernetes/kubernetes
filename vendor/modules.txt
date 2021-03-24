@@ -304,7 +304,7 @@ github.com/go-ozzo/ozzo-validation/is
 github.com/go-stack/stack
 # github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
 github.com/godbus/dbus
-# github.com/gogo/protobuf v1.3.1 => github.com/gogo/protobuf v1.3.1
+# github.com/gogo/protobuf v1.3.2 => github.com/gogo/protobuf v1.3.2
 github.com/gogo/protobuf/gogoproto
 github.com/gogo/protobuf/plugin/compare
 github.com/gogo/protobuf/plugin/defaultcheck
@@ -933,7 +933,7 @@ golang.org/x/text/unicode/norm
 golang.org/x/text/width
 # golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
+# golang.org/x/tools v0.0.0-20210106214847-113979e3529a => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/analysis
