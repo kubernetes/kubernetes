@@ -485,9 +485,14 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 
 				// Filesystem: check fsType
 				if fsType != "" {
-					ginkgo.By("Checking fsType is correct.")
-					_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
-					framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+					// Skip this checking if a Kata Containers pod because the filesystem type
+					// will not match fsType, instead it will be the backend used to share
+					// host filesystems. Currently the guest mounts virtiofs by default.
+					if pod.Spec.RuntimeClassName == nil || !strings.Contains(*pod.Spec.RuntimeClassName, "kata") {
+						ginkgo.By("Checking fsType is correct.")
+						_, err = framework.LookForStringInPodExec(pod.Namespace, pod.Name, []string{"grep", " " + dirName + " ", "/proc/mounts"}, fsType, time.Minute)
+						framework.ExpectNoError(err, "failed: getting the right fsType %s", fsType)
+					}
 				}
 			}
 		}
