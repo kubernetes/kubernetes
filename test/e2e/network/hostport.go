@@ -114,8 +114,13 @@ var _ = common.SIGDescribe("HostPort", func() {
 
 		// use a 5 seconds timeout per connection
 		timeout := 5
-		// IPv6 doesn't NAT from localhost -> localhost, it doesn't have the route_localnet kernel hack, so we need to specify the source IP
-		cmdPod1 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v --interface %s http://%s/hostname", timeout, hostIP, net.JoinHostPort(localhost, strconv.Itoa(int(port))))}
+		cmdPod1 := []string{"/bin/sh", "-c"}
+		if framework.TestContext.ClusterIsIPv6() {
+			// IPv6 doesn't NAT from localhost -> localhost, it doesn't have the route_localnet kernel hack, so we need to specify the source IP
+			cmdPod1 = append(cmdPod1, fmt.Sprintf("curl -g --connect-timeout %v --interface %s http://%s/hostname", timeout, hostIP, net.JoinHostPort(localhost, strconv.Itoa(int(port)))))
+		} else {
+			cmdPod1 = append(cmdPod1, fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(localhost, strconv.Itoa(int(port)))))
+		}
 		cmdPod2 := []string{"/bin/sh", "-c", fmt.Sprintf("curl -g --connect-timeout %v http://%s/hostname", timeout, net.JoinHostPort(hostIP, strconv.Itoa(int(port))))}
 		cmdPod3 := []string{"/bin/sh", "-c", fmt.Sprintf("nc -vuz -w %v %s %d", timeout, hostIP, port)}
 		// try 5 times to connect to the exposed ports
