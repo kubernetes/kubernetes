@@ -126,7 +126,7 @@ func printObj(w io.Writer, name string, operation string, shortOutput, showKind 
 	obj := fmt.Sprintf("%s%s", name, operation)
 
 	if !showKind {
-		fmt.Fprintf(w, "%s\n",  obj)
+		fmt.Fprintf(w, "%s\n", obj)
 		return nil
 	}
 
