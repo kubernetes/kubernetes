@@ -189,10 +189,10 @@ run_non_native_resource_tests() {
   kube::test::if_has_string "${output_message}" 'myobj'
 
   output_message=$(kubectl "${kube_flags[@]}" get resources/myobj -o name)
-  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+  kube::test::if_has_string "${output_message}" 'myobj'
 
   output_message=$(kubectl "${kube_flags[@]}" get kind.mygroup.example.com/myobj -o name)
-  kube::test::if_has_string "${output_message}" 'kind.mygroup.example.com/myobj'
+  kube::test::if_has_string "${output_message}" 'myobj'
 
   # Delete the resource with cascading strategy background.
   kubectl "${kube_flags[@]}" delete resources myobj --cascade=background
@@ -228,7 +228,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" get foos      -o "go-template={{range .items}}{{.someField}}{{end}}" --allow-missing-template-keys=false
   kubectl "${kube_flags[@]}" get foos/test -o "go-template={{.someField}}"                        --allow-missing-template-keys=false
   output_message=$(kubectl "${kube_flags[@]}" get foos/test -o name)
-  kube::test::if_has_string "${output_message}" 'foo.company.com/test'
+  kube::test::if_has_string "${output_message}" 'test'
 
   # Test patching
   kube::log::status "Testing CustomResource patching"
@@ -311,7 +311,7 @@ run_non_native_resource_tests() {
   # Stop the watcher and the patch loop.
   kill -9 "${watch_pid}"
   kill -9 "${patch_pid}"
-  kube::test::if_has_string "${watch_output}" 'bar.company.com/test'
+  kube::test::if_has_string "${watch_output}" 'test'
 
   # Delete the resource with cascading strategy orphan.
   kubectl "${kube_flags[@]}" delete bars test --cascade=orphan

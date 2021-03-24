@@ -52,7 +52,7 @@ EOF
   # Command
   output=$(kubectl "${kube_flags_with_token[@]:?}" --kubeconfig="${TMPDIR:-/tmp}"/invalid_exec_plugin.yaml get namespace kube-system -o name || true)
 
-  if [[ "${output}" == "namespace/kube-system" ]]; then
+  if [[ "${output}" == "kube-system" ]]; then
     kube::log::status "exec credential plugin not triggered since kubectl was called with provided --token"
   else
     kube::log::status "Unexpected output when providing --token for authentication - exec credential plugin likely triggered. Output: ${output}"
