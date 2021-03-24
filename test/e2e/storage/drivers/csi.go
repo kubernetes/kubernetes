@@ -46,7 +46,10 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	spb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
+
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -382,16 +385,16 @@ func (c *MockCSICalls) LogGRPC(method string, request, reply interface{}, err er
 		// "" on no error.
 		Error string
 		// Full error dump, to be able to parse out full gRPC error code and message separately in a test.
-		FullError error
+		FullError *spb.Status
 	}{
-		Method:    method,
-		Request:   request,
-		Response:  reply,
-		FullError: err,
+		Method:   method,
+		Request:  request,
+		Response: reply,
 	}
 
 	if err != nil {
 		logMessage.Error = err.Error()
+		logMessage.FullError = grpcstatus.Convert(err).Proto()
 	}
 
 	msg, _ := json.Marshal(logMessage)
