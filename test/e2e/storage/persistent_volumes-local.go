@@ -658,7 +658,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			var (
 				pvc   *v1.PersistentVolumeClaim
 				pods  = map[string]*v1.Pod{}
-				count = 50
+				count = 2
 				err   error
 			)
 			pvc = e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
