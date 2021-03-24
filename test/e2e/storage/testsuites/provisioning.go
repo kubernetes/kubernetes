@@ -337,7 +337,10 @@ func SetupStorageClass(
 			framework.ExpectNoError(err)
 			clearComputedStorageClass = func() {
 				framework.Logf("deleting storage class %s", computedStorageClass.Name)
-				framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(context.TODO(), computedStorageClass.Name, metav1.DeleteOptions{}))
+				err := client.StorageV1().StorageClasses().Delete(context.TODO(), computedStorageClass.Name, metav1.DeleteOptions{})
+				if err != nil && !apierrors.IsNotFound(err) {
+					framework.ExpectNoError(err, "delete storage class")
+				}
 			}
 		}
 	} else {
