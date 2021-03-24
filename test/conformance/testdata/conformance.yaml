@@ -1233,14 +1233,6 @@
     update, and delete actions.
   release: v1.21
   file: test/e2e/network/endpointslicemirroring.go
-- testname: Scheduling, HostPort matching and HostIP and Protocol not-matching
-  codename: '[sig-network] HostPort validates that there is no conflict between pods
-    with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]'
-  description: Pods with the same HostPort value MUST be able to be scheduled to the
-    same node if the HostIP or Protocol is different. This test is marked LinuxOnly
-    since hostNetwork is not supported on Windows.
-  release: v1.16, v1.21
-  file: test/e2e/network/hostport.go
 - testname: Ingress API
   codename: '[sig-network] Ingress API should support creating Ingress API operations
     [Conformance]'

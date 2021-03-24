@@ -58,7 +58,7 @@ var _ = common.SIGDescribe("HostPort", func() {
 		Windows.
 	*/
 
-	framework.ConformanceIt("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
+	ginkgo.It("validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly]", func() {
 
 		localhost := "127.0.0.1"
 		family := v1.IPv4Protocol
