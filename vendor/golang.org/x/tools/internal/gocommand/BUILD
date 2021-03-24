@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "invoke.go",
         "vendor.go",
+        "version.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/golang.org/x/tools/internal/gocommand",
     importpath = "golang.org/x/tools/internal/gocommand",
