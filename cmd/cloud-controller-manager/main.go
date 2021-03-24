@@ -48,6 +48,8 @@ import (
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+
 	ccmOptions, err := options.NewCloudControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -70,12 +72,6 @@ func main() {
 
 	command := app.NewCloudControllerManagerCommand(ccmOptions, cloudInitializer, controllerInitializers, fss, wait.NeverStop)
 
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	// Here is an sample
-	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
-	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
