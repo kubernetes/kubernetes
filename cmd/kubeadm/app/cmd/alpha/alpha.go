@@ -20,6 +20,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
+	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 )
 
 // NewCmdAlpha returns "kubeadm alpha" command.
@@ -27,6 +28,7 @@ func NewCmdAlpha(in io.Reader, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "alpha",
 		Short: "Kubeadm experimental sub-commands",
+		RunE:  cmdutil.SubCmdRunE("alpha"),
 	}
 
 	kubeconfigCmd := NewCmdKubeConfigUtility(out)

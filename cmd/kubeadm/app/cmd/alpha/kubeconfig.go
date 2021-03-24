@@ -49,6 +49,7 @@ func NewCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 		Use:   "kubeconfig",
 		Short: "Kubeconfig file utilities",
 		Long:  kubeconfigLongDesc,
+		RunE:  cmdutil.SubCmdRunE("kubeconfig"),
 	}
 
 	cmd.AddCommand(newCmdUserKubeConfig(out))
