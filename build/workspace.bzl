@@ -102,15 +102,15 @@ _DEBIAN_IPTABLES_DIGEST = {
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.3.1
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:buster-v2.3.1
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/go-runner:v2.3.1-go1.15.10-buster.0
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/go-runner:v2.3.1-go1.15.10-buster.0
 _GO_RUNNER_DIGEST = {
-    "manifest": "sha256:cd45714e4824eeff6f107d9e3b4f79be9ee0cf5071dc46caf755d3f324a36089",
-    "amd64": "sha256:309379049147b749d2bc63cd8bb2d6c46a68f45fd7fc5fd391d221b42e2c7196",
-    "arm": "sha256:81ad4220d42a19e5e11ccb4b385b404ab287d6417f9b51077ea15df5196d6e75",
-    "arm64": "sha256:93ccd74b2a434e21cd150cf89b10c6fc5e0bf66691ee5c8f22bf1241d168c445",
-    "ppc64le": "sha256:4a7f8dce0f4505e43790fb660b67f4cebad91fae1835c79d0132ba6ecf480701",
-    "s390x": "sha256:e6fa60bd53c8f3706c4d1cd6cd6bc3e95d01b4a924daab004fca9bf403b03e41",
+    "manifest": "sha256:fda5b13760fd7588c5cd0be8c58b9621463aa08cab7fb3e38f01d7a314e8d7f7",
+    "amd64": "sha256:eb553c33afe161fabcba774a6ef893e16d60266b6f1cc555468a41304d7da709",
+    "arm": "sha256:43177338150cac818d595cade6fe5942c3f44f791356c0875d716ee8ca20e503",
+    "arm64": "sha256:9740a92e3285d8a533378e2040762461c1aba68d2cc426b3bb781bcbaa86670a",
+    "ppc64le": "sha256:b87dafe4d9b98f464e541bc0a5da867449c425c1a57a1b70e8705d4157f740f6",
+    "s390x": "sha256:43c2eae3df4346b857c32cea629e7cf5529e7df4659f7bda1d80dfc1afb3af5c",
 }
 
 def _digest(d, arch):
@@ -127,7 +127,7 @@ def image_dependencies():
             digest = _digest(_GO_RUNNER_DIGEST, arch),
             registry = "k8s.gcr.io/build-image",
             repository = "go-runner",
-            tag = "buster-v2.3.1",  # ignored, but kept here for documentation
+            tag = "v2.3.1-go1.15.10-buster.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
