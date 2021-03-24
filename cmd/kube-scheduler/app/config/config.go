@@ -65,6 +65,9 @@ type Config struct {
 
 	// ComponentGlobalsRegistry is the registry where the effective versions and feature gates for all components are stored.
 	ComponentGlobalsRegistry basecompatibility.ComponentGlobalsRegistry
+
+	// OpenShiftContext is additional context that we need to launch the kube-scheduler for openshift
+	OpenShiftContext OpenShiftContext
 }
 
 type completedConfig struct {
