@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"k8s.io/apiserver/pkg/apis/audit"
+	auditinternal "k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 )
 
@@ -28,18 +29,12 @@ const (
 	DefaultAuditLevel = audit.LevelNone
 )
 
-// Checker exposes methods for checking the policy rules.
-type Checker interface {
-	// Check the audit level for a request with the given authorizer attributes.
-	LevelAndStages(authorizer.Attributes) (audit.Level, []audit.Stage)
-}
-
-// NewChecker creates a new policy checker.
-func NewChecker(policy *audit.Policy) Checker {
+// NewPolicyRuleEvaluator creates a new policy rule evaluator.
+func NewPolicyRuleEvaluator(policy *audit.Policy) auditinternal.PolicyRuleEvaluator {
 	for i, rule := range policy.Rules {
 		policy.Rules[i].OmitStages = unionStages(policy.OmitStages, rule.OmitStages)
 	}
-	return &policyChecker{*policy}
+	return &policyRuleEvaluator{*policy}
 }
 
 func unionStages(stageLists ...[]audit.Stage) []audit.Stage {
@@ -56,16 +51,17 @@ func unionStages(stageLists ...[]audit.Stage) []audit.Stage {
 	return result
 }
 
-// FakeChecker creates a checker that returns a constant level for all requests (for testing).
-func FakeChecker(level audit.Level, stage []audit.Stage) Checker {
-	return &fakeChecker{level, stage}
+// NewFakePolicyRuleEvaluator creates a fake policy rule evaluator that returns
+// a constant level for all requests (for testing).
+func NewFakePolicyRuleEvaluator(level audit.Level, stage []audit.Stage) auditinternal.PolicyRuleEvaluator {
+	return &fakePolicyRuleEvaluator{level, stage}
 }
 
-type policyChecker struct {
+type policyRuleEvaluator struct {
 	audit.Policy
 }
 
-func (p *policyChecker) LevelAndStages(attrs authorizer.Attributes) (audit.Level, []audit.Stage) {
+func (p *policyRuleEvaluator) LevelAndStages(attrs authorizer.Attributes) (audit.Level, []audit.Stage) {
 	for _, rule := range p.Rules {
 		if ruleMatches(&rule, attrs) {
 			return rule.Level, rule.OmitStages
@@ -209,11 +205,11 @@ func hasString(slice []string, value string) bool {
 	return false
 }
 
-type fakeChecker struct {
+type fakePolicyRuleEvaluator struct {
 	level audit.Level
 	stage []audit.Stage
 }
 
-func (f *fakeChecker) LevelAndStages(_ authorizer.Attributes) (audit.Level, []audit.Stage) {
+func (f *fakePolicyRuleEvaluator) LevelAndStages(_ authorizer.Attributes) (audit.Level, []audit.Stage) {
 	return f.level, f.stage
 }

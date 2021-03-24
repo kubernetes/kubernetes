@@ -52,7 +52,7 @@ func TestWebhookLoopback(t *testing.T) {
 
 			// Hook into audit to watch requests
 			config.GenericConfig.AuditBackend = auditSinkFunc(func(events ...*auditinternal.Event) {})
-			config.GenericConfig.AuditPolicyChecker = auditChecker(func(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
+			config.GenericConfig.AuditPolicyRuleEvaluator = auditPolicyRuleEvaluator(func(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
 				if attrs.GetPath() == webhookPath {
 					if attrs.GetUser().GetName() != "system:apiserver" {
 						t.Errorf("expected user %q, got %q", "system:apiserver", attrs.GetUser().GetName())
@@ -106,9 +106,9 @@ func TestWebhookLoopback(t *testing.T) {
 	}
 }
 
-type auditChecker func(authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage)
+type auditPolicyRuleEvaluator func(authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage)
 
-func (f auditChecker) LevelAndStages(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
+func (f auditPolicyRuleEvaluator) LevelAndStages(attrs authorizer.Attributes) (auditinternal.Level, []auditinternal.Stage) {
 	return f(attrs)
 }
 

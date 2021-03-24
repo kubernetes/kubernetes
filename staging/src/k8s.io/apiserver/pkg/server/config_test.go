@@ -289,9 +289,9 @@ func TestAuthenticationAuditAnnotationsDefaultChain(t *testing.T) {
 	})
 	backend := &testBackend{}
 	c := &Config{
-		Authentication:     AuthenticationInfo{Authenticator: authn},
-		AuditBackend:       backend,
-		AuditPolicyChecker: policy.FakeChecker(auditinternal.LevelMetadata, nil),
+		Authentication:           AuthenticationInfo{Authenticator: authn},
+		AuditBackend:             backend,
+		AuditPolicyRuleEvaluator: policy.NewFakePolicyRuleEvaluator(auditinternal.LevelMetadata, nil),
 
 		// avoid nil panics
 		HandlerChainWaitGroup: &waitgroup.SafeWaitGroup{},
