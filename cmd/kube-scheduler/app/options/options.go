@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -42,7 +41,6 @@ import (
 	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
-	"k8s.io/klog/v2"
 	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/pkg/scheduler"
@@ -331,15 +329,7 @@ func makeLeaderElectionConfig(config componentbaseconfig.LeaderElectionConfigura
 // createKubeConfig creates a kubeConfig from the given config and masterOverride.
 // TODO remove masterOverride when CLI flags are removed.
 func createKubeConfig(config componentbaseconfig.ClientConnectionConfiguration, masterOverride string) (*restclient.Config, error) {
-	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.Warning("Neither --kubeconfig nor --master was specified. Using default API client. This might not work.")
-	}
-
-	// This creates a client, first loading any specified kubeconfig
-	// file, and then overriding the Master flag, if non-empty.
-	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: masterOverride}}).ClientConfig()
+	kubeConfig, err := clientcmd.BuildConfigFromFlags(masterOverride, config.Kubeconfig)
 	if err != nil {
 		return nil, err
 	}
