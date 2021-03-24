@@ -57,6 +57,9 @@ type Config struct {
 	// value, the pod will be moved from unschedulablePods to backoffQ or activeQ.
 	// If this value is empty, the default value (5min) will be used.
 	PodMaxInUnschedulablePodsDuration time.Duration
+
+	// OpenShiftContext is additional context that we need to launch the kube-scheduler for openshift
+	OpenShiftContext OpenShiftContext
 }
 
 type completedConfig struct {
