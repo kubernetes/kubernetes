@@ -54,6 +54,10 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	}
 	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
 	dnsImageTag := constants.GetDNSVersion(cfg.DNS.Type)
+	
+	if cfg.CoreDNSVersion != "" {
+                dnsImageTag =  cfg.CoreDNSVersion
+        }
 
 	// unless an override is specified
 	if cfg.DNS.ImageTag != "" {
@@ -72,13 +76,24 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 	}
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
 	etcdImageTag := constants.DefaultEtcdVersion
-	etcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
-	if err == nil {
-		etcdImageTag = etcdVersion.String()
-	}
-	if warning != nil {
-		klog.Warningln(warning)
-	}
+	EtcdVersion, warning, err := constants.EtcdSupportedVersion(constants.SupportedEtcdVersion, cfg.KubernetesVersion)
+        if cfg.EtcdVersion != "" {
+                CfgEtcdVersion := cfg.EtcdVersion
+                etcdImageTag = EtcdVersion.String()
+                if etcdImageTag != CfgEtcdVersion {
+                        warning := fmt.Errorf("the version(%s) of etcd you input is not officially supported for Kubernetes %s ",
+                        CfgEtcdVersion, cfg.KubernetesVersion)
+                        klog.Warningln(warning)
+                }
+                etcdImageTag = CfgEtcdVersion
+        } else {
+                if err == nil {
+                        etcdImageTag = EtcdVersion.String()
+                }
+                if warning != nil {
+                        klog.Warningln(warning)
+                }
+        }
 	// unless an override is specified
 	if cfg.Etcd.Local != nil && cfg.Etcd.Local.ImageTag != "" {
 		etcdImageTag = cfg.Etcd.Local.ImageTag

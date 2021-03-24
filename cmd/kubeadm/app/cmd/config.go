@@ -489,5 +489,7 @@ func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.Cl
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)
+	options.AddImageMetaEtcdFlags(flagSet, &cfg.EtcdVersion)
+	options.AddImageMetaCoreDNSFlags(flagSet,&cfg.CoreDNSVersion)
 	options.AddConfigFlag(flagSet, cfgPath)
 }

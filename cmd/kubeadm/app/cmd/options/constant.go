@@ -40,9 +40,15 @@ const (
 
 	// ControlPlaneEndpoint flag sets a stable IP address or DNS name for the control plane.
 	ControlPlaneEndpoint = "control-plane-endpoint"
+	
+	// CoreDNSVersion is the target version of the control plane.
+        CoreDNSVersion = "coredns-version"
 
 	// DryRun flag instruct kubeadm to don't apply any changes; just output what would be done.
 	DryRun = "dry-run"
+
+	// EtcdVersion is the target version of the control plane.
+        EtcdVersion = "etcd-version" 
 
 	// FeatureGatesString flag sets key=value pairs that describe feature gates for various features.
 	FeatureGatesString = "feature-gates"

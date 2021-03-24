@@ -95,6 +95,12 @@ type ClusterConfiguration struct {
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string `json:"certificatesDir,omitempty"`
 
+	// CoreDNSVersion is the target version of the control plane.
+	CoreDNSVersion string `json:"coreDNSVersion,omitempty"`	
+
+	// EtcdVersion is the target version of the control plane.
+	EtcdVersion string `json:"etcdVersion,omitempty"`	
+
 	// ImageRepository sets the container registry to pull images from.
 	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
 	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
@@ -163,6 +169,12 @@ type ImageMeta struct {
 	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 	ImageTag string `json:"imageTag,omitempty"`
 
+	// EtcdVersion is the target version of the control plane.
+	EtcdVersion string `json:"etcdVersion,omitempty"`
+
+	// CoreDNSVersion is the target version of the control plane.
+	CoreDNSVersion string `json:"coreDNSVersion,omitempty"`
+	
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
 }
 

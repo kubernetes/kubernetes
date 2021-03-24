@@ -105,6 +105,12 @@ type ClusterConfiguration struct {
 	// will be used for all the other images.
 	ImageRepository string `json:"imageRepository"`
 
+	// EtcdVersion is the target version of the control plane.
+	EtcdVersion string `json:"etcdVersion,omitempty"`
+
+	// CoreDNSVersion is the target version of the control plane.
+	CoreDNSVersion string `json:"coreDNSVersion,omitempty"`
+	
 	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
 	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
 	// will print multiple warnings when set to true, and at some point it may become ignored.
@@ -166,6 +172,12 @@ type ImageMeta struct {
 	// ImageTag allows to specify a tag for the image.
 	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
 	ImageTag string `json:"imageTag,omitempty"`
+
+	// EtcdVersion is the target version of the control plane.
+	EtcdVersion string `json:"etcdVersion,omitempty"`
+
+	// CoreDNSVersion is the target version of the control plane.
+	CoreDNSVersion string `json:"coreDNSVersion,omitempty"`
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
 }

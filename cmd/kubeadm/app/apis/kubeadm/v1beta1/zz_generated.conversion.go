@@ -401,6 +401,8 @@ func autoConvert_v1beta1_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	}
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
+	out.EtcdVersion = in.EtcdVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
 	out.ClusterName = in.ClusterName
@@ -436,6 +438,8 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in
 	}
 	out.CertificatesDir = in.CertificatesDir
 	out.ImageRepository = in.ImageRepository
+	out.EtcdVersion = in.EtcdVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
@@ -641,6 +645,8 @@ func Convert_kubeadm_HostPathMount_To_v1beta1_HostPathMount(in *kubeadm.HostPath
 func autoConvert_v1beta1_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
+	out.EtcdVersion = in.EtcdVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	return nil
 }
 
@@ -652,6 +658,8 @@ func Convert_v1beta1_ImageMeta_To_kubeadm_ImageMeta(in *ImageMeta, out *kubeadm.
 func autoConvert_kubeadm_ImageMeta_To_v1beta1_ImageMeta(in *kubeadm.ImageMeta, out *ImageMeta, s conversion.Scope) error {
 	out.ImageRepository = in.ImageRepository
 	out.ImageTag = in.ImageTag
+	out.EtcdVersion = in.EtcdVersion
+	out.CoreDNSVersion = in.CoreDNSVersion
 	return nil
 }
 
