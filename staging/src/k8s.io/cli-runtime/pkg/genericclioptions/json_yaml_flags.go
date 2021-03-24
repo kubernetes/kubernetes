@@ -65,6 +65,10 @@ func (f *JSONYamlPrintFlags) ToPrinter(outputFormat string) (printers.ResourcePr
 // AddFlags receives a *cobra.Command reference and binds
 // flags related to JSON or Yaml printing to it
 func (f *JSONYamlPrintFlags) AddFlags(c *cobra.Command) {
+	if f == nil {
+		return
+	}
+
 	c.Flags().BoolVar(&f.showManagedFields, "show-managed-fields", f.showManagedFields, "If true, keep the managedFields when printing objects in JSON or YAML format.")
 }
 
