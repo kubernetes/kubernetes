@@ -801,6 +801,39 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectEqual(cur.Revision, int64(2))
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
+
+	ginkgo.It("should list and delete a collection of DaemonSets", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		dsClient := f.ClientSet.AppsV1().DaemonSets(ns)
+		cs := f.ClientSet
+		one := int64(1)
+
+		ginkgo.By(fmt.Sprintf("Creating simple DaemonSet %q", dsName))
+		testDaemonset, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSetWithLabel(dsName, image, label), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Check that daemon pods launch on every node of the cluster.")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnAllNodes(f, testDaemonset))
+		framework.ExpectNoError(err, "error waiting for daemon pod to start")
+		err = checkDaemonStatus(f, dsName)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("listing all DeamonSets")
+		dsList, err := cs.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list Daemon Sets")
+		framework.ExpectEqual(len(dsList.Items), 1, "filtered list wasn't found")
+
+		ginkgo.By("DeleteCollection of the DaemonSets")
+		err = dsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to delete DaemonSets")
+
+		ginkgo.By("Verify that ReplicaSets have been deleted")
+		dsList, err = c.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err, "failed to list DaemonSets")
+		framework.ExpectEqual(len(dsList.Items), 0, "filtered list should have no daemonset")
+	})
 })
 
 // randomPod selects a random pod within pods that causes fn to return true, or nil
@@ -825,6 +858,34 @@ func newDaemonSet(dsName, image string, label map[string]string) *appsv1.DaemonS
 	return &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: dsName,
+		},
+		Spec: appsv1.DaemonSetSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: label,
+			},
+			Template: v1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: label,
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{
+						{
+							Name:  "app",
+							Image: image,
+							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newDaemonSetWithLabel(dsName, image string, label map[string]string) *appsv1.DaemonSet {
+	return &appsv1.DaemonSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   dsName,
+			Labels: label,
 		},
 		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
