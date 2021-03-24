@@ -91,7 +91,7 @@ const (
 	sensitiveMaskAfter   = "*** (after)"
 )
 
-// diffError returns the ExitError if the status code is less than 1,
+// diffError returns the ExitError if the status code is less than 2,
 // nil otherwise.
 func diffError(err error) exec.ExitError {
 	if err, ok := err.(exec.ExitError); ok && err.ExitStatus() <= 1 {
