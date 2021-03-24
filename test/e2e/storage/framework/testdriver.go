@@ -144,7 +144,7 @@ func GetDriverTimeouts(driver TestDriver) *framework.TimeoutContext {
 // Capability represents a feature that a volume plugin supports
 type Capability string
 
-// Constants related to capability
+// Constants related to capabilities and behavior of the driver.
 const (
 	CapPersistence        Capability = "persistence"        // data is persisted across pod restarts
 	CapBlock              Capability = "block"              // raw block mode
@@ -166,6 +166,18 @@ const (
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
 	CapTopology            Capability = "topology"            // support topology
+
+	// The driver publishes storage capacity information: when the storage class
+	// for dynamic provisioning exists, the driver is expected to provide
+	// capacity information for it.
+	CapCapacity Capability = "capacity"
+
+	// The driver manages storage locally through CSI. TopologyKeys must be
+	// set and contain exactly one entry for distinguishing nodes.
+	// When the driver supports CapCapacity and the storage class
+	// for dynamic provisioning exists, the driver is expected to
+	// provider capacity information for it for each node.
+	CapCSILocalStorage Capability = "CSILocalStorage"
 )
 
 // DriverInfo represents static information about a TestDriver.
