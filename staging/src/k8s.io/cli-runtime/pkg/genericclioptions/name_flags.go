@@ -83,6 +83,5 @@ func (f *NamePrintFlags) AddFlags(c *cobra.Command) {}
 func NewNamePrintFlags(operation string) *NamePrintFlags {
 	return &NamePrintFlags{
 		Operation: operation,
-		ShowKind:  false, // by default it doesn't show kind
 	}
 }

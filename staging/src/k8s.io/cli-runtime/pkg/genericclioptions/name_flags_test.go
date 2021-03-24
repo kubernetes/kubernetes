@@ -44,7 +44,6 @@ func TestNamePrinterSupportsExpectedFormats(t *testing.T) {
 		{
 			name:           "valid \"name\" output format with no operation prints resource name",
 			outputFormat:   "name",
-			showKind:       false,
 			expectedOutput: "foo",
 		},
 		{
