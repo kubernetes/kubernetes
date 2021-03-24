@@ -125,12 +125,17 @@ func (p *capacityTestSuite) DefineTests(driver storageframework.TestDriver, patt
 		// is that it provides some arbitrary capacity for the
 		// storage class.
 		matcher := matchSC
-		if dInfo.Capabilities[storageframework.CapCSILocalStorage] {
-			// Local storage. We expect one CSIStorageCapacity object per
-			// node for the storage class.
-			if len(dInfo.TopologyKeys) != 1 {
-				framework.Failf("need exactly one topology key for local storage, DriverInfo.TopologyKeys has: %v", dInfo.TopologyKeys)
-			}
+		if len(dInfo.TopologyKeys) == 1 {
+			// We can construct topology segments by
+			// collecting all values for this one key and
+			// then expect one CSIStorageCapacity object
+			// per value for the storage class.
+			//
+			// Local storage on a node will be covered by
+			// this checking. A more complex approach for
+			// drivers with multiple keys might be
+			// possible, too, but is not currently
+			// implemented.
 			matcher = HaveCapacitiesForClassAndNodes(f.ClientSet, sc.Provisioner, sc.Name, dInfo.TopologyKeys[0])
 		}
 
@@ -259,7 +264,6 @@ type haveLocalStorageCapacities struct {
 	topologyKey string
 
 	matchSuccess          bool
-	topologyValues        []string
 	expectedCapacities    []storagev1beta1.CSIStorageCapacity
 	unexpectedCapacities  []storagev1beta1.CSIStorageCapacity
 	missingTopologyValues []string
@@ -268,7 +272,6 @@ type haveLocalStorageCapacities struct {
 var _ CapacityMatcher = &haveLocalStorageCapacities{}
 
 func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, err error) {
-	h.topologyValues = nil
 	h.expectedCapacities = nil
 	h.unexpectedCapacities = nil
 	h.missingTopologyValues = nil
@@ -285,6 +288,7 @@ func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, er
 	if err != nil {
 		return false, err
 	}
+	topologyValues := map[string]bool{}
 	for _, csiNode := range csiNodes.Items {
 		for _, driver := range csiNode.Spec.Drivers {
 			if driver.Name != h.driverName {
@@ -301,17 +305,17 @@ func (h *haveLocalStorageCapacities) Match(actual interface{}) (success bool, er
 					node.Name,
 					h.topologyKey)
 			}
-			h.topologyValues = append(h.topologyValues, value)
+			topologyValues[value] = true
 			break
 		}
 	}
-	if len(h.topologyValues) == 0 {
+	if len(topologyValues) == 0 {
 		return false, fmt.Errorf("driver %q not running on any node", h.driverName)
 	}
 
 	// Now check that for each topology value there is exactly one CSIStorageCapacity object.
 	remainingTopologyValues := map[string]bool{}
-	for _, value := range h.topologyValues {
+	for value := range topologyValues {
 		remainingTopologyValues[value] = true
 	}
 	capacities := h.match.MatchedCapacities()

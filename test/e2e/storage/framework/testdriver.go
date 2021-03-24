@@ -171,13 +171,6 @@ const (
 	// for dynamic provisioning exists, the driver is expected to provide
 	// capacity information for it.
 	CapCapacity Capability = "capacity"
-
-	// The driver manages storage locally through CSI. TopologyKeys must be
-	// set and contain exactly one entry for distinguishing nodes.
-	// When the driver supports CapCapacity and the storage class
-	// for dynamic provisioning exists, the driver is expected to
-	// provider capacity information for it for each node.
-	CapCSILocalStorage Capability = "CSILocalStorage"
 )
 
 // DriverInfo represents static information about a TestDriver.
