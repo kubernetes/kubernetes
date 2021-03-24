@@ -51,6 +51,9 @@ type Config struct {
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig
+
+	// OpenShiftContext is additional context that we need to launch the kube-scheduler for openshift
+	OpenShiftContext OpenShiftContext
 }
 
 type completedConfig struct {
