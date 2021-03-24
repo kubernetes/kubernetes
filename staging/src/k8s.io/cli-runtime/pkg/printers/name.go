@@ -123,19 +123,18 @@ func printObj(w io.Writer, name string, operation string, shortOutput, showKind 
 		operation = ""
 	}
 
-	if len(groupKind.Group) == 0 {
-		if showKind {
-			fmt.Fprintf(w, "%s/%s%s\n", strings.ToLower(groupKind.Kind), name, operation)
-		} else {
-			fmt.Fprintf(w, "%s%s\n", name, operation)
-		}
+	obj := fmt.Sprintf("%s%s", name, operation)
+
+	if !showKind {
+		fmt.Fprintf(w, "%s\n",  obj)
 		return nil
 	}
 
-	if showKind {
-		fmt.Fprintf(w, "%s.%s/%s%s\n", strings.ToLower(groupKind.Kind), groupKind.Group, name, operation)
-	} else {
-		fmt.Fprintf(w, "%s%s\n", name, operation)
+	kind := strings.ToLower(groupKind.Kind)
+	if len(groupKind.Group) > 0 {
+		kind = fmt.Sprintf("%s.%s", kind, groupKind.Group)
 	}
+
+	fmt.Fprintf(w, "%s/%s\n", kind, obj)
 	return nil
 }
