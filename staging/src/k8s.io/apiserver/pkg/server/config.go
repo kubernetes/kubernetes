@@ -215,6 +215,10 @@ type Config struct {
 	// If not specify any in flags, then genericapiserver will only enable defaultAPIResourceConfig.
 	MergedResourceConfig *serverstore.ResourceConfig
 
+	// AdvertisePort is used when the targetPort and port used in the kubernetes.default.svc service and
+	// endpoint is different than the one used for binding. This configuration is needed in case of a front proxy is
+	// used in front of kube-apiserver
+	AdvertisePort int
 	//===========================================================================
 	// values below here are targets for removal
 	//===========================================================================

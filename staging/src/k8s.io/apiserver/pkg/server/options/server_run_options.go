@@ -34,6 +34,7 @@ import (
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
 	AdvertiseAddress net.IP
+	AdvertisePort    int
 
 	CorsAllowedOriginList       []string
 	HSTSDirectives              []string
@@ -86,7 +87,7 @@ func (s *ServerRunOptions) ApplyTo(c *server.Config) error {
 	c.JSONPatchMaxCopyBytes = s.JSONPatchMaxCopyBytes
 	c.MaxRequestBodyBytes = s.MaxRequestBodyBytes
 	c.PublicAddress = s.AdvertiseAddress
-
+	c.AdvertisePort = s.AdvertisePort
 	return nil
 }
 
@@ -112,6 +113,9 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 func (s *ServerRunOptions) Validate() []error {
 	errors := []error{}
 
+	if s.AdvertisePort < 0 || s.AdvertisePort > 65535 {
+		errors = append(errors, fmt.Errorf("--advertise-port %v must be between 0 and 65535, inclusive. 0 for turning off", s.AdvertisePort))
+	}
 	if s.LivezGracePeriod < 0 {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
 	}
@@ -182,6 +186,10 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"address must be reachable by the rest of the cluster. If blank, the --bind-address "+
 		"will be used. If --bind-address is unspecified, the host's default interface will "+
 		"be used.")
+
+	fs.IntVar(&s.AdvertisePort, "advertise-port", s.AdvertisePort, ""+
+		"The targetPort used in the kubernetes.default.svc service and the port used in the "+
+		"connected endpoint object. If not specified the --secure-port or --port is used")
 
 	fs.StringSliceVar(&s.CorsAllowedOriginList, "cors-allowed-origins", s.CorsAllowedOriginList, ""+
 		"List of allowed origins for CORS, comma separated.  An allowed origin can be a regular "+
