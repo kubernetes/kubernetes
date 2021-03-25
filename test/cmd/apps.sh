@@ -278,11 +278,11 @@ run_deployment_tests() {
   kubectl create -f test/fixtures/doc-yaml/user-guide/deployment.yaml "${kube_flags[@]:?}"
   kube::test::get_object_assert deployment "{{range.items}}{{${id_field:?}}}:{{end}}" 'nginx-deployment:'
   # Dry-run autoscale
-  kubectl-with-retry autoscale deployment nginx-deployment --dry-run=client "${kube_flags[@]:?}" --min=2 --max=3
-  kubectl-with-retry autoscale deployment nginx-deployment --dry-run=server "${kube_flags[@]:?}" --min=2 --max=3
+  kubectl autoscale deployment nginx-deployment --dry-run=client "${kube_flags[@]:?}" --min=2 --max=3
+  kubectl autoscale deployment nginx-deployment --dry-run=server "${kube_flags[@]:?}" --min=2 --max=3
   kube::test::get_object_assert 'hpa' "{{range.items}}{{ if eq $id_field \\\"nginx-deployment\\\" }}found{{end}}{{end}}:" ':'
   # autoscale 2~3 pods, no CPU utilization specified
-  kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]:?}" --min=2 --max=3
+  kubectl autoscale deployment nginx-deployment "${kube_flags[@]:?}" --min=2 --max=3
   kube::test::get_object_assert 'hpa nginx-deployment' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
@@ -319,13 +319,13 @@ run_deployment_tests() {
   sleep 1
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   # Pause the deployment
-  kubectl-with-retry rollout pause deployment nginx "${kube_flags[@]:?}"
+  kubectl rollout pause deployment nginx "${kube_flags[@]:?}"
   # A paused deployment cannot be rolled back
   ! kubectl rollout undo deployment nginx "${kube_flags[@]:?}" || exit 1
   # A paused deployment cannot be restarted
   ! kubectl rollout restart deployment nginx "${kube_flags[@]:?}" || exit 1
   # Resume the deployment
-  kubectl-with-retry rollout resume deployment nginx "${kube_flags[@]:?}"
+  kubectl rollout resume deployment nginx "${kube_flags[@]:?}"
   # The resumed deployment can now be rolled back
   kubectl rollout undo deployment nginx "${kube_flags[@]:?}"
   # Check that the new replica set has all old revisions stored in an annotation

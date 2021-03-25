@@ -125,10 +125,7 @@ run_multi_resources_tests() {
     # cleaning
     rm "${temp_editor}"
     # Command
-    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl label"
-    # fails on some, but not all, of the resources, retries will fail because it tries to modify
-    # existing labels.
-    kubectl-with-retry label -f "${file}" labeled=true --overwrite "${kube_flags[@]}"
+    kubectl label -f "${file}" labeled=true "${kube_flags[@]}"
     # Post-condition: mock service and mock rc (and mock2) are labeled
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${labels_field}.labeled}}" 'true'
@@ -144,10 +141,7 @@ run_multi_resources_tests() {
     fi
     # Command
     # Command
-    # We need to set --overwrite, because otherwise, if the first attempt to run "kubectl annotate"
-    # fails on some, but not all, of the resources, retries will fail because it tries to modify
-    # existing annotations.
-    kubectl-with-retry annotate -f "${file}" annotated=true --overwrite "${kube_flags[@]}"
+    kubectl annotate -f "${file}" annotated=true "${kube_flags[@]}"
     # Post-condition: mock service (and mock2) and mock rc (and mock2) are annotated
     if [ "$has_svc" = true ]; then
       kube::test::get_object_assert 'services mock' "{{${annotations_field:?}.annotated}}" 'true'
@@ -370,16 +364,12 @@ run_recursive_resources_tests() {
   kube::test::get_object_assert deployment "{{range.items}}{{${image_field0:?}}}:{{end}}" "${IMAGE_NGINX}:${IMAGE_NGINX}:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Pause the deployments recursively
-  # shellcheck disable=SC2034  # PRESERVE_ERR_FILE is used in kubectl-with-retry
-  PRESERVE_ERR_FILE=true
-  kubectl-with-retry rollout pause -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
-  output_message=$(cat "${ERROR_FILE}")
+  output_message=$(! kubectl rollout pause -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: nginx0 & nginx1 should both have paused set to true, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "true:true:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   ## Resume the deployments recursively
-  kubectl-with-retry rollout resume -f hack/testdata/recursive/deployment --recursive "${kube_flags[@]}"
-  output_message=$(cat "${ERROR_FILE}")
+  output_message=$(! kubectl rollout resume -f hack/testdata/recursive/deployment --recursive 2>&1 "${kube_flags[@]}")
   # Post-condition: nginx0 & nginx1 should both have paused set to nothing, and since nginx2 is malformed, it should error
   kube::test::get_object_assert deployment "{{range.items}}{{.spec.paused}}:{{end}}" "<no value>:<no value>:"
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
