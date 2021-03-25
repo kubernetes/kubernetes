@@ -53,6 +53,7 @@ type migrationOpCheck struct {
 
 // BaseSuites is a list of storage test suites that work for in-tree and CSI drivers
 var BaseSuites = []func() storageframework.TestSuite{
+	InitCapacityTestSuite,
 	InitVolumesTestSuite,
 	InitVolumeIOTestSuite,
 	InitVolumeModeTestSuite,
