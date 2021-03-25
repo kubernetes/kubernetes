@@ -218,7 +218,13 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	successCases := []*networking.NetworkPolicy{
 		makeNetworkPolicyCustom(setIngressEmptyFirstElement),
 		makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setIngressEmptyPorts),
-		makeNetworkPolicyCustom(setIngressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
+		makeNetworkPolicyCustom(setIngressPorts(
+			makePort(nil, intstr.FromInt(80), 0),
+			makePort(&protocolTCP, intstr.FromInt(0), 0),
+			makePort(&protocolTCP, intstr.FromInt(443), 0),
+			makePort(&protocolUDP, intstr.FromString("dns"), 0),
+			makePort(&protocolSCTP, intstr.FromInt(7777), 0),
+		)),
 		makeNetworkPolicyCustom(setIngressFromPodSelector("c", "d")),
 		makeNetworkPolicyCustom(setIngressFromNamespaceSelector),
 		makeNetworkPolicyCustom(setIngressFromPodSelector("e", "f"), setIngressFromNamespaceSelector),
@@ -226,13 +232,26 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		makeNetworkPolicyCustom(setIngressFromIPBlockIPV4),
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV4, setPolicyTypesEgress),
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV4, setPolicyTypesIngressEgress),
-		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
+		makeNetworkPolicyCustom(setEgressPorts(
+			makePort(nil, intstr.FromInt(80), 0),
+			makePort(&protocolTCP, intstr.FromInt(0), 0),
+			makePort(&protocolTCP, intstr.FromInt(443), 0),
+			makePort(&protocolUDP, intstr.FromString("dns"), 0),
+			makePort(&protocolSCTP, intstr.FromInt(7777), 0),
+		)),
 		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlockIPV6),
 		makeNetworkPolicyCustom(setIngressFromIPBlockIPV6),
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesEgress),
 		makeNetworkPolicyCustom(setEgressToIPBlockIPV6, setPolicyTypesIngressEgress),
 		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(32000), 32768), makePort(&protocolUDP, intstr.FromString("dns"), 0))),
-		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(nil, intstr.FromInt(30000), 32768), makePort(nil, intstr.FromInt(32000), 32768)), setIngressFromPodSelector("e", "f"), setIngressPorts(makePort(&protocolTCP, intstr.FromInt(32768), 32768))),
+		makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(
+				makePort(nil, intstr.FromInt(30000), 32768),
+				makePort(nil, intstr.FromInt(32000), 32768),
+			),
+			setIngressFromPodSelector("e", "f"),
+			setIngressPorts(makePort(&protocolTCP, intstr.FromInt(32768), 32768))),
 	}
 
 	// Success cases are expected to pass validation.
@@ -320,12 +339,36 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		"too many policyTypes": makeNetworkPolicyCustom(setEgressToIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar", "baz"}
 		}),
-		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
-		"endPort defined with named/string port":            makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromString("dns"), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
-		"endPort defined without port defined":              makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(0), 32768))),
-		"port is greater than endPort":                      makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolSCTP, intstr.FromInt(35000), 32768))),
-		"multiple invalid port ranges defined":              makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(&protocolTCP, intstr.FromInt(0), 32768), makePort(&protocolTCP, intstr.FromString("https"), 32768))),
-
+		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(
+				makePort(&protocolUDP, intstr.FromInt(35000), 32768),
+				makePort(nil, intstr.FromInt(32000), 32768),
+			),
+		),
+		"endPort defined with named/string port": makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(
+				makePort(&protocolUDP, intstr.FromString("dns"), 32768),
+				makePort(nil, intstr.FromInt(32000), 32768),
+			),
+		),
+		"endPort defined without port defined": makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(makePort(&protocolTCP, intstr.FromInt(0), 32768)),
+		),
+		"port is greater than endPort": makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(makePort(&protocolSCTP, intstr.FromInt(35000), 32768)),
+		),
+		"multiple invalid port ranges defined": makeNetworkPolicyCustom(
+			setEgressToNamespaceSelector,
+			setEgressPorts(
+				makePort(&protocolUDP, intstr.FromInt(35000), 32768),
+				makePort(&protocolTCP, intstr.FromInt(0), 32768),
+				makePort(&protocolTCP, intstr.FromString("https"), 32768),
+			),
+		),
 		"invalid endport range defined": makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolTCP, intstr.FromInt(30000), 65537))),
 	}
 
