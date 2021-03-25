@@ -182,6 +182,9 @@ try {
   Start-Sleep 15
   Verify-WorkerServices
 
+  # Download, install and configure network policy related items
+  DownloadInstallAndConfigure-NetworkPolicy
+
   $config = New-FileRotationConfig
   # TODO(random-liu): Generate containerd log into the log directory.
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config

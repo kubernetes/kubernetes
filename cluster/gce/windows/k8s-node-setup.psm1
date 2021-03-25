@@ -284,6 +284,12 @@ function Set-EnvironmentVars {
     "BOOTSTRAP_KUBECONFIG" = ${kube_env}['BOOTSTRAP_KUBECONFIG_FILE']
     "KUBECONFIG" = ${kube_env}['KUBECONFIG_FILE']
     "KUBEPROXY_KUBECONFIG" = ${kube_env}['KUBEPROXY_KUBECONFIG_FILE']
+    "WINDOWS_NETWORK_POLICY_PROVIDER" = ${kube_env}['WINDOWS_NETWORK_POLICY_PROVIDER']
+    "ANTREA_CONFIG" = ${kube_env}['ANTREA_CONFIG_FILE']
+    "ANTREA_KUBECONFIG" = ${kube_env}['ANTREA_KUBECONFIG_FILE']
+    "ANTREA_CNI_BINARY_URL" = ${kube_env}['ANTREA_CNI_BINARY_URL']
+    "ANTREA_AGENT_BINARY_URL" = ${kube_env}['ANTREA_AGENT_BINARY_URL']
+    "OVS_INSTALLER_URL" = ${kube_env}['OVS_INSTALLER_URL']
     "LOGS_DIR" = ${kube_env}['LOGS_DIR']
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
@@ -434,6 +440,142 @@ function DownloadAndInstall-CSIProxyBinaries {
       Remove-Item -Force -Recurse $tmp_dir
     }
   }
+}
+
+# Downloads Network Policy related binaries, install and configure them.
+# kube-env WINDOWS_NETWORK_POLICY_PROVIDER determines what plugin to be
+# downloaded, installed and configured.
+#
+# Required ${kube_env} keys:
+#   WINDOWS_NETWORK_POLICY_PROVIDER
+function DownloadInstallAndConfigure-NetworkPolicy {
+  if ("${env:WINDOWS_NETWORK_POLICY_PROVIDER}" -eq "antrea") {
+    DownloadAndInstall-OVSBinaries
+    DownloadAndInstall-AntreaBinaries
+    DownloadAndInstall-AntreaScripts
+    Create-AntreaKubeconfig
+    Start-AntreaService
+  }
+}
+
+# Sets up antrea service.
+#
+# Required ${kube_env} keys:
+#   ANTREA_CONFIG
+function Start-AntreaService {
+  Configure-Antrea
+
+  $env:NODE_NAME = (hostname)
+  $antrea_args = @(`
+    "--log_file=\etc\kubernetes\logs\antrea.log",
+    "--logtostderr=false"
+  )
+
+  Log-Output "kubelet_args from metadata: ${kubelet_args}"
+  & sc.exe create antrea-agent binPath= "${env:NODE_DIR}\antrea-agent.exe --config ${env:ANTREA_CONFIG} ${antrea_args}" start= demand
+  & sc.exe failure antrea-agent reset= 0 actions= restart/10000
+  & sc.exe start antrea-agent
+}
+
+# Download and install ovs binaries. kube-env OVS_INSTALLER_URL specifies the
+# url to a script that downloads and installs OVS. It also enabled Hyper-V, which
+# is prerequisite for OVS.
+#
+# Required ${kube_env} keys:
+#   OVS_INSTALLER_URL
+function DownloadAndInstall-OVSBinaries {
+  Log-Output "Enabling HyperV"
+  Install-WindowsFeature containers
+  Install-WindowsFeature Hyper-V-Powershell
+  dism /online /enable-feature /featurename:Microsoft-Hyper-V /all /NoRestart
+  dism /online /disable-feature /featurename:Microsoft-Hyper-V-Online /NoRestart
+
+  Log-Output "Installing OVS"
+  $ovsInstallerURL = ${env:OVS_INSTALLER_URL}
+
+  # Download ovs installer
+  $tmp_dir = 'C:\k8s_tmp'
+  New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+  $filename = 'Install-OVS.ps1'
+  MustDownload-File -OutFile $tmp_dir\$filename -URLs $ovsInstallerURL
+
+  # Install OVS
+  & $tmp_dir\$filename
+}
+
+# Download and install antrea binaries: antrea-agent and antrea-cni. kube-env
+# ANTREA_AGENT_BINARY_URL specifies the url to download antrea-agent. kube-env
+# ANTREA_AGENT_CNI_URL specifies the url to download antrea-cni.
+#
+# Required ${kube_env} keys:
+#   ANTREA_AGENT_BINARY_URL
+#   ANTREA_CNI_BINARY_URL
+function DownloadAndInstall-AntreaBinaries {
+  $agent_url = ${env:ANTREA_AGENT_BINARY_URL}
+  $cni_url = ${env:ANTREA_CNI_BINARY_URL}
+
+  # Download ovs installer
+  $tmp_dir = 'C:\k8s_tmp'
+  New-Item -Force -ItemType 'directory' $tmp_dir | Out-Null
+  $cni_filename = 'antrea.exe'
+  MustDownload-File -OutFile $tmp_dir\$cni_filename -URLs $cni_url
+  $agent_filename = 'antrea-agent.exe'
+  MustDownload-File -OutFile $tmp_dir\$agent_filename -URLs $agent_url
+
+  Move-Item -Force $tmp_dir\$cni_filename ${env:CNI_DIR}\$cni_filename
+  Move-Item -Force $tmp_dir\$agent_filename ${env:NODE_DIR}\$agent_filename
+}
+
+# Install Antrea's prepare script and install the trigger to run the script at
+# startup time
+function DownloadAndInstall-AntreaScripts {
+  $filename = 'C:\Prepare-AntreaAgent.ps1'
+
+  Set-Content $filename `
+'$NeedCleanNetwork = $true
+$AntreaHnsNetwork = Get-HnsNetwork | Where-Object {$_.Name -eq "antrea-hnsnetwork"}
+if ($AntreaHnsNetwork) {
+    $OVSExtension = $AntreaHnsNetwork.Extensions | Where-Object {$_.Name -eq "Open vSwitch Extension"}
+    if ($OVSExtension.IsEnabled) {
+        $NeedCleanNetwork = $false
+    }
+}
+if ($NeedCleanNetwork) {
+    Write-Host "Cleaning stale Antrea network resources if they exist..."
+}
+# Enure OVS services are running.
+Write-Host "Starting ovsdb-server service..."
+Start-Service ovsdb-server
+Write-Host "Starting ovs-vswitchd service..."
+Start-Service ovs-vswitchd
+Write-Host "Preparing service network interface for kube-proxy..."
+
+# kube-proxy
+$InterfaceAlias="HNS Internal NIC"
+$INTERFACE_TO_ADD_SERVICE_IP = "vEthernet ($InterfaceAlias)"
+Write-Host "Creating netadapter $INTERFACE_TO_ADD_SERVICE_IP for kube-proxy"
+if (Get-NetAdapter -InterfaceAlias $INTERFACE_TO_ADD_SERVICE_IP -ErrorAction SilentlyContinue) {
+    Write-Host "NetAdapter $INTERFACE_TO_ADD_SERVICE_IP exists, exit."
+    return
+}
+[Environment]::SetEnvironmentVariable("INTERFACE_TO_ADD_SERVICE_IP", $INTERFACE_TO_ADD_SERVICE_IP, [System.EnvironmentVariableTarget]::Machine)
+$hnsSwitchName = $(Get-VMSwitch -SwitchType Internal).Name
+Add-VMNetworkAdapter -ManagementOS -Name $InterfaceAlias -SwitchName $hnsSwitchName
+Set-NetIPInterface -ifAlias $INTERFACE_TO_ADD_SERVICE_IP -Forwarding Enabled
+
+Stop-Service kube-proxy
+Start-Service kube-proxy
+'
+
+  & $filename
+
+  # TODO(anfernee): Schedule at startup
+  # It failed with:
+  #  An error occurred while registering scheduled job definition PrepareAntreaAgent to the Windows Task Scheduler.  The Task Scheduler error is: (13,8):UserId:.
+  #
+  # $trigger = New-JobTrigger -AtStartup
+  # $options = New-ScheduledJobOption -RunElevated
+  # Register-ScheduledJob -Name PrepareAntreaAgent -Trigger $trigger -ScriptBlock { Invoke-Expression C:\Prepare-AntreaAgent.ps1 } -ScheduledJobOption $options
 }
 
 function Start-CSIProxy {
@@ -665,6 +807,38 @@ function Create-KubeletKubeconfig {
   } else {
     Write_BootstrapKubeconfig
   }
+}
+
+function Create-AntreaKubeconfig {
+  if (-not (ShouldWrite-File ${env:ANTREA_KUBECONFIG})) {
+    return
+  }
+
+  New-Item -Force -ItemType file ${env:ANTREA_KUBECONFIG} | Out-Null
+  Set-Content ${env:ANTREA_KUBECONFIG} `
+'apiVersion: v1
+kind: Config
+users:
+- name: antrea
+  user:
+    token: KUBEPROXY_TOKEN
+clusters:
+- name: local
+  cluster:
+    server: https://APISERVER_ADDRESS
+    certificate-authority-data: CA_CERT
+contexts:
+- context:
+    cluster: local
+    user: antrea
+  name: service-account-context
+current-context: service-account-context'.`
+    replace('KUBEPROXY_TOKEN', ${kube_env}['ANTREA_TOKEN']).`
+    replace('CA_CERT', ${kube_env}['CA_CERT']).`
+    replace('APISERVER_ADDRESS', ${kube_env}['KUBERNETES_MASTER_NAME'])
+
+  Log-Output ("kubeproxy kubeconfig:`n" +
+              "$(Get-Content -Raw ${env:ANTREA_KUBECONFIG})")
 }
 
 # Creates the kube-proxy user kubeconfig file at $env:KUBEPROXY_KUBECONFIG.
@@ -966,6 +1140,9 @@ function Prepare-CniNetworking {
     Install_Cni_Binaries
     Configure_Dockerd_CniNetworking
   }
+  if (${env:WINDOWS_NETWORK_POLICY_PROVIDER} -eq "antrea") {
+    Configure_Antrea_CniNetworking
+  }
 }
 
 # Downloads the Windows CNI binaries and puts them in $env:CNI_DIR.
@@ -1000,6 +1177,29 @@ function Install_Cni_Binaries {
         "win-bridge.exe and host-local.exe not found in ${env:CNI_DIR}" `
         -Fatal
   }
+}
+
+function Configure_Antrea_CniNetworking {
+  $antrea_cni_conf = "${env:CNI_CONFIG_DIR}\10-antrea.conf"
+  Set-Content ${antrea_cni_conf} `
+'{
+    "cniVersion":"0.3.0",
+    "name": "antrea",
+    "plugins": [
+        {
+            "type": "antrea",
+            "ipam": {
+                "type": "host-local"
+            }
+        },
+        {
+            "type": "portmap",
+            "capabilities": {"portMappings": true}
+        }
+    ]
+  }'
+
+  Log-Output "CNI config:`n$(Get-Content -Raw ${antrea_cni_conf})"
 }
 
 # Writes a CNI config file under $env:CNI_CONFIG_DIR.
@@ -1144,6 +1344,15 @@ function Configure-Kubelet {
   $kubelet_config = Get-InstanceMetadataAttribute 'kubelet-config'
   Set-Content ${env:KUBELET_CONFIG} $kubelet_config
   Log-Output "Kubelet config:`n$(Get-Content -Raw ${env:KUBELET_CONFIG})"
+}
+
+function Configure-Antrea {
+  $antrea_config = 'trafficEncapMode: noEncap
+clientConnection:
+  kubeconfig: \etc\kubernetes\antrea.kubeconfig
+  '
+  Set-Content ${env:ANTREA_CONFIG} $antrea_config
+  Log-Output "Antrea config:`n$(Get-Content -Raw ${env:ANTREA_CONFIG})"
 }
 
 # Sets up the kubelet and kube-proxy arguments and starts them as native

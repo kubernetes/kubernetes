@@ -1,0 +1,262 @@
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: antrea
+    addonmanager.kubernetes.io/mode: Reconcile
+    component: antrea-node-init
+  name: antrea-node-init
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: antrea
+      component: antrea-node-init
+  template:
+    metadata:
+      labels:
+        app: antrea
+        component: antrea-node-init
+    spec:
+      nodeSelector:
+        antrea.io/ds-ready: "true"
+        kubernetes.io/os: linux
+      hostPID: true
+      hostNetwork: true
+      containers:
+        - name: node-init
+          image: gcr.io/google-containers/startup-script:v1
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          volumeMounts:
+          - mountPath: /etc/default/
+            name: host-etc-default
+          env:
+          - name: STARTUP_SCRIPT
+            value: |
+              #! /bin/bash
+              set -o errexit
+              set -o pipefail
+              set -o nounset
+
+              echo "Node initialization start"
+              sed 's/^ip_aliases = .*/ip_aliases = false/g' -i /etc/default/instance_configs.cfg
+
+              # kill restart google-network-daemon then systemd on host will restart it
+              killall google_network_daemon
+
+              echo "Node initialization complete"
+      volumes:
+      - hostPath:
+          path: /etc/default
+        name: host-etc-default
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: antrea
+    addonmanager.kubernetes.io/mode: Reconcile
+    component: antrea-agent
+  name: antrea-agent
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: antrea
+      component: antrea-agent
+  template:
+    metadata:
+      labels:
+        app: antrea
+        component: antrea-agent
+    spec:
+      containers:
+      - args:
+        - --config
+        - /etc/antrea/antrea-agent.conf
+        - --logtostderr=false
+        - --log_dir=/var/log/antrea
+        - --alsologtostderr
+        - --log_file_max_size=100
+        - --log_file_max_num=4
+        - --v=0
+        command:
+        - antrea-agent
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        image: projects.registry.vmware.com/antrea/antrea-ubuntu:v1.0.0
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - container_liveness_probe agent
+          failureThreshold: 5
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        name: antrea-agent
+        ports:
+        - containerPort: 10350
+          name: api
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 5
+          httpGet:
+            host: localhost
+            path: /readyz
+            port: api
+            scheme: HTTPS
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 200m
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /etc/antrea/antrea-agent.conf
+          name: antrea-config
+          readOnly: true
+          subPath: antrea-agent.conf
+        - mountPath: /var/run/antrea
+          name: host-var-run-antrea
+        - mountPath: /var/run/openvswitch
+          name: host-var-run-antrea
+          subPath: openvswitch
+        - mountPath: /var/lib/cni
+          name: host-var-run-antrea
+          subPath: cni
+        - mountPath: /var/log/antrea
+          name: host-var-log-antrea
+        - mountPath: /host/proc
+          name: host-proc
+          readOnly: true
+        - mountPath: /host/var/run/netns
+          mountPropagation: HostToContainer
+          name: host-var-run-netns
+          readOnly: true
+        - mountPath: /run/xtables.lock
+          name: xtables-lock
+      - args:
+        - --log_file_max_size=100
+        - --log_file_max_num=4
+        command:
+        - start_ovs
+        image: projects.registry.vmware.com/antrea/antrea-ubuntu:v1.0.0
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - timeout 10 container_liveness_probe ovs
+          failureThreshold: 5
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 10
+        name: antrea-ovs
+        resources:
+          requests:
+            cpu: 200m
+        securityContext:
+          capabilities:
+            add:
+            - SYS_NICE
+            - NET_ADMIN
+            - SYS_ADMIN
+            - IPC_LOCK
+        volumeMounts:
+        - mountPath: /var/run/openvswitch
+          name: host-var-run-antrea
+          subPath: openvswitch
+        - mountPath: /var/log/openvswitch
+          name: host-var-log-antrea
+          subPath: openvswitch
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      initContainers:
+      - command:
+        - install_cni
+        image: projects.registry.vmware.com/antrea/antrea-ubuntu:v1.0.0
+        name: install-cni
+        resources:
+          requests:
+            cpu: 100m
+        securityContext:
+          capabilities:
+            add:
+            - SYS_MODULE
+        volumeMounts:
+        - mountPath: /etc/antrea/antrea-cni.conflist
+          name: antrea-config
+          readOnly: true
+          subPath: antrea-cni.conflist
+        - mountPath: /host/etc/cni/net.d
+          name: host-cni-conf
+        - mountPath: /host/opt/cni/bin
+          name: host-cni-bin
+        - mountPath: /lib/modules
+          name: host-lib-modules
+          readOnly: true
+        - mountPath: /var/run/antrea
+          name: host-var-run-antrea
+      nodeSelector:
+        antrea.io/ds-ready: "true"
+        kubernetes.io/os: linux
+      priorityClassName: system-node-critical
+      serviceAccountName: antrea-agent
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+      volumes:
+      - configMap:
+          name: antrea-config-5ct9ktdt77
+        name: antrea-config
+      - hostPath:
+          path: /etc/cni/net.d
+        name: host-cni-conf
+      - hostPath:
+          path: /home/kubernetes/bin
+        name: host-cni-bin
+      - hostPath:
+          path: /proc
+        name: host-proc
+      - hostPath:
+          path: /var/run/netns
+        name: host-var-run-netns
+      - hostPath:
+          path: /var/run/antrea
+          type: DirectoryOrCreate
+        name: host-var-run-antrea
+      - hostPath:
+          path: /var/log/antrea
+          type: DirectoryOrCreate
+        name: host-var-log-antrea
+      - hostPath:
+          path: /lib/modules
+        name: host-lib-modules
+      - hostPath:
+          path: /run/xtables.lock
+          type: FileOrCreate
+        name: xtables-lock
+  updateStrategy:
+    type: RollingUpdate
+---

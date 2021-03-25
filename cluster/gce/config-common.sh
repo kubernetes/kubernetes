@@ -163,3 +163,7 @@ export WINDOWS_INFRA_CONTAINER="k8s.gcr.io/pause:3.4.1"
 export CSI_PROXY_STORAGE_PATH="https://storage.googleapis.com/gke-release/csi-proxy"
 # Version for csi-proxy
 export CSI_PROXY_VERSION="v0.2.2-gke.0"
+# Path for antrea kubeconfig file on Windows nodes.
+export WINDOWS_ANTREA_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\antrea.kubeconfig"
+# Path for antrea config file on Windows nodes
+export WINDOWS_ANTREA_CONFIG_FILE="${WINDOWS_K8S_DIR}\antrea.conf"

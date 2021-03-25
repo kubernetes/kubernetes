@@ -74,6 +74,40 @@ export KUBERNETES_NODE_PLATFORM=windows
 export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
 ```
 
+**Experimental: Windows**
+
+To deploy antrea as network policy solution for Windows, do the following:
+
+```bash
+export WINDOWS_NETWORK_POLICY_PROVIDER=antrea
+
+# Optionally specify the URL for antrea binaries
+export WINDOWS_ANTREA_CNI_BINARY_URL='https://storage.googleapis.com/gke-dev/antrea-cni.exe'
+export WINDOWS_ANTREA_AGENT_BINARY_URL='https://storage.googleapis.com/gke-dev/antrea-agent.exe'
+```
+
+It's recommended to use antrea as Linux network policy solution, but this requires using ubuntu
+as Linux OS (because the default option COS is not supported yet). For example, the following
+will deploy antrea on Ubuntu based Linux nodes:
+
+```bash
+export NETWORK_POLICY_PROVIDER=antrea
+export KUBE_GCE_NODE_IMAGE=ubuntu-2004-focal-v20200423
+export KUBE_GCE_NODE_PROJECT=ubuntu-os-cloud
+```
+
+There are 2 ways to specify Windows images: Either by `WINDOWS_NODE_OS_DISTRIBUTION` to specify
+the image family, or by `WINDOWS_NODE_IMAGE` to specify the image name. For example:
+
+```bash
+# Option 1: Image family. Valid values include [win1909, win2004, win2019, win20h2]
+export WINDOWS_NODE_OS_DISTRIBUTION=win2019
+
+# Option 2: Image project and name. (Run `gcloud compute images list` to get image list).
+export WINDOWS_NODE_IMAGE_PROJECT=windows-cloud  # default value is windows-cloud
+export WINDOWS_NODE_IMAGE=windows-server-20h2-dc-core-v20210309
+```
+
 Now bring up a cluster using one of the following two methods:
 
 #### 2a. Create a regular Kubernetes cluster

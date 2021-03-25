@@ -274,6 +274,9 @@ export ENABLE_NODELOCAL_DNS=${KUBE_ENABLE_NODELOCAL_DNS:-false}
 # Windows nodes do not support Calico.
 if [[ ${NETWORK_POLICY_PROVIDER:-} = 'calico' ]]; then
   NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
+elif [[ ${NETWORK_POLICY_PROVIDER:-} = 'antrea' ]]; then
+  # antrea-
+  NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}antrea.io/ds-ready=true"
 fi
 
 # Enable metadata concealment by firewalling pod traffic to the metadata server

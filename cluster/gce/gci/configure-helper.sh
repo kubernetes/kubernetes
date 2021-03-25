@@ -760,6 +760,9 @@ function create-master-auth {
   if [[ -n "${KUBE_PROXY_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${KUBE_PROXY_TOKEN},"              "system:kube-proxy,uid:kube_proxy"
   fi
+  if [[ -n "${ANTREA_TOKEN:-}" ]]; then
+    append_or_replace_prefixed_line "${known_tokens_csv}" "${ANTREA_TOKEN},"                  "system:antrea,uid:antrea"
+  fi
   if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
     append_or_replace_prefixed_line "${known_tokens_csv}" "${NODE_PROBLEM_DETECTOR_TOKEN},"   "system:node-problem-detector,uid:node-problem-detector"
   fi
@@ -2772,6 +2775,7 @@ EOF
     setup-addon-manifests "admission-controls" "limit-range" "gce"
   fi
   setup-addon-manifests "addons" "admission-resource-quota-critical-pods"
+
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
 
@@ -2781,7 +2785,17 @@ EOF
     # Configure Calico CNI directory.
     local -r ds_file="${dst_dir}/calico-policy-controller/calico-node-daemonset.yaml"
     sed -i -e "s@__CALICO_CNI_DIR__@/home/kubernetes/bin@g" "${ds_file}"
+
   fi
+
+  if [[ "${WINDOWS_NETWORK_POLICY_PROVIDER:-}" == "antrea" || "${NETWORK_POLICY_PROVIDER:-}" == "antrea" ]]; then
+    setup-addon-manifests "addons" "antrea"
+  fi
+
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "antrea" ]]; then
+    setup-addon-manifests "addons" "antrea/linux"
+  fi
+
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
   fi

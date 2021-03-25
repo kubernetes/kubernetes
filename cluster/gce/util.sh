@@ -83,17 +83,20 @@ function set-linux-node-image() {
 # Requires:
 #   WINDOWS_NODE_OS_DISTRIBUTION
 # Sets:
-#   WINDOWS_NODE_IMAGE_PROJECT
 #   WINDOWS_NODE_IMAGE
 function set-windows-node-image() {
-  WINDOWS_NODE_IMAGE_PROJECT="windows-cloud"
+  # If WINDOWS_NODE_IMAGE exits, use it.
+  if [[ "${WINDOWS_NODE_IMAGE:-}" != "" ]]; then
+    return
+  fi
+
   if [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2019" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-2019-dc-core-v20210112"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win1909" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-1909-dc-core-v20210112"
   elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win2004" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-2004-dc-core-v20210112"
-  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION,,}" == "win20h2" ]]; then
+  elif [[ "${WINDOWS_NODE_OS_DISTRIBUTION}" == "win20h2" ]]; then
     WINDOWS_NODE_IMAGE="windows-server-20h2-dc-core-v20210112"
   else
     echo "Unknown WINDOWS_NODE_OS_DISTRIBUTION ${WINDOWS_NODE_OS_DISTRIBUTION}" >&2
@@ -797,7 +800,7 @@ function construct-linux-kubelet-flags {
   # Network plugin
   if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
     flags+=" --cni-bin-dir=/home/kubernetes/bin"
-    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${ENABLE_NETD:-}" == "true" ]]; then
+    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" || "${NETWORK_POLICY_PROVIDER:-}" == "antrea" || "${ENABLE_NETD:-}" == "true" ]]; then
       # Calico uses CNI always.
       # Note that network policy won't work for master node.
       if [[ "${node_type}" == "master" ]]; then
@@ -928,8 +931,12 @@ function construct-windows-kubeproxy-flags {
   # Use the same log level as the Kubelet during tests.
   flags+=" ${KUBELET_TEST_LOG_LEVEL:-"--v=2"}"
 
-  # Windows uses kernelspace proxymode
-  flags+=" --proxy-mode=kernelspace"
+  # Windows uses kernelspace proxymode unless it's using antrea.
+  if [[ "${WINDOWS_NETWORK_POLICY_PROVIDER}" == "antrea" ]]; then
+    flags+=" --proxy-mode=userspace"
+  else
+    flags+=" --proxy-mode=kernelspace"
+  fi
 
   # Configure kube-proxy to run as a windows service.
   flags+=" --windows-service=true"
@@ -1180,6 +1187,7 @@ DNS_MEMORY_LIMIT: $(yaml-quote "${DNS_MEMORY_LIMIT:-}")
 ENABLE_DNS_HORIZONTAL_AUTOSCALER: $(yaml-quote "${ENABLE_DNS_HORIZONTAL_AUTOSCALER:-false}")
 KUBE_PROXY_DAEMONSET: $(yaml-quote "${KUBE_PROXY_DAEMONSET:-false}")
 KUBE_PROXY_TOKEN: $(yaml-quote "${KUBE_PROXY_TOKEN:-}")
+ANTREA_TOKEN: $(yaml-quote "${ANTREA_TOKEN:-}")
 KUBE_PROXY_MODE: $(yaml-quote "${KUBE_PROXY_MODE:-iptables}")
 DETECT_LOCAL_MODE: $(yaml-quote "${DETECT_LOCAL_MODE:-}")
 NODE_PROBLEM_DETECTOR_TOKEN: $(yaml-quote "${NODE_PROBLEM_DETECTOR_TOKEN:-}")
@@ -1589,8 +1597,15 @@ KUBEPROXY_ARGS: $(yaml-quote "${KUBEPROXY_ARGS}")
 KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_KUBECONFIG_FILE}")
 BOOTSTRAP_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_BOOTSTRAP_KUBECONFIG_FILE}")
 KUBEPROXY_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_KUBEPROXY_KUBECONFIG_FILE}")
+ANTREA_KUBECONFIG_FILE: $(yaml-quote "${WINDOWS_ANTREA_KUBECONFIG_FILE}")
 WINDOWS_INFRA_CONTAINER: $(yaml-quote "${WINDOWS_INFRA_CONTAINER}")
 WINDOWS_ENABLE_PIGZ: $(yaml-quote "${WINDOWS_ENABLE_PIGZ}")
+WINDOWS_NETWORK_POLICY_PROVIDER: $(yaml-quote "${WINDOWS_NETWORK_POLICY_PROVIDER}")
+ANTREA_CONFIG_FILE: $(yaml-quote "${WINDOWS_ANTREA_CONFIG_FILE}")
+ANTREA_CNI_BINARY_URL: $(yaml-quote "${WINDOWS_ANTREA_CNI_BINARY_URL}")
+ANTREA_AGENT_BINARY_URL: $(yaml-quote "${WINDOWS_ANTREA_AGENT_BINARY_URL}")
+OVS_INSTALLER_URL: $(yaml-quote "${WINDOWS_OVS_INSTALLER_URL}")
+
 EOF
 }
 
@@ -1857,6 +1872,7 @@ function parse-master-env() {
   local master_env
   master_env=$(get-master-env)
   KUBE_PROXY_TOKEN=$(get-env-val "${master_env}" "KUBE_PROXY_TOKEN")
+  ANTREA_TOKEN=$(get-env-val "${master_env}" "ANTREA_TOKEN")
   NODE_PROBLEM_DETECTOR_TOKEN=$(get-env-val "${master_env}" "NODE_PROBLEM_DETECTOR_TOKEN")
   CA_CERT_BASE64=$(get-env-val "${master_env}" "CA_CERT")
   CA_KEY_BASE64=$(get-env-val "${master_env}" "CA_KEY")
@@ -2024,7 +2040,7 @@ function make-gcloud-network-argument() {
     fi
     ret="${ret},subnet=${subnetURL}"
     ret="${ret},aliases=pods-default:${alias_size}"
-    ret="${ret} --no-can-ip-forward"
+    ret="${ret} --can-ip-forward"
   else
     if [[ -n ${subnet:-} ]]; then
       ret="${ret} --subnet ${subnetURL}"
@@ -2662,6 +2678,7 @@ function create-master() {
   # computer) can forget it later. This should disappear with
   # http://issue.k8s.io/3168
   KUBE_PROXY_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+  ANTREA_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
     NODE_PROBLEM_DETECTOR_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
   fi

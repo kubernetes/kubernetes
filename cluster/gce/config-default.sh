@@ -167,7 +167,7 @@ export ENABLE_DOCKER_REGISTRY_CACHE=true
 
 # Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
 #   glbc           - CE L7 Load Balancer Controller
-export ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
+
 
 # Optional: Enable Metrics Server. Metrics Server should be enable everywhere,
 # since it's a critical component, but in the first release we need a way to disable
@@ -198,6 +198,17 @@ export MASTER_NODE_LABELS="${KUBE_MASTER_NODE_LABELS:-}"
 NON_MASTER_NODE_LABELS="${KUBE_NON_MASTER_NODE_LABELS:-}"
 WINDOWS_NON_MASTER_NODE_LABELS="${WINDOWS_NON_MASTER_NODE_LABELS:-}"
 
+# Network Policy plugin specific settings for Linux.
+#  none    - No network policy plugin installed on Linux
+#  calico  - Install calico on Linux nodes to provide network policy support
+#  antrea  - Install antrea on Linux nodes to provide network policy support
+NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}"
+
+# Network Policy plugin specific settings for Windows.
+#  none   - No network policy plugin installed on Windows
+#  antrea - Install Antrea on Windows nodes to provide network policy support
+export WINDOWS_NETWORK_POLICY_PROVIDER="${WINDOWS_NETWORK_POLICY_PROVIDER:-none}"
+
 if [[ "${PREEMPTIBLE_MASTER}" == "true" ]]; then
     NODE_LABELS="${NODE_LABELS},cloud.google.com/gke-preemptible=true"
     WINDOWS_NODE_LABELS="${WINDOWS_NODE_LABELS},cloud.google.com/gke-preemptible=true"
@@ -211,6 +222,8 @@ fi
 # Windows nodes do not support Calico.
 if [[ ${NETWORK_POLICY_PROVIDER:-} == "calico" ]]; then
 	NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}projectcalico.org/ds-ready=true"
+elif [[ ${NETWORK_POLICY_PROVIDER:-} == 'antrea' ]] || [[ "${WINDOWS_NETWORK_POLICY_PROVIDER:-}" == "antrea" ]]; then
+  NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS:+${NON_MASTER_NODE_LABELS},}antrea.io/ds-ready=true"
 fi
 
 # Optional: Enable netd.
@@ -402,9 +415,6 @@ STORAGE_BACKEND=${STORAGE_BACKEND:-}
 # Networking plugin specific settings.
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, kubenet
 
-# Network Policy plugin specific settings.
-NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
-
 export NON_MASQUERADE_CIDR="0.0.0.0/0"
 
 # How should the kubelet configure hairpin mode?
@@ -566,3 +576,18 @@ export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver. 
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""
+
+# Optional: URL to download antrea-cni.exe for Windows node
+export WINDOWS_ANTREA_CNI_BINARY_URL="${WINDOWS_ANTREA_CNI_BINARY_URL:-https://github.com/vmware-tanzu/antrea/releases/download/v0.13.1/antrea-cni-windows-x86_64.exe}"
+
+# Optional: URL to download antrea-agent.exe for Windows node
+export WINDOWS_ANTREA_AGENT_BINARY_URL="${WINDOWS_ANTREA_AGENT_BINARY_URL:-https://github.com/vmware-tanzu/antrea/releases/download/v0.13.1/antrea-cni-windows-x86_64.exe}"
+
+# Optional: URL to a script that downloads and installs OVS for Windows node
+export WINDOWS_OVS_INSTALLER_URL="${WINDOWS_OVS_INSTALLER_URL:-https://raw.githubusercontent.com/vmware-tanzu/antrea/v0.13.1/hack/windows/Install-OVS.ps1}"
+
+# Optional: Image project for Windows node
+WINDOWS_NODE_IMAGE_PROJECT=${WINDOWS_NODE_IMAGE_PROJECT:-windows-cloud}
+
+# Optional: Image name for Windows node
+WINDOWS_NODE_IMAGE=${WINDOWS_NODE_IMAGE:-}
