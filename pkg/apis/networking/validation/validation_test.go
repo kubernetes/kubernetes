@@ -59,7 +59,7 @@ func makePort(proto *api.Protocol, port intstr.IntOrString, endPort int32) netwo
 		Protocol: proto,
 		Port:     nil,
 	}
-	if port != intstr.FromInt(0) {
+	if port != intstr.FromInt(0) && port != intstr.FromString("") && port != intstr.FromString("0") {
 		r.Port = &port
 	}
 	if endPort != 0 {
