@@ -129,7 +129,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		}
 	}
 
-	setIngressFromIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+	setIngressFromIPBlockIPV4 := func(networkPolicy *networking.NetworkPolicy) {
 		setIngressFromIfEmpty(networkPolicy)
 		networkPolicy.Spec.Ingress[0].From[0].IPBlock = &networking.IPBlock{
 			CIDR:   "192.168.0.0/16",
@@ -179,7 +179,7 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		}
 	}
 
-	setEgressToIPBlock := func(networkPolicy *networking.NetworkPolicy) {
+	setEgressToIPBlockIPV4 := func(networkPolicy *networking.NetworkPolicy) {
 		setEgressToIfEmpty(networkPolicy)
 		networkPolicy.Spec.Egress[0].To[0].IPBlock = &networking.IPBlock{
 			CIDR:   "192.168.0.0/16",
@@ -222,10 +222,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 		makeNetworkPolicyCustom(setIngressFromPodSelector("c", "d")),
 		makeNetworkPolicyCustom(setIngressFromNamespaceSelector),
 		makeNetworkPolicyCustom(setIngressFromPodSelector("e", "f"), setIngressFromNamespaceSelector),
-		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlock),
-		makeNetworkPolicyCustom(setIngressFromIPBlock),
-		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesEgress),
-		makeNetworkPolicyCustom(setEgressToIPBlock, setPolicyTypesIngressEgress),
+		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlockIPV4),
+		makeNetworkPolicyCustom(setIngressFromIPBlockIPV4),
+		makeNetworkPolicyCustom(setEgressToIPBlockIPV4, setPolicyTypesEgress),
+		makeNetworkPolicyCustom(setEgressToIPBlockIPV4, setPolicyTypesIngressEgress),
 		makeNetworkPolicyCustom(setEgressPorts(makePort(nil, intstr.FromInt(80), 0), makePort(&protocolTCP, intstr.FromInt(0), 0), makePort(&protocolTCP, intstr.FromInt(443), 0), makePort(&protocolUDP, intstr.FromString("dns"), 0), makePort(&protocolSCTP, intstr.FromInt(7777), 0))),
 		makeNetworkPolicyCustom(setEgressToNamespaceSelector, setIngressFromIPBlockIPV6),
 		makeNetworkPolicyCustom(setIngressFromIPBlockIPV6),
@@ -246,8 +246,8 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 
 	errorCases := map[string]*networking.NetworkPolicy{
-		"namespaceSelector and ipBlock": makeNetworkPolicyCustom(setIngressFromNamespaceSelector, setIngressFromIPBlock),
-		"podSelector and ipBlock":       makeNetworkPolicyCustom(setEgressToPodSelector, setEgressToIPBlock),
+		"namespaceSelector and ipBlock": makeNetworkPolicyCustom(setIngressFromNamespaceSelector, setIngressFromIPBlockIPV4),
+		"podSelector and ipBlock":       makeNetworkPolicyCustom(setEgressToPodSelector, setEgressToIPBlockIPV4),
 		"missing from and to type":      makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, setEgressToEmptyFirstElement),
 		"invalid spec.podSelector": makeNetworkPolicyCustom(setIngressFromNamespaceSelector, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec = networking.NetworkPolicySpec{
@@ -278,22 +278,22 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				MatchLabels: invalidSelector,
 			}
 		}),
-		"missing cidr field": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"missing cidr field": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = ""
 		}),
-		"invalid cidr format": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "192.168.5.6"
 		}),
 		"invalid ipv6 cidr format": makeNetworkPolicyCustom(setIngressFromIPBlockIPV6, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.CIDR = "fd00:192:168::"
 		}),
-		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an empty string": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{""}
 		}),
-		"except field is an space string": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an space string": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{" "}
 		}),
-		"except field is an invalid ip": makeNetworkPolicyCustom(setIngressFromIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"except field is an invalid ip": makeNetworkPolicyCustom(setIngressFromIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.Ingress[0].From[0].IPBlock.Except = []string{"300.300.300.300"}
 		}),
 		"except IP is outside of CIDR range": makeNetworkPolicyCustom(setIngressFromEmptyFirstElement, func(networkPolicy *networking.NetworkPolicy) {
@@ -314,10 +314,10 @@ func TestValidateNetworkPolicy(t *testing.T) {
 				Except: []string{"fd00:192:168:2::/64"},
 			}
 		}),
-		"invalid policyTypes": makeNetworkPolicyCustom(setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"invalid policyTypes": makeNetworkPolicyCustom(setEgressToIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar"}
 		}),
-		"too many policyTypes": makeNetworkPolicyCustom(setEgressToIPBlock, func(networkPolicy *networking.NetworkPolicy) {
+		"too many policyTypes": makeNetworkPolicyCustom(setEgressToIPBlockIPV4, func(networkPolicy *networking.NetworkPolicy) {
 			networkPolicy.Spec.PolicyTypes = []networking.PolicyType{"foo", "bar", "baz"}
 		}),
 		"multiple ports defined, one port range is invalid": makeNetworkPolicyCustom(setEgressToNamespaceSelector, setEgressPorts(makePort(&protocolUDP, intstr.FromInt(35000), 32768), makePort(nil, intstr.FromInt(32000), 32768))),
