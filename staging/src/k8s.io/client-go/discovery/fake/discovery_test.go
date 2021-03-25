@@ -17,11 +17,16 @@ limitations under the License.
 package fake_test
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/version"
+	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
+	kubetesting "k8s.io/client-go/testing"
 )
 
 func TestFakingServerVersion(t *testing.T) {
@@ -42,5 +47,60 @@ func TestFakingServerVersion(t *testing.T) {
 	}
 	if sv.GitCommit != testGitCommit {
 		t.Fatalf("unexpected faked discovery return value: %q", sv.GitCommit)
+	}
+}
+
+func TestGetErrorResponseFromClient(t *testing.T) {
+	expErr := errors.New("error override")
+
+	tests := map[string]struct {
+		call     func(client discovery.DiscoveryInterface) error
+		resource string
+	}{
+		"ServerResourcesForGroupVersion": {
+			call: func(client discovery.DiscoveryInterface) error {
+				_, err := client.ServerResourcesForGroupVersion("")
+				return err
+			},
+			resource: "resource",
+		},
+		"ServerGroupsAndResources": {
+			call: func(client discovery.DiscoveryInterface) error {
+				_, _, err := client.ServerGroupsAndResources()
+				return err
+			},
+			resource: "resource",
+		},
+		"ServerGroups": {
+			call: func(client discovery.DiscoveryInterface) error {
+				_, err := client.ServerGroups()
+				return err
+			},
+			resource: "group",
+		},
+		"ServerVersion": {
+			call: func(client discovery.DiscoveryInterface) error {
+				_, err := client.ServerVersion()
+				return err
+			},
+			resource: "version",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			reactor := func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+				return true, nil, expErr
+			}
+
+			client := fakeclientset.NewSimpleClientset()
+			client.PrependReactor("get", test.resource, reactor)
+
+			err := test.call(client.Discovery())
+			if !reflect.DeepEqual(err, expErr) {
+				t.Errorf("unexpected error response, exp=%v got=%v",
+					expErr, err)
+			}
+		})
 	}
 }

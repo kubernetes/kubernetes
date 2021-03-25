@@ -43,7 +43,9 @@ func (c *FakeDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*me
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
-	c.Invokes(action, nil)
+	if _, err := c.Invokes(action, nil); err != nil {
+		return nil, err
+	}
 	for _, resourceList := range c.Resources {
 		if resourceList.GroupVersion == groupVersion {
 			return resourceList, nil
@@ -74,7 +76,9 @@ func (c *FakeDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "resource"},
 	}
-	c.Invokes(action, nil)
+	if _, err := c.Invokes(action, nil); err != nil {
+		return nil, nil, err
+	}
 	return resultGroups, c.Resources, nil
 }
 
@@ -97,7 +101,9 @@ func (c *FakeDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
 		Verb:     "get",
 		Resource: schema.GroupVersionResource{Resource: "group"},
 	}
-	c.Invokes(action, nil)
+	if _, err := c.Invokes(action, nil); err != nil {
+		return nil, err
+	}
 
 	groups := map[string]*metav1.APIGroup{}
 
@@ -138,7 +144,9 @@ func (c *FakeDiscovery) ServerVersion() (*version.Info, error) {
 	action := testing.ActionImpl{}
 	action.Verb = "get"
 	action.Resource = schema.GroupVersionResource{Resource: "version"}
-	c.Invokes(action, nil)
+	if _, err := c.Invokes(action, nil); err != nil {
+		return nil, err
+	}
 
 	if c.FakedServerVersion != nil {
 		return c.FakedServerVersion, nil
