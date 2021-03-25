@@ -72,7 +72,8 @@ type diskServiceManager interface {
 		sizeGb int64,
 		tagsStr string,
 		diskType string,
-		zone string) (*Disk, error)
+		zone string,
+		labels map[string]string) (*Disk, error)
 
 	// Creates a new regional persistent disk on GCE with the given disk spec.
 	CreateRegionalDiskOnCloudProvider(
@@ -80,7 +81,8 @@ type diskServiceManager interface {
 		sizeGb int64,
 		tagsStr string,
 		diskType string,
-		zones sets.String) (*Disk, error)
+		zones sets.String,
+		labels map[string]string) (*Disk, error)
 
 	// Deletes the persistent disk from GCE with the given diskName.
 	DeleteDiskOnCloudProvider(zone string, disk string) error
@@ -122,7 +124,8 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
-	zone string) (*Disk, error) {
+	zone string,
+	labels map[string]string) (*Disk, error) {
 	diskTypeURI, err := manager.getDiskTypeURI(
 		manager.gce.region /* diskRegion */, singleZone{zone}, diskType)
 	if err != nil {
@@ -134,6 +137,7 @@ func (manager *gceServiceManager) CreateDiskOnCloudProvider(
 		SizeGb:      sizeGb,
 		Description: tagsStr,
 		Type:        diskTypeURI,
+		Labels:      labels,
 	}
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -153,7 +157,8 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 	sizeGb int64,
 	tagsStr string,
 	diskType string,
-	replicaZones sets.String) (*Disk, error) {
+	replicaZones sets.String,
+	labels map[string]string) (*Disk, error) {
 
 	diskTypeURI, err := manager.getDiskTypeURI(
 		manager.gce.region /* diskRegion */, multiZone{replicaZones}, diskType)
@@ -172,6 +177,7 @@ func (manager *gceServiceManager) CreateRegionalDiskOnCloudProvider(
 		Description:  tagsStr,
 		Type:         diskTypeURI,
 		ReplicaZones: fullyQualifiedReplicaZones,
+		Labels:       labels,
 	}
 
 	ctx, cancel := cloud.ContextWithCallTimeout()
@@ -449,12 +455,12 @@ type Disks interface {
 
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
-	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) (*Disk, error)
+	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string, labels map[string]string) (*Disk, error)
 
 	// CreateRegionalDisk creates a new Regional Persistent Disk, with the
 	// specified properties, replicated to the specified zones. Tags are
 	// serialized as JSON into Description field.
-	CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*Disk, error)
+	CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string, labels map[string]string) (*Disk, error)
 
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
@@ -700,7 +706,7 @@ func (g *Cloud) BulkDisksAreAttached(diskByNodes map[types.NodeName][]string) (m
 // size, in the specified zone. It stores specified tags encoded in
 // JSON in Description field.
 func (g *Cloud) CreateDisk(
-	name string, diskType string, zone string, sizeGb int64, tags map[string]string) (*Disk, error) {
+	name string, diskType string, zone string, sizeGb int64, tags map[string]string, labels map[string]string) (*Disk, error) {
 	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
 	// are not currently usable.
 	curZones, err := g.GetAllCurrentZones()
@@ -723,7 +729,7 @@ func (g *Cloud) CreateDisk(
 
 	mc := newDiskMetricContextZonal("create", g.region, zone)
 	disk, err := g.manager.CreateDiskOnCloudProvider(
-		name, sizeGb, tagsStr, diskType, zone)
+		name, sizeGb, tagsStr, diskType, zone, labels)
 
 	mc.Observe(err)
 	if err != nil {
@@ -740,7 +746,7 @@ func (g *Cloud) CreateDisk(
 // name & size, replicated to the specified zones. It stores specified tags
 // encoded in JSON in Description field.
 func (g *Cloud) CreateRegionalDisk(
-	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*Disk, error) {
+	name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string, labels map[string]string) (*Disk, error) {
 
 	// Do not allow creation of PDs in zones that are do not have nodes. Such PDs
 	// are not currently usable. This functionality should be reverted to checking
@@ -767,7 +773,7 @@ func (g *Cloud) CreateRegionalDisk(
 	mc := newDiskMetricContextRegional("create", g.region)
 
 	disk, err := g.manager.CreateRegionalDiskOnCloudProvider(
-		name, sizeGb, tagsStr, diskType, replicaZones)
+		name, sizeGb, tagsStr, diskType, replicaZones, labels)
 
 	mc.Observe(err)
 	if err != nil {

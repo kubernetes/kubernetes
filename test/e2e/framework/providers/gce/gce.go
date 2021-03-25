@@ -238,7 +238,8 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	}
 
 	tags := map[string]string{}
-	if _, err := p.gceCloud.CreateDisk(pdName, gcecloud.DiskTypeStandard, zone, 2 /* sizeGb */, tags); err != nil {
+	labels := map[string]string{}
+	if _, err := p.gceCloud.CreateDisk(pdName, gcecloud.DiskTypeStandard, zone, 2 /* sizeGb */, tags, labels); err != nil {
 		return "", err
 	}
 	return pdName, nil

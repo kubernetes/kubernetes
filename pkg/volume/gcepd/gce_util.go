@@ -58,6 +58,9 @@ const (
 	// scsi_id output should be in the form of:
 	// 0Google PersistentDisk <disk name>
 	scsiPattern = `^0Google\s+PersistentDisk\s+([\S]+)\s*$`
+
+	clusterLabelOwnedKeyPrefix = "kubernetes-io-cluster-"
+	clusterLablelOwnedValue    = "owned"
 )
 
 var (
@@ -150,6 +153,15 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", err
 	}
 
+	labels := map[string]string{}
+	clusterID, err := cloud.ClusterID.GetID()
+	if err != nil {
+		klog.Errorf("error getting cluster ID for volume %q: %v", name, err)
+	} else {
+		clusterLabelKey := fmt.Sprintf("%s%s", clusterLabelOwnedKeyPrefix, clusterID)
+		labels[clusterLabelKey] = clusterLablelOwnedValue
+	}
+
 	var disk *gcecloud.Disk
 	switch replicationType {
 	case replicationTypeRegionalPD:
@@ -163,7 +175,8 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			diskType,
 			selectedZones,
 			requestGB,
-			*c.options.CloudTags)
+			*c.options.CloudTags,
+			labels)
 		if err != nil {
 			klog.V(2).Infof("Error creating regional GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -180,7 +193,8 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 			diskType,
 			selectedZone,
 			requestGB,
-			*c.options.CloudTags)
+			*c.options.CloudTags,
+			labels)
 		if err != nil {
 			klog.V(2).Infof("Error creating single-zone GCE PD volume: %v", err)
 			return "", 0, nil, "", err
@@ -191,7 +205,7 @@ func (util *GCEDiskUtil) CreateVolume(c *gcePersistentDiskProvisioner, node *v1.
 		return "", 0, nil, "", fmt.Errorf("replication-type of '%s' is not supported", replicationType)
 	}
 
-	labels, err := cloud.GetAutoLabelsForPD(disk)
+	labels, err = cloud.GetAutoLabelsForPD(disk)
 	if err != nil {
 		// We don't really want to leak the volume here...
 		klog.Errorf("error getting labels for volume %q: %v", name, err)

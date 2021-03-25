@@ -597,12 +597,12 @@ func (testcase *testcase) BulkDisksAreAttached(diskByNodes map[types.NodeName][]
 	return verifiedDisksByNodes, nil
 }
 
-func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
-	return nil, errors.New("not implemented")
+func (testcase *testcase) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string, labels map[string]string) (*gce.Disk, error) {
+	return nil, errors.New("Not implemented")
 }
 
-func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string) (*gce.Disk, error) {
-	return nil, errors.New("not implemented")
+func (testcase *testcase) CreateRegionalDisk(name string, diskType string, replicaZones sets.String, sizeGb int64, tags map[string]string, labels map[string]string) (*gce.Disk, error) {
+	return nil, errors.New("Not implemented")
 }
 
 func (testcase *testcase) DeleteDisk(diskToDelete string) error {
