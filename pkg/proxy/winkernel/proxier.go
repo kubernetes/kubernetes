@@ -1250,7 +1250,7 @@ func (proxier *Proxier) syncProxyRules() {
 				uint16(svcInfo.Port()),
 			)
 			if err != nil {
-				klog.ErrorS(err, "Policy creation failed", err)
+				klog.ErrorS(err, "Policy creation failed")
 				continue
 			}
 			externalIP.hnsID = hnsLoadBalancer.hnsID
