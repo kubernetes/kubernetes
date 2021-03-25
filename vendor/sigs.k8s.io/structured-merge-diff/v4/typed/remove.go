@@ -57,7 +57,7 @@ func (w *removingWalker) doList(t *schema.List) (errs ValidationErrors) {
 	for iter.Next() {
 		i, item := iter.Item()
 		// Ignore error because we have already validated this list
-		pe, _ := listItemToPathElement(w.allocator, t, i, item)
+		pe, _ := listItemToPathElement(w.allocator, w.schema, t, i, item)
 		path, _ := fieldpath.MakePath(pe)
 		if w.toRemove.Has(path) {
 			continue
