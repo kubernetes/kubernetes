@@ -249,9 +249,6 @@ func MakePodSpec(podConfig *Config) *v1.PodSpec {
 	podSpec.Containers[0].VolumeMounts = volumeMounts
 	podSpec.Containers[0].VolumeDevices = volumeDevices
 	podSpec.Volumes = volumes
-	if runtime.GOOS != "windows" {
-		podSpec.SecurityContext.SELinuxOptions = podConfig.SeLinuxLabel
-	}
 
 	SetNodeSelection(podSpec, podConfig.NodeSelection)
 	return podSpec
