@@ -116,6 +116,10 @@ rules:
       branch: master
     - repository: api
       branch: master
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod ./...
+      go test -mod=mod ./...
   - source:
       branch: release-1.17
       dir: staging/src/k8s.io/client-go
@@ -126,6 +130,10 @@ rules:
         branch: release-1.17
       - repository: api
         branch: release-1.17
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build ./...
+      go test ./...
   - source:
       branch: release-1.18
       dir: staging/src/k8s.io/client-go
@@ -136,6 +144,10 @@ rules:
         branch: release-1.18
       - repository: api
         branch: release-1.18
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build ./...
+      go test ./...
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/client-go
@@ -146,6 +158,10 @@ rules:
         branch: release-1.19
       - repository: api
         branch: release-1.19
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod ./...
+      go test -mod=mod ./...
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/client-go
@@ -155,10 +171,10 @@ rules:
         branch: release-1.20
       - repository: api
         branch: release-1.20
-  smoke-test: |
-    # assumes GO111MODULE=on
-    go build -mod=mod ./...
-    go test -mod=mod ./...
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod ./...
+      go test -mod=mod ./...
 
 - destination: component-base
   library: true
@@ -432,6 +448,9 @@ rules:
       branch: master
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
   - source:
       branch: release-1.17
       dir: staging/src/k8s.io/sample-apiserver
@@ -452,6 +471,9 @@ rules:
       branch: release-1.17
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build .
   - source:
       branch: release-1.18
       dir: staging/src/k8s.io/sample-apiserver
@@ -472,6 +494,9 @@ rules:
       branch: release-1.18
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build .
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/sample-apiserver
@@ -492,6 +517,9 @@ rules:
       branch: release-1.19
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/sample-apiserver
@@ -511,9 +539,9 @@ rules:
       branch: release-1.20
     required-packages:
     - k8s.io/code-generator
-  smoke-test: |
-    # assumes GO111MODULE=on
-    go build -mod=mod .
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
 
 - destination: sample-controller
   branches:
@@ -532,6 +560,9 @@ rules:
       branch: master
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
   - source:
       branch: release-1.17
       dir: staging/src/k8s.io/sample-controller
@@ -548,6 +579,9 @@ rules:
       branch: release-1.17
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build .
   - source:
       branch: release-1.18
       dir: staging/src/k8s.io/sample-controller
@@ -564,6 +598,9 @@ rules:
       branch: release-1.18
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build .
   - source:
       branch: release-1.19
       dir: staging/src/k8s.io/sample-controller
@@ -580,6 +617,9 @@ rules:
       branch: release-1.19
     required-packages:
     - k8s.io/code-generator
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
   - source:
       branch: release-1.20
       dir: staging/src/k8s.io/sample-controller
@@ -595,9 +635,9 @@ rules:
       branch: release-1.20
     required-packages:
     - k8s.io/code-generator
-  smoke-test: |
-    # assumes GO111MODULE=on
-    go build -mod=mod .
+    smoke-test: |
+      # assumes GO111MODULE=on
+      go build -mod=mod .
 
 - destination: apiextensions-apiserver
   branches:
