@@ -386,7 +386,7 @@ func (rc *reconciler) syncStates() {
 	// Get volumes information by reading the pod's directory
 	podVolumes, err := getVolumesFromPodDir(rc.kubeletPodsDir)
 	if err != nil {
-		klog.ErrorS(err, "Cannot get volumes from disk")
+		klog.ErrorS(err, "Cannot get volumes from disk, skip sync states for volume reconstruction")
 		return
 	}
 	volumesNeedUpdate := make(map[v1.UniqueVolumeName]*reconstructedVolume)

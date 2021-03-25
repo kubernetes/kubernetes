@@ -83,6 +83,8 @@ const (
 	// FailWithInUseVolumeName will cause NodeExpandVolume to result in FailedPrecondition error
 	FailWithInUseVolumeName = "fail-expansion-in-use"
 
+	FailVolumeExpansion = "fail-expansion-test"
+
 	deviceNotMounted     = "deviceNotMounted"
 	deviceMountUncertain = "deviceMountUncertain"
 	deviceMounted        = "deviceMounted"
@@ -468,6 +470,14 @@ func (plugin *FakeVolumePlugin) RequiresFSResize() bool {
 func (plugin *FakeVolumePlugin) NodeExpand(resizeOptions NodeResizeOptions) (bool, error) {
 	if resizeOptions.VolumeSpec.Name() == FailWithInUseVolumeName {
 		return false, volumetypes.NewFailedPreconditionError("volume-in-use")
+	}
+	// Set up fakeVolumePlugin not support STAGE_UNSTAGE for testing the behavior
+	// so as volume can be node published before we can resize
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumeStaged {
+		return false, nil
+	}
+	if resizeOptions.CSIVolumePhase == volume.CSIVolumePublished && resizeOptions.VolumeSpec.Name() == FailVolumeExpansion {
+		return false, fmt.Errorf("fail volume expansion for volume: %s", FailVolumeExpansion)
 	}
 	return true, nil
 }

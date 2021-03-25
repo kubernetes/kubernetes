@@ -709,6 +709,14 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)
 				eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.Setup failed while expanding volume", resizeError)
+				// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
+				// so that reconciler can clean up volume when needed. However, volume resize failed,
+				// we should not mark the volume as mounted to avoid pod starts using it.
+				// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
+				// volume tear down when pod is deleted, and also makes sure pod will not start using it.
+				if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts); err != nil {
+					klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
+				}
 				return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 			}
 		}
@@ -719,7 +727,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			eventErr, detailedErr := volumeToMount.GenerateError("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
-
 		return volumetypes.NewOperationContext(nil, nil, migrated)
 	}
 
@@ -1150,6 +1157,14 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		if resizeError != nil {
 			klog.Errorf("MapVolume.NodeExpandVolume failed with %v", resizeError)
 			eventErr, detailedErr := volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
+			// At this point, MountVolume.Setup already succeeded, we should add volume into actual state
+			// so that reconciler can clean up volume when needed. However, if nodeExpandVolume failed,
+			// we should not mark the volume as mounted to avoid pod starts using it.
+			// Considering the above situations, we mark volume as uncertain here so that reconciler will tigger
+			// volume tear down when pod is deleted, and also makes sure pod will not start using it.
+			if err := actualStateOfWorld.MarkVolumeMountAsUncertain(markVolumeOpts); err != nil {
+				klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", err).Error())
+			}
 			return volumetypes.NewOperationContext(eventErr, detailedErr, migrated)
 		}
 
