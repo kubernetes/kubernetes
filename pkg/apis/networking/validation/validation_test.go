@@ -116,13 +116,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	setIngressFromPodSelector := func(k, v string) func(*networking.NetworkPolicy) {
 		return func(networkPolicy *networking.NetworkPolicy) {
 			setIngressFromIfEmpty(networkPolicy)
-			networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{
-				From: []networking.NetworkPolicyPeer{{
-						PodSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{k: v},
-						},
-				}},
-			}}
+			networkPolicy.Spec.Ingress[0].From[0].PodSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{k: v},
+			}
 		}
 	}
 
