@@ -1347,7 +1347,10 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					framework.Failf("Expected deletion timestamp to be set on snapshotcontent")
 				}
 
-				if claim != nil {
+				// If the claim is non existent, the Get() call on the API server returns
+				// an non-nil claim object with all fields unset.
+				// Refer https://github.com/kubernetes/kubernetes/pull/99167#issuecomment-781670012
+				if claim != nil && claim.Spec.VolumeName != "" {
 					ginkgo.By(fmt.Sprintf("Wait for PV %s to be deleted", claim.Spec.VolumeName))
 					err = e2epv.WaitForPersistentVolumeDeleted(m.cs, claim.Spec.VolumeName, framework.Poll, 3*time.Minute)
 					framework.ExpectNoError(err, fmt.Sprintf("failed to delete PV %s", claim.Spec.VolumeName))
