@@ -96,11 +96,9 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	}
 
 	setIngressEmptyPorts := func(networkPolicy *networking.NetworkPolicy) {
-		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
-			{
-				Ports: []networking.NetworkPolicyPort{{}},
-			},
-		}
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{
+			Ports: []networking.NetworkPolicyPort{{}},
+		}}
 	}
 
 	setIngressPorts := func(ports ...networking.NetworkPolicyPort) netpolTweak {
@@ -118,17 +116,13 @@ func TestValidateNetworkPolicy(t *testing.T) {
 	setIngressFromPodSelector := func(k, v string) func(*networking.NetworkPolicy) {
 		return func(networkPolicy *networking.NetworkPolicy) {
 			setIngressFromIfEmpty(networkPolicy)
-			networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{
-				{
-					From: []networking.NetworkPolicyPeer{
-						{
-							PodSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{k: v},
-							},
+			networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{
+				From: []networking.NetworkPolicyPeer{{
+						PodSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{k: v},
 						},
-					},
-				},
-			}
+				}},
+			}}
 		}
 	}
 
