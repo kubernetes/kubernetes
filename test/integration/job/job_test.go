@@ -278,7 +278,6 @@ func TestSuspendJob(t *testing.T) {
 		wantReason string
 	}
 	testCases := []struct {
-		short       bool
 		featureGate bool
 		create      step
 		update      step
@@ -286,7 +285,6 @@ func TestSuspendJob(t *testing.T) {
 		// Exhaustively test all combinations other than trivial true->true and
 		// false->false cases.
 		{
-			short:       true,
 			featureGate: true,
 			create:      step{flag: false, wantActive: 2},
 			update:      step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
@@ -311,9 +309,6 @@ func TestSuspendJob(t *testing.T) {
 	for _, tc := range testCases {
 		name := fmt.Sprintf("feature=%v,create=%v,update=%v", tc.featureGate, tc.create.flag, tc.update.flag)
 		t.Run(name, func(t *testing.T) {
-			if testing.Short() && !tc.short {
-				t.Skip("skipping expensive subtest")
-			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.SuspendJob, tc.featureGate)()
 
 			closeFn, restConfig, clientSet, ns := setup(t, "suspend")
