@@ -19,6 +19,22 @@ import "unsafe"
  * Wrapped
  */
 
+func Access(path string, mode uint32) (err error) {
+	return Faccessat(AT_FDCWD, path, mode, 0)
+}
+
+func Chmod(path string, mode uint32) (err error) {
+	return Fchmodat(AT_FDCWD, path, mode, 0)
+}
+
+func Chown(path string, uid int, gid int) (err error) {
+	return Fchownat(AT_FDCWD, path, uid, gid, 0)
+}
+
+func Creat(path string, mode uint32) (fd int, err error) {
+	return Open(path, O_CREAT|O_WRONLY|O_TRUNC, mode)
+}
+
 //sys	utimes(path string, times *[2]Timeval) (err error)
 func Utimes(path string, tv []Timeval) error {
 	if len(tv) != 2 {
@@ -350,48 +366,11 @@ func (w WaitStatus) Signal() Signal {
 
 func (w WaitStatus) Continued() bool { return w&0x01000000 != 0 }
 
-func (w WaitStatus) CoreDump() bool { return w&0x200 != 0 }
+func (w WaitStatus) CoreDump() bool { return w&0x80 == 0x80 }
 
 func (w WaitStatus) TrapCause() int { return -1 }
 
 //sys	ioctl(fd int, req uint, arg uintptr) (err error)
-
-// ioctl itself should not be exposed directly, but additional get/set
-// functions for specific types are permissible.
-
-// IoctlSetInt performs an ioctl operation which sets an integer value
-// on fd, using the specified request number.
-func IoctlSetInt(fd int, req uint, value int) error {
-	return ioctl(fd, req, uintptr(value))
-}
-
-func ioctlSetWinsize(fd int, req uint, value *Winsize) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
-func ioctlSetTermios(fd int, req uint, value *Termios) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
-// IoctlGetInt performs an ioctl operation which gets an integer value
-// from fd, using the specified request number.
-func IoctlGetInt(fd int, req uint) (int, error) {
-	var value int
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return value, err
-}
-
-func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
-	var value Winsize
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
-
-func IoctlGetTermios(fd int, req uint) (*Termios, error) {
-	var value Termios
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
 
 // fcntl must never be called with cmd=F_DUP2FD because it doesn't work on AIX
 // There is no way to create a custom fcntl and to keep //sys fcntl easily,

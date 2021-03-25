@@ -82,6 +82,34 @@ type Stat_t struct {
 
 type Statfs_t [0]byte
 
+type Statvfs_t struct {
+	Flag        uint64
+	Bsize       uint64
+	Frsize      uint64
+	Iosize      uint64
+	Blocks      uint64
+	Bfree       uint64
+	Bavail      uint64
+	Bresvd      uint64
+	Files       uint64
+	Ffree       uint64
+	Favail      uint64
+	Fresvd      uint64
+	Syncreads   uint64
+	Syncwrites  uint64
+	Asyncreads  uint64
+	Asyncwrites uint64
+	Fsidx       Fsid
+	Fsid        uint64
+	Namemax     uint64
+	Owner       uint32
+	Spare       [4]uint32
+	Fstypename  [32]byte
+	Mntonname   [1024]byte
+	Mntfromname [1024]byte
+	_           [4]byte
+}
+
 type Flock_t struct {
 	Start  int64
 	Len    int64
@@ -105,6 +133,11 @@ type Fsid struct {
 
 const (
 	PathMax = 0x400
+)
+
+const (
+	ST_WAIT   = 0x1
+	ST_NOWAIT = 0x2
 )
 
 const (

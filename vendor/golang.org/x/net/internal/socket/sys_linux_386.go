@@ -9,8 +9,6 @@ import (
 	"unsafe"
 )
 
-func probeProtocolStack() int { return 4 }
-
 const (
 	sysSETSOCKOPT = 0xe
 	sysGETSOCKOPT = 0xf

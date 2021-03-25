@@ -15,7 +15,6 @@ var (
 	errMissingAddress  = errors.New("missing address")
 	errHeaderTooShort  = errors.New("header too short")
 	errInvalidConnType = errors.New("invalid conn type")
-	errNoSuchInterface = errors.New("no such interface")
 	errNotImplemented  = errors.New("not implemented on " + runtime.GOOS + "/" + runtime.GOARCH)
 )
 
