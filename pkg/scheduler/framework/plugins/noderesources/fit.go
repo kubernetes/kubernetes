@@ -72,8 +72,7 @@ func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
 	}
-
-	if err := validation.ValidateNodeResourcesFitArgs(args); err != nil {
+	if err := validation.ValidateNodeResourcesFitArgs(nil, args); err != nil {
 		return nil, err
 	}
 	return &Fit{

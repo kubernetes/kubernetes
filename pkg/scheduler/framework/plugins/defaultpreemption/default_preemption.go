@@ -74,7 +74,7 @@ func New(dpArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if !ok {
 		return nil, fmt.Errorf("got args of type %T, want *DefaultPreemptionArgs", dpArgs)
 	}
-	if err := validation.ValidateDefaultPreemptionArgs(*args); err != nil {
+	if err := validation.ValidateDefaultPreemptionArgs(nil, args); err != nil {
 		return nil, err
 	}
 	pl := DefaultPreemption{

@@ -85,7 +85,7 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := validation.ValidatePodTopologySpreadArgs(&args); err != nil {
+	if err := validation.ValidatePodTopologySpreadArgs(nil, &args); err != nil {
 		return nil, err
 	}
 	pl := &PodTopologySpread{

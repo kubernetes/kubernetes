@@ -80,7 +80,7 @@ func New(plArgs runtime.Object, h framework.Handle, fts feature.Features) (frame
 	if err != nil {
 		return nil, err
 	}
-	if err := validation.ValidateInterPodAffinityArgs(args); err != nil {
+	if err := validation.ValidateInterPodAffinityArgs(nil, &args); err != nil {
 		return nil, err
 	}
 	pl := &InterPodAffinity{

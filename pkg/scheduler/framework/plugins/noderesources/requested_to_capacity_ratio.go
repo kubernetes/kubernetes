@@ -41,8 +41,7 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := validation.ValidateRequestedToCapacityRatioArgs(args); err != nil {
+	if err := validation.ValidateRequestedToCapacityRatioArgs(nil, &args); err != nil {
 		return nil, err
 	}
 

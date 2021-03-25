@@ -408,7 +408,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 		if err != nil {
 			b.Fatalf("error loading scheduler config file: %v", err)
 		}
-		if err = validation.ValidateKubeSchedulerConfiguration(cfg).ToAggregate(); err != nil {
+		if err = validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}

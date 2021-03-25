@@ -71,6 +71,12 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 						Disabled: []config.Plugin{{Name: "*"}},
 					},
 				},
+				PluginConfig: []config.PluginConfig{
+					{
+						Name: "DefaultPreemption",
+						Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 10, MinCandidateNodesAbsolute: 100},
+					},
+				},
 			},
 			{
 				SchedulerName: "other",
@@ -134,6 +140,62 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 
 	extenderNegativeWeight := validConfig.DeepCopy()
 	extenderNegativeWeight.Extenders[0].Weight = -1
+
+	invalidNodePercentage := validConfig.DeepCopy()
+	invalidNodePercentage.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "DefaultPreemption",
+			Args: &config.DefaultPreemptionArgs{MinCandidateNodesPercentage: 200, MinCandidateNodesAbsolute: 100},
+		},
+	}
+
+	invalidPluginArgs := validConfig.DeepCopy()
+	invalidPluginArgs.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "DefaultPreemption",
+			Args: &config.InterPodAffinityArgs{},
+		},
+	}
+
+	duplicatedPluginConfig := validConfig.DeepCopy()
+	duplicatedPluginConfig.Profiles[0].PluginConfig = []config.PluginConfig{
+		{
+			Name: "config",
+		},
+		{
+			Name: "config",
+		},
+	}
+
+	mismatchQueueSort := validConfig.DeepCopy()
+	mismatchQueueSort.Profiles = []config.KubeSchedulerProfile{
+		{
+			SchedulerName: "me",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "PrioritySort"}},
+				},
+			},
+			PluginConfig: []config.PluginConfig{
+				{
+					Name: "PrioritySort",
+				},
+			},
+		},
+		{
+			SchedulerName: "other",
+			Plugins: &config.Plugins{
+				QueueSort: config.PluginSet{
+					Enabled: []config.Plugin{{Name: "CustomSort"}},
+				},
+			},
+			PluginConfig: []config.PluginConfig{
+				{
+					Name: "CustomSort",
+				},
+			},
+		},
+	}
 
 	extenderDuplicateManagedResource := validConfig.DeepCopy()
 	extenderDuplicateManagedResource.Extenders[0].ManagedResources = []config.ExtenderManagedResource{
@@ -216,15 +278,31 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         extenderDuplicateBind,
 		},
+		"invalid-node-percentage": {
+			expectedToFail: true,
+			config:         invalidNodePercentage,
+		},
+		"invalid-plugin-args": {
+			expectedToFail: true,
+			config:         invalidPluginArgs,
+		},
+		"duplicated-plugin-config": {
+			expectedToFail: true,
+			config:         duplicatedPluginConfig,
+		},
+		"mismatch-queue-sort": {
+			expectedToFail: true,
+			config:         mismatchQueueSort,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			errs := ValidateKubeSchedulerConfiguration(scenario.config)
-			if len(errs) == 0 && scenario.expectedToFail {
+			if errs == nil && scenario.expectedToFail {
 				t.Error("Unexpected success")
 			}
-			if len(errs) > 0 && !scenario.expectedToFail {
+			if errs != nil && !scenario.expectedToFail {
 				t.Errorf("Unexpected failure: %+v", errs)
 			}
 		})
@@ -306,7 +384,7 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
 				}},
-			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": kubernetes.io/foo is an invalid extended resource name"),
+			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": is an invalid extended resource name"),
 		},
 		{
 			name: "invalid redeclared RequestedToCapacityRatio custom priority",

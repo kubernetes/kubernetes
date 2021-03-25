@@ -341,7 +341,7 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
-	if err := validation.ValidateVolumeBindingArgs(args); err != nil {
+	if err := validation.ValidateVolumeBindingArgs(nil, args); err != nil {
 		return nil, err
 	}
 	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
