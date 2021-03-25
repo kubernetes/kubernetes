@@ -462,7 +462,8 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		}
 		return false, err
 	}
-	job := *sharedJob
+	// make a copy so we don't mutate the shared cache
+	job := *sharedJob.DeepCopy()
 
 	// if job was finished previously, we don't want to redo the termination
 	if IsJobFinished(&job) {
