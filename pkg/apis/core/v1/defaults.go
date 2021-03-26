@@ -184,7 +184,11 @@ func SetDefaults_PodSpec(obj *v1.PodSpec) {
 	// In most cases the new defaulted field can added to SetDefaults_Pod instead of here, so
 	// that it only materializes in the Pod object and not all objects with a PodSpec field.
 	if obj.DNSPolicy == "" {
-		obj.DNSPolicy = v1.DNSClusterFirst
+		if obj.HostNetwork {
+			obj.DNSPolicy = v1.DNSDefault
+		} else {
+			obj.DNSPolicy = v1.DNSClusterFirst
+		}
 	}
 	if obj.RestartPolicy == "" {
 		obj.RestartPolicy = v1.RestartPolicyAlways

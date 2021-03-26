@@ -32,12 +32,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
-
-	// ensure types are installed
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
@@ -1892,6 +1890,45 @@ func TestSetDefaultServiceInternalTrafficPolicy(t *testing.T) {
 				if *svc.Spec.InternalTrafficPolicy != test.expectedInternalTrafficPolicy {
 					t.Fatalf("expected .spec.internalTrafficPolicy: %v got %v", test.expectedInternalTrafficPolicy, *svc.Spec.InternalTrafficPolicy)
 				}
+			}
+		})
+	}
+}
+
+func TestSetDefaults_PodSpec(t *testing.T) {
+	type args struct {
+		podSpec *v1.PodSpec
+	}
+	tests := []struct {
+		name      string
+		args      args
+		dnsPolicy v1.DNSPolicy
+	}{
+		{
+			name: "Test the default value of DNSPolicy when hostNetwork is true",
+			args: args{
+				podSpec: &v1.PodSpec{
+					HostNetwork: true,
+				},
+			},
+			dnsPolicy: v1.DNSDefault,
+		},
+		{
+			name: "Test the default value of DNSPolicy when hostNetwork is false",
+			args: args{
+				podSpec: &v1.PodSpec{
+					HostNetwork: false,
+				},
+			},
+			dnsPolicy: v1.DNSClusterFirst,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			corev1.SetDefaults_PodSpec(tt.args.podSpec)
+			if tt.args.podSpec.DNSPolicy != tt.dnsPolicy {
+				t.Errorf("HostNetwork is %v the default value of DNSPolicy is not %v", tt.args.podSpec.HostNetwork, tt.dnsPolicy)
 			}
 		})
 	}
