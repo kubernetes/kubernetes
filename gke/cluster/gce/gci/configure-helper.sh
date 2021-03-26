@@ -1803,6 +1803,13 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    if ! deploy-etcd-via-kube-up; then
+      echo "etcd is configured to not be deployed through kube-up."
+      return
+    fi
+  fi
+
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
   local -r host_ip=$(python3 -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""

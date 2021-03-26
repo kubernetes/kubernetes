@@ -724,6 +724,9 @@ function setup-inplace-master-pod-manifests {
   mv ${KUBE_HOME}/inplace/in-place-status.yaml ${KUBE_HOME}/inplace/in-place-status.init.yaml
 }
 
+function deploy-etcd-via-kube-up {
+  [[ "${ETCD_CRP:-}" != "true" ]]
+}
 function deploy-kube-scheduler-via-kube-up {
   [[ "${KUBE_SCHEDULER_CRP:-}" != "true" ]]
 }
