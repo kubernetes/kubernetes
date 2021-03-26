@@ -25,6 +25,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -445,13 +448,23 @@ func testRSLifeCycle(f *framework.Framework) {
 	}
 
 	rsName := "test-rs"
+	label := "test-rs=patched"
+	labelMap := map[string]string{"test-rs": "patched"}
 	replicas := int32(1)
 	rsPatchReplicas := int32(3)
 	rsPatchImage := imageutils.GetE2EImage(imageutils.Pause)
 
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = label
+			return f.ClientSet.AppsV1().ReplicaSets(ns).Watch(context.TODO(), options)
+		},
+	}
+	rsList, err := f.ClientSet.AppsV1().ReplicaSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: label})
+	framework.ExpectNoError(err, "failed to list rsList")
 	// Create a ReplicaSet
 	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
-	_, err := c.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs, metav1.CreateOptions{})
+	_, err = c.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
 
 	// Verify that the required pods have come up.
@@ -470,7 +483,7 @@ func testRSLifeCycle(f *framework.Framework) {
 	ginkgo.By("patching the ReplicaSet")
 	rsPatch, err := json.Marshal(map[string]interface{}{
 		"metadata": map[string]interface{}{
-			"labels": map[string]string{"test-rs": "patched"},
+			"labels": labelMap,
 		},
 		"spec": map[string]interface{}{
 			"replicas": rsPatchReplicas,
@@ -478,9 +491,8 @@ func testRSLifeCycle(f *framework.Framework) {
 				"spec": map[string]interface{}{
 					"TerminationGracePeriodSeconds": &zero,
 					"containers": [1]map[string]interface{}{{
-						"name":    rsName,
-						"image":   rsPatchImage,
-						"command": []string{"/bin/sleep", "100000"},
+						"name":  rsName,
+						"image": rsPatchImage,
 					}},
 				},
 			},
@@ -490,8 +502,25 @@ func testRSLifeCycle(f *framework.Framework) {
 	_, err = f.ClientSet.AppsV1().ReplicaSets(ns).Patch(context.TODO(), rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch ReplicaSet")
 
-	rs, err = c.AppsV1().ReplicaSets(ns).Get(context.TODO(), rsName, metav1.GetOptions{})
-	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
-	framework.ExpectEqual(*(rs.Spec.Replicas), rsPatchReplicas, "replicaset should have 3 replicas")
-	framework.ExpectEqual(rs.Spec.Template.Spec.Containers[0].Image, rsPatchImage, "replicaset not using rsPatchImage. Is using %v", rs.Spec.Template.Spec.Containers[0].Image)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err = watchtools.Until(ctx, rsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if rset, ok := event.Object.(*appsv1.ReplicaSet); ok {
+			found := rset.ObjectMeta.Name == rsName &&
+				rset.ObjectMeta.Labels["test-rs"] == "patched" &&
+				rset.Status.ReadyReplicas == rsPatchReplicas &&
+				rset.Status.AvailableReplicas == rsPatchReplicas &&
+				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage
+			if !found {
+				framework.Logf("observed ReplicaSet %v in namespace %v with ReadyReplicas %v, AvailableReplicas %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas,
+					rset.Status.AvailableReplicas)
+			} else {
+				framework.Logf("observed Replicaset %v in namespace %v with ReadyReplicas %v found %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas, found)
+			}
+			return found, nil
+		}
+		return false, nil
+	})
+
+	framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", rs.Name, ns, rsPatchReplicas)
 }
