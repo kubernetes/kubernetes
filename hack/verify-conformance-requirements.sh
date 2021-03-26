@@ -26,6 +26,11 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# Explicitly opt into go modules, even though we're inside a GOPATH directory
+export GO111MODULE=on
+# Explicitly set GOFLAGS to ignore vendor, since GOFLAGS=-mod=vendor breaks dependency resolution while rebuilding vendor
+export GOFLAGS=-mod=mod
+
 kube::golang::verify_go_version
 
 cd "${KUBE_ROOT}"
