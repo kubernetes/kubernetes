@@ -48,6 +48,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	samplev1alpha1 "k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1"
 	"k8s.io/utils/pointer"
+	"k8s.io/kubernetes/test/e2e/framework/apihelper"
 
 	"github.com/onsi/ginkgo"
 )
@@ -107,6 +108,9 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	// delete the APIService first to avoid causing discovery errors
 	_ = aggrclient.ApiregistrationV1().APIServices().Delete(context.TODO(), "v1alpha1.wardle.example.com", metav1.DeleteOptions{})
 
+	// make sure that the sample API was unregistered from all Kube APIs before tearing down the deployment
+	ensureSampleAPIUnregisteredFromAllRootAPIs(client, namespace)
+
 	_ = client.AppsV1().Deployments(namespace).Delete(context.TODO(), "sample-apiserver-deployment", metav1.DeleteOptions{})
 	_ = client.CoreV1().Secrets(namespace).Delete(context.TODO(), "sample-apiserver-secret", metav1.DeleteOptions{})
 	_ = client.CoreV1().Services(namespace).Delete(context.TODO(), "sample-api", metav1.DeleteOptions{})
@@ -115,6 +119,27 @@ func cleanTest(client clientset.Interface, aggrclient *aggregatorclient.Clientse
 	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":auth-delegator", metav1.DeleteOptions{})
 	_ = client.RbacV1().ClusterRoles().Delete(context.TODO(), "sample-apiserver-reader", metav1.DeleteOptions{})
 	_ = client.RbacV1().ClusterRoleBindings().Delete(context.TODO(), "wardler:"+namespace+":sample-apiserver-reader", metav1.DeleteOptions{})
+}
+
+func ensureSampleAPIUnregisteredFromAllRootAPIs(client clientset.Interface, namespace string) {
+	apiHelper, err := apihelper.NewAPIEndpointHelper(client, namespace)
+	if err != nil {
+		framework.ExpectNoError(err, "unable to create an API endpoint helper")
+	}
+	defer apiHelper.CleanUp()
+
+	apiHelper.WaitForAll(2*time.Minute, func(client *clientset.Clientset)(bool, error) {
+		apiGroups, err := client.Discovery().ServerGroups()
+		if err != nil {
+			return false, err
+		}
+		for _, group := range apiGroups.Groups {
+			if group.Name == "wardle.example.com" {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
 
 // TestSampleAPIServer is a basic test if the sample-apiserver code from 1.10 and compiled against 1.10
