@@ -739,16 +739,16 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 		return nil, nil
 	}
 
-	// Get metadata
-	md, err := getMetadata(os.metadataOpts.SearchOrder)
+	// Get Volume
+	volume, err := os.getVolume(pv.Spec.Cinder.VolumeID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Construct Volume Labels
 	labels := make(map[string]string)
-	if md.AvailabilityZone != "" {
-		labels[v1.LabelFailureDomainBetaZone] = md.AvailabilityZone
+	if volume.AvailabilityZone != "" {
+		labels[v1.LabelFailureDomainBetaZone] = volume.AvailabilityZone
 	}
 	if os.region != "" {
 		labels[v1.LabelFailureDomainBetaRegion] = os.region
