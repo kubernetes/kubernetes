@@ -487,6 +487,7 @@ ifeq ($(PRINT_HELP),y)
 package package-tarballs:
 	@echo "$$PACKAGE_HELP_INFO"
 else
+package-tarballs: KUBE_BUILD_CONFORMANCE = y
 package package-tarballs:
 	build/package-tarballs.sh
 endif
