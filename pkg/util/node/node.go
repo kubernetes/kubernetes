@@ -158,18 +158,18 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		node, err := client.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
-			klog.Errorf("Failed to retrieve node info: %v", err)
+			klog.ErrorS(err,"Failed to retrieve node info")
 			return false, nil
 		}
 		nodeIP, err = GetNodeHostIP(node)
 		if err != nil {
-			klog.Errorf("Failed to retrieve node IP: %v", err)
+			klog.ErrorS(err,"Failed to retrieve node IP")
 			return false, err
 		}
 		return true, nil
 	})
 	if err == nil {
-		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
+		klog.InfoS("Successfully retrieved node IP", "nodeIP", nodeIP)
 	}
 	return nodeIP
 }
@@ -284,7 +284,7 @@ func PatchNodeCIDRs(c clientset.Interface, node types.NodeName, cidrs []string) 
 	if err != nil {
 		return fmt.Errorf("failed to json.Marshal CIDR: %v", err)
 	}
-	klog.V(4).Infof("cidrs patch bytes are:%s", string(patchBytes))
+	klog.V(4).InfoS("Success to json.Marshal cidrs patch", "patchBytes", string(patchBytes))
 	if _, err := c.CoreV1().Nodes().Patch(context.TODO(), string(node), types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
 		return fmt.Errorf("failed to patch node CIDR: %v", err)
 	}
