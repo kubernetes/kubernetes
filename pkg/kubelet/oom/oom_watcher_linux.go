@@ -66,6 +66,7 @@ func NewWatcher(recorder record.EventRecorder) (Watcher, error) {
 
 const (
 	systemOOMEvent                 = "SystemOOM"
+	cGroupOOMEvent                 = "CgroupOOM"
 	legacyRecordEventContainerName = "/"
 )
 
@@ -79,16 +80,18 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFun
 
 		for event := range outStream {
 			eventMsg := "System OOM encountered"
+			if event.ContainerName != legacyRecordEventContainerName {
+				eventMsg = "Cgroup OOM encountered"
+			}
 			if event.ProcessName != "" && event.Pid != 0 {
 				eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 			}
 
 			parsedContainer := containerRegexp.FindStringSubmatch(event.VictimContainerName)
 			if parsedContainer != nil && event.ContainerName != legacyRecordEventContainerName {
-				klog.V(1).InfoS("Got sys oom event", "event", event)
-				ow.recorder.Eventf(ref, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+				klog.V(1).InfoS("Got cgroup oom event", "event", event)
 				if pod, ok := getPodByUID(types.UID(parsedContainer[1])); ok {
-					ow.recorder.Eventf(pod, v1.EventTypeWarning, systemOOMEvent, eventMsg)
+					ow.recorder.Eventf(pod, v1.EventTypeWarning, cGroupOOMEvent, eventMsg)
 				}
 			}
 

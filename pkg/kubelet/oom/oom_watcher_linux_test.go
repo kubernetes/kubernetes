@@ -98,7 +98,7 @@ func TestWatcherRecordsEventsForOomEvents(t *testing.T) {
 			VictimContainerName: "/kubepods/burstable/podfa08b07e-b396-4cd5-bda3-f7ebbe2e9b88",
 		},
 	}
-	numExpectedOomEvents := len(oomInstancesToStream) * 2
+	numExpectedOomEvents := len(oomInstancesToStream)
 
 	fakeStreamer := &fakeStreamer{
 		oomInstancesToStream: oomInstancesToStream,
@@ -293,7 +293,7 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 		},
 	}
 	// 4 events are emitted, one each for both the node and pod resource
-	numExpectedOomEvents := len(oomInstancesToStream) * 2
+	numExpectedOomEvents := len(oomInstancesToStream)
 
 	fakeStreamer := &fakeStreamer{
 		oomInstancesToStream: oomInstancesToStream,
@@ -311,18 +311,12 @@ func TestWatcherRecordsEventsForOomEventsWithAdditionalInfo(t *testing.T) {
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
-	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
+	assert.Contains(t, eventsRecorded[0], cGroupOOMEvent)
 	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("pid: %d", eventPid1))
 	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("victim process: %s", processName1))
-	assert.Contains(t, eventsRecorded[1], systemOOMEvent)
-	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("pid: %d", eventPid1))
-	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("victim process: %s", processName1))
-	assert.Contains(t, eventsRecorded[2], systemOOMEvent)
-	assert.Contains(t, eventsRecorded[2], fmt.Sprintf("pid: %d", eventPid2))
-	assert.Contains(t, eventsRecorded[2], fmt.Sprintf("victim process: %s", processName2))
-	assert.Contains(t, eventsRecorded[3], systemOOMEvent)
-	assert.Contains(t, eventsRecorded[3], fmt.Sprintf("pid: %d", eventPid2))
-	assert.Contains(t, eventsRecorded[3], fmt.Sprintf("victim process: %s", processName2))
+	assert.Contains(t, eventsRecorded[1], cGroupOOMEvent)
+	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("pid: %d", eventPid2))
+	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("victim process: %s", processName2))
 }
 
 // TestWatcherRecordsEventsForOomEventsWithPodNotFound verifies that the
@@ -351,7 +345,7 @@ func TestWatcherRecordsEventsForOomEventsWithPodNotFound(t *testing.T) {
 		},
 	}
 	// 2 events are emitted, only for the node resource when the pod resource is not found
-	numExpectedOomEvents := len(oomInstancesToStream)
+	numExpectedOomEvents := 0
 
 	fakeStreamer := &fakeStreamer{
 		oomInstancesToStream: oomInstancesToStream,
@@ -368,10 +362,4 @@ func TestWatcherRecordsEventsForOomEventsWithPodNotFound(t *testing.T) {
 
 	eventsRecorded := getRecordedEvents(fakeRecorder, numExpectedOomEvents)
 	assert.Equal(t, numExpectedOomEvents, len(eventsRecorded))
-	assert.Contains(t, eventsRecorded[0], systemOOMEvent)
-	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("pid: %d", eventPid1))
-	assert.Contains(t, eventsRecorded[0], fmt.Sprintf("victim process: %s", processName1))
-	assert.Contains(t, eventsRecorded[1], systemOOMEvent)
-	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("pid: %d", eventPid2))
-	assert.Contains(t, eventsRecorded[1], fmt.Sprintf("victim process: %s", processName2))
 }
