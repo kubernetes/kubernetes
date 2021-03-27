@@ -150,3 +150,30 @@ func TestCancelAndReadd(t *testing.T) {
 		t.Errorf("Expected testVal = 4, got %v", lastVal)
 	}
 }
+
+func TestCancelBeforeWorkFuncReturn(t *testing.T) {
+	testVal := int32(0)
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	queue := CreateWorkerQueue(func(args *WorkArgs) error {
+		atomic.AddInt32(&testVal, 1)
+		time.Sleep(2 * time.Second)
+		wg.Done()
+		return nil
+	})
+	now := time.Now()
+	then := now.Add(10 * time.Second)
+	fakeClock := clock.NewFakeClock(now)
+	queue.clock = fakeClock
+	queue.AddWork(NewWorkArgs("1", "1"), now, then)
+	queue.AddWork(NewWorkArgs("2", "2"), now, then)
+
+	fakeClock.Step(11 * time.Second)
+	queue.CancelWork(NewWorkArgs("1", "1").KeyFromWorkArgs())
+	wg.Wait()
+
+	workersLen := len(queue.workers)
+	if workersLen != 1 || atomic.LoadInt32(&testVal) != 2 {
+		t.Errorf("Expected len(queue.workers) = 1, got %v", workersLen)
+	}
+}

@@ -99,7 +99,10 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 		if err == nil {
 			// To avoid duplicated calls we keep the key in the queue, to prevent
 			// subsequent additions.
-			q.workers[key] = nil
+			// Add the judgment to resolve the conflict with CancelWork() and AddWork().
+			if _, ok := q.workers[key]; ok {
+				q.workers[key] = nil
+			}
 		} else {
 			delete(q.workers, key)
 		}
