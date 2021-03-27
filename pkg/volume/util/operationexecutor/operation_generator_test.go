@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 
@@ -36,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/version"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/volume"
 	csitesting "k8s.io/kubernetes/pkg/volume/csi/testing"
@@ -596,7 +596,7 @@ func getTestPV(volumeName string, specSize string) *v1.PersistentVolume {
 
 func getTestOperationGenerator(volumePluginMgr *volume.VolumePluginMgr, objects ...runtime.Object) OperationGenerator {
 	fakeKubeClient := fakeclient.NewSimpleClientset(objects...)
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	operationGenerator := NewOperationGenerator(
 		fakeKubeClient,
@@ -621,7 +621,7 @@ func getTestOperatorGeneratorWithPVPVC(volumePluginMgr *volume.VolumePluginMgr, 
 		return true, nil, fmt.Errorf("no reaction implemented for %s", action)
 	})
 
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	operationGenerator := NewOperationGenerator(
 		fakeKubeClient,

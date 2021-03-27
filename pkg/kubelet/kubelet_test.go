@@ -58,7 +58,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -228,7 +228,7 @@ func newTestKubeletWithImageList(
 		T:           t,
 	}
 
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeKubeClient := &fake.Clientset{}
 	kubelet := &Kubelet{}
 	kubelet.recorder = fakeRecorder
@@ -943,7 +943,7 @@ func TestHandlePortConflicts(t *testing.T) {
 		},
 	}}
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -993,7 +993,7 @@ func TestHandleHostNameConflicts(t *testing.T) {
 		},
 	}}
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -1036,7 +1036,7 @@ func TestHandleNodeSelector(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -1106,7 +1106,7 @@ func TestHandleNodeSelectorBasedOnOS(t *testing.T) {
 			}
 			kl.nodeLister = testNodeLister{nodes: nodes}
 
-			recorder := record.NewFakeRecorder(20)
+			recorder := events.NewFakeRecorder(20)
 			nodeRef := &v1.ObjectReference{
 				Kind:      "Node",
 				Name:      "testNode",
@@ -1141,7 +1141,7 @@ func TestHandleMemExceeded(t *testing.T) {
 	}
 	kl.nodeLister = testNodeLister{nodes: nodes}
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -1238,7 +1238,7 @@ func TestHandlePluginResources(t *testing.T) {
 	// add updatePluginResourcesFunc to admission handler, to test it's behavior.
 	kl.allocationManager.AddPodAdmitHandlers(lifecycle.PodAdmitHandlers{lifecycle.NewPredicateAdmitHandler(kl.GetCachedNode, lifecycle.NewAdmissionFailureHandlerStub(), updatePluginResourcesFunc)})
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -3293,7 +3293,7 @@ func TestNewMainKubeletStandAlone(t *testing.T) {
 	defer func() {
 		fakeRuntime.Stop()
 	}()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	rtSvc := createRemoteRuntimeService(endpoint, t, noopoteltrace.NewTracerProvider())
 	kubeDep := &Dependencies{
 		Auth:                 nil,
@@ -3381,7 +3381,7 @@ func TestSyncPodSpans(t *testing.T) {
 	testKubelet := newTestKubelet(t, false)
 	kubelet := testKubelet.kubelet
 
-	recorder := record.NewFakeRecorder(20)
+	recorder := events.NewFakeRecorder(20)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      "testNode",
@@ -3809,7 +3809,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
 	kubelet := testKubelet.kubelet
-	kubelet.recorder = record.NewFakeRecorder(20)
+	kubelet.recorder = events.NewFakeRecorder(20)
 
 	pod := podWithUIDNameNsSpec("12345678", "foo", "new", v1.PodSpec{
 		Containers: []v1.Container{
@@ -3914,7 +3914,7 @@ func TestSyncPodWithErrorsDuringInPlacePodResize(t *testing.T) {
 			}
 			require.Equal(t, tc.expectedResizeConditions, gotResizeConditions)
 
-			fakeRecorder := kubelet.recorder.(*record.FakeRecorder)
+			fakeRecorder := kubelet.recorder.(*events.FakeRecorder)
 			found := false
 			for len(fakeRecorder.Events) > 0 {
 				event := <-fakeRecorder.Events
@@ -4816,7 +4816,7 @@ func TestSyncPodNodeDeclaredFeaturesUpdate(t *testing.T) {
 			kubelet := testKubelet.kubelet
 
 			// Setup mocks
-			recorder := record.NewFakeRecorder(10)
+			recorder := events.NewFakeRecorder(10)
 			kubelet.recorder = recorder
 
 			framework, err := ndf.New(tc.registeredFeatures)
