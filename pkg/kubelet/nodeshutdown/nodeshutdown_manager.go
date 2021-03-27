@@ -20,7 +20,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
@@ -42,7 +42,7 @@ type Config struct {
 	Logger                           klog.Logger
 	ProbeManager                     prober.Manager
 	VolumeManager                    volumemanager.VolumeManager
-	Recorder                         record.EventRecorder
+	Recorder                         events.EventRecorder
 	NodeRef                          *v1.ObjectReference
 	GetPodsFunc                      eviction.ActivePodsFunc
 	KillPodFunc                      eviction.KillPodFunc
