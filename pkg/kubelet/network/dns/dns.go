@@ -25,7 +25,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -122,7 +121,7 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 
 	if limitsExceeded {
 		err := fmt.Errorf("Search Line limits were exceeded, some search paths have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		c.recorder.Eventf(pod, nil, v1.EventTypeWarning, "DNSConfigForming", "DNSConfigForming", err.Error())
 		klog.ErrorS(err, "Search Line limits exceeded")
 	}
 	return composedSearch
@@ -132,7 +131,7 @@ func (c *Configurer) formDNSNameserversFitsLimits(nameservers []string, pod *v1.
 	if len(nameservers) > validation.MaxDNSNameservers {
 		nameservers = nameservers[0:validation.MaxDNSNameservers]
 		err := fmt.Errorf("Nameserver limits were exceeded, some nameservers have been omitted, the applied nameserver line is: %s", strings.Join(nameservers, " "))
-		c.recorder.Event(pod, v1.EventTypeWarning, "DNSConfigForming", err.Error())
+		c.recorder.Eventf(pod, nil, v1.EventTypeWarning, "DNSConfigForming", "DNSConfigForming", err.Error())
 		klog.ErrorS(err, "Nameserver limits exceeded")
 	}
 	return nameservers
