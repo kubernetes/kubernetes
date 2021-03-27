@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -122,7 +122,7 @@ type manager struct {
 	allocationMutex        sync.Mutex
 	podsWithPendingResizes []types.UID
 
-	recorder record.EventRecorderLogger
+	recorder toolsevents.EventRecorderLogger
 }
 
 func NewManager(checkpointDirectory string,
@@ -131,7 +131,7 @@ func NewManager(checkpointDirectory string,
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorderLogger,
+	recorder toolsevents.EventRecorderLogger,
 	logger klog.Logger,
 ) Manager {
 	return &manager{
@@ -174,7 +174,7 @@ func NewInMemoryManager(
 	getActivePods func() []*v1.Pod,
 	getPodByUID func(types.UID) (*v1.Pod, bool),
 	sourcesReady config.SourcesReady,
-	recorder record.EventRecorderLogger,
+	recorder toolsevents.EventRecorderLogger,
 ) Manager {
 	return &manager{
 		allocated: state.NewStateMemory(logger, nil),
@@ -560,7 +560,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 		m.statusManager.SetPodResizeInProgressCondition(pod.UID, "", "", pod.Generation)
 
 		msg := events.PodResizeStartedMsg(logger, pod, pod.Generation)
-		m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeStarted, "%s", msg)
+		m.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeNormal, events.ResizeStarted, "ResizingPod", msg)
 		return true, nil
 	}
 
@@ -571,7 +571,7 @@ func (m *manager) handlePodResourcesResize(ctx context.Context, pod *v1.Pod) (bo
 				eventType = events.ResizeInfeasible
 			}
 			msg := events.PodResizePendingMsg(logger, pod, reason, message, pod.Generation)
-			m.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, eventType, "%s", msg)
+			m.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, eventType, "ResizingPod", msg)
 		}
 	}
 

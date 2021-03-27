@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	utiltesting "k8s.io/client-go/util/testing"
 )
 
@@ -434,7 +434,7 @@ func TestProgressTracking(t *testing.T) {
 
 			mounter := &localFakeMounter{path: "FAKE_DIR_DOESNT_EXIST"} // SetVolumeOwnership() must rely on tmpDir
 
-			fakeRecorder := record.NewFakeRecorder(100)
+			fakeRecorder := events.NewFakeRecorder(100)
 			recordedEvents := []string{}
 
 			// Set how long file permission change takes

@@ -29,7 +29,7 @@ import (
 
 	noopoteltrace "go.opentelemetry.io/otel/trace/noop"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/pkg/features"
@@ -52,7 +52,7 @@ func newRealImageGCManager(policy ImageGCPolicy, mockStatsProvider stats.Provide
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
+		recorder:      &events.FakeRecorder{},
 		tracer:        noopoteltrace.NewTracerProvider().Tracer(""),
 	}, fakeRuntime
 }
@@ -680,7 +680,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 	}
 	mockStatsProvider := statstest.NewMockProvider(t)
 	fakeRuntime := &containertest.FakeRuntime{}
-	recorder := record.NewFakeRecorder(1)
+	recorder := events.NewFakeRecorder(1)
 	manager := &realImageGCManager{
 		runtime:       fakeRuntime,
 		policy:        policy,
@@ -734,7 +734,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
+		recorder:      &events.FakeRecorder{},
 	}
 
 	fakeRuntime.ImageList = []container.Image{
@@ -788,7 +788,7 @@ func TestGarbageCollectImageTooOld(t *testing.T) {
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
+		recorder:      &events.FakeRecorder{},
 	}
 
 	fakeRuntime.ImageList = []container.Image{
@@ -843,7 +843,7 @@ func TestGarbageCollectImageMaxAgeDisabled(t *testing.T) {
 		policy:        policy,
 		imageRecords:  make(map[string]*imageRecord),
 		statsProvider: mockStatsProvider,
-		recorder:      &record.FakeRecorder{},
+		recorder:      &events.FakeRecorder{},
 	}
 
 	assert := assert.New(t)

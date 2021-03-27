@@ -24,7 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/third_party/forked/cadvisor/oomparser"
 )
@@ -36,7 +36,7 @@ type streamer interface {
 var _ streamer = &oomparser.OomParser{}
 
 type realWatcher struct {
-	recorder    record.EventRecorderLogger
+	recorder    events.EventRecorderLogger
 	oomStreamer streamer
 }
 
@@ -44,9 +44,9 @@ var _ Watcher = &realWatcher{}
 
 // NewWatcher creates and initializes an OOMWatcher backed by the kernel log
 // (/dev/kmsg) oom streamer.
-func NewWatcher(recorder record.EventRecorderLogger) (Watcher, error) {
+func NewWatcher(recorder events.EventRecorderLogger) (Watcher, error) {
 	// for test purpose
-	_, ok := recorder.(*record.FakeRecorder)
+	_, ok := recorder.(*events.FakeRecorder)
 	if ok {
 		return nil, nil
 	}
@@ -89,7 +89,7 @@ func (ow *realWatcher) Start(ctx context.Context, ref *v1.ObjectReference) error
 				if event.ProcessName != "" && event.Pid != 0 {
 					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
 				}
-				ow.recorder.WithLogger(logger).Eventf(ref, v1.EventTypeWarning, systemOOMEvent, "%s", eventMsg)
+				ow.recorder.WithLogger(logger).Eventf(ref, nil, v1.EventTypeWarning, systemOOMEvent, "OOM", eventMsg)
 			}
 		}
 		logger.Error(nil, "Unexpectedly stopped receiving OOM notifications")

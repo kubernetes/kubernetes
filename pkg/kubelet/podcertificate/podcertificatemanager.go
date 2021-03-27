@@ -45,7 +45,7 @@ import (
 	certlistersv1beta1 "k8s.io/client-go/listers/certificates/v1beta1"
 	corelistersv1 "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -110,7 +110,7 @@ type IssuingManager struct {
 
 	podManager PodManager
 
-	recorder record.EventRecorder
+	recorder events.EventRecorder
 
 	projectionQueue workqueue.TypedRateLimitingInterface[projectionKey]
 
@@ -266,7 +266,7 @@ func (c *credStateWaitRefresh) metricsState(now time.Time) string {
 
 var _ Manager = (*IssuingManager)(nil)
 
-func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder record.EventRecorder, pcrInformer certinformersv1beta1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
+func NewIssuingManager(kc kubernetes.Interface, podManager PodManager, recorder events.EventRecorder, pcrInformer certinformersv1beta1.PodCertificateRequestInformer, nodeInformer coreinformersv1.NodeInformer, nodeName types.NodeName, clock clock.WithTicker) *IssuingManager {
 	m := &IssuingManager{
 		kc: kc,
 
@@ -499,7 +499,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 				}
 				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, "HandlingProjection", eventMessage)
 				return nil
 			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
@@ -508,7 +508,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 				}
 				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, "HandlingProjection", eventMessage)
 				return nil
 			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
@@ -552,14 +552,14 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
 			logger.V(4).Info("Refresh overdue", "key", key)
-			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
+			m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "HandlingProjection", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labelled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
 			logger.V(4).Info("Certificates expired", "key", key)
-			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
+			m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, "CertificateExpired", "HandlingProjection", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}
 
@@ -644,7 +644,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 				}
 				logger.V(4).Info("PodCertificateRequest denied, moving to credStateDenied", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s was denied, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeDenied, cond.Reason, "HandlingProjection", eventMessage)
 				return nil
 			case certificatesv1beta1.PodCertificateRequestConditionTypeFailed:
 				rec.curState = &credStateFailed{
@@ -653,7 +653,7 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 				}
 				logger.V(4).Info("PodCertificateRequest failed, moving to credStateFailed", "key", key, "pcr", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name)
 				eventMessage := fmt.Sprintf("PodCertificateRequest %s failed, reason=%q, message=%q", pcr.ObjectMeta.Namespace+"/"+pcr.ObjectMeta.Name, cond.Reason, cond.Message)
-				m.recorder.Eventf(pod, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, eventMessage)
+				m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, certificatesv1beta1.PodCertificateRequestConditionTypeFailed, cond.Reason, "HandlingProjection", eventMessage)
 				return nil
 			case certificatesv1beta1.PodCertificateRequestConditionTypeIssued:
 				rec.curState = &credStateFresh{
@@ -675,14 +675,14 @@ func (m *IssuingManager) handleProjection(ctx context.Context, key projectionKey
 		// The current time is more than 10 minutes past the most recently issued certificate's `beginRefreshAt` timestamp but the state has not been labeled with overdue for refresh.
 		if m.clock.Now().After(state.beginRefreshAt.Add(refreshOverdueDuration)) && !state.eventEmittedForOverdueForRefresh {
 			logger.V(4).Info("Refresh overdue", "key", key)
-			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "PodCertificate refresh overdue")
+			m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, "CertificateOverdueForRefresh", "HandlingProjection", "PodCertificate refresh overdue")
 			state.eventEmittedForOverdueForRefresh = true
 		}
 
 		// The current time is past the most recently issued certificate's `notAfter` timestamp but the state has not been labeled with expired.
 		if m.clock.Now().After(state.notAfter) && !state.eventEmittedForExpiration {
 			logger.V(4).Info("Certificates expired", "key", key)
-			m.recorder.Eventf(pod, corev1.EventTypeWarning, "CertificateExpired", "PodCertificate expired")
+			m.recorder.Eventf(pod, nil, corev1.EventTypeWarning, "CertificateExpired", "HandlingProjection", "PodCertificate expired")
 			state.eventEmittedForExpiration = true
 		}
 		return nil

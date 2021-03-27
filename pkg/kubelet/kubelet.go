@@ -71,7 +71,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	toolsevents "k8s.io/client-go/tools/events"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
@@ -328,7 +328,7 @@ type Dependencies struct {
 	OSInterface               kubecontainer.OSInterface
 	PodConfig                 *config.PodConfig
 	ProbeManager              prober.Manager
-	Recorder                  record.EventRecorderLogger
+	Recorder                  toolsevents.EventRecorderLogger
 	Subpather                 subpath.Interface
 	TracerProvider            trace.TracerProvider
 	VolumePlugins             []volume.VolumePlugin
@@ -1375,7 +1375,7 @@ type Kubelet struct {
 	startupManager   proberesults.Manager
 
 	// The EventRecorder to use
-	recorder record.EventRecorderLogger
+	recorder toolsevents.EventRecorderLogger
 
 	// Policy for handling garbage collection of dead containers.
 	containerGC kubecontainer.GC
@@ -1709,7 +1709,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 	go wait.UntilWithContext(ctx, func(ctx context.Context) {
 		if err := kl.containerGC.GarbageCollect(ctx); err != nil {
 			logger.Error(err, "Container garbage collection failed")
-			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, "%s", err.Error())
+			kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, nil, v1.EventTypeWarning, events.ContainerGCFailed, "GarbageCollecting", err.Error())
 			loggedContainerGCFailure = true
 		} else {
 			var vLevel klog.Level = 4
@@ -1736,7 +1736,7 @@ func (kl *Kubelet) StartGarbageCollection(ctx context.Context) {
 			if prevImageGCFailed {
 				logger.Error(err, "Image garbage collection failed multiple times in a row")
 				// Only create an event for repeated failures
-				kl.recorder.WithLogger(logger).Event(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
+				kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, nil, v1.EventTypeWarning, events.ImageGCFailed, "ImageGarbageCollecting", err.Error())
 			} else {
 				logger.Error(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
 			}
@@ -1909,7 +1909,7 @@ func (kl *Kubelet) Run(ctx context.Context, updates <-chan kubetypes.PodUpdate) 
 	}
 
 	if err := kl.initializeModules(ctx); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, "%s", err.Error())
+		kl.recorder.WithLogger(logger).Eventf(kl.nodeRef, nil, v1.EventTypeWarning, events.KubeletSetupFailed, "StartingKubeletSetup", err.Error())
 		logger.Error(err, "Failed to initialize internal modules")
 		os.Exit(1)
 	}
@@ -2085,7 +2085,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		} else if generation, cleared := kl.statusManager.ClearPodResizeInProgressCondition(pod.UID); cleared {
 			// (Allocated == Actual) => clear the resize in-progress status.
 			msg := events.PodResizeCompletedMsg(logger, pod, generation)
-			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeNormal, events.ResizeCompleted, "%s", msg)
+			kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeNormal, events.ResizeCompleted, "RisizingPod", msg)
 		}
 		// TODO(natasha41575): There is a race condition here, where the goroutine in the
 		// allocation manager may allocate a new resize and unconditionally set the
@@ -2124,7 +2124,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// If the network plugin is not ready, only start the pod if it uses the host network
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
+		kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.NetworkNotReady, "PreparingNetwork", "%s: %v", NetworkNotReadyErrorMsg, err)
 		return false, nil, fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
 	}
 
@@ -2193,7 +2193,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 					logger.V(2).Info("Failed to update QoS cgroups while syncing pod", "pod", klog.KObj(pod), "err", err)
 				}
 				if err := pcm.EnsureExists(logger, pod); err != nil {
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToCreatePodContainer, "unable to ensure pod container exists: %v", err)
+					kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedToCreatePodContainer, "CreatingPodContainer", "unable to ensure pod container exists: %v", err)
 					return false, nil, fmt.Errorf("failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
 				}
 
@@ -2209,7 +2209,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
+		kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "MakingPodDataDirectories", "error making pod data directories: %v", err)
 		logger.Error(err, "Unable to make pod data directories for pod", "pod", klog.KObj(pod))
 		return false, nil, err
 	}
@@ -2223,7 +2223,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			return true, nil, nil
 		}
 		if !wait.Interrupted(err) {
-			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
+			kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedMountVolume, "MountingVolume", "Unable to attach or mount volumes: %v", err)
 			logger.Error(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
 		}
 		return false, nil, err
@@ -2283,7 +2283,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				// If the condition already exists, the observedGeneration does not get updated.
 				if generation, updated := kl.statusManager.SetPodResizeInProgressCondition(pod.UID, v1.PodReasonError, r.Message, pod.Generation); updated {
 					msg := events.PodResizeErrorMsg(logger, pod, generation, r.Message)
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.ResizeError, "%s", msg)
+					kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.ResizeError, "ResizingPod", msg)
 				}
 			}
 		}
@@ -2300,7 +2300,7 @@ func (kl *Kubelet) SyncPod(ctx context.Context, updateType kubetypes.SyncPodType
 			}
 		}
 		if hasPullFailures {
-			kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(missingPullSecretNames, ", "))
+			kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "FailedToRetrieveImagePullSecret", "PullingImage", "Unable to retrieve some image pull secrets (%s); attempting to pull the image may not succeed.", strings.Join(missingPullSecretNames, ", "))
 		}
 	}
 
@@ -2361,7 +2361,7 @@ func (kl *Kubelet) SyncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
 	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
+		kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedToKillPod, "KillingPod", "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		return fmt.Errorf("error killing terminating pod: %w", err)
 	}
@@ -2474,7 +2474,7 @@ func (kl *Kubelet) SyncTerminatingRuntimePod(ctx context.Context, runningPod *ku
 	// TODO: this should probably be zero, to bypass any waiting (needs fixes in container runtime)
 	gracePeriod := int64(1)
 	if err := kl.killPod(ctx, pod, *runningPod, &gracePeriod); err != nil {
-		kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
+		kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedToKillPod, "KillingPod", "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		utilruntime.HandleError(err)
 		return err
@@ -2625,7 +2625,7 @@ func (kl *Kubelet) deletePod(ctx context.Context, pod *v1.Pod) error {
 // and updates the pod to the failed phase in the status manager.
 func (kl *Kubelet) rejectPod(ctx context.Context, pod *v1.Pod, reason, message string) {
 	logger := klog.FromContext(ctx)
-	kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, reason, "%s", message)
+	kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, reason, "RejectingPod", message)
 	kl.statusManager.SetPodStatus(logger, pod, v1.PodStatus{
 		QOSClass: v1qos.GetPodQOS(pod), // keep it as is
 		Phase:    v1.PodFailed,
@@ -2993,7 +2993,7 @@ func (kl *Kubelet) HandlePodUpdates(ctx context.Context, pods []*v1.Pod) {
 				if !matchResult.IsMatch {
 					missingNodeDeclaredFeatures := strings.Join(matchResult.UnsatisfiedRequirements, ", ")
 					logger.Error(nil, "Pod requires node features that are not available", "missingFeatures", missingNodeDeclaredFeatures)
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
+					kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, events.FailedNodeDeclaredFeaturesCheck, "CheckingNodeDeclaredFeatures", "Pod requires node features that are not available: %s", missingNodeDeclaredFeatures)
 				}
 			}
 		}
@@ -3328,7 +3328,7 @@ func (kl *Kubelet) GetConfiguration() kubeletconfiginternal.KubeletConfiguration
 // BirthCry sends an event that the kubelet has started up.
 func (kl *Kubelet) BirthCry() {
 	// Make an event that kubelet restarted.
-	kl.recorder.Eventf(kl.nodeRef, v1.EventTypeNormal, events.StartingKubelet, "Starting kubelet.")
+	kl.recorder.Eventf(kl.nodeRef, nil, v1.EventTypeNormal, events.StartingKubelet, "StartingKubelet", "Starting kubelet.")
 }
 
 // ListenAndServe runs the kubelet HTTP server.

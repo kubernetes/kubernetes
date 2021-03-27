@@ -637,12 +637,12 @@ func (kl *Kubelet) markVolumesFromNode(node *v1.Node) {
 // message for the node.
 func (kl *Kubelet) recordNodeStatusEvent(logger klog.Logger, eventType, event string) {
 	logger.V(2).Info("Recording event message for node", "node", klog.KRef("", string(kl.nodeName)), "event", event)
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "Node %s status is now: %s", kl.nodeName, event)
+	kl.recorder.Eventf(kl.nodeRef, nil, eventType, event, "RecordingNodeStatus", "Node %s status is now: %s", kl.nodeName, event)
 }
 
 // recordEvent records an event for this node, the Kubelet's nodeRef is passed to the recorder
 func (kl *Kubelet) recordEvent(eventType, event, message string) {
-	kl.recorder.Eventf(kl.nodeRef, eventType, event, "%s", message)
+	kl.recorder.Eventf(kl.nodeRef, nil, eventType, event, "RecordingEvent", message)
 }
 
 // record if node schedulable change.

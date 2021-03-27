@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils/ktesting"
@@ -1175,25 +1175,15 @@ func TestExpandContainerCommandOnlyStatic(t *testing.T) {
 }
 
 type fakeRecorder struct {
-	events  []string
 	fEvents []string
-	aEvents []string
 }
 
-func (f *fakeRecorder) WithLogger(logger klog.Logger) record.EventRecorderLogger {
+func (f *fakeRecorder) WithLogger(logger klog.Logger) events.EventRecorderLogger {
 	return f
 }
 
-func (f *fakeRecorder) Event(object runtime.Object, eventtype, reason, message string) {
-	f.events = append(f.events, eventtype+":"+reason+":"+message)
-}
-
-func (f *fakeRecorder) Eventf(object runtime.Object, eventtype, reason, messageFmt string, args ...interface{}) {
+func (f *fakeRecorder) Eventf(object, related runtime.Object, eventtype, reason, action, messageFmt string, args ...interface{}) {
 	f.fEvents = append(f.fEvents, eventtype+":"+reason+":"+messageFmt)
-}
-
-func (f *fakeRecorder) AnnotatedEventf(object runtime.Object, annotations map[string]string, eventtype, reason, messageFmt string, args ...interface{}) {
-	f.aEvents = append(f.aEvents, eventtype+":"+reason+":"+messageFmt)
 }
 
 func TestFilterEventRecorder(t *testing.T) {
@@ -1202,21 +1192,13 @@ func TestFilterEventRecorder(t *testing.T) {
 
 	// record a normal event
 	obj := &v1.ObjectReference{FieldPath: "foo"}
-	filtered.Event(obj, "Normal", "Reason", "Message")
-	filtered.Eventf(obj, "Normal", "Reason", "MessageFmt")
-	//nolint:forbidigo // Legacy usage
-	filtered.AnnotatedEventf(obj, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
+	filtered.Eventf(obj, nil, "Normal", "Reason", "MessageFmt", "")
 
 	// don't record events for implicit container
 	implicit := &v1.ObjectReference{FieldPath: "implicitly required container foo"}
-	filtered.Event(implicit, "Normal", "Reason", "Message")
-	filtered.Eventf(implicit, "Normal", "Reason", "MessageFmt")
-	//nolint:forbidigo // Legacy usage
-	filtered.AnnotatedEventf(implicit, map[string]string{"a": "b"}, "Normal", "Reason", "MessageFmt")
+	filtered.Eventf(implicit, nil, "Normal", "Reason", "MessageFmt", "")
 
-	assert.Len(t, recorder.events, 1, "Expected only one event of each type to be recorded, got events: %v", recorder.events)
 	assert.Len(t, recorder.fEvents, 1, "Expected only one event of each type to be recorded, got fEvents: %v", recorder.fEvents)
-	assert.Len(t, recorder.aEvents, 1, "Expected only one event of each type to be recorded, got aEvents: %v", recorder.aEvents)
 }
 
 func TestIsHostNetworkPod(t *testing.T) {

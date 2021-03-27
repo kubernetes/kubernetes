@@ -42,7 +42,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -73,7 +73,7 @@ var (
 
 type testRuntimeManagerOptions struct {
 	errors   map[string][]error
-	recorder *record.FakeRecorder
+	recorder *events.FakeRecorder
 }
 
 type testRuntimeManagerOption func(*testRuntimeManagerOptions)
@@ -84,7 +84,7 @@ func withErrors(errors map[string][]error) testRuntimeManagerOption {
 	}
 }
 
-func withRecorder(recorder *record.FakeRecorder) testRuntimeManagerOption {
+func withRecorder(recorder *events.FakeRecorder) testRuntimeManagerOption {
 	return func(o *testRuntimeManagerOptions) {
 		o.recorder = recorder
 	}
@@ -97,7 +97,7 @@ func createTestRuntimeManager(ctx context.Context, opts ...testRuntimeManagerOpt
 	}
 
 	if options.recorder == nil {
-		options.recorder = &record.FakeRecorder{}
+		options.recorder = &events.FakeRecorder{}
 	}
 
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
@@ -1070,7 +1070,7 @@ func TestSyncPodNoEventsInSteadyState(t *testing.T) {
 		},
 	}
 
-	consumeEvents := func(recorder *record.FakeRecorder) []string {
+	consumeEvents := func(recorder *events.FakeRecorder) []string {
 		var events []string
 		for {
 			select {
@@ -1085,7 +1085,7 @@ func TestSyncPodNoEventsInSteadyState(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create a recorder with a large enough buffer to hold all events generated during a single sync
-			recorder := record.NewFakeRecorder(100)
+			recorder := events.NewFakeRecorder(100)
 
 			tCtx := ktesting.Init(t)
 			_, _, m, err := createTestRuntimeManager(tCtx, withRecorder(recorder))

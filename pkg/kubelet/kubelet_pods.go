@@ -2022,7 +2022,7 @@ func (kl *Kubelet) generateAPIPodStatus(ctx context.Context, pod *v1.Pod, podSta
 		} else {
 			if s.HostIP != "" {
 				if utilnet.IPFamilyOfString(s.HostIP) != utilnet.IPFamilyOf(hostIPs[0]) {
-					kl.recorder.WithLogger(logger).Eventf(pod, v1.EventTypeWarning, "HostIPsIPFamilyMismatch",
+					kl.recorder.WithLogger(logger).Eventf(pod, nil, v1.EventTypeWarning, "HostIPsIPFamilyMismatch", "MatchingHostIPsIPFamily",
 						"Kubelet detected an IPv%s node IP (%s), but the cloud provider selected an IPv%s node IP (%s); pass an explicit `--node-ip` to kubelet to fix this.",
 						utilnet.IPFamilyOfString(s.HostIP), s.HostIP, utilnet.IPFamilyOf(hostIPs[0]), hostIPs[0].String())
 				}

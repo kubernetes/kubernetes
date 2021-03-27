@@ -31,8 +31,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/klog/v2"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -100,8 +101,9 @@ func createSourceUpdate(pods ...*v1.Pod) sourceUpdate {
 }
 
 func createPodConfigTester(ctx context.Context) (chan<- sourceUpdate, <-chan kubetypes.PodUpdate, *PodConfig) {
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(ctx))
-	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+	client := clientsetfake.NewClientset()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, "kubelet"), &mockPodStartupSLIObserver{})
 	channel := config.Channel(ctx, TestSource)
 	ch := config.Updates()
 	return channel, ch, config
@@ -397,8 +399,9 @@ func TestPodUpdateLabels(t *testing.T) {
 func TestPodConfigRace(t *testing.T) {
 	tCtx := ktesting.Init(t)
 
-	eventBroadcaster := record.NewBroadcaster(record.WithContext(tCtx))
-	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "kubelet"}), &mockPodStartupSLIObserver{})
+	client := clientsetfake.NewClientset()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()})
+	config := NewPodConfig(eventBroadcaster.NewRecorder(scheme.Scheme, "kubelet"), &mockPodStartupSLIObserver{})
 	seenSources := sets.New[string](TestSource)
 	var wg sync.WaitGroup
 	const iterations = 100

@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/ktesting"
@@ -353,7 +353,7 @@ func TestManager(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
-			fakeRecorder := &record.FakeRecorder{}
+			fakeRecorder := &events.FakeRecorder{}
 			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 			manager := NewManager(&Config{
@@ -457,7 +457,7 @@ func TestFeatureEnabled(t *testing.T) {
 			}
 			featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)
 
-			fakeRecorder := &record.FakeRecorder{}
+			fakeRecorder := &events.FakeRecorder{}
 			fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 			nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
@@ -517,7 +517,7 @@ func TestRestart(t *testing.T) {
 		return dbus, nil
 	}
 
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
@@ -584,7 +584,7 @@ func TestStartDoesNotReconnectAfterContextCancel(t *testing.T) {
 	manager := NewManager(&Config{
 		Logger:                          logger,
 		VolumeManager:                   volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false),
-		Recorder:                        &record.FakeRecorder{},
+		Recorder:                        &events.FakeRecorder{},
 		NodeRef:                         &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""},
 		GetPodsFunc:                     func() []*v1.Pod { return nil },
 		KillPodFunc:                     func(*v1.Pod, bool, *int64, func(*v1.PodStatus)) error { return nil },
@@ -619,7 +619,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	tCtx := testutilsktesting.Init(t)
 
 	var (
-		fakeRecorder      = &record.FakeRecorder{}
+		fakeRecorder      = &events.FakeRecorder{}
 		fakeVolumeManager = volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 		syncNodeStatus    = func(context.Context) {}
 		nodeRef           = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
@@ -627,7 +627,7 @@ func Test_managerImpl_processShutdownEvent(t *testing.T) {
 	)
 
 	type fields struct {
-		recorder                         record.EventRecorder
+		recorder                         events.EventRecorder
 		nodeRef                          *v1.ObjectReference
 		volumeManager                    volumemanager.VolumeManager
 		shutdownGracePeriodByPodPriority []kubeletconfig.ShutdownGracePeriodByPodPriority
@@ -732,7 +732,7 @@ func Test_processShutdownEvent_VolumeUnmountTimeout(t *testing.T) {
 	tCtx := testutilsktesting.Init(t)
 
 	var (
-		fakeRecorder               = &record.FakeRecorder{}
+		fakeRecorder               = &events.FakeRecorder{}
 		syncNodeStatus             = func(context.Context) {}
 		nodeRef                    = &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 		fakeclock                  = testingclock.NewFakeClock(time.Now())
@@ -818,7 +818,7 @@ func TestStartDbusConnectionClosedOnError(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
@@ -872,7 +872,7 @@ func TestRestartClosesOldConnection(t *testing.T) {
 	}
 	featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)
 
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeVolumeManager := volumemanager.NewFakeVolumeManager([]v1.UniqueVolumeName{}, 0, nil, false)
 	nodeRef := &v1.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 	manager := NewManager(&Config{
