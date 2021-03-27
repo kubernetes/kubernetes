@@ -1283,6 +1283,15 @@ func (proxier *Proxier) syncProxyRules() {
 				} else if svcInfo.Protocol() != v1.ProtocolSCTP {
 					socket, err := proxier.portMapper.OpenLocalPort(&lp)
 					if err != nil {
+						msg := fmt.Sprintf("can't open %s, skipping this nodePort: %v", lp.String(), err)
+
+						proxier.recorder.Eventf(
+							&v1.ObjectReference{
+								Kind:      "Node",
+								Name:      proxier.hostname,
+								UID:       types.UID(proxier.hostname),
+								Namespace: "",
+							}, v1.EventTypeWarning, err.Error(), msg)
 						klog.ErrorS(err, "can't open port, skipping this nodePort", "port", lp.String())
 						continue
 					}
