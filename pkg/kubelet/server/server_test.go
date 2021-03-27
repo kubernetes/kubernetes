@@ -46,7 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/remotecommand"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
@@ -359,7 +359,7 @@ func newServerTestWithDebuggingHandlers(kubeCfg *kubeletconfiginternal.KubeletCo
 	}
 	server := NewServer(
 		fw.fakeKubelet,
-		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &record.FakeRecorder{}),
+		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute, &events.FakeRecorder{}),
 		fw.fakeAuth,
 		oteltrace.NewNoopTracerProvider(),
 		kubeCfg,

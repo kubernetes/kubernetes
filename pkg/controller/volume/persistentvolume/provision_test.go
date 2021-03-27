@@ -19,16 +19,18 @@ package persistentvolume
 import (
 	"errors"
 
+	"testing"
+
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2/ktesting"
 	"k8s.io/kubernetes/pkg/features"
-	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-helpers/storage/volume"
@@ -684,7 +686,8 @@ func TestProvisionMultiSync(t *testing.T) {
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
 	_, ctx := ktesting.NewTestContext(t)
-	ctrl, err := newTestController(ctx, nil, nil, false)
+	client := &fake.Clientset{}
+	ctrl, err := newTestController(ctx, client, nil, false)
 	if err != nil {
 		t.Fatalf("Construct PersistentVolume controller failed: %v", err)
 	}

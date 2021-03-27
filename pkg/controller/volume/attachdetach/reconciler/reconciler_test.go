@@ -28,7 +28,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/metrics/legacyregistry"
 	metricstestutil "k8s.io/component-base/metrics/testutil"
 	"k8s.io/klog/v2"
@@ -63,19 +63,21 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nsu := statusupdater.NewNodeStatusUpdater(
+		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nsu := statusupdater.NewNodeStatusUpdater(
-		fakeKubeClient, informerFactory.Core().V1().Nodes().Lister(), asw)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 
 	// Act
 	_, ctx := ktesting.NewTestContext(t)
@@ -100,18 +102,19 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -154,18 +157,19 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -232,18 +236,20 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -311,18 +317,20 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName := "pod-uid"
 	volumeName := v1.UniqueVolumeName("volume-name")
 	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
@@ -389,18 +397,20 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteMany(t *testing.
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -484,18 +494,20 @@ func Test_Run_OneVolumeAttachAndDetachMultipleNodesWithReadWriteOnce(t *testing.
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -577,18 +589,20 @@ func Test_Run_OneVolumeAttachAndDetachUncertainNodesWithReadWriteOnce(t *testing
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -641,7 +655,7 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
@@ -650,12 +664,13 @@ func Test_Run_UpdateNodeStatusFailBeforeOneVolumeDetachNodeWithReadWriteOnce(t *
 		fakeHandler))
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	logger, ctx := ktesting.NewTestContext(t)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	rc := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	reconciliationLoopFunc := rc.(*reconciler).reconciliationLoopFunc(ctx)
 	podName1 := "pod-uid1"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -704,18 +719,20 @@ func Test_Run_OneVolumeDetachFailNodeWithReadWriteOnce(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	podName3 := "pod-uid3"
@@ -791,18 +808,20 @@ func Test_Run_OneVolumeAttachAndDetachTimeoutNodesWithReadWriteOnce(t *testing.T
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
-		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	podName2 := "pod-uid2"
 	volumeName := v1.UniqueVolumeName("volume-name")
@@ -867,19 +886,21 @@ func Test_Run_OneVolumeDetachOnOutOfServiceTaintedNode(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -951,19 +972,21 @@ func Test_Run_OneVolumeDetachOnNoOutOfServiceTaintedNode(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxLongWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1028,19 +1051,21 @@ func Test_Run_OneVolumeDetachOnUnhealthyNode(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
+	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
 		volumePluginMgr,
 		fakeRecorder,
 		fakeHandler))
-	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
-	nodeLister := informerFactory.Core().V1().Nodes().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1140,7 +1165,7 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 	fakeHandler := volumetesting.NewBlockVolumePathHandler()
 	ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 		fakeKubeClient,
@@ -1150,9 +1175,10 @@ func Test_Run_OneVolumeDetachOnUnhealthyNodeWithForceDetachOnUnmountDisabled(t *
 	informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	nodeLister := informerFactory.Core().V1().Nodes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, true, dsw, asw, ad,
-		nsu, nodeLister, fakeRecorder)
+		nsu, nodeLister, pvcLister, fakeRecorder)
 	podName1 := "pod-uid1"
 	volumeName1 := v1.UniqueVolumeName("volume-name1")
 	volumeSpec1 := controllervolumetesting.GetTestVolumeSpec(string(volumeName1), volumeName1)
@@ -1302,18 +1328,20 @@ func Test_ReportMultiAttachError(t *testing.T) {
 		dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 		asw := cache.NewActualStateOfWorld(volumePluginMgr)
 		fakeKubeClient := controllervolumetesting.CreateTestClient()
-		fakeRecorder := record.NewFakeRecorder(100)
+		fakeRecorder := events.NewFakeRecorder(100)
 		fakeHandler := volumetesting.NewBlockVolumePathHandler()
+		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
+		nodeLister := informerFactory.Core().V1().Nodes().Lister()
+		pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 		ad := operationexecutor.NewOperationExecutor(operationexecutor.NewOperationGenerator(
 			fakeKubeClient,
 			volumePluginMgr,
 			fakeRecorder,
 			fakeHandler))
-		informerFactory := informers.NewSharedInformerFactory(fakeKubeClient, controller.NoResyncPeriodFunc())
-		nodeLister := informerFactory.Core().V1().Nodes().Lister()
+
 		nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 		rc := NewReconciler(
-			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, fakeRecorder)
+			reconcilerLoopPeriod, maxWaitForUnmountDuration, syncLoopPeriod, false, false, dsw, asw, ad, nsu, nodeLister, pvcLister, fakeRecorder)
 
 		nodes := []k8stypes.NodeName{}
 		for _, n := range test.nodes {

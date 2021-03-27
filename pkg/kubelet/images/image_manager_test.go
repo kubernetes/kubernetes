@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	crierrors "k8s.io/cri-api/pkg/errors"
@@ -239,7 +239,7 @@ func pullerTestEnv(t *testing.T, c pullerTestCase, serialized bool, maxParallelI
 	backOff.Clock = fakeClock
 
 	fakeRuntime = &ctest.FakeRuntime{T: t}
-	fakeRecorder := &record.FakeRecorder{}
+	fakeRecorder := &events.FakeRecorder{}
 
 	fakeRuntime.ImageList = []Image{{ID: "present_image:latest"}}
 	fakeRuntime.Err = c.pullerErr
