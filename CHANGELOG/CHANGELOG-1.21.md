@@ -203,7 +203,7 @@ filename | sha512 hash
 - Migrated pkg/kubelet/cm/topologymanager to structure logging ([#99969](https://github.com/kubernetes/kubernetes/pull/99969), [@knabben](https://github.com/knabben)) [SIG Instrumentation and Node]
 - Rename metrics `etcd_object_counts` to `apiserver_storage_object_counts` and mark it as stable. The original `etcd_object_counts` metrics name is marked as "Deprecated" and will be removed in the future. ([#99785](https://github.com/kubernetes/kubernetes/pull/99785), [@erain](https://github.com/erain)) [SIG API Machinery, Instrumentation and Testing]
 - Update pause container to run as pseudo user and group `65535:65535`. This implies the release of version 3.5 of the container images. ([#97963](https://github.com/kubernetes/kubernetes/pull/97963), [@saschagrunert](https://github.com/saschagrunert)) [SIG CLI, Cloud Provider, Cluster Lifecycle, Node, Release, Security and Testing]
-- Users might specify the `kubectl.kubernetes.io/default-exec-container` annotation in a Pod to preselect container for kubectl commands. ([#99833](https://github.com/kubernetes/kubernetes/pull/99833), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG CLI]
+- Users might specify the `kubectl.kubernetes.io/default-container` annotation in a Pod to preselect container for kubectl commands. ([#99833](https://github.com/kubernetes/kubernetes/pull/99833), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG CLI]
 
 ### Bug or Regression
 
@@ -427,7 +427,7 @@ filename | sha512 hash
   The well-known annotation endpoints.kubernetes.io/last-change-trigger-time is skipped and not mirrored. ([#98116](https://github.com/kubernetes/kubernetes/pull/98116), [@aojea](https://github.com/aojea)) [SIG Apps, Network and Testing]
 - Update the latest validated version of Docker to 20.10 ([#98977](https://github.com/kubernetes/kubernetes/pull/98977), [@neolit123](https://github.com/neolit123)) [SIG CLI, Cluster Lifecycle and Node]
 - Upgrade node local dns to 1.17.0 for better IPv6 support ([#99749](https://github.com/kubernetes/kubernetes/pull/99749), [@pacoxu](https://github.com/pacoxu)) [SIG Cloud Provider and Network]
-- Users might specify the `kubectl.kubernetes.io/default-exec-container` annotation in a Pod to preselect container for kubectl commands. ([#99581](https://github.com/kubernetes/kubernetes/pull/99581), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG CLI]
+- Users might specify the `kubectl.kubernetes.io/default-container` annotation in a Pod to preselect container for kubectl commands. ([#99581](https://github.com/kubernetes/kubernetes/pull/99581), [@mengjiao-liu](https://github.com/mengjiao-liu)) [SIG CLI]
 - When downscaling ReplicaSets, ready and creation timestamps are compared in a logarithmic scale. ([#99212](https://github.com/kubernetes/kubernetes/pull/99212), [@damemi](https://github.com/damemi)) [SIG Apps and Testing]
 - When the kubelet is watching a ConfigMap or Secret purely in the context of setting environment variables
   for containers, only hold that watch for a defined duration before cancelling it. This change reduces the CPU
