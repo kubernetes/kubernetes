@@ -120,23 +120,23 @@ func copyAnnotations(template *batchv1.JobTemplateSpec) labels.Set {
 	return a
 }
 
-func (r realJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
+func (r *realJobControl) GetJob(namespace, name string) (*batchv1.Job, error) {
 	return r.KubeClient.BatchV1().Jobs(namespace).Get(context.TODO(), name, metav1.GetOptions{})
 }
 
-func (r realJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
+func (r *realJobControl) UpdateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	return r.KubeClient.BatchV1().Jobs(namespace).Update(context.TODO(), job, metav1.UpdateOptions{})
 }
 
-func (r realJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
+func (r *realJobControl) PatchJob(namespace string, name string, pt types.PatchType, data []byte, subresources ...string) (*batchv1.Job, error) {
 	return r.KubeClient.BatchV1().Jobs(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
 }
 
-func (r realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
+func (r *realJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1.Job, error) {
 	return r.KubeClient.BatchV1().Jobs(namespace).Create(context.TODO(), job, metav1.CreateOptions{})
 }
 
-func (r realJobControl) DeleteJob(namespace string, name string) error {
+func (r *realJobControl) DeleteJob(namespace string, name string) error {
 	background := metav1.DeletePropagationBackground
 	return r.KubeClient.BatchV1().Jobs(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{PropagationPolicy: &background})
 }
@@ -236,11 +236,11 @@ type realPodControl struct {
 
 var _ podControlInterface = &realPodControl{}
 
-func (r realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
+func (r *realPodControl) ListPods(namespace string, opts metav1.ListOptions) (*v1.PodList, error) {
 	return r.KubeClient.CoreV1().Pods(namespace).List(context.TODO(), opts)
 }
 
-func (r realPodControl) DeletePod(namespace string, name string) error {
+func (r *realPodControl) DeletePod(namespace string, name string) error {
 	return r.KubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 }
 

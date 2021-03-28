@@ -80,7 +80,7 @@ func NewController(kubeClient clientset.Interface) (*Controller, error) {
 
 	jm := &Controller{
 		kubeClient: kubeClient,
-		jobControl: realJobControl{KubeClient: kubeClient},
+		jobControl: &realJobControl{KubeClient: kubeClient},
 		cjControl:  &realCJControl{KubeClient: kubeClient},
 		podControl: &realPodControl{KubeClient: kubeClient},
 		recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cronjob-controller"}),
