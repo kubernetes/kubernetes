@@ -298,7 +298,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 	if cj.Spec.ConcurrencyPolicy == batchv1.ForbidConcurrent && len(cj.Status.Active) > 0 {
 		// Regardless which source of information we use for the set of active jobs,
 		// there is some risk that we won't see an active job when there is one.
-		// (because we haven't seen the status update to the SJ or the created pod).
+		// (because we haven't seen the status update to the CJ or the created pod).
 		// So it is theoretically possible to have concurrency with Forbid.
 		// As long the as the invocations are "far enough apart in time", this usually won't happen.
 		//
@@ -344,7 +344,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 
 	// If this process restarts at this point (after posting a job, but
 	// before updating the status), then we might try to start the job on
-	// the next time.  Actually, if we re-list the SJs and Jobs on the next
+	// the next time.  Actually, if we re-list the CJs and Jobs on the next
 	// iteration of syncAll, we might not see our own status update, and
 	// then post one again.  So, we need to use the job name as a lock to
 	// prevent us from making the job twice (name the job with hash of its
