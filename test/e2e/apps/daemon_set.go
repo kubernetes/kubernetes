@@ -174,6 +174,30 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err, "error waiting for daemon pod to revive")
 	})
 
+	ginkgo.It("should list all daemon and delete a collection of daemons with a label selector", func() {
+		label := map[string]string{daemonsetNameLabel: dsName}
+		labelSelector := labels.SelectorFromSet(label).String()
+
+		ginkgo.By(fmt.Sprintf("Creating a DaemonSet %q", dsName))
+		ds, err := c.AppsV1().DaemonSets(ns).Create(context.TODO(), newDaemonSet(dsName, image, label), metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("List all Daemonsets")
+		dsList, err := c.AppsV1().DaemonSets(ns).List(context.TODO(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Check that daemon is in the list")
+		checkDaemonSetExists(dsList, ds)
+
+		ginkgo.By("Delete a collection of DaemonSets with a label selector")
+		err = c.AppsV1().DaemonSets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: labelSelector})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Wait for the daemon set to be completely deleted")
+		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, waitDaemonSetDeleted(c, ds))
+		framework.ExpectNoError(err, "error waiting for the daemon set to be completely deleted")
+	})
+
 	/*
 	  Release: v1.10
 	  Testname: DaemonSet-NodeSelection
@@ -1096,6 +1120,15 @@ func checkDaemonSetPodsLabels(podList *v1.PodList, hash string) {
 	}
 }
 
+func checkDaemonSetExists(dsList *appsv1.DaemonSetList, ds *appsv1.DaemonSet) {
+	for _, item := range dsList.Items {
+		if item.Namespace == ds.Namespace && item.Name == ds.Name {
+			return
+		}
+	}
+	framework.ExpectNoError(fmt.Errorf("daemon %q not found", ds.Name))
+}
+
 func waitForHistoryCreated(c clientset.Interface, ns string, label map[string]string, numHistory int) {
 	listHistoryFn := func() (bool, error) {
 		selector := labels.Set(label).AsSelector()
@@ -1140,6 +1173,18 @@ func curHistory(historyList *appsv1.ControllerRevisionList, ds *appsv1.DaemonSet
 	framework.ExpectEqual(foundCurHistories, 1)
 	gomega.Expect(curHistory).NotTo(gomega.BeNil())
 	return curHistory
+}
+
+func waitDaemonSetDeleted(c clientset.Interface, ds *appsv1.DaemonSet) func() (bool, error) {
+	return func() (bool, error) {
+		if _, err := c.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{}); err != nil {
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, fmt.Errorf("failed to get daemon set %q: %v", ds.Name, err)
+		}
+		return false, nil
+	}
 }
 
 func waitFailedDaemonPodDeleted(c clientset.Interface, pod *v1.Pod) func() (bool, error) {
