@@ -99,19 +99,19 @@ func omitDuplicates(strs []string) []string {
 func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Pod) []string {
 	limitsExceeded := false
 
-	if len(composedSearch) > validation.MaxDNSSearchPaths {
+	if len(composedSearch) > validation.MaxDNSSearchPathsExpanded {
 		composedSearch = composedSearch[:validation.MaxDNSSearchPaths]
 		limitsExceeded = true
 	}
 
-	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > validation.MaxDNSSearchListChars {
+	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > validation.MaxDNSSearchListCharsExpanded {
 		cutDomainsNum := 0
 		cutDomainsLen := 0
 		for i := len(composedSearch) - 1; i >= 0; i-- {
 			cutDomainsLen += len(composedSearch[i]) + 1
 			cutDomainsNum++
 
-			if (resolvSearchLineStrLen - cutDomainsLen) <= validation.MaxDNSSearchListChars {
+			if (resolvSearchLineStrLen - cutDomainsLen) <= validation.MaxDNSSearchListCharsExpanded {
 				break
 			}
 		}
@@ -173,7 +173,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 		return
 	}
 
-	domainCountLimit := validation.MaxDNSSearchPaths
+	domainCountLimit := validation.MaxDNSSearchPathsExpanded
 
 	if c.ClusterDomain != "" {
 		domainCountLimit -= 3
@@ -186,8 +186,8 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 		return
 	}
 
-	if len(strings.Join(hostSearch, " ")) > validation.MaxDNSSearchListChars {
-		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, validation.MaxDNSSearchListChars)
+	if len(strings.Join(hostSearch, " ")) > validation.MaxDNSSearchListCharsExpanded {
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, validation.MaxDNSSearchListCharsExpanded)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
 		klog.V(4).InfoS("Check limits for resolv.conf failed", "eventlog", log)
 		return

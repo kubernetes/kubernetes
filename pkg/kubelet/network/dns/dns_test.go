@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/apis/core/validation"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -144,9 +145,9 @@ func TestFormDNSSearchFitsLimits(t *testing.T) {
 		},
 
 		{
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC", "DDD"},
-			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "AAA", "BBB", "CCC"},
-			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST AAA BBB CCC"},
+			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
+			[]string{"testNS.svc.TEST", "svc.TEST", "TEST", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			[]string{"Search Line limits were exceeded, some search paths have been omitted, the applied search line is: testNS.svc.TEST svc.TEST TEST 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32"},
 		},
 	}
 
@@ -445,8 +446,8 @@ func TestGetPodDNS(t *testing.T) {
 		t.Errorf("expected nameserver %s, got %v", clusterNS, options[0].DNS[0])
 	}
 	expLength := len(options[1].DNSSearch) + 3
-	if expLength > 6 {
-		expLength = 6
+	if expLength > validation.MaxDNSSearchPathsExpanded {
+		expLength = validation.MaxDNSSearchPathsExpanded
 	}
 	if len(options[0].DNSSearch) != expLength {
 		t.Errorf("expected prepend of cluster domain, got %+v", options[0].DNSSearch)

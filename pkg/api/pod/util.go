@@ -419,6 +419,15 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
+
+		if oldPodSpec.DNSConfig != nil {
+			// if old spec is from the future, set AllowExpandedDNSConfig
+			// TODO: after 1.22, remove this
+			if len(oldPodSpec.DNSConfig.Searches) > apivalidation.MaxDNSSearchPathsLegacy ||
+				len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) > apivalidation.MaxDNSSearchListCharsLegacy {
+				opts.AllowExpandedDNSConfig = true
+			}
+		}
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.
