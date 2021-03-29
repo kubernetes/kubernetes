@@ -147,20 +147,14 @@ func NodeAddress(nodeIPs []net.IP, // typically Kubelet.nodeIPs
 			} else if nodeIP != nil {
 				// nodeIP is "0.0.0.0" or "::"; sort cloudNodeAddresses to
 				// prefer addresses of the matching family
-				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
+				preferredAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
 				for _, nodeAddress := range cloudNodeAddresses {
 					ip := net.ParseIP(nodeAddress.Address)
 					if ip == nil || isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
+						preferredAddresses = append(preferredAddresses, nodeAddress)
 					}
 				}
-				for _, nodeAddress := range cloudNodeAddresses {
-					ip := net.ParseIP(nodeAddress.Address)
-					if ip != nil && !isPreferredIPFamily(ip) {
-						sortedAddresses = append(sortedAddresses, nodeAddress)
-					}
-				}
-				nodeAddresses = sortedAddresses
+				nodeAddresses = preferredAddresses
 			} else {
 				// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
 				nodeAddresses = cloudNodeAddresses
