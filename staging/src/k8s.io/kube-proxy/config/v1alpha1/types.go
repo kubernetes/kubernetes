@@ -95,6 +95,12 @@ type KubeProxyWinkernelConfiguration struct {
 	// enableDSR tells kube-proxy whether HNS policies should be created
 	// with DSR
 	EnableDSR bool `json:"enableDSR"`
+	// RootHnsEndpointName is the name of hnsendpoint that is attached to
+	// l2bridge for root network namespace
+	RootHnsEndpointName string `json:"rootHnsEndpointName"`
+	// ForwardHealthCheckVip forwards service VIP for health check port on
+	// Windows
+	ForwardHealthCheckVip bool `json:"forwardHealthCheckVip"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
