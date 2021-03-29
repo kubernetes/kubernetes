@@ -606,7 +606,7 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 	}
 	if err := pm.prober.Init(); err != nil {
 		// Prober init failure should not affect the initialization of other plugins.
-		klog.Errorf("Error initializing dynamic plugin prober: %s", err)
+		klog.ErrorS(err, "Error initializing dynamic plugin prober")
 		pm.prober = &dummyPluginProber{}
 	}
 
@@ -631,12 +631,12 @@ func (pm *VolumePluginMgr) InitPlugins(plugins []VolumePlugin, prober DynamicPlu
 		}
 		err := plugin.Init(host)
 		if err != nil {
-			klog.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
+			klog.ErrorS(err, "Failed to load volume plugin", "pluginName", name)
 			allErrs = append(allErrs, err)
 			continue
 		}
 		pm.plugins[name] = plugin
-		klog.V(1).Infof("Loaded volume plugin %q", name)
+		klog.V(1).InfoS("Loaded volume plugin", "pluginName", name)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -652,7 +652,7 @@ func (pm *VolumePluginMgr) initProbedPlugin(probedPlugin VolumePlugin) error {
 		return fmt.Errorf("Failed to load volume plugin %s, error: %s", name, err.Error())
 	}
 
-	klog.V(1).Infof("Loaded volume plugin %q", name)
+	klog.V(1).InfoS("Loaded volume plugin", "pluginName", name)
 	return nil
 }
 
@@ -745,15 +745,15 @@ func (pm *VolumePluginMgr) logDeprecation(plugin string) {
 func (pm *VolumePluginMgr) refreshProbedPlugins() {
 	events, err := pm.prober.Probe()
 	if err != nil {
-		klog.Errorf("Error dynamically probing plugins: %s", err)
+		klog.ErrorS(err, "Error dynamically probing plugins")
 		return // Use cached plugins upon failure.
 	}
 
 	for _, event := range events {
 		if event.Op == ProbeAddOrUpdate {
 			if err := pm.initProbedPlugin(event.Plugin); err != nil {
-				klog.Errorf("Error initializing dynamically probed plugin %s; error: %s",
-					event.Plugin.GetPluginName(), err)
+				klog.ErrorS(err, "Error initializing dynamically probed plugin",
+					"pluginName", event.Plugin.GetPluginName())
 				continue
 			}
 			pm.probedPlugins[event.Plugin.GetPluginName()] = event.Plugin
@@ -761,8 +761,8 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 			// Plugin is not available on ProbeRemove event, only PluginName
 			delete(pm.probedPlugins, event.PluginName)
 		} else {
-			klog.Errorf("Unknown Operation on PluginName: %s.",
-				event.Plugin.GetPluginName())
+			klog.ErrorS(nil, "Unknown Operation on PluginName.",
+				"pluginName", event.Plugin.GetPluginName())
 		}
 	}
 }
@@ -956,10 +956,10 @@ func (pm *VolumePluginMgr) FindExpandablePluginBySpec(spec *Spec) (ExpandableVol
 		if spec.IsKubeletExpandable() {
 			// for kubelet expandable volumes, return a noop plugin that
 			// returns success for expand on the controller
-			klog.V(4).Infof("FindExpandablePluginBySpec(%s) -> returning noopExpandableVolumePluginInstance", spec.Name())
+			klog.V(4).InfoS("FindExpandablePluginBySpec -> returning noopExpandableVolumePluginInstance", "specName", spec.Name())
 			return &noopExpandableVolumePluginInstance{spec}, nil
 		}
-		klog.V(4).Infof("FindExpandablePluginBySpec(%s) -> err:%v", spec.Name(), err)
+		klog.V(4).InfoS("FindExpandablePluginBySpec -> err", "specName", spec.Name(), "err", err)
 		return nil, err
 	}
 
