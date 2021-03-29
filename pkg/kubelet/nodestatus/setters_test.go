@@ -332,7 +332,6 @@ func TestNodeAddress(t *testing.T) {
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
-				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
 			},
 			shouldError: false,
 		},
@@ -347,7 +346,6 @@ func TestNodeAddress(t *testing.T) {
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
-				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
 			},
 			shouldError: false,
 		},
@@ -362,7 +360,6 @@ func TestNodeAddress(t *testing.T) {
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 			},
 			shouldError: false,
 		},
@@ -377,7 +374,6 @@ func TestNodeAddress(t *testing.T) {
 			expectedAddresses: []v1.NodeAddress{
 				{Type: v1.NodeInternalIP, Address: "fc01:1234::5678"},
 				{Type: v1.NodeHostName, Address: testKubeletHostname},
-				{Type: v1.NodeInternalIP, Address: "10.1.1.1"},
 			},
 			shouldError: false,
 		},
