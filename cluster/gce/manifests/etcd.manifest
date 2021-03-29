@@ -7,6 +7,8 @@
 },
 "spec":{
 "securityContext": {
+    {{ run_as_user }}
+    {{ run_as_group }}
     "seccompProfile": {
         "type": "RuntimeDefault"
     }
@@ -17,6 +19,7 @@
 "containers":[
     {
     "name": "etcd-container",
+    {{security_context}}
     "image": "{{ pillar.get('etcd_docker_repository', 'k8s.gcr.io/etcd') }}:{{ pillar.get('etcd_docker_tag', '3.4.13-0') }}",
     "resources": {
       "requests": {
@@ -34,6 +37,10 @@
       },
       { "name": "TARGET_VERSION",
         "value": "{{ pillar.get('etcd_version', '3.4.13') }}"
+      },
+      {
+        "name": "DO_NOT_MOVE_BINARIES",
+        "value": "true"
       },
       { "name": "DATA_DIRECTORY",
         "value": "/var/etcd/data{{ suffix }}"
