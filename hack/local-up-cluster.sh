@@ -378,6 +378,9 @@ cleanup()
   if [[ "${PRESERVE_ETCD}" == "false" ]]; then
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
+
+  # Drop the rule we added
+  iptables -t nat -D OUTPUT -m addrtype --dst-type LOCAL -j DOCKER || true
   exit 0
 }
 
@@ -1094,8 +1097,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
 fi
 
-if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
-  exit 1
+if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
+  if ! kube::util::ensure_docker_daemon_connectivity; then
+    exit 1
+  else
+    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
+    # so we append a new rule on top of the docker one
+    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
+    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
+      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
+    fi
+  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
