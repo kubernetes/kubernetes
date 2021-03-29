@@ -1016,6 +1016,7 @@ func TestReservePluginUnreserve(t *testing.T) {
 		failReserve      bool
 		failReserveIndex int
 		failPreBind      bool
+		failPostBind     bool
 	}{
 		{
 			name:             "fail reserve",
@@ -1027,17 +1028,24 @@ func TestReservePluginUnreserve(t *testing.T) {
 			failPreBind: true,
 		},
 		{
+			name:         "fail postBind",
+			failPostBind: true,
+		},
+		{
 			name: "pass everything",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			numReservePlugins := 3
+			numReservePlugins := 4
 			pluginInvokeEventChan := make(chan pluginInvokeEvent, numReservePlugins)
 
 			preBindPlugin := &PreBindPlugin{
 				failPreBind: true,
+			}
+			postBindPlugin := &PostBindPlugin{
+				pluginInvokeEventChan: make(chan pluginInvokeEvent, 1),
 			}
 			var reservePlugins []*ReservePlugin
 			for i := 0; i < numReservePlugins; i++ {
@@ -1050,7 +1058,8 @@ func TestReservePluginUnreserve(t *testing.T) {
 			registry := frameworkruntime.Registry{
 				// TODO(#92229): test more failure points that would trigger Unreserve in
 				// reserve plugins than just one pre-bind plugin.
-				preBindPluginName: newPlugin(preBindPlugin),
+				preBindPluginName:  newPlugin(preBindPlugin),
+				postBindPluginName: newPlugin(postBindPlugin),
 			}
 			for _, pl := range reservePlugins {
 				registry[pl.Name()] = newPlugin(pl)
@@ -1067,6 +1076,13 @@ func TestReservePluginUnreserve(t *testing.T) {
 						Enabled: []schedulerconfig.Plugin{
 							{
 								Name: preBindPluginName,
+							},
+						},
+					},
+					PostBind: schedulerconfig.PluginSet{
+						Enabled: []schedulerconfig.Plugin{
+							{
+								Name: postBindPluginName,
 							},
 						},
 					},
