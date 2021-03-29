@@ -87,8 +87,9 @@ type externalIPInfo struct {
 }
 
 type loadBalancerIngressInfo struct {
-	ip    string
-	hnsID string
+	ip               string
+	hnsID            string
+	healthCheckHnsID string
 }
 
 type loadBalancerInfo struct {
@@ -548,6 +549,10 @@ type Proxier struct {
 	hostMac           string
 	isDSR             bool
 	supportedFeatures hcn.SupportedFeatures
+	healthzPort       int
+
+	forwardHealthCheckVip bool
+	rootHnsEndpointName   string
 }
 
 type localPort struct {
@@ -593,6 +598,7 @@ func NewProxier(
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
+	healthzPort int,
 ) (*Proxier, error) {
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
@@ -684,24 +690,27 @@ func NewProxier(
 
 	isIPv6 := netutils.IsIPv6(nodeIP)
 	proxier := &Proxier{
-		endPointsRefCount:   make(endPointsReferenceCountMap),
-		serviceMap:          make(proxy.ServiceMap),
-		endpointsMap:        make(proxy.EndpointsMap),
-		masqueradeAll:       masqueradeAll,
-		masqueradeMark:      masqueradeMark,
-		clusterCIDR:         clusterCIDR,
-		hostname:            hostname,
-		nodeIP:              nodeIP,
-		recorder:            recorder,
-		serviceHealthServer: serviceHealthServer,
-		healthzServer:       healthzServer,
-		hns:                 hns,
-		network:             *hnsNetworkInfo,
-		sourceVip:           sourceVip,
-		hostMac:             hostMac,
-		isDSR:               isDSR,
-		supportedFeatures:   supportedFeatures,
-		isIPv6Mode:          isIPv6,
+		endPointsRefCount:     make(endPointsReferenceCountMap),
+		serviceMap:            make(proxy.ServiceMap),
+		endpointsMap:          make(proxy.EndpointsMap),
+		masqueradeAll:         masqueradeAll,
+		masqueradeMark:        masqueradeMark,
+		clusterCIDR:           clusterCIDR,
+		hostname:              hostname,
+		nodeIP:                nodeIP,
+		recorder:              recorder,
+		serviceHealthServer:   serviceHealthServer,
+		healthzServer:         healthzServer,
+		hns:                   hns,
+		network:               *hnsNetworkInfo,
+		sourceVip:             sourceVip,
+		hostMac:               hostMac,
+		isDSR:                 isDSR,
+		supportedFeatures:     supportedFeatures,
+		isIPv6Mode:            isIPv6,
+		healthzPort:           healthzPort,
+		rootHnsEndpointName:   config.RootHnsEndpointName,
+		forwardHealthCheckVip: config.ForwardHealthCheckVip,
 	}
 
 	ipFamily := v1.IPv4Protocol
@@ -730,18 +739,19 @@ func NewDualStackProxier(
 	recorder events.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	config config.KubeProxyWinkernelConfiguration,
+	healthzPort int,
 ) (proxy.Provider, error) {
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config)
+		clusterCIDR, hostname, nodeIP[0], recorder, healthzServer, config, healthzPort)
 
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[0])
 	}
 
 	ipv6Proxier, err := NewProxier(syncPeriod, minSyncPeriod, masqueradeAll, masqueradeBit,
-		clusterCIDR, hostname, nodeIP[1], recorder, healthzServer, config)
+		clusterCIDR, hostname, nodeIP[1], recorder, healthzServer, config, healthzPort)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v, hostname: %s, clusterCIDR : %s, nodeIP:%v", err, hostname, clusterCIDR, nodeIP[1])
 	}
@@ -796,6 +806,10 @@ func (svcInfo *serviceInfo) deleteAllHnsLoadBalancerPolicy() {
 	for _, lbIngressIP := range svcInfo.loadBalancerIngressIPs {
 		hns.deleteLoadBalancer(lbIngressIP.hnsID)
 		lbIngressIP.hnsID = ""
+		if lbIngressIP.healthCheckHnsID != "" {
+			hns.deleteLoadBalancer(lbIngressIP.healthCheckHnsID)
+			lbIngressIP.healthCheckHnsID = ""
+		}
 	}
 }
 
@@ -987,6 +1001,11 @@ func (proxier *Proxier) syncProxyRules() {
 
 	hnsNetworkName := proxier.network.name
 	hns := proxier.hns
+
+	var gatewayHnsendpoint *endpointsInfo
+	if proxier.forwardHealthCheckVip {
+		gatewayHnsendpoint, _ = hns.getEndpointByName(proxier.rootHnsEndpointName)
+	}
 
 	prevNetworkID := proxier.network.id
 	updatedNetwork, err := hns.getNetworkByName(hnsNetworkName)
@@ -1319,7 +1338,30 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				klog.V(3).InfoS("Skipped creating Hns LoadBalancer for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 			}
+			lbIngressIP.hnsID = hnsLoadBalancer.hnsID
+			klog.V(3).InfoS("Hns LoadBalancer resource created for loadBalancer Ingress resources", "lbIngressIP", lbIngressIP)
 
+			if proxier.forwardHealthCheckVip && gatewayHnsendpoint != nil {
+				nodeport := proxier.healthzPort
+				if svcInfo.HealthCheckNodePort() != 0 {
+					nodeport = svcInfo.HealthCheckNodePort()
+				}
+				hnsHealthCheckLoadBalancer, err := hns.getLoadBalancer(
+					[]endpointsInfo{*gatewayHnsendpoint},
+					loadBalancerFlags{isDSR: false, useMUX: svcInfo.preserveDIP, preserveDIP: svcInfo.preserveDIP},
+					sourceVip,
+					lbIngressIP.ip,
+					Enum(svcInfo.Protocol()),
+					uint16(nodeport),
+					uint16(nodeport),
+				)
+				if err != nil {
+					klog.ErrorS(err, "Policy creation failed")
+					continue
+				}
+				lbIngressIP.healthCheckHnsID = hnsHealthCheckLoadBalancer.hnsID
+				klog.V(3).InfoS("Hns Health Check LoadBalancer resource created for loadBalancer Ingress resources", "ip", lbIngressIP)
+			}
 		}
 		svcInfo.policyApplied = true
 		klog.V(2).InfoS("Policy successfully applied for service", "serviceInfo", svcInfo)

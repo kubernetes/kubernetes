@@ -892,8 +892,12 @@ function Configure-HostNetworkingService {
         -Verbose
     $created_hns_network = $true
   }
-
+  # This name of endpoint is referred in pkg/proxy/winkernel/proxier.go as part of
+  # kube-proxy as well. A health check port for every service that is specified as
+  # "externalTrafficPolicy: local" will be added on the endpoint.
+  # PLEASE KEEP THEM CONSISTENT!!!
   $endpoint_name = "cbr0"
+
   $vnic_name = "vEthernet (${endpoint_name})"
 
   $hns_endpoint = Get-HnsEndpoint | Where-Object Name -eq $endpoint_name
