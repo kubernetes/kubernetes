@@ -42,7 +42,9 @@ import (
 	kubeletapis "k8s.io/kubelet/pkg/apis"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -131,6 +133,9 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileHugePageResource(node, existingNode) || requiresUpdate
+	if managed.IsEnabled() {
+		requiresUpdate = kl.addManagementNodeCapacity(node, existingNode) || requiresUpdate
+	}
 	if requiresUpdate {
 		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
 			klog.ErrorS(err, "Unable to reconcile node with API server,error updating node", "node", klog.KObj(node))
@@ -138,6 +143,25 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		}
 	}
 
+	return true
+}
+
+// addManagementNodeCapacity adds the managednode capacity to the node
+func (kl *Kubelet) addManagementNodeCapacity(initialNode, existingNode *v1.Node) bool {
+	updateDefaultResources(initialNode, existingNode)
+	machineInfo, err := kl.cadvisor.MachineInfo()
+	if err != nil {
+		klog.Errorf("Unable to calculate managed node capacity for %q: %v", kl.nodeName, err)
+		return false
+	}
+	cpuRequest := cadvisor.CapacityFromMachineInfo(machineInfo)[v1.ResourceCPU]
+	cpuRequestInMilli := cpuRequest.MilliValue()
+	newCPURequest := resource.NewMilliQuantity(cpuRequestInMilli*1000, cpuRequest.Format)
+	managedResourceName := managed.GenerateResourceName("management")
+	if existingCapacity, ok := existingNode.Status.Capacity[managedResourceName]; ok && existingCapacity.Equal(*newCPURequest) {
+		return false
+	}
+	existingNode.Status.Capacity[managedResourceName] = *newCPURequest
 	return true
 }
 
@@ -431,6 +455,9 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 				node.ObjectMeta.Labels[v1.LabelTopologyRegion] = zone.Region
 			}
 		}
+	}
+	if managed.IsEnabled() {
+		kl.addManagementNodeCapacity(node, node)
 	}
 
 	kl.setNodeStatus(ctx, node)
