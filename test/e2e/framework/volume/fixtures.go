@@ -368,11 +368,7 @@ func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutC
 	var gracePeriod int64 = 1
 	var command string
 
-	if !framework.NodeOSDistroIs("windows") {
-		command = "while true ; do sleep 2; done "
-	} else {
-		command = "while(1) {sleep 2}"
-	}
+	command = "while true ; do sleep 2; done "
 	seLinuxOptions := &v1.SELinuxOptions{Level: "s0:c0,c1"}
 	clientPod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
