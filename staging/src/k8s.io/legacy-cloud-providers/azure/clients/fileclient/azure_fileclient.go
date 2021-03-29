@@ -59,7 +59,7 @@ func (c *Client) CreateFileShare(resourceGroupName, accountName string, shareOpt
 	}
 	result, err := c.GetFileShare(resourceGroupName, accountName, shareOptions.Name)
 	if err == nil {
-		klog.V(2).Infof("file share(%s) under account(%s) rg(%s) already exists", shareOptions.Name, accountName, resourceGroupName)
+		klog.V(2).InfoS("File share) under account resourceGroupName already exists", "shareOptionsName", shareOptions.Name, "accountName", accountName, "resourceGroupName", resourceGroupName)
 		return nil
 	} else if result.Response.Response == nil || (err != nil && result.Response.Response.StatusCode != http.StatusNotFound && !strings.Contains(err.Error(), "ShareNotFound")) {
 		return fmt.Errorf("failed to get file share(%s), err: %v", shareOptions.Name, err)
@@ -97,8 +97,8 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 		return fmt.Errorf("failed to get file share(%s), : %v", name, err)
 	}
 	if *share.FileShareProperties.ShareQuota >= quota {
-		klog.Warningf("file share size(%dGi) is already greater or equal than requested size(%dGi), accountName: %s, shareName: %s",
-			share.FileShareProperties.ShareQuota, sizeGiB, accountName, name)
+		klog.InfoS("File share size is already greater or equal than requested size",
+			"fileShareSize(Gi)",share.FileShareProperties.ShareQuota, "requestedSize(Gi)", sizeGiB, "accountName", accountName, "shareName", name)
 		return nil
 
 	}
@@ -108,8 +108,7 @@ func (c *Client) ResizeFileShare(resourceGroupName, accountName, name string, si
 	if err != nil {
 		return fmt.Errorf("failed to update quota on file share(%s), err: %v", name, err)
 	}
-
-	klog.V(4).Infof("resize file share completed, resourceGroupName(%s), accountName: %s, shareName: %s, sizeGiB: %d", resourceGroupName, accountName, name, sizeGiB)
+	klog.V(4).InfoS("Resize file share completed", "resourceGroupName", resourceGroupName, "accountName", accountName, "shareName", name, "sizeGiB", sizeGiB)
 
 	return nil
 }
