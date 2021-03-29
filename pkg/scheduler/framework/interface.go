@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -587,6 +588,9 @@ type Handle interface {
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
+
+	// KubeConfig returns the raw kube config.
+	KubeConfig() *restclient.Config
 
 	// EventRecorder returns an event recorder.
 	EventRecorder() events.EventRecorder

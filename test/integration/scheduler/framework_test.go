@@ -92,7 +92,7 @@ type BindPlugin struct {
 	numBindCalled         int
 	PluginName            string
 	bindStatus            *framework.Status
-	client                *clientset.Clientset
+	client                clientset.Interface
 	pluginInvokeEventChan chan pluginInvokeEvent
 }
 

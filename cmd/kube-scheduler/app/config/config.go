@@ -41,6 +41,7 @@ type Config struct {
 	SecureServing          *apiserver.SecureServingInfo
 
 	Client          clientset.Interface
+	KubeConfig      *restclient.Config
 	InformerFactory informers.SharedInformerFactory
 
 	//lint:ignore SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.

@@ -176,7 +176,8 @@ func TestSchedulerCreation(t *testing.T) {
 
 			stopCh := make(chan struct{})
 			defer close(stopCh)
-			s, err := New(client,
+			s, err := New(
+				client,
 				informerFactory,
 				profile.NewRecorderFactory(eventBroadcaster),
 				stopCh,
@@ -456,7 +457,8 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 	defer cancel()
 
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	sched, err := New(client,
+	sched, err := New(
+		client,
 		informerFactory,
 		profile.NewRecorderFactory(broadcaster),
 		ctx.Done(),
