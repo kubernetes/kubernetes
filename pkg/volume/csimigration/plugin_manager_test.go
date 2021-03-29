@@ -125,7 +125,7 @@ func TestIsMigratable(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator)
+		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
@@ -337,7 +337,7 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 	}
 	csiTranslator := csitrans.New()
 	for _, test := range testCases {
-		pm := NewPluginManager(csiTranslator)
+		pm := NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 		t.Run(fmt.Sprintf("Testing %v", test.name), func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()

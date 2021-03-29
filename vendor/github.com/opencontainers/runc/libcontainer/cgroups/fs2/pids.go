@@ -3,7 +3,6 @@
 package fs2
 
 import (
-	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -34,15 +33,15 @@ func setPids(dirPath string, cgroup *configs.Cgroup) error {
 func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
-	contents, err := ioutil.ReadFile(filepath.Join(dirPath, "cgroup.procs"))
+	contents, err := fscommon.ReadFile(dirPath, "cgroup.procs")
 	if errors.Is(err, unix.ENOTSUP) {
-		contents, err = ioutil.ReadFile(filepath.Join(dirPath, "cgroup.threads"))
+		contents, err = fscommon.ReadFile(dirPath, "cgroup.threads")
 	}
 	if err != nil {
 		return err
 	}
 	pids := make(map[string]string)
-	for _, i := range strings.Split(string(contents), "\n") {
+	for _, i := range strings.Split(contents, "\n") {
 		if i != "" {
 			pids[i] = i
 		}

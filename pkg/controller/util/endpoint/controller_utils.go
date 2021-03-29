@@ -25,7 +25,8 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -274,4 +275,61 @@ func (sl portsInOrder) Less(i, j int) bool {
 	h1 := DeepHashObjectToString(sl[i])
 	h2 := DeepHashObjectToString(sl[j])
 	return h1 < h2
+}
+
+// endpointsEqualBeyondHash returns true if endpoints have equal attributes
+// but excludes equality checks that would have already been covered with
+// endpoint hashing (see hashEndpoint func for more info).
+func EndpointsEqualBeyondHash(ep1, ep2 *discovery.Endpoint) bool {
+	if stringPtrChanged(ep1.NodeName, ep1.NodeName) {
+		return false
+	}
+
+	if stringPtrChanged(ep1.Zone, ep1.Zone) {
+		return false
+	}
+
+	if boolPtrChanged(ep1.Conditions.Ready, ep2.Conditions.Ready) {
+		return false
+	}
+
+	if objectRefPtrChanged(ep1.TargetRef, ep2.TargetRef) {
+		return false
+	}
+
+	return true
+}
+
+// boolPtrChanged returns true if a set of bool pointers have different values.
+func boolPtrChanged(ptr1, ptr2 *bool) bool {
+	if (ptr1 == nil) != (ptr2 == nil) {
+		return true
+	}
+	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
+		return true
+	}
+	return false
+}
+
+// objectRefPtrChanged returns true if a set of object ref pointers have
+// different values.
+func objectRefPtrChanged(ref1, ref2 *v1.ObjectReference) bool {
+	if (ref1 == nil) != (ref2 == nil) {
+		return true
+	}
+	if ref1 != nil && ref2 != nil && !apiequality.Semantic.DeepEqual(*ref1, *ref2) {
+		return true
+	}
+	return false
+}
+
+// stringPtrChanged returns true if a set of string pointers have different values.
+func stringPtrChanged(ptr1, ptr2 *string) bool {
+	if (ptr1 == nil) != (ptr2 == nil) {
+		return true
+	}
+	if ptr1 != nil && ptr2 != nil && *ptr1 != *ptr2 {
+		return true
+	}
+	return false
 }

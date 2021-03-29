@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"net/url"
+	"os"
 	"reflect"
 	goruntime "runtime"
 	"strconv"
@@ -84,7 +85,6 @@ const (
 	cadvisorMetricsPath = "/metrics/cadvisor"
 	resourceMetricsPath = "/metrics/resource"
 	proberMetricsPath   = "/metrics/probes"
-	specPath            = "/spec/"
 	statsPath           = "/stats/"
 	logsPath            = "/logs/"
 	pprofBasePath       = "/debug/pprof/"
@@ -142,13 +142,12 @@ func ListenAndServeKubeletServer(
 	resourceAnalyzer stats.ResourceAnalyzer,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	tlsOptions *TLSOptions,
-	auth AuthInterface,
-	enableCAdvisorJSONEndpoints bool) {
+	auth AuthInterface) {
 
 	address := net.ParseIP(kubeCfg.Address)
 	port := uint(kubeCfg.Port)
 	klog.InfoS("Starting to listen", "address", address, "port", port)
-	handler := NewServer(host, resourceAnalyzer, auth, enableCAdvisorJSONEndpoints, kubeCfg)
+	handler := NewServer(host, resourceAnalyzer, auth, kubeCfg)
 	s := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &handler,
@@ -161,23 +160,31 @@ func ListenAndServeKubeletServer(
 		// Passing empty strings as the cert and key files means no
 		// cert/keys are specified and GetCertificate in the TLSConfig
 		// should be called instead.
-		klog.Fatal(s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile))
-	} else {
-		klog.Fatal(s.ListenAndServe())
+		if err := s.ListenAndServeTLS(tlsOptions.CertFile, tlsOptions.KeyFile); err != nil {
+			klog.ErrorS(err, "Failed to listen and serve")
+			os.Exit(1)
+		}
+	} else if err := s.ListenAndServe(); err != nil {
+		klog.ErrorS(err, "Failed to listen and serve")
+		os.Exit(1)
 	}
 }
 
 // ListenAndServeKubeletReadOnlyServer initializes a server to respond to HTTP network requests on the Kubelet.
-func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint, enableCAdvisorJSONEndpoints bool) {
+func ListenAndServeKubeletReadOnlyServer(host HostInterface, resourceAnalyzer stats.ResourceAnalyzer, address net.IP, port uint) {
 	klog.InfoS("Starting to listen read-only", "address", address, "port", port)
-	s := NewServer(host, resourceAnalyzer, nil, enableCAdvisorJSONEndpoints, nil)
+	s := NewServer(host, resourceAnalyzer, nil, nil)
 
 	server := &http.Server{
 		Addr:           net.JoinHostPort(address.String(), strconv.FormatUint(uint64(port), 10)),
 		Handler:        &s,
 		MaxHeaderBytes: 1 << 20,
 	}
-	klog.Fatal(server.ListenAndServe())
+
+	if err := server.ListenAndServe(); err != nil {
+		klog.ErrorS(err, "Failed to listen and serve")
+		os.Exit(1)
+	}
 }
 
 // ListenAndServePodResources initializes a gRPC server to serve the PodResources service
@@ -187,9 +194,14 @@ func ListenAndServePodResources(socket string, podsProvider podresources.PodsPro
 	podresourcesapi.RegisterPodResourcesListerServer(server, podresources.NewV1PodResourcesServer(podsProvider, devicesProvider, cpusProvider))
 	l, err := util.CreateListener(socket)
 	if err != nil {
-		klog.Fatalf("Failed to create listener for podResources endpoint: %v", err)
+		klog.ErrorS(err, "Failed to create listener for podResources endpoint")
+		os.Exit(1)
 	}
-	klog.Fatal(server.Serve(l))
+
+	if err := server.Serve(l); err != nil {
+		klog.ErrorS(err, "Failed to serve")
+		os.Exit(1)
+	}
 }
 
 // AuthInterface contains all methods required by the auth filters
@@ -222,7 +234,6 @@ func NewServer(
 	host HostInterface,
 	resourceAnalyzer stats.ResourceAnalyzer,
 	auth AuthInterface,
-	enableCAdvisorJSONEndpoints bool,
 	kubeCfg *kubeletconfiginternal.KubeletConfiguration) Server {
 	server := Server{
 		host:                 host,
@@ -235,7 +246,7 @@ func NewServer(
 	if auth != nil {
 		server.InstallAuthFilter()
 	}
-	server.InstallDefaultHandlers(enableCAdvisorJSONEndpoints)
+	server.InstallDefaultHandlers()
 	if kubeCfg != nil && kubeCfg.EnableDebuggingHandlers {
 		server.InstallDebuggingHandlers()
 		// To maintain backward compatibility serve logs and pprof only when enableDebuggingHandlers is also enabled
@@ -312,7 +323,7 @@ func (s *Server) getMetricMethodBucket(method string) string {
 
 // InstallDefaultHandlers registers the default set of supported HTTP request
 // patterns with the restful Container.
-func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
+func (s *Server) InstallDefaultHandlers() {
 	s.addMetricsBucketMatcher("healthz")
 	healthz.InstallHandler(s.restfulCont,
 		healthz.PingHealthz,
@@ -331,7 +342,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Add(ws)
 
 	s.addMetricsBucketMatcher("stats")
-	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
+	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer))
 
 	s.addMetricsBucketMatcher("metrics")
 	s.addMetricsBucketMatcher("metrics/cadvisor")
@@ -387,19 +398,6 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Handle(proberMetricsPath,
 		compbasemetrics.HandlerFor(p, compbasemetrics.HandlerOpts{ErrorHandling: compbasemetrics.ContinueOnError}),
 	)
-
-	s.addMetricsBucketMatcher("spec")
-	if enableCAdvisorJSONEndpoints {
-		ws := new(restful.WebService)
-		ws.
-			Path(specPath).
-			Produces(restful.MIME_JSON)
-		ws.Route(ws.GET("").
-			To(s.getSpec).
-			Operation("getSpec").
-			Writes(cadvisorapi.MachineInfo{}))
-		s.restfulCont.Add(ws)
-	}
 }
 
 // InstallDebuggingHandlers registers the HTTP request patterns that serve logs or run commands/containers
@@ -716,16 +714,6 @@ func (s *Server) getRunningPods(request *restful.Request, response *restful.Resp
 // getLogs handles logs requests against the Kubelet.
 func (s *Server) getLogs(request *restful.Request, response *restful.Response) {
 	s.host.ServeLogs(response, request.Request)
-}
-
-// getSpec handles spec requests against the Kubelet.
-func (s *Server) getSpec(request *restful.Request, response *restful.Response) {
-	info, err := s.host.GetCachedMachineInfo()
-	if err != nil {
-		response.WriteError(http.StatusInternalServerError, err)
-		return
-	}
-	response.WriteEntity(info)
 }
 
 type execRequestParams struct {

@@ -31,28 +31,31 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	"k8s.io/utils/pointer"
 )
-
-func newBool(a bool) *bool {
-	return &a
-}
-
-func newInt32(i int32) *int32 {
-	return &i
-}
 
 func TestJobStrategy(t *testing.T) {
 	cases := map[string]struct {
-		ttlEnabled bool
+		ttlEnabled        bool
+		indexedJobEnabled bool
+		suspendJobEnabled bool
 	}{
 		"features disabled": {},
 		"ttl enabled": {
 			ttlEnabled: true,
 		},
+		"indexed job enabled": {
+			indexedJobEnabled: true,
+		},
+		"suspend job enabled": {
+			suspendJobEnabled: true,
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TTLAfterFinished, tc.ttlEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IndexedJob, tc.indexedJobEnabled)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.SuspendJob, tc.suspendJobEnabled)()
 			testJobStrategy(t)
 		})
 	}
@@ -60,6 +63,8 @@ func TestJobStrategy(t *testing.T) {
 
 func testJobStrategy(t *testing.T) {
 	ttlEnabled := utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished)
+	indexedJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IndexedJob)
+	suspendJobEnabled := utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob)
 	ctx := genericapirequest.NewDefaultContext()
 	if !Strategy.NamespaceScoped() {
 		t.Errorf("Job must be namespace scoped")
@@ -87,10 +92,14 @@ func testJobStrategy(t *testing.T) {
 			Namespace: metav1.NamespaceDefault,
 		},
 		Spec: batch.JobSpec{
-			Selector:                validSelector,
-			Template:                validPodTemplateSpec,
-			TTLSecondsAfterFinished: newInt32(0), // Set TTL
-			ManualSelector:          newBool(true),
+			Selector:       validSelector,
+			Template:       validPodTemplateSpec,
+			ManualSelector: pointer.BoolPtr(true),
+			Completions:    pointer.Int32Ptr(2),
+			// Set gated values.
+			Suspend:                 pointer.BoolPtr(true),
+			TTLSecondsAfterFinished: pointer.Int32Ptr(0),
+			CompletionMode:          completionModePtr(batch.IndexedCompletion),
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -106,15 +115,24 @@ func testJobStrategy(t *testing.T) {
 		t.Errorf("Unexpected error validating %v", errs)
 	}
 	if ttlEnabled != (job.Spec.TTLSecondsAfterFinished != nil) {
-		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)
+		t.Errorf("Job should allow setting .spec.ttlSecondsAfterFinished only when %v feature is enabled", features.TTLAfterFinished)
+	}
+	if indexedJobEnabled != (job.Spec.CompletionMode != nil) {
+		t.Errorf("Job should allow setting .spec.completionMode only when %v feature is enabled", features.IndexedJob)
+	}
+	if !suspendJobEnabled && (job.Spec.Suspend != nil) {
+		t.Errorf("Job should allow setting .spec.suspend only when %v feature is enabled", features.SuspendJob)
 	}
 
 	parallelism := int32(10)
 	updatedJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
-			Parallelism:             &parallelism,
-			TTLSecondsAfterFinished: newInt32(1), // Update TTL
+			Parallelism: &parallelism,
+			Completions: pointer.Int32Ptr(2),
+			// Update gated features.
+			TTLSecondsAfterFinished: pointer.Int32Ptr(1),
+			CompletionMode:          completionModePtr(batch.IndexedCompletion), // No change because field is immutable.
 		},
 		Status: batch.JobStatus{
 			Active: 11,
@@ -135,12 +153,17 @@ func testJobStrategy(t *testing.T) {
 		t.Errorf("Expected a validation error")
 	}
 
-	// Existing TTLSecondsAfterFinished should be preserved
-	job.Spec.TTLSecondsAfterFinished = newInt32(1)
-	updatedJob.Spec.TTLSecondsAfterFinished = newInt32(2)
+	// Test updating suspend false->true and nil-> true when the feature gate is
+	// disabled. We don't care about other combinations.
+	job.Spec.Suspend, updatedJob.Spec.Suspend = pointer.BoolPtr(false), pointer.BoolPtr(true)
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
-	if job.Spec.TTLSecondsAfterFinished == nil || updatedJob.Spec.TTLSecondsAfterFinished == nil {
-		t.Errorf("existing TTLSecondsAfterFinished should be preserved")
+	if !suspendJobEnabled && *updatedJob.Spec.Suspend {
+		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from false to true", suspendJobEnabled)
+	}
+	job.Spec.Suspend, updatedJob.Spec.Suspend = nil, pointer.BoolPtr(true)
+	Strategy.PrepareForUpdate(ctx, updatedJob, job)
+	if !suspendJobEnabled && updatedJob.Spec.Suspend != nil {
+		t.Errorf("[SuspendJob=%v] .spec.suspend should not be updated from nil to non-nil", suspendJobEnabled)
 	}
 
 	// Make sure we correctly implement the interface.
@@ -289,4 +312,8 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		JobToSelectableFields(&batch.Job{}),
 		nil,
 	)
+}
+
+func completionModePtr(m batch.CompletionMode) *batch.CompletionMode {
+	return &m
 }

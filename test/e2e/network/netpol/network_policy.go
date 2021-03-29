@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -116,12 +117,7 @@ and what is happening in practice:
 		z/c	.	.	.	.	.	.	.	.	.
 */
 
-// SIGDescribeCopy function SIGDescribe is COPIED from test/e2e/network/framework.go , so that we can avoid a cyclic dependency while we incubate these new tests.
-func SIGDescribeCopy(text string, body func()) bool {
-	return ginkgo.Describe("[sig-network] "+text, body)
-}
-
-var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("netpol")
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -778,6 +774,20 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
+		ginkgo.It("should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP]", func() {
+			nsX, _, _, model, k8s := getK8SModel(f)
+
+			policy := GetAllowIngressByProtocol("allow-ingress-by-proto", map[string]string{"pod": "a"}, &protocolTCP)
+			CreatePolicy(k8s, policy, nsX)
+
+			reachabilityTCP := NewReachability(model.AllPods(), true)
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: reachabilityTCP})
+
+			reachabilityUDP := NewReachability(model.AllPods(), true)
+			reachabilityUDP.ExpectPeer(&Peer{}, &Peer{Namespace: nsX, Pod: "a"}, false)
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolUDP, Reachability: reachabilityUDP})
+		})
+
 		ginkgo.It("should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]", func() {
 			nsX, _, _, model, k8s := getK8SModel(f)
 			policyAllowOnlyPort80 := GetAllowIngressByPort("allow-ingress-port-80", &intstr.IntOrString{Type: intstr.Int, IntVal: 80})
@@ -991,7 +1001,7 @@ var _ = SIGDescribeCopy("Netpol [LinuxOnly]", func() {
 	})
 })
 
-var _ = SIGDescribeCopy("Netpol [Feature:UDPConnectivity][LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol [Feature:UDPConnectivity][LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 
 	ginkgo.BeforeEach(func() {
@@ -1065,7 +1075,7 @@ var _ = SIGDescribeCopy("Netpol [Feature:UDPConnectivity][LinuxOnly]", func() {
 	})
 })
 
-var _ = SIGDescribeCopy("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
+var _ = common.SIGDescribe("Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive]", func() {
 	f := framework.NewDefaultFramework("sctp-network-policy")
 
 	ginkgo.BeforeEach(func() {

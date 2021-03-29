@@ -892,7 +892,7 @@ func TestRemoveStaleState(t *testing.T) {
 
 			mgr.removeStaleState()
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Errorf("Memory Manager removeStaleState() error, expected assignments %v, but got: %v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments())
 			}
@@ -1117,102 +1117,6 @@ func TestAddContainer(t *testing.T) {
 				},
 			},
 			expectedAllocateError:     fmt.Errorf("fake reg error"),
-			expectedAddContainerError: nil,
-			podAllocate:               pod,
-			assignments:               state.ContainerMemoryAssignments{},
-			activePods:                nil,
-		},
-		{
-			description: "Adding container should fail (CRI error) but without an error",
-			updateError: fmt.Errorf("fake reg error"),
-			policyName:  policyTypeStatic,
-			machineInfo: machineInfo,
-			reserved:    reserved,
-			machineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedMachineState: state.NUMANodeMap{
-				0: &state.NUMANodeState{
-					Cells:               []int{0},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-				1: &state.NUMANodeState{
-					Cells:               []int{1},
-					NumberOfAssignments: 0,
-					MemoryMap: map[v1.ResourceName]*state.MemoryTable{
-						v1.ResourceMemory: {
-							Allocatable:    9 * gb,
-							Free:           9 * gb,
-							Reserved:       0 * gb,
-							SystemReserved: 1 * gb,
-							TotalMemSize:   10 * gb,
-						},
-						hugepages1Gi: {
-							Allocatable:    5 * gb,
-							Free:           5 * gb,
-							Reserved:       0,
-							SystemReserved: 0,
-							TotalMemSize:   5 * gb,
-						},
-					},
-				},
-			},
-			expectedAllocateError:     nil,
 			expectedAddContainerError: nil,
 			podAllocate:               pod,
 			assignments:               state.ContainerMemoryAssignments{},
@@ -1487,7 +1391,8 @@ func TestAddContainer(t *testing.T) {
 				t.Errorf("Memory Manager Allocate() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAllocateError, err)
 			}
-			err = mgr.AddContainer(pod, container, "fakeID")
+			mgr.AddContainer(pod, container, "fakeID")
+			_, _, err = mgr.containerMap.GetContainerRef("fakeID")
 			if !reflect.DeepEqual(err, testCase.expectedAddContainerError) {
 				t.Errorf("Memory Manager AddContainer() error (%v), expected error: %v, but got: %v",
 					testCase.description, testCase.expectedAddContainerError, err)
@@ -2107,7 +2012,7 @@ func TestRemoveContainer(t *testing.T) {
 					testCase.description, testCase.expectedError, err)
 			}
 
-			if !areContainerMemoryAssignmentsEqual(mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
+			if !areContainerMemoryAssignmentsEqual(t, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments) {
 				t.Fatalf("Memory Manager RemoveContainer() inconsistent assignment, expected: %+v, but got: %+v, start %+v",
 					testCase.expectedAssignments, mgr.state.GetMemoryAssignments(), testCase.expectedAssignments)
 			}

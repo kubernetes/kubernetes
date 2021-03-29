@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -42,6 +42,7 @@ import (
 	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -276,7 +277,7 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			f, err := st.NewFramework(registeredPlugins,
+			f, err := st.NewFramework(registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -530,7 +531,9 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-				st.RegisterPluginAsExtensions(interpodaffinity.Name, interpodaffinity.New, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(interpodaffinity.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return interpodaffinity.New(plArgs, fh, feature.Features{})
+				}, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -991,16 +994,30 @@ func TestDryRunPreemption(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
+			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			parallelism := parallelize.DefaultParallelism
+			if tt.disableParallelism {
+				// We need disableParallelism because of the non-deterministic nature
+				// of the results of tests that set custom minCandidateNodesPercentage
+				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
+				parallelism = 1
+			}
 			fwk, err := st.NewFramework(
-				registeredPlugins,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithParallelism(parallelism),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
@@ -1009,17 +1026,6 @@ func TestDryRunPreemption(t *testing.T) {
 			sort.Slice(nodeInfos, func(i, j int) bool {
 				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
 			})
-
-			if tt.disableParallelism {
-				// We need disableParallelism because of the non-deterministic nature
-				// of the results of tests that set custom minCandidateNodesPercentage
-				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
-				oldParallelism := parallelize.GetParallelism()
-				parallelize.SetParallelism(1)
-				t.Cleanup(func() {
-					parallelize.SetParallelism(oldParallelism)
-				})
-			}
 
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()
@@ -1235,6 +1241,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
@@ -1635,13 +1642,13 @@ func TestPreempt(t *testing.T) {
 				extender.CachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
-
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),

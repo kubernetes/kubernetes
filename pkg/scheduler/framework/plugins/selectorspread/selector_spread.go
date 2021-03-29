@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
-	utilnode "k8s.io/kubernetes/pkg/util/node"
 )
 
 // SelectorSpread is a plugin that calculates selector spread priority.

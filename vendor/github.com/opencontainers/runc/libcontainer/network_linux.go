@@ -3,11 +3,11 @@
 package libcontainer
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/types"
@@ -79,7 +79,7 @@ func readSysfsNetworkStats(ethInterface, statsFile string) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseUint(strings.TrimSpace(string(data)), 10, 64)
+	return strconv.ParseUint(string(bytes.TrimSpace(data)), 10, 64)
 }
 
 // loopback is a network strategy that provides a basic loopback device

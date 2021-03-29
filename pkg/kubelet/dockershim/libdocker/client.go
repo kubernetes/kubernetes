@@ -19,6 +19,7 @@ limitations under the License.
 package libdocker
 
 import (
+	"os"
 	"time"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -74,7 +75,7 @@ type Interface interface {
 // DOCKER_HOST, DOCKER_TLS_VERIFY, and DOCKER_CERT path per their spec
 func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	if len(dockerEndpoint) > 0 {
-		klog.Infof("Connecting to docker on %s", dockerEndpoint)
+		klog.InfoS("Connecting to docker on the dockerEndpoint", "endpoint", dockerEndpoint)
 		return dockerapi.NewClientWithOpts(dockerapi.WithHost(dockerEndpoint), dockerapi.WithVersion(""))
 	}
 	return dockerapi.NewClientWithOpts(dockerapi.FromEnv)
@@ -89,8 +90,10 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout, imagePullProgressDeadline time.Duration) Interface {
 	client, err := getDockerClient(dockerEndpoint)
 	if err != nil {
-		klog.Fatalf("Couldn't connect to docker: %v", err)
+		klog.ErrorS(err, "Couldn't connect to docker")
+		os.Exit(1)
+
 	}
-	klog.Infof("Start docker client with request timeout=%v", requestTimeout)
+	klog.InfoS("Start docker client with request timeout", "timeout", requestTimeout)
 	return newKubeDockerClient(client, requestTimeout, imagePullProgressDeadline)
 }

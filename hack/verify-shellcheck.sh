@@ -25,14 +25,14 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
+# allow overriding docker cli, which should work fine for this script
+DOCKER="${DOCKER:-docker}"
+
 # required version for this script, if not installed on the host we will
 # use the official docker image instead. keep this in sync with SHELLCHECK_IMAGE
-SHELLCHECK_VERSION="0.7.0"
+SHELLCHECK_VERSION="0.7.1"
 # upstream shellcheck latest stable image as of October 23rd, 2019
-SHELLCHECK_IMAGE="koalaman/shellcheck-alpine:v0.7.0@sha256:24bbf52aae6eaa27accc9f61de32d30a1498555e6ef452966d0702ff06f38ecb"
-
-# fixed name for the shellcheck docker container so we can reliably clean it up
-SHELLCHECK_CONTAINER="k8s-shellcheck"
+SHELLCHECK_IMAGE="docker.io/koalaman/shellcheck-alpine:v0.7.1@sha256:d6147f30864ddb7c9cf983fc277d345bc315e798e309ddf70062b194843ee252"
 
 # disabled lints
 disabled=(
@@ -50,21 +50,6 @@ join_by() {
 }
 SHELLCHECK_DISABLED="$(join_by , "${disabled[@]}")"
 readonly SHELLCHECK_DISABLED
-
-# creates the shellcheck container for later use
-create_container () {
-  # TODO(bentheelder): this is a performance hack, we create the container with
-  # a sleep MAX_INT32 so that it is effectively paused.
-  # We then repeatedly exec to it to run each shellcheck, and later rm it when
-  # we're done.
-  # This is incredibly much faster than creating a container for each shellcheck
-  # call ...
-  docker run --name "${SHELLCHECK_CONTAINER}" -d --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" --entrypoint="sleep" "${SHELLCHECK_IMAGE}" 2147483647
-}
-# removes the shellcheck container
-remove_container () {
-  docker rm -f "${SHELLCHECK_CONTAINER}" &> /dev/null || true
-}
 
 # ensure we're linting the k8s source tree
 cd "${KUBE_ROOT}"
@@ -87,16 +72,6 @@ done < <(find . -name "*.sh" \
     \( -path ./third_party\* -a -not -path ./third_party/forked\* \) \
   \))
 
-# make sure known failures are sorted
-failure_file="${KUBE_ROOT}/hack/.shellcheck_failures"
-kube::util::check-file-in-alphabetical-order "${failure_file}"
-
-# load known failure files
-failing_files=()
-while IFS=$'\n' read -r script;
-  do failing_files+=("$script");
-done < <(cat "${failure_file}")
-
 # detect if the host machine has the required shellcheck version installed
 # if so, we will use that instead.
 HAVE_SHELLCHECK=false
@@ -104,25 +79,6 @@ if which shellcheck &>/dev/null; then
   detected_version="$(shellcheck --version | grep 'version: .*')"
   if [[ "${detected_version}" = "version: ${SHELLCHECK_VERSION}" ]]; then
     HAVE_SHELLCHECK=true
-  fi
-fi
-
-# tell the user which we've selected and possibly set up the container
-if ${HAVE_SHELLCHECK}; then
-  echo "Using host shellcheck ${SHELLCHECK_VERSION} binary."
-else
-  echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
-  # remove any previous container, ensure we will attempt to cleanup on exit,
-  # and create the container
-  remove_container
-  kube::util::trap_add 'remove_container' EXIT
-  if ! output="$(create_container 2>&1)"; then
-      {
-        echo "Failed to create shellcheck container with output: "
-        echo ""
-        echo "${output}"
-      } >&2
-      exit 1
   fi
 fi
 
@@ -145,71 +101,35 @@ SHELLCHECK_OPTIONS=(
   "--color=${SHELLCHECK_COLORIZED_OUTPUT}"
 )
 
-# lint each script, tracking failures
-errors=()
-not_failing=()
-for f in "${all_shell_scripts[@]}"; do
-  set +o errexit
-  if ${HAVE_SHELLCHECK}; then
-    failedLint=$(shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
-  else
-    failedLint=$(docker exec -t ${SHELLCHECK_CONTAINER} \
-                 shellcheck "${SHELLCHECK_OPTIONS[@]}" "${f}")
-  fi
-  set -o errexit
-  kube::util::array_contains "${f}" "${failing_files[@]}" && in_failing=$? || in_failing=$?
-  if [[ -n "${failedLint}" ]] && [[ "${in_failing}" -ne "0" ]]; then
-    errors+=( "${failedLint}" )
-  fi
-  if [[ -z "${failedLint}" ]] && [[ "${in_failing}" -eq "0" ]]; then
-    not_failing+=( "${f}" )
-  fi
-done
+# tell the user which we've selected and lint all scripts
+res=0
+if ${HAVE_SHELLCHECK}; then
+  echo "Using host shellcheck ${SHELLCHECK_VERSION} binary."
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
+else
+  echo "Using shellcheck ${SHELLCHECK_VERSION} docker image."
+  "${DOCKER}" run \
+    --rm -v "${KUBE_ROOT}:${KUBE_ROOT}" -w "${KUBE_ROOT}" \
+    "${SHELLCHECK_IMAGE}" \
+  shellcheck "${SHELLCHECK_OPTIONS[@]}" "${all_shell_scripts[@]}" || res=$?
+fi
 
-# Check to be sure all the files that should pass lint are.
-if [ ${#errors[@]} -eq 0 ]; then
-  echo 'Congratulations! All shell files are passing lint (excluding those in hack/.shellcheck_failures).'
+# print a message based on the result
+if [ $res -eq 0 ]; then
+  echo 'Congratulations! All shell files are passing lint :-)'
 else
   {
-    echo "Errors from shellcheck:"
-    for err in "${errors[@]}"; do
-      echo "$err"
-    done
     echo
     echo 'Please review the above warnings. You can test via "./hack/verify-shellcheck.sh"'
-    echo 'If the above warnings do not make sense, you can exempt this package from shellcheck'
-    echo 'checking by adding it to hack/.shellcheck_failures (if your reviewer is okay with it).'
+    echo 'If the above warnings do not make sense, you can exempt this warning with a comment'
+    echo ' (if your reviewer is okay with it).'
+    echo 'In general please prefer to fix the error, we have already disabled specific lints'
+    echo ' that the project chooses to ignore.'
+    echo 'See: https://github.com/koalaman/shellcheck/wiki/Ignore#ignoring-one-specific-instance-in-a-file'
     echo
   } >&2
   exit 1
 fi
 
-if [[ ${#not_failing[@]} -gt 0 ]]; then
-  {
-    echo "Some files in hack/.shellcheck_failures are passing shellcheck. Please remove them."
-    echo
-    for f in "${not_failing[@]}"; do
-      echo "  $f"
-    done
-    echo
-  } >&2
-  exit 1
-fi
-
-# Check that all failing_files actually still exist
-gone=()
-for f in "${failing_files[@]}"; do
-  kube::util::array_contains "$f" "${all_shell_scripts[@]}" || gone+=( "$f" )
-done
-
-if [[ ${#gone[@]} -gt 0 ]]; then
-  {
-    echo "Some files in hack/.shellcheck_failures do not exist anymore. Please remove them."
-    echo
-    for f in "${gone[@]}"; do
-      echo "  $f"
-    done
-    echo
-  } >&2
-  exit 1
-fi
+# preserve the result
+exit $res

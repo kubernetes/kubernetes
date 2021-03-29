@@ -79,7 +79,7 @@ func (sc *stateCheckpoint) restoreState() error {
 	sc.cache.SetMachineState(checkpoint.MachineState)
 	sc.cache.SetMemoryAssignments(checkpoint.Entries)
 
-	klog.V(2).Info("[memorymanager] state checkpoint: restored state from checkpoint")
+	klog.V(2).InfoS("State checkpoint: restored state from checkpoint")
 
 	return nil
 }
@@ -93,7 +93,7 @@ func (sc *stateCheckpoint) storeState() error {
 
 	err := sc.checkpointManager.CreateCheckpoint(sc.checkpointName, checkpoint)
 	if err != nil {
-		klog.Errorf("[memorymanager] could not save checkpoint: %v", err)
+		klog.ErrorS(err, "Could not save checkpoint")
 		return err
 	}
 	return nil
@@ -131,7 +131,7 @@ func (sc *stateCheckpoint) SetMachineState(memoryMap NUMANodeMap) {
 	sc.cache.SetMachineState(memoryMap)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -143,7 +143,7 @@ func (sc *stateCheckpoint) SetMemoryBlocks(podUID string, containerName string, 
 	sc.cache.SetMemoryBlocks(podUID, containerName, blocks)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -155,7 +155,7 @@ func (sc *stateCheckpoint) SetMemoryAssignments(assignments ContainerMemoryAssig
 	sc.cache.SetMemoryAssignments(assignments)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -167,7 +167,7 @@ func (sc *stateCheckpoint) Delete(podUID string, containerName string) {
 	sc.cache.Delete(podUID, containerName)
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }
 
@@ -179,6 +179,6 @@ func (sc *stateCheckpoint) ClearState() {
 	sc.cache.ClearState()
 	err := sc.storeState()
 	if err != nil {
-		klog.Warningf("store state to checkpoint error: %v", err)
+		klog.InfoS("Store state to checkpoint error", "err", err)
 	}
 }

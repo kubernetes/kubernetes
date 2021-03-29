@@ -120,6 +120,10 @@ func (p *mockPolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string]
 	return nil
 }
 
+func (p *mockPolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
+	return cpuset.NewCPUSet()
+}
+
 type mockRuntimeService struct {
 	err error
 }

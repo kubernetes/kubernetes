@@ -120,12 +120,22 @@ func (o *ExplainOptions) Run(args []string) error {
 	recursive := o.Recursive
 	apiVersionString := o.APIVersion
 
-	// TODO: After we figured out the new syntax to separate group and resource, allow
-	// the users to use it in explain (kubectl explain <group><syntax><resource>).
-	// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
-	fullySpecifiedGVR, fieldsPath, err := explain.SplitAndParseResourceRequest(args[0], o.Mapper)
-	if err != nil {
-		return err
+	var fullySpecifiedGVR schema.GroupVersionResource
+	var fieldsPath []string
+	var err error
+	if len(apiVersionString) == 0 {
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequestWithMatchingPrefix(args[0], o.Mapper)
+		if err != nil {
+			return err
+		}
+	} else {
+		// TODO: After we figured out the new syntax to separate group and resource, allow
+		// the users to use it in explain (kubectl explain <group><syntax><resource>).
+		// Refer to issue #16039 for why we do this. Refer to PR #15808 that used "/" syntax.
+		fullySpecifiedGVR, fieldsPath, err = explain.SplitAndParseResourceRequest(args[0], o.Mapper)
+		if err != nil {
+			return err
+		}
 	}
 
 	gvk, _ := o.Mapper.KindFor(fullySpecifiedGVR)

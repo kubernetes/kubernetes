@@ -20,18 +20,19 @@ package network
 import (
 	"context"
 	"fmt"
-	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeployment "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -179,7 +180,7 @@ func iperf2ClientDaemonSet(client clientset.Interface, namespace string) (*appsv
 //     would require n^2 tests, n^2 time, and n^2 network resources which quickly become prohibitively large
 //     as the cluster size increases.
 //   Finally, after collecting all data, the results are analyzed and tabulated.
-var _ = SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
+var _ = common.SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func() {
 	// this test runs iperf2: one pod as a server, and a daemonset of clients
 	f := framework.NewDefaultFramework("network-perf")
 
@@ -211,8 +212,8 @@ var _ = SIGDescribe("Networking IPerf2 [Feature:Networking-Performance]", func()
 		// Make sure the server is ready to go
 		framework.Logf("waiting for iperf2 server endpoints")
 		err = wait.Poll(2*time.Second, largeClusterTimeout, func() (done bool, err error) {
-			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1beta1.LabelServiceName, serverServiceName)}
-			esList, err := f.ClientSet.DiscoveryV1beta1().EndpointSlices(f.Namespace.Name).List(context.TODO(), listOptions)
+			listOptions := metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", discoveryv1.LabelServiceName, serverServiceName)}
+			esList, err := f.ClientSet.DiscoveryV1().EndpointSlices(f.Namespace.Name).List(context.TODO(), listOptions)
 			framework.ExpectNoError(err, "Error fetching EndpointSlice for Service %s/%s", f.Namespace.Name, serverServiceName)
 
 			if len(esList.Items) == 0 {

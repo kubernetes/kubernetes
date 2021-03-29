@@ -27,7 +27,7 @@ import (
 var (
 	markControlPlaneExample = cmdutil.Examples(`
 		# Applies control-plane label and taint to the current node, functionally equivalent to what executed by kubeadm init.
-		kubeadm init phase mark-control-plane --config config.yml
+		kubeadm init phase mark-control-plane --config config.yaml
 
 		# Applies control-plane label and taint to a specific node
 		kubeadm init phase mark-control-plane --node-name myNode

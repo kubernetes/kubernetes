@@ -24,16 +24,12 @@ import (
 	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "github.com/google/go-flow-levee/cmd/levee"
 	_ "honnef.co/go/tools/cmd/staticcheck"
+	_ "k8s.io/klog/hack/tools/logcheck"
 
 	// benchmarking tools
 	_ "github.com/cespare/prettybench"
 	_ "gotest.tools"
 	_ "gotest.tools/gotestsum"
-
-	// bazel-related tools
-	_ "github.com/bazelbuild/bazel-gazelle/cmd/gazelle"
-	_ "github.com/bazelbuild/buildtools/buildozer"
-	_ "k8s.io/repo-infra/cmd/kazel"
 
 	// dependencies
 	_ "sigs.k8s.io/zeitgeist"

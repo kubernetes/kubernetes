@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -142,7 +143,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	csiTranslator := csitrans.New()
 	controller.translator = csiTranslator
-	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator)
+	controller.csiMigratedPluginManager = csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate)
 
 	controller.filteredDialOptions = p.FilteredDialOptions
 
@@ -365,7 +366,7 @@ func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume 
 
 // updateMigrationAnnotations takes an Annotations map and checks for a
 // provisioner name using the provisionerKey. It will then add a
-// "volume.beta.kubernetes.io/migrated-to" annotation if migration with the CSI
+// "pv.kubernetes.io/migrated-to" annotation if migration with the CSI
 // driver name for that provisioner is "on" based on feature flags, it will also
 // remove the annotation is migration is "off" for that provisioner in rollback
 // scenarios. Returns true if the annotations map was modified and false otherwise.

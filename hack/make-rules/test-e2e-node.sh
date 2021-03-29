@@ -17,6 +17,8 @@
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
+kube::golang::setup_env
+
 # start the cache mutation detector by default so that cache mutators will be found
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-true}"
 export KUBE_CACHE_MUTATION_DETECTOR
@@ -44,6 +46,7 @@ test_args=${TEST_ARGS:-""}
 timeout_arg=""
 system_spec_name=${SYSTEM_SPEC_NAME:-}
 extra_envs=${EXTRA_ENVS:-}
+runtime_config=${RUNTIME_CONFIG:-}
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -166,7 +169,8 @@ if [ "${remote}" = true ] ; then
     --image-project="${image_project}" --instance-name-prefix="${instance_prefix}" \
     --delete-instances="${delete_instances}" --test_args="${test_args}" --instance-metadata="${metadata}" \
     --image-config-file="${image_config_file}" --system-spec-name="${system_spec_name}" \
-    --preemptible-instances="${preemptible_instances}" --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
+    --runtime-config="${runtime_config}" --preemptible-instances="${preemptible_instances}" \
+    --extra-envs="${extra_envs}" --test-suite="${test_suite}" \
     "${timeout_arg}" \
     2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
@@ -201,6 +205,7 @@ else
     --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
     --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
-    ${test_args}" --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
+    ${test_args}" --runtime-config="${runtime_config}" \
+    --build-dependencies=true 2>&1 | tee -i "${artifacts}/build-log.txt"
   exit $?
 fi

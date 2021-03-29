@@ -1,6 +1,7 @@
 apiVersion: storage.k8s.io/v1alpha1
 capacity: "130"
 kind: CSIStorageCapacity
+maximumVolumeSize: "330"
 metadata:
   annotations:
     "9": "10"

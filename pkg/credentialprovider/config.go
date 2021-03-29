@@ -116,7 +116,7 @@ func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
 			klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
 			continue
 		}
-		cfg, err := readDockerConfigFileFromBytes(contents)
+		cfg, err := ReadDockerConfigFileFromBytes(contents)
 		if err != nil {
 			klog.V(4).Infof("couldn't get the config from %q contents: %v", absDockerConfigFileLocation, err)
 			continue
@@ -226,13 +226,14 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 // ReadDockerConfigFileFromURL read a docker config file from the given url
 func ReadDockerConfigFileFromURL(url string, client *http.Client, header *http.Header) (cfg DockerConfig, err error) {
 	if contents, err := ReadURL(url, client, header); err == nil {
-		return readDockerConfigFileFromBytes(contents)
+		return ReadDockerConfigFileFromBytes(contents)
 	}
 
 	return nil, err
 }
 
-func readDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
+// ReadDockerConfigFileFromBytes read a docker config file from the given bytes
+func ReadDockerConfigFileFromBytes(contents []byte) (cfg DockerConfig, err error) {
 	if err = json.Unmarshal(contents, &cfg); err != nil {
 		return nil, errors.New("error occurred while trying to unmarshal json")
 	}

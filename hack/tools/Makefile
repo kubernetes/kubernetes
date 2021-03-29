@@ -16,13 +16,11 @@ export GO111MODULE=on
 
 GOBIN ?= $(shell go env GOPATH)/bin
 DEP_PROGS=\
-	$(GOBIN)/buildozer\
-	$(GOBIN)/gazelle\
 	$(GOBIN)/gotestsum\
-	$(GOBIN)/kazel\
 	$(GOBIN)/misspell\
 	$(GOBIN)/prettybench\
 	$(GOBIN)/staticcheck\
+	$(GOBIN)/logcheck\
 
 .PHONY: all
 all: clean build
@@ -39,17 +37,8 @@ build: $(DEP_PROGS)
 deps:
 	go mod vendor
 
-$(GOBIN)/buildozer: deps
-	go install github.com/bazelbuild/buildtools/buildozer
-
-$(GOBIN)/gazelle: deps
-	go install github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-
 $(GOBIN)/gotestsum: deps
 	go install gotest.tools/gotestsum
-
-$(GOBIN)/kazel: deps
-	go install k8s.io/repo-infra/cmd/kazel
 
 $(GOBIN)/misspell: deps
 	go install github.com/client9/misspell/cmd/misspell
@@ -59,3 +48,6 @@ $(GOBIN)/prettybench: deps
 
 $(GOBIN)/staticcheck: deps
 	go install honnef.co/go/tools/cmd/staticcheck
+
+$(GOBIN)/logcheck: deps
+	go install k8s.io/klog/hack/tools/logcheck

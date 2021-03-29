@@ -19,6 +19,7 @@ package cpuset
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strconv"
@@ -71,6 +72,15 @@ func NewCPUSet(cpus ...int) CPUSet {
 	b := NewBuilder()
 	for _, c := range cpus {
 		b.Add(c)
+	}
+	return b.Result()
+}
+
+// NewCPUSet returns a new CPUSet containing the supplied elements, as slice of int64.
+func NewCPUSetInt64(cpus ...int64) CPUSet {
+	b := NewBuilder()
+	for _, c := range cpus {
+		b.Add(int(c))
 	}
 	return b.Result()
 }
@@ -269,7 +279,8 @@ func (s CPUSet) String() string {
 func MustParse(s string) CPUSet {
 	res, err := Parse(s)
 	if err != nil {
-		klog.Fatalf("unable to parse [%s] as CPUSet: %v", s, err)
+		klog.ErrorS(err, "Failed to parse input as CPUSet", "input", s)
+		os.Exit(1)
 	}
 	return res
 }

@@ -14,7 +14,7 @@ import (
 // It returns the JSON content in the response body.
 func (cli *Client) ImageImport(ctx context.Context, source types.ImageImportSource, ref string, options types.ImageImportOptions) (io.ReadCloser, error) {
 	if ref != "" {
-		//Check if the given image name can be resolved
+		// Check if the given image name can be resolved
 		if _, err := reference.ParseNormalizedNamed(ref); err != nil {
 			return nil, err
 		}

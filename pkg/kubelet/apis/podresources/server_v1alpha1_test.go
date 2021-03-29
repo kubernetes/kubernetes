@@ -52,6 +52,16 @@ func (m *mockProvider) UpdateAllocatedDevices() {
 	m.Called()
 }
 
+func (m *mockProvider) GetAllocatableDevices() []*podresourcesv1.ContainerDevices {
+	args := m.Called()
+	return args.Get(0).([]*podresourcesv1.ContainerDevices)
+}
+
+func (m *mockProvider) GetAllocatableCPUs() []int64 {
+	args := m.Called()
+	return args.Get(0).([]int64)
+}
+
 func TestListPodResourcesV1alpha1(t *testing.T) {
 	podName := "pod-name"
 	podNamespace := "pod-namespace"

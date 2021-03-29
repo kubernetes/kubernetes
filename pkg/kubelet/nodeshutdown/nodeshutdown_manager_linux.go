@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/nodeshutdown/systemd"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -107,10 +106,7 @@ func (m *Manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 
 // Start starts the node shutdown manager and will start watching the node for shutdown events.
 func (m *Manager) Start() error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
-		return nil
-	}
-	if m.shutdownGracePeriodRequested == 0 {
+	if !m.isFeatureEnabled() {
 		return nil
 	}
 
@@ -170,7 +166,7 @@ func (m *Manager) Start() error {
 		for {
 			select {
 			case isShuttingDown := <-events:
-				klog.V(1).Infof("Shutdown manager detected new shutdown event, isNodeShuttingDownNow: %t", isShuttingDown)
+				klog.V(1).InfoS("Shutdown manager detected new shutdown event, isNodeShuttingDownNow", "event", isShuttingDown)
 
 				m.nodeShuttingDownMutex.Lock()
 				m.nodeShuttingDownNow = isShuttingDown
@@ -202,9 +198,14 @@ func (m *Manager) aquireInhibitLock() error {
 	return nil
 }
 
+// Returns if the feature is enabled
+func (m *Manager) isFeatureEnabled() bool {
+	return utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) && m.shutdownGracePeriodRequested > 0
+}
+
 // ShutdownStatus will return an error if the node is currently shutting down.
 func (m *Manager) ShutdownStatus() error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.GracefulNodeShutdown) {
+	if !m.isFeatureEnabled() {
 		return nil
 	}
 
@@ -218,7 +219,7 @@ func (m *Manager) ShutdownStatus() error {
 }
 
 func (m *Manager) processShutdownEvent() error {
-	klog.V(1).Infof("Shutdown manager processing shutdown event")
+	klog.V(1).InfoS("Shutdown manager processing shutdown event")
 	activePods := m.getPods()
 
 	nonCriticalPodGracePeriod := m.shutdownGracePeriodRequested - m.shutdownGracePeriodCriticalPods
@@ -242,7 +243,7 @@ func (m *Manager) processShutdownEvent() error {
 				gracePeriodOverride = *pod.Spec.TerminationGracePeriodSeconds
 			}
 
-			klog.V(1).Infof("Shutdown manager killing pod %q with gracePeriod: %v seconds", format.Pod(pod), gracePeriodOverride)
+			klog.V(1).InfoS("Shutdown manager killing pod with gracePeriod", "pod", klog.KObj(pod), "gracePeriod", gracePeriodOverride)
 
 			status := v1.PodStatus{
 				Phase:   v1.PodFailed,
@@ -252,9 +253,9 @@ func (m *Manager) processShutdownEvent() error {
 
 			err := m.killPod(pod, status, &gracePeriodOverride)
 			if err != nil {
-				klog.V(1).Infof("Shutdown manager failed killing pod %q: %v", format.Pod(pod), err)
+				klog.V(1).InfoS("Shutdown manager failed killing pod", "pod", klog.KObj(pod), "err", err)
 			} else {
-				klog.V(1).Infof("Shutdown manager finished killing pod %q", format.Pod(pod))
+				klog.V(1).InfoS("Shutdown manager finished killing pod", "pod", klog.KObj(pod))
 			}
 		}(pod)
 	}
@@ -270,11 +271,11 @@ func (m *Manager) processShutdownEvent() error {
 	case <-c:
 		break
 	case <-time.After(m.shutdownGracePeriodRequested):
-		klog.V(1).Infof("Shutdown manager pod killing did not complete in %v", m.shutdownGracePeriodRequested)
+		klog.V(1).InfoS("Shutdown manager pod killing time out", "gracePeriod", m.shutdownGracePeriodRequested)
 	}
 
 	m.dbusCon.ReleaseInhibitLock(m.inhibitLock)
-	klog.V(1).Infof("Shutdown manager completed processing shutdown event, node will shutdown shortly")
+	klog.V(1).InfoS("Shutdown manager completed processing shutdown event, node will shutdown shortly")
 
 	return nil
 }

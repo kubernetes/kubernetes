@@ -3,8 +3,8 @@
 package user
 
 import (
-	"fmt"
 	"os/user"
+	"strconv"
 )
 
 func lookupUser(username string) (User, error) {
@@ -16,7 +16,7 @@ func lookupUser(username string) (User, error) {
 }
 
 func lookupUid(uid int) (User, error) {
-	u, err := user.LookupId(fmt.Sprintf("%d", uid))
+	u, err := user.LookupId(strconv.Itoa(uid))
 	if err != nil {
 		return User{}, err
 	}
@@ -32,7 +32,7 @@ func lookupGroup(groupname string) (Group, error) {
 }
 
 func lookupGid(gid int) (Group, error) {
-	g, err := user.LookupGroupId(fmt.Sprintf("%d", gid))
+	g, err := user.LookupGroupId(strconv.Itoa(gid))
 	if err != nil {
 		return Group{}, err
 	}

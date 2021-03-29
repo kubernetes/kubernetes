@@ -65,3 +65,24 @@ func TestNonePolicyRemove(t *testing.T) {
 		t.Errorf("NonePolicy RemoveContainer() error. expected no error but got %v", err)
 	}
 }
+
+func TestNonePolicyGetAllocatableCPUs(t *testing.T) {
+	// any random topology is fine
+
+	var cpuIDs []int
+	for cpuID := range topoSingleSocketHT.CPUDetails {
+		cpuIDs = append(cpuIDs, cpuID)
+	}
+
+	policy := &nonePolicy{}
+
+	st := &mockState{
+		assignments:   state.ContainerCPUAssignments{},
+		defaultCPUSet: cpuset.NewCPUSet(cpuIDs...),
+	}
+
+	cpus := policy.GetAllocatableCPUs(st)
+	if cpus.Size() != 0 {
+		t.Errorf("NonePolicy GetAllocatableCPUs() error. expected empty set, returned: %v", cpus)
+	}
+}

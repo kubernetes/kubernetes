@@ -147,6 +147,66 @@ func TestFakeAfter(t *testing.T) {
 	}
 }
 
+func TestFakeAfterFunc(t *testing.T) {
+	tc := NewFakeClock(time.Now())
+	if tc.HasWaiters() {
+		t.Errorf("unexpected waiter?")
+	}
+	expectOneSecTimerFire := false
+	oneSecTimerFire := 0
+	tc.AfterFunc(time.Second, func() {
+		if !expectOneSecTimerFire {
+			t.Errorf("oneSecTimer func fired")
+		} else {
+			oneSecTimerFire++
+		}
+	})
+	if !tc.HasWaiters() {
+		t.Errorf("unexpected lack of waiter?")
+	}
+
+	expectOneOhOneSecTimerFire := false
+	oneOhOneSecTimerFire := 0
+	tc.AfterFunc(time.Second+time.Millisecond, func() {
+		if !expectOneOhOneSecTimerFire {
+			t.Errorf("oneOhOneSecTimer func fired")
+		} else {
+			oneOhOneSecTimerFire++
+		}
+	})
+
+	expectTwoSecTimerFire := false
+	twoSecTimerFire := 0
+	twoSecTimer := tc.AfterFunc(2*time.Second, func() {
+		if !expectTwoSecTimerFire {
+			t.Errorf("twoSecTimer func fired")
+		} else {
+			twoSecTimerFire++
+		}
+	})
+
+	tc.Step(999 * time.Millisecond)
+
+	expectOneSecTimerFire = true
+	tc.Step(time.Millisecond)
+	if oneSecTimerFire != 1 {
+		t.Errorf("expected oneSecTimerFire=1, got %d", oneSecTimerFire)
+	}
+	expectOneSecTimerFire = false
+
+	expectOneOhOneSecTimerFire = true
+	tc.Step(time.Millisecond)
+	if oneOhOneSecTimerFire != 1 {
+		// should not double-trigger!
+		t.Errorf("expected oneOhOneSecTimerFire=1, got %d", oneOhOneSecTimerFire)
+	}
+	expectOneOhOneSecTimerFire = false
+
+	// ensure a canceled timer doesn't fire
+	twoSecTimer.Stop()
+	tc.Step(time.Second)
+}
+
 func TestFakeTimer(t *testing.T) {
 	tc := NewFakeClock(time.Now())
 	if tc.HasWaiters() {

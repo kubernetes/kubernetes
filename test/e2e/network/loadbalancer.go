@@ -42,13 +42,14 @@ import (
 	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("LoadBalancers", func() {
+var _ = common.SIGDescribe("LoadBalancers", func() {
 	f := framework.NewDefaultFramework("loadbalancers")
 
 	var cs clientset.Interface
@@ -847,7 +848,7 @@ var _ = SIGDescribe("LoadBalancers", func() {
 	})
 })
 
-var _ = SIGDescribe("ESIPP [Slow]", func() {
+var _ = common.SIGDescribe("ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	var loadBalancerCreateTimeout time.Duration
 

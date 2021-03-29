@@ -54,6 +54,9 @@ func (a *APIServer) Start() error {
 	if err != nil {
 		return err
 	}
+	if len(framework.TestContext.RuntimeConfig) > 0 {
+		o.APIEnablement.RuntimeConfig = framework.TestContext.RuntimeConfig
+	}
 	o.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	o.ServiceClusterIPRanges = ipnet.String()
 	o.AllowPrivileged = true

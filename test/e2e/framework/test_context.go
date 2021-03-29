@@ -217,6 +217,8 @@ type NodeTestContextType struct {
 	KubeletConfig kubeletconfig.KubeletConfiguration
 	// ImageDescription is the description of the image on which the test is running.
 	ImageDescription string
+	// RuntimeConfig is a map of API server runtime configuration values.
+	RuntimeConfig map[string]string
 	// SystemSpecName is the name of the system spec (e.g., gke) that's used in
 	// the node e2e test. If empty, the default one (system.DefaultSpec) is
 	// used. The system specs are in test/e2e_node/system/specs/.

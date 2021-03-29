@@ -28,7 +28,7 @@ import (
 var (
 	legacyContainerRegexp = regexp.MustCompile(`Task in (.*) killed as a result of limit of (.*)`)
 	// Starting in 5.0 linux kernels, the OOM message changed
-	containerRegexp = regexp.MustCompile(`oom-kill:constraint=(.*),nodemask=(.*),cpuset=(.*),mems_allowed=(.*),oom_memcg=(.*) (.*),task_memcg=(.*),task=(.*),pid=(.*),uid=(.*)`)
+	containerRegexp = regexp.MustCompile(`oom-kill:constraint=(.*),nodemask=(.*),cpuset=(.*),mems_allowed=(.*),oom_memcg=(.*),task_memcg=(.*),task=(.*),pid=(.*),uid=(.*)`)
 	lastLineRegexp  = regexp.MustCompile(`Killed process ([0-9]+) \((.+)\)`)
 	firstLineRegexp = regexp.MustCompile(`invoked oom-killer:`)
 )
@@ -76,15 +76,15 @@ func getContainerName(line string, currentOomInstance *OomInstance) (bool, error
 		// Fall back to the legacy format if it isn't found here.
 		return false, getLegacyContainerName(line, currentOomInstance)
 	}
-	currentOomInstance.ContainerName = parsedLine[7]
+	currentOomInstance.ContainerName = parsedLine[6]
 	currentOomInstance.VictimContainerName = parsedLine[5]
 	currentOomInstance.Constraint = parsedLine[1]
-	pid, err := strconv.Atoi(parsedLine[9])
+	pid, err := strconv.Atoi(parsedLine[8])
 	if err != nil {
 		return false, err
 	}
 	currentOomInstance.Pid = pid
-	currentOomInstance.ProcessName = parsedLine[8]
+	currentOomInstance.ProcessName = parsedLine[7]
 	return true, nil
 }
 

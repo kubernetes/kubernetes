@@ -114,7 +114,7 @@ func openLocalPort(hp *hostport) (closeable, error) {
 	default:
 		return nil, fmt.Errorf("unknown protocol %q", hp.protocol)
 	}
-	klog.V(3).Infof("Opened local port %s", hp.String())
+	klog.V(3).InfoS("Opened local port", "port", hp.String())
 	return socket, nil
 }
 
@@ -130,7 +130,7 @@ func portMappingToHostport(portMapping *PortMapping, family ipFamily) hostport {
 
 // ensureKubeHostportChains ensures the KUBE-HOSTPORTS chain is setup correctly
 func ensureKubeHostportChains(iptables utiliptables.Interface, natInterfaceName string) error {
-	klog.V(4).Info("Ensuring kubelet hostport chains")
+	klog.V(4).InfoS("Ensuring kubelet hostport chains")
 	// Ensure kubeHostportChain
 	if _, err := iptables.EnsureChain(utiliptables.TableNAT, kubeHostportsChain); err != nil {
 		return fmt.Errorf("failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, kubeHostportsChain, err)

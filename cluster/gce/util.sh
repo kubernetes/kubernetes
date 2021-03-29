@@ -1580,7 +1580,7 @@ CNI_CONFIG_DIR: $(yaml-quote "${WINDOWS_CNI_CONFIG_DIR}")
 WINDOWS_CNI_STORAGE_PATH: $(yaml-quote "${WINDOWS_CNI_STORAGE_PATH}")
 WINDOWS_CNI_VERSION: $(yaml-quote "${WINDOWS_CNI_VERSION}")
 WINDOWS_CONTAINER_RUNTIME: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME}")
-WINDOWS_CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME_ENDPOINT}")
+WINDOWS_CONTAINER_RUNTIME_ENDPOINT: $(yaml-quote "${WINDOWS_CONTAINER_RUNTIME_ENDPOINT:-}")
 MANIFESTS_DIR: $(yaml-quote "${WINDOWS_MANIFESTS_DIR}")
 PKI_DIR: $(yaml-quote "${WINDOWS_PKI_DIR}")
 CA_FILE_PATH: $(yaml-quote "${WINDOWS_CA_FILE}")
@@ -3363,7 +3363,7 @@ function check-cluster() {
   get-kubeconfig-basicauth
 
   if [[ ${GCE_UPLOAD_KUBCONFIG_TO_MASTER_METADATA:-} == "true" ]]; then
-    gcloud compute instances add-metadata "${MASTER_NAME}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
+    gcloud compute instances add-metadata "${MASTER_NAME}" --project="${PROJECT}" --zone="${ZONE}"  --metadata-from-file="kubeconfig=${KUBECONFIG}" || true
   fi
 
   echo

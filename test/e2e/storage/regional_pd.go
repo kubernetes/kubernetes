@@ -160,6 +160,9 @@ func testVolumeProvisioning(c clientset.Interface, t *framework.TimeoutContext, 
 			StorageClassName: &(test.Class.Name),
 			VolumeMode:       &test.VolumeMode,
 		}, ns)
+		_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
+		defer clearStorageClass()
+
 		test.TestDynamicProvisioning()
 	}
 }
@@ -387,6 +390,9 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 		StorageClassName: &(test.Class.Name),
 		VolumeMode:       &test.VolumeMode,
 	}, ns)
+
+	_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
+	defer clearStorageClass()
 
 	pv := test.TestDynamicProvisioning()
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)

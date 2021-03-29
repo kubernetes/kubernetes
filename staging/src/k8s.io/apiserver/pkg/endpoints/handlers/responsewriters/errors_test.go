@@ -83,6 +83,7 @@ func TestForbidden(t *testing.T) {
 		if result != test.expected {
 			t.Errorf("Forbidden response body(%#v...)\n expected: %v\ngot:       %v", test.attributes, test.expected, result)
 		}
+		//lint:ignore SA1019 backwards compatibility
 		resultType := observer.HeaderMap.Get("Content-Type")
 		if resultType != test.contentType {
 			t.Errorf("Forbidden content type(%#v...) != %#v, got %#v", test.attributes, test.expected, result)

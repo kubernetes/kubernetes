@@ -15,7 +15,9 @@ import (
 	"sync"
 	"time"
 
-	units "github.com/docker/go-units"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
+	"github.com/opencontainers/runc/libcontainer/system"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -29,19 +31,19 @@ var (
 	isUnified     bool
 )
 
-// HugePageSizeUnitList is a list of the units used by the linux kernel when
-// naming the HugePage control files.
-// https://www.kernel.org/doc/Documentation/cgroup-v1/hugetlb.txt
-// TODO Since the kernel only use KB, MB and GB; TB and PB should be removed,
-// depends on https://github.com/docker/go-units/commit/a09cd47f892041a4fac473133d181f5aea6fa393
-var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
-
 // IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
 func IsCgroup2UnifiedMode() bool {
 	isUnifiedOnce.Do(func() {
 		var st unix.Statfs_t
-		if err := unix.Statfs(unifiedMountpoint, &st); err != nil {
-			panic("cannot statfs cgroup root")
+		err := unix.Statfs(unifiedMountpoint, &st)
+		if err != nil {
+			if os.IsNotExist(err) && system.RunningInUserNS() {
+				// ignore the "not found" error if running in userns
+				logrus.WithError(err).Debugf("%s missing, assuming cgroup v1", unifiedMountpoint)
+				isUnified = false
+				return
+			}
+			panic(fmt.Sprintf("cannot statfs cgroup root: %s", err))
 		}
 		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
 	})
@@ -86,11 +88,11 @@ func GetAllSubsystems() ([]string, error) {
 		// - freezer: implemented in kernel 5.2
 		// We assume these are always available, as it is hard to detect availability.
 		pseudo := []string{"devices", "freezer"}
-		data, err := ioutil.ReadFile("/sys/fs/cgroup/cgroup.controllers")
+		data, err := fscommon.ReadFile("/sys/fs/cgroup", "cgroup.controllers")
 		if err != nil {
 			return nil, err
 		}
-		subsystems := append(pseudo, strings.Fields(string(data))...)
+		subsystems := append(pseudo, strings.Fields(data)...)
 		return subsystems, nil
 	}
 	f, err := os.Open("/proc/cgroups")
@@ -207,20 +209,66 @@ func EnterPid(cgroupPaths map[string]string, pid int) error {
 	return nil
 }
 
+func rmdir(path string) error {
+	err := unix.Rmdir(path)
+	if err == nil || err == unix.ENOENT {
+		return nil
+	}
+	return &os.PathError{Op: "rmdir", Path: path, Err: err}
+}
+
+// RemovePath aims to remove cgroup path. It does so recursively,
+// by removing any subdirectories (sub-cgroups) first.
+func RemovePath(path string) error {
+	// try the fast path first
+	if err := rmdir(path); err == nil {
+		return nil
+	}
+
+	infos, err := ioutil.ReadDir(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = nil
+		}
+		return err
+	}
+	for _, info := range infos {
+		if info.IsDir() {
+			// We should remove subcgroups dir first
+			if err = RemovePath(filepath.Join(path, info.Name())); err != nil {
+				break
+			}
+		}
+	}
+	if err == nil {
+		err = rmdir(path)
+	}
+	return err
+}
+
 // RemovePaths iterates over the provided paths removing them.
 // We trying to remove all paths five times with increasing delay between tries.
 // If after all there are not removed cgroups - appropriate error will be
 // returned.
 func RemovePaths(paths map[string]string) (err error) {
+	const retries = 5
 	delay := 10 * time.Millisecond
-	for i := 0; i < 5; i++ {
+	for i := 0; i < retries; i++ {
 		if i != 0 {
 			time.Sleep(delay)
 			delay *= 2
 		}
 		for s, p := range paths {
-			os.RemoveAll(p)
-			// TODO: here probably should be logging
+			if err := RemovePath(p); err != nil {
+				// do not log intermediate iterations
+				switch i {
+				case 0:
+					logrus.WithError(err).Warnf("Failed to remove cgroup (will retry)")
+				case retries - 1:
+					logrus.WithError(err).Error("Failed to remove cgroup")
+				}
+
+			}
 			_, err := os.Stat(p)
 			// We need this strange way of checking cgroups existence because
 			// RemoveAll almost always returns error, even on already removed
@@ -230,6 +278,8 @@ func RemovePaths(paths map[string]string) (err error) {
 			}
 		}
 		if len(paths) == 0 {
+			//nolint:ineffassign,staticcheck // done to help garbage collecting: opencontainers/runc#2506
+			paths = make(map[string]string)
 			return nil
 		}
 	}
@@ -237,27 +287,50 @@ func RemovePaths(paths map[string]string) (err error) {
 }
 
 func GetHugePageSize() ([]string, error) {
-	files, err := ioutil.ReadDir("/sys/kernel/mm/hugepages")
+	dir, err := os.OpenFile("/sys/kernel/mm/hugepages", unix.O_DIRECTORY|unix.O_RDONLY, 0)
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
-	var fileNames []string
-	for _, st := range files {
-		fileNames = append(fileNames, st.Name())
+	files, err := dir.Readdirnames(0)
+	dir.Close()
+	if err != nil {
+		return nil, err
 	}
-	return getHugePageSizeFromFilenames(fileNames)
+
+	return getHugePageSizeFromFilenames(files)
 }
 
 func getHugePageSizeFromFilenames(fileNames []string) ([]string, error) {
-	var pageSizes []string
-	for _, fileName := range fileNames {
-		nameArray := strings.Split(fileName, "-")
-		pageSize, err := units.RAMInBytes(nameArray[1])
-		if err != nil {
-			return []string{}, err
+	pageSizes := make([]string, 0, len(fileNames))
+
+	for _, file := range fileNames {
+		// example: hugepages-1048576kB
+		val := strings.TrimPrefix(file, "hugepages-")
+		if len(val) == len(file) {
+			// unexpected file name: no prefix found
+			continue
 		}
-		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, HugePageSizeUnitList)
-		pageSizes = append(pageSizes, sizeString)
+		// The suffix is always "kB" (as of Linux 5.9)
+		eLen := len(val) - 2
+		val = strings.TrimSuffix(val, "kB")
+		if len(val) != eLen {
+			logrus.Warnf("GetHugePageSize: %s: invalid filename suffix (expected \"kB\")", file)
+			continue
+		}
+		size, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, err
+		}
+		// Model after https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/hugetlb_cgroup.c?id=eff48ddeab782e35e58ccc8853f7386bbae9dec4#n574
+		// but in our case the size is in KB already.
+		if size >= (1 << 20) {
+			val = strconv.Itoa(size>>20) + "GB"
+		} else if size >= (1 << 10) {
+			val = strconv.Itoa(size>>10) + "MB"
+		} else {
+			val += "KB"
+		}
+		pageSizes = append(pageSizes, val)
 	}
 
 	return pageSizes, nil
@@ -303,14 +376,14 @@ func WriteCgroupProc(dir string, pid int) error {
 		return nil
 	}
 
-	cgroupProcessesFile, err := os.OpenFile(filepath.Join(dir, CgroupProcesses), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	file, err := fscommon.OpenFile(dir, CgroupProcesses, os.O_WRONLY)
 	if err != nil {
 		return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
 	}
-	defer cgroupProcessesFile.Close()
+	defer file.Close()
 
 	for i := 0; i < 5; i++ {
-		_, err = cgroupProcessesFile.WriteString(strconv.Itoa(pid))
+		_, err = file.WriteString(strconv.Itoa(pid))
 		if err == nil {
 			return nil
 		}

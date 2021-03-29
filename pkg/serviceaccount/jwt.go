@@ -290,7 +290,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 	if len(tokenAudiences) == 0 {
 		// only apiserver audiences are allowed for legacy tokens
 		audit.AddAuditAnnotation(ctx, "authentication.k8s.io/legacy-token", public.Subject)
-		legacyTokensTotal.Inc()
+		legacyTokensTotal.WithContext(ctx).Inc()
 		tokenAudiences = j.implicitAuds
 	}
 

@@ -104,7 +104,7 @@ limitations when it comes to the Windows images:
   which won't work properly on Windows. See https://github.com/moby/buildkit/issues/1560
 - The base image for all the Windows images is nanoserver, which is ~10 times smaller than Windows Servercore.
   Most binaries added to the image will work out of the box, but some will not due to missing dependencies
-  (**atention**: the image will still build successfully, even if the added binaries will not work).
+  (**attention**: the image will still build successfully, even if the added binaries will not work).
   For example, `coredns.exe` requires `netapi32.dll`, which cannot be found on a nanoserver image, but
   we can copy it from a servercore image (see the agnhost image's `Dockerfile_windows` file as an example).
   A good rule of thumb is to use 64-bit applications instead of 32-bit as they have fewer dependencies.
@@ -198,3 +198,9 @@ After all the above has been done, run the desired tests.
 ```bash
 sudo chmod o+x /etc/docker
 ```
+
+A few images have been mirrored from dockerhub into the `gcr.io/k8s-staging-e2e-test-images` registry
+(`busybox`, `glusterdynamic-provisioner`, `httpd`, `httpd-new`, `nginx`, `nginx-new`, `perl`), and they
+only have a noop Dockerfile. However, due to an [issue](https://github.com/kubernetes/test-infra/issues/20884),
+the same SHA cannot be pushed twice. A small change to them is required in order to generate a new SHA,
+which can then be pushed and promoted.

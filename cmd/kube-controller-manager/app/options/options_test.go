@@ -35,6 +35,7 @@ import (
 	"k8s.io/component-base/metrics"
 	cmconfig "k8s.io/controller-manager/config"
 	cmoptions "k8s.io/controller-manager/options"
+	migration "k8s.io/controller-manager/pkg/leadermigration/options"
 	kubecontrollerconfig "k8s.io/kubernetes/cmd/kube-controller-manager/app/config"
 	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
 	csrsigningconfig "k8s.io/kubernetes/pkg/controller/certificates/signer/config"
@@ -197,6 +198,7 @@ func TestAddFlags(t *testing.T) {
 					EnableContentionProfiling: true,
 				},
 			},
+			LeaderMigration: &migration.LeaderMigrationOptions{},
 		},
 		KubeCloudShared: &cpoptions.KubeCloudSharedOptions{
 			KubeCloudSharedConfiguration: &cpconfig.KubeCloudSharedConfiguration{

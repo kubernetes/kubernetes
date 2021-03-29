@@ -52,7 +52,7 @@ func (r *streamingRuntime) portForward(podSandboxID string, port int32, stream i
 	}
 
 	commandString := fmt.Sprintf("%s %s", nsenterPath, strings.Join(args, " "))
-	klog.V(4).Infof("executing port forwarding command: %s", commandString)
+	klog.V(4).InfoS("Executing port forwarding command", "command", commandString)
 
 	command := exec.Command(nsenterPath, args...)
 	command.Stdout = stream

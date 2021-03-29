@@ -19,6 +19,7 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +37,21 @@ import (
 // resource prefix.
 func IsHugePageResourceName(name core.ResourceName) bool {
 	return strings.HasPrefix(string(name), core.ResourceHugePagesPrefix)
+}
+
+// IsHugePageResourceValueDivisible returns true if the resource value of storage is
+// integer multiple of page size.
+func IsHugePageResourceValueDivisible(name core.ResourceName, quantity resource.Quantity) bool {
+	pageSize, err := HugePageSizeFromResourceName(name)
+	if err != nil {
+		return false
+	}
+
+	if pageSize.Sign() <= 0 || pageSize.MilliValue()%int64(1000) != int64(0) {
+		return false
+	}
+
+	return quantity.Value()%pageSize.Value() == 0
 }
 
 // IsQuotaHugePageResourceName returns true if the resource name has the quota
@@ -107,8 +123,9 @@ var standardResourceQuotaScopes = sets.NewString(
 )
 
 // IsStandardResourceQuotaScope returns true if the scope is a standard value
-func IsStandardResourceQuotaScope(str string) bool {
-	return standardResourceQuotaScopes.Has(str)
+func IsStandardResourceQuotaScope(str string, allowNamespaceAffinityScope bool) bool {
+	return standardResourceQuotaScopes.Has(str) ||
+		(allowNamespaceAffinityScope && str == string(core.ResourceQuotaScopeCrossNamespacePodAffinity))
 }
 
 var podObjectCountQuotaResources = sets.NewString(
@@ -127,7 +144,8 @@ var podComputeQuotaResources = sets.NewString(
 // IsResourceQuotaScopeValidForResource returns true if the resource applies to the specified scope
 func IsResourceQuotaScopeValidForResource(scope core.ResourceQuotaScope, resource string) bool {
 	switch scope {
-	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort, core.ResourceQuotaScopePriorityClass:
+	case core.ResourceQuotaScopeTerminating, core.ResourceQuotaScopeNotTerminating, core.ResourceQuotaScopeNotBestEffort,
+		core.ResourceQuotaScopePriorityClass, core.ResourceQuotaScopeCrossNamespacePodAffinity:
 		return podObjectCountQuotaResources.Has(resource) || podComputeQuotaResources.Has(resource)
 	case core.ResourceQuotaScopeBestEffort:
 		return podObjectCountQuotaResources.Has(resource)
@@ -531,4 +549,30 @@ func ToPodResourcesSet(podSpec *core.PodSpec) sets.String {
 		result = result.Union(toContainerResourcesSet(&podSpec.Containers[i]))
 	}
 	return result
+}
+
+// GetDeletionCostFromPodAnnotations returns the integer value of pod-deletion-cost. Returns 0
+// if not set or the value is invalid.
+func GetDeletionCostFromPodAnnotations(annotations map[string]string) (int32, error) {
+	if value, exist := annotations[core.PodDeletionCost]; exist {
+		// values that start with plus sign (e.g, "+10") or leading zeros (e.g., "008") are not valid.
+		if !validFirstDigit(value) {
+			return 0, fmt.Errorf("invalid value %q", value)
+		}
+
+		i, err := strconv.ParseInt(value, 10, 32)
+		if err != nil {
+			// make sure we default to 0 on error.
+			return 0, err
+		}
+		return int32(i), nil
+	}
+	return 0, nil
+}
+
+func validFirstDigit(str string) bool {
+	if len(str) == 0 {
+		return false
+	}
+	return str[0] == '-' || (str[0] == '0' && str == "0") || (str[0] >= '1' && str[0] <= '9')
 }

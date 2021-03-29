@@ -19,7 +19,6 @@ package evictions
 import (
 	"context"
 	"fmt"
-
 	"net/http/httptest"
 	"reflect"
 	"sync"
@@ -28,7 +27,8 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -95,7 +95,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), numOfEvictions, v1.PodRunning)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -110,7 +110,7 @@ func TestConcurrentEvictionRequests(t *testing.T) {
 		go func(id int, errCh chan error) {
 			defer wg.Done()
 			podName := fmt.Sprintf(podNameFormat, id)
-			eviction := newEviction(ns.Name, podName, deleteOption)
+			eviction := newV1beta1Eviction(ns.Name, podName, deleteOption)
 
 			err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 				e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
@@ -208,7 +208,7 @@ func TestTerminalPodEviction(t *testing.T) {
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), 1, v1.PodSucceeded)
 
 	pdb := newPDB()
-	if _, err := clientSet.PolicyV1beta1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
+	if _, err := clientSet.PolicyV1().PodDisruptionBudgets(ns.Name).Create(context.TODO(), pdb, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create PodDisruptionBudget: %v", err)
 	}
 
@@ -219,7 +219,7 @@ func TestTerminalPodEviction(t *testing.T) {
 		t.Fatalf("Error while listing pod disruption budget")
 	}
 	oldPdb := pdbList.Items[0]
-	eviction := newEviction(ns.Name, pod.Name, deleteOption)
+	eviction := newV1beta1Eviction(ns.Name, pod.Name, deleteOption)
 	err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 		e := clientSet.PolicyV1beta1().Evictions(ns.Name).Evict(context.TODO(), eviction)
 		switch {
@@ -292,12 +292,12 @@ func addPodConditionReady(pod *v1.Pod) {
 	}
 }
 
-func newPDB() *v1beta1.PodDisruptionBudget {
-	return &v1beta1.PodDisruptionBudget{
+func newPDB() *policyv1.PodDisruptionBudget {
+	return &policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-pdb",
 		},
-		Spec: v1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			MinAvailable: &intstr.IntOrString{
 				Type:   intstr.Int,
 				IntVal: 0,
@@ -309,8 +309,8 @@ func newPDB() *v1beta1.PodDisruptionBudget {
 	}
 }
 
-func newEviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *v1beta1.Eviction {
-	return &v1beta1.Eviction{
+func newV1beta1Eviction(ns, evictionName string, deleteOption metav1.DeleteOptions) *policyv1beta1.Eviction {
+	return &policyv1beta1.Eviction{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "Policy/v1beta1",
 			Kind:       "Eviction",
@@ -348,7 +348,7 @@ func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *disruption.D
 
 	rm := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),

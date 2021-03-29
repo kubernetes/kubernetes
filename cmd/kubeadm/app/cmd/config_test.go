@@ -175,16 +175,6 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			},
 			expectedImages: defaultNumberOfImages,
 		},
-		{
-			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersionStr,
-				DNS: kubeadmapiv1beta2.DNS{
-					Type: kubeadmapiv1beta2.KubeDNS,
-				},
-			},
-			expectedImages: defaultNumberOfImages + 2,
-		},
 	}
 
 	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)

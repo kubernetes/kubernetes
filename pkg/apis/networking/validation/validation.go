@@ -31,9 +31,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/kubernetes/pkg/features"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -49,6 +52,11 @@ var (
 	)
 	invalidPathSequences = []string{"//", "/./", "/../", "%2f", "%2F"}
 	invalidPathSuffixes  = []string{"/..", "/."}
+
+	supportedIngressClassParametersReferenceScopes = sets.NewString(
+		networking.IngressClassParametersReferenceScopeNamespace,
+		networking.IngressClassParametersReferenceScopeCluster,
+	)
 )
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
@@ -518,7 +526,7 @@ func validateIngressClassSpec(spec *networking.IngressClassSpec, fldPath *field.
 		allErrs = append(allErrs, field.TooLong(fldPath.Child("controller"), spec.Controller, maxLenIngressClassController))
 	}
 	allErrs = append(allErrs, validation.IsDomainPrefixedPath(fldPath.Child("controller"), spec.Controller)...)
-	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(spec.Parameters, fldPath.Child("parameters"))...)
+	allErrs = append(allErrs, validateIngressClassParametersReference(spec.Parameters, fldPath.Child("parameters"))...)
 	return allErrs
 }
 
@@ -555,6 +563,55 @@ func validateIngressTypedLocalObjectReference(params *api.TypedLocalObjectRefere
 	} else {
 		for _, msg := range pathvalidation.IsValidPathSegmentName(params.Name) {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("name"), params.Name, msg))
+		}
+	}
+
+	return allErrs
+}
+
+// validateIngressClassParametersReference ensures that Parameters fields are valid.
+// Parameters was previously of type `TypedLocalObjectReference` and used
+// `validateIngressTypedLocalObjectReference()`. This function extends validation
+// for additional fields introduced for namespace-scoped references.
+func validateIngressClassParametersReference(params *networking.IngressClassParametersReference, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	if params == nil {
+		return allErrs
+	}
+
+	allErrs = append(allErrs, validateIngressTypedLocalObjectReference(&api.TypedLocalObjectReference{
+		APIGroup: params.APIGroup,
+		Kind:     params.Kind,
+		Name:     params.Name,
+	}, fldPath)...)
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.IngressClassNamespacedParams) && params.Scope == nil {
+		allErrs = append(allErrs, field.Required(fldPath.Child("scope"), ""))
+		return allErrs
+	}
+
+	if params.Scope != nil || params.Namespace != nil {
+		scope := utilpointer.StringPtrDerefOr(params.Scope, "")
+
+		if !supportedIngressClassParametersReferenceScopes.Has(scope) {
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("scope"), scope,
+				supportedIngressClassParametersReferenceScopes.List()))
+		} else {
+
+			if scope == networking.IngressClassParametersReferenceScopeNamespace {
+				if params.Namespace == nil {
+					allErrs = append(allErrs, field.Required(fldPath.Child("namespace"), "`parameters.scope` is set to 'Namespace'"))
+				} else {
+					for _, msg := range apivalidation.ValidateNamespaceName(*params.Namespace, false) {
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("namespace"), *params.Namespace, msg))
+					}
+				}
+			}
+
+			if scope == networking.IngressClassParametersReferenceScopeCluster && params.Namespace != nil {
+				allErrs = append(allErrs, field.Forbidden(fldPath.Child("namespace"), "`parameters.scope` is set to 'Cluster'"))
+			}
 		}
 	}
 

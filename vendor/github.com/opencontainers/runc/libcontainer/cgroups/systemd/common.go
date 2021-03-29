@@ -13,10 +13,18 @@ import (
 
 	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
 	dbus "github.com/godbus/dbus/v5"
-	"github.com/opencontainers/runc/libcontainer/cgroups/devices"
+	cgroupdevices "github.com/opencontainers/runc/libcontainer/cgroups/devices"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	// Default kernel value for cpu quota period is 100000 us (100 ms), same for v1 and v2.
+	// v1: https://www.kernel.org/doc/html/latest/scheduler/sched-bwc.html and
+	// v2: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
+	defCPUQuotaPeriod = uint64(100000)
 )
 
 var (
@@ -26,7 +34,6 @@ var (
 
 	versionOnce sync.Once
 	version     int
-	versionErr  error
 
 	isRunningSystemdOnce sync.Once
 	isRunningSystemd     bool
@@ -81,11 +88,11 @@ func ExpandSlice(slice string) (string, error) {
 	return path, nil
 }
 
-func groupPrefix(ruleType configs.DeviceType) (string, error) {
+func groupPrefix(ruleType devices.Type) (string, error) {
 	switch ruleType {
-	case configs.BlockDevice:
+	case devices.BlockDevice:
 		return "block-", nil
-	case configs.CharDevice:
+	case devices.CharDevice:
 		return "char-", nil
 	default:
 		return "", errors.Errorf("device type %v has no group prefix", ruleType)
@@ -93,10 +100,10 @@ func groupPrefix(ruleType configs.DeviceType) (string, error) {
 }
 
 // findDeviceGroup tries to find the device group name (as listed in
-// /proc/devices) with the type prefixed as requried for DeviceAllow, for a
+// /proc/devices) with the type prefixed as required for DeviceAllow, for a
 // given (type, major) combination. If more than one device group exists, an
 // arbitrary one is chosen.
-func findDeviceGroup(ruleType configs.DeviceType, ruleMajor int64) (string, error) {
+func findDeviceGroup(ruleType devices.Type, ruleMajor int64) (string, error) {
 	fh, err := os.Open("/proc/devices")
 	if err != nil {
 		return "", err
@@ -109,7 +116,7 @@ func findDeviceGroup(ruleType configs.DeviceType, ruleMajor int64) (string, erro
 	}
 
 	scanner := bufio.NewScanner(fh)
-	var currentType configs.DeviceType
+	var currentType devices.Type
 	for scanner.Scan() {
 		// We need to strip spaces because the first number is column-aligned.
 		line := strings.TrimSpace(scanner.Text())
@@ -117,10 +124,10 @@ func findDeviceGroup(ruleType configs.DeviceType, ruleMajor int64) (string, erro
 		// Handle the "header" lines.
 		switch line {
 		case "Block devices:":
-			currentType = configs.BlockDevice
+			currentType = devices.BlockDevice
 			continue
 		case "Character devices:":
-			currentType = configs.CharDevice
+			currentType = devices.CharDevice
 			continue
 		case "":
 			continue
@@ -156,7 +163,7 @@ func findDeviceGroup(ruleType configs.DeviceType, ruleMajor int64) (string, erro
 
 // generateDeviceProperties takes the configured device rules and generates a
 // corresponding set of systemd properties to configure the devices correctly.
-func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Property, error) {
+func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, error) {
 	// DeviceAllow is the type "a(ss)" which means we need a temporary struct
 	// to represent it in Go.
 	type deviceAllowEntry struct {
@@ -172,7 +179,7 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 	}
 
 	// Figure out the set of rules.
-	configEmu := &devices.Emulator{}
+	configEmu := &cgroupdevices.Emulator{}
 	for _, rule := range rules {
 		if err := configEmu.Apply(*rule); err != nil {
 			return nil, errors.Wrap(err, "apply rule for systemd")
@@ -199,7 +206,7 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 	// Now generate the set of rules we actually need to apply. Unlike the
 	// normal devices cgroup, in "strict" mode systemd defaults to a deny-all
 	// whitelist which is the default for devices.Emulator.
-	baseEmu := &devices.Emulator{}
+	baseEmu := &cgroupdevices.Emulator{}
 	finalRules, err := baseEmu.Transition(configEmu)
 	if err != nil {
 		return nil, errors.Wrap(err, "get simplified rules for systemd")
@@ -211,7 +218,7 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 			return nil, errors.Errorf("[internal error] cannot add deny rule to systemd DeviceAllow list: %v", *rule)
 		}
 		switch rule.Type {
-		case configs.BlockDevice, configs.CharDevice:
+		case devices.BlockDevice, devices.CharDevice:
 		default:
 			// Should never happen.
 			return nil, errors.Errorf("invalid device type for DeviceAllow: %v", rule.Type)
@@ -243,9 +250,9 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 		// so we'll give a warning in that case (note that the fallback code
 		// will insert any rules systemd couldn't handle). What amazing fun.
 
-		if rule.Major == configs.Wildcard {
+		if rule.Major == devices.Wildcard {
 			// "_ *:n _" rules aren't supported by systemd.
-			if rule.Minor != configs.Wildcard {
+			if rule.Minor != devices.Wildcard {
 				logrus.Warnf("systemd doesn't support '*:n' device rules -- temporarily ignoring rule: %v", *rule)
 				continue
 			}
@@ -256,7 +263,7 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 				return nil, err
 			}
 			entry.Path = prefix + "*"
-		} else if rule.Minor == configs.Wildcard {
+		} else if rule.Minor == devices.Wildcard {
 			// "_ n:* _" rules require a device group from /proc/devices.
 			group, err := findDeviceGroup(rule.Type, rule.Major)
 			if err != nil {
@@ -271,9 +278,9 @@ func generateDeviceProperties(rules []*configs.DeviceRule) ([]systemdDbus.Proper
 		} else {
 			// "_ n:m _" rules are just a path in /dev/{block,char}/.
 			switch rule.Type {
-			case configs.BlockDevice:
+			case devices.BlockDevice:
 				entry.Path = fmt.Sprintf("/dev/block/%d:%d", rule.Major, rule.Minor)
-			case configs.CharDevice:
+			case devices.CharDevice:
 				entry.Path = fmt.Sprintf("/dev/char/%d:%d", rule.Major, rule.Minor)
 			}
 		}
@@ -307,7 +314,7 @@ func newProp(name string, units interface{}) systemdDbus.Property {
 func getUnitName(c *configs.Cgroup) string {
 	// by default, we create a scope unless the user explicitly asks for a slice.
 	if !strings.HasSuffix(c.Name, ".slice") {
-		return fmt.Sprintf("%s-%s.scope", c.ScopePrefix, c.Name)
+		return c.ScopePrefix + "-" + c.Name + ".scope"
 	}
 	return c.Name
 }
@@ -325,6 +332,9 @@ func isUnitExists(err error) bool {
 func startUnit(dbusConnection *systemdDbus.Conn, unitName string, properties []systemdDbus.Property) error {
 	statusChan := make(chan string, 1)
 	if _, err := dbusConnection.StartTransientUnit(unitName, "replace", properties, statusChan); err == nil {
+		timeout := time.NewTimer(30 * time.Second)
+		defer timeout.Stop()
+
 		select {
 		case s := <-statusChan:
 			close(statusChan)
@@ -333,8 +343,9 @@ func startUnit(dbusConnection *systemdDbus.Conn, unitName string, properties []s
 				dbusConnection.ResetFailedUnit(unitName)
 				return errors.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
 			}
-		case <-time.After(time.Second):
-			logrus.Warnf("Timed out while waiting for StartTransientUnit(%s) completion signal from dbus. Continuing...", unitName)
+		case <-timeout.C:
+			dbusConnection.ResetFailedUnit(unitName)
+			return errors.New("Timeout waiting for systemd to create " + unitName)
 		}
 	} else if !isUnitExists(err) {
 		return err
@@ -360,20 +371,20 @@ func stopUnit(dbusConnection *systemdDbus.Conn, unitName string) error {
 	return nil
 }
 
-func systemdVersion(conn *systemdDbus.Conn) (int, error) {
+func systemdVersion(conn *systemdDbus.Conn) int {
 	versionOnce.Do(func() {
 		version = -1
 		verStr, err := conn.GetManagerProperty("Version")
-		if err != nil {
-			versionErr = err
-			return
+		if err == nil {
+			version, err = systemdVersionAtoi(verStr)
 		}
 
-		version, versionErr = systemdVersionAtoi(verStr)
-		return
+		if err != nil {
+			logrus.WithError(err).Error("unable to get systemd version")
+		}
 	})
 
-	return version, versionErr
+	return version
 }
 
 func systemdVersionAtoi(verStr string) (int, error) {
@@ -394,12 +405,13 @@ func systemdVersionAtoi(verStr string) (int, error) {
 func addCpuQuota(conn *systemdDbus.Conn, properties *[]systemdDbus.Property, quota int64, period uint64) {
 	if period != 0 {
 		// systemd only supports CPUQuotaPeriodUSec since v242
-		sdVer, err := systemdVersion(conn)
-		if err != nil {
-			logrus.Warnf("systemdVersion: %s", err)
-		} else if sdVer >= 242 {
+		sdVer := systemdVersion(conn)
+		if sdVer >= 242 {
 			*properties = append(*properties,
 				newProp("CPUQuotaPeriodUSec", period))
+		} else {
+			logrus.Debugf("systemd v%d is too old to support CPUQuotaPeriodSec "+
+				" (setting will still be applied to cgroupfs)", sdVer)
 		}
 	}
 	if quota != 0 || period != 0 {
@@ -407,10 +419,8 @@ func addCpuQuota(conn *systemdDbus.Conn, properties *[]systemdDbus.Property, quo
 		cpuQuotaPerSecUSec := uint64(math.MaxUint64)
 		if quota > 0 {
 			if period == 0 {
-				// assume the default kernel value of 100000 us (100 ms), same for v1 and v2.
-				// v1: https://www.kernel.org/doc/html/latest/scheduler/sched-bwc.html and
-				// v2: https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html
-				period = 100000
+				// assume the default
+				period = defCPUQuotaPeriod
 			}
 			// systemd converts CPUQuotaPerSecUSec (microseconds per CPU second) to CPUQuota
 			// (integer percentage of CPU) internally.  This means that if a fractional percent of
@@ -424,4 +434,38 @@ func addCpuQuota(conn *systemdDbus.Conn, properties *[]systemdDbus.Property, quo
 		*properties = append(*properties,
 			newProp("CPUQuotaPerSecUSec", cpuQuotaPerSecUSec))
 	}
+}
+
+func addCpuset(conn *systemdDbus.Conn, props *[]systemdDbus.Property, cpus, mems string) error {
+	if cpus == "" && mems == "" {
+		return nil
+	}
+
+	// systemd only supports AllowedCPUs/AllowedMemoryNodes since v244
+	sdVer := systemdVersion(conn)
+	if sdVer < 244 {
+		logrus.Debugf("systemd v%d is too old to support AllowedCPUs/AllowedMemoryNodes"+
+			" (settings will still be applied to cgroupfs)", sdVer)
+		return nil
+	}
+
+	if cpus != "" {
+		bits, err := rangeToBits(cpus)
+		if err != nil {
+			return fmt.Errorf("resources.CPU.Cpus=%q conversion error: %w",
+				cpus, err)
+		}
+		*props = append(*props,
+			newProp("AllowedCPUs", bits))
+	}
+	if mems != "" {
+		bits, err := rangeToBits(mems)
+		if err != nil {
+			return fmt.Errorf("resources.CPU.Mems=%q conversion error: %w",
+				mems, err)
+		}
+		*props = append(*props,
+			newProp("AllowedMemoryNodes", bits))
+	}
+	return nil
 }

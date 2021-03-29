@@ -24,3 +24,19 @@ func (cli *Client) ContainerStats(ctx context.Context, containerID string, strea
 	osType := getDockerOS(resp.header.Get("Server"))
 	return types.ContainerStats{Body: resp.body, OSType: osType}, err
 }
+
+// ContainerStatsOneShot gets a single stat entry from a container.
+// It differs from `ContainerStats` in that the API should not wait to prime the stats
+func (cli *Client) ContainerStatsOneShot(ctx context.Context, containerID string) (types.ContainerStats, error) {
+	query := url.Values{}
+	query.Set("stream", "0")
+	query.Set("one-shot", "1")
+
+	resp, err := cli.get(ctx, "/containers/"+containerID+"/stats", query, nil)
+	if err != nil {
+		return types.ContainerStats{}, err
+	}
+
+	osType := getDockerOS(resp.header.Get("Server"))
+	return types.ContainerStats{Body: resp.body, OSType: osType}, err
+}

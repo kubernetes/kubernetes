@@ -76,14 +76,6 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	dualStackEnabled := effectiveFeatures.Enabled(kubefeatures.IPv6DualStack)
-	endpointSliceEnabled := effectiveFeatures.Enabled(kubefeatures.EndpointSlice)
-
-	// dual stack has strong dependency on endpoint slice since
-	// endpoint slice controller is the only capabable of producing
-	// slices for *all* clusterIPs
-	if dualStackEnabled && !endpointSliceEnabled {
-		allErrs = append(allErrs, field.Invalid(newPath.Child("FeatureGates"), config.FeatureGates, "EndpointSlice feature flag must be turned on when turning on DualStack"))
-	}
 
 	if config.ClusterCIDR != "" {
 		cidrs := strings.Split(config.ClusterCIDR, ",")

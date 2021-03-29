@@ -50,6 +50,9 @@ type BaseEndpointInfo struct {
 	IsLocal  bool
 	Topology map[string]string
 
+	// ZoneHints represent the zone hints for the endpoint. This is based on
+	// endpoint.hints.forZones[*].name in the EndpointSlice API.
+	ZoneHints sets.String
 	// Ready indicates whether this endpoint is ready and NOT terminating.
 	// For pods, this is true if a pod has a ready status and a nil deletion timestamp.
 	// This is only set when watching EndpointSlices. If using Endpoints, this is always
@@ -102,6 +105,11 @@ func (info *BaseEndpointInfo) GetTopology() map[string]string {
 	return info.Topology
 }
 
+// GetZoneHints returns the zone hint for the endpoint.
+func (info *BaseEndpointInfo) GetZoneHints() sets.String {
+	return info.ZoneHints
+}
+
 // IP returns just the IP part of the endpoint, it's a part of proxy.Endpoint interface.
 func (info *BaseEndpointInfo) IP() string {
 	return utilproxy.IPPart(info.Endpoint)
@@ -118,7 +126,7 @@ func (info *BaseEndpointInfo) Equal(other Endpoint) bool {
 }
 
 func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]string,
-	ready, serving, terminating bool) *BaseEndpointInfo {
+	ready, serving, terminating bool, zoneHints sets.String) *BaseEndpointInfo {
 	return &BaseEndpointInfo{
 		Endpoint:    net.JoinHostPort(IP, strconv.Itoa(port)),
 		IsLocal:     isLocal,
@@ -126,6 +134,7 @@ func newBaseEndpointInfo(IP string, port int, isLocal bool, topology map[string]
 		Ready:       ready,
 		Serving:     serving,
 		Terminating: terminating,
+		ZoneHints:   zoneHints,
 	}
 }
 
@@ -427,8 +436,10 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				isServing := true
 				isTerminating := false
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname
+				// Only supported with EndpointSlice API
+				zoneHints := sets.String{}
 
-				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, isReady, isServing, isTerminating)
+				baseEndpointInfo := newBaseEndpointInfo(addr.IP, int(port.Port), isLocal, nil, isReady, isServing, isTerminating, zoneHints)
 				if ect.makeEndpointInfo != nil {
 					endpointsMap[svcPortName] = append(endpointsMap[svcPortName], ect.makeEndpointInfo(baseEndpointInfo))
 				} else {

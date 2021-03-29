@@ -20,6 +20,9 @@ type UnsupportedFeatureError struct {
 }
 
 func (ufe *UnsupportedFeatureError) Error() string {
+	if ufe.MinimumVersion.Unspecified() {
+		return fmt.Sprintf("%s not supported", ufe.Name)
+	}
 	return fmt.Sprintf("%s not supported (requires >= %s)", ufe.Name, ufe.MinimumVersion)
 }
 
@@ -119,4 +122,9 @@ func (v Version) Less(other Version) bool {
 		return a < other[i]
 	}
 	return false
+}
+
+// Unspecified returns true if the version is all zero.
+func (v Version) Unspecified() bool {
+	return v[0] == 0 && v[1] == 0 && v[2] == 0
 }

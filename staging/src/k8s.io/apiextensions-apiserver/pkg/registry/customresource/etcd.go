@@ -31,6 +31,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // CustomResourceStorage includes dummy storage for CustomResources, and their Status and Scale subresources.
@@ -92,9 +93,10 @@ func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKi
 		PredicateFunc:            strategy.MatchCustomResourceDefinitionStorage,
 		DefaultQualifiedResource: resource,
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: tableConvertor,
 	}
@@ -104,7 +106,9 @@ func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKi
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = NewStatusStrategy(strategy)
+	statusStrategy := NewStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 	return &REST{store, categories}, &StatusREST{store: &statusStore}
 }
 
@@ -197,6 +201,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 type ScaleREST struct {

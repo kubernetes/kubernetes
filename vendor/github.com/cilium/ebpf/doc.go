@@ -12,6 +12,5 @@
 // eBPF code should be compiled ahead of time using clang, and shipped with
 // your application as any other resource.
 //
-// This package doesn't include code required to attach eBPF to Linux
-// subsystems, since this varies per subsystem.
+// Use the link subpackage to attach a loaded program to a hook in the kernel.
 package ebpf

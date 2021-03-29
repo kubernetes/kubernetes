@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,6 +100,7 @@ func TestCreateFromConfig(t *testing.T) {
 		configData       []byte
 		wantPluginConfig []schedulerapi.PluginConfig
 		wantPlugins      *schedulerapi.Plugins
+		wantErr          string
 	}{
 
 		{
@@ -155,6 +157,7 @@ func TestCreateFromConfig(t *testing.T) {
 					Enabled: []schedulerapi.Plugin{
 						{Name: "NodeResourcesFit"},
 						{Name: "NodePorts"},
+						{Name: "NodeAffinity"},
 						{Name: "VolumeBinding"},
 						{Name: "PodTopologySpread"},
 						{Name: "InterPodAffinity"},
@@ -373,6 +376,22 @@ func TestCreateFromConfig(t *testing.T) {
 				Bind: schedulerapi.PluginSet{Enabled: []schedulerapi.Plugin{{Name: "DefaultBinder"}}},
 			},
 		},
+		{
+			name: "policy with invalid arguments",
+			configData: []byte(`{
+				"kind" : "Policy",
+				"apiVersion" : "v1",
+				"predicates" : [
+					{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}}
+				],
+				"priorities" : [
+					{"name": "RequestedToCapacityRatioPriority", "weight": 2},
+					{"name" : "NodeAffinityPriority", "weight" : 10},
+					{"name" : "InterPodAffinityPriority", "weight" : 100}
+				]
+			}`),
+			wantErr: `couldn't create scheduler from policy: priority type not found for "RequestedToCapacityRatioPriority"`,
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -401,9 +420,10 @@ func TestCreateFromConfig(t *testing.T) {
 					}
 				}),
 			)
-
 			if err != nil {
-				t.Fatalf("Error constructing: %v", err)
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("Unexpected error, got %v, expect: %s", err, tc.wantErr)
+				}
 			}
 		})
 	}
@@ -451,7 +471,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			// Need to add/update/delete testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			queue.Add(testPod)
@@ -525,7 +545,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			// Need to add testPod to the store.
 			podInformer.Informer().GetStore().Add(testPod)
 
-			queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 			schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 			for i := range tt.nodes {
@@ -566,7 +586,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	// Need to add testPod to the store.
 	podInformer.Informer().GetStore().Add(testPod)
 
-	queue := internalqueue.NewPriorityQueue(nil, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
+	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.

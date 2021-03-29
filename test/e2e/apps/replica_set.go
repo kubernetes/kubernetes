@@ -25,6 +25,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -129,6 +132,17 @@ var _ = SIGDescribe("ReplicaSet", func() {
 	*/
 	framework.ConformanceIt("Replicaset should have a working scale subresource", func() {
 		testRSScaleSubresources(f)
+	})
+
+	/*
+		Release: v1.21
+		Testname: ReplicaSet, is created, Replaced and Patched
+		Description: Create a ReplicaSet (RS) with a single Pod. The Pod MUST be verified
+		that it is running. The RS MUST scale to two replicas and verify the scale count
+		The RS MUST be patched and verify that patch succeeded.
+	*/
+	framework.ConformanceIt("Replace and Patch tests", func() {
+		testRSLifeCycle(f)
 	})
 })
 
@@ -419,4 +433,94 @@ func testRSScaleSubresources(f *framework.Framework) {
 	framework.ExpectNoError(err, "Failed to get replicaset resource: %v", err)
 	framework.ExpectEqual(*(rs.Spec.Replicas), int32(4), "replicaset should have 4 replicas")
 
+}
+
+// ReplicaSet Replace and Patch tests
+func testRSLifeCycle(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+	zero := int64(0)
+
+	// Create webserver pods.
+	rsPodLabels := map[string]string{
+		"name": "sample-pod",
+		"pod":  WebserverImageName,
+	}
+
+	rsName := "test-rs"
+	label := "test-rs=patched"
+	labelMap := map[string]string{"test-rs": "patched"}
+	replicas := int32(1)
+	rsPatchReplicas := int32(3)
+	rsPatchImage := imageutils.GetE2EImage(imageutils.Pause)
+
+	w := &cache.ListWatch{
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			options.LabelSelector = label
+			return f.ClientSet.AppsV1().ReplicaSets(ns).Watch(context.TODO(), options)
+		},
+	}
+	rsList, err := f.ClientSet.AppsV1().ReplicaSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: label})
+	framework.ExpectNoError(err, "failed to list rsList")
+	// Create a ReplicaSet
+	rs := newRS(rsName, replicas, rsPodLabels, WebserverImageName, WebserverImage, nil)
+	_, err = c.AppsV1().ReplicaSets(ns).Create(context.TODO(), rs, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	// Verify that the required pods have come up.
+	err = e2epod.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
+	framework.ExpectNoError(err, "Failed to create pods: %s", err)
+
+	// Scale the ReplicaSet
+	ginkgo.By(fmt.Sprintf("Scaling up %q replicaset ", rsName))
+	_, err = e2ereplicaset.UpdateReplicaSetWithRetries(c, ns, rsName, func(update *appsv1.ReplicaSet) {
+		x := int32(2)
+		update.Spec.Replicas = &x
+	})
+	framework.ExpectNoError(err, "ReplicaSet fail to scale to %q replicasets")
+
+	// Patch the PeplicaSet
+	ginkgo.By("patching the ReplicaSet")
+	rsPatch, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": labelMap,
+		},
+		"spec": map[string]interface{}{
+			"replicas": rsPatchReplicas,
+			"template": map[string]interface{}{
+				"spec": map[string]interface{}{
+					"TerminationGracePeriodSeconds": &zero,
+					"containers": [1]map[string]interface{}{{
+						"name":  rsName,
+						"image": rsPatchImage,
+					}},
+				},
+			},
+		},
+	})
+	framework.ExpectNoError(err, "failed to Marshal ReplicaSet JSON patch")
+	_, err = f.ClientSet.AppsV1().ReplicaSets(ns).Patch(context.TODO(), rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
+	framework.ExpectNoError(err, "failed to patch ReplicaSet")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	_, err = watchtools.Until(ctx, rsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+		if rset, ok := event.Object.(*appsv1.ReplicaSet); ok {
+			found := rset.ObjectMeta.Name == rsName &&
+				rset.ObjectMeta.Labels["test-rs"] == "patched" &&
+				rset.Status.ReadyReplicas == rsPatchReplicas &&
+				rset.Status.AvailableReplicas == rsPatchReplicas &&
+				rset.Spec.Template.Spec.Containers[0].Image == rsPatchImage
+			if !found {
+				framework.Logf("observed ReplicaSet %v in namespace %v with ReadyReplicas %v, AvailableReplicas %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas,
+					rset.Status.AvailableReplicas)
+			} else {
+				framework.Logf("observed Replicaset %v in namespace %v with ReadyReplicas %v found %v", rset.ObjectMeta.Name, rset.ObjectMeta.Namespace, rset.Status.ReadyReplicas, found)
+			}
+			return found, nil
+		}
+		return false, nil
+	})
+
+	framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", rs.Name, ns, rsPatchReplicas)
 }

@@ -174,6 +174,13 @@ func (cm *FakeContainerManager) GetDevices(_, _ string) []*podresourcesapi.Conta
 	return nil
 }
 
+func (cm *FakeContainerManager) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	cm.Lock()
+	defer cm.Unlock()
+	cm.CalledFunctions = append(cm.CalledFunctions, "GetAllocatableDevices")
+	return nil
+}
+
 func (cm *FakeContainerManager) ShouldResetExtendedResourceCapacity() bool {
 	cm.Lock()
 	defer cm.Unlock()
@@ -199,5 +206,11 @@ func (cm *FakeContainerManager) GetCPUs(_, _ string) []int64 {
 	cm.Lock()
 	defer cm.Unlock()
 	cm.CalledFunctions = append(cm.CalledFunctions, "GetCPUs")
+	return nil
+}
+
+func (cm *FakeContainerManager) GetAllocatableCPUs() []int64 {
+	cm.Lock()
+	defer cm.Unlock()
 	return nil
 }

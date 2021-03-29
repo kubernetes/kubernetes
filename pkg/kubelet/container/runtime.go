@@ -204,7 +204,7 @@ func BuildContainerID(typ, ID string) ContainerID {
 func ParseContainerID(containerID string) ContainerID {
 	var id ContainerID
 	if err := id.ParseString(containerID); err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Parsing containerID failed")
 	}
 	return id
 }

@@ -29,9 +29,10 @@ import (
 	apps "k8s.io/api/apps/v1"
 	autoscalingapi "k8s.io/api/autoscaling/v1"
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/meta/testrestmapper"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -73,6 +74,8 @@ func (ps *pdbStates) Get(key string) policy.PodDisruptionBudget {
 func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowed, currentHealthy, desiredHealthy, expectedPods int32,
 	disruptedPodMap map[string]metav1.Time) {
 	actualPDB := ps.Get(key)
+	actualConditions := actualPDB.Status.Conditions
+	actualPDB.Status.Conditions = nil
 	expectedStatus := policy.PodDisruptionBudgetStatus{
 		DisruptionsAllowed: disruptionsAllowed,
 		CurrentHealthy:     currentHealthy,
@@ -85,6 +88,22 @@ func (ps *pdbStates) VerifyPdbStatus(t *testing.T, key string, disruptionsAllowe
 	if !apiequality.Semantic.DeepEqual(actualStatus, expectedStatus) {
 		debug.PrintStack()
 		t.Fatalf("PDB %q status mismatch.  Expected %+v but got %+v.", key, expectedStatus, actualStatus)
+	}
+
+	cond := apimeta.FindStatusCondition(actualConditions, policy.DisruptionAllowedCondition)
+	if cond == nil {
+		t.Fatalf("Expected condition %q, but didn't find it", policy.DisruptionAllowedCondition)
+	}
+	if disruptionsAllowed > 0 {
+		if cond.Status != metav1.ConditionTrue {
+			t.Fatalf("Expected condition %q to have status %q, but was %q",
+				policy.DisruptionAllowedCondition, metav1.ConditionTrue, cond.Status)
+		}
+	} else {
+		if cond.Status != metav1.ConditionFalse {
+			t.Fatalf("Expected condition %q to have status %q, but was %q",
+				policy.DisruptionAllowedCondition, metav1.ConditionFalse, cond.Status)
+		}
 	}
 }
 
@@ -132,7 +151,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 
 	dc := NewDisruptionController(
 		informerFactory.Core().V1().Pods(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Policy().V1().PodDisruptionBudgets(),
 		informerFactory.Core().V1().ReplicationControllers(),
 		informerFactory.Apps().V1().ReplicaSets(),
 		informerFactory.Apps().V1().Deployments(),
@@ -156,7 +175,7 @@ func newFakeDisruptionController() (*disruptionController, *pdbStates) {
 	return &disruptionController{
 		dc,
 		informerFactory.Core().V1().Pods().Informer().GetStore(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets().Informer().GetStore(),
+		informerFactory.Policy().V1().PodDisruptionBudgets().Informer().GetStore(),
 		informerFactory.Core().V1().ReplicationControllers().Informer().GetStore(),
 		informerFactory.Apps().V1().ReplicaSets().Informer().GetStore(),
 		informerFactory.Apps().V1().Deployments().Informer().GetStore(),
@@ -383,7 +402,7 @@ func add(t *testing.T, store cache.Store, obj interface{}) {
 	}
 }
 
-// Create one with no selector.  Verify it matches 0 pods.
+// Create one with no selector.  Verify it matches all pods
 func TestNoSelector(t *testing.T) {
 	dc, ps := newFakeDisruptionController()
 
@@ -397,7 +416,7 @@ func TestNoSelector(t *testing.T) {
 
 	add(t, dc.podStore, pod)
 	dc.sync(pdbName)
-	ps.VerifyPdbStatus(t, pdbName, 0, 0, 3, 0, map[string]metav1.Time{})
+	ps.VerifyPdbStatus(t, pdbName, 0, 1, 3, 1, map[string]metav1.Time{})
 }
 
 // Verify that available/expected counts go up as we add pods, then verify that
@@ -1132,7 +1151,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 
 	// Create a PDB and 3 pods that match it.
 	pdb, pdbKey := newMinAvailablePodDisruptionBudget(t, intstr.FromInt(1))
-	pdb, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets(pdb.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
+	pdb, err := dc.coreClient.PolicyV1().PodDisruptionBudgets(pdb.Namespace).Create(context.TODO(), pdb, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Failed to create PDB: %v", err)
 	}
@@ -1167,7 +1186,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 		// These GVRs are copied from the generated fake code because they are not exported.
 		var (
 			podsResource                 = schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-			poddisruptionbudgetsResource = schema.GroupVersionResource{Group: "policy", Version: "v1beta1", Resource: "poddisruptionbudgets"}
+			poddisruptionbudgetsResource = schema.GroupVersionResource{Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"}
 		)
 
 		// Bypass the coreClient.Fake and write directly to the ObjectTracker, because
@@ -1229,7 +1248,7 @@ func TestUpdatePDBStatusRetries(t *testing.T) {
 
 	// (C) Whether or not sync() returned an error, the PDB status should reflect
 	// the evictions that took place.
-	finalPDB, err := dc.coreClient.PolicyV1beta1().PodDisruptionBudgets("default").Get(context.TODO(), pdb.Name, metav1.GetOptions{})
+	finalPDB, err := dc.coreClient.PolicyV1().PodDisruptionBudgets("default").Get(context.TODO(), pdb.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatalf("Failed to get PDB: %v", err)
 	}

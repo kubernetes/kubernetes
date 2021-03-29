@@ -34,7 +34,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
 	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -338,8 +337,8 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 		NS:            l.config.Framework.Namespace.Name,
 		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
 		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
 	framework.ExpectNoError(err)

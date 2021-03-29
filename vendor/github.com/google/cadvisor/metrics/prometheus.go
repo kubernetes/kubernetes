@@ -455,6 +455,16 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 			},
 		}...)
 	}
+	if includedMetrics.Has(container.CPUSetMetrics) {
+		c.containerMetrics = append(c.containerMetrics, containerMetric{
+			name:      "container_memory_migrate",
+			help:      "Memory migrate status.",
+			valueType: prometheus.GaugeValue,
+			getValues: func(s *info.ContainerStats) metricValues {
+				return metricValues{{value: float64(s.CpuSet.MemoryMigrate), timestamp: s.Timestamp}}
+			},
+		})
+	}
 	if includedMetrics.Has(container.MemoryNumaMetrics) {
 		c.containerMetrics = append(c.containerMetrics, []containerMetric{
 			{
@@ -755,6 +765,28 @@ func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc, includedMetri
 					return fsValues(s.Filesystem, func(fs *info.FsStats) float64 {
 						return float64(fs.WeightedIoTime) / float64(time.Second)
 					}, s.Timestamp)
+				},
+			},
+			{
+				name:        "container_blkio_device_usage_total",
+				help:        "Blkio Device bytes usage",
+				valueType:   prometheus.CounterValue,
+				extraLabels: []string{"device", "major", "minor", "operation"},
+				getValues: func(s *info.ContainerStats) metricValues {
+					var values metricValues
+					for _, diskStat := range s.DiskIo.IoServiceBytes {
+						for operation, value := range diskStat.Stats {
+							values = append(values, metricValue{
+								value: float64(value),
+								labels: []string{diskStat.Device,
+									strconv.Itoa(int(diskStat.Major)),
+									strconv.Itoa(int(diskStat.Minor)),
+									operation},
+								timestamp: s.Timestamp,
+							})
+						}
+					}
+					return values
 				},
 			},
 		}...)

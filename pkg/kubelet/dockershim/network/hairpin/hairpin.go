@@ -74,7 +74,7 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceN
 }
 
 func setUpInterface(ifName string) error {
-	klog.V(3).Infof("Enabling hairpin on interface %s", ifName)
+	klog.V(3).InfoS("Enabling hairpin on interface", "interfaceName", ifName)
 	ifPath := path.Join(sysfsNetPath, ifName)
 	if _, err := os.Stat(ifPath); err != nil {
 		return err

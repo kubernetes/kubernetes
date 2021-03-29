@@ -55,5 +55,6 @@
     ]
   },
   "storageClassName": "25",
-  "capacity": "130"
+  "capacity": "130",
+  "maximumVolumeSize": "330"
 }

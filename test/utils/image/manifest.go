@@ -32,11 +32,9 @@ import (
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
-	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
-	GcHttpdRegistry         string `yaml:"gcHttpdRegistry"`
 	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
@@ -72,17 +70,15 @@ func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
 		GcEtcdRegistry:          "k8s.gcr.io",
-		GcHttpdRegistry:         "k8s.gcr.io/e2e-test-images",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
 		MicrosoftRegistry:       "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
@@ -111,12 +107,10 @@ var (
 	// Preconfigured image configs
 	dockerLibraryRegistry   = "docker.io/library"
 	e2eRegistry             = registry.E2eRegistry
-	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
 	gcEtcdRegistry          = registry.GcEtcdRegistry
-	gcHttpdRegistry         = registry.GcHttpdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
@@ -219,13 +213,13 @@ const (
 
 func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.28"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.30"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
 	configs[APIServer] = Config{promoterE2eRegistry, "sample-apiserver", "1.17.4"}
 	configs[AppArmorLoader] = Config{promoterE2eRegistry, "apparmor-loader", "1.3"}
-	configs[BusyBox] = Config{promoterE2eRegistry, "busybox", "1.29"}
+	configs[BusyBox] = Config{promoterE2eRegistry, "busybox", "1.29-1"}
 	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
@@ -233,16 +227,16 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
 	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{gcHttpdRegistry, "httpd", "2.4.38-alpine"}
-	configs[HttpdNew] = Config{gcHttpdRegistry, "httpd", "2.4.39-alpine"}
+	configs[Httpd] = Config{promoterE2eRegistry, "httpd", "2.4.38-1"}
+	configs[HttpdNew] = Config{promoterE2eRegistry, "httpd", "2.4.39-1"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
 	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
 	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
 	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
 	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
-	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-alpine"}
-	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-alpine"}
+	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-1"}
+	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-1"}
 	configs[NodePerfNpbEp] = Config{promoterE2eRegistry, "node-perf/npb-ep", "1.1"}
 	configs[NodePerfNpbIs] = Config{promoterE2eRegistry, "node-perf/npb-is", "1.1"}
 	configs[NodePerfTfWideDeep] = Config{promoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
@@ -390,8 +384,6 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":
 		registryAndUser = e2eRegistry
-	case "gcr.io/kubernetes-e2e-test-images/volume":
-		registryAndUser = e2eVolumeRegistry
 	case "k8s.gcr.io":
 		registryAndUser = gcRegistry
 	case "k8s.gcr.io/sig-storage":

@@ -36,6 +36,9 @@ option go_package = "v1";
 // continued existence of events with that Reason.  Events should be
 // treated as informative, best-effort, supplemental data.
 message Event {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
   // eventTime is the time when this Event was first observed. It is required.

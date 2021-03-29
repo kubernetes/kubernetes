@@ -170,30 +170,30 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 		if strings.HasSuffix(confFile, ".conflist") {
 			confList, err = libcni.ConfListFromFile(confFile)
 			if err != nil {
-				klog.Warningf("Error loading CNI config list file %s: %v", confFile, err)
+				klog.InfoS("Error loading CNI config list file", "path", confFile, "err", err)
 				continue
 			}
 		} else {
 			conf, err := libcni.ConfFromFile(confFile)
 			if err != nil {
-				klog.Warningf("Error loading CNI config file %s: %v", confFile, err)
+				klog.InfoS("Error loading CNI config file", "path", confFile, "err", err)
 				continue
 			}
 			// Ensure the config has a "type" so we know what plugin to run.
 			// Also catches the case where somebody put a conflist into a conf file.
 			if conf.Network.Type == "" {
-				klog.Warningf("Error loading CNI config file %s: no 'type'; perhaps this is a .conflist?", confFile)
+				klog.InfoS("Error loading CNI config file: no 'type'; perhaps this is a .conflist?", "path", confFile)
 				continue
 			}
 
 			confList, err = libcni.ConfListFromConf(conf)
 			if err != nil {
-				klog.Warningf("Error converting CNI config file %s to list: %v", confFile, err)
+				klog.InfoS("Error converting CNI config file to list", "path", confFile, "err", err)
 				continue
 			}
 		}
 		if len(confList.Plugins) == 0 {
-			klog.Warningf("CNI config list %s has no networks, skipping", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]))
+			klog.InfoS("CNI config list has no networks, skipping", "configList", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]))
 			continue
 		}
 
@@ -201,11 +201,11 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 		// all plugins of this config exist on disk
 		caps, err := cniConfig.ValidateNetworkList(context.TODO(), confList)
 		if err != nil {
-			klog.Warningf("Error validating CNI config list %s: %v", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]), err)
+			klog.InfoS("Error validating CNI config list", "configList", string(confList.Bytes[:maxStringLengthInLog(len(confList.Bytes))]), "err", err)
 			continue
 		}
 
-		klog.V(4).Infof("Using CNI configuration file %s", confFile)
+		klog.V(4).InfoS("Using CNI configuration file", "path", confFile)
 
 		return &cniNetwork{
 			name:          confList.Name,
@@ -236,7 +236,7 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfi
 func (plugin *cniNetworkPlugin) syncNetworkConfig() {
 	network, err := getDefaultCNINetwork(plugin.confDir, plugin.binDirs)
 	if err != nil {
-		klog.Warningf("Unable to update cni config: %s", err)
+		klog.InfoS("Unable to update cni config", "err", err)
 		return
 	}
 	plugin.setDefaultNetwork(network)
@@ -278,12 +278,12 @@ func (plugin *cniNetworkPlugin) Event(name string, details map[string]interface{
 
 	podCIDR, ok := details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR].(string)
 	if !ok {
-		klog.Warningf("%s event didn't contain pod CIDR", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
+		klog.InfoS("The event didn't contain pod CIDR", "event", network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE)
 		return
 	}
 
 	if plugin.podCidr != "" {
-		klog.Warningf("Ignoring subsequent pod CIDR update to %s", podCIDR)
+		klog.InfoS("Ignoring subsequent pod CIDR update to new cidr", "podCIDR", podCIDR)
 		return
 	}
 
@@ -330,7 +330,7 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	// Lack of namespace should not be fatal on teardown
 	netnsPath, err := plugin.host.GetNetNS(id.ID)
 	if err != nil {
-		klog.Warningf("CNI failed to retrieve network namespace path: %v", err)
+		klog.InfoS("CNI failed to retrieve network namespace path", "err", err)
 	}
 
 	// Todo get the timeout from parent ctx
@@ -340,54 +340,47 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 	if plugin.loNetwork != nil {
 		// Loopback network deletion failure should not be fatal on teardown
 		if err := plugin.deleteFromNetwork(cniTimeoutCtx, plugin.loNetwork, name, namespace, id, netnsPath, nil); err != nil {
-			klog.Warningf("CNI failed to delete loopback network: %v", err)
+			klog.InfoS("CNI failed to delete loopback network", "err", err)
 		}
 	}
 
 	return plugin.deleteFromNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 
-func podDesc(namespace, name string, id kubecontainer.ContainerID) string {
-	return fmt.Sprintf("%s_%s/%s", namespace, name, id.ID)
-}
-
 func (plugin *cniNetworkPlugin) addToNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations, options map[string]string) (cnitypes.Result, error) {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, options)
 	if err != nil {
-		klog.Errorf("Error adding network when building cni runtime conf: %v", err)
+		klog.ErrorS(err, "Error adding network when building cni runtime conf")
 		return nil, err
 	}
 
-	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	klog.V(4).Infof("Adding %s to network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	klog.V(4).InfoS("Adding pod to network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "podNetnsPath", podNetnsPath, "networkType", netConf.Plugins[0].Network.Type, "networkName", netConf.Name)
 	res, err := cniNet.AddNetworkList(ctx, netConf, rt)
 	if err != nil {
-		klog.Errorf("Error adding %s to network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		klog.ErrorS(err, "Error adding pod to network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "podNetnsPath", podNetnsPath, "networkType", netConf.Plugins[0].Network.Type, "networkName", netConf.Name)
 		return nil, err
 	}
-	klog.V(4).Infof("Added %s to network %s: %v", pdesc, netConf.Name, res)
+	klog.V(4).InfoS("Added pod to network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "networkName", netConf.Name, "response", res)
 	return res, nil
 }
 
 func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *cniNetwork, podName string, podNamespace string, podSandboxID kubecontainer.ContainerID, podNetnsPath string, annotations map[string]string) error {
 	rt, err := plugin.buildCNIRuntimeConf(podName, podNamespace, podSandboxID, podNetnsPath, annotations, nil)
 	if err != nil {
-		klog.Errorf("Error deleting network when building cni runtime conf: %v", err)
+		klog.ErrorS(err, "Error deleting network when building cni runtime conf")
 		return err
 	}
-
-	pdesc := podDesc(podNamespace, podName, podSandboxID)
 	netConf, cniNet := network.NetworkConfig, network.CNIConfig
-	klog.V(4).Infof("Deleting %s from network %s/%s netns %q", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, podNetnsPath)
+	klog.V(4).InfoS("Deleting pod from network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "podNetnsPath", podNetnsPath, "networkType", netConf.Plugins[0].Network.Type, "networkName", netConf.Name)
 	err = cniNet.DelNetworkList(ctx, netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
-		klog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
+		klog.ErrorS(err, "Error deleting pod from network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "podNetnsPath", podNetnsPath, "networkType", netConf.Plugins[0].Network.Type, "networkName", netConf.Name)
 		return err
 	}
-	klog.V(4).Infof("Deleted %s from network %s/%s", pdesc, netConf.Plugins[0].Network.Type, netConf.Name)
+	klog.V(4).InfoS("Deleted pod from network", "pod", klog.KRef(podNamespace, podName), "podSandboxID", podSandboxID, "networkType", netConf.Plugins[0].Network.Type, "networkName", netConf.Name)
 	return nil
 }
 

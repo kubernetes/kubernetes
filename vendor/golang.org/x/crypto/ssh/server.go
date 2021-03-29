@@ -572,6 +572,10 @@ userAuthLoop:
 				perms = candidate.perms
 			}
 		case "gssapi-with-mic":
+			if config.GSSAPIWithMICConfig == nil {
+				authErr = errors.New("ssh: gssapi-with-mic auth not configured")
+				break
+			}
 			gssapiConfig := config.GSSAPIWithMICConfig
 			userAuthRequestGSSAPI, err := parseGSSAPIPayload(userAuthReq.Payload)
 			if err != nil {

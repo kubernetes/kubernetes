@@ -25,19 +25,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 var argumentEnvironment = regexp.MustCompile("(?ms)^(.+)\\=(.*)$")
-var validArgumentEnvironment = regexp.MustCompile("(?ms)^(\\w+)\\=(.*)$")
 
 // IsEnvironmentArgument checks whether a string is an environment argument, that is, whether it matches the "anycharacters=anycharacters" pattern.
 func IsEnvironmentArgument(s string) bool {
 	return argumentEnvironment.MatchString(s)
-}
-
-// IsValidEnvironmentArgument checks whether a string is a valid environment argument, that is, whether it matches the "wordcharacters=anycharacters" pattern. Word characters can be letters, numbers, and underscores.
-func IsValidEnvironmentArgument(s string) bool {
-	return validArgumentEnvironment.MatchString(s)
 }
 
 // SplitEnvironmentFromResources separates resources from environment arguments.
@@ -70,8 +65,6 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 	var remove []string
 	for _, envSpec := range spec {
 		switch {
-		case !IsValidEnvironmentArgument(envSpec) && !strings.HasSuffix(envSpec, "-"):
-			return nil, nil, fmt.Errorf("%ss must be of the form key=value and can only contain letters, numbers, and underscores", envVarType)
 		case envSpec == "-":
 			if defaultReader == nil {
 				return nil, nil, fmt.Errorf("when '-' is used, STDIN must be open")
@@ -85,6 +78,9 @@ func parseIntoEnvVar(spec []string, defaultReader io.Reader, envVarType string) 
 			parts := strings.SplitN(envSpec, "=", 2)
 			if len(parts) != 2 {
 				return nil, nil, fmt.Errorf("invalid %s: %v", envVarType, envSpec)
+			}
+			if errs := validation.IsEnvVarName(parts[0]); len(errs) != 0 {
+				return nil, nil, fmt.Errorf("%q is not a valid key name: %s", parts[0], strings.Join(errs, ";"))
 			}
 			exists.Insert(parts[0])
 			env = append(env, v1.EnvVar{

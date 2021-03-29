@@ -198,6 +198,7 @@ aliases:
     - liu-cong
     - damemi
     - chendave
+    - adtac
 
   sig-cli-maintainers:
     - brendandburns
@@ -229,6 +230,8 @@ aliases:
     - pwittrock
     - zhouya0
     - eddiezane
+    - dougsland
+    - rikatz
 
   sig-testing-reviewers:
     - bentheelder
@@ -284,6 +287,7 @@ aliases:
     - andrewsykim
     - bowei
     - caseydavenport
+    - cmluciano
     - danwinship
     - dcbw
     - freehan

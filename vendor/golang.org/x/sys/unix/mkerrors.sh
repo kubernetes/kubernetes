@@ -65,6 +65,7 @@ includes_Darwin='
 #include <sys/ptrace.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/sockio.h>
 #include <sys/sys_domain.h>
 #include <sys/sysctl.h>
@@ -114,6 +115,7 @@ includes_FreeBSD='
 #include <sys/sched.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/sockio.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
@@ -204,6 +206,7 @@ struct ltchars {
 #include <linux/devlink.h>
 #include <linux/dm-ioctl.h>
 #include <linux/errqueue.h>
+#include <linux/ethtool_netlink.h>
 #include <linux/falloc.h>
 #include <linux/fanotify.h>
 #include <linux/filter.h>
@@ -212,6 +215,7 @@ struct ltchars {
 #include <linux/fsverity.h>
 #include <linux/genetlink.h>
 #include <linux/hdreg.h>
+#include <linux/hidraw.h>
 #include <linux/icmpv6.h>
 #include <linux/if.h>
 #include <linux/if_addr.h>
@@ -222,9 +226,11 @@ struct ltchars {
 #include <linux/if_tun.h>
 #include <linux/if_packet.h>
 #include <linux/if_xdp.h>
+#include <linux/input.h>
 #include <linux/kexec.h>
 #include <linux/keyctl.h>
 #include <linux/loop.h>
+#include <linux/lwtunnel.h>
 #include <linux/magic.h>
 #include <linux/memfd.h>
 #include <linux/module.h>
@@ -297,6 +303,17 @@ struct ltchars {
 // Including linux/l2tp.h here causes conflicts between linux/in.h
 // and netinet/in.h included via net/route.h above.
 #define IPPROTO_L2TP		115
+
+// Copied from linux/hid.h.
+// Keep in sync with the size of the referenced fields.
+#define _HIDIOCGRAWNAME_LEN	128 // sizeof_field(struct hid_device, name)
+#define _HIDIOCGRAWPHYS_LEN	64  // sizeof_field(struct hid_device, phys)
+#define _HIDIOCGRAWUNIQ_LEN	64  // sizeof_field(struct hid_device, uniq)
+
+#define _HIDIOCGRAWNAME		HIDIOCGRAWNAME(_HIDIOCGRAWNAME_LEN)
+#define _HIDIOCGRAWPHYS		HIDIOCGRAWPHYS(_HIDIOCGRAWPHYS_LEN)
+#define _HIDIOCGRAWUNIQ		HIDIOCGRAWUNIQ(_HIDIOCGRAWUNIQ_LEN)
+
 '
 
 includes_NetBSD='
@@ -444,6 +461,8 @@ ccflags="$@"
 		$2 !~ /^EPROC_/ &&
 		$2 !~ /^EQUIV_/ &&
 		$2 !~ /^EXPR_/ &&
+		$2 !~ /^EVIOC/ &&
+		$2 !~ /^EV_/ &&
 		$2 ~ /^E[A-Z0-9_]+$/ ||
 		$2 ~ /^B[0-9_]+$/ ||
 		$2 ~ /^(OLD|NEW)DEV$/ ||
@@ -478,7 +497,7 @@ ccflags="$@"
 		$2 ~ /^LOCK_(SH|EX|NB|UN)$/ ||
 		$2 ~ /^LO_(KEY|NAME)_SIZE$/ ||
 		$2 ~ /^LOOP_(CLR|CTL|GET|SET)_/ ||
-		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|MCAST|EVFILT|NOTE|EV|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR)_/ ||
+		$2 ~ /^(AF|SOCK|SO|SOL|IPPROTO|IP|IPV6|ICMP6|TCP|MCAST|EVFILT|NOTE|SHUT|PROT|MAP|MFD|T?PACKET|MSG|SCM|MCL|DT|MADV|PR|LOCAL)_/ ||
 		$2 ~ /^TP_STATUS_/ ||
 		$2 ~ /^FALLOC_/ ||
 		$2 == "ICMPV6_FILTER" ||
@@ -560,11 +579,17 @@ ccflags="$@"
 		$2 ~ /^(HDIO|WIN|SMART)_/ ||
 		$2 ~ /^CRYPTO_/ ||
 		$2 ~ /^TIPC_/ ||
+		$2 !~  "DEVLINK_RELOAD_LIMITS_VALID_MASK" &&
 		$2 ~ /^DEVLINK_/ ||
+		$2 ~ /^ETHTOOL_/ ||
+		$2 ~ /^LWTUNNEL_IP/ ||
 		$2 !~ "WMESGLEN" &&
 		$2 ~ /^W[A-Z0-9]+$/ ||
 		$2 ~/^PPPIOC/ ||
 		$2 ~ /^FAN_|FANOTIFY_/ ||
+		$2 == "HID_MAX_DESCRIPTOR_SIZE" ||
+		$2 ~ /^_?HIDIOC/ ||
+		$2 ~ /^BUS_(USB|HIL|BLUETOOTH|VIRTUAL)$/ ||
 		$2 ~ /^BLK[A-Z]*(GET$|SET$|BUF$|PART$|SIZE)/ {printf("\t%s = C.%s\n", $2, $2)}
 		$2 ~ /^__WCOREFLAG$/ {next}
 		$2 ~ /^__W[A-Z0-9]+$/ {printf("\t%s = C.%s\n", substr($2,3), $2)}

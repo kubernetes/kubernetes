@@ -33,6 +33,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/network/common"
 
 	"github.com/onsi/ginkgo"
 )
@@ -75,7 +76,7 @@ func checkConnectivityToHost(f *framework.Framework, nodeName, podName, host str
 	return err
 }
 
-var _ = SIGDescribe("Networking", func() {
+var _ = common.SIGDescribe("Networking", func() {
 	var svcname = "nettest"
 	f := framework.NewDefaultFramework(svcname)
 
@@ -467,10 +468,7 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		// skip because pods can not reach the endpoint in the same host if using UDP and hostNetwork
-		// xref: #95565
 		ginkgo.It("should function for pod-Service(hostNetwork): udp", func() {
-			e2eskipper.Skipf("skip because pods can not reach the endpoint in the same host if using UDP and hostNetwork #95565")
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EndpointsUseHostNetwork)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
 			err := config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())

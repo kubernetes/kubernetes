@@ -3,11 +3,9 @@
 package fs
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -133,45 +131,18 @@ func getCgroupRoot() (string, error) {
 		return cgroupRoot, nil
 	}
 
-	// slow path: parse mountinfo, find the first mount where fs=cgroup
-	// (e.g. "/sys/fs/cgroup/memory"), use its parent.
-	f, err := os.Open("/proc/self/mountinfo")
+	// slow path: parse mountinfo
+	mi, err := cgroups.GetCgroupMounts(false)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
-
-	var root string
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		text := scanner.Text()
-		fields := strings.Split(text, " ")
-		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		index := strings.Index(text, " - ")
-		postSeparatorFields := strings.Fields(text[index+3:])
-		numPostFields := len(postSeparatorFields)
-
-		// This is an error as we can't detect if the mount is for "cgroup"
-		if numPostFields == 0 {
-			return "", fmt.Errorf("mountinfo: found no fields post '-' in %q", text)
-		}
-
-		if postSeparatorFields[0] == "cgroup" {
-			// Check that the mount is properly formatted.
-			if numPostFields < 3 {
-				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
-			}
-
-			root = filepath.Dir(fields[4])
-			break
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", err
-	}
-	if root == "" {
+	if len(mi) < 1 {
 		return "", errors.New("no cgroup mount found in mountinfo")
 	}
+
+	// Get the first cgroup mount (e.g. "/sys/fs/cgroup/memory"),
+	// use its parent directory.
+	root := filepath.Dir(mi[0].Mountpoint)
 
 	if _, err := os.Stat(root); err != nil {
 		return "", err
@@ -218,26 +189,29 @@ func (m *manager) Apply(pid int) (err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	var c = m.cgroups
-
-	d, err := getCgroupData(m.cgroups, pid)
-	if err != nil {
-		return err
+	c := m.cgroups
+	if c.Resources.Unified != nil {
+		return cgroups.ErrV1NoUnified
 	}
 
 	m.paths = make(map[string]string)
 	if c.Paths != nil {
+		cgMap, err := cgroups.ParseCgroupFile("/proc/self/cgroup")
+		if err != nil {
+			return err
+		}
 		for name, path := range c.Paths {
-			_, err := d.path(name)
-			if err != nil {
-				if cgroups.IsNotFound(err) {
-					continue
-				}
-				return err
+			// XXX(kolyshkin@): why this check is needed?
+			if _, ok := cgMap[name]; ok {
+				m.paths[name] = path
 			}
-			m.paths[name] = path
 		}
 		return cgroups.EnterPid(m.paths, pid)
+	}
+
+	d, err := getCgroupData(m.cgroups, pid)
+	if err != nil {
+		return err
 	}
 
 	for _, sys := range subsystems {
@@ -274,11 +248,7 @@ func (m *manager) Destroy() error {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if err := cgroups.RemovePaths(m.paths); err != nil {
-		return err
-	}
-	m.paths = make(map[string]string)
-	return nil
+	return cgroups.RemovePaths(m.paths)
 }
 
 func (m *manager) Path(subsys string) string {
@@ -312,6 +282,9 @@ func (m *manager) Set(container *configs.Config) error {
 	// and there is no need to set any values.
 	if m.cgroups != nil && m.cgroups.Paths != nil {
 		return nil
+	}
+	if container.Cgroups.Resources.Unified != nil {
+		return cgroups.ErrV1NoUnified
 	}
 
 	m.mu.Lock()
@@ -423,16 +396,6 @@ func join(path string, pid int) error {
 		return err
 	}
 	return cgroups.WriteCgroupProc(path, pid)
-}
-
-func removePath(p string, err error) error {
-	if err != nil {
-		return err
-	}
-	if p != "" {
-		return os.RemoveAll(p)
-	}
-	return nil
 }
 
 func (m *manager) GetPaths() map[string]string {

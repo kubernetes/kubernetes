@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"k8s.io/api/admission/v1beta1"
-	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -243,7 +243,7 @@ func runTestWithVersion(t *testing.T, version string) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	if err := createV1beta1MutationWebhook(kubeclient, url+"/mutation"); err != nil {
+	if err := createMutationWebhook(kubeclient, url+"/mutation"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -452,24 +452,26 @@ func admitFunc(review *v1beta1.AdmissionReview) error {
 	return nil
 }
 
-func createV1beta1MutationWebhook(client clientset.Interface, endpoint string) error {
-	fail := admissionv1beta1.Fail
+func createMutationWebhook(client clientset.Interface, endpoint string) error {
+	fail := admissionregistrationv1.Fail
+	noSideEffects := admissionregistrationv1.SideEffectClassNone
 	// Attaching Mutation webhook to API server
-	_, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionv1beta1.MutatingWebhookConfiguration{
+	_, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(context.TODO(), &admissionregistrationv1.MutatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: testWebhookConfigurationName},
-		Webhooks: []admissionv1beta1.MutatingWebhook{{
+		Webhooks: []admissionregistrationv1.MutatingWebhook{{
 			Name: testWebhookName,
-			ClientConfig: admissionv1beta1.WebhookClientConfig{
+			ClientConfig: admissionregistrationv1.WebhookClientConfig{
 				URL:      &endpoint,
 				CABundle: utils.LocalhostCert,
 			},
-			Rules: []admissionv1beta1.RuleWithOperations{{
-				Operations: []admissionv1beta1.OperationType{admissionv1beta1.Create, admissionv1beta1.Update},
-				Rule:       admissionv1beta1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
+			Rules: []admissionregistrationv1.RuleWithOperations{{
+				Operations: []admissionregistrationv1.OperationType{admissionregistrationv1.Create, admissionregistrationv1.Update},
+				Rule:       admissionregistrationv1.Rule{APIGroups: []string{"*"}, APIVersions: []string{"*"}, Resources: []string{"*/*"}},
 			}},
 			ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"admission": "true"}},
 			FailurePolicy:           &fail,
 			AdmissionReviewVersions: []string{"v1beta1"},
+			SideEffects:             &noSideEffects,
 		}},
 	}, metav1.CreateOptions{})
 	return err

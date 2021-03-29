@@ -229,6 +229,32 @@ func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 	return types
 }
 
+// VersionsForGroupKind returns the versions that a particular GroupKind can be converted to within the given group.
+// A GroupKind might be converted to a different group. That information is available in EquivalentResourceMapper.
+func (s *Scheme) VersionsForGroupKind(gk schema.GroupKind) []schema.GroupVersion {
+	availableVersions := []schema.GroupVersion{}
+	for gvk := range s.gvkToType {
+		if gk != gvk.GroupKind() {
+			continue
+		}
+
+		availableVersions = append(availableVersions, gvk.GroupVersion())
+	}
+
+	// order the return for stability
+	ret := []schema.GroupVersion{}
+	for _, version := range s.PrioritizedVersionsForGroup(gk.Group) {
+		for _, availableVersion := range availableVersions {
+			if version != availableVersion {
+				continue
+			}
+			ret = append(ret, availableVersion)
+		}
+	}
+
+	return ret
+}
+
 // AllKnownTypes returns the all known types.
 func (s *Scheme) AllKnownTypes() map[schema.GroupVersionKind]reflect.Type {
 	return s.gvkToType

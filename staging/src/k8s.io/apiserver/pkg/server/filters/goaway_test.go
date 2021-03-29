@@ -438,10 +438,7 @@ func TestGOAWAYHTTP1Requests(t *testing.T) {
 }
 
 // TestGOAWAYConcurrency tests GOAWAY frame will not affect concurrency requests in a single http client instance.
-// Known issues in history: https://github.com/kubernetes/kubernetes/issues/91131.
 func TestGOAWAYConcurrency(t *testing.T) {
-	t.Skip("disabled because of https://github.com/kubernetes/kubernetes/issues/94532")
-
 	s, err := newTestGOAWAYServer()
 	if err != nil {
 		t.Fatalf("failed to set-up test GOAWAY http server, err: %v", err)

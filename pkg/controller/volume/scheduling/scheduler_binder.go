@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,11 +35,12 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	storagelistersv1alpha1 "k8s.io/client-go/listers/storage/v1alpha1"
+	storagelistersv1beta1 "k8s.io/client-go/listers/storage/v1beta1"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	csitrans "k8s.io/csi-translation-lib"
 	csiplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog/v2"
@@ -79,6 +80,28 @@ type BindingInfo struct {
 
 	// Proposed PV to bind to this PVC
 	pv *v1.PersistentVolume
+}
+
+// StorageClassName returns the name of the storage class.
+func (b *BindingInfo) StorageClassName() string {
+	return b.pv.Spec.StorageClassName
+}
+
+// StorageResource represents storage resource.
+type StorageResource struct {
+	Requested int64
+	Capacity  int64
+}
+
+// StorageResource returns storage resource.
+func (b *BindingInfo) StorageResource() *StorageResource {
+	// both fields are mandatory
+	requestedQty := b.pvc.Spec.Resources.Requests[v1.ResourceName(v1.ResourceStorage)]
+	capacityQty := b.pv.Spec.Capacity[v1.ResourceName(v1.ResourceStorage)]
+	return &StorageResource{
+		Requested: requestedQty.Value(),
+		Capacity:  capacityQty.Value(),
+	}
 }
 
 // PodVolumes holds pod's volumes information used in volume scheduling.
@@ -187,7 +210,7 @@ type volumeBinder struct {
 
 	capacityCheckEnabled     bool
 	csiDriverLister          storagelisters.CSIDriverLister
-	csiStorageCapacityLister storagelistersv1alpha1.CSIStorageCapacityLister
+	csiStorageCapacityLister storagelistersv1beta1.CSIStorageCapacityLister
 }
 
 // CapacityCheck contains additional parameters for NewVolumeBinder that
@@ -195,7 +218,7 @@ type volumeBinder struct {
 // capacity is desired.
 type CapacityCheck struct {
 	CSIDriverInformer          storageinformers.CSIDriverInformer
-	CSIStorageCapacityInformer storageinformersv1alpha1.CSIStorageCapacityInformer
+	CSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
 // NewVolumeBinder sets up all the caches needed for the scheduler to make volume binding decisions.
@@ -673,8 +696,13 @@ func (b *volumeBinder) isVolumeBound(pod *v1.Pod, vol *v1.Volume) (bound bool, p
 	switch {
 	case vol.PersistentVolumeClaim != nil:
 		pvcName = vol.PersistentVolumeClaim.ClaimName
-	case vol.Ephemeral != nil &&
-		utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume):
+	case vol.Ephemeral != nil:
+		if !utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
+			return false, nil, fmt.Errorf(
+				"volume %s is a generic ephemeral volume, but that feature is disabled in kube-scheduler",
+				vol.Name,
+			)
+		}
 		// Generic ephemeral inline volumes also use a PVC,
 		// just with a computed name, and...
 		pvcName = pod.Name + "-" + vol.Name
@@ -815,7 +843,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := v1helper.GetPersistentVolumeClaimClass(pvc)
+		storageClassName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 		pvcName := getPVCName(pvc)
 
@@ -855,7 +883,7 @@ func (b *volumeBinder) checkVolumeProvisions(pod *v1.Pod, claimsToProvision []*v
 	// fails or we encounter an error.
 	for _, claim := range claimsToProvision {
 		pvcName := getPVCName(claim)
-		className := v1helper.GetPersistentVolumeClaimClass(claim)
+		className := storagehelpers.GetPersistentVolumeClaimClass(claim)
 		if className == "" {
 			return false, false, nil, fmt.Errorf("no class for claim %q", pvcName)
 		}
@@ -946,8 +974,7 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	sizeInBytes := quantity.Value()
 	for _, capacity := range capacities {
 		if capacity.StorageClassName == storageClass.Name &&
-			capacity.Capacity != nil &&
-			capacity.Capacity.Value() >= sizeInBytes &&
+			capacitySufficient(capacity, sizeInBytes) &&
 			b.nodeHasAccess(node, capacity) {
 			// Enough capacity found.
 			return true, nil
@@ -961,7 +988,16 @@ func (b *volumeBinder) hasEnoughCapacity(provisioner string, claim *v1.Persisten
 	return false, nil
 }
 
-func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1alpha1.CSIStorageCapacity) bool {
+func capacitySufficient(capacity *storagev1beta1.CSIStorageCapacity, sizeInBytes int64) bool {
+	limit := capacity.Capacity
+	if capacity.MaximumVolumeSize != nil {
+		// Prefer MaximumVolumeSize if available, it is more precise.
+		limit = capacity.MaximumVolumeSize
+	}
+	return limit != nil && limit.Value() >= sizeInBytes
+}
+
+func (b *volumeBinder) nodeHasAccess(node *v1.Node, capacity *storagev1beta1.CSIStorageCapacity) bool {
 	if capacity.NodeTopology == nil {
 		// Unavailable
 		return false

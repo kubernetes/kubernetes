@@ -145,13 +145,10 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:    "write-pod",
-					Image:   BusyBoxImage,
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", command},
-					SecurityContext: &v1.SecurityContext{
-						Privileged: &isPrivileged,
-					},
+					Name:            "write-pod",
+					Image:           GetDefaultTestImage(),
+					Command:         GenerateScriptCmd(command),
+					SecurityContext: GenerateContainerSecurityContext(isPrivileged),
 				},
 			},
 			RestartPolicy: v1.RestartPolicyOnFailure,
@@ -187,10 +184,6 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			return &i
 		}(1000)
 	}
-	image := imageutils.BusyBox
-	if podConfig.ImageID != imageutils.None {
-		image = podConfig.ImageID
-	}
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -200,28 +193,34 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 			Name:      podName,
 			Namespace: podConfig.NS,
 		},
-		Spec: v1.PodSpec{
-			HostIPC: podConfig.HostIPC,
-			HostPID: podConfig.HostPID,
-			SecurityContext: &v1.PodSecurityContext{
-				FSGroup: podConfig.FsGroup,
-			},
-			Containers: []v1.Container{
-				{
-					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(image),
-					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", podConfig.Command},
-					SecurityContext: &v1.SecurityContext{
-						Privileged: &podConfig.IsPrivileged,
-					},
-				},
-			},
-			RestartPolicy: v1.RestartPolicyOnFailure,
-		},
+		Spec: *MakePodSpec(podConfig),
 	}
+	return podSpec, nil
+}
+
+// MakePodSpec returns a PodSpec definition
+func MakePodSpec(podConfig *Config) *v1.PodSpec {
+	image := imageutils.BusyBox
+	if podConfig.ImageID != imageutils.None {
+		image = podConfig.ImageID
+	}
+	podSpec := &v1.PodSpec{
+		HostIPC:         podConfig.HostIPC,
+		HostPID:         podConfig.HostPID,
+		SecurityContext: GeneratePodSecurityContext(podConfig.FsGroup, podConfig.SeLinuxLabel),
+		Containers: []v1.Container{
+			{
+				Name:            "write-pod",
+				Image:           GetTestImage(image),
+				Command:         GenerateScriptCmd(podConfig.Command),
+				SecurityContext: GenerateContainerSecurityContext(podConfig.IsPrivileged),
+			},
+		},
+		RestartPolicy: v1.RestartPolicyOnFailure,
+	}
+
 	if podConfig.PodFSGroupChangePolicy != nil {
-		podSpec.Spec.SecurityContext.FSGroupChangePolicy = podConfig.PodFSGroupChangePolicy
+		podSpec.SecurityContext.FSGroupChangePolicy = podConfig.PodFSGroupChangePolicy
 	}
 
 	var volumeMounts = make([]v1.VolumeMount, 0)
@@ -247,13 +246,10 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 		volumeIndex++
 	}
 
-	podSpec.Spec.Containers[0].VolumeMounts = volumeMounts
-	podSpec.Spec.Containers[0].VolumeDevices = volumeDevices
-	podSpec.Spec.Volumes = volumes
-	if runtime.GOOS != "windows" {
-		podSpec.Spec.SecurityContext.SELinuxOptions = podConfig.SeLinuxLabel
-	}
+	podSpec.Containers[0].VolumeMounts = volumeMounts
+	podSpec.Containers[0].VolumeDevices = volumeDevices
+	podSpec.Volumes = volumes
 
-	SetNodeSelection(&podSpec.Spec, podConfig.NodeSelection)
-	return podSpec, nil
+	SetNodeSelection(podSpec, podConfig.NodeSelection)
+	return podSpec
 }

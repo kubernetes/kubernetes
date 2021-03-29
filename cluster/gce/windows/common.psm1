@@ -48,6 +48,25 @@ function Log-Output {
   }
 }
 
+# Dumps detailed information about the specified service to the console output.
+# $Delay can be set to a positive value to introduce some seconds of delay
+# before querying the service information, which may produce more consistent
+# results if this function is called immediately after changing a service's
+# configuration.
+function Write-VerboseServiceInfoToConsole {
+  param (
+    [parameter(Mandatory=$true)] [string]$Service,
+    [parameter(Mandatory=$false)] [int]$Delay = 0
+  )
+  if ($Delay -gt 0) {
+    Start-Sleep $Delay
+  }
+  Get-Service -ErrorAction Continue $Service | Select-Object * | Out-String
+  & sc.exe queryex $Service
+  & sc.exe qc $Service
+  & sc.exe qfailure $Service
+}
+
 # Checks if a file should be written or overwritten by testing if it already
 # exists and checking the value of the global $REDO_STEPS variable. Emits an
 # informative message if the file already exists.

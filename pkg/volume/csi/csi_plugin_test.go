@@ -41,8 +41,22 @@ import (
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-// create a plugin mgr to load plugins and setup a fake client
+const (
+	volumeHostType int = iota
+	kubeletVolumeHostType
+	attachDetachVolumeHostType
+)
+
 func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
+	return newTestPluginWithVolumeHost(t, client, kubeletVolumeHostType)
+}
+
+func newTestPluginWithAttachDetachVolumeHost(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, string) {
+	return newTestPluginWithVolumeHost(t, client, attachDetachVolumeHostType)
+}
+
+// create a plugin mgr to load plugins and setup a fake client
+func newTestPluginWithVolumeHost(t *testing.T, client *fakeclient.Clientset, hostType int) (*csiPlugin, string) {
 	tmpDir, err := utiltesting.MkTmpdir("csi-test")
 	if err != nil {
 		t.Fatalf("can't create temp dir: %v", err)
@@ -77,16 +91,45 @@ func newTestPlugin(t *testing.T, client *fakeclient.Clientset) (*csiPlugin, stri
 		}
 	}
 
-	host := volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t,
-		tmpDir,
-		client,
-		ProbeVolumePlugins(),
-		"fakeNode",
-		csiDriverLister,
-		volumeAttachmentLister,
-	)
+	var host volume.VolumeHost
+	switch hostType {
+	case volumeHostType:
+		host = volumetest.NewFakeVolumeHostWithCSINodeName(t,
+			tmpDir,
+			client,
+			ProbeVolumePlugins(),
+			"fakeNode",
+			csiDriverLister,
+			nil,
+		)
+	case kubeletVolumeHostType:
+		host = volumetest.NewFakeKubeletVolumeHostWithCSINodeName(t,
+			tmpDir,
+			client,
+			ProbeVolumePlugins(),
+			"fakeNode",
+			csiDriverLister,
+			volumeAttachmentLister,
+		)
+	case attachDetachVolumeHostType:
+		host = volumetest.NewFakeAttachDetachVolumeHostWithCSINodeName(t,
+			tmpDir,
+			client,
+			ProbeVolumePlugins(),
+			"fakeNode",
+			csiDriverLister,
+			volumeAttachmentLister,
+		)
+	default:
+		t.Fatalf("Unsupported volume host type")
+	}
 
-	pluginMgr := host.GetPluginMgr()
+	fakeHost, ok := host.(volumetest.FakeVolumeHost)
+	if !ok {
+		t.Fatalf("Unsupported volume host type")
+	}
+
+	pluginMgr := fakeHost.GetPluginMgr()
 	plug, err := pluginMgr.FindPluginByName(CSIPluginName)
 	if err != nil {
 		t.Fatalf("can't find plugin %v", CSIPluginName)
@@ -867,7 +910,7 @@ func TestPluginNewAttacher(t *testing.T) {
 		t.Fatalf("failed to create new attacher: %v", err)
 	}
 
-	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher)
+	csiAttacher := getCsiAttacherFromVolumeAttacher(attacher, testWatchTimeout)
 	if csiAttacher.plugin == nil {
 		t.Error("plugin not set for attacher")
 	}
@@ -888,7 +931,7 @@ func TestPluginNewDetacher(t *testing.T) {
 		t.Fatalf("failed to create new detacher: %v", err)
 	}
 
-	csiDetacher := getCsiAttacherFromVolumeDetacher(detacher)
+	csiDetacher := getCsiAttacherFromVolumeDetacher(detacher, testWatchTimeout)
 	if csiDetacher.plugin == nil {
 		t.Error("plugin not set for detacher")
 	}

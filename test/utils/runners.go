@@ -28,7 +28,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -1017,14 +1017,14 @@ type NodeAllocatableStrategy struct {
 	// Node.status.allocatable to fill to all nodes.
 	NodeAllocatable map[v1.ResourceName]string
 	// Map <driver_name> -> VolumeNodeResources to fill into csiNode.spec.drivers[<driver_name>].
-	CsiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources
+	CsiNodeAllocatable map[string]*storagev1.VolumeNodeResources
 	// List of in-tree volume plugins migrated to CSI.
 	MigratedPlugins []string
 }
 
 var _ PrepareNodeStrategy = &NodeAllocatableStrategy{}
 
-func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiNodeAllocatable map[string]*storagev1beta1.VolumeNodeResources, migratedPlugins []string) *NodeAllocatableStrategy {
+func NewNodeAllocatableStrategy(nodeAllocatable map[v1.ResourceName]string, csiNodeAllocatable map[string]*storagev1.VolumeNodeResources, migratedPlugins []string) *NodeAllocatableStrategy {
 	return &NodeAllocatableStrategy{
 		NodeAllocatable:    nodeAllocatable,
 		CsiNodeAllocatable: csiNodeAllocatable,
@@ -1063,20 +1063,20 @@ func (s *NodeAllocatableStrategy) CleanupNode(node *v1.Node) *v1.Node {
 }
 
 func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientset.Interface) error {
-	csiNode := &storagev1beta1.CSINode{
+	csiNode := &storagev1.CSINode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
 			Annotations: map[string]string{
 				v1.MigratedPluginsAnnotationKey: strings.Join(s.MigratedPlugins, ","),
 			},
 		},
-		Spec: storagev1beta1.CSINodeSpec{
-			Drivers: []storagev1beta1.CSINodeDriver{},
+		Spec: storagev1.CSINodeSpec{
+			Drivers: []storagev1.CSINodeDriver{},
 		},
 	}
 
 	for driver, allocatable := range s.CsiNodeAllocatable {
-		d := storagev1beta1.CSINodeDriver{
+		d := storagev1.CSINodeDriver{
 			Name:        driver,
 			Allocatable: allocatable,
 			NodeID:      nodeName,
@@ -1084,7 +1084,7 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 		csiNode.Spec.Drivers = append(csiNode.Spec.Drivers, d)
 	}
 
-	_, err := client.StorageV1beta1().CSINodes().Create(context.TODO(), csiNode, metav1.CreateOptions{})
+	_, err := client.StorageV1().CSINodes().Create(context.TODO(), csiNode, metav1.CreateOptions{})
 	if apierrors.IsAlreadyExists(err) {
 		// Something created CSINode instance after we checked it did not exist.
 		// Make the caller to re-try PrepareDependentObjects by returning Conflict error
@@ -1093,7 +1093,7 @@ func (s *NodeAllocatableStrategy) createCSINode(nodeName string, client clientse
 	return err
 }
 
-func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode, client clientset.Interface) error {
+func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1.CSINode, client clientset.Interface) error {
 	for driverName, allocatable := range s.CsiNodeAllocatable {
 		found := false
 		for i, driver := range csiNode.Spec.Drivers {
@@ -1104,7 +1104,7 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 			}
 		}
 		if !found {
-			d := storagev1beta1.CSINodeDriver{
+			d := storagev1.CSINodeDriver{
 				Name:        driverName,
 				Allocatable: allocatable,
 			}
@@ -1114,12 +1114,12 @@ func (s *NodeAllocatableStrategy) updateCSINode(csiNode *storagev1beta1.CSINode,
 	}
 	csiNode.Annotations[v1.MigratedPluginsAnnotationKey] = strings.Join(s.MigratedPlugins, ",")
 
-	_, err := client.StorageV1beta1().CSINodes().Update(context.TODO(), csiNode, metav1.UpdateOptions{})
+	_, err := client.StorageV1().CSINodes().Update(context.TODO(), csiNode, metav1.UpdateOptions{})
 	return err
 }
 
 func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client clientset.Interface) error {
-	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
+	csiNode, err := client.StorageV1().CSINodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return s.createCSINode(node.Name, client)
@@ -1130,7 +1130,7 @@ func (s *NodeAllocatableStrategy) PrepareDependentObjects(node *v1.Node, client 
 }
 
 func (s *NodeAllocatableStrategy) CleanupDependentObjects(nodeName string, client clientset.Interface) error {
-	csiNode, err := client.StorageV1beta1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+	csiNode, err := client.StorageV1().CSINodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -1486,10 +1486,10 @@ func makeUnboundPersistentVolumeClaim(storageClass string) *v1.PersistentVolumeC
 
 func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFactory, podTemplate *v1.Pod) TestPodCreateStrategy {
 	return func(client clientset.Interface, namespace string, podCount int) error {
-		volumeBindingMode := storage.VolumeBindingWaitForFirstConsumer
-		storageClass := &storage.StorageClass{
+		volumeBindingMode := storagev1.VolumeBindingWaitForFirstConsumer
+		storageClass := &storagev1.StorageClass{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "storage-class-1",
+				Name: "storagev1-class-1",
 			},
 			Provisioner:       "kubernetes.io/gce-pd",
 			VolumeBindingMode: &volumeBindingMode,
@@ -1497,7 +1497,7 @@ func NewCreatePodWithPersistentVolumeWithFirstConsumerStrategy(factory volumeFac
 		claimTemplate := makeUnboundPersistentVolumeClaim(storageClass.Name)
 
 		if err := CreateStorageClassWithRetries(client, storageClass); err != nil {
-			return fmt.Errorf("failed to create storage class: %v", err)
+			return fmt.Errorf("failed to create storagev1 class: %v", err)
 		}
 
 		factoryWithStorageClass := func(i int) *v1.PersistentVolume {

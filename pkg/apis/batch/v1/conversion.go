@@ -32,14 +32,13 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			case "metadata.name", "metadata.namespace", "status.successful":
 				return label, value, nil
 			default:
-				return "", "", fmt.Errorf("field label %q not supported for batchv1.Job", label)
+				return "", "", fmt.Errorf("field label %q not supported for Job", label)
 			}
-		},
-	)
+		})
 }
 
 // The following functions don't do anything special, but they need to be added
-// here due to the dependency of v1beta1 and v2alpha1 on v1.
+// here due to the dependency of v1beta1 on v1.
 
 func Convert_batch_JobSpec_To_v1_JobSpec(in *batch.JobSpec, out *v1.JobSpec, s conversion.Scope) error {
 	return autoConvert_batch_JobSpec_To_v1_JobSpec(in, out, s)

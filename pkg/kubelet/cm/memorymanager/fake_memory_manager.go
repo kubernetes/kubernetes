@@ -18,6 +18,7 @@ package memorymanager
 
 import (
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
@@ -31,37 +32,41 @@ type fakeManager struct {
 }
 
 func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
-	klog.Info("[fake memorymanager] Start()")
+	klog.InfoS("Start()")
 	return nil
 }
 
 func (m *fakeManager) Policy() Policy {
-	klog.Info("[fake memorymanager] Policy()")
+	klog.InfoS("Policy()")
 	return NewPolicyNone()
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
-	klog.Infof("[fake memorymanager] Allocate (pod: %s, container: %s", pod.Name, container.Name)
+	klog.InfoS("Allocate", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
-func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
-	klog.Infof("[fake memorymanager] AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
+func (m *fakeManager) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	klog.InfoS("Add container", "pod", klog.KObj(pod), "containerName", container.Name, "containerID", containerID)
+}
+
+func (m *fakeManager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int {
+	klog.InfoS("Get MemoryNUMANodes", "pod", klog.KObj(pod), "containerName", container.Name)
 	return nil
 }
 
 func (m *fakeManager) RemoveContainer(containerID string) error {
-	klog.Infof("[fake memorymanager] RemoveContainer (container id: %s)", containerID)
+	klog.InfoS("RemoveContainer", "containerID", containerID)
 	return nil
 }
 
 func (m *fakeManager) GetTopologyHints(pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
-	klog.Infof("[fake memorymanager] Get Topology Hints")
+	klog.InfoS("Get Topology Hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 
 func (m *fakeManager) GetPodTopologyHints(pod *v1.Pod) map[string][]topologymanager.TopologyHint {
-	klog.Infof("[fake memorymanager] Get Pod Topology Hints")
+	klog.InfoS("Get Pod Topology Hints")
 	return map[string][]topologymanager.TopologyHint{}
 }
 

@@ -100,7 +100,7 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.InfoS("Using this format as endpoint is deprecated, please consider using full url format.", "deprecatedFormat", endpoint, "fullURLFormat", fallbackEndpoint)
 		}
 	}
 	return

@@ -47,6 +47,8 @@ const (
 	ILBFinalizerV2 = "gke.networking.io/l4-ilb-v2"
 	// maxInstancesPerInstanceGroup defines maximum number of VMs per InstanceGroup.
 	maxInstancesPerInstanceGroup = 1000
+	// maxL4ILBPorts is the maximum number of ports that can be specified in an L4 ILB Forwarding Rule. Beyond this, "AllPorts" field should be used.
+	maxL4ILBPorts = 5
 )
 
 func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
@@ -186,6 +188,10 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 	}
 	if options.AllowGlobalAccess {
 		newFwdRule.AllowGlobalAccess = options.AllowGlobalAccess
+	}
+	if len(ports) > maxL4ILBPorts {
+		newFwdRule.Ports = nil
+		newFwdRule.AllPorts = true
 	}
 
 	fwdRuleDeleted := false
@@ -969,13 +975,18 @@ func (g *Cloud) ensureInternalForwardingRule(existingFwdRule, newFwdRule *comput
 func forwardingRulesEqual(old, new *compute.ForwardingRule) bool {
 	// basepath could have differences like compute.googleapis.com vs www.googleapis.com, compare resourceIDs
 	oldResourceID, err := cloud.ParseResourceURL(old.BackendService)
-	klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse backend resource URL from existing FR, err - %v", err)
+	}
 	newResourceID, err := cloud.ParseResourceURL(new.BackendService)
-	klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
+	if err != nil {
+		klog.Errorf("forwardingRulesEqual(): failed to parse resource URL from new FR, err - %v", err)
+	}
 	return (old.IPAddress == "" || new.IPAddress == "" || old.IPAddress == new.IPAddress) &&
 		old.IPProtocol == new.IPProtocol &&
 		old.LoadBalancingScheme == new.LoadBalancingScheme &&
 		equalStringSets(old.Ports, new.Ports) &&
+		old.AllPorts == new.AllPorts &&
 		oldResourceID.Equal(newResourceID) &&
 		old.AllowGlobalAccess == new.AllowGlobalAccess &&
 		old.Subnetwork == new.Subnetwork

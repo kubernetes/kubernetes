@@ -11,14 +11,14 @@ dependencies:
   #
   # ref: https://github.com/kubernetes/kubernetes/pull/98845
   - name: "zeitgeist"
-    version: "v0.1.1-0.20210222132743-e06e27751b7f"
+    version: "v0.2.0"
     refPaths:
     - path: hack/tools/go.mod
       match: sigs.k8s.io/zeitgeist\ v(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?
 
   # agnhost: bump this one first
   - name: "agnhost"
-    version: "2.28"
+    version: "2.30"
     refPaths:
     - path: test/images/agnhost/VERSION
       match: \d.\d
@@ -27,26 +27,15 @@ dependencies:
 
   # then after merge and successful postsubmit image push / promotion, bump this
   - name: "agnhost: dependents"
-    version: "2.28"
+    version: "2.30"
     refPaths:
     - path: test/utils/image/manifest.go
       match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
-
-  # Bazel
-  - name: "repo-infra"
-    version: 0.2.0
-    refPaths:
-    - path: build/root/WORKSPACE
-      match: strip_prefix = "repo-infra-\d+.\d+.\d+"
-    - path: build/root/WORKSPACE
-      match: https://github.com/kubernetes/repo-infra/archive/v\d+.\d+.\d+.tar.gz
 
   # CNI plugins
   - name: "cni"
     version: 0.8.7
     refPaths:
-    - path: build/workspace.bzl
-      match: CNI_VERSION =
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CNI_VERSION=
     - path: cluster/gce/config-common.sh
@@ -56,7 +45,7 @@ dependencies:
 
   # CoreDNS
   - name: "coredns-kube-up"
-    version: 1.7.0
+    version: 1.8.0
     refPaths:
     - path: cluster/addons/dns/coredns/coredns.yaml.base
       match: k8s.gcr.io/coredns
@@ -75,8 +64,6 @@ dependencies:
   - name: "crictl"
     version: 1.20.0
     refPaths:
-    - path: build/workspace.bzl
-      match: CRI_TOOLS_VERSION =
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
     - path: cluster/gce/windows/k8s-node-setup.psm1
@@ -84,7 +71,7 @@ dependencies:
 
   # Docker
   - name: "docker"
-    version: 19.03
+    version: 20.10
     refPaths:
     - path: vendor/k8s.io/system-validators/validators/docker_validator.go
       match: latestValidatedDockerVersion
@@ -95,8 +82,6 @@ dependencies:
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version
-    - path: build/workspace.bzl
-      match: ETCD_VERSION
     - path: cluster/gce/upgrade-aliases.sh
       match: ETCD_IMAGE|ETCD_VERSION
     - path: cmd/kubeadm/app/constants/constants.go
@@ -116,11 +101,9 @@ dependencies:
 
   # Golang
   - name: "golang: upstream version"
-    version: 1.15.8
+    version: 1.16.1
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: build/root/WORKSPACE
-      match: (override_)?go_version = "\d+.\d+(alpha|beta|rc)?\.?\d+"
     - path: cluster/addons/fluentd-elasticsearch/es-image/Dockerfile
       match: 'FROM golang\:\d+.\d+(alpha|beta|rc)?\.?(\d+)?'
     - path: test/images/Makefile
@@ -128,8 +111,20 @@ dependencies:
     - path: staging/publishing/rules.yaml
       match: 'default-go-version\: \d+.\d+(alpha|beta|rc)?\.?(\d+)?'
 
+  # Golang pre-releases are denoted as `1.y<pre-release stage>.z`
+  # Example: go1.16rc1
+  #
+  # This entry is a stub of the major and minor version to allow dependency
+  # checks to pass when building Kubernetes using a pre-release of Golang.
+  - name: "golang: <major>.<minor>"
+    version: 1.16
+    refPaths:
+    - path: build/build-image/cross/VERSION
+    - path: hack/lib/golang.sh
+      match: minimum_go_version=go([0-9]+\.[0-9]+)
+
   - name: "k8s.gcr.io/kube-cross: dependents"
-    version: v1.15.8-1
+    version: v1.16.1-1
     refPaths:
     - path: build/build-image/cross/VERSION
     - path: test/images/sample-apiserver/Makefile
@@ -139,8 +134,6 @@ dependencies:
   - name: "k8s.gcr.io/debian-base: dependents"
     version: buster-v1.4.0
     refPaths:
-    - path: build/workspace.bzl
-      match: tag =
     - path: cluster/images/etcd/Makefile
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base:[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
     - path: cluster/images/etcd/Makefile
@@ -156,22 +149,18 @@ dependencies:
     version: buster-v1.5.0
     refPaths:
     - path: build/common.sh
-      match: debian_iptables_version=
-    - path: build/workspace.bzl
-      match: tag =
+      match: __default_debian_iptables_version=
     - path: test/utils/image/manifest.go
       match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
-    version: buster-v2.3.1
+    version: v2.3.1-go1.16.1-buster.0
     refPaths:
     - path: build/common.sh
-      match: go_runner_version=
-    - path: build/workspace.bzl
-      match: tag =
+      match: __default_go_runner_version=
 
   - name: "k8s.gcr.io/pause"
-    version: 3.4
+    version: 3.5
     refPaths:
     - path: build/pause/Makefile
       match: TAG =

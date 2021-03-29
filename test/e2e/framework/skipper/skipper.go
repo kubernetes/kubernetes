@@ -46,6 +46,11 @@ import (
 // New local storage types to support local storage capacity isolation
 var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIsolation"
 
+var (
+	downwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
+	execProbeTimeout     featuregate.Feature = "ExecProbeTimeout"
+)
+
 func skipInternalf(caller int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
 	framework.Logf(msg)
@@ -134,6 +139,18 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 func SkipUnlessLocalEphemeralStorageEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(localStorageCapacityIsolation) {
 		skipInternalf(1, "Only supported when %v feature is enabled", localStorageCapacityIsolation)
+	}
+}
+
+func SkipUnlessDownwardAPIHugePagesEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(downwardAPIHugePages) {
+		skipInternalf(1, "Only supported when %v feature is enabled", downwardAPIHugePages)
+	}
+}
+
+func SkipUnlessExecProbeTimeoutEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(execProbeTimeout) {
+		skipInternalf(1, "Only supported when %v feature is enabled", execProbeTimeout)
 	}
 }
 

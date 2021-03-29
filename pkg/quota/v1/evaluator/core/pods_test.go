@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +29,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	quota "k8s.io/apiserver/pkg/quota/v1"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
+	"k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -90,8 +95,9 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	deletionTimestampNotPastGracePeriod := metav1.NewTime(fakeClock.Now())
 
 	testCases := map[string]struct {
-		pod   *api.Pod
-		usage corev1.ResourceList
+		pod                *api.Pod
+		usage              corev1.ResourceList
+		podOverheadEnabled bool
 	}{
 		"init container CPU": {
 			pod: &api.Pod{
@@ -433,15 +439,309 @@ func TestPodEvaluatorUsage(t *testing.T) {
 				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
 			},
 		},
+		"count pod overhead as usage": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Overhead: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("1"),
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("1"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("2"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("3"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("2"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+			podOverheadEnabled: true,
+		},
+		"do not count pod overhead as usage with pod overhead disabled": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Overhead: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("1"),
+					},
+					Containers: []api.Container{
+						{
+							Resources: api.ResourceRequirements{
+								Requests: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("1"),
+								},
+								Limits: api.ResourceList{
+									api.ResourceCPU: resource.MustParse("2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			usage: corev1.ResourceList{
+				corev1.ResourceRequestsCPU: resource.MustParse("1"),
+				corev1.ResourceLimitsCPU:   resource.MustParse("2"),
+				corev1.ResourcePods:        resource.MustParse("1"),
+				corev1.ResourceCPU:         resource.MustParse("1"),
+				generic.ObjectCountQuotaResourceNameFor(schema.GroupResource{Resource: "pods"}): resource.MustParse("1"),
+			},
+			podOverheadEnabled: false,
+		},
 	}
 	for testName, testCase := range testCases {
 		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodOverhead, testCase.podOverheadEnabled)()
 			actual, err := evaluator.Usage(testCase.pod)
 			if err != nil {
 				t.Error(err)
 			}
 			if !quota.Equals(testCase.usage, actual) {
 				t.Errorf("expected: %v, actual: %v", testCase.usage, actual)
+			}
+		})
+	}
+}
+
+func TestPodEvaluatorMatchingScopes(t *testing.T) {
+	fakeClock := clock.NewFakeClock(time.Now())
+	evaluator := NewPodEvaluator(nil, fakeClock)
+	activeDeadlineSeconds := int64(30)
+	testCases := map[string]struct {
+		pod                      *api.Pod
+		selectors                []corev1.ScopedResourceSelectorRequirement
+		wantSelectors            []corev1.ScopedResourceSelectorRequirement
+		disableNamespaceSelector bool
+	}{
+		"EmptyPod": {
+			pod: &api.Pod{},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+			},
+		},
+		"PriorityClass": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					PriorityClassName: "class1",
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopePriorityClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+			},
+		},
+		"NotBestEffort": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					Containers: []api.Container{{
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceCPU:                        resource.MustParse("1"),
+								api.ResourceMemory:                     resource.MustParse("50M"),
+								api.ResourceName("example.com/dongle"): resource.MustParse("1"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceCPU:                        resource.MustParse("2"),
+								api.ResourceMemory:                     resource.MustParse("100M"),
+								api.ResourceName("example.com/dongle"): resource.MustParse("1"),
+							},
+						},
+					}},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeNotBestEffort},
+			},
+		},
+		"Terminating": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+			},
+		},
+		"OnlyTerminating": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+				},
+			},
+			selectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+			},
+		},
+		"CrossNamespaceRequiredAffinity": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}, NamespaceSelector: &metav1.LabelSelector{}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"CrossNamespaceRequiredAffinityWithSlice": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns1"}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"CrossNamespacePreferredAffinity": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns2"}, NamespaceSelector: &metav1.LabelSelector{}}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"CrossNamespacePreferredAffinityWithSelector": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAffinity: &api.PodAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, NamespaceSelector: &metav1.LabelSelector{}}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"CrossNamespacePreferredAntiAffinity": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAntiAffinity: &api.PodAntiAffinity{
+							PreferredDuringSchedulingIgnoredDuringExecution: []api.WeightedPodAffinityTerm{
+								{PodAffinityTerm: api.PodAffinityTerm{LabelSelector: &metav1.LabelSelector{}, NamespaceSelector: &metav1.LabelSelector{}}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"CrossNamespaceRequiredAntiAffinity": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+				{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+			},
+		},
+		"NamespaceSelectorFeatureDisabled": {
+			pod: &api.Pod{
+				Spec: api.PodSpec{
+					ActiveDeadlineSeconds: &activeDeadlineSeconds,
+					Affinity: &api.Affinity{
+						PodAntiAffinity: &api.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []api.PodAffinityTerm{
+								{LabelSelector: &metav1.LabelSelector{}, Namespaces: []string{"ns3"}},
+							},
+						},
+					},
+				},
+			},
+			wantSelectors: []corev1.ScopedResourceSelectorRequirement{
+				{ScopeName: corev1.ResourceQuotaScopeTerminating},
+				{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+			},
+			disableNamespaceSelector: true,
+		},
+	}
+	for testName, testCase := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.PodAffinityNamespaceSelector, !testCase.disableNamespaceSelector)()
+			if testCase.selectors == nil {
+				testCase.selectors = []corev1.ScopedResourceSelectorRequirement{
+					{ScopeName: corev1.ResourceQuotaScopeTerminating},
+					{ScopeName: corev1.ResourceQuotaScopeNotTerminating},
+					{ScopeName: corev1.ResourceQuotaScopeBestEffort},
+					{ScopeName: corev1.ResourceQuotaScopeNotBestEffort},
+					{ScopeName: corev1.ResourceQuotaScopePriorityClass, Operator: corev1.ScopeSelectorOpIn, Values: []string{"class1"}},
+					{ScopeName: corev1.ResourceQuotaScopeCrossNamespacePodAffinity},
+				}
+			}
+			gotSelectors, err := evaluator.MatchingScopes(testCase.pod, testCase.selectors)
+			if err != nil {
+				t.Error(err)
+			}
+			if diff := cmp.Diff(testCase.wantSelectors, gotSelectors); diff != "" {
+				t.Errorf("%v: unexpected diff (-want, +got):\n%s", testName, diff)
 			}
 		})
 	}

@@ -92,7 +92,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		ns = f.Namespace.Name
 	})
 
-	framework.KubeDescribe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
+	ginkgo.Describe("Basic StatefulSet functionality [StatefulSetBasic]", func() {
 		ssName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -891,7 +891,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		})
 	})
 
-	framework.KubeDescribe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
+	ginkgo.Describe("Deploy clustered applications [Feature:StatefulSet] [Slow]", func() {
 		var appTester *clusterAppTester
 
 		ginkgo.BeforeEach(func() {

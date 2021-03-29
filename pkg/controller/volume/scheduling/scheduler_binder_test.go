@@ -26,7 +26,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1alpha1 "k8s.io/api/storage/v1alpha1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1alpha1 "k8s.io/client-go/informers/storage/v1alpha1"
+	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -76,6 +76,11 @@ var (
 	// PVCs for CSI migration
 	boundMigrationPVC     = makeTestPVC("pvc-migration-bound", "1G", "", pvcBound, "pv-migration-bound", "1", &waitClass)
 	provMigrationPVCBound = makeTestPVC("pvc-migration-provisioned", "1Gi", "", pvcBound, "pv-migration-bound", "1", &waitClassWithProvisioner)
+
+	// PVCs and PV for GenericEphemeralVolume
+	conflictingGenericPVC = makeGenericEphemeralPVC("test-volume", false /* not owned*/)
+	correctGenericPVC     = makeGenericEphemeralPVC("test-volume", true /* owned */)
+	pvBoundGeneric        = makeTestPV("pv-bound", "node1", "1G", "1", correctGenericPVC, waitClass)
 
 	// PVs for manual binding
 	pvNode1a                   = makeTestPV("pv-node1a", "node1", "5G", "1", nil, waitClass)
@@ -135,7 +140,7 @@ type testEnv struct {
 
 	// For CSIStorageCapacity feature testing:
 	internalCSIDriverInformer          storageinformers.CSIDriverInformer
-	internalCSIStorageCapacityInformer storageinformersv1alpha1.CSIStorageCapacityInformer
+	internalCSIStorageCapacityInformer storageinformersv1beta1.CSIStorageCapacityInformer
 }
 
 func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...bool) *testEnv {
@@ -159,7 +164,7 @@ func newTestBinder(t *testing.T, stopCh <-chan struct{}, csiStorageCapacity ...b
 	pvcInformer := informerFactory.Core().V1().PersistentVolumeClaims()
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	csiDriverInformer := informerFactory.Storage().V1().CSIDrivers()
-	csiStorageCapacityInformer := informerFactory.Storage().V1alpha1().CSIStorageCapacities()
+	csiStorageCapacityInformer := informerFactory.Storage().V1beta1().CSIStorageCapacities()
 	var capacityCheck *CapacityCheck
 	if len(csiStorageCapacity) > 0 && csiStorageCapacity[0] {
 		capacityCheck = &CapacityCheck{
@@ -297,7 +302,7 @@ func (env *testEnv) addCSIDriver(csiDriver *storagev1.CSIDriver) {
 	csiDriverInformer.GetIndexer().Add(csiDriver)
 }
 
-func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1alpha1.CSIStorageCapacity) {
+func (env *testEnv) addCSIStorageCapacities(capacities []*storagev1beta1.CSIStorageCapacity) {
 	csiStorageCapacityInformer := env.internalCSIStorageCapacityInformer.Informer()
 	for _, capacity := range capacities {
 		csiStorageCapacityInformer.GetIndexer().Add(capacity)
@@ -583,6 +588,22 @@ const (
 	pvcSelectedNode
 )
 
+func makeGenericEphemeralPVC(volumeName string, owned bool) *v1.PersistentVolumeClaim {
+	pod := makePodWithGenericEphemeral()
+	pvc := makeTestPVC(pod.Name+"-"+volumeName, "1G", "", pvcBound, "pv-bound", "1", &immediateClass)
+	if owned {
+		controller := true
+		pvc.OwnerReferences = []metav1.OwnerReference{
+			{
+				Name:       pod.Name,
+				UID:        pod.UID,
+				Controller: &controller,
+			},
+		}
+	}
+	return pvc
+}
+
 func makeTestPVC(name, size, node string, pvcBoundState int, pvName, resourceVersion string, className *string) *v1.PersistentVolumeClaim {
 	fs := v1.PersistentVolumeFilesystem
 	pvc := &v1.PersistentVolumeClaim{
@@ -722,8 +743,8 @@ func makeCSIDriver(name string, storageCapacity bool) *storagev1.CSIDriver {
 	}
 }
 
-func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr string) *storagev1alpha1.CSIStorageCapacity {
-	c := &storagev1alpha1.CSIStorageCapacity{
+func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr, maximumVolumeSizeStr string) *storagev1beta1.CSIStorageCapacity {
+	c := &storagev1beta1.CSIStorageCapacity{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
@@ -736,6 +757,10 @@ func makeCapacity(name, storageClassName string, node *v1.Node, capacityStr stri
 	if capacityStr != "" {
 		capacityQuantity := resource.MustParse(capacityStr)
 		c.Capacity = &capacityQuantity
+	}
+	if maximumVolumeSizeStr != "" {
+		maximumVolumeSizeQuantity := resource.MustParse(maximumVolumeSizeStr)
+		c.MaximumVolumeSize = &maximumVolumeSizeQuantity
 	}
 	return c
 }
@@ -784,8 +809,21 @@ func makePodWithoutPVC() *v1.Pod {
 	return pod
 }
 
+func makePodWithGenericEphemeral(volumeNames ...string) *v1.Pod {
+	pod := makePod(nil)
+	for _, volumeName := range volumeNames {
+		pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{
+			Name: volumeName,
+			VolumeSource: v1.VolumeSource{
+				Ephemeral: &v1.EphemeralVolumeSource{},
+			},
+		})
+	}
+	return pod
+}
+
 func makeBinding(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) *BindingInfo {
-	return &BindingInfo{pvc: pvc, pv: pv}
+	return &BindingInfo{pvc: pvc.DeepCopy(), pv: pv.DeepCopy()}
 }
 
 func addProvisionAnn(pvc *v1.PersistentVolumeClaim) *v1.PersistentVolumeClaim {
@@ -846,6 +884,8 @@ func findPodVolumes(binder SchedulerVolumeBinder, pod *v1.Pod, node *v1.Node) (*
 }
 
 func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -854,6 +894,9 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 		cachePVCs []*v1.PersistentVolumeClaim
 		// If nil, makePod with podPVCs
 		pod *v1.Pod
+
+		// GenericEphemeralVolume feature enabled?
+		ephemeral bool
 
 		// Expected podBindingCache fields
 		expectedBindings []*BindingInfo
@@ -951,6 +994,31 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 			podPVCs:    []*v1.PersistentVolumeClaim{immediateUnboundPVC, unboundPVC},
 			shouldFail: true,
 		},
+		"generic-ephemeral,no-pvc": {
+			pod:        makePodWithGenericEphemeral("no-such-pvc"),
+			ephemeral:  true,
+			shouldFail: true,
+		},
+		"generic-ephemeral,with-pvc": {
+			pod:       makePodWithGenericEphemeral("test-volume"),
+			cachePVCs: []*v1.PersistentVolumeClaim{correctGenericPVC},
+			pvs:       []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral: true,
+		},
+		"generic-ephemeral,wrong-pvc": {
+			pod:        makePodWithGenericEphemeral("test-volume"),
+			cachePVCs:  []*v1.PersistentVolumeClaim{conflictingGenericPVC},
+			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral:  true,
+			shouldFail: true,
+		},
+		"generic-ephemeral,disabled": {
+			pod:        makePodWithGenericEphemeral("test-volume"),
+			cachePVCs:  []*v1.PersistentVolumeClaim{correctGenericPVC},
+			pvs:        []*v1.PersistentVolume{pvBoundGeneric},
+			ephemeral:  false,
+			shouldFail: true,
+		},
 	}
 
 	testNode := &v1.Node{
@@ -963,6 +1031,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 	}
 
 	run := func(t *testing.T, scenario scenarioType, csiStorageCapacity bool, csiDriver *storagev1.CSIDriver) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, scenario.ephemeral)()
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -1016,6 +1086,8 @@ func TestFindPodVolumesWithoutProvisioning(t *testing.T) {
 }
 
 func TestFindPodVolumesWithProvisioning(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		pvs     []*v1.PersistentVolume
@@ -1527,6 +1599,8 @@ func TestBindAPIUpdate(t *testing.T) {
 }
 
 func TestCheckBindings(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		initPVs  []*v1.PersistentVolume
@@ -1724,6 +1798,8 @@ func TestCheckBindings(t *testing.T) {
 }
 
 func TestCheckBindingsWithCSIMigration(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		initPVs      []*v1.PersistentVolume
@@ -1844,6 +1920,8 @@ func TestCheckBindingsWithCSIMigration(t *testing.T) {
 }
 
 func TestBindPodVolumes(t *testing.T) {
+	t.Parallel()
+
 	type scenarioType struct {
 		// Inputs
 		bindingsNil bool // Pass in nil bindings slice
@@ -2053,7 +2131,11 @@ func TestBindPodVolumes(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) { run(t, scenario) })
+		scenario := scenario
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			run(t, scenario)
+		})
 	}
 }
 
@@ -2124,7 +2206,7 @@ func TestCapacity(t *testing.T) {
 	type scenarioType struct {
 		// Inputs
 		pvcs       []*v1.PersistentVolumeClaim
-		capacities []*storagev1alpha1.CSIStorageCapacity
+		capacities []*storagev1beta1.CSIStorageCapacity
 
 		// Expected return values
 		reasons    ConflictReasons
@@ -2133,22 +2215,22 @@ func TestCapacity(t *testing.T) {
 	scenarios := map[string]scenarioType{
 		"network-attached": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
 			},
 		},
 		"local-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"multiple": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, nil, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", ""),
 			},
 		},
 		"no-storage": {
@@ -2157,36 +2239,50 @@ func TestCapacity(t *testing.T) {
 		},
 		"wrong-node": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node2, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"wrong-storage-class": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClass, node1, "1Gi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClass, node1, "1Gi", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"insufficient-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"insufficient-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "1Gi", "1Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"zero-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi"),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "0Mi", ""),
+			},
+			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
+		},
+		"zero-volume-size": {
+			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "", "0Mi"),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
 		"nil-storage": {
 			pvcs: []*v1.PersistentVolumeClaim{provisionedPVC},
-			capacities: []*storagev1alpha1.CSIStorageCapacity{
-				makeCapacity("net", waitClassWithProvisioner, node1, ""),
+			capacities: []*storagev1beta1.CSIStorageCapacity{
+				makeCapacity("net", waitClassWithProvisioner, node1, "", ""),
 			},
 			reasons: ConflictReasons{ErrReasonNotEnoughSpace},
 		},
@@ -2201,14 +2297,14 @@ func TestCapacity(t *testing.T) {
 		},
 	}
 
-	run := func(t *testing.T, scenario scenarioType) {
+	run := func(t *testing.T, scenario scenarioType, featureEnabled, optIn bool) {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIStorageCapacity, featureEnabled)()
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		// Setup
-		withCSIStorageCapacity := true
-		testEnv := newTestBinder(t, ctx.Done(), withCSIStorageCapacity)
-		testEnv.addCSIDriver(makeCSIDriver(provisioner, withCSIStorageCapacity))
+		// Setup: the driver has the feature enabled, but the scheduler might not.
+		testEnv := newTestBinder(t, ctx.Done(), featureEnabled)
+		testEnv.addCSIDriver(makeCSIDriver(provisioner, optIn))
 		testEnv.addCSIStorageCapacities(scenario.capacities)
 
 		// a. Init pvc cache
@@ -2221,13 +2317,19 @@ func TestCapacity(t *testing.T) {
 		podVolumes, reasons, err := findPodVolumes(testEnv.binder, pod, testNode)
 
 		// Validate
-		if !scenario.shouldFail && err != nil {
+		shouldFail := scenario.shouldFail
+		expectedReasons := scenario.reasons
+		if !featureEnabled || !optIn {
+			shouldFail = false
+			expectedReasons = nil
+		}
+		if !shouldFail && err != nil {
 			t.Errorf("returned error: %v", err)
 		}
-		if scenario.shouldFail && err == nil {
+		if shouldFail && err == nil {
 			t.Error("returned success but expected error")
 		}
-		checkReasons(t, reasons, scenario.reasons)
+		checkReasons(t, reasons, expectedReasons)
 		provisions := scenario.pvcs
 		if len(reasons) > 0 {
 			provisions = nil
@@ -2235,7 +2337,18 @@ func TestCapacity(t *testing.T) {
 		testEnv.validatePodCache(t, pod.Spec.NodeName, pod, podVolumes, nil, provisions)
 	}
 
-	for name, scenario := range scenarios {
-		t.Run(name, func(t *testing.T) { run(t, scenario) })
+	yesNo := []bool{true, false}
+	for _, featureEnabled := range yesNo {
+		name := fmt.Sprintf("CSIStorageCapacity=%v", featureEnabled)
+		t.Run(name, func(t *testing.T) {
+			for _, optIn := range yesNo {
+				name := fmt.Sprintf("CSIDriver.StorageCapacity=%v", optIn)
+				t.Run(name, func(t *testing.T) {
+					for name, scenario := range scenarios {
+						t.Run(name, func(t *testing.T) { run(t, scenario, featureEnabled, optIn) })
+					}
+				})
+			}
+		})
 	}
 }

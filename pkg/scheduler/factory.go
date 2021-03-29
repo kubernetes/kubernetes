@@ -83,6 +83,7 @@ type Configurator struct {
 	nodeInfoSnapshot  *internalcache.Snapshot
 	extenders         []schedulerapi.Extender
 	frameworkCapturer FrameworkCapturer
+	parallellism      int32
 }
 
 // create a scheduler from a set of registered plugins.
@@ -132,6 +133,8 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
+	// It's a "cluster event" -> "plugin names" map.
+	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithInformerFactory(c.informerFactory),
@@ -139,6 +142,8 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
+		frameworkruntime.WithClusterEventMap(clusterEventMap),
+		frameworkruntime.WithParallelism(int(c.parallellism)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing profiles: %v", err)
@@ -150,9 +155,11 @@ func (c *Configurator) create() (*Scheduler, error) {
 	lessFn := profiles[c.profiles[0].SchedulerName].QueueSortFunc()
 	podQueue := internalqueue.NewSchedulingQueue(
 		lessFn,
+		c.informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
+		internalqueue.WithClusterEventMap(clusterEventMap),
 	)
 
 	// Setup cache debugger.
@@ -221,7 +228,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	} else {
 		for _, predicate := range policy.Predicates {
 			klog.V(2).InfoS("Registering predicate", "predicate", predicate.Name)
-			predicateKeys.Insert(lr.ProcessPredicatePolicy(predicate, args))
+			predicateName, err := lr.ProcessPredicatePolicy(predicate, args)
+			if err != nil {
+				return nil, err
+			}
+			predicateKeys.Insert(predicateName)
 		}
 	}
 
@@ -236,7 +247,11 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 				continue
 			}
 			klog.V(2).InfoS("Registering priority", "priority", priority.Name)
-			priorityKeys[lr.ProcessPriorityPolicy(priority, args)] = priority.Weight
+			priorityName, err := lr.ProcessPriorityPolicy(priority, args)
+			if err != nil {
+				return nil, err
+			}
+			priorityKeys[priorityName] = priority.Weight
 		}
 	}
 
@@ -317,7 +332,9 @@ func MakeDefaultErrorFunc(client clientset.Interface, podLister corelisters.PodL
 		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).InfoS("Unable to schedule pod; no nodes are registered to the cluster; waiting", "pod", klog.KObj(pod))
-		} else if _, ok := err.(*framework.FitError); ok {
+		} else if fitError, ok := err.(*framework.FitError); ok {
+			// Inject UnschedulablePlugins to PodInfo, which will be used later for moving Pods between queues efficiently.
+			podInfo.UnschedulablePlugins = fitError.Diagnosis.UnschedulablePlugins
 			klog.V(2).InfoS("Unable to schedule pod; no fit; waiting", "pod", klog.KObj(pod), "err", err)
 		} else if apierrors.IsNotFound(err) {
 			klog.V(2).InfoS("Unable to schedule pod, possibly due to node not found; waiting", "pod", klog.KObj(pod), "err", err)

@@ -33,9 +33,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
@@ -43,11 +45,14 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 )
@@ -120,7 +125,7 @@ func newDaemonSet(name string) *apps.DaemonSet {
 	}
 }
 
-func newRollbackStrategy() *apps.DaemonSetUpdateStrategy {
+func newRollingUpdateStrategy() *apps.DaemonSetUpdateStrategy {
 	one := intstr.FromInt(1)
 	return &apps.DaemonSetUpdateStrategy{
 		Type:          apps.RollingUpdateDaemonSetStrategyType,
@@ -135,7 +140,7 @@ func newOnDeleteStrategy() *apps.DaemonSetUpdateStrategy {
 }
 
 func updateStrategies() []*apps.DaemonSetUpdateStrategy {
-	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollbackStrategy()}
+	return []*apps.DaemonSetUpdateStrategy{newOnDeleteStrategy(), newRollingUpdateStrategy()}
 }
 
 func newNode(name string, label map[string]string) *v1.Node {
@@ -378,7 +383,7 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 		return fmt.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", expectedCreates, len(fakePodControl.Templates))
 	}
 	if len(fakePodControl.DeletePodName) != expectedDeletes {
-		return fmt.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", expectedDeletes, len(fakePodControl.DeletePodName))
+		return fmt.Errorf("Unexpected number of deletes.  Expected %d, got %v\n", expectedDeletes, fakePodControl.DeletePodName)
 	}
 	if len(manager.fakeRecorder.Events) != expectedEvents {
 		return fmt.Errorf("Unexpected number of events.  Expected %d, saw %d\n", expectedEvents, len(manager.fakeRecorder.Events))
@@ -402,23 +407,22 @@ func validateSyncDaemonSets(manager *daemonSetsController, fakePodControl *fakeP
 	return nil
 }
 
-func syncAndValidateDaemonSets(manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) error {
+func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.DaemonSet, podControl *fakePodControl, expectedCreates, expectedDeletes int, expectedEvents int) {
+	t.Helper()
 	key, err := controller.KeyFunc(ds)
 	if err != nil {
-		return fmt.Errorf("could not get key for daemon")
+		t.Fatal("could not get key for daemon")
 	}
 
 	err = manager.syncHandler(key)
 	if err != nil {
-		klog.Warning(err)
+		t.Log(err)
 	}
 
 	err = validateSyncDaemonSets(manager, podControl, expectedCreates, expectedDeletes, expectedEvents)
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
-
-	return nil
 }
 
 // clearExpectations copies the FakePodControl to PodStore and clears the create and delete expectations.
@@ -431,6 +435,39 @@ func clearExpectations(t *testing.T, manager *daemonSetsController, ds *apps.Dae
 		return
 	}
 	manager.expectations.DeleteExpectations(key)
+
+	now := manager.failedPodsBackoff.Clock.Now()
+	hash, _ := currentDSHash(manager, ds)
+	// log all the pods in the store
+	var lines []string
+	for _, obj := range manager.podStore.List() {
+		pod := obj.(*v1.Pod)
+		if pod.CreationTimestamp.IsZero() {
+			pod.CreationTimestamp.Time = now
+		}
+		var readyLast time.Time
+		ready := podutil.IsPodReady(pod)
+		if ready {
+			if c := podutil.GetPodReadyCondition(pod.Status); c != nil {
+				readyLast = c.LastTransitionTime.Time.Add(time.Duration(ds.Spec.MinReadySeconds) * time.Second)
+			}
+		}
+		nodeName, _ := util.GetTargetNodeName(pod)
+
+		lines = append(lines, fmt.Sprintf("node=%s current=%-5t ready=%-5t age=%-4d pod=%s now=%d available=%d",
+			nodeName,
+			hash == pod.Labels[apps.ControllerRevisionHashLabelKey],
+			ready,
+			now.Unix(),
+			pod.Name,
+			pod.CreationTimestamp.Unix(),
+			readyLast.Unix(),
+		))
+	}
+	sort.Strings(lines)
+	for _, line := range lines {
+		klog.Info(line)
+	}
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
@@ -669,10 +706,7 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 			t.Error(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 5, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 	}
 }
 
@@ -692,10 +726,7 @@ func TestSimpleDaemonSetScheduleDaemonSetPodsLaunchesPods(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, nodeNum, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, nodeNum, 0, 0)
 
 		if len(podControl.podIDMap) != nodeNum {
 			t.Fatalf("failed to create pods for DaemonSet")
@@ -773,10 +804,7 @@ func TestSimpleDaemonSetPodCreateErrors(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
 
 		expectedLimit := 0
 		for pass := uint8(0); expectedLimit <= podControl.FakePodControl.CreateLimit; pass++ {
@@ -805,10 +833,7 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, podControl.FakePodControl.CreateLimit, 0, 0)
 
 		dsKey, err := controller.KeyFunc(ds)
 		if err != nil {
@@ -843,10 +868,7 @@ func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
 
 		manager.dsStore.Add(ds)
 		addNodes(manager.nodeStore, 0, 5, nil)
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 5, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
 		// Make sure the single sync() updated Status already for the change made
 		// during the manage() phase.
@@ -870,11 +892,7 @@ func TestNoNodesDoesNothing(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
-
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -897,10 +915,7 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -927,10 +942,7 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -999,15 +1011,9 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 		}
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
-			err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		case apps.RollingUpdateDaemonSetStrategyType:
-			err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -1040,10 +1046,7 @@ func TestInsufficientCapacityNodeSufficientCapacityWithNodeLabelDaemonLaunchPod(
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-	if err != nil {
-		t.Error(err)
-	}
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	// we do not expect any event for insufficient free resource
 	if len(manager.fakeRecorder.Events) != 0 {
 		t.Fatalf("unexpected events, got %v, expected %v: %+v", len(manager.fakeRecorder.Events), 0, manager.fakeRecorder.Events)
@@ -1073,10 +1076,7 @@ func TestNetworkUnavailableNodeDaemonLaunchesPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1109,10 +1109,7 @@ func TestDontDoAnythingIfBeingDeleted(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1144,10 +1141,7 @@ func TestDontDoAnythingIfBeingDeletedRace(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1186,10 +1180,7 @@ func TestPortConflictWithSameDaemonPodDoesNotDeletePod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1234,10 +1225,7 @@ func TestNoPortConflictNodeDaemonLaunchesPod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1287,10 +1275,7 @@ func TestPodIsNotDeletedByDaemonsetWithEmptyLabelSelector(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 1)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 1)
 	}
 }
 
@@ -1312,10 +1297,7 @@ func TestDealsWithExistingPods(t *testing.T) {
 		addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 2)
 		addPods(manager.podStore, "node-3", simpleDaemonSetLabel, ds, 5)
 		addPods(manager.podStore, "node-4", simpleDaemonSetLabel2, ds, 2)
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 2, 5, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 2, 5, 0)
 	}
 }
 
@@ -1335,10 +1317,7 @@ func TestSelectorDaemonLaunchesPods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, daemon, podControl, 3, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, daemon, podControl, 3, 0, 0)
 	}
 }
 
@@ -1362,10 +1341,7 @@ func TestSelectorDaemonDeletesUnselectedPods(t *testing.T) {
 		addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 3)
 		addPods(manager.podStore, "node-1", simpleDaemonSetLabel2, ds, 1)
 		addPods(manager.podStore, "node-4", simpleDaemonSetLabel, ds, 1)
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 5, 4, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 5, 4, 0)
 	}
 }
 
@@ -1393,10 +1369,7 @@ func TestSelectorDaemonDealsWithExistingPods(t *testing.T) {
 		addPods(manager.podStore, "node-7", simpleDaemonSetLabel2, ds, 4)
 		addPods(manager.podStore, "node-9", simpleDaemonSetLabel, ds, 1)
 		addPods(manager.podStore, "node-9", simpleDaemonSetLabel2, ds, 1)
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 3, 20, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 3, 20, 0)
 	}
 }
 
@@ -1416,10 +1389,7 @@ func TestBadSelectorDaemonDoesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1438,10 +1408,7 @@ func TestNameDaemonSetLaunchesPods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1460,10 +1427,7 @@ func TestBadNameDaemonSetDoesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1484,10 +1448,7 @@ func TestNameAndSelectorDaemonSetLaunchesPods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1508,10 +1469,7 @@ func TestInconsistentNameSelectorDaemonSetDoesNothing(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1529,10 +1487,7 @@ func TestSelectorDaemonSetLaunchesPods(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = syncAndValidateDaemonSets(manager, ds, podControl, 3, 0, 0)
-	if err != nil {
-		t.Error(err)
-	}
+	expectSyncDaemonSets(t, manager, ds, podControl, 3, 0, 0)
 }
 
 // Daemon with node affinity should launch pods on nodes matching affinity.
@@ -1568,10 +1523,7 @@ func TestNodeAffinityDaemonLaunchesPods(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, daemon, podControl, 3, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, daemon, podControl, 3, 0, 0)
 	}
 }
 
@@ -1601,10 +1553,7 @@ func TestNumberReadyStatus(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 		if updated.Status.NumberReady != 0 {
 			t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 		}
@@ -1616,10 +1565,7 @@ func TestNumberReadyStatus(t *testing.T) {
 			pod.Status.Conditions = append(pod.Status.Conditions, condition)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 		if updated.Status.NumberReady != 2 {
 			t.Errorf("Wrong daemon %s status: %v", updated.Name, updated.Status)
 		}
@@ -1653,10 +1599,7 @@ func TestObservedGeneration(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 		if updated.Status.ObservedGeneration != ds.Generation {
 			t.Errorf("Wrong ObservedGeneration for daemon %s in status. Expected %d, got %d", updated.Name, ds.Generation, updated.Status.ObservedGeneration)
 		}
@@ -1691,10 +1634,7 @@ func TestDaemonKillFailedPods(t *testing.T) {
 				addNodes(manager.nodeStore, 0, 1, nil)
 				addFailedPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numFailedPods)
 				addPods(manager.podStore, "node-0", simpleDaemonSetLabel, ds, test.numNormalPods)
-				err = syncAndValidateDaemonSets(manager, ds, podControl, test.expectedCreates, test.expectedDeletes, test.expectedEvents)
-				if err != nil {
-					t.Error(err)
-				}
+				expectSyncDaemonSets(t, manager, ds, podControl, test.expectedCreates, test.expectedDeletes, test.expectedEvents)
 			}
 		})
 	}
@@ -1731,10 +1671,7 @@ func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 			backoffKey := failedPodsBackoffKey(ds, nodeName)
 
 			// First sync will delete the pod, initializing backoff
-			err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 1, 1)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 1)
 			initialDelay := manager.failedPodsBackoff.Get(backoffKey)
 			if initialDelay <= 0 {
 				t.Fatal("Initial delay is expected to be set.")
@@ -1743,10 +1680,7 @@ func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 			resetCounters(manager)
 
 			// Immediate (second) sync gets limited by the backoff
-			err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 			delay := manager.failedPodsBackoff.Get(backoffKey)
 			if delay != initialDelay {
 				t.Fatal("Backoff delay shouldn't be raised while waiting.")
@@ -1770,10 +1704,7 @@ func TestDaemonKillFailedPodsBackoff(t *testing.T) {
 			}
 
 			// After backoff time, it will delete the failed pod
-			err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 1, 1)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 1)
 		})
 	}
 }
@@ -1804,10 +1735,7 @@ func TestNoScheduleTaintedDoesntEvicitRunningIntolerantPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1837,10 +1765,7 @@ func TestNoExecuteTaintedDoesEvicitRunningIntolerantPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 1, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
 	}
 }
 
@@ -1865,10 +1790,7 @@ func TestTaintedNodeDaemonDoesNotLaunchIntolerantPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -1894,10 +1816,7 @@ func TestTaintedNodeDaemonLaunchesToleratePod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1925,10 +1844,7 @@ func TestNotReadyNodeDaemonLaunchesPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1956,10 +1872,7 @@ func TestUnreachableNodeDaemonLaunchesPod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -1979,10 +1892,7 @@ func TestNodeDaemonLaunchesToleratePod(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -2008,10 +1918,7 @@ func TestDaemonSetRespectsTermination(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 0, 0)
 	}
 }
 
@@ -2053,10 +1960,7 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 1, 0, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 	}
 }
 
@@ -2079,7 +1983,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 		nodeUnschedulable                bool
 		ds                               *apps.DaemonSet
 		shouldRun, shouldContinueRunning bool
-		err                              error
 	}{
 		{
 			predicateName: "ShouldRunDaemonPod",
@@ -2358,16 +2261,13 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				manager.podNodeIndex.Add(p)
 			}
 			c.ds.Spec.UpdateStrategy = *strategy
-			shouldRun, shouldContinueRunning, err := manager.nodeShouldRunDaemonPod(node, c.ds)
+			shouldRun, shouldContinueRunning := manager.nodeShouldRunDaemonPod(node, c.ds)
 
 			if shouldRun != c.shouldRun {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldRun: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldRun, shouldRun)
 			}
 			if shouldContinueRunning != c.shouldContinueRunning {
 				t.Errorf("[%v] strategy: %v, predicateName: %v expected shouldContinueRunning: %v, got: %v", i, c.ds.Spec.UpdateStrategy.Type, c.predicateName, c.shouldContinueRunning, shouldContinueRunning)
-			}
-			if err != c.err {
-				t.Errorf("[%v] strategy: %v, predicateName: %v expected err: %v, got: %v", i, c.predicateName, c.ds.Spec.UpdateStrategy.Type, c.err, err)
 			}
 		}
 	}
@@ -2475,10 +2375,7 @@ func TestUpdateNode(t *testing.T) {
 			if c.expectedCreates != nil {
 				expectedCreates = c.expectedCreates()
 			}
-			err = syncAndValidateDaemonSets(manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
-			if err != nil {
-				t.Error(err)
-			}
+			expectSyncDaemonSets(t, manager, c.ds, podControl, expectedCreates, 0, expectedEvents)
 
 			manager.enqueueDaemonSet = func(ds *apps.DaemonSet) {
 				if ds.Name == "ds" {
@@ -2658,10 +2555,7 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 			}
 			switch strategy.Type {
 			case apps.OnDeleteDaemonSetStrategyType, apps.RollingUpdateDaemonSetStrategyType:
-				err = syncAndValidateDaemonSets(manager, c.ds, podControl, 1, 0, 0)
-				if err != nil {
-					t.Error(err)
-				}
+				expectSyncDaemonSets(t, manager, c.ds, podControl, 1, 0, 0)
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 			}
@@ -2713,10 +2607,7 @@ func TestDeleteUnscheduledPodForNotExistingNode(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		err = syncAndValidateDaemonSets(manager, ds, podControl, 0, 1, 0)
-		if err != nil {
-			t.Error(err)
-		}
+		expectSyncDaemonSets(t, manager, ds, podControl, 0, 1, 0)
 	}
 }
 
@@ -3185,4 +3076,238 @@ func getQueuedKeys(queue workqueue.RateLimitingInterface) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// Controller should not create pods on nodes which have daemon pods, and should remove excess pods from nodes that have extra pods.
+func TestSurgeDealsWithExistingPods(t *testing.T) {
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+	addPods(manager.podStore, "node-1", simpleDaemonSetLabel, ds, 1)
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 2)
+	addPods(manager.podStore, "node-3", simpleDaemonSetLabel, ds, 5)
+	addPods(manager.podStore, "node-4", simpleDaemonSetLabel2, ds, 2)
+	expectSyncDaemonSets(t, manager, ds, podControl, 2, 5, 0)
+}
+
+func TestSurgePreservesReadyOldPods(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// will be preserved because it's the current hash
+	pod := newPod("node-1-", "node-1", simpleDaemonSetLabel, ds)
+	pod.CreationTimestamp.Time = time.Unix(100, 0)
+	manager.podStore.Add(pod)
+
+	// will be preserved because it's the oldest AND it is ready
+	pod = newPod("node-1-old-", "node-1", simpleDaemonSetLabel, ds)
+	delete(pod.Labels, apps.ControllerRevisionHashLabelKey)
+	pod.CreationTimestamp.Time = time.Unix(50, 0)
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(pod)
+
+	// will be deleted because it's not the oldest, even though it is ready
+	oldReadyPod := newPod("node-1-delete-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldReadyPod.CreationTimestamp.Time = time.Unix(60, 0)
+	oldReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldReadyPod)
+
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 1)
+	expectSyncDaemonSets(t, manager, ds, podControl, 3, 1, 0)
+
+	actual := sets.NewString(podControl.DeletePodName...)
+	expected := sets.NewString(oldReadyPod.Name)
+	if !actual.Equal(expected) {
+		t.Errorf("unexpected deletes\nexpected: %v\n  actual: %v", expected.List(), actual.List())
+	}
+}
+
+func TestSurgeCreatesNewPodWhenAtMaxSurgeAndOldPodDeleted(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// will be preserved because it has the newest hash, and is also consuming the surge budget
+	pod := newPod("node-0-", "node-0", simpleDaemonSetLabel, ds)
+	pod.CreationTimestamp.Time = time.Unix(100, 0)
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionFalse}}
+	manager.podStore.Add(pod)
+
+	// will be preserved because it is ready
+	oldPodReady := newPod("node-0-old-ready-", "node-0", simpleDaemonSetLabel, ds)
+	delete(oldPodReady.Labels, apps.ControllerRevisionHashLabelKey)
+	oldPodReady.CreationTimestamp.Time = time.Unix(50, 0)
+	oldPodReady.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldPodReady)
+
+	// create old ready pods on all other nodes
+	for i := 1; i < 5; i++ {
+		oldPod := newPod(fmt.Sprintf("node-%d-preserve-", i), fmt.Sprintf("node-%d", i), simpleDaemonSetLabel, ds)
+		delete(oldPod.Labels, apps.ControllerRevisionHashLabelKey)
+		oldPod.CreationTimestamp.Time = time.Unix(1, 0)
+		oldPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+		manager.podStore.Add(oldPod)
+
+		// mark the last old pod as deleted, which should trigger a creation above surge
+		if i == 4 {
+			thirty := int64(30)
+			timestamp := metav1.Time{Time: time.Unix(1+thirty, 0)}
+			oldPod.DeletionGracePeriodSeconds = &thirty
+			oldPod.DeletionTimestamp = &timestamp
+		}
+	}
+
+	// controller should detect that node-4 has only a deleted pod
+	clearExpectations(t, manager, ds, podControl)
+	expectSyncDaemonSets(t, manager, ds, podControl, 1, 0, 0)
+	clearExpectations(t, manager, ds, podControl)
+}
+
+func TestSurgeDeletesUnreadyOldPods(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
+	ds := newDaemonSet("foo")
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// will be preserved because it has the newest hash
+	pod := newPod("node-1-", "node-1", simpleDaemonSetLabel, ds)
+	pod.CreationTimestamp.Time = time.Unix(100, 0)
+	manager.podStore.Add(pod)
+
+	// will be deleted because it is unready
+	oldUnreadyPod := newPod("node-1-old-unready-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldUnreadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldUnreadyPod.CreationTimestamp.Time = time.Unix(50, 0)
+	oldUnreadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionFalse}}
+	manager.podStore.Add(oldUnreadyPod)
+
+	// will be deleted because it is not the oldest
+	oldReadyPod := newPod("node-1-delete-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldReadyPod.CreationTimestamp.Time = time.Unix(60, 0)
+	oldReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldReadyPod)
+
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 1)
+	expectSyncDaemonSets(t, manager, ds, podControl, 3, 2, 0)
+
+	actual := sets.NewString(podControl.DeletePodName...)
+	expected := sets.NewString(oldReadyPod.Name, oldUnreadyPod.Name)
+	if !actual.Equal(expected) {
+		t.Errorf("unexpected deletes\nexpected: %v\n  actual: %v", expected.List(), actual.List())
+	}
+}
+
+func TestSurgePreservesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
+	ds := newDaemonSet("foo")
+	ds.Spec.MinReadySeconds = 15
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// the clock will be set 10s after the newest pod on node-1 went ready, which is not long enough to be available
+	manager.DaemonSetsController.failedPodsBackoff.Clock = clock.NewFakeClock(time.Unix(50+10, 0))
+
+	// will be preserved because it has the newest hash
+	pod := newPod("node-1-", "node-1", simpleDaemonSetLabel, ds)
+	pod.CreationTimestamp.Time = time.Unix(100, 0)
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Unix(50, 0)}}}
+	manager.podStore.Add(pod)
+
+	// will be preserved because it is ready AND the newest pod is not yet available for long enough
+	oldReadyPod := newPod("node-1-old-ready-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldReadyPod.CreationTimestamp.Time = time.Unix(50, 0)
+	oldReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldReadyPod)
+
+	// will be deleted because it is not the oldest
+	oldExcessReadyPod := newPod("node-1-delete-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldExcessReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldExcessReadyPod.CreationTimestamp.Time = time.Unix(60, 0)
+	oldExcessReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldExcessReadyPod)
+
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 1)
+	expectSyncDaemonSets(t, manager, ds, podControl, 3, 1, 0)
+
+	actual := sets.NewString(podControl.DeletePodName...)
+	expected := sets.NewString(oldExcessReadyPod.Name)
+	if !actual.Equal(expected) {
+		t.Errorf("unexpected deletes\nexpected: %v\n  actual: %v", expected.List(), actual.List())
+	}
+}
+
+func TestSurgeDeletesOldReadyWithUnsatisfiedMinReady(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, true)()
+	ds := newDaemonSet("foo")
+	ds.Spec.MinReadySeconds = 15
+	ds.Spec.UpdateStrategy = newUpdateSurge(intstr.FromInt(1))
+	manager, podControl, _, err := newTestController(ds)
+	if err != nil {
+		t.Fatalf("error creating DaemonSets controller: %v", err)
+	}
+	manager.dsStore.Add(ds)
+	addNodes(manager.nodeStore, 0, 5, nil)
+
+	// the clock will be set 20s after the newest pod on node-1 went ready, which is not long enough to be available
+	manager.DaemonSetsController.failedPodsBackoff.Clock = clock.NewFakeClock(time.Unix(50+20, 0))
+
+	// will be preserved because it has the newest hash
+	pod := newPod("node-1-", "node-1", simpleDaemonSetLabel, ds)
+	pod.CreationTimestamp.Time = time.Unix(100, 0)
+	pod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue, LastTransitionTime: metav1.Time{Time: time.Unix(50, 0)}}}
+	manager.podStore.Add(pod)
+
+	// will be preserved because it is ready AND the newest pod is not yet available for long enough
+	oldReadyPod := newPod("node-1-old-ready-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldReadyPod.CreationTimestamp.Time = time.Unix(50, 0)
+	oldReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldReadyPod)
+
+	// will be deleted because it is not the oldest
+	oldExcessReadyPod := newPod("node-1-delete-", "node-1", simpleDaemonSetLabel, ds)
+	delete(oldExcessReadyPod.Labels, apps.ControllerRevisionHashLabelKey)
+	oldExcessReadyPod.CreationTimestamp.Time = time.Unix(60, 0)
+	oldExcessReadyPod.Status.Conditions = []v1.PodCondition{{Type: v1.PodReady, Status: v1.ConditionTrue}}
+	manager.podStore.Add(oldExcessReadyPod)
+
+	addPods(manager.podStore, "node-2", simpleDaemonSetLabel, ds, 1)
+	expectSyncDaemonSets(t, manager, ds, podControl, 3, 2, 0)
+
+	actual := sets.NewString(podControl.DeletePodName...)
+	expected := sets.NewString(oldExcessReadyPod.Name, oldReadyPod.Name)
+	if !actual.Equal(expected) {
+		t.Errorf("unexpected deletes\nexpected: %v\n  actual: %v", expected.List(), actual.List())
+	}
 }
