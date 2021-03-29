@@ -1,3 +1,7 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-snapshotter/raw/v4.0.0/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml
+# for csi-driver-host-path v1.6.2
+# by test/e2e/testing-manifests/storage-csi/update-hostpath.sh
+#
 # Together with the RBAC file for external-provisioner, this YAML file
 # contains all RBAC objects that are necessary to run external CSI
 # snapshotter.
@@ -23,9 +27,13 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
+  # Secret permission is optional.
+  # Enable it if your driver needs secret.
+  # For example, `csi.storage.k8s.io/snapshotter-secret-name` is set in VolumeSnapshotClass.
+  # See https://kubernetes-csi.github.io/docs/secrets-and-credentials.html for more details.
+  #  - apiGroups: [""]
+  #    resources: ["secrets"]
+  #    verbs: ["get", "list"]
   - apiGroups: ["snapshot.storage.k8s.io"]
     resources: ["volumesnapshotclasses"]
     verbs: ["get", "list", "watch"]

@@ -1,17 +1,3 @@
-kind: Service
-apiVersion: v1
-metadata:
-  name: csi-hostpath-attacher
-  labels:
-    app: csi-hostpath-attacher
-spec:
-  selector:
-    app: csi-hostpath-attacher
-  ports:
-    - name: dummy
-      port: 12345
-
----
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -40,7 +26,7 @@ spec:
       serviceAccountName: csi-attacher
       containers:
         - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v2.2.0
+          image: k8s.gcr.io/sig-storage/csi-attacher:v3.1.0
           args:
             - --v=5
             - --csi-address=/csi/csi.sock

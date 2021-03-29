@@ -142,7 +142,12 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
 		storageframework.CapSingleNodeVolume:    true,
-		storageframework.CapVolumeLimits:        true,
+
+		// This is needed for the
+		// testsuites/volumelimits.go `should support volume limits`
+		// test. --maxvolumespernode=10 gets
+		// added when patching the deployment.
+		storageframework.CapVolumeLimits: true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -152,7 +157,8 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
@@ -220,10 +226,15 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 	}
 
 	o := utils.PatchCSIOptions{
-		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            config.GetUniqueDriverName(),
-		DriverContainerName:      "hostpath",
-		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName()},
+		OldDriverName:       h.driverInfo.Name,
+		NewDriverName:       config.GetUniqueDriverName(),
+		DriverContainerName: "hostpath",
+		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName(),
+			// This is needed for the
+			// testsuites/volumelimits.go `should support volume limits`
+			// test.
+			"--maxvolumespernode=10",
+		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
@@ -408,7 +419,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
 	}

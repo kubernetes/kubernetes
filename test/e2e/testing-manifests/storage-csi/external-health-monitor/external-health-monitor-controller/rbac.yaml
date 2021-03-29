@@ -1,76 +1,71 @@
-# Do not edit, downloaded from https://github.com/kubernetes-csi/external-resizer/raw/v1.1.0/deploy/kubernetes//rbac.yaml
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-health-monitor/raw/v0.2.0/deploy/kubernetes/external-health-monitor-controller/rbac.yaml
 # for csi-driver-host-path v1.6.2
 # by test/e2e/testing-manifests/storage-csi/update-hostpath.sh
 #
 # This YAML file contains all RBAC objects that are necessary to run external
-# CSI resizer.
+# CSI health monitor controller.
 #
 # In production, each CSI driver deployment has to be customized:
 # - to avoid conflicts, use non-default namespace and different names
 #   for non-namespaced entities like the ClusterRole
 # - decide whether the deployment replicates the external CSI
-#   resizer, in which case leadership election must be enabled;
+#   health monitor controller, in which case leadership election must be enabled;
 #   this influences the RBAC setup, see below
 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-resizer
+  name: csi-external-health-monitor-controller
   # replace with non-default namespace name
   namespace: default
 
 ---
-# Resizer must be able to work with PVCs, PVs, SCs.
+# Health monitor controller must be able to work with PVs, PVCs, Nodes and Pods
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: external-resizer-runner
+  name: external-health-monitor-controller-runner
 rules:
-  # The following rule should be uncommented for plugins that require secrets
-  # for provisioning.
-  # - apiGroups: [""]
-  #   resources: ["secrets"]
-  #   verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
-    verbs: ["get", "list", "watch", "patch"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["persistentvolumeclaims/status"]
-    verbs: ["patch"]
-  - apiGroups: [""]
     resources: ["events"]
-    verbs: ["list", "watch", "create", "update", "patch"]
+    verbs: ["get", "list", "watch", "create", "patch"]
 
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-resizer-role
+  name: csi-external-health-monitor-controller-role
 subjects:
   - kind: ServiceAccount
-    name: csi-resizer
+    name: csi-external-health-monitor-controller
     # replace with non-default namespace name
     namespace: default
 roleRef:
   kind: ClusterRole
-  name: external-resizer-runner
+  name: external-health-monitor-controller-runner
   apiGroup: rbac.authorization.k8s.io
 
 ---
-# Resizer must be able to work with end point in current namespace
+# Health monitor controller must be able to work with configmaps or leases in the current namespace
 # if (and only if) leadership election is enabled
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   # replace with non-default namespace name
   namespace: default
-  name: external-resizer-cfg
+  name: external-health-monitor-controller-cfg
 rules:
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]
@@ -80,15 +75,15 @@ rules:
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: csi-resizer-role-cfg
+  name: csi-external-health-monitor-controller-role-cfg
   # replace with non-default namespace name
   namespace: default
 subjects:
   - kind: ServiceAccount
-    name: csi-resizer
+    name: csi-external-health-monitor-controller
     # replace with non-default namespace name
     namespace: default
 roleRef:
   kind: Role
-  name: external-resizer-cfg
+  name: external-health-monitor-controller-cfg
   apiGroup: rbac.authorization.k8s.io
