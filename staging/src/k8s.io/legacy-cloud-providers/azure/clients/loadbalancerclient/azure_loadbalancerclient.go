@@ -60,12 +60,12 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure LoadBalancersClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure LoadBalancersClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	klog.V(2).InfoS("Azure LoadBalancersClient (read ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPS,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure LoadBalancersClient (write ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
 		armClient:         armClient,
@@ -121,7 +121,7 @@ func (c *Client) getLB(ctx context.Context, resourceGroupName string, loadBalanc
 	response, rerr := c.armClient.GetResource(ctx, resourceID, expand)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in loadbalancer.get.request","resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
@@ -130,7 +130,7 @@ func (c *Client) getLB(ctx context.Context, resourceGroupName string, loadBalanc
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in loadbalancer.get.respond","resourceID", resourceID, "err", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -181,14 +181,14 @@ func (c *Client) listLB(ctx context.Context, resourceGroupName string) ([]networ
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in loadbalancer.list.request","resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.lblr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in loadbalancer.list.respond","resourceID", resourceID, "err", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -201,7 +201,7 @@ func (c *Client) listLB(ctx context.Context, resourceGroupName string) ([]networ
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in loadbalancer.list.next", "resourceID", resourceID, "err", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
@@ -259,14 +259,14 @@ func (c *Client) createOrUpdateLB(ctx context.Context, resourceGroupName string,
 	response, rerr := c.armClient.PutResourceWithDecorators(ctx, resourceID, parameters, decorators)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in loadbalancer.put.request", "resourceID", resourceID, "err", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "loadbalancer.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in loadbalancer.put.respond", "resourceID", resourceID, "err", rerr.Error())
 			return rerr
 		}
 	}
