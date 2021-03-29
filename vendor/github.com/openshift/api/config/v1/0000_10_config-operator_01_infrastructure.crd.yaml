@@ -1,0 +1,510 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: infrastructures.config.openshift.io
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+spec:
+  group: config.openshift.io
+  names:
+    kind: Infrastructure
+    listKind: InfrastructureList
+    plural: infrastructures
+    singular: infrastructure
+  scope: Cluster
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        description: Infrastructure holds cluster-wide information about Infrastructure.  The
+          canonical name is `cluster`
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: spec holds user settable values for configuration
+            type: object
+            properties:
+              cloudConfig:
+                description: "cloudConfig is a reference to a ConfigMap containing
+                  the cloud provider configuration file. This configuration file is
+                  used to configure the Kubernetes cloud provider integration when
+                  using the built-in cloud provider integration or the external cloud
+                  controller manager. The namespace for this config map is openshift-config.
+                  \n cloudConfig should only be consumed by the kube_cloud_config
+                  controller. The controller is responsible for using the user configuration
+                  in the spec for various platforms and combining that with the user
+                  provided ConfigMap in this field to create a stitched kube cloud
+                  config. The controller generates a ConfigMap `kube-cloud-config`
+                  in `openshift-config-managed` namespace with the kube cloud config
+                  is stored in `cloud.conf` key. All the clients are expected to use
+                  the generated ConfigMap only."
+                type: object
+                properties:
+                  key:
+                    description: Key allows pointing to a specific key/value inside
+                      of the configmap.  This is useful for logical file references.
+                    type: string
+                  name:
+                    type: string
+              platformSpec:
+                description: platformSpec holds desired information specific to the
+                  underlying infrastructure provider.
+                type: object
+                properties:
+                  aws:
+                    description: AWS contains settings specific to the Amazon Web
+                      Services infrastructure provider.
+                    type: object
+                    properties:
+                      serviceEndpoints:
+                        description: serviceEndpoints list contains custom endpoints
+                          which will override default service endpoint of AWS Services.
+                          There must be only one ServiceEndpoint for a service.
+                        type: array
+                        items:
+                          description: AWSServiceEndpoint store the configuration
+                            of a custom url to override existing defaults of AWS Services.
+                          type: object
+                          properties:
+                            name:
+                              description: name is the name of the AWS service. The
+                                list of all the service names can be found at https://docs.aws.amazon.com/general/latest/gr/aws-service-information.html
+                                This must be provided and cannot be empty.
+                              type: string
+                              pattern: ^[a-z0-9-]+$
+                            url:
+                              description: url is fully qualified URI with scheme
+                                https, that overrides the default generated endpoint
+                                for a client. This must be provided and cannot be
+                                empty.
+                              type: string
+                              pattern: ^https://
+                  azure:
+                    description: Azure contains settings specific to the Azure infrastructure
+                      provider.
+                    type: object
+                  baremetal:
+                    description: BareMetal contains settings specific to the BareMetal
+                      platform.
+                    type: object
+                  equinixMetal:
+                    description: EquinixMetal contains settings specific to the Equinix
+                      Metal infrastructure provider.
+                    type: object
+                  gcp:
+                    description: GCP contains settings specific to the Google Cloud
+                      Platform infrastructure provider.
+                    type: object
+                  ibmcloud:
+                    description: IBMCloud contains settings specific to the IBMCloud
+                      infrastructure provider.
+                    type: object
+                  kubevirt:
+                    description: Kubevirt contains settings specific to the kubevirt
+                      infrastructure provider.
+                    type: object
+                  openstack:
+                    description: OpenStack contains settings specific to the OpenStack
+                      infrastructure provider.
+                    type: object
+                  ovirt:
+                    description: Ovirt contains settings specific to the oVirt infrastructure
+                      provider.
+                    type: object
+                  type:
+                    description: type is the underlying infrastructure provider for
+                      the cluster. This value controls whether infrastructure automation
+                      such as service load balancers, dynamic volume provisioning,
+                      machine creation and deletion, and other integrations are enabled.
+                      If None, no infrastructure automation is enabled. Allowed values
+                      are "AWS", "Azure", "BareMetal", "GCP", "Libvirt", "OpenStack",
+                      "VSphere", "oVirt", "KubeVirt", "EquinixMetal", and "None".
+                      Individual components may not support all platforms, and must
+                      handle unrecognized platforms as None if they do not support
+                      that platform.
+                    type: string
+                    enum:
+                    - ""
+                    - AWS
+                    - Azure
+                    - BareMetal
+                    - GCP
+                    - Libvirt
+                    - OpenStack
+                    - None
+                    - VSphere
+                    - oVirt
+                    - IBMCloud
+                    - KubeVirt
+                    - EquinixMetal
+                  vsphere:
+                    description: VSphere contains settings specific to the VSphere
+                      infrastructure provider.
+                    type: object
+          status:
+            description: status holds observed values from the cluster. They may not
+              be overridden.
+            type: object
+            properties:
+              apiServerInternalURI:
+                description: apiServerInternalURL is a valid URI with scheme 'https',
+                  address and optionally a port (defaulting to 443).  apiServerInternalURL
+                  can be used by components like kubelets, to contact the Kubernetes
+                  API server using the infrastructure provider rather than Kubernetes
+                  networking.
+                type: string
+              apiServerURL:
+                description: apiServerURL is a valid URI with scheme 'https', address
+                  and optionally a port (defaulting to 443).  apiServerURL can be
+                  used by components like the web console to tell users where to find
+                  the Kubernetes API.
+                type: string
+              controlPlaneTopology:
+                description: controlPlaneTopology expresses the expectations for operands
+                  that normally run on control nodes. The default is 'HighlyAvailable',
+                  which represents the behavior operators have in a "normal" cluster.
+                  The 'SingleReplica' mode will be used in single-node deployments
+                  and the operators should not configure the operand for highly-available
+                  operation
+                type: string
+                default: HighlyAvailable
+                enum:
+                - HighlyAvailable
+                - SingleReplica
+              etcdDiscoveryDomain:
+                description: 'etcdDiscoveryDomain is the domain used to fetch the
+                  SRV records for discovering etcd servers and clients. For more info:
+                  https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery
+                  deprecated: as of 4.7, this field is no longer set or honored.  It
+                  will be removed in a future release.'
+                type: string
+              infrastructureName:
+                description: infrastructureName uniquely identifies a cluster with
+                  a human friendly name. Once set it should not be changed. Must be
+                  of max length 27 and must have only alphanumeric or hyphen characters.
+                type: string
+              infrastructureTopology:
+                description: infrastructureTopology expresses the expectations for
+                  infrastructure services that do not run on control plane nodes,
+                  usually indicated by a node selector for a `role` value other than
+                  `master`. The default is 'HighlyAvailable', which represents the
+                  behavior operators have in a "normal" cluster. The 'SingleReplica'
+                  mode will be used in single-node deployments and the operators should
+                  not configure the operand for highly-available operation
+                type: string
+                default: HighlyAvailable
+                enum:
+                - HighlyAvailable
+                - SingleReplica
+              platform:
+                description: "platform is the underlying infrastructure provider for
+                  the cluster. \n Deprecated: Use platformStatus.type instead."
+                type: string
+                enum:
+                - ""
+                - AWS
+                - Azure
+                - BareMetal
+                - GCP
+                - Libvirt
+                - OpenStack
+                - None
+                - VSphere
+                - oVirt
+                - IBMCloud
+                - KubeVirt
+                - EquinixMetal
+              platformStatus:
+                description: platformStatus holds status information specific to the
+                  underlying infrastructure provider.
+                type: object
+                properties:
+                  aws:
+                    description: AWS contains settings specific to the Amazon Web
+                      Services infrastructure provider.
+                    type: object
+                    properties:
+                      region:
+                        description: region holds the default AWS region for new AWS
+                          resources created by the cluster.
+                        type: string
+                      serviceEndpoints:
+                        description: ServiceEndpoints list contains custom endpoints
+                          which will override default service endpoint of AWS Services.
+                          There must be only one ServiceEndpoint for a service.
+                        type: array
+                        items:
+                          description: AWSServiceEndpoint store the configuration
+                            of a custom url to override existing defaults of AWS Services.
+                          type: object
+                          properties:
+                            name:
+                              description: name is the name of the AWS service. The
+                                list of all the service names can be found at https://docs.aws.amazon.com/general/latest/gr/aws-service-information.html
+                                This must be provided and cannot be empty.
+                              type: string
+                              pattern: ^[a-z0-9-]+$
+                            url:
+                              description: url is fully qualified URI with scheme
+                                https, that overrides the default generated endpoint
+                                for a client. This must be provided and cannot be
+                                empty.
+                              type: string
+                              pattern: ^https://
+                  azure:
+                    description: Azure contains settings specific to the Azure infrastructure
+                      provider.
+                    type: object
+                    properties:
+                      cloudName:
+                        description: cloudName is the name of the Azure cloud environment
+                          which can be used to configure the Azure SDK with the appropriate
+                          Azure API endpoints. If empty, the value is equal to `AzurePublicCloud`.
+                        type: string
+                        enum:
+                        - ""
+                        - AzurePublicCloud
+                        - AzureUSGovernmentCloud
+                        - AzureChinaCloud
+                        - AzureGermanCloud
+                      networkResourceGroupName:
+                        description: networkResourceGroupName is the Resource Group
+                          for network resources like the Virtual Network and Subnets
+                          used by the cluster. If empty, the value is same as ResourceGroupName.
+                        type: string
+                      resourceGroupName:
+                        description: resourceGroupName is the Resource Group for new
+                          Azure resources created for the cluster.
+                        type: string
+                  baremetal:
+                    description: BareMetal contains settings specific to the BareMetal
+                      platform.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                      nodeDNSIP:
+                        description: nodeDNSIP is the IP address for the internal
+                          DNS used by the nodes. Unlike the one managed by the DNS
+                          operator, `NodeDNSIP` provides name resolution for the nodes
+                          themselves. There is no DNS-as-a-service for BareMetal deployments.
+                          In order to minimize necessary changes to the datacenter
+                          DNS, a DNS service is hosted as a static pod to serve those
+                          hostnames to the nodes in the cluster.
+                        type: string
+                  equinixMetal:
+                    description: EquinixMetal contains settings specific to the Equinix
+                      Metal infrastructure provider.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                  gcp:
+                    description: GCP contains settings specific to the Google Cloud
+                      Platform infrastructure provider.
+                    type: object
+                    properties:
+                      projectID:
+                        description: resourceGroupName is the Project ID for new GCP
+                          resources created for the cluster.
+                        type: string
+                      region:
+                        description: region holds the region for new GCP resources
+                          created for the cluster.
+                        type: string
+                  ibmcloud:
+                    description: IBMCloud contains settings specific to the IBMCloud
+                      infrastructure provider.
+                    type: object
+                    properties:
+                      location:
+                        description: Location is where the cluster has been deployed
+                        type: string
+                      providerType:
+                        description: ProviderType indicates the type of cluster that
+                          was created
+                        type: string
+                      resourceGroupName:
+                        description: ResourceGroupName is the Resource Group for new
+                          IBMCloud resources created for the cluster.
+                        type: string
+                  kubevirt:
+                    description: Kubevirt contains settings specific to the kubevirt
+                      infrastructure provider.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                  openstack:
+                    description: OpenStack contains settings specific to the OpenStack
+                      infrastructure provider.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      cloudName:
+                        description: cloudName is the name of the desired OpenStack
+                          cloud in the client configuration file (`clouds.yaml`).
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                      nodeDNSIP:
+                        description: nodeDNSIP is the IP address for the internal
+                          DNS used by the nodes. Unlike the one managed by the DNS
+                          operator, `NodeDNSIP` provides name resolution for the nodes
+                          themselves. There is no DNS-as-a-service for OpenStack deployments.
+                          In order to minimize necessary changes to the datacenter
+                          DNS, a DNS service is hosted as a static pod to serve those
+                          hostnames to the nodes in the cluster.
+                        type: string
+                  ovirt:
+                    description: Ovirt contains settings specific to the oVirt infrastructure
+                      provider.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                      nodeDNSIP:
+                        description: 'deprecated: as of 4.6, this field is no longer
+                          set or honored.  It will be removed in a future release.'
+                        type: string
+                  type:
+                    description: "type is the underlying infrastructure provider for
+                      the cluster. This value controls whether infrastructure automation
+                      such as service load balancers, dynamic volume provisioning,
+                      machine creation and deletion, and other integrations are enabled.
+                      If None, no infrastructure automation is enabled. Allowed values
+                      are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\",
+                      \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", and
+                      \"None\". Individual components may not support all platforms,
+                      and must handle unrecognized platforms as None if they do not
+                      support that platform. \n This value will be synced with to
+                      the `status.platform` and `status.platformStatus.type`. Currently
+                      this value cannot be changed once set."
+                    type: string
+                    enum:
+                    - ""
+                    - AWS
+                    - Azure
+                    - BareMetal
+                    - GCP
+                    - Libvirt
+                    - OpenStack
+                    - None
+                    - VSphere
+                    - oVirt
+                    - IBMCloud
+                    - KubeVirt
+                    - EquinixMetal
+                  vsphere:
+                    description: VSphere contains settings specific to the VSphere
+                      infrastructure provider.
+                    type: object
+                    properties:
+                      apiServerInternalIP:
+                        description: apiServerInternalIP is an IP address to contact
+                          the Kubernetes API server that can be used by components
+                          inside the cluster, like kubelets using the infrastructure
+                          rather than Kubernetes networking. It is the IP that the
+                          Infrastructure.status.apiServerInternalURI points to. It
+                          is the IP for a self-hosted load balancer in front of the
+                          API servers.
+                        type: string
+                      ingressIP:
+                        description: ingressIP is an external IP which routes to the
+                          default ingress controller. The IP is a suitable target
+                          of a wildcard DNS record used to resolve default route host
+                          names.
+                        type: string
+                      nodeDNSIP:
+                        description: nodeDNSIP is the IP address for the internal
+                          DNS used by the nodes. Unlike the one managed by the DNS
+                          operator, `NodeDNSIP` provides name resolution for the nodes
+                          themselves. There is no DNS-as-a-service for vSphere deployments.
+                          In order to minimize necessary changes to the datacenter
+                          DNS, a DNS service is hosted as a static pod to serve those
+                          hostnames to the nodes in the cluster.
+                        type: string

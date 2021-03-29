@@ -1,0 +1,74 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: consoles.config.openshift.io
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+spec:
+  scope: Cluster
+  preserveUnknownFields: false
+  group: config.openshift.io
+  names:
+    kind: Console
+    listKind: ConsoleList
+    plural: consoles
+    singular: console
+  subresources:
+    status: {}
+  versions:
+  - name: v1
+    served: true
+    storage: true
+  "validation":
+    "openAPIV3Schema":
+      description: Console holds cluster-wide configuration for the web console, including
+        the logout URL, and reports the public URL of the console. The canonical name
+        is `cluster`.
+      type: object
+      required:
+      - spec
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: spec holds user settable values for configuration
+          type: object
+          properties:
+            authentication:
+              description: ConsoleAuthentication defines a list of optional configuration
+                for console authentication.
+              type: object
+              properties:
+                logoutRedirect:
+                  description: 'An optional, absolute URL to redirect web browsers
+                    to after logging out of the console. If not specified, it will
+                    redirect to the default login page. This is required when using
+                    an identity provider that supports single sign-on (SSO) such as:
+                    - OpenID (Keycloak, Azure) - RequestHeader (GSSAPI, SSPI, SAML)
+                    - OAuth (GitHub, GitLab, Google) Logging out of the console will
+                    destroy the user''s token. The logoutRedirect provides the user
+                    the option to perform single logout (SLO) through the identity
+                    provider to destroy their single sign-on session.'
+                  type: string
+                  pattern: ^$|^((https):\/\/?)[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|\/?))$
+        status:
+          description: status holds observed values from the cluster. They may not
+            be overridden.
+          type: object
+          properties:
+            consoleURL:
+              description: The URL for the console. This will be derived from the
+                host for the route that is created for the console.
+              type: string

@@ -1,0 +1,13 @@
+spec:
+  validation:
+    openAPIV3Schema:
+      properties:
+        spec:
+          properties:
+            quota:
+              properties:
+                hard:
+                  additionalProperties:
+                    type: ""
+                    x-kubernetes-int-or-string: true
+

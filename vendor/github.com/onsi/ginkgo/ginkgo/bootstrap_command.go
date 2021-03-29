@@ -131,7 +131,10 @@ func determinePackageName(name string, internal bool) string {
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
-	return err == nil
+	if err == nil {
+		return true
+	}
+	return false
 }
 
 func generateBootstrap(agouti, noDot, internal bool, customBootstrapFile string) {

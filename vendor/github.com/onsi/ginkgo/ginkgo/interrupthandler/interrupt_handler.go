@@ -16,7 +16,7 @@ type InterruptHandler struct {
 func NewInterruptHandler() *InterruptHandler {
 	h := &InterruptHandler{
 		lock: &sync.Mutex{},
-		C:    make(chan bool),
+		C:    make(chan bool, 0),
 	}
 
 	go h.handleInterrupt()
