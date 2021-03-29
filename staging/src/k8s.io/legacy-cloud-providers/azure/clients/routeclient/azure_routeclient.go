@@ -58,12 +58,12 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure RoutesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure RoutesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	klog.V(2).InfoS("Azure RoutesClient (read ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPS,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure RoutesClient (write ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
 		armClient:         armClient,
@@ -127,14 +127,14 @@ func (c *Client) createOrUpdateRoute(ctx context.Context, resourceGroupName stri
 	response, rerr := c.armClient.PutResourceWithDecorators(ctx, resourceID, routeParameters, decorators)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "route.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in route.put.request", "resourceID", resourceID, "err", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "route.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in route.put.respondt", "resourceID", resourceID, "err", rerr.Error())
 			return rerr
 		}
 	}
