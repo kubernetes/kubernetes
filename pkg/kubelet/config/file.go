@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	utilio "k8s.io/utils/io"
 )
 
@@ -228,6 +229,16 @@ func (s *sourceFile) extractFromFile(logger klog.Logger, filename string) (pod *
 	if parsed {
 		if podErr != nil {
 			return pod, podErr
+		}
+		if managed.IsEnabled() {
+			if newPod, _, err := managed.ModifyStaticPodForPinnedManagement(pod); err != nil {
+				klog.V(2).Error(err, "Static Pod is managed but errored", "name", pod.ObjectMeta.Name, "namespace", pod.ObjectMeta.Namespace)
+			} else if newPod != nil {
+				klog.V(2).InfoS("Static Pod is managed. Using modified pod", "name", newPod.ObjectMeta.Name, "namespace", newPod.ObjectMeta.Namespace, "annotations", newPod.Annotations)
+				pod = newPod
+			} else {
+				klog.V(2).InfoS("Static Pod is not managed", "name", pod.ObjectMeta.Name, "namespace", pod.ObjectMeta.Namespace)
+			}
 		}
 		return pod, nil
 	}

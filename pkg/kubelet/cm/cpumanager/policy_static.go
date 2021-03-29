@@ -37,6 +37,7 @@ import (
 	cmqos "k8s.io/kubernetes/pkg/kubelet/cm/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/utils/cpuset"
 )
@@ -221,6 +222,10 @@ func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
 		// state is empty initialize
 		s.SetDefaultCPUSet(allCPUs)
 		logger.Info("Static policy initialized", "defaultCPUSet", allCPUs)
+		if managed.IsEnabled() {
+			defaultCpus := s.GetDefaultCPUSet().Difference(p.reservedCPUs)
+			s.SetDefaultCPUSet(defaultCpus)
+		}
 		return nil
 	}
 
@@ -234,8 +239,10 @@ func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
 				p.reservedCPUs.Intersection(tmpDefaultCPUset).String(), tmpDefaultCPUset.String())
 		}
 	} else {
-		if !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
-			return fmt.Errorf("not all reserved cpus: %q are present in defaultCpuSet: %q",
+		// 2. This only applies when managed mode is disabled. Active workload partitioning feature
+		//    removes the reserved cpus from the default cpu mask on purpose.
+		if !managed.IsEnabled() && !p.reservedCPUs.Intersection(tmpDefaultCPUset).Equals(p.reservedCPUs) {
+			return fmt.Errorf("not all reserved cpus: \"%s\" are present in defaultCpuSet: \"%s\"",
 				p.reservedCPUs.String(), tmpDefaultCPUset.String())
 		}
 	}
@@ -271,10 +278,17 @@ func (p *staticPolicy) validateState(logger logr.Logger, s state.State) error {
 		}
 	}
 	totalKnownCPUs = totalKnownCPUs.Union(tmpCPUSets...)
-	if !totalKnownCPUs.Equals(allCPUs) {
-		return fmt.Errorf("current set of available CPUs %q doesn't match with CPUs in state %q",
-			allCPUs.String(), totalKnownCPUs.String())
+	availableCPUs := p.topology.CPUDetails.CPUs()
 
+	// CPU (workload) partitioning removes reserved cpus
+	// from the default mask intentionally
+	if managed.IsEnabled() {
+		availableCPUs = availableCPUs.Difference(p.reservedCPUs)
+	}
+
+	if !totalKnownCPUs.Equals(availableCPUs) {
+		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
+			availableCPUs.String(), totalKnownCPUs.String())
 	}
 
 	return nil
