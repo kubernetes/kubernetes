@@ -10,7 +10,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20180725130230-947c36da3153
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/gogo/protobuf v1.3.1
+	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7
 	github.com/golang/protobuf v1.4.2
 	github.com/google/go-cmp v0.4.0
