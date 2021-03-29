@@ -46,7 +46,7 @@ var (
 	etcdObjectCounts = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:              "etcd_object_counts",
-			DeprecatedVersion: "1.21.0",
+			DeprecatedVersion: "1.22.0",
 			Help:              "Number of stored objects at the time of last check split by kind. This metric is replaced by apiserver_storage_object_counts.",
 			StabilityLevel:    compbasemetrics.ALPHA,
 		},
