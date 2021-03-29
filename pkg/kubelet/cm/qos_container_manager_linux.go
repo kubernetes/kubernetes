@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 )
 
 const (
@@ -173,6 +174,9 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	reuseReqs := make(v1.ResourceList, 4)
 	for i := range pods {
 		pod := pods[i]
+		if enabled, _, _ := managed.IsPodManaged(pod); enabled {
+			continue
+		}
 		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
