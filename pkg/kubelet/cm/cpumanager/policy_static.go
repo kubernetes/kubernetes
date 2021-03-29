@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
@@ -180,6 +181,10 @@ func (p *staticPolicy) validateState(s state.State) error {
 		// state is empty initialize
 		allCPUs := p.topology.CPUDetails.CPUs()
 		s.SetDefaultCPUSet(allCPUs)
+		if managed.IsEnabled() {
+			defaultCpus := s.GetDefaultCPUSet().Difference(p.reserved)
+			s.SetDefaultCPUSet(defaultCpus)
+		}
 		return nil
 	}
 
