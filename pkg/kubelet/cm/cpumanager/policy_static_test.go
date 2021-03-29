@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/kubelet/managed"
+
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -939,17 +941,18 @@ func TestTopologyAwareAllocateCPUs(t *testing.T) {
 // above test cases are without kubelet --reserved-cpus cmd option
 // the following tests are with --reserved-cpus configured
 type staticPolicyTestWithResvList struct {
-	description     string
-	topo            *topology.CPUTopology
-	numReservedCPUs int
-	reserved        cpuset.CPUSet
-	stAssignments   state.ContainerCPUAssignments
-	stDefaultCPUSet cpuset.CPUSet
-	pod             *v1.Pod
-	expErr          error
-	expNewErr       error
-	expCPUAlloc     bool
-	expCSet         cpuset.CPUSet
+	description         string
+	topo                *topology.CPUTopology
+	numReservedCPUs     int
+	reserved            cpuset.CPUSet
+	stAssignments       state.ContainerCPUAssignments
+	stDefaultCPUSet     cpuset.CPUSet
+	pod                 *v1.Pod
+	expErr              error
+	expNewErr           error
+	expCPUAlloc         bool
+	expCSet             cpuset.CPUSet
+	managementPartition bool
 }
 
 func TestStaticPolicyStartWithResvList(t *testing.T) {
@@ -981,9 +984,32 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			stDefaultCPUSet: cpuset.New(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expNewErr:       fmt.Errorf("[cpumanager] unable to reserve the required amount of CPUs (size of 0-1 did not equal 1)"),
 		},
+		{
+			description:         "reserved cores 0 & 6 are not present in available cpuset when management partitioning is enabled",
+			topo:                topoDualSocketHT,
+			numReservedCPUs:     2,
+			stAssignments:       state.ContainerCPUAssignments{},
+			managementPartition: true,
+			expCSet:             cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+		},
+		{
+			description:         "reserved cores 0 & 6 are not present in available cpuset when management partitioning is enabled during recovery",
+			topo:                topoDualSocketHT,
+			numReservedCPUs:     2,
+			stAssignments:       state.ContainerCPUAssignments{},
+			stDefaultCPUSet:     cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+			managementPartition: true,
+			expCSet:             cpuset.New(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
+		},
 	}
 	for _, testCase := range testCases {
 		t.Run(testCase.description, func(t *testing.T) {
+			wasManaged := managed.IsEnabled()
+			managed.TestOnlySetEnabled(testCase.managementPartition)
+			defer func() {
+				managed.TestOnlySetEnabled(wasManaged)
+			}()
+
 			p, err := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, testCase.reserved, topologymanager.NewFakeManager(), nil)
 			if !reflect.DeepEqual(err, testCase.expNewErr) {
 				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",

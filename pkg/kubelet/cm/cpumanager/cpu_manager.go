@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/utils/cpuset"
 )
@@ -407,11 +408,16 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 	failure = []reconciledContainer{}
 
 	m.removeStaleState()
+	workloadEnabled := managed.IsEnabled()
 	for _, pod := range m.activePods() {
 		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		if !ok {
 			klog.V(4).InfoS("ReconcileState: skipping pod; status not found", "pod", klog.KObj(pod))
 			failure = append(failure, reconciledContainer{pod.Name, "", ""})
+			continue
+		}
+		if enabled, _, _ := managed.IsPodManaged(pod); workloadEnabled && enabled {
+			klog.V(4).InfoS("[cpumanager] reconcileState: skipping pod; pod is managed (pod: %s)", pod.Name)
 			continue
 		}
 
