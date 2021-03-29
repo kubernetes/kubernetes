@@ -1,4 +1,4 @@
-// +build providerless
+// +build !providerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -19,6 +19,8 @@ limitations under the License.
 package auth
 
 import (
-	// Initialize common client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	// Initialize client auth plugins for cloud providers.
+	_ "k8s.io/client-go/plugin/pkg/client/auth/azure"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 )
