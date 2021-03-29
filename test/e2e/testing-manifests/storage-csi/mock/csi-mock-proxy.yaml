@@ -53,16 +53,24 @@ spec:
           - mountPath: /registration
             name: registration-dir
         - name: mock
-          image: k8s.gcr.io/sig-storage/mock-driver:v4.1.0
+          # FIXME: Move to release image once the hostpath-plugin release
+          # having below chagnes;
+          #  - https://github.com/kubernetes-csi/csi-driver-host-path/pull/269
+          #  - https://github.com/kubernetes-csi/csi-driver-host-path/pull/260          #
+          image: gcr.io/k8s-staging-sig-storage/hostpathplugin:canary
           args:
-            # -v3 shows when connections get established. Higher log levels print information about
-            # transferred bytes, but cannot print message content (no gRPC parsing), so this is usually
-            # not interesting.
-            - -v=3
+            - -v=5
+            - -nodeid=$(KUBE_NODE_NAME)
+            - -endpoint=/csi/csi.sock
             - -proxy-endpoint=tcp://:9000
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
           ports:
             - containerPort: 9000
               name: socat
