@@ -285,6 +285,11 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDist
 	// request's context's Done channel gets closed by the time
 	// the request is done being processed.
 	doneCh := ctx.Done()
+
+	// Retrieve the queueset configuration name while we have the lock
+	// and use it in the goroutine below.
+	configName := qs.qCfg.Name
+
 	if doneCh != nil {
 		qs.preCreateOrUnblockGoroutine()
 		go func() {
@@ -297,7 +302,7 @@ func (qs *queueSet) StartRequest(ctx context.Context, hashValue uint64, flowDist
 			// known that the count does not need to be accurate.
 			// BTW, the count only needs to be accurate in a test that
 			// uses FakeEventClock::Run().
-			klog.V(6).Infof("QS(%s): Context of request %q %#+v %#+v is Done", qs.qCfg.Name, fsName, descr1, descr2)
+			klog.V(6).Infof("QS(%s): Context of request %q %#+v %#+v is Done", configName, fsName, descr1, descr2)
 			qs.cancelWait(req)
 			qs.goroutineDoneOrBlocked()
 		}()
