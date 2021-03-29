@@ -132,7 +132,7 @@ func (t *multiVolumeTestSuite) DefineTests(driver storageframework.TestDriver, p
 	//      [   node1   ]                           ==>        [   node1   ]
 	//          /    \      <- same volume mode                   /    \
 	//   [volume1]  [volume2]                              [volume1]  [volume2]
-	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on the same node [LinuxOnly]", func() {
+	ginkgo.It("should access to two volumes with the same volume mode and retain data across pod recreation on the same node", func() {
 		// Currently, multiple volumes are not generally available for pre-provisoined volume,
 		// because containerized storage servers, such as iSCSI and rbd, are just returning
 		// a static volume inside container, not actually creating a new volume per request.
@@ -510,7 +510,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		// CreateSecPodWithNodeSelection make volumes accessible via /mnt/volume({i} + 1)
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
-		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
+		ginkgo.By(fmt.Sprintf("Checking if the volume=%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {

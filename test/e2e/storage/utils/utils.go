@@ -543,8 +543,13 @@ func CheckReadFromPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persisten
 
 	sum := sha256.Sum256(genBinDataFromSeed(len, seed))
 
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
+	if framework.NodeOSDistroIs("windows") {
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("cat %s | sha256sum", pathForVolMode))
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("cat %s | sha256sum | grep -Fq %x", pathForVolMode, sum))
+	} else {
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum", pathForVolMode, iflag, len))
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("dd if=%s %s bs=%d count=1 | sha256sum | grep -Fq %x", pathForVolMode, iflag, len, sum))
+	}
 }
 
 // CheckWriteToPath that file can be properly written.
@@ -568,8 +573,13 @@ func CheckWriteToPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persistent
 
 	encoded := base64.StdEncoding.EncodeToString(genBinDataFromSeed(len, seed))
 
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
-	e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+	if framework.NodeOSDistroIs("windows") {
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d > %s", encoded, pathForVolMode))
+	} else {
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | sha256sum", encoded))
+		e2evolume.VerifyExecInPodSucceed(f, pod, fmt.Sprintf("echo %s | base64 -d | dd of=%s %s bs=%d count=1", encoded, pathForVolMode, oflag, len))
+	}
 }
 
 // GetSectorSize returns the sector size of the device.
