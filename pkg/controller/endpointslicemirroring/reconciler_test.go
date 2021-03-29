@@ -43,6 +43,7 @@ func TestReconcile(t *testing.T) {
 	testCases := []struct {
 		testName                 string
 		subsets                  []corev1.EndpointSubset
+		epLabels                 map[string]string
 		endpointsDeletionPending bool
 		maxEndpointsPerSubset    int32
 		existingEndpointSlices   []*discovery.EndpointSlice
@@ -105,6 +106,102 @@ func TestReconcile(t *testing.T) {
 		existingEndpointSlices:   []*discovery.EndpointSlice{},
 		expectedNumSlices:        0,
 		expectedClientActions:    0,
+	}, {
+		testName: "Endpoints with 1 subset, port, and address and existing slice with same fields",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ep-1",
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 0,
+	}, {
+		testName: "Endpoints with 1 subset, port, and address and existing slice with an additional annotation",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-ep-1",
+				Annotations: map[string]string{"foo": "bar"},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
+	}, {
+		testName: "Endpoints with 1 subset, port, label and address and existing slice with same fields but the label",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		epLabels: map[string]string{"foo": "bar"},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-ep-1",
+				Annotations: map[string]string{"foo": "bar"},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
 	}, {
 		testName: "Endpoints with 1 subset, 2 ports, and 2 addresses",
 		subsets: []corev1.EndpointSubset{{
@@ -641,7 +738,7 @@ func TestReconcile(t *testing.T) {
 			setupMetrics()
 			namespace := "test"
 			endpoints := corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels},
 				Subsets:    tc.subsets,
 			}
 
