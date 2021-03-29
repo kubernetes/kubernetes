@@ -217,7 +217,6 @@ func (ust *uniformScenarioThread) genCallK(k int) func(time.Time) {
 		ust.uss.counter.Add(1)
 		go func() {
 			ust.callK(k)
-			ust.uss.counter.Add(-1)
 		}()
 	}
 }
@@ -226,6 +225,7 @@ func (ust *uniformScenarioThread) callK(k int) {
 	if k >= ust.nCalls {
 		return
 	}
+
 	req, idle := ust.uss.qs.StartRequest(context.Background(), ust.uc.hash, "", ust.fsName, ust.uss.name, []int{ust.i, ust.j, k}, nil)
 	ust.uss.t.Logf("%s: %d, %d, %d got req=%p, idle=%v", ust.uss.clk.Now().Format(nsTimeFmt), ust.i, ust.j, k, req, idle)
 	if req == nil {

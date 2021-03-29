@@ -66,7 +66,7 @@ type request struct {
 // queue is an array of requests with additional metadata required for
 // the FQScheduler
 type queue struct {
-	requests []*request
+	requests fifo
 
 	// virtualStart is the virtual time (virtual seconds since process
 	// startup) when the oldest request in the queue (if there is any)
@@ -78,18 +78,14 @@ type queue struct {
 }
 
 // Enqueue enqueues a request into the queue
-func (q *queue) Enqueue(request *request) {
-	q.requests = append(q.requests, request)
+func (q *queue) Enqueue(request *request) removeFunc {
+	return q.requests.Enqueue(request)
 }
 
 // Dequeue dequeues a request from the queue
 func (q *queue) Dequeue() (*request, bool) {
-	if len(q.requests) == 0 {
-		return nil, false
-	}
-	request := q.requests[0]
-	q.requests = q.requests[1:]
-	return request, true
+	request, ok := q.requests.Dequeue()
+	return request, ok
 }
 
 // GetVirtualFinish returns the expected virtual finish time of the request at
@@ -104,8 +100,9 @@ func (q *queue) GetVirtualFinish(J int, G float64) float64 {
 }
 
 func (q *queue) dump(includeDetails bool) debug.QueueDump {
-	digest := make([]debug.RequestDump, len(q.requests))
-	for i, r := range q.requests {
+	digest := make([]debug.RequestDump, q.requests.Length())
+	i := 0
+	q.requests.ForEach(func(r *request) {
 		// dump requests.
 		digest[i].MatchedFlowSchema = r.fsName
 		digest[i].FlowDistinguisher = r.flowDistinguisher
@@ -119,7 +116,8 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 				digest[i].RequestInfo = *requestInfo
 			}
 		}
-	}
+		i += 1
+	})
 	return debug.QueueDump{
 		VirtualStart:      q.virtualStart,
 		Requests:          digest,
