@@ -28,9 +28,10 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
@@ -132,6 +133,9 @@ func (s *sourceFile) consumeWatchEvent(e *watchEvent) error {
 		pod, err := s.extractFromFile(e.fileName)
 		if err != nil {
 			return fmt.Errorf("can't process config file %q: %v", e.fileName, err)
+		}
+		if managed.IsEnabled() {
+			managed.ModifyStaticPodForPinnedManagement(pod)
 		}
 		return s.store.Add(pod)
 	case podDelete:
