@@ -134,6 +134,14 @@ func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
 }
 
+func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	var inj injectedResult
+	if err := DecodeInto(injArgs, &inj); err != nil {
+		return nil, err
+	}
+	return &TestPlugin{testPlugin, inj}, nil
+}
+
 // TestPlugin implements all Plugin interfaces.
 type TestPlugin struct {
 	name string
@@ -329,6 +337,7 @@ var registry = func() Registry {
 	r.Register(scorePlugin1, newScorePlugin1)
 	r.Register(pluginNotImplementingScore, newPluginNotImplementingScore)
 	r.Register(duplicatePluginName, newDuplicatePlugin)
+	r.Register(testPlugin, newTestPlugin)
 	return r
 }()
 
@@ -2350,6 +2359,14 @@ func TestListPlugins(t *testing.T) {
 			},
 			pluginSetCount: 3,
 		},
+		{
+			name: "Add multiple plugins with weights",
+			plugins: &config.Plugins{
+				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+			},
+			pluginSetCount: 4,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2363,8 +2380,25 @@ func TestListPlugins(t *testing.T) {
 			if len(plugins) != tt.pluginSetCount {
 				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
 			}
+
+			if len(plugins["ScorePlugin"]) != 0 && len(tt.plugins.Score.Enabled) != 0 {
+				compareScoreWeight(t, plugins["ScorePlugin"], tt.plugins.Score.Enabled)
+			}
 		})
 	}
+}
+
+func compareScoreWeight(t *testing.T, gotScores []config.Plugin, wantScores []config.Plugin) {
+	for _, ws := range wantScores {
+		if ws.Weight != 0 {
+			for _, gs := range gotScores {
+				if gs.Name == ws.Name && gs.Weight != ws.Weight {
+					t.Errorf("Expect %d sample, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
+				}
+			}
+		}
+	}
+
 }
 
 func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {

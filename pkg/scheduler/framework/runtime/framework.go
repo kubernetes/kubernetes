@@ -126,12 +126,13 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{plugins.PostFilter, &f.postFilterPlugins},
 		{plugins.Reserve, &f.reservePlugins},
 		{plugins.PreScore, &f.preScorePlugins},
-		{plugins.Score, &f.scorePlugins},
 		{plugins.PreBind, &f.preBindPlugins},
 		{plugins.Bind, &f.bindPlugins},
 		{plugins.PostBind, &f.postBindPlugins},
 		{plugins.Permit, &f.permitPlugins},
 		{plugins.QueueSort, &f.queueSortPlugins},
+		// Keep plugins.Score at the end for weighting.
+		{plugins.Score, &f.scorePlugins},
 	}
 }
 
