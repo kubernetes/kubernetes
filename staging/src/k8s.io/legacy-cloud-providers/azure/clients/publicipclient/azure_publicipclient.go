@@ -60,12 +60,12 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, APIVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure PublicIPAddressesClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure PublicIPAddressesClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	klog.V(2).InfoS("Azure PublicIPAddressesClient (read ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPS,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure PublicIPAddressesClient (write ops) using rate limit config",
+		"QPS",	config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
 		armClient:         armClient,
@@ -121,7 +121,7 @@ func (c *Client) getPublicIPAddress(ctx context.Context, resourceGroupName strin
 	response, rerr := c.armClient.GetResource(ctx, resourceID, expand)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in publicip.get.request", "resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
@@ -130,7 +130,7 @@ func (c *Client) getPublicIPAddress(ctx context.Context, resourceGroupName strin
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in publicip.get.respond", "resourceID", resourceID, "err", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -194,7 +194,7 @@ func (c *Client) getVMSSPublicIPAddress(ctx context.Context, resourceGroupName s
 	response, rerr := c.armClient.GetResourceWithDecorators(ctx, resourceID, decorators)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmsspublicip.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in vmsspublicip.get.request", "resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
@@ -203,7 +203,7 @@ func (c *Client) getVMSSPublicIPAddress(ctx context.Context, resourceGroupName s
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "vmsspublicip.get.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in vmsspublicip.get.respond", "resourceID", resourceID, "err", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -254,14 +254,14 @@ func (c *Client) listPublicIPAddress(ctx context.Context, resourceGroupName stri
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in publicip.list.request", "resourceID", resourceID, "err", rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.pialr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in publicip.list.respond", "resourceID", resourceID, "err", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -274,7 +274,7 @@ func (c *Client) listPublicIPAddress(ctx context.Context, resourceGroupName stri
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in publicip.list.next", "resourceID", resourceID, "err", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
@@ -325,14 +325,14 @@ func (c *Client) createOrUpdatePublicIP(ctx context.Context, resourceGroupName s
 	response, rerr := c.armClient.PutResource(ctx, resourceID, parameters)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in publicip.put.request", "resourceID", resourceID, "err", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createOrUpdateResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "publicip.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in publicip.put.respond", "resourceID", resourceID, "err", rerr.Error())
 			return rerr
 		}
 	}
