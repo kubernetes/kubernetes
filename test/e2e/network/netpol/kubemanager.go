@@ -19,6 +19,8 @@ package netpol
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,14 +111,15 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 
 // probeConnectivity execs into a pod and checks its connectivity to another pod..
 func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int) (bool, string, error) {
+	port := strconv.Itoa(toPort)
 	var cmd []string
 	switch protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=1s", "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=1s", "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", fmt.Sprintf("%s:%d", addrTo, toPort), "--timeout=1s", "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=1s", "--protocol=udp"}
 	default:
 		framework.Failf("protocol %s not supported", protocol)
 	}
