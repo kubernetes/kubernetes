@@ -76,7 +76,7 @@ func getVSphereConfig() (*VSphereConfig, error) {
 	if confFileLocation == "" {
 		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
 	}
-	confFile, err := os.Open(confFileLocation)
+	confFile, err := os.Open(filepath.Clean(confFileLocation))
 	if err != nil {
 		return nil, err
 	}
