@@ -463,11 +463,11 @@ func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix s
 		}
 
 		baseName := filepath.Dir(destFileName)
-		if err := os.MkdirAll(baseName, 0755); err != nil {
+		if err := os.MkdirAll(baseName, 0750); err != nil {
 			return err
 		}
 		if header.FileInfo().IsDir() {
-			if err := os.MkdirAll(destFileName, 0755); err != nil {
+			if err := os.MkdirAll(destFileName, 0750); err != nil {
 				return err
 			}
 			continue
