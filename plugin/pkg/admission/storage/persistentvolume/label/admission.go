@@ -175,7 +175,7 @@ func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (
 	topologyLabelGA := true
 	domain, domainOK := existingLabels[v1.LabelTopologyZone]
 	region, regionOK := existingLabels[v1.LabelTopologyRegion]
-	// If they dont have GA labels we should check for failuredomain beta labels
+	// If they don't have GA labels we should check for failuredomain beta labels
 	// TODO: remove this once all the cloud provider change to GA topology labels
 	if !domainOK || !regionOK {
 		topologyLabelGA = false

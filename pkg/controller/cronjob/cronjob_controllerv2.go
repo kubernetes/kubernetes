@@ -169,7 +169,7 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 	cronJob, err := jm.cronJobLister.CronJobs(ns).Get(name)
 	switch {
 	case errors.IsNotFound(err):
-		// may be cronjob is deleted, dont need to requeue this key
+		// may be cronjob is deleted, don't need to requeue this key
 		klog.V(4).InfoS("cronjob not found, may be it is deleted", "cronjob", klog.KRef(ns, name), "err", err)
 		return nil, nil
 	case err != nil:

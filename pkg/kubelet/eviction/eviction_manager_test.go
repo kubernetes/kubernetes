@@ -889,7 +889,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	// induce disk pressure!
 	fakeClock.Step(1 * time.Minute)
 	summaryProvider.result = summaryStatsMaker("400Mi", "200Gi", podStats)
-	// Dont reclaim any disk
+	// Don't reclaim any disk
 	diskGC.summaryAfterGC = summaryStatsMaker("400Mi", "200Gi", podStats)
 	manager.synchronize(diskInfoProvider, activePodsFunc)
 

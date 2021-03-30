@@ -719,7 +719,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
 	scache := internalcache.New(10*time.Minute, stop)
 
-	// Design the baseline for the pods, and we will make nodes that dont fit it later.
+	// Design the baseline for the pods, and we will make nodes that don't fit it later.
 	var cpu = int64(4)
 	var mem = int64(500)
 	podWithTooBigResourceRequests := podWithResources("bar", "", v1.ResourceList{
