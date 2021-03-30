@@ -71,12 +71,7 @@ func TestValidateSupportedVersion(t *testing.T) {
 				Version: "v1beta1",
 			},
 			allowDeprecated: true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
-				Version: "v1beta1",
-			},
+			expectedErr:     true,
 		},
 		{
 			gv: schema.GroupVersion{
@@ -225,7 +220,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "InitConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: InitConfiguration
 			`),
 			expectedKinds: []string{
@@ -237,7 +232,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "ClusterConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: ClusterConfiguration
 			`),
 			expectedKinds: []string{
@@ -249,7 +244,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "JoinConfiguration only gets migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
@@ -265,10 +260,10 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "Init + Cluster Configurations are migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: ClusterConfiguration
 			`),
 			expectedKinds: []string{
@@ -280,10 +275,10 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "Init + Join Configurations are migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
@@ -301,10 +296,10 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "Cluster + Join Configurations are migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
@@ -322,13 +317,13 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "Init + Cluster + Join Configurations are migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:
