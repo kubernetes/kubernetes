@@ -97,7 +97,10 @@ func main(cmd *cobra.Command, args []string) {
 	}
 	log.Printf("OK: Constructed OIDC provider for issuer %v", unsafeClaims.Issuer)
 
-	validTok, err := iss.Verifier(&oidc.Config{ClientID: audience}).Verify(ctx, raw)
+	validTok, err := iss.Verifier(&oidc.Config{
+		ClientID:             audience,
+		SupportedSigningAlgs: []string{oidc.RS256, oidc.ES256},
+	}).Verify(ctx, raw)
 	if err != nil {
 		log.Fatal(err)
 	}
