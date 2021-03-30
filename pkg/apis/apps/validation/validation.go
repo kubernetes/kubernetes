@@ -53,8 +53,8 @@ func ValidatePodTemplateSpecForStatefulSet(template *api.PodTemplateSpec, select
 	} else {
 		if !selector.Empty() {
 			// Verify that the StatefulSet selector matches the labels in template.
-			labels := labels.Set(template.Labels)
-			if !selector.Matches(labels) {
+			tempLabels := labels.Set(template.Labels)
+			if !selector.Matches(tempLabels) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}
@@ -683,8 +683,8 @@ func ValidatePodTemplateSpecForReplicaSet(template *api.PodTemplateSpec, selecto
 	} else {
 		if !selector.Empty() {
 			// Verify that the ReplicaSet selector matches the labels in template.
-			labels := labels.Set(template.Labels)
-			if !selector.Matches(labels) {
+			tempLabels := labels.Set(template.Labels)
+			if !selector.Matches(tempLabels) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("metadata", "labels"), template.Labels, "`selector` does not match template `labels`"))
 			}
 		}

@@ -362,23 +362,23 @@ func TestValidateStatefulSet(t *testing.T) {
 			}
 
 			for i := range errs {
-				field := errs[i].Field
-				if !strings.HasPrefix(field, "spec.template.") &&
-					field != "metadata.name" &&
-					field != "metadata.namespace" &&
-					field != "spec.selector" &&
-					field != "spec.template" &&
-					field != "GCEPersistentDisk.ReadOnly" &&
-					field != "spec.replicas" &&
-					field != "spec.template.labels" &&
-					field != "metadata.annotations" &&
-					field != "metadata.labels" &&
-					field != "status.replicas" &&
-					field != "spec.updateStrategy" &&
-					field != "spec.updateStrategy.rollingUpdate" &&
-					field != "spec.updateStrategy.rollingUpdate.partition" &&
-					field != "spec.podManagementPolicy" &&
-					field != "spec.template.spec.activeDeadlineSeconds" {
+				errField := errs[i].Field
+				if !strings.HasPrefix(errField, "spec.template.") &&
+					errField != "metadata.name" &&
+					errField != "metadata.namespace" &&
+					errField != "spec.selector" &&
+					errField != "spec.template" &&
+					errField != "GCEPersistentDisk.ReadOnly" &&
+					errField != "spec.replicas" &&
+					errField != "spec.template.labels" &&
+					errField != "metadata.annotations" &&
+					errField != "metadata.labels" &&
+					errField != "status.replicas" &&
+					errField != "spec.updateStrategy" &&
+					errField != "spec.updateStrategy.rollingUpdate" &&
+					errField != "spec.updateStrategy.rollingUpdate.partition" &&
+					errField != "spec.podManagementPolicy" &&
+					errField != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}
 			}
@@ -1979,17 +1979,17 @@ func TestValidateDaemonSet(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				!strings.HasPrefix(field, "spec.updateStrategy") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" {
+			errField := errs[i].Field
+			if !strings.HasPrefix(errField, "spec.template.") &&
+				!strings.HasPrefix(errField, "spec.updateStrategy") &&
+				errField != "metadata.name" &&
+				errField != "metadata.namespace" &&
+				errField != "spec.selector" &&
+				errField != "spec.template" &&
+				errField != "GCEPersistentDisk.ReadOnly" &&
+				errField != "spec.template.labels" &&
+				errField != "metadata.annotations" &&
+				errField != "metadata.labels" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
@@ -2954,18 +2954,18 @@ func TestValidateReplicaSet(t *testing.T) {
 			t.Errorf("expected failure for %s", k)
 		}
 		for i := range errs {
-			field := errs[i].Field
-			if !strings.HasPrefix(field, "spec.template.") &&
-				field != "metadata.name" &&
-				field != "metadata.namespace" &&
-				field != "spec.selector" &&
-				field != "spec.template" &&
-				field != "GCEPersistentDisk.ReadOnly" &&
-				field != "spec.replicas" &&
-				field != "spec.template.labels" &&
-				field != "metadata.annotations" &&
-				field != "metadata.labels" &&
-				field != "status.replicas" {
+			errField := errs[i].Field
+			if !strings.HasPrefix(errField, "spec.template.") &&
+				errField != "metadata.name" &&
+				errField != "metadata.namespace" &&
+				errField != "spec.selector" &&
+				errField != "spec.template" &&
+				errField != "GCEPersistentDisk.ReadOnly" &&
+				errField != "spec.replicas" &&
+				errField != "spec.template.labels" &&
+				errField != "metadata.annotations" &&
+				errField != "metadata.labels" &&
+				errField != "status.replicas" {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
