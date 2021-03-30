@@ -93,7 +93,7 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 func (c *Controller) gc() {
 	leases, err := c.leaseLister.Leases(c.leaseNamespace).List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error while listing apiserver leases: %v", err)
+		klog.ErrorS(err, "Error while listing apiserver leases")
 		return
 	}
 	for _, lease := range leases {
@@ -104,14 +104,14 @@ func (c *Controller) gc() {
 		// double check latest lease from apiserver before deleting
 		lease, err := c.kubeclientset.CoordinationV1().Leases(c.leaseNamespace).Get(context.TODO(), lease.Name, metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
-			klog.Errorf("Error getting lease: %v", err)
+			klog.ErrorS(err, "Error getting lease")
 			continue
 		}
 		if errors.IsNotFound(err) || lease == nil {
 			// In an HA cluster, this can happen if the lease was deleted
 			// by the same GC controller in another apiserver, which is legit.
 			// We don't expect other components to delete the lease.
-			klog.V(4).Infof("cannot find apiserver lease: %v", err)
+			klog.V(4).InfoS("Cannot find apiserver lease", "err", err)
 			continue
 		}
 		// evaluate lease from apiserver
@@ -124,9 +124,9 @@ func (c *Controller) gc() {
 				// In an HA cluster, this can happen if the lease was deleted
 				// by the same GC controller in another apiserver, which is legit.
 				// We don't expect other components to delete the lease.
-				klog.V(4).Infof("apiserver lease is gone already: %v", err)
+				klog.V(4).InfoS("Apiserver lease is gone already", "err", err)
 			} else {
-				klog.Errorf("Error deleting lease: %v", err)
+				klog.ErrorS(err, "Error deleting lease")
 			}
 		}
 	}

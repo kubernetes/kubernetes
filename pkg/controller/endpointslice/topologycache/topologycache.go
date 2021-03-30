@@ -88,7 +88,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	allocations := t.getAllocations(totalEndpoints)
 
 	if allocations == nil {
-		klog.V(2).Infof("Insufficient endpoints, removing hints from %s Service", si.ServiceKey)
+		klog.V(2).InfoS("Insufficient endpoints, removing hints from service", "serviceKey", si.ServiceKey)
 		t.RemoveHints(si.ServiceKey, si.AddressType)
 		return RemoveHintsFromSlices(si)
 	}
@@ -104,7 +104,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	for _, slice := range allocatableSlices {
 		for i, endpoint := range slice.Endpoints {
 			if endpoint.Zone == nil || *endpoint.Zone == "" {
-				klog.Warningf("Endpoint found without zone specified, removing hints from %s Service", si.ServiceKey)
+				klog.InfoS("Endpoint found without zone specified, removing hints from service", "serviceKey", si.ServiceKey)
 				t.RemoveHints(si.ServiceKey, si.AddressType)
 				return RemoveHintsFromSlices(si)
 			}
