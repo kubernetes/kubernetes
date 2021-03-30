@@ -254,8 +254,8 @@ func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 
 // generatePods generates pods to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generatePods(config *testConfig) {
-	testutils.CreatePod(config.clientset, "sample", inputConfig.PodCount, config.mutatedPodTemplate)
-	testutils.CreatePod(config.clientset, "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
+	testutils.CreatePods(config.clientset, "sample", inputConfig.PodCount, config.mutatedPodTemplate)
+	testutils.CreatePods(config.clientset, "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
 }
 
 // generatePodAndNodeTopology is the wrapper function for modifying both pods and node objects.

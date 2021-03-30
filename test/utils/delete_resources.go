@@ -57,13 +57,10 @@ func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, nam
 	}
 }
 
-func DeleteResourceWithRetries(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
-	deleteFunc := func() (bool, error) {
-		err := deleteResource(c, kind, namespace, name, options)
-		if err == nil || apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, fmt.Errorf("Failed to delete object with non-retriable error: %v", err)
+func DeleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options metav1.DeleteOptions) error {
+	err := deleteResource(c, kind, namespace, name, options)
+	if err == nil || apierrors.IsNotFound(err) {
+		return nil
 	}
-	return RetryWithExponentialBackOff(deleteFunc)
+	return fmt.Errorf("failed to delete object: %v", err)
 }

@@ -91,7 +91,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	falseVar := false
 	deleteOption := metav1.DeleteOptions{OrphanDependents: &falseVar}
 	startTime := time.Now()
-	if err := testutils.DeleteResourceWithRetries(c, kind, ns, name, deleteOption); err != nil {
+	if err := testutils.DeleteResource(c, kind, ns, name, deleteOption); err != nil {
 		return err
 	}
 	deleteTime := time.Since(startTime)
