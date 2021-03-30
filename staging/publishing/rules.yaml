@@ -39,6 +39,7 @@ rules:
       branch: release-1.21
       dir: staging/src/k8s.io/code-generator
     name: release-1.21
+    go: 1.16.1
 
 - destination: apimachinery
   library: true
