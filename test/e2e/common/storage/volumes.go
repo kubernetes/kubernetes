@@ -113,7 +113,7 @@ var _ = SIGDescribe("Volumes", func() {
 					ExpectedContent: "Hello from NFS!",
 				},
 			}
-			// Must match content of test/images/volume-tester/nfs/index.html
+			// Must match content of test/images/volume/nfs/index.html
 			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
@@ -139,13 +139,13 @@ var _ = SIGDescribe("Volumes", func() {
 					Volume: v1.VolumeSource{
 						Glusterfs: &v1.GlusterfsVolumeSource{
 							EndpointsName: name,
-							// 'test_vol' comes from test/images/volumes-tester/gluster/run_gluster.sh
+							// 'test_vol' comes from test/images/volume/gluster/run_gluster.sh
 							Path:     "test_vol",
 							ReadOnly: true,
 						},
 					},
 					File: "index.html",
-					// Must match content of test/images/volumes-tester/gluster/index.html
+					// Must match content of test/images/volume/gluster/index.html
 					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
