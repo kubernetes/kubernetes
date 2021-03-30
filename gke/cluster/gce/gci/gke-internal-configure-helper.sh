@@ -262,6 +262,8 @@ function gke-internal-master-start {
   echo "Internal GKE configuration start"
   compute-master-manifest-variables
 
+  configure-sshd
+
   write-kube-apiserver-internal-cert-key
   setup-kube-apiserver-internal-address-redirect
 
@@ -728,6 +730,18 @@ function deploy-kube-scheduler-via-kube-up {
 
 function deploy-kube-controller-manager-via-kube-up {
   [[ "${KUBE_CONTROLLER_MANAGER_CRP:-}" != "true" ]]
+}
+
+# Tweak SSH daemon config.
+function configure-sshd {
+  mkdir -p /etc/systemd/system/sshd.service.d
+  cat <<EOF >/etc/systemd/system/sshd.service.d/gke.conf
+[Service]
+OOMScoreAdjust=-1000
+EOF
+
+  systemctl daemon-reload
+  systemctl restart sshd
 }
 
 # Configure OS Config agent. Activation is controlled by VM metadata.
