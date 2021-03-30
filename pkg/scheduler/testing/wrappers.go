@@ -383,6 +383,7 @@ func (p *PodWrapper) Req(resMap map[v1.ResourceName]string) *PodWrapper {
 	p.Spec.Containers = append(p.Spec.Containers, v1.Container{
 		Resources: v1.ResourceRequirements{
 			Requests: res,
+			Limits:   res,
 		},
 	})
 	return p
