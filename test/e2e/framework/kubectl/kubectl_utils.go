@@ -144,7 +144,7 @@ func (tk *TestKubeconfig) WriteFileViaContainer(podName, containerName string, p
 	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
 	// TODO: replace with `framework.NodeOSDistroIs` when #81245 is complete
 	if e2epod.NodeOSDistroIs("windows") {
-		command = fmt.Sprintf("echo '%s' > '%s'; sleep 1", contents, path)
+		command = fmt.Sprintf("echo '%s' > '%s';", contents, path)
 	}
 	stdout, stderr, err := tk.kubectlExecWithRetry(tk.Namespace, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
