@@ -37,9 +37,6 @@ limitations under the License.
  * and checks, that Kubernetes can use it as a volume.
  */
 
-// GlusterFS test is duplicated from test/e2e/volumes.go.  Any changes made there
-// should be duplicated here
-
 package storage
 
 import (
@@ -56,7 +53,6 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-// TODO(#99468): Check if these tests are still needed.
 var _ = SIGDescribe("Volumes", func() {
 	f := framework.NewDefaultFramework("volume")
 
@@ -94,7 +90,7 @@ var _ = SIGDescribe("Volumes", func() {
 				},
 			}
 
-			// Must match content of test/images/volumes-tester/nfs/index.html
+			// Must match content of test/images/volume/nfs/index.html
 			e2evolume.TestVolumeClient(f, config, nil, "" /* fsType */, tests)
 		})
 	})
