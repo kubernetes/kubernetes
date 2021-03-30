@@ -18,7 +18,7 @@ package validation
 
 import (
 	"errors"
-	"fmt"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"testing"
 	"time"
 
@@ -316,14 +316,14 @@ func TestValidatePolicy(t *testing.T) {
 		name     string
 	}{
 		{
-			name:     "no weight defined in policy",
-			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority"}}},
-			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
-		},
-		{
-			name:     "policy weight is not positive",
-			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}},
-			expected: errors.New("priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+			name:   "policy weight is not positive",
+			policy: config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}},
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "priorities[0].weight",
+				BadValue: int64(0),
+				Detail:   "priority should have a positive weight applied to it or it has overflown",
+			},
 		},
 		{
 			name:     "valid weight priority",
@@ -331,14 +331,24 @@ func TestValidatePolicy(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "invalid negative weight policy",
-			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}},
-			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			name:   "invalid negative weight policy",
+			policy: config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}},
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "priorities[0].weight",
+				BadValue: int64(-2),
+				Detail:   "priority should have a positive weight applied to it or it has overflown",
+			},
 		},
 		{
-			name:     "policy weight exceeds maximum",
-			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: config.MaxWeight}}},
-			expected: errors.New("priority WeightPriority should have a positive weight applied to it or it has overflown"),
+			name:   "policy weight exceeds maximum",
+			policy: config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: config.MaxWeight}}},
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "priorities[0].weight",
+				BadValue: config.MaxWeight,
+				Detail:   "priority should have a positive weight applied to it or it has overflown",
+			},
 		},
 		{
 			name:     "valid weight in policy extender config",
@@ -346,9 +356,14 @@ func TestValidatePolicy(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "invalid negative weight in policy extender config",
-			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
-			expected: errors.New("extenders[0].weight: Invalid value: -2: must have a positive weight applied to it"),
+			name:   "invalid negative weight in policy extender config",
+			policy: config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "extenders[0].weight",
+				BadValue: int64(-2),
+				Detail:   "must have a positive weight applied to it",
+			},
 		},
 		{
 			name:     "valid filter verb and url prefix",
@@ -367,7 +382,12 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
 				}},
-			expected: errors.New("extenders: Invalid value: \"found 2 extenders implementing bind\": only one extender can implement bind"),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "extenders",
+				BadValue: "found 2 extenders implementing bind",
+				Detail:   "only one extender can implement bind",
+			},
 		},
 		{
 			name: "invalid duplicate extender resource name",
@@ -376,7 +396,12 @@ func TestValidatePolicy(t *testing.T) {
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
 				}},
-			expected: errors.New("extenders[1].managedResources[0].name: Invalid value: \"foo.com/bar\": duplicate extender managed resource name"),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "extenders[1].managedResources[0].name",
+				BadValue: "foo.com/bar",
+				Detail:   "duplicate extender managed resource name",
+			},
 		},
 		{
 			name: "invalid extended resource name",
@@ -384,7 +409,12 @@ func TestValidatePolicy(t *testing.T) {
 				Extenders: []config.Extender{
 					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
 				}},
-			expected: errors.New("extenders[0].managedResources[0].name: Invalid value: \"kubernetes.io/foo\": is an invalid extended resource name"),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "extenders[0].managedResources[0].name",
+				BadValue: "kubernetes.io/foo",
+				Detail:   "is an invalid extended resource name",
+			},
 		},
 		{
 			name: "invalid redeclared RequestedToCapacityRatio custom priority",
@@ -394,7 +424,11 @@ func TestValidatePolicy(t *testing.T) {
 					{Name: "customPriority2", Weight: 1, Argument: &config.PriorityArgument{RequestedToCapacityRatioArguments: &config.RequestedToCapacityRatioArguments{}}},
 				},
 			},
-			expected: errors.New("priority \"customPriority2\" redeclares custom priority \"RequestedToCapacityRatio\", from: \"customPriority1\""),
+			expected: &field.Error{
+				Type:     field.ErrorTypeDuplicate,
+				Field:    "priorities[1].argument.requestedToCapacityRatio",
+				BadValue: &config.RequestedToCapacityRatioArguments{},
+			},
 		},
 		{
 			name: "different weights for LabelPreference custom priority",
@@ -404,7 +438,12 @@ func TestValidatePolicy(t *testing.T) {
 					{Name: "customPriority2", Weight: 2, Argument: &config.PriorityArgument{LabelPreference: &config.LabelPreference{}}},
 				},
 			},
-			expected: errors.New("LabelPreference  priority \"customPriority2\" has a different weight with \"customPriority1\""),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "priorities[1].argument.labelPreference.weight",
+				BadValue: int64(2),
+				Detail:   "priority has a different weight with \"customPriority1\"",
+			},
 		},
 		{
 			name: "different weights for ServiceAntiAffinity custom priority",
@@ -414,28 +453,43 @@ func TestValidatePolicy(t *testing.T) {
 					{Name: "customPriority2", Weight: 2, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{}}},
 				},
 			},
-			expected: errors.New("ServiceAntiAffinity  priority \"customPriority2\" has a different weight with \"customPriority1\""),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "priorities[1].argument.serviceAntiAffinity.weight",
+				BadValue: int64(2),
+				Detail:   "priority has a different weight with \"customPriority1\"",
+			},
 		},
 		{
 			name: "invalid hardPodAffinitySymmetricWeight, above the range",
 			policy: config.Policy{
 				HardPodAffinitySymmetricWeight: 101,
 			},
-			expected: errors.New("hardPodAffinitySymmetricWeight: Invalid value: 101: not in valid range [0-100]"),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "hardPodAffinitySymmetricWeight",
+				BadValue: int32(101),
+				Detail:   "not in valid range [0-100]",
+			},
 		},
 		{
 			name: "invalid hardPodAffinitySymmetricWeight, below the range",
 			policy: config.Policy{
 				HardPodAffinitySymmetricWeight: -1,
 			},
-			expected: errors.New("hardPodAffinitySymmetricWeight: Invalid value: -1: not in valid range [0-100]"),
+			expected: &field.Error{
+				Type:     field.ErrorTypeInvalid,
+				Field:    "hardPodAffinitySymmetricWeight",
+				BadValue: int32(-1),
+				Detail:   "not in valid range [0-100]",
+			},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			actual := ValidatePolicy(test.policy)
-			if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
+			if !errors.Is(actual, test.expected) {
 				t.Errorf("expected: %s, actual: %s", test.expected, actual)
 			}
 		})

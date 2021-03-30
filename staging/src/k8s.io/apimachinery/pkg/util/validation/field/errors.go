@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/go-cmp/cmp"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -40,6 +41,15 @@ var _ error = &Error{}
 // Error implements the error interface.
 func (v *Error) Error() string {
 	return fmt.Sprintf("%s: %s", v.Field, v.ErrorBody())
+}
+
+// Is overrides the original Is method, compares error against the defined template.
+func (v *Error) Is(target error) bool {
+	t, ok := target.(*Error)
+	if !ok {
+		return false
+	}
+	return v.Type == t.Type && v.Field == t.Field && cmp.Equal(v.BadValue, t.BadValue) && v.Detail == t.Detail
 }
 
 // ErrorBody returns the error message without the field name.  This is useful

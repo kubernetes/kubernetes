@@ -174,11 +174,14 @@ func ValidatePolicy(policy config.Policy) error {
 	var validationErrors []error
 
 	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
-	for _, priority := range policy.Priorities {
+	priorityPath := field.NewPath("priorities")
+	for i, priority := range policy.Priorities {
+		path := priorityPath.Index(i)
 		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
-			validationErrors = append(validationErrors, fmt.Errorf("priority %s should have a positive weight applied to it or it has overflown", priority.Name))
+			validationErrors = append(validationErrors, field.Invalid(path.Child("weight"), priority.Weight,
+				"priority should have a positive weight applied to it or it has overflown"))
 		}
-		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
+		validationErrors = append(validationErrors, validateCustomPriorities(path, priorities, priority))
 	}
 
 	if extenderErrs := validateExtenders(field.NewPath("extenders"), policy.Extenders); len(extenderErrs) > 0 {
@@ -226,36 +229,32 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error
 // 1. RequestedToCapacityRatioRedeclared custom priority cannot be declared multiple times,
 // 2. LabelPreference/ServiceAntiAffinity custom priorities can be declared multiple times,
 // however the weights for each custom priority type should be the same.
-func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
-	verifyRedeclaration := func(priorityType string) error {
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("priority %q redeclares custom priority %q, from: %q", priority.Name, priorityType, existing.Name)
-		}
-		priorities[priorityType] = priority
-		return nil
-	}
-	verifyDifferentWeights := func(priorityType string) error {
+func validateCustomPriorities(fldPath *field.Path, priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
+	verifyDifferentWeights := func(priorityType string, parentPath *field.Path) error {
 		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
 			if existing.Weight != priority.Weight {
-				return fmt.Errorf("%s  priority %q has a different weight with %q", priorityType, priority.Name, existing.Name)
+				return field.Invalid(parentPath.Child(priorityType).Child("weight"), priority.Weight,
+					fmt.Sprintf("priority has a different weight with %q", existing.Name))
 			}
 		}
 		priorities[priorityType] = priority
 		return nil
 	}
 	if priority.Argument != nil {
+		argumentPath := fldPath.Child("argument")
 		if priority.Argument.LabelPreference != nil {
-			if err := verifyDifferentWeights("LabelPreference"); err != nil {
+			if err := verifyDifferentWeights("labelPreference", argumentPath); err != nil {
 				return err
 			}
 		} else if priority.Argument.ServiceAntiAffinity != nil {
-			if err := verifyDifferentWeights("ServiceAntiAffinity"); err != nil {
+			if err := verifyDifferentWeights("serviceAntiAffinity", argumentPath); err != nil {
 				return err
 			}
 		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
-			if err := verifyRedeclaration("RequestedToCapacityRatio"); err != nil {
-				return err
+			if _, alreadyDeclared := priorities["requestedToCapacityRatio"]; alreadyDeclared {
+				return field.Duplicate(argumentPath.Child("requestedToCapacityRatio"), priority.Argument.RequestedToCapacityRatioArguments)
 			}
+			priorities["requestedToCapacityRatio"] = priority
 		} else {
 			return fmt.Errorf("no priority arguments set for priority %s", priority.Name)
 		}
