@@ -67,7 +67,7 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	if oomScore < expectedMinOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
 	}
-	if oomScore < expectedMaxOOMScoreAdj {
+	if oomScore >= expectedMaxOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 	}
 	return nil

@@ -27,3 +27,18 @@ cd "${KUBE_ROOT}"
 # verify the providerless build
 # https://github.com/kubernetes/enhancements/blob/master/keps/sig-cloud-provider/1179-building-without-in-tree-providers/README.md
 hack/verify-typecheck.sh --skip-test --tags=providerless --ignore-dirs=test
+
+# verify using go list
+if _out="$(go list -mod=readonly -tags "providerless" -e -json  k8s.io/kubernetes/cmd/kubelet/... \
+  | grep -e Azure/azure-sdk-for-go -e github.com/aws/aws-sdk-go -e google.golang.org/api)"; then
+    echo "${_out}" >&2
+    echo "Verify typecheck for providerless tag failed. Found restricted packages." >&2
+    exit 1
+fi
+if _out="$(go list -mod=readonly -tags "providerless" -e -json  k8s.io/kubernetes/cmd/kube-apiserver/... \
+  | grep -e Azure/azure-sdk-for-go -e github.com/aws/aws-sdk-go -e google.golang.org/api \
+         -e Azure/go-autorest -e oauth2/google)"; then
+    echo "${_out}" >&2
+    echo "Verify typecheck for providerless tag failed. Found restricted packages." >&2
+    exit 1
+fi

@@ -1,7 +1,8 @@
-// +build providerless
+// +build linux
+// +build !providerless
 
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +17,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package auth
+package cadvisor
 
 import (
-	// Initialize common client auth plugins.
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	// Register cloud info providers.
+	// TODO(#68522): Remove this in 1.20+ once the cAdvisor endpoints are removed.
+	_ "github.com/google/cadvisor/utils/cloudinfo/aws"
+	_ "github.com/google/cadvisor/utils/cloudinfo/azure"
+	_ "github.com/google/cadvisor/utils/cloudinfo/gce"
 )

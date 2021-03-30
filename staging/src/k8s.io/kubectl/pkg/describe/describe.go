@@ -2556,7 +2556,11 @@ func (i *IngressDescriber) describeBackendV1(ns string, backend *networkingv1.In
 	}
 	if backend.Resource != nil {
 		ic := backend.Resource
-		return fmt.Sprintf("APIGroup: %v, Kind: %v, Name: %v", *ic.APIGroup, ic.Kind, ic.Name)
+		apiGroup := "<none>"
+		if ic.APIGroup != nil {
+			apiGroup = fmt.Sprintf("%v", *ic.APIGroup)
+		}
+		return fmt.Sprintf("APIGroup: %v, Kind: %v, Name: %v", apiGroup, ic.Kind, ic.Name)
 	}
 	return ""
 }
