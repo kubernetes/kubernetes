@@ -636,7 +636,7 @@ var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 				{
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
-							// dont use named ports
+							// don't use named ports
 							Port: &intstr.IntOrString{Type: intstr.Int, IntVal: 80},
 						},
 						{

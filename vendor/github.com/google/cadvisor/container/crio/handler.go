@@ -169,7 +169,7 @@ func newCrioContainerHandler(
 	}
 
 	handler.image = cInfo.Image
-	// TODO: we wantd to know graph driver DeviceId (dont think this is needed now)
+	// TODO: we wantd to know graph driver DeviceId (don't think this is needed now)
 
 	// ignore err and get zero as default, this happens with sandboxes, not sure why...
 	// kube isn't sending restart count in labels for sandboxes.

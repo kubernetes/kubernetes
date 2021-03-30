@@ -31,7 +31,7 @@ const (
 )
 
 // Epoller manages multiple epoll consoles using edge-triggered epoll api so we
-// dont have to deal with repeated wake-up of EPOLLER or EPOLLHUP.
+// don't have to deal with repeated wake-up of EPOLLER or EPOLLHUP.
 // For more details, see:
 // - https://github.com/systemd/systemd/pull/4262
 // - https://github.com/moby/moby/issues/27202

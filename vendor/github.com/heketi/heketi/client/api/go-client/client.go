@@ -328,7 +328,7 @@ func (c *Client) retryOperationDo(req *http.Request) (*http.Response, error) {
 		case http.StatusTooManyRequests:
 			if r != nil {
 				//Read Response Body
-				// I don't like discarding error here, but I cant
+				// I don't like discarding error here, but I can't
 				// think of something better atm
 				b, _ := ioutil.ReadAll(r.Body)
 				r.Body.Close()

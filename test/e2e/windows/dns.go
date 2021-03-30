@@ -95,7 +95,7 @@ var _ = SIGDescribe("[Feature:Windows] DNS", func() {
 
 		ginkgo.By("Verifying that curl queries FAIL for wrong URLs")
 
-		// the below tests use curl because nslookup doesnt seem to use ndots properly
+		// the below tests use curl because nslookup doesn't seem to use ndots properly
 		// ideally we'd use the powershell native ResolveDns but, that is not a part of agnhost images (as of k8s 1.20)
 		// TODO @jayunit100 add ResolveHost to agn images
 

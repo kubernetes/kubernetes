@@ -583,7 +583,7 @@ func breakForwardStubDomainsIntoServerBlocks(cf *corefile.Corefile) (*corefile.C
 				return nil, errors.New("found invalid forward plugin declaration")
 			}
 			if fwd.Args[0] == "." {
-				// dont move the default upstream
+				// don't move the default upstream
 				continue
 			}
 			if len(sb.DomPorts) != 1 {

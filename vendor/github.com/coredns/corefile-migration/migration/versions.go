@@ -13,7 +13,7 @@ type release struct {
 	plugins        map[string]plugin // map of plugins with deprecation status and migration actions for this release
 
 	// pre/postProcess are processing actions to take on the corefile as a whole.  Used for complex migration
-	//   tasks that dont fit well into the modular plugin/option migration framework. For example, when the
+	//   tasks that don't fit well into the modular plugin/option migration framework. For example, when the
 	//   action on a plugin would need to extend beyond the scope of that plugin (affecting other plugins, or
 	//   server blocks, etc). e.g. Splitting plugins out into separate server blocks.
 	preProcess corefileAction

@@ -11,7 +11,7 @@
 //     `
 // But raw-string cannot recognize indentation. Thus such content is an indented string, equivalent to
 //     "\n\tFoo\n\tBar\n"
-// I dont't want this!
+// I don't want this!
 //
 // However this problem is solved by package heredoc.
 //     doc := heredoc.Doc(`

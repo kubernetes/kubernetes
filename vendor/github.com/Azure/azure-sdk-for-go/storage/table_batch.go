@@ -190,7 +190,7 @@ func (t *TableBatch) getFailedOperation(errorMessage string) string {
 		return msg
 	}
 
-	// cant parse the message, just return the original message to client
+	// can't parse the message, just return the original message to client
 	return errorMessage
 }
 

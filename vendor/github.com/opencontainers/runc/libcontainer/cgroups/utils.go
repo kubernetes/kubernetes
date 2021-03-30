@@ -371,7 +371,7 @@ func WriteCgroupProc(dir string, pid int) error {
 		return fmt.Errorf("no such directory for %s", CgroupProcesses)
 	}
 
-	// Dont attach any pid to the cgroup if -1 is specified as a pid
+	// Don't attach any pid to the cgroup if -1 is specified as a pid
 	if pid == -1 {
 		return nil
 	}

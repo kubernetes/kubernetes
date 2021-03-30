@@ -117,7 +117,7 @@ func calculateEmptyDirMemorySize(nodeAllocatableMemory *resource.Quantity, spec 
 		return sizeLimit
 	}
 
-	// size limit defaults to node allocatable (pods cant consume more memory than all pods)
+	// size limit defaults to node allocatable (pods can't consume more memory than all pods)
 	sizeLimit = nodeAllocatableMemory
 	zero := resource.MustParse("0")
 

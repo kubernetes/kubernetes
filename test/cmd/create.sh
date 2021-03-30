@@ -54,7 +54,7 @@ run_kubectl_create_filter_tests() {
   kube::test::get_object_assert 'pods selector-test-pod' "{{${labels_field:?}.name}}" 'selector-test-pod'
   # check wrong pod doesn't exist
   output_message=$(! kubectl get pods selector-test-pod-dont-apply 2>&1 "${kube_flags[@]}")
-  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-dont-apply" not found'
+  kube::test::if_has_string "${output_message}" 'pods "selector-test-pod-don't-apply" not found'
   # cleanup
   kubectl delete pods selector-test-pod
 

@@ -438,7 +438,7 @@ func (config *NetworkingTestConfig) GetHTTPCodeFromTestContainer(path, targetIP 
 //   (See the TODO about checking probability, which isnt implemented yet).
 // - maxTries is the maximum number of curl/echo attempts before an error is returned.  The
 //   smaller this number is, the less 'slack' there is for declaring success.
-// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints wont be hit.
+// - if maxTries < expectedEps, this test is guaranteed to return an error, because all endpoints won't be hit.
 // - maxTries == minTries will return as soon as all endpoints succeed (or fail once maxTries is reached without
 //   success on all endpoints).
 //   In general its prudent to have a high enough level of minTries to guarantee that all pods get a fair chance at receiving traffic.

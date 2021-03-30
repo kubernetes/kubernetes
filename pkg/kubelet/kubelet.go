@@ -464,7 +464,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeInformers.Start(wait.NeverStop)
 		klog.InfoS("Kubelet client is not nil")
 	} else {
-		// we dont have a client to sync!
+		// we don't have a client to sync!
 		nodeIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{})
 		nodeLister = corelisters.NewNodeLister(nodeIndexer)
 		nodeHasSynced = func() bool { return true }

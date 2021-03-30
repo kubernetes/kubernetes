@@ -161,7 +161,7 @@ func (h *containerdContainerHandler) needNet() bool {
 }
 
 func (h *containerdContainerHandler) GetSpec() (info.ContainerSpec, error) {
-	// TODO: Since we dont collect disk usage stats for containerd, we set hasFilesystem
+	// TODO: Since we don't collect disk usage stats for containerd, we set hasFilesystem
 	// to false. Revisit when we support disk usage stats for containerd
 	hasFilesystem := false
 	spec, err := common.GetSpec(h.cgroupPaths, h.machineInfoFactory, h.needNet(), hasFilesystem)
@@ -237,6 +237,6 @@ func (h *containerdContainerHandler) Cleanup() {
 }
 
 func (h *containerdContainerHandler) GetContainerIPAddress() string {
-	// containerd doesnt take care of networking.So it doesnt maintain networking states
+	// containerd doesn't take care of networking.So it doesn't maintain networking states
 	return ""
 }
