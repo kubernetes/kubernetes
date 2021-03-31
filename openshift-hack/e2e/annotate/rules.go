@@ -16,6 +16,19 @@ var (
 			// BETA features in 1.20, enabled by default
 			// Their enablement is tracked via bz's targeted at 4.8.
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
+
+			`\[Feature:NetworkPolicy\]`,
+
+			`\[Feature:CrossNamespacePodAffinity\]`,
+
+			`\[Feature:GenericEphemeralVolume\]`,
+
+			`\[Feature:DaemonSetUpdateSurge\]`,
+
+			`\[Feature:StorageVersionAPI\]`,
+
+			`\[Feature:IndexedJob\]`,
+			`\[Feature:SuspendJob\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -90,6 +103,15 @@ var (
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945104
+			`\[sig-storage\].*\[Driver: csi-hostpath\] \[Testpattern: Generic Ephemeral-volume`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945091
+			`\[Feature:IPv6DualStack\]`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
+			`should drop INVALID conntrack entries`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
