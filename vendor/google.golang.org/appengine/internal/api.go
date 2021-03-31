@@ -391,7 +391,7 @@ func (c *context) post(body []byte, timeout time.Duration) (b []byte, err error)
 			apiContentType:    apiContentTypeValue,
 			apiDeadlineHeader: []string{strconv.FormatFloat(timeout.Seconds(), 'f', -1, 64)},
 		},
-		Body:          io.NopCloser(bytes.NewReader(body)),
+		Body:          ioutil.NopCloser(bytes.NewReader(body)),
 		ContentLength: int64(len(body)),
 		Host:          c.apiURL.Host,
 	}
@@ -425,7 +425,7 @@ func (c *context) post(body []byte, timeout time.Duration) (b []byte, err error)
 		}
 	}
 	defer hresp.Body.Close()
-	hrespBody, err := io.ReadAll(hresp.Body)
+	hrespBody, err := ioutil.ReadAll(hresp.Body)
 	if hresp.StatusCode != 200 {
 		return nil, &CallError{
 			Detail: fmt.Sprintf("service bridge returned HTTP %d (%q)", hresp.StatusCode, hrespBody),

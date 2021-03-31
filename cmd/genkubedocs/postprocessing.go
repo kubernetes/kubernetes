@@ -38,7 +38,7 @@ func MarkdownPostProcessing(cmd *cobra.Command, dir string, processor func(strin
 	basename := strings.Replace(cmd.CommandPath(), " ", "_", -1) + ".md"
 	filename := filepath.Join(dir, basename)
 
-	markdownBytes, err := os.ReadFile(filename)
+	markdownBytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}

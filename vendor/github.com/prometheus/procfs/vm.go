@@ -87,7 +87,7 @@ func (fs FS) VM() (*VM, error) {
 		return nil, fmt.Errorf("%s is not a directory", path)
 	}
 
-	files, err := os.ReadDir(path)
+	files, err := ioutil.ReadDir(path)
 	if err != nil {
 		return nil, err
 	}

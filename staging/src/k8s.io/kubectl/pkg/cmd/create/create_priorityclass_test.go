@@ -43,7 +43,7 @@ func TestCreatePriorityClass(t *testing.T) {
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
 				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(&bytes.Buffer{}),
+				Body:       ioutil.NopCloser(&bytes.Buffer{}),
 			}, nil
 		}),
 	}

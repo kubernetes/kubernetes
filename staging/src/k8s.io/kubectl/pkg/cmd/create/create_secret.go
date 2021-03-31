@@ -345,7 +345,7 @@ func handleSecretFromFileSources(secret *corev1.Secret, fileSources []string) er
 			if strings.Contains(fileSource, "=") {
 				return fmt.Errorf("cannot give a key name for a directory path")
 			}
-			fileList, err := os.ReadDir(filePath)
+			fileList, err := ioutil.ReadDir(filePath)
 			if err != nil {
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
@@ -394,7 +394,7 @@ func handleSecretFromEnvFileSource(secret *corev1.Secret, envFileSource string) 
 // addKeyFromFileToSecret adds a key with the given name to a Secret, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToSecret(secret *corev1.Secret, keyName, filePath string) error {
-	data, err := os.ReadFile(filePath)
+	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

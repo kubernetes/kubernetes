@@ -93,7 +93,7 @@ func getNodeSummary() (*stats.Summary, error) {
 	}
 
 	defer resp.Body.Close()
-	contentsBytes, err := io.ReadAll(resp.Body)
+	contentsBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read /stats/summary: %+v", resp)
 	}

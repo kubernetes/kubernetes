@@ -207,7 +207,7 @@ func (c *Client) SetRootCAs(file string) error {
 	pool := x509.NewCertPool()
 
 	for _, name := range filepath.SplitList(file) {
-		pem, err := os.ReadFile(name)
+		pem, err := ioutil.ReadFile(name)
 		if err != nil {
 			return err
 		}

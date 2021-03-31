@@ -16,7 +16,7 @@ func UnmarshalDiscardBody(r *request.Request) {
 		return
 	}
 
-	io.Copy(io.Discard, r.HTTPResponse.Body)
+	io.Copy(ioutil.Discard, r.HTTPResponse.Body)
 	r.HTTPResponse.Body.Close()
 }
 

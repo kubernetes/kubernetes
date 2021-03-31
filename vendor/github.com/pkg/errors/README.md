@@ -16,7 +16,7 @@ which applied recursively up the call stack results in error reports without con
 
 The errors.Wrap function returns a new error that adds context to the original error. For example
 ```go
-_, err := io.ReadAll(r)
+_, err := ioutil.ReadAll(r)
 if err != nil {
         return errors.Wrap(err, "read failed")
 }

@@ -216,7 +216,7 @@ func main() {
 }
 
 func loadImportRestrictions(configFile string) ([]ImportRestriction, error) {
-	config, err := os.ReadFile(configFile)
+	config, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load configuration from %s: %v", configFile, err)
 	}

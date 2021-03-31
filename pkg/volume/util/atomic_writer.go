@@ -300,7 +300,7 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 		return true, nil
 	}
 
-	contentOnFs, err := os.ReadFile(path)
+	contentOnFs, err := ioutil.ReadFile(path)
 	if err != nil {
 		return false, err
 	}

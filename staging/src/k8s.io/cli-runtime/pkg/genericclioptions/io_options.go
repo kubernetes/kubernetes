@@ -51,7 +51,7 @@ func NewTestIOStreamsDiscard() IOStreams {
 	in := &bytes.Buffer{}
 	return IOStreams{
 		In:     in,
-		Out:    io.Discard,
-		ErrOut: io.Discard,
+		Out:    ioutil.Discard,
+		ErrOut: ioutil.Discard,
 	}
 }

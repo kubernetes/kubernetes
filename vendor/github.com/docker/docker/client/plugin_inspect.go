@@ -20,7 +20,7 @@ func (cli *Client) PluginInspectWithRaw(ctx context.Context, name string) (*type
 		return nil, nil, wrapResponseError(err, resp, "plugin", name)
 	}
 
-	body, err := io.ReadAll(resp.body)
+	body, err := ioutil.ReadAll(resp.body)
 	if err != nil {
 		return nil, nil, err
 	}

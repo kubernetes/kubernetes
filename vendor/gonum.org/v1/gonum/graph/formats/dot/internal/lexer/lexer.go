@@ -43,7 +43,7 @@ func NewLexer(src []byte) *Lexer {
 }
 
 func NewLexerFile(fpath string) (*Lexer, error) {
-	src, err := os.ReadFile(fpath)
+	src, err := ioutil.ReadFile(fpath)
 	if err != nil {
 		return nil, err
 	}

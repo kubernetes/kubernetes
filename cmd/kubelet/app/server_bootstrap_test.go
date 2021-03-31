@@ -215,7 +215,7 @@ func getCSR(req *http.Request) (*certapi.CertificateSigningRequest, error) {
 	if req.Body == nil {
 		return nil, nil
 	}
-	body, err := io.ReadAll(req.Body)
+	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return nil, err
 	}

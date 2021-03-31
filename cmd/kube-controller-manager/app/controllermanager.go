@@ -633,7 +633,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 }
 
 func readCA(file string) ([]byte, error) {
-	rootCA, err := os.ReadFile(file)
+	rootCA, err := ioutil.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

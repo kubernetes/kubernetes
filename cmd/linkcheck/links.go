@@ -81,7 +81,7 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 			return nil
 		}
 
-		fileBytes, err := os.ReadFile(filePath)
+		fileBytes, err := ioutil.ReadFile(filePath)
 		if err != nil {
 			return err
 		}

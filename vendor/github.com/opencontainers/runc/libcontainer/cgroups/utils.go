@@ -225,7 +225,7 @@ func RemovePath(path string) error {
 		return nil
 	}
 
-	infos, err := os.ReadDir(path)
+	infos, err := ioutil.ReadDir(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil

@@ -59,7 +59,7 @@ import (
 
 func Read() *plugin.CodeGeneratorRequest {
 	g := generator.New()
-	data, err := io.ReadAll(os.Stdin)
+	data, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {
 		g.Error(err, "reading input")
 	}

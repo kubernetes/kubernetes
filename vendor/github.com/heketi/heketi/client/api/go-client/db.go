@@ -42,7 +42,7 @@ func (c *Client) DbDump() (string, error) {
 		return "", utils.GetErrorFromResponse(r)
 	}
 
-	respBytes, err := io.ReadAll(r.Body)
+	respBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return "", err
 	}
@@ -74,7 +74,7 @@ func (c *Client) DbCheck() (string, error) {
 		return "", utils.GetErrorFromResponse(r)
 	}
 
-	respBytes, err := io.ReadAll(r.Body)
+	respBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return "", err
 	}

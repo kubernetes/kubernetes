@@ -48,7 +48,7 @@ func mustReadConfig(t *testing.T, path string) []byte {
 	}
 	defer f.Close()
 
-	configFileContents, err := io.ReadAll(f)
+	configFileContents, err := ioutil.ReadAll(f)
 	if err != nil {
 		t.Fatalf("could not read contents of encryption config: %v", err)
 	}

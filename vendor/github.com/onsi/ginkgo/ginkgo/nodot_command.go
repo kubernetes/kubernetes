@@ -28,7 +28,7 @@ func BuildNodotCommand() *Command {
 func updateNodot(args []string, additionalArgs []string) {
 	suiteFile, perm := findSuiteFile()
 
-	data, err := os.ReadFile(suiteFile)
+	data, err := ioutil.ReadFile(suiteFile)
 	if err != nil {
 		complainAndQuit("Failed to update nodot declarations: " + err.Error())
 	}
@@ -48,7 +48,7 @@ func findSuiteFile() (string, os.FileMode) {
 		complainAndQuit("Could not find suite file for nodot: " + err.Error())
 	}
 
-	files, err := os.ReadDir(workingDir)
+	files, err := ioutil.ReadDir(workingDir)
 	if err != nil {
 		complainAndQuit("Could not find suite file for nodot: " + err.Error())
 	}

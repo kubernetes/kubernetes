@@ -177,7 +177,7 @@ func TestWriteKubeconfigToDisk(t *testing.T) {
 					err,
 				)
 			}
-			newFile, _ := os.ReadFile(configPath)
+			newFile, _ := ioutil.ReadFile(configPath)
 			if !bytes.Equal(newFile, rt.file) {
 				t.Errorf(
 					"failed WriteToDisk config write:\n\texpected: %s\n\t  actual: %s",

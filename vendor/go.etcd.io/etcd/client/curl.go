@@ -53,7 +53,7 @@ func printcURL(req *http.Request) error {
 	}
 
 	if req.Body != nil {
-		b, err = io.ReadAll(req.Body)
+		b, err = ioutil.ReadAll(req.Body)
 		if err != nil {
 			return err
 		}
@@ -64,7 +64,7 @@ func printcURL(req *http.Request) error {
 
 	// reset body
 	body := bytes.NewBuffer(b)
-	req.Body = io.NopCloser(body)
+	req.Body = ioutil.NopCloser(body)
 
 	return nil
 }

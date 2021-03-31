@@ -205,7 +205,7 @@ func (b *bridge) ioCopy(dst io.Writer, src io.Reader) (err error) {
 	for {
 		select {
 		case <-b.blackholec:
-			io.Copy(io.Discard, src)
+			io.Copy(ioutil.Discard, src)
 			return nil
 		default:
 		}

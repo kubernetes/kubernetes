@@ -34,7 +34,7 @@ func unfocusSpecs([]string, []string) {
 
 func unfocus(component string) {
 	fmt.Printf("Removing F%s...\n", component)
-	files, err := os.ReadDir(".")
+	files, err := ioutil.ReadDir(".")
 	if err != nil {
 		fmt.Println(err.Error())
 		return

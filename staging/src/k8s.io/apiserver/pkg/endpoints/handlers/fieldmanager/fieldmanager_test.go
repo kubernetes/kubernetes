@@ -378,7 +378,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 }
 
 func getObjectBytes(file string) []byte {
-	s, err := os.ReadFile(file)
+	s, err := ioutil.ReadFile(file)
 	if err != nil {
 		panic(err)
 	}

@@ -455,7 +455,7 @@ func ConfigFromFile(path string) (*Config, error) {
 }
 
 func (cfg *configYAML) configFromFile(path string) error {
-	b, err := os.ReadFile(path)
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
 	}

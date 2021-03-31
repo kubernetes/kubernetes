@@ -485,7 +485,7 @@ var quotaTestCases = []quotaTestCase{
 }
 
 func compareProjectsFiles(t *testing.T, testcase quotaTestCase, projectsFile string, projidFile string, enabled bool) {
-	bytes, err := os.ReadFile(projectsFile)
+	bytes, err := ioutil.ReadFile(projectsFile)
 	if err != nil {
 		t.Error(err.Error())
 	} else {
@@ -498,7 +498,7 @@ func compareProjectsFiles(t *testing.T, testcase quotaTestCase, projectsFile str
 			t.Errorf("Case %v /etc/projects miscompare: expected\n`%s`\ngot\n`%s`\n", testcase.path, p, s)
 		}
 	}
-	bytes, err = os.ReadFile(projidFile)
+	bytes, err = ioutil.ReadFile(projidFile)
 	if err != nil {
 		t.Error(err.Error())
 	} else {

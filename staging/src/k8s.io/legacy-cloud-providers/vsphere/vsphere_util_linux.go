@@ -26,7 +26,7 @@ import (
 const UUIDPath = "/sys/class/dmi/id/product_serial"
 
 func getRawUUID() (string, error) {
-	id, err := os.ReadFile(UUIDPath)
+	id, err := ioutil.ReadFile(UUIDPath)
 	if err != nil {
 		return "", err
 	}

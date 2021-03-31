@@ -200,7 +200,7 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 			}
 			// Buffer the whole file, so that we can close the file and unload
 			// kernel config module in this function.
-			b, err := os.ReadFile(path)
+			b, err := ioutil.ReadFile(path)
 			if err != nil {
 				return nil, err
 			}

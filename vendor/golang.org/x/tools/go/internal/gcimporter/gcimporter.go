@@ -195,7 +195,7 @@ func Import(packages map[string]*types.Package, path, srcDir string, lookup func
 
 	case "$$B\n":
 		var data []byte
-		data, err = io.ReadAll(buf)
+		data, err = ioutil.ReadAll(buf)
 		if err != nil {
 			break
 		}

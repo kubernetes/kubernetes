@@ -132,7 +132,7 @@ func (k *claims) String() string {
 }
 
 func gettoken() (string, error) {
-	b, err := os.ReadFile(tokenPath)
+	b, err := ioutil.ReadFile(tokenPath)
 	return string(b), err
 }
 

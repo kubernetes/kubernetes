@@ -75,7 +75,7 @@ func loadConfig(cfgPath string, client clientset.Interface, skipComponentConfigs
 	}
 
 	// Otherwise, we have a config file. Let's load it.
-	configBytes, err := os.ReadFile(cfgPath)
+	configBytes, err := ioutil.ReadFile(cfgPath)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "unable to load config from file %q", cfgPath)
 	}

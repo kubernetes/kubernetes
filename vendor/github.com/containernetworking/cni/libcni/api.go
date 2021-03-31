@@ -270,7 +270,7 @@ func (c *CNIConfig) getCachedConfig(netName string, rt *RuntimeConf) ([]byte, *R
 	if err != nil {
 		return nil, nil, err
 	}
-	bytes, err = os.ReadFile(fname)
+	bytes, err = ioutil.ReadFile(fname)
 	if err != nil {
 		// Ignore read errors; the cached result may not exist on-disk
 		return nil, nil, nil
@@ -298,7 +298,7 @@ func (c *CNIConfig) getLegacyCachedResult(netName, cniVersion string, rt *Runtim
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(fname)
+	data, err := ioutil.ReadFile(fname)
 	if err != nil {
 		// Ignore read errors; the cached result may not exist on-disk
 		return nil, nil
@@ -333,7 +333,7 @@ func (c *CNIConfig) getCachedResult(netName, cniVersion string, rt *RuntimeConf)
 	if err != nil {
 		return nil, err
 	}
-	fdata, err := os.ReadFile(fname)
+	fdata, err := ioutil.ReadFile(fname)
 	if err != nil {
 		// Ignore read errors; the cached result may not exist on-disk
 		return nil, nil

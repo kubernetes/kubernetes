@@ -99,9 +99,9 @@ func GenerateSelfSignedCertKeyWithFixtures(host string, alternateIPs []net.IP, a
 	certFixturePath := filepath.Join(fixtureDirectory, baseName+".crt")
 	keyFixturePath := filepath.Join(fixtureDirectory, baseName+".key")
 	if len(fixtureDirectory) > 0 {
-		cert, err := os.ReadFile(certFixturePath)
+		cert, err := ioutil.ReadFile(certFixturePath)
 		if err == nil {
-			key, err := os.ReadFile(keyFixturePath)
+			key, err := ioutil.ReadFile(keyFixturePath)
 			if err == nil {
 				return cert, key, nil
 			}

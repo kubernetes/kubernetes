@@ -123,7 +123,7 @@ func (t *CassandraUpgradeTest) listUsers() ([]string, error) {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(r.Body)
+		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +145,7 @@ func (t *CassandraUpgradeTest) addUser(name string) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		b, err := io.ReadAll(r.Body)
+		b, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			return err
 		}

@@ -39,7 +39,7 @@ type provider struct{}
 var _ cloudinfo.CloudProvider = provider{}
 
 func (provider) IsActiveProvider() bool {
-	data, err := os.ReadFile(gceProductName)
+	data, err := ioutil.ReadFile(gceProductName)
 	if err != nil {
 		klog.V(2).Infof("Error while reading product_name: %v", err)
 		return false

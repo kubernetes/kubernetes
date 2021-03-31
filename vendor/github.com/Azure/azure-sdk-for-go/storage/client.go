@@ -892,7 +892,7 @@ func genBatchReader(batchBoundary string, respBody []byte) (io.Reader, string, e
 
 func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
 	defer body.Close()
-	out, err := io.ReadAll(body)
+	out, err := ioutil.ReadAll(body)
 	if err == io.EOF {
 		err = nil
 	}
@@ -901,7 +901,7 @@ func readAndCloseBody(body io.ReadCloser) ([]byte, error) {
 
 // reads the response body then closes it
 func drainRespBody(resp *http.Response) {
-	io.Copy(io.Discard, resp.Body)
+	io.Copy(ioutil.Discard, resp.Body)
 	resp.Body.Close()
 }
 

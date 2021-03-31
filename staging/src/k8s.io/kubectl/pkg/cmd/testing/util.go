@@ -55,15 +55,15 @@ func DefaultClientConfig() *restclient.Config {
 }
 
 func ObjBody(codec runtime.Codec, obj runtime.Object) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
+	return ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(codec, obj))))
 }
 
 func BytesBody(bodyBytes []byte) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader(bodyBytes))
+	return ioutil.NopCloser(bytes.NewReader(bodyBytes))
 }
 
 func StringBody(body string) io.ReadCloser {
-	return io.NopCloser(bytes.NewReader([]byte(body)))
+	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func TestData() (*corev1.PodList, *corev1.ServiceList, *corev1.ReplicationControllerList) {

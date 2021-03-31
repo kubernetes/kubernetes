@@ -72,7 +72,7 @@ func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty
 	}
 
 	go func() {
-		io.Copy(io.Discard, stdin)
+		io.Copy(ioutil.Discard, stdin)
 		copyDone <- struct{}{}
 	}()
 

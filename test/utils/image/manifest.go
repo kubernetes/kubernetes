@@ -86,7 +86,7 @@ func initReg() RegistryList {
 		return registry
 	}
 
-	fileContent, err := os.ReadFile(repoList)
+	fileContent, err := ioutil.ReadFile(repoList)
 	if err != nil {
 		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
 	}

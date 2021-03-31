@@ -115,7 +115,7 @@ type fileFormat struct {
 }
 
 func readFile(path string) (*fileFormat, error) {
-	currentBytes, err := os.ReadFile(path)
+	currentBytes, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read %v: %v", path, err)
 	}

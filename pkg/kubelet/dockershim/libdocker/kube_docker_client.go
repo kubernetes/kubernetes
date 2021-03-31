@@ -561,10 +561,10 @@ func (d *kubeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON,
 // only be redirected to stdout.
 func (d *kubeDockerClient) redirectResponseToOutputStream(tty bool, outputStream, errorStream io.Writer, resp io.Reader) error {
 	if outputStream == nil {
-		outputStream = io.Discard
+		outputStream = ioutil.Discard
 	}
 	if errorStream == nil {
-		errorStream = io.Discard
+		errorStream = ioutil.Discard
 	}
 	var err error
 	if tty {

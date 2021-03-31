@@ -63,7 +63,7 @@ func (p *PackageHash) CheckForChanges() bool {
 }
 
 func (p *PackageHash) computeHashes() (codeHash string, codeModifiedTime time.Time, testHash string, testModifiedTime time.Time, deleted bool) {
-	infos, err := os.ReadDir(p.path)
+	infos, err := ioutil.ReadDir(p.path)
 
 	if err != nil {
 		deleted = true

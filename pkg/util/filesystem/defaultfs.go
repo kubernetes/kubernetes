@@ -67,9 +67,9 @@ func (DefaultFs) Remove(name string) error {
 	return os.Remove(name)
 }
 
-// ReadFile via os.ReadFile
+// ReadFile via ioutil.ReadFile
 func (DefaultFs) ReadFile(filename string) ([]byte, error) {
-	return os.ReadFile(filename)
+	return ioutil.ReadFile(filename)
 }
 
 // TempDir via ioutil.TempDir
@@ -86,9 +86,9 @@ func (DefaultFs) TempFile(dir, prefix string) (File, error) {
 	return &defaultFile{file}, nil
 }
 
-// ReadDir via os.ReadDir
+// ReadDir via ioutil.ReadDir
 func (DefaultFs) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return os.ReadDir(dirname)
+	return ioutil.ReadDir(dirname)
 }
 
 // Walk via filepath.Walk

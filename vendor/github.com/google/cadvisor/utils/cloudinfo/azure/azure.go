@@ -37,7 +37,7 @@ type provider struct{}
 var _ cloudinfo.CloudProvider = provider{}
 
 func (provider) IsActiveProvider() bool {
-	data, err := os.ReadFile(sysVendorFileName)
+	data, err := ioutil.ReadFile(sysVendorFileName)
 	if err != nil {
 		return false
 	}
@@ -50,7 +50,7 @@ func (provider) GetInstanceType() info.InstanceType {
 }
 
 func (provider) GetInstanceID() info.InstanceID {
-	data, err := os.ReadFile(biosUUIDFileName)
+	data, err := ioutil.ReadFile(biosUUIDFileName)
 	if err != nil {
 		return info.UnNamedInstance
 	}

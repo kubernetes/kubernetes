@@ -103,7 +103,7 @@ func GetPatchManagerForPath(path string, knownTargets []string, output io.Writer
 	pathLock.RUnlock()
 
 	if output == nil {
-		output = io.Discard
+		output = ioutil.Discard
 	}
 
 	fmt.Fprintf(output, "[patches] Reading patches from path %q\n", path)
@@ -311,7 +311,7 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		}
 
 		// Read the patch file.
-		data, err := os.ReadFile(path)
+		data, err := ioutil.ReadFile(path)
 		if err != nil {
 			return errors.Wrapf(err, "could not read the file %q", path)
 		}

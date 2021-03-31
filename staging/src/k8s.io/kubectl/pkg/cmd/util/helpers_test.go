@@ -312,7 +312,7 @@ func TestDumpReaderToFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("error in DumpReaderToFile: %v", err)
 	}
-	data, err := os.ReadFile(tempFile.Name())
+	data, err := ioutil.ReadFile(tempFile.Name())
 	if err != nil {
 		t.Errorf("error when reading %s: %v", tempFile.Name(), err)
 	}

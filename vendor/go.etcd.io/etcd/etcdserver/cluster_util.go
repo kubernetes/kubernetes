@@ -80,7 +80,7 @@ func getClusterFromRemotePeers(lg *zap.Logger, urls []string, timeout time.Durat
 			}
 			continue
 		}
-		b, err := io.ReadAll(resp.Body)
+		b, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			if logerr {
@@ -324,7 +324,7 @@ func getVersion(lg *zap.Logger, m *membership.Member, rt http.RoundTripper) (*ve
 			continue
 		}
 		var b []byte
-		b, err = io.ReadAll(resp.Body)
+		b, err = ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
 			if lg != nil {
@@ -373,7 +373,7 @@ func promoteMemberHTTP(ctx context.Context, url string, id uint64, peerRt http.R
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := io.ReadAll(resp.Body)
+	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

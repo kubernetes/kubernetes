@@ -723,7 +723,7 @@ func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
 	certs := []*x509.Certificate{}
 	for _, name := range names {
 		filename := "testdata/" + name + ".pem"
-		data, err := os.ReadFile(filename)
+		data, err := ioutil.ReadFile(filename)
 		if err != nil {
 			t.Fatalf("error reading %s: %v", filename, err)
 		}

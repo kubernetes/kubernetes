@@ -81,7 +81,7 @@ func New(core zapcore.Core, options ...Option) *Logger {
 func NewNop() *Logger {
 	return &Logger{
 		core:        zapcore.NewNopCore(),
-		errorOutput: zapcore.AddSync(io.Discard),
+		errorOutput: zapcore.AddSync(ioutil.Discard),
 		addStack:    zapcore.FatalLevel + 1,
 	}
 }

@@ -165,7 +165,7 @@ func generateBootstrap(agouti, noDot, internal bool, customBootstrapFile string)
 
 	var templateText string
 	if customBootstrapFile != "" {
-		tpl, err := os.ReadFile(customBootstrapFile)
+		tpl, err := ioutil.ReadFile(customBootstrapFile)
 		if err != nil {
 			panic(err.Error())
 		}

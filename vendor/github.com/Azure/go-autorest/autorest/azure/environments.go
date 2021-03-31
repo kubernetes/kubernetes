@@ -253,7 +253,7 @@ func EnvironmentFromName(name string) (Environment, error) {
 // This function is particularly useful in the Hybrid Cloud model, where one must define their own
 // endpoints.
 func EnvironmentFromFile(location string) (unmarshaled Environment, err error) {
-	fileContents, err := os.ReadFile(location)
+	fileContents, err := ioutil.ReadFile(location)
 	if err != nil {
 		return
 	}

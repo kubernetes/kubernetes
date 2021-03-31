@@ -61,7 +61,7 @@ func TestSetupOutputWriterFile(t *testing.T) {
 	output := "some data here"
 	writer.Write([]byte(output))
 
-	data, err := os.ReadFile(fullPath)
+	data, err := ioutil.ReadFile(fullPath)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

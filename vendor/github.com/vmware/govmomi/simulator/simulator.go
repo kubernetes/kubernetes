@@ -87,7 +87,7 @@ type Server struct {
 // New returns an initialized simulator Service instance
 func New(instance *ServiceInstance) *Service {
 	s := &Service{
-		readAll: io.ReadAll,
+		readAll: ioutil.ReadAll,
 		sm:      Map.SessionManager(),
 		sdk:     make(map[string]*Registry),
 	}

@@ -324,7 +324,7 @@ func (b *Builder) addDir(dir string, userRequested bool) error {
 			continue
 		}
 		absPath := filepath.Join(buildPkg.Dir, file)
-		data, err := os.ReadFile(absPath)
+		data, err := ioutil.ReadFile(absPath)
 		if err != nil {
 			return fmt.Errorf("while loading %q: %v", absPath, err)
 		}

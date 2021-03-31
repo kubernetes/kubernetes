@@ -105,14 +105,14 @@ func (li LoggingInspector) WithInspection() PrepareDecorator {
 
 			defer r.Body.Close()
 
-			r.Body = io.NopCloser(io.TeeReader(r.Body, &body))
+			r.Body = ioutil.NopCloser(io.TeeReader(r.Body, &body))
 			if err := r.Write(&b); err != nil {
 				return nil, fmt.Errorf("Failed to write response: %v", err)
 			}
 
 			li.Logger.Printf(requestFormat, b.String())
 
-			r.Body = io.NopCloser(&body)
+			r.Body = ioutil.NopCloser(&body)
 			return p.Prepare(r)
 		})
 	}
@@ -128,14 +128,14 @@ func (li LoggingInspector) ByInspecting() RespondDecorator {
 		return ResponderFunc(func(resp *http.Response) error {
 			var body, b bytes.Buffer
 			defer resp.Body.Close()
-			resp.Body = io.NopCloser(io.TeeReader(resp.Body, &body))
+			resp.Body = ioutil.NopCloser(io.TeeReader(resp.Body, &body))
 			if err := resp.Write(&b); err != nil {
 				return fmt.Errorf("Failed to write response: %v", err)
 			}
 
 			li.Logger.Printf(responseFormat, b.String())
 
-			resp.Body = io.NopCloser(&body)
+			resp.Body = ioutil.NopCloser(&body)
 			return r.Respond(resp)
 		})
 	}

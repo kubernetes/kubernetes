@@ -147,7 +147,7 @@ func (o *CanIOptions) Complete(f cmdutil.Factory, args []string) error {
 		}
 	} else {
 		if o.Quiet {
-			o.Out = io.Discard
+			o.Out = ioutil.Discard
 		}
 
 		switch len(args) {

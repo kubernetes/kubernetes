@@ -16,7 +16,7 @@ import (
 // If fn returns a non-nil error, readDir returns with that error
 // immediately.
 func readDir(dirName string, fn func(dirName, entName string, typ os.FileMode) error) error {
-	fis, err := os.ReadDir(dirName)
+	fis, err := ioutil.ReadDir(dirName)
 	if err != nil {
 		return err
 	}

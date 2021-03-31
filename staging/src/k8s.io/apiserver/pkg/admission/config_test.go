@@ -311,7 +311,7 @@ func TestEmbeddedConfiguration(t *testing.T) {
 			t.Errorf("[%s] Failed to get Foo config: %v", desc, err)
 			continue
 		}
-		bs, err := io.ReadAll(r)
+		bs, err := ioutil.ReadAll(r)
 		if err != nil {
 			t.Errorf("[%s] Failed to read Foo config data: %v", desc, err)
 			continue

@@ -73,7 +73,7 @@ func (c *Client) Do(ctx context.Context, req *http.Request, resBody interface{})
 		case http.StatusOK:
 		case http.StatusBadRequest:
 			// TODO: structured error types
-			detail, err := io.ReadAll(res.Body)
+			detail, err := ioutil.ReadAll(res.Body)
 			if err != nil {
 				return err
 			}

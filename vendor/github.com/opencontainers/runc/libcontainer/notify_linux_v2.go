@@ -15,7 +15,7 @@ import (
 )
 
 func getValueFromCgroup(path, key string) (int, error) {
-	content, err := os.ReadFile(path)
+	content, err := ioutil.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}

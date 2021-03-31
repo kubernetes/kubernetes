@@ -57,7 +57,7 @@ func ReadAtMost(path string, max int64) ([]byte, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
-	data, err := io.ReadAll(f)
+	data, err := ioutil.ReadAll(f)
 	return data, offset > 0, err
 }
 

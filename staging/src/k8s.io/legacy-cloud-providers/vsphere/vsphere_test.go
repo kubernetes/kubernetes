@@ -318,7 +318,7 @@ func TestVSphereLoginByToken(t *testing.T) {
 }
 
 func TestVSphereLoginWithCaCert(t *testing.T) {
-	caCertPEM, err := os.ReadFile("./vclib/testdata/ca.pem")
+	caCertPEM, err := ioutil.ReadFile("./vclib/testdata/ca.pem")
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}

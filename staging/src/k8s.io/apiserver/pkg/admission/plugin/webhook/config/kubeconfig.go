@@ -47,7 +47,7 @@ func LoadConfig(configFile io.Reader) (string, error) {
 	var kubeconfigFile string
 	if configFile != nil {
 		// we have a config so parse it.
-		data, err := io.ReadAll(configFile)
+		data, err := ioutil.ReadAll(configFile)
 		if err != nil {
 			return "", err
 		}

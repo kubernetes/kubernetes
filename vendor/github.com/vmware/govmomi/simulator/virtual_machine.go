@@ -700,7 +700,7 @@ func (vm *VirtualMachine) RefreshStorageInfo(ctx *Context, req *types.RefreshSto
 			continue
 		}
 
-		files, err := os.ReadDir(directory)
+		files, err := ioutil.ReadDir(directory)
 		if err != nil {
 			body.Fault_ = soap.ToSoapFault(err)
 			return body

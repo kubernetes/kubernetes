@@ -343,7 +343,7 @@ func LoadBytes(b []byte) (tree *Tree, err error) {
 
 // LoadReader creates a Tree from any io.Reader.
 func LoadReader(reader io.Reader) (tree *Tree, err error) {
-	inputBytes, err := io.ReadAll(reader)
+	inputBytes, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return
 	}

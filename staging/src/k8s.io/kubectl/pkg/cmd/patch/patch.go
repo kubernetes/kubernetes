@@ -203,7 +203,7 @@ func (o *PatchOptions) RunPatch() error {
 	var patchBytes []byte
 	if len(o.PatchFile) > 0 {
 		var err error
-		patchBytes, err = os.ReadFile(o.PatchFile)
+		patchBytes, err = ioutil.ReadFile(o.PatchFile)
 		if err != nil {
 			return fmt.Errorf("unable to read patch file: %v", err)
 		}

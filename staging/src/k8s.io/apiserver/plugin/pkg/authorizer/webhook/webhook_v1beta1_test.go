@@ -241,7 +241,7 @@ func NewV1beta1TestServer(s V1beta1Service, cert, key, caCert []byte) (*httptest
 		}
 
 		var review authorizationv1beta1.SubjectAccessReview
-		bodyData, _ := io.ReadAll(r.Body)
+		bodyData, _ := ioutil.ReadAll(r.Body)
 		if err := json.Unmarshal(bodyData, &review); err != nil {
 			http.Error(w, fmt.Sprintf("failed to decode body: %v", err), http.StatusBadRequest)
 			return

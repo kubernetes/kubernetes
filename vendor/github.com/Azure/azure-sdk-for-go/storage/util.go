@@ -105,7 +105,7 @@ func prepareBlockListRequest(blocks []Block) string {
 }
 
 func xmlUnmarshal(body io.Reader, v interface{}) error {
-	data, err := io.ReadAll(body)
+	data, err := ioutil.ReadAll(body)
 	if err != nil {
 		return err
 	}

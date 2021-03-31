@@ -279,8 +279,8 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
-	eo, eerr := os.ReadFile(outputEnv)
-	output, err := os.ReadFile(outputFile)
+	eo, eerr := ioutil.ReadFile(outputEnv)
+	output, err := ioutil.ReadFile(outputFile)
 	if err != nil || eerr != nil {
 		t.Errorf("Failed to read output file %s: %v (env %s err %v)", outputFile, err, eo, eerr)
 	}
@@ -298,7 +298,7 @@ func TestCNIPlugin(t *testing.T) {
 			IPRanges     [][]map[string]interface{} `json:"IPRanges"`
 		} `json:"runtimeConfig"`
 	}{}
-	inputBytes, inerr := os.ReadFile(inputFile)
+	inputBytes, inerr := ioutil.ReadFile(inputFile)
 	parseerr := json.Unmarshal(inputBytes, &inputConfig)
 	if inerr != nil || parseerr != nil {
 		t.Errorf("failed to parse reported cni input config %s: (%v %v)", inputFile, inerr, parseerr)
@@ -342,7 +342,7 @@ func TestCNIPlugin(t *testing.T) {
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}
-	output, err = os.ReadFile(outputFile)
+	output, err = ioutil.ReadFile(outputFile)
 	require.NoError(t, err)
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {

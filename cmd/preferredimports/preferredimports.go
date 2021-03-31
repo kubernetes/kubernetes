@@ -235,7 +235,7 @@ func main() {
 	sort.Strings(c.dirs)
 
 	if len(*importAliases) > 0 {
-		bytes, err := os.ReadFile(*importAliases)
+		bytes, err := ioutil.ReadFile(*importAliases)
 		if err != nil {
 			log.Fatalf("Error reading import aliases: %v", err)
 		}

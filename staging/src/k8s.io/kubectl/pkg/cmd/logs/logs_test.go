@@ -839,12 +839,12 @@ type responseWrapperMock struct {
 }
 
 func (r *responseWrapperMock) DoRaw(context.Context) ([]byte, error) {
-	data, _ := io.ReadAll(r.data)
+	data, _ := ioutil.ReadAll(r.data)
 	return data, r.err
 }
 
 func (r *responseWrapperMock) Stream(context.Context) (io.ReadCloser, error) {
-	return io.NopCloser(r.data), r.err
+	return ioutil.NopCloser(r.data), r.err
 }
 
 type logTestMock struct {

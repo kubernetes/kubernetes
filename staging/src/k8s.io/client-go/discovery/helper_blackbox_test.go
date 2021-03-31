@@ -41,7 +41,7 @@ func objBody(object interface{}) io.ReadCloser {
 	if err != nil {
 		panic(err)
 	}
-	return io.NopCloser(bytes.NewReader([]byte(output)))
+	return ioutil.NopCloser(bytes.NewReader([]byte(output)))
 }
 
 func TestServerSupportsVersion(t *testing.T) {

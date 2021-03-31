@@ -16,7 +16,7 @@ func newTLSClient(caCertPath, keyPath, certPath string) (*http.Client, error) {
 	}
 
 	// CA certificate
-	caCert, err := os.ReadFile(caCertPath)
+	caCert, err := ioutil.ReadFile(caCertPath)
 	if err != nil {
 		return nil, err
 	}

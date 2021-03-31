@@ -24,7 +24,7 @@ func (system *System) GetScsiInitiator() (scsiInitiators []types.ScsiInitiator, 
 		return []types.ScsiInitiator{}, fmt.Errorf("error decoding instances response: %s", err)
 	}
 
-	// bs, err := io.ReadAll(resp.Body)
+	// bs, err := ioutil.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return types.ScsiInitiator{}, errors.New("error reading body")
 	// }

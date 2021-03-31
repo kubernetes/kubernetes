@@ -115,7 +115,7 @@ func splitStream(config io.Reader) (io.Reader, io.Reader, error) {
 		return nil, nil, nil
 	}
 
-	configBytes, err := io.ReadAll(config)
+	configBytes, err := ioutil.ReadAll(config)
 	if err != nil {
 		return nil, nil, err
 	}

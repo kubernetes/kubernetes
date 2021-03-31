@@ -93,7 +93,7 @@ func HandleMetrics(mux *http.ServeMux, c *http.Client, eps []string) {
 		}
 		defer resp.Body.Close()
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
-		body, _ := io.ReadAll(resp.Body)
+		body, _ := ioutil.ReadAll(resp.Body)
 		fmt.Fprintf(w, "%s", body)
 	})
 }

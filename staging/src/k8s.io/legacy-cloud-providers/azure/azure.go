@@ -650,7 +650,7 @@ func parseConfig(configReader io.Reader) (*Config, error) {
 		return nil, nil
 	}
 
-	configContents, err := io.ReadAll(configReader)
+	configContents, err := ioutil.ReadAll(configReader)
 	if err != nil {
 		return nil, err
 	}

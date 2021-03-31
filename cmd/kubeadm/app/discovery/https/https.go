@@ -38,7 +38,7 @@ func RetrieveValidatedConfigInfo(httpsURL, clustername string, discoveryTimeout 
 	}
 	defer response.Body.Close()
 
-	kubeconfig, err := io.ReadAll(response.Body)
+	kubeconfig, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

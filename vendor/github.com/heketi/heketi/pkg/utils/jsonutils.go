@@ -22,7 +22,7 @@ import (
 func jsonFromBody(r io.Reader, v interface{}) error {
 
 	// Check body
-	body, err := io.ReadAll(r)
+	body, err := ioutil.ReadAll(r)
 	if err != nil {
 		return err
 	}

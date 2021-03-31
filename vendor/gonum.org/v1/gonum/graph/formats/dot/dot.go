@@ -24,7 +24,7 @@ import (
 
 // ParseFile parses the given Graphviz DOT file into an AST.
 func ParseFile(path string) (*ast.File, error) {
-	buf, err := os.ReadFile(path)
+	buf, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func ParseFile(path string) (*ast.File, error) {
 
 // Parse parses the given Graphviz DOT file into an AST, reading from r.
 func Parse(r io.Reader) (*ast.File, error) {
-	buf, err := io.ReadAll(r)
+	buf, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

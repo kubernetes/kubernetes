@@ -32,7 +32,7 @@ func (h HandlerPayloadUnmarshal) UnmarshalPayload(r io.Reader, v interface{}) er
 		HTTPResponse: &http.Response{
 			StatusCode: 200,
 			Header:     http.Header{},
-			Body:       io.NopCloser(r),
+			Body:       ioutil.NopCloser(r),
 		},
 		Data: v,
 	}

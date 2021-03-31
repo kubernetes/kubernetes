@@ -250,7 +250,7 @@ func newCmdConfigMigrate(out io.Writer) *cobra.Command {
 				return errors.New("the --old-config flag is mandatory")
 			}
 
-			oldCfgBytes, err := os.ReadFile(oldCfgPath)
+			oldCfgBytes, err := ioutil.ReadFile(oldCfgPath)
 			if err != nil {
 				return err
 			}

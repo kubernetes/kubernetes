@@ -490,7 +490,7 @@ func InClusterConfig() (*Config, error) {
 		return nil, ErrNotInCluster
 	}
 
-	token, err := os.ReadFile(tokenFile)
+	token, err := ioutil.ReadFile(tokenFile)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func dataFromSliceOrFile(data []byte, file string) ([]byte, error) {
 		return data, nil
 	}
 	if len(file) > 0 {
-		fileData, err := os.ReadFile(file)
+		fileData, err := ioutil.ReadFile(file)
 		if err != nil {
 			return []byte{}, err
 		}

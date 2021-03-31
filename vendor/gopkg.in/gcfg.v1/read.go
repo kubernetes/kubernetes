@@ -204,7 +204,7 @@ func readInto(config interface{}, fset *token.FileSet, file *token.File,
 // ReadInto reads gcfg formatted data from reader and sets the values into the
 // corresponding fields in config.
 func ReadInto(config interface{}, reader io.Reader) error {
-	src, err := io.ReadAll(reader)
+	src, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return err
 	}
@@ -228,7 +228,7 @@ func ReadFileInto(config interface{}, filename string) error {
 		return err
 	}
 	defer f.Close()
-	src, err := io.ReadAll(f)
+	src, err := ioutil.ReadAll(f)
 	if err != nil {
 		return err
 	}

@@ -97,7 +97,7 @@ func (v *volumeClient) GraphDriverChanges(id string, parent string) ([]api.Graph
 }
 
 func (v *volumeClient) GraphDriverApplyDiff(id string, parent string, diff io.Reader) (int, error) {
-	b, err := io.ReadAll(diff)
+	b, err := ioutil.ReadAll(diff)
 	if err != nil {
 		return 0, err
 	}

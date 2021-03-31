@@ -170,7 +170,7 @@ func getKernelRelease() (string, error) {
 // getOSDistro returns the OS distro of the local machine.
 func getOSDistro() (string, error) {
 	f := "/etc/lsb-release"
-	b, err := os.ReadFile(f)
+	b, err := ioutil.ReadFile(f)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to read %q", f)
 	}

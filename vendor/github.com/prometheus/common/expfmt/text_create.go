@@ -44,7 +44,7 @@ const (
 var (
 	bufPool = sync.Pool{
 		New: func() interface{} {
-			return bufio.NewWriter(io.Discard)
+			return bufio.NewWriter(ioutil.Discard)
 		},
 	}
 	numBufPool = sync.Pool{

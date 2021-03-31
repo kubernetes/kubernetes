@@ -764,7 +764,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 			return nil
 		}
 
-		content, err := os.ReadFile(path)
+		content, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
 		}
@@ -779,7 +779,7 @@ func checkVolumeContents(targetDir, tcName string, payload map[string]FileProjec
 		return nil
 	}
 
-	d, err := os.ReadDir(targetDir)
+	d, err := ioutil.ReadDir(targetDir)
 	if err != nil {
 		t.Errorf("Unable to read dir %v: %v", targetDir, err)
 		return

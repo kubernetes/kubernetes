@@ -273,14 +273,14 @@ func readSource(filename string, src interface{}) ([]byte, error) {
 	case []byte:
 		return src, nil
 	case io.Reader:
-		data, err := io.ReadAll(src)
+		data, err := ioutil.ReadAll(src)
 		if err != nil {
 			err = &os.PathError{Op: "read", Path: filename, Err: err}
 			return nil, err
 		}
 		return data, nil
 	case nil:
-		return os.ReadFile(filename)
+		return ioutil.ReadFile(filename)
 	default:
 		return nil, fmt.Errorf("invalid source: %T", src)
 	}
