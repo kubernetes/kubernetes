@@ -650,11 +650,19 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 
 	serviceName := getServiceName(service)
 
+	var changed bool
 	if existsPip {
-		// ensure that the service tag is good
-		changed, err := bindServicesToPIP(&pip, []string{serviceName}, false)
-		if err != nil {
-			return nil, err
+		// ensure that the service tag is good for managed pips
+		owns, isUserAssignedPIP := serviceOwnsPublicIP(service, &pip, clusterName)
+		if owns && !isUserAssignedPIP {
+			changed, err = bindServicesToPIP(&pip, []string{serviceName}, false)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		if pip.Tags == nil {
+			pip.Tags = make(map[string]*string)
 		}
 
 		// return if pip exist and dns label is the same
@@ -2084,7 +2092,12 @@ func deduplicate(collection *[]string) *[]string {
 }
 
 // Determine if we should release existing owned public IPs
-func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lbShouldExist, lbIsInternal bool, desiredPipName, svcName string, ipTagRequest serviceIPTagRequest) bool {
+func shouldReleaseExistingOwnedPublicIP(existingPip *network.PublicIPAddress, lbShouldExist, lbIsInternal, isUserAssignedPIP bool, desiredPipName string, ipTagRequest serviceIPTagRequest) bool {
+	// skip deleting user created pip
+	if isUserAssignedPIP {
+		return false
+	}
+
 	// Latch some variables for readability purposes.
 	pipName := *(*existingPip).Name
 
@@ -2207,9 +2220,10 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 
 		// Now, let's perform additional analysis to determine if we should release the public ips we have found.
 		// We can only let them go if (a) they are owned by this service and (b) they meet the criteria for deletion.
-		if serviceOwnsPublicIP(&pip, clusterName, serviceName) {
+		owns, isUserAssignedPIP := serviceOwnsPublicIP(service, &pip, clusterName)
+		if owns {
 			var dirtyPIP, toBeDeleted bool
-			if !wantLb {
+			if !wantLb && !isUserAssignedPIP {
 				klog.V(2).Infof("reconcilePublicIP for service(%s): unbinding the service from pip %s", serviceName, *pip.Name)
 				err = unbindServiceFromPIP(&pip, serviceName)
 				if err != nil {
@@ -2221,7 +2235,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 			if changed {
 				dirtyPIP = true
 			}
-			if shouldReleaseExistingOwnedPublicIP(&pip, wantLb, isInternal, desiredPipName, serviceName, serviceIPTagRequest) {
+			if shouldReleaseExistingOwnedPublicIP(&pip, wantLb, isInternal, isUserAssignedPIP, desiredPipName, serviceIPTagRequest) {
 				// Then, release the public ip
 				pipsToBeDeleted = append(pipsToBeDeleted, &pip)
 
@@ -2542,26 +2556,55 @@ func getServiceTags(service *v1.Service) []string {
 	return nil
 }
 
-func serviceOwnsPublicIP(pip *network.PublicIPAddress, clusterName, serviceName string) bool {
-	if pip != nil && pip.Tags != nil {
+// serviceOwnsPublicIP checks if the service owns the pip and if the pip is user-created.
+// The pip is user-created if and only if there is no service tags.
+// The service owns the pip if:
+// 1. The serviceName is included in the service tags of a system-created pip.
+// 2. The service.Spec.LoadBalancerIP matches the IP address of a user-created pip.
+func serviceOwnsPublicIP(service *v1.Service, pip *network.PublicIPAddress, clusterName string) (bool, bool) {
+	if service == nil || pip == nil {
+		klog.Warningf("serviceOwnsPublicIP: nil service or public IP")
+		return false, false
+	}
+
+	if pip.PublicIPAddressPropertiesFormat == nil || to.String(pip.IPAddress) == "" {
+		klog.Warningf("serviceOwnsPublicIP: empty pip.IPAddress")
+		return false, false
+	}
+
+	serviceName := getServiceName(service)
+
+	if pip.Tags != nil {
 		serviceTag := pip.Tags[serviceTagKey]
 		clusterTag := pip.Tags[clusterNameKey]
 
-		if serviceTag != nil && isSVCNameInPIPTag(*serviceTag, serviceName) {
-			// Backward compatible for clusters upgraded from old releases.
-			// In such case, only "service" tag is set.
-			if clusterTag == nil {
-				return true
-			}
+		// if there is no service tag on the pip, it is user-created pip
+		if to.String(serviceTag) == "" {
+			return strings.EqualFold(to.String(pip.IPAddress), service.Spec.LoadBalancerIP), true
+		}
 
-			// If cluster name tag is set, then return true if it matches.
-			if *clusterTag == clusterName {
-				return true
+		if serviceTag != nil {
+			// if there is service tag on the pip, it is system-created pip
+			if isSVCNameInPIPTag(*serviceTag, serviceName) {
+				// Backward compatible for clusters upgraded from old releases.
+				// In such case, only "service" tag is set.
+				if clusterTag == nil {
+					return true, false
+				}
+
+				// If cluster name tag is set, then return true if it matches.
+				if *clusterTag == clusterName {
+					return true, false
+				}
+			} else {
+				// if the service is not included in te tags of the system-created pip, check the ip address
+				// this could happen for secondary services
+				return strings.EqualFold(to.String(pip.IPAddress), service.Spec.LoadBalancerIP), false
 			}
 		}
 	}
 
-	return false
+	return false, false
 }
 
 func isSVCNameInPIPTag(tag, svcName string) bool {
