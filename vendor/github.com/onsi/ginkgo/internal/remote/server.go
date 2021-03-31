@@ -90,7 +90,7 @@ func (server *Server) Address() string {
 //The server will forward all received messages to Ginkgo reporters registered with `RegisterReporters`
 func (server *Server) readAll(request *http.Request) []byte {
 	defer request.Body.Close()
-	body, _ := ioutil.ReadAll(request.Body)
+	body, _ := io.ReadAll(request.Body)
 	return body
 }
 

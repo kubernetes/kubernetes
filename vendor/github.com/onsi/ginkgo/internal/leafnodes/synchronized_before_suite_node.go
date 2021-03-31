@@ -86,7 +86,7 @@ func (node *synchronizedBeforeSuiteNode) waitForA(syncHost string) (types.SpecSt
 			return types.SpecStateFailed, failure("Failed to fetch BeforeSuite state")
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return types.SpecStateFailed, failure("Failed to read BeforeSuite state")
 		}

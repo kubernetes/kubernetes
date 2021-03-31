@@ -24,7 +24,7 @@ var hwCap uint
 var hwCap2 uint
 
 func readHWCAP() error {
-	buf, err := ioutil.ReadFile(procAuxv)
+	buf, err := os.ReadFile(procAuxv)
 	if err != nil {
 		// e.g. on android /proc/self/auxv is not accessible, so silently
 		// ignore the error and leave Initialized = false. On some

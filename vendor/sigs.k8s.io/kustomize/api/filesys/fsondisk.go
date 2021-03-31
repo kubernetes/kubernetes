@@ -100,8 +100,8 @@ func (fsOnDisk) IsDir(name string) bool {
 	return info.IsDir()
 }
 
-// ReadFile delegates to ioutil.ReadFile.
-func (fsOnDisk) ReadFile(name string) ([]byte, error) { return ioutil.ReadFile(name) }
+// ReadFile delegates to os.ReadFile.
+func (fsOnDisk) ReadFile(name string) ([]byte, error) { return os.ReadFile(name) }
 
 // WriteFile delegates to ioutil.WriteFile with read/write permissions.
 func (fsOnDisk) WriteFile(name string, c []byte) error {

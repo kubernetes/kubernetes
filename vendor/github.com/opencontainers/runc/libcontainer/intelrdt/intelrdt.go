@@ -387,7 +387,7 @@ func parseUint(s string, base, bitSize int) (uint64, error) {
 // Gets a single uint64 value from the specified file.
 func getIntelRdtParamUint(path, file string) (uint64, error) {
 	fileName := filepath.Join(path, file)
-	contents, err := ioutil.ReadFile(fileName)
+	contents, err := os.ReadFile(fileName)
 	if err != nil {
 		return 0, err
 	}
@@ -401,7 +401,7 @@ func getIntelRdtParamUint(path, file string) (uint64, error) {
 
 // Gets a string value from the specified file
 func getIntelRdtParamString(path, file string) (string, error) {
-	contents, err := ioutil.ReadFile(filepath.Join(path, file))
+	contents, err := os.ReadFile(filepath.Join(path, file))
 	if err != nil {
 		return "", err
 	}

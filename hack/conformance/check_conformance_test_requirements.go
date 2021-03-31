@@ -46,7 +46,7 @@ func checkAllProviders(e2eFile string) error {
 	regEndConformance := regexp.MustCompile(patternEndConformance)
 	regSkip := regexp.MustCompile(patternSkip)
 
-	fileInput, err := ioutil.ReadFile(e2eFile)
+	fileInput, err := os.ReadFile(e2eFile)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to read file %s", e2eFile)
 	}
@@ -84,7 +84,7 @@ func checkAllProviders(e2eFile string) error {
 func processFile(e2ePath string) error {
 	regGoFile := regexp.MustCompile(`.*\.go`)
 
-	files, err := ioutil.ReadDir(e2ePath)
+	files, err := os.ReadDir(e2ePath)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to read dir %s", e2ePath)
 	}
@@ -111,7 +111,7 @@ func processDir(e2ePath string) error {
 	}
 
 	// Search sub directories if exist
-	files, err := ioutil.ReadDir(e2ePath)
+	files, err := os.ReadDir(e2ePath)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to read dir %s", e2ePath)
 	}

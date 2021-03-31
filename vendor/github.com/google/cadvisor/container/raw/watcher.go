@@ -141,7 +141,7 @@ func (w *rawContainerWatcher) watchDirectory(events chan watcher.ContainerEvent,
 
 	// TODO(vmarmol): We should re-do this once we're done to ensure directories were not added in the meantime.
 	// Watch subdirectories as well.
-	entries, err := ioutil.ReadDir(dir)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return alreadyWatching, err
 	}

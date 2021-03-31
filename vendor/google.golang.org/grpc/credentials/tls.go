@@ -146,7 +146,7 @@ func NewClientTLSFromCert(cp *x509.CertPool, serverNameOverride string) Transpor
 // serverNameOverride is for testing only. If set to a non empty string,
 // it will override the virtual host name of authority (e.g. :authority header field) in requests.
 func NewClientTLSFromFile(certFile, serverNameOverride string) (TransportCredentials, error) {
-	b, err := ioutil.ReadFile(certFile)
+	b, err := os.ReadFile(certFile)
 	if err != nil {
 		return nil, err
 	}

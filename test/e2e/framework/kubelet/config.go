@@ -117,7 +117,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfig.KubeletConfiguration, er
 	configz := configzWrapper{}
 	kubeCfg := kubeletconfig.KubeletConfiguration{}
 
-	contentsBytes, err := ioutil.ReadAll(resp.Body)
+	contentsBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

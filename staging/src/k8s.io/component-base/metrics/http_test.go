@@ -57,7 +57,7 @@ func TestResetHandler(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 			resetHandler.ServeHTTP(rec, req)
-			body, err := ioutil.ReadAll(rec.Result().Body)
+			body, err := io.ReadAll(rec.Result().Body)
 			if err != nil {
 				t.Fatalf("Error reading response body")
 			}

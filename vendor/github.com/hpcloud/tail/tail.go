@@ -93,7 +93,7 @@ var (
 	// DefaultLogger is used when Config.Logger == nil
 	DefaultLogger = log.New(os.Stderr, "", log.LstdFlags)
 	// DiscardingLogger can be used to disable logging output
-	DiscardingLogger = log.New(ioutil.Discard, "", 0)
+	DiscardingLogger = log.New(io.Discard, "", 0)
 )
 
 // TailFile begins tailing the file. Output stream is made available

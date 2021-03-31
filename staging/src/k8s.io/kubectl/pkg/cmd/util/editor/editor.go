@@ -157,7 +157,7 @@ func (e Editor) LaunchTempFile(prefix, suffix string, r io.Reader) ([]byte, stri
 	if err := e.Launch(path); err != nil {
 		return nil, path, err
 	}
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	return bytes, path, err
 }
 

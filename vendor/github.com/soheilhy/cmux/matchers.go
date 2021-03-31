@@ -148,7 +148,7 @@ func HTTP1HeaderFieldPrefix(name, valuePrefix string) Matcher {
 // headers frame.
 func HTTP2HeaderField(name, value string) Matcher {
 	return func(r io.Reader) bool {
-		return matchHTTP2Field(ioutil.Discard, r, name, func(gotValue string) bool {
+		return matchHTTP2Field(io.Discard, r, name, func(gotValue string) bool {
 			return gotValue == value
 		})
 	}
@@ -159,7 +159,7 @@ func HTTP2HeaderField(name, value string) Matcher {
 // valuePrefix, this will match.
 func HTTP2HeaderFieldPrefix(name, valuePrefix string) Matcher {
 	return func(r io.Reader) bool {
-		return matchHTTP2Field(ioutil.Discard, r, name, func(gotValue string) bool {
+		return matchHTTP2Field(io.Discard, r, name, func(gotValue string) bool {
 			return strings.HasPrefix(gotValue, valuePrefix)
 		})
 	}

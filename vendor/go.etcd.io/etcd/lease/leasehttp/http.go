@@ -53,7 +53,7 @@ func (h *leaseHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "error reading body", http.StatusBadRequest)
 		return
@@ -242,7 +242,7 @@ func TimeToLiveHTTP(ctx context.Context, id lease.LeaseID, keys bool, url string
 }
 
 func readResponse(resp *http.Response) (b []byte, err error) {
-	b, err = ioutil.ReadAll(resp.Body)
+	b, err = io.ReadAll(resp.Body)
 	httputil.GracefulClose(resp)
 	return
 }

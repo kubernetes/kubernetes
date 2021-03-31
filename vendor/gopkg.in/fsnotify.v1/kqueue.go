@@ -389,7 +389,7 @@ func newCreateEvent(name string) Event {
 // watchDirectoryFiles to mimic inotify when adding a watch on a directory
 func (w *Watcher) watchDirectoryFiles(dirPath string) error {
 	// Get all files
-	files, err := ioutil.ReadDir(dirPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		return err
 	}
@@ -415,7 +415,7 @@ func (w *Watcher) watchDirectoryFiles(dirPath string) error {
 // create event for files created in a watched directory.
 func (w *Watcher) sendDirectoryChangeEvents(dirPath string) {
 	// Get all files
-	files, err := ioutil.ReadDir(dirPath)
+	files, err := os.ReadDir(dirPath)
 	if err != nil {
 		select {
 		case w.Errors <- err:

@@ -47,7 +47,7 @@ func RunTestsOnYAMLData(t *testing.T, tests []TestCase) {
 }
 
 func decodeYAML(t *testing.T, path string, codec runtime.Codec) runtime.Object {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func getCodecForGV(codecs serializer.CodecFactory, gv schema.GroupVersion) (runt
 }
 
 func matchOutputFile(t *testing.T, actual []byte, expectedFilePath string) {
-	expected, err := ioutil.ReadFile(expectedFilePath)
+	expected, err := os.ReadFile(expectedFilePath)
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatalf("couldn't read test data: %v", err)
 	}

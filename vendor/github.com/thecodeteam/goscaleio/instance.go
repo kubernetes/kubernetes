@@ -42,7 +42,7 @@ func (client *Client) GetInstance(systemhref string) (systems []*types.System, e
 		systems = append(systems, system)
 	}
 
-	// bs, err := ioutil.ReadAll(resp.Body)
+	// bs, err := io.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return types.Systems{}, errors.New("error reading body")
 	// }
@@ -127,7 +127,7 @@ func (client *Client) FindVolumeID(volumename string) (volumeID string, err erro
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("error reading body")
 	}

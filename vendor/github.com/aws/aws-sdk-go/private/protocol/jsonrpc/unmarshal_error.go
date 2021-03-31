@@ -42,7 +42,7 @@ func (u *UnmarshalTypedError) UnmarshalError(
 	if err != nil {
 		return nil, err
 	}
-	body := ioutil.NopCloser(&buf)
+	body := io.NopCloser(&buf)
 
 	// Code may be separated by hash(#), with the last element being the code
 	// used by the SDK.

@@ -665,7 +665,7 @@ var _ = SIGDescribe("POD Resources [Serial] [Feature:PodResources][NodeFeature:P
 })
 
 func getOnlineCPUs() (cpuset.CPUSet, error) {
-	onlineCPUList, err := ioutil.ReadFile("/sys/devices/system/cpu/online")
+	onlineCPUList, err := os.ReadFile("/sys/devices/system/cpu/online")
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}

@@ -258,7 +258,7 @@ func (s *Signer) SignRequest(req *http.Request) error {
 				return fmt.Errorf("sts: getting http.Request body: %s", rerr)
 			}
 			defer r.Close()
-			body, rerr = ioutil.ReadAll(r)
+			body, rerr = io.ReadAll(r)
 			if rerr != nil {
 				return fmt.Errorf("sts: reading http.Request body: %s", rerr)
 			}

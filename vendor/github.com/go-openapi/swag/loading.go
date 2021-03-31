@@ -29,13 +29,13 @@ var LoadHTTPTimeout = 30 * time.Second
 
 // LoadFromFileOrHTTP loads the bytes from a file or a remote http server based on the path passed in
 func LoadFromFileOrHTTP(path string) ([]byte, error) {
-	return LoadStrategy(path, ioutil.ReadFile, loadHTTPBytes(LoadHTTPTimeout))(path)
+	return LoadStrategy(path, os.ReadFile, loadHTTPBytes(LoadHTTPTimeout))(path)
 }
 
 // LoadFromFileOrHTTPWithTimeout loads the bytes from a file or a remote http server based on the path passed in
 // timeout arg allows for per request overriding of the request timeout
 func LoadFromFileOrHTTPWithTimeout(path string, timeout time.Duration) ([]byte, error) {
-	return LoadStrategy(path, ioutil.ReadFile, loadHTTPBytes(timeout))(path)
+	return LoadStrategy(path, os.ReadFile, loadHTTPBytes(timeout))(path)
 }
 
 // LoadStrategy returns a loader function for a given path or uri
@@ -75,6 +75,6 @@ func loadHTTPBytes(timeout time.Duration) func(path string) ([]byte, error) {
 			return nil, fmt.Errorf("could not access document at %q [%s] ", path, resp.Status)
 		}
 
-		return ioutil.ReadAll(resp.Body)
+		return io.ReadAll(resp.Body)
 	}
 }

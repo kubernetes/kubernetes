@@ -24,7 +24,7 @@ func (system *System) GetUser() (user []types.User, err error) {
 		return []types.User{}, fmt.Errorf("error decoding instances response: %s", err)
 	}
 
-	// bs, err := ioutil.ReadAll(resp.Body)
+	// bs, err := io.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return types.User{}, errors.New("error reading body")
 	// }

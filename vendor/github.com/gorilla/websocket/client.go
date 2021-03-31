@@ -356,7 +356,7 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string, requestHeader h
 		// debugging.
 		buf := make([]byte, 1024)
 		n, _ := io.ReadFull(resp.Body, buf)
-		resp.Body = ioutil.NopCloser(bytes.NewReader(buf[:n]))
+		resp.Body = io.NopCloser(bytes.NewReader(buf[:n]))
 		return nil, resp, ErrBadHandshake
 	}
 
@@ -374,7 +374,7 @@ func (d *Dialer) DialContext(ctx context.Context, urlStr string, requestHeader h
 		break
 	}
 
-	resp.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
+	resp.Body = io.NopCloser(bytes.NewReader([]byte{}))
 	conn.subprotocol = resp.Header.Get("Sec-Websocket-Protocol")
 
 	netConn.SetDeadline(time.Time{})

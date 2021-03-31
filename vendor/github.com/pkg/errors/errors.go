@@ -17,7 +17,7 @@
 // original error by recording a stack trace at the point Wrap is called,
 // together with the supplied message. For example
 //
-//     _, err := ioutil.ReadAll(r)
+//     _, err := io.ReadAll(r)
 //     if err != nil {
 //             return errors.Wrap(err, "read failed")
 //     }

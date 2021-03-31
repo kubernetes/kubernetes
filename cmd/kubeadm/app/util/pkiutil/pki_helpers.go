@@ -547,7 +547,7 @@ func parseCSRPEM(pemCSR []byte) (*x509.CertificateRequest, error) {
 // CertificateRequestFromFile returns the CertificateRequest from a given PEM-encoded file.
 // Returns an error if the file could not be read or if the CSR could not be parsed.
 func CertificateRequestFromFile(file string) (*x509.CertificateRequest, error) {
-	pemBlock, err := ioutil.ReadFile(file)
+	pemBlock, err := os.ReadFile(file)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read file")
 	}

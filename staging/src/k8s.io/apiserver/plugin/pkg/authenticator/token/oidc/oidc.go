@@ -647,7 +647,7 @@ func getClaimJWT(client *http.Client, url, accessToken string) (string, error) {
 		return "", fmt.Errorf("error while getting distributed claim JWT: %v", response.Status)
 	}
 	defer response.Body.Close()
-	responseBytes, err := ioutil.ReadAll(response.Body)
+	responseBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return "", fmt.Errorf("could not decode distributed claim response")
 	}

@@ -98,7 +98,7 @@ func GetSigner(provider string) (ssh.Signer, error) {
 }
 
 func makePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
-	buffer, err := ioutil.ReadFile(key)
+	buffer, err := os.ReadFile(key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
 	}

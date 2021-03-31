@@ -322,7 +322,7 @@ func (f *File) ListRanges(options *ListRangesOptions) (*FileRanges, error) {
 	var cl uint64
 	cl, err = strconv.ParseUint(resp.Header.Get("x-ms-content-length"), 10, 64)
 	if err != nil {
-		ioutil.ReadAll(resp.Body)
+		io.ReadAll(resp.Body)
 		return nil, err
 	}
 

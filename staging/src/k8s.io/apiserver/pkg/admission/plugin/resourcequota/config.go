@@ -50,7 +50,7 @@ func LoadConfiguration(config io.Reader) (*resourcequotaapi.Configuration, error
 		return internalConfig, nil
 	}
 	// we have a config so parse it.
-	data, err := ioutil.ReadAll(config)
+	data, err := io.ReadAll(config)
 	if err != nil {
 		return nil, err
 	}

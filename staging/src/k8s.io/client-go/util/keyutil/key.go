@@ -75,7 +75,7 @@ func WriteKey(keyPath string, data []byte) error {
 // LoadOrGenerateKeyFile looks for a key in the file at the given path. If it
 // can't find one, it will generate a new key and store it there.
 func LoadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err error) {
-	loadedData, err := ioutil.ReadFile(keyPath)
+	loadedData, err := os.ReadFile(keyPath)
 	// Call verifyKeyData to ensure the file wasn't empty/corrupt.
 	if err == nil && verifyKeyData(loadedData) {
 		return loadedData, false, err
@@ -122,7 +122,7 @@ func MarshalPrivateKeyToPEM(privateKey crypto.PrivateKey) ([]byte, error) {
 // PrivateKeyFromFile returns the private key in rsa.PrivateKey or ecdsa.PrivateKey format from a given PEM-encoded file.
 // Returns an error if the file could not be read or if the private key could not be parsed.
 func PrivateKeyFromFile(file string) (interface{}, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func PrivateKeyFromFile(file string) (interface{}, error) {
 // PublicKeysFromFile returns the public keys in rsa.PublicKey or ecdsa.PublicKey format from a given PEM-encoded file.
 // Reads public keys from both public and private key files.
 func PublicKeysFromFile(file string) ([]interface{}, error) {
-	data, err := ioutil.ReadFile(file)
+	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}

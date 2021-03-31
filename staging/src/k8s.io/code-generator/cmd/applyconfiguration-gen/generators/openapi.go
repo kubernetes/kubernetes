@@ -44,7 +44,7 @@ func newTypeModels(openAPISchemaFilePath string, pkgTypes map[string]*types.Pack
 		return emptyModels, nil // No Extract<type>() functions will be generated.
 	}
 
-	rawOpenAPISchema, err := ioutil.ReadFile(openAPISchemaFilePath)
+	rawOpenAPISchema, err := os.ReadFile(openAPISchemaFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read openapi-schema file: %w", err)
 	}

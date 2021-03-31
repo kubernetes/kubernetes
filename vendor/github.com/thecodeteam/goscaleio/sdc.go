@@ -43,7 +43,7 @@ func (system *System) GetSdc() (sdcs []types.Sdc, err error) {
 		return []types.Sdc{}, fmt.Errorf("error decoding instances response: %s", err)
 	}
 
-	// bs, err := ioutil.ReadAll(resp.Body)
+	// bs, err := io.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return []types.Sdc{}, errors.New("error reading body")
 	// }

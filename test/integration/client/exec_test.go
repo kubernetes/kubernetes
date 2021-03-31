@@ -428,7 +428,7 @@ func writeTokenFile(t *testing.T, goodToken string) string {
 
 func read(t *testing.T, fileName string) string {
 	t.Helper()
-	data, err := ioutil.ReadFile(fileName)
+	data, err := os.ReadFile(fileName)
 	if err != nil {
 		t.Fatal(err)
 	}

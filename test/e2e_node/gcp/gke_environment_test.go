@@ -230,7 +230,7 @@ func checkDockerNetworkServer() error {
 // checkDockerAppArmor checks whether AppArmor is enabled and has the
 // "docker-default" profile.
 func checkDockerAppArmor() error {
-	buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
+	buf, err := os.ReadFile("/sys/module/apparmor/parameters/enabled")
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func checkDockerAppArmor() error {
 	}
 
 	// Checks that the "docker-default" profile is loaded and enforced.
-	buf, err = ioutil.ReadFile("/sys/kernel/security/apparmor/profiles")
+	buf, err = os.ReadFile("/sys/kernel/security/apparmor/profiles")
 	if err != nil {
 		return err
 	}
@@ -367,7 +367,7 @@ var _ = SIGDescribe("GKE system requirements [NodeConformance][Feature:GKEEnv][N
 // getPPID returns the PPID for the pid.
 func getPPID(pid int) (int, error) {
 	statusFile := "/proc/" + strconv.Itoa(pid) + "/status"
-	content, err := ioutil.ReadFile(statusFile)
+	content, err := os.ReadFile(statusFile)
 	if err != nil {
 		return 0, err
 	}
@@ -413,7 +413,7 @@ func getCmdToProcessMap() (map[string][]process, error) {
 		if err != nil {
 			continue
 		}
-		content, err := ioutil.ReadFile("/proc/" + dir + "/cmdline")
+		content, err := os.ReadFile("/proc/" + dir + "/cmdline")
 		if err != nil || len(content) == 0 {
 			continue
 		}

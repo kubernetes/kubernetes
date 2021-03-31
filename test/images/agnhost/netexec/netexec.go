@@ -383,7 +383,7 @@ func dialHTTP(request string, addr net.Addr) (string, error) {
 	defer transport.CloseIdleConnections()
 	if err == nil {
 		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err == nil {
 			return string(body), nil
 		}

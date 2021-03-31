@@ -959,7 +959,7 @@ func TestWaitForCondition(t *testing.T) {
 				Timeout:        test.timeout,
 
 				Printer:     printers.NewDiscardingPrinter(),
-				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
+				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: io.Discard}.IsConditionMet,
 				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()

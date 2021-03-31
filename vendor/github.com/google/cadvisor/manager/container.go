@@ -242,7 +242,7 @@ func (cd *containerData) ReadFile(filepath string, inHostNamespace bool) ([]byte
 	for _, pid := range pids {
 		filePath := path.Join(rootfs, "/proc", pid, "/root", filepath)
 		klog.V(3).Infof("Trying path %q", filePath)
-		data, err := ioutil.ReadFile(filePath)
+		data, err := os.ReadFile(filePath)
 		if err == nil {
 			return data, err
 		}
@@ -322,7 +322,7 @@ func (cd *containerData) parseProcessList(cadvisorContainer string, inHostNamesp
 
 		var fdCount int
 		dirPath := path.Join(rootfs, "/proc", strconv.Itoa(processInfo.Pid), "fd")
-		fds, err := ioutil.ReadDir(dirPath)
+		fds, err := os.ReadDir(dirPath)
 		if err != nil {
 			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
 			continue

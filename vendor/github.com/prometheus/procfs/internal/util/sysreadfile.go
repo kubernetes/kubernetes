@@ -21,7 +21,7 @@ import (
 	"syscall"
 )
 
-// SysReadFile is a simplified ioutil.ReadFile that invokes syscall.Read directly.
+// SysReadFile is a simplified ioutil.ReadFile/os.ReadFile that invokes syscall.Read directly.
 // https://github.com/prometheus/node_exporter/pull/728/files
 //
 // Note that this function will not read files larger than 128 bytes.

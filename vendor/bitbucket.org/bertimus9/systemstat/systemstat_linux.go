@@ -19,7 +19,7 @@ import (
 
 func getUptime(procfile string) (uptime UptimeSample) {
 	// read in whole uptime file with cpu usage information ;"/proc/uptime"
-	contents, err := ioutil.ReadFile(procfile)
+	contents, err := os.ReadFile(procfile)
 	uptime.Time = time.Now()
 	if err != nil {
 		return
@@ -40,7 +40,7 @@ func getUptime(procfile string) (uptime UptimeSample) {
 
 func getLoadAvgSample(procfile string) (samp LoadAvgSample) {
 	// read in whole loadavg file with cpu usage information ;"/proc/loadavg"
-	contents, err := ioutil.ReadFile(procfile)
+	contents, err := os.ReadFile(procfile)
 	samp.Time = time.Now()
 	if err != nil {
 		return
@@ -79,7 +79,7 @@ func getMemSample(procfile string) (samp MemSample) {
 		"SwapUsed:":  true}
 
 	// read in whole meminfo file with cpu usage information ;"/proc/meminfo"
-	contents, err := ioutil.ReadFile(procfile)
+	contents, err := os.ReadFile(procfile)
 	samp.Time = time.Now()
 	if err != nil {
 		return
@@ -137,7 +137,7 @@ func getProcCPUSample() (s ProcCPUSample) {
 
 func getCPUSample(procfile string) (samp CPUSample) {
 	// read in whole proc file with cpu usage information ; "/proc/stat"
-	contents, err := ioutil.ReadFile(procfile)
+	contents, err := os.ReadFile(procfile)
 	samp.Time = time.Now()
 	if err != nil {
 		return

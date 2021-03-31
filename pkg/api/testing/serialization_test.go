@@ -364,7 +364,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr := streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+		sr := streaming.NewDecoder(framer.NewFrameReader(io.NopCloser(out)), s)
 		resultSecret := &v1.Secret{}
 		res, _, err := sr.Decode(nil, resultSecret)
 		if err != nil {
@@ -393,7 +393,7 @@ func TestObjectWatchFraming(t *testing.T) {
 		if n, err := w.Write(obj.Bytes()); err != nil || n != len(obj.Bytes()) {
 			t.Fatal(err)
 		}
-		sr = streaming.NewDecoder(framer.NewFrameReader(ioutil.NopCloser(out)), s)
+		sr = streaming.NewDecoder(framer.NewFrameReader(io.NopCloser(out)), s)
 		outEvent := &metav1.WatchEvent{}
 		_, _, err = sr.Decode(nil, outEvent)
 		if err != nil || outEvent.Type != string(watch.Added) {

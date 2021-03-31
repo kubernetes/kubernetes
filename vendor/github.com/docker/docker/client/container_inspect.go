@@ -41,7 +41,7 @@ func (cli *Client) ContainerInspectWithRaw(ctx context.Context, containerID stri
 		return types.ContainerJSON{}, nil, wrapResponseError(err, serverResp, "container", containerID)
 	}
 
-	body, err := ioutil.ReadAll(serverResp.body)
+	body, err := io.ReadAll(serverResp.body)
 	if err != nil {
 		return types.ContainerJSON{}, nil, err
 	}

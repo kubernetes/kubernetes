@@ -312,14 +312,14 @@ var AlwaysReject FuncHttpsHandler = func(host string, ctx *ProxyCtx) (*ConnectAc
 // and will replace the body of the original response with the resulting byte array.
 func HandleBytes(f func(b []byte, ctx *ProxyCtx) []byte) RespHandler {
 	return FuncRespHandler(func(resp *http.Response, ctx *ProxyCtx) *http.Response {
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			ctx.Warnf("Cannot read response %s", err)
 			return resp
 		}
 		resp.Body.Close()
 
-		resp.Body = ioutil.NopCloser(bytes.NewBuffer(f(b, ctx)))
+		resp.Body = io.NopCloser(bytes.NewBuffer(f(b, ctx)))
 		return resp
 	})
 }

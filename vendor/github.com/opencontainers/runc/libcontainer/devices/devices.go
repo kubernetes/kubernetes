@@ -17,7 +17,7 @@ var (
 // Testing dependencies
 var (
 	unixLstat     = unix.Lstat
-	ioutilReadDir = ioutil.ReadDir
+	ioutilReadDir = os.ReadDir
 )
 
 // Given the path to a device and its cgroup_permissions(which cannot be easily queried) look up the

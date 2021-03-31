@@ -24,7 +24,7 @@ func PossibleCPUs() (int, error) {
 }
 
 func parseCPUsFromFile(path string) (int, error) {
-	spec, err := ioutil.ReadFile(path)
+	spec, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}

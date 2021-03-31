@@ -220,7 +220,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if failSwapOn {
 		// Check whether swap is enabled. The Kubelet does not support running with swap enabled.
 		swapFile := "/proc/swaps"
-		swapData, err := ioutil.ReadFile(swapFile)
+		swapData, err := os.ReadFile(swapFile)
 		if err != nil {
 			if os.IsNotExist(err) {
 				klog.InfoS("File does not exist, assuming that swap is disabled", "path", swapFile)

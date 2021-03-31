@@ -177,7 +177,7 @@ func (r *SpecRunner) combineCoverprofiles(runners []*testrunner.TestRunner) erro
 
 	modeRegex := regexp.MustCompile(`^mode: .*\n`)
 	for index, runner := range runners {
-		contents, err := ioutil.ReadFile(runner.CoverageFile)
+		contents, err := os.ReadFile(runner.CoverageFile)
 
 		// remove the cover mode line from every file
 		// except the first one

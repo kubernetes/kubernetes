@@ -272,7 +272,7 @@ func TestGetNodeAddressesWithOnlySomeExternalIP(t *testing.T) {
 func decodeResponse(resp *http.Response, obj interface{}) error {
 	defer resp.Body.Close()
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

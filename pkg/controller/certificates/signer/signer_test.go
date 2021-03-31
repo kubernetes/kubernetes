@@ -55,7 +55,7 @@ func TestSigner(t *testing.T) {
 	currCA.Backdate = 0
 	s.caProvider.caValue.Store(currCA)
 
-	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
+	csrb, err := os.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
 		t.Fatalf("failed to read CSR: %v", err)
 	}

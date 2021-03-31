@@ -116,7 +116,7 @@ func InitiateDeviceAuthWithContext(ctx context.Context, sender Sender, oauthConf
 	}
 
 	s := v.Encode()
-	body := ioutil.NopCloser(strings.NewReader(s))
+	body := io.NopCloser(strings.NewReader(s))
 
 	req, err := http.NewRequest(http.MethodPost, oauthConfig.DeviceCodeEndpoint.String(), body)
 	if err != nil {
@@ -131,7 +131,7 @@ func InitiateDeviceAuthWithContext(ctx context.Context, sender Sender, oauthConf
 	}
 	defer resp.Body.Close()
 
-	rb, err := ioutil.ReadAll(resp.Body)
+	rb, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %s", logPrefix, errCodeHandlingFails, err.Error())
 	}
@@ -175,7 +175,7 @@ func CheckForUserCompletionWithContext(ctx context.Context, sender Sender, code 
 	}
 
 	s := v.Encode()
-	body := ioutil.NopCloser(strings.NewReader(s))
+	body := io.NopCloser(strings.NewReader(s))
 
 	req, err := http.NewRequest(http.MethodPost, code.OAuthConfig.TokenEndpoint.String(), body)
 	if err != nil {
@@ -190,7 +190,7 @@ func CheckForUserCompletionWithContext(ctx context.Context, sender Sender, code 
 	}
 	defer resp.Body.Close()
 
-	rb, err := ioutil.ReadAll(resp.Body)
+	rb, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("%s %s: %s", logPrefix, errTokenHandlingFails, err.Error())
 	}

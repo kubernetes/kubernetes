@@ -122,7 +122,7 @@ func definitionRefsFromRNode(object *yaml.RNode) ([]string, error) {
 
 // parseOpenAPI reads openAPIPath yaml and converts it to RNode
 func parseOpenAPI(openAPIPath string) (*yaml.RNode, error) {
-	b, err := ioutil.ReadFile(openAPIPath)
+	b, err := os.ReadFile(openAPIPath)
 	if err != nil {
 		return nil, err
 	}

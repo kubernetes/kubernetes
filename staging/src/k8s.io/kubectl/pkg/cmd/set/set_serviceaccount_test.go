@@ -333,7 +333,7 @@ func TestSetServiceAccountRemote(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
-						bytes, err := ioutil.ReadAll(stream)
+						bytes, err := io.ReadAll(stream)
 						if err != nil {
 							return nil, err
 						}

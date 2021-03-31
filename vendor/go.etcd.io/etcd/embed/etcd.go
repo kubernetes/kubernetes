@@ -546,7 +546,7 @@ func (e *Etcd) servePeers() (err error) {
 		srv := &http.Server{
 			Handler:     grpcHandlerFunc(gs, ph),
 			ReadTimeout: 5 * time.Minute,
-			ErrorLog:    defaultLog.New(ioutil.Discard, "", 0), // do not log user error
+			ErrorLog:    defaultLog.New(io.Discard, "", 0), // do not log user error
 		}
 		go srv.Serve(m.Match(cmux.Any()))
 		p.serve = func() error { return m.Serve() }

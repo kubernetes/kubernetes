@@ -656,7 +656,7 @@ func waitForOpenAPISchema(c k8sclientset.Interface, pred func(*spec.Swagger) (bo
 			spec = etagSpec
 		} else if resp.StatusCode != http.StatusOK {
 			return false, fmt.Errorf("unexpected response: %d", resp.StatusCode)
-		} else if bs, err := ioutil.ReadAll(resp.Body); err != nil {
+		} else if bs, err := io.ReadAll(resp.Body); err != nil {
 			return false, err
 		} else if err := json.Unmarshal(bs, spec); err != nil {
 			return false, err

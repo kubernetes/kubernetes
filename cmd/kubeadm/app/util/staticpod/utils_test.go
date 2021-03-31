@@ -820,7 +820,7 @@ func TestPatchStaticPod(t *testing.T) {
 				}
 			}
 
-			pod, err := PatchStaticPod(tc.pod, tempDir, ioutil.Discard)
+			pod, err := PatchStaticPod(tc.pod, tempDir, io.Discard)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, (err != nil), err)
 			}

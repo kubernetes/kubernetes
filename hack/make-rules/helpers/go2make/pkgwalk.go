@@ -81,7 +81,7 @@ func findPackage(pkgName string) (*build.Package, error) {
 
 // readDirInfos returns a list of os.FileInfo structures for the dirents under
 // dirPath.  The result list is sorted by name.  This is very similar to
-// ioutil.ReadDir, except that it follows symlinks.
+// os.ReadDir, except that it follows symlinks.
 func readDirInfos(dirPath string) ([]os.FileInfo, error) {
 	names, err := readDirNames(dirPath)
 	if err != nil {

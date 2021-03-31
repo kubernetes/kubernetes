@@ -190,7 +190,7 @@ func systemInfoSuggestsGCE() bool {
 		// We don't have any non-Linux clues available, at least yet.
 		return false
 	}
-	slurp, _ := ioutil.ReadFile("/sys/class/dmi/id/product_name")
+	slurp, _ := os.ReadFile("/sys/class/dmi/id/product_name")
 	name := strings.TrimSpace(string(slurp))
 	return name == "Google" || name == "Google Compute Engine"
 }
@@ -311,7 +311,7 @@ func (c *Client) getETag(suffix string) (value, etag string, err error) {
 	if res.StatusCode == http.StatusNotFound {
 		return "", "", NotDefinedError(suffix)
 	}
-	all, err := ioutil.ReadAll(res.Body)
+	all, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", "", err
 	}

@@ -201,7 +201,7 @@ func (cli *Client) checkResponseErr(serverResp serverResponse) error {
 			R: serverResp.body,
 			N: int64(bodyMax),
 		}
-		body, err = ioutil.ReadAll(bodyR)
+		body, err = io.ReadAll(bodyR)
 		if err != nil {
 			return err
 		}
@@ -263,7 +263,7 @@ func encodeData(data interface{}) (*bytes.Buffer, error) {
 func ensureReaderClosed(response serverResponse) {
 	if response.body != nil {
 		// Drain up to 512 bytes and close the body to let the Transport reuse the connection
-		io.CopyN(ioutil.Discard, response.body, 512)
+		io.CopyN(io.Discard, response.body, 512)
 		response.body.Close()
 	}
 }

@@ -263,7 +263,7 @@ func (d *Diskv) Read(key string) ([]byte, error) {
 		return []byte{}, err
 	}
 	defer rc.Close()
-	return ioutil.ReadAll(rc)
+	return io.ReadAll(rc)
 }
 
 // ReadStream reads the key and returns the value (data) as an io.ReadCloser.
@@ -286,7 +286,7 @@ func (d *Diskv) ReadStream(key string, direct bool) (io.ReadCloser, error) {
 			if d.Compression != nil {
 				return d.Compression.Reader(buf)
 			}
-			return ioutil.NopCloser(buf), nil
+			return io.NopCloser(buf), nil
 		}
 
 		go func() {
@@ -326,7 +326,7 @@ func (d *Diskv) readWithRLock(key string) (io.ReadCloser, error) {
 		r = &closingReader{f}
 	}
 
-	var rc = io.ReadCloser(ioutil.NopCloser(r))
+	var rc = io.ReadCloser(io.NopCloser(r))
 	if d.Compression != nil {
 		rc, err = d.Compression.Reader(r)
 		if err != nil {

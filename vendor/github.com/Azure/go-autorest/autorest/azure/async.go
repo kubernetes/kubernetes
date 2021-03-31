@@ -268,11 +268,11 @@ func (f Future) GetResult(sender autorest.Sender) (*http.Response, error) {
 	if err == nil && resp.Body != nil {
 		// copy the body and close it so callers don't have to
 		defer resp.Body.Close()
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return resp, err
 		}
-		resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+		resp.Body = io.NopCloser(bytes.NewReader(b))
 	}
 	return resp, err
 }
@@ -409,12 +409,12 @@ func (pt *pollingTrackerBase) updateRawBody() error {
 	pt.rawBody = map[string]interface{}{}
 	if pt.resp.ContentLength != 0 {
 		defer pt.resp.Body.Close()
-		b, err := ioutil.ReadAll(pt.resp.Body)
+		b, err := io.ReadAll(pt.resp.Body)
 		if err != nil {
 			return autorest.NewErrorWithError(err, "pollingTrackerBase", "updateRawBody", nil, "failed to read response body")
 		}
 		// put the body back so it's available to other callers
-		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+		pt.resp.Body = io.NopCloser(bytes.NewReader(b))
 		// observed in 204 responses over HTTP/2.0; the content length is -1 but body is empty
 		if len(b) == 0 {
 			return nil
@@ -466,11 +466,11 @@ func (pt *pollingTrackerBase) updateErrorFromResponse() {
 		re := respErr{}
 		defer pt.resp.Body.Close()
 		var b []byte
-		if b, err = ioutil.ReadAll(pt.resp.Body); err != nil {
+		if b, err = io.ReadAll(pt.resp.Body); err != nil {
 			goto Default
 		}
 		// put the body back so it's available to other callers
-		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+		pt.resp.Body = io.NopCloser(bytes.NewReader(b))
 		if len(b) == 0 {
 			goto Default
 		}

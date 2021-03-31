@@ -182,7 +182,7 @@ const cmdlineCGroupMemory = `cgroup_enable=memory`
 
 // kernel checks that the kernel has been configured correctly to support the required cgroup features
 func kernel() error {
-	cmdline, err := ioutil.ReadFile("/proc/cmdline")
+	cmdline, err := os.ReadFile("/proc/cmdline")
 	if err != nil {
 		return printError("Kernel Command Line Check %s: Could not check /proc/cmdline", failed)
 	}

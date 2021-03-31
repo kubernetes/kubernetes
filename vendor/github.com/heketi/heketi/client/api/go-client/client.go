@@ -142,7 +142,7 @@ func (c *Client) SetTLSOptions(o *ClientTLSOptions) error {
 	if len(o.VerifyCerts) > 0 {
 		tlsConfig.RootCAs = x509.NewCertPool()
 		for _, path := range o.VerifyCerts {
-			pem, err := ioutil.ReadFile(path)
+			pem, err := os.ReadFile(path)
 			if err != nil {
 				return fmt.Errorf("failed to read cert file %v: %v",
 					path, err)
@@ -255,7 +255,7 @@ func (c *Client) waitForResponseWithTimer(r *http.Response,
 			}
 			if r != nil {
 				//Read Response Body
-				ioutil.ReadAll(r.Body)
+				io.ReadAll(r.Body)
 				r.Body.Close()
 			}
 			time.Sleep(waitTime)
@@ -310,7 +310,7 @@ func (c *Client) retryOperationDo(req *http.Request) (*http.Response, error) {
 		err         error
 	)
 	if req.Body != nil {
-		requestBody, err = ioutil.ReadAll(req.Body)
+		requestBody, err = io.ReadAll(req.Body)
 		if err != nil {
 			return nil, err
 		}
@@ -319,7 +319,7 @@ func (c *Client) retryOperationDo(req *http.Request) (*http.Response, error) {
 	// Send request
 	var r *http.Response
 	for i := 0; i <= c.opts.RetryCount; i++ {
-		req.Body = ioutil.NopCloser(bytes.NewReader(requestBody))
+		req.Body = io.NopCloser(bytes.NewReader(requestBody))
 		r, err = c.doBasic(req)
 		if err != nil {
 			return nil, err
@@ -330,9 +330,9 @@ func (c *Client) retryOperationDo(req *http.Request) (*http.Response, error) {
 				//Read Response Body
 				// I don't like discarding error here, but I cant
 				// think of something better atm
-				b, _ := ioutil.ReadAll(r.Body)
+				b, _ := io.ReadAll(r.Body)
 				r.Body.Close()
-				r.Body = ioutil.NopCloser(bytes.NewReader(b))
+				r.Body = io.NopCloser(bytes.NewReader(b))
 			}
 			//sleep before continue
 			time.Sleep(c.opts.retryDelay(r))

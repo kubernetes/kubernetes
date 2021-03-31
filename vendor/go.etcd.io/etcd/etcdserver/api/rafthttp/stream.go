@@ -655,7 +655,7 @@ func (cr *streamReader) dial(t streamType) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("peer %s failed to find local node %s", cr.peerID, cr.tr.ID)
 
 	case http.StatusPreconditionFailed:
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			cr.picker.unreachable(u)
 			return nil, err

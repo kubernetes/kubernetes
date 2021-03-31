@@ -118,7 +118,7 @@ func loadNewProfiles() (success bool, newProfiles []string) {
 
 	success = true
 	for _, dir := range dirs {
-		infos, err := ioutil.ReadDir(dir)
+		infos, err := os.ReadDir(dir)
 		if err != nil {
 			klog.Warningf("Error reading %s: %v", dir, err)
 			success = false

@@ -44,7 +44,7 @@ var LocalPrefix string
 func Process(filename string, src []byte, opt *Options) ([]byte, error) {
 	var err error
 	if src == nil {
-		src, err = ioutil.ReadFile(filename)
+		src, err = os.ReadFile(filename)
 		if err != nil {
 			return nil, err
 		}

@@ -140,7 +140,7 @@ func readAllTar(tarPath string) (map[string]string, error) {
 			return nil, err
 		}
 
-		b, err := ioutil.ReadAll(tr)
+		b, err := io.ReadAll(tr)
 		if err != nil {
 			return nil, err
 		}

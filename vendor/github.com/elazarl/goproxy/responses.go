@@ -23,7 +23,7 @@ func NewResponse(r *http.Request, contentType string, status int, body string) *
 	resp.StatusCode = status
 	buf := bytes.NewBufferString(body)
 	resp.ContentLength = int64(buf.Len())
-	resp.Body = ioutil.NopCloser(buf)
+	resp.Body = io.NopCloser(buf)
 	return resp
 }
 

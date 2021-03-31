@@ -870,7 +870,7 @@ func (m *member) Launch() error {
 			Config: &http.Server{
 				Handler:   h,
 				TLSConfig: peerTLScfg,
-				ErrorLog:  log.New(ioutil.Discard, "net/http", 0),
+				ErrorLog:  log.New(io.Discard, "net/http", 0),
 			},
 			TLS: peerTLScfg,
 		}
@@ -898,7 +898,7 @@ func (m *member) Launch() error {
 					m.s,
 					m.ServerConfig.ReqTimeout(),
 				),
-				ErrorLog: log.New(ioutil.Discard, "net/http", 0),
+				ErrorLog: log.New(io.Discard, "net/http", 0),
 			},
 		}
 		if m.ClientTLSInfo == nil {
@@ -1147,7 +1147,7 @@ func (m *member) Metric(metricName string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	b, rerr := ioutil.ReadAll(resp.Body)
+	b, rerr := io.ReadAll(resp.Body)
 	if rerr != nil {
 		return "", rerr
 	}

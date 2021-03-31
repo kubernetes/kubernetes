@@ -579,11 +579,11 @@ func TestMigratingFile(t *testing.T) {
 	// the load should have recreated this file
 	defer os.Remove(destinationFile.Name())
 
-	sourceContent, err := ioutil.ReadFile(sourceFile.Name())
+	sourceContent, err := os.ReadFile(sourceFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}
@@ -609,7 +609,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 		t.Errorf("unexpected error %v", err)
 	}
 
-	destinationContent, err := ioutil.ReadFile(destinationFile.Name())
+	destinationContent, err := os.ReadFile(destinationFile.Name())
 	if err != nil {
 		t.Errorf("unexpected error %v", err)
 	}

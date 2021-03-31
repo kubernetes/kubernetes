@@ -22,7 +22,7 @@ type File struct {
 
 // Load loads a named po file.
 func Load(name string) (*File, error) {
-	data, err := ioutil.ReadFile(name)
+	data, err := os.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}

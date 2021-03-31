@@ -56,5 +56,5 @@ func getMetadata(key string) ([]byte, error) {
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("metadata server returned HTTP %d", resp.StatusCode)
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }

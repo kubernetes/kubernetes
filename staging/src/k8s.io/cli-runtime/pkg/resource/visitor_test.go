@@ -114,7 +114,7 @@ func TestVisitorHttpGet(t *testing.T) {
 		{
 			name: "Test attempts less than 1 results in an error",
 			httpRetries: func(url string) (int, string, io.ReadCloser, error) {
-				return 200, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
+				return 200, "Status", io.NopCloser(new(bytes.Buffer)), nil
 
 			},
 			args: httpArgs{
@@ -130,7 +130,7 @@ func TestVisitorHttpGet(t *testing.T) {
 				assert.Equal(t, "hello", url)
 				i++
 				if i > 1 {
-					return 200, "Status", ioutil.NopCloser(new(bytes.Buffer)), nil
+					return 200, "Status", io.NopCloser(new(bytes.Buffer)), nil
 				}
 				return 501, "Status", nil, nil
 

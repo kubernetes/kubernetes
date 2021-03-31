@@ -131,7 +131,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

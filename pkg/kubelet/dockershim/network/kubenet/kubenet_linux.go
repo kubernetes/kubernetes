@@ -668,7 +668,7 @@ func (plugin *kubenetNetworkPlugin) checkRequiredCNIPlugins() bool {
 
 // checkRequiredCNIPluginsInOneDir returns true if all required cni plugins are placed in dir
 func (plugin *kubenetNetworkPlugin) checkRequiredCNIPluginsInOneDir(dir string) bool {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return false
 	}

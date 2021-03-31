@@ -439,7 +439,7 @@ func (h *hashKVHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer r.Body.Close()
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "error reading body", http.StatusBadRequest)
 		return
@@ -496,7 +496,7 @@ func (s *EtcdServer) getPeerHashKVHTTP(ctx context.Context, url string, rev int6
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

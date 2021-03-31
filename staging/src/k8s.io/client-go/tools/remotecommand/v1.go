@@ -111,7 +111,7 @@ func (p *streamProtocolV1) stream(conn streamCreator) error {
 
 	// always read from errorStream
 	go func() {
-		message, err := ioutil.ReadAll(p.errorStream)
+		message, err := io.ReadAll(p.errorStream)
 		if err != nil && err != io.EOF {
 			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
 			return

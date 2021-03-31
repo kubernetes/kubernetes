@@ -175,7 +175,7 @@ func (s *snapshotSender) post(req *http.Request) (err error) {
 		// prevents from reading the body forever when the other side dies right after
 		// successfully receives the request body.
 		time.AfterFunc(snapResponseReadTimeout, func() { httputil.GracefulClose(resp) })
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		result <- responseAndError{resp, body, err}
 	}()
 

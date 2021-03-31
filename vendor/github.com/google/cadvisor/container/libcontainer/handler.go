@@ -255,7 +255,7 @@ func processLimitsFile(fileData string) []info.UlimitSpec {
 
 func processRootProcUlimits(rootFs string, rootPid int) []info.UlimitSpec {
 	filePath := path.Join(rootFs, "/proc", strconv.Itoa(rootPid), "limits")
-	out, err := ioutil.ReadFile(filePath)
+	out, err := os.ReadFile(filePath)
 	if err != nil {
 		klog.V(4).Infof("error while listing directory %q to read ulimits: %v", filePath, err)
 		return []info.UlimitSpec{}
@@ -266,14 +266,14 @@ func processRootProcUlimits(rootFs string, rootPid int) []info.UlimitSpec {
 func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.ProcessStats, error) {
 	var fdCount, socketCount uint64
 	filePath := path.Join(cgroupPath, "cgroup.procs")
-	out, err := ioutil.ReadFile(filePath)
+	out, err := os.ReadFile(filePath)
 	if err != nil {
 		return info.ProcessStats{}, fmt.Errorf("couldn't open cpu cgroup procs file %v : %v", filePath, err)
 	}
 
 	pids := strings.Split(string(out), "\n")
 
-	// EOL is also treated as a new line while reading "cgroup.procs" file with ioutil.ReadFile.
+	// EOL is also treated as a new line while reading "cgroup.procs" file with os.ReadFile.
 	// The last value is an empty string "". Ex: pids = ["22", "1223", ""]
 	// Trim the last value
 	if len(pids) != 0 && pids[len(pids)-1] == "" {
@@ -282,7 +282,7 @@ func processStatsFromProcs(rootFs string, cgroupPath string, rootPid int) (info.
 
 	for _, pid := range pids {
 		dirPath := path.Join(rootFs, "/proc", pid, "fd")
-		fds, err := ioutil.ReadDir(dirPath)
+		fds, err := os.ReadDir(dirPath)
 		if err != nil {
 			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
 			continue
@@ -321,7 +321,7 @@ func schedulerStatsFromProcs(rootFs string, pids []int, pidMetricsCache map[int]
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't open scheduler statistics for process %d: %v", pid, err)
 		}
 		defer f.Close()
-		contents, err := ioutil.ReadAll(f)
+		contents, err := io.ReadAll(f)
 		if err != nil {
 			return info.CpuSchedstat{}, fmt.Errorf("couldn't read scheduler statistics for process %d: %v", pid, err)
 		}
@@ -379,7 +379,7 @@ func getReferencedKBytes(pids []int) (uint64, error) {
 	foundMatch := false
 	for _, pid := range pids {
 		smapsFilePath := fmt.Sprintf(smapsFilePathPattern, pid)
-		smapsContent, err := ioutil.ReadFile(smapsFilePath)
+		smapsContent, err := os.ReadFile(smapsFilePath)
 		if err != nil {
 			klog.V(5).Infof("Cannot read %s file, err: %s", smapsFilePath, err)
 			if os.IsNotExist(err) {
@@ -564,7 +564,7 @@ func advancedTCPStatsFromProc(rootFs string, pid int, file1, file2 string) (info
 }
 
 func scanAdvancedTCPStats(advancedStats *info.TcpAdvancedStat, advancedTCPStatsFile string) error {
-	data, err := ioutil.ReadFile(advancedTCPStatsFile)
+	data, err := os.ReadFile(advancedTCPStatsFile)
 	if err != nil {
 		return fmt.Errorf("failure opening %s: %v", advancedTCPStatsFile, err)
 	}
@@ -622,7 +622,7 @@ func scanTCPStats(tcpStatsFile string) (info.TcpStat, error) {
 
 	var stats info.TcpStat
 
-	data, err := ioutil.ReadFile(tcpStatsFile)
+	data, err := os.ReadFile(tcpStatsFile)
 	if err != nil {
 		return stats, fmt.Errorf("failure opening %s: %v", tcpStatsFile, err)
 	}

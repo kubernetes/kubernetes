@@ -101,7 +101,7 @@ func (cfg *Config) setupLogging() error {
 		} else {
 			capnslog.SetGlobalLogLevel(logutil.ConvertToCapnslogLogLevel(cfg.LogLevel))
 			// only discard info
-			grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, os.Stderr, os.Stderr))
+			grpclog.SetLoggerV2(grpclog.NewLoggerV2(io.Discard, os.Stderr, os.Stderr))
 		}
 
 		// TODO: deprecate with "capnslog"

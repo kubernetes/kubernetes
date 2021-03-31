@@ -65,7 +65,7 @@ func main() {
 			log.Fatalf("Error compiling excluded package regex: %v", err)
 		}
 	}
-	b, err := ioutil.ReadFile(args[0])
+	b, err := os.ReadFile(args[0])
 	if err != nil {
 		log.Fatalf("Error reading dependencies file: %v", err)
 	}

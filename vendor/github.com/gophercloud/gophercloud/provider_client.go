@@ -374,7 +374,7 @@ func (client *ProviderClient) Request(method, url string, options *RequestOpts) 
 	}
 
 	if !ok {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
 		respErr := ErrUnexpectedResponseCode{
 			URL:      url,

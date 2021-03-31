@@ -28,7 +28,7 @@ import (
 
 // unmountKubeletDirectory unmounts all paths that contain KubeletRunDirectory
 func unmountKubeletDirectory(absoluteKubeletRunDirectory string) error {
-	raw, err := ioutil.ReadFile("/proc/mounts")
+	raw, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return err
 	}

@@ -38,7 +38,7 @@ type FetchTokenPath string
 
 // FetchToken returns a token by reading from the filesystem
 func (f FetchTokenPath) FetchToken(ctx credentials.Context) ([]byte, error) {
-	data, err := ioutil.ReadFile(string(f))
+	data, err := os.ReadFile(string(f))
 	if err != nil {
 		errMsg := fmt.Sprintf("unable to read file at %s", f)
 		return nil, awserr.New(ErrCodeWebIdentity, errMsg, err)

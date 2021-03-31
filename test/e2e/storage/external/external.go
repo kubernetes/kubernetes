@@ -183,7 +183,7 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 	if filename == "" {
 		return nil, errors.New("missing file name")
 	}
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func (d *driverDefinition) GetTimeouts() *framework.TimeoutContext {
 }
 
 func loadSnapshotClass(filename string) (*unstructured.Unstructured, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

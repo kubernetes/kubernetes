@@ -929,7 +929,7 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 		}
 
 		s := v.Encode()
-		body := ioutil.NopCloser(strings.NewReader(s))
+		body := io.NopCloser(strings.NewReader(s))
 		req.ContentLength = int64(len(s))
 		req.Header.Set(contentType, mimeTypeFormPost)
 		req.Body = body
@@ -960,7 +960,7 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 	}
 
 	defer resp.Body.Close()
-	rb, err := ioutil.ReadAll(resp.Body)
+	rb, err := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		if err != nil {
@@ -1028,7 +1028,7 @@ func retryForIMDS(sender Sender, req *http.Request, maxAttempts int) (resp *http
 
 	for attempt < maxAttempts {
 		if resp != nil && resp.Body != nil {
-			io.Copy(ioutil.Discard, resp.Body)
+			io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
 		}
 		resp, err = sender.Do(req)

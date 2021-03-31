@@ -144,7 +144,7 @@ func (c *CgroupsValidator) getCgroupV2Subsystems() ([]string, error) {
 	// - devices: implemented in kernel 4.15
 	// - freezer: implemented in kernel 5.2
 	pseudo := []string{"devices", "freezer"}
-	data, err := ioutil.ReadFile(filepath.Join(unifiedMountpoint, "cgroup.controllers"))
+	data, err := os.ReadFile(filepath.Join(unifiedMountpoint, "cgroup.controllers"))
 	if err != nil {
 		return nil, err
 	}

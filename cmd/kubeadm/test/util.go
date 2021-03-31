@@ -68,7 +68,7 @@ func SetupPkiDirWithCertificateAuthority(t *testing.T, tmpdir string) string {
 // AssertFilesCount is a utility function for kubeadm testing that asserts if the given folder contains
 // count files.
 func AssertFilesCount(t *testing.T, dirName string, count int) {
-	files, err := ioutil.ReadDir(dirName)
+	files, err := os.ReadDir(dirName)
 	if err != nil {
 		t.Fatalf("Couldn't read files from tmpdir: %s", err)
 	}

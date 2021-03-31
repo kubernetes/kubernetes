@@ -20,7 +20,7 @@ func (cli *Client) TaskInspectWithRaw(ctx context.Context, taskID string) (swarm
 		return swarm.Task{}, nil, wrapResponseError(err, serverResp, "task", taskID)
 	}
 
-	body, err := ioutil.ReadAll(serverResp.body)
+	body, err := io.ReadAll(serverResp.body)
 	if err != nil {
 		return swarm.Task{}, nil, err
 	}

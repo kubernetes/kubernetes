@@ -57,7 +57,7 @@ func (client *Client) getVersion() (string, error) {
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("error reading body")
 	}
@@ -113,7 +113,7 @@ func (client *Client) Authenticate(configConnect *ConfigConnect) (Cluster, error
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return Cluster{}, errors.New("error reading body")
 	}
@@ -199,7 +199,7 @@ func (client *Client) retryCheckResp(httpClient *http.Client, req *http.Request)
 				return nil, fmt.Errorf("Error re-authenticating: %s", err)
 			}
 
-			ioutil.ReadAll(resp.Body)
+			io.ReadAll(resp.Body)
 			resp.Body.Close()
 
 			req2.SetBasicAuth("", client.Token)
@@ -236,7 +236,7 @@ func (client *Client) checkResp(resp *http.Response, err error) (*http.Response,
 
 func (client *Client) decodeBody(resp *http.Response, out interface{}) error {
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

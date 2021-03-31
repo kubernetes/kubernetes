@@ -158,7 +158,7 @@ if (err == nil) {
 ```Go
 certificatePath := "./example-app.pfx"
 
-certData, err := ioutil.ReadFile(certificatePath)
+certData, err := os.ReadFile(certificatePath)
 if err != nil {
 	return nil, fmt.Errorf("failed to read the certificate file (%s): %v", certificatePath, err)
 }

@@ -133,7 +133,7 @@ func isSysFSWritable() (bool, error) {
 }
 
 func readIntStringFile(filename string) (int, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return -1, err
 	}

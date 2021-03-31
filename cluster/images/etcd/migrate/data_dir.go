@@ -128,7 +128,7 @@ func (v *VersionFile) Exists() (bool, error) {
 
 // Read parses the version.txt file and returns it's contents.
 func (v *VersionFile) Read() (*EtcdVersionPair, error) {
-	data, err := ioutil.ReadFile(v.path)
+	data, err := os.ReadFile(v.path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read version file %s: %v", v.path, err)
 	}

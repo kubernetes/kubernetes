@@ -103,7 +103,7 @@ func (t *Table) Get(timeout uint, ml MetadataLevel) error {
 		return err
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (t *Table) Create(timeout uint, ml MetadataLevel, options *TableOptions) er
 	}
 
 	if ml != EmptyPayload {
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}
@@ -331,7 +331,7 @@ func (t *Table) queryEntities(uri string, headers map[string]string, ml Metadata
 		return nil, err
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

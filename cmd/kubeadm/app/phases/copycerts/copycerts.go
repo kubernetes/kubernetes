@@ -171,7 +171,7 @@ func getSecretOwnerRef(client clientset.Interface, tokenID string) ([]metav1.Own
 }
 
 func loadAndEncryptCert(certPath string, key []byte) ([]byte, error) {
-	cert, err := ioutil.ReadFile(certPath)
+	cert, err := os.ReadFile(certPath)
 	if err != nil {
 		return nil, err
 	}

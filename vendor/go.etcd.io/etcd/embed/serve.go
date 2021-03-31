@@ -88,7 +88,7 @@ func (sctx *serveCtx) serve(
 	handler http.Handler,
 	errHandler func(error),
 	gopts ...grpc.ServerOption) (err error) {
-	logger := defaultLog.New(ioutil.Discard, "etcdhttp", 0)
+	logger := defaultLog.New(io.Discard, "etcdhttp", 0)
 	<-s.ReadyNotify()
 
 	if sctx.lg == nil {

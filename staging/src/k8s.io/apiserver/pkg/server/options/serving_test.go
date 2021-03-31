@@ -414,7 +414,7 @@ func getOrCreateTestCertFiles(certFileName, keyFileName string, spec TestCertSpe
 }
 
 func caCertFromBundle(bundlePath string) (*x509.Certificate, error) {
-	pemData, err := ioutil.ReadFile(bundlePath)
+	pemData, err := os.ReadFile(bundlePath)
 	if err != nil {
 		return nil, err
 	}

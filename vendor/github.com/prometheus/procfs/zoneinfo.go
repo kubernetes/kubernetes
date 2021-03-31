@@ -72,7 +72,7 @@ var nodeZoneRE = regexp.MustCompile(`(\d+), zone\s+(\w+)`)
 // structs containing the relevant info.  More information available here:
 // https://www.kernel.org/doc/Documentation/sysctl/vm.txt
 func (fs FS) Zoneinfo() ([]Zoneinfo, error) {
-	data, err := ioutil.ReadFile(fs.proc.Path("zoneinfo"))
+	data, err := os.ReadFile(fs.proc.Path("zoneinfo"))
 	if err != nil {
 		return nil, fmt.Errorf("error reading zoneinfo %s: %s", fs.proc.Path("zoneinfo"), err)
 	}

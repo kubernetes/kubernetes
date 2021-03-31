@@ -86,7 +86,7 @@ func GetSockets(procInfo []byte) int {
 func GetClockSpeed(procInfo []byte) (uint64, error) {
 	// First look through sys to find a max supported cpu frequency.
 	if utils.FileExists(maxFreqFile) {
-		val, err := ioutil.ReadFile(maxFreqFile)
+		val, err := os.ReadFile(maxFreqFile)
 		if err != nil {
 			return 0, err
 		}
@@ -119,7 +119,7 @@ func GetClockSpeed(procInfo []byte) (uint64, error) {
 // GetMachineMemoryCapacity returns the machine's total memory from /proc/meminfo.
 // Returns the total memory capacity as an uint64 (number of bytes).
 func GetMachineMemoryCapacity() (uint64, error) {
-	out, err := ioutil.ReadFile("/proc/meminfo")
+	out, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, err
 	}
@@ -139,7 +139,7 @@ func GetMachineMemoryCapacity() (uint64, error) {
 // (https://github.com/torvalds/linux/blob/v5.5/drivers/edac/edac_mc.c#L198)
 func GetMachineMemoryByType(edacPath string) (map[string]*info.MemoryInfo, error) {
 	memory := map[string]*info.MemoryInfo{}
-	names, err := ioutil.ReadDir(edacPath)
+	names, err := os.ReadDir(edacPath)
 	// On some architectures (such as ARM) memory controller device may not exist.
 	// If this is the case then we ignore error and return empty slice.
 	_, ok := err.(*os.PathError)
@@ -153,7 +153,7 @@ func GetMachineMemoryByType(edacPath string) (map[string]*info.MemoryInfo, error
 		if !isMemoryController.MatchString(controller) {
 			continue
 		}
-		dimms, err := ioutil.ReadDir(path.Join(edacPath, controllerDir.Name()))
+		dimms, err := os.ReadDir(path.Join(edacPath, controllerDir.Name()))
 		if err != nil {
 			return map[string]*info.MemoryInfo{}, err
 		}
@@ -162,7 +162,7 @@ func GetMachineMemoryByType(edacPath string) (map[string]*info.MemoryInfo, error
 			if !isDimm.MatchString(dimm) {
 				continue
 			}
-			memType, err := ioutil.ReadFile(path.Join(edacPath, controller, dimm, memTypeFileName))
+			memType, err := os.ReadFile(path.Join(edacPath, controller, dimm, memTypeFileName))
 			if err != nil {
 				return map[string]*info.MemoryInfo{}, err
 			}
@@ -170,7 +170,7 @@ func GetMachineMemoryByType(edacPath string) (map[string]*info.MemoryInfo, error
 			if _, exists := memory[readableMemType]; !exists {
 				memory[readableMemType] = &info.MemoryInfo{}
 			}
-			size, err := ioutil.ReadFile(path.Join(edacPath, controller, dimm, sizeFileName))
+			size, err := os.ReadFile(path.Join(edacPath, controller, dimm, sizeFileName))
 			if err != nil {
 				return map[string]*info.MemoryInfo{}, err
 			}
@@ -193,7 +193,7 @@ func mbToBytes(megabytes int) int {
 // GetMachineSwapCapacity returns the machine's total swap from /proc/meminfo.
 // Returns the total swap capacity as an uint64 (number of bytes).
 func GetMachineSwapCapacity() (uint64, error) {
-	out, err := ioutil.ReadFile("/proc/meminfo")
+	out, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
 		return 0, err
 	}

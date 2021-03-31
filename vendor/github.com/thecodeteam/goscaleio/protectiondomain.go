@@ -52,7 +52,7 @@ func (system *System) CreateProtectionDomain(name string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("error reading body")
 	}
@@ -104,7 +104,7 @@ func (system *System) GetProtectionDomain(protectiondomainhref string) (protecti
 
 	}
 	//
-	// bs, err := ioutil.ReadAll(resp.Body)
+	// bs, err := io.ReadAll(resp.Body)
 	// if err != nil {
 	// 	return []types.ProtectionDomain{}, errors.New("error reading body")
 	// }

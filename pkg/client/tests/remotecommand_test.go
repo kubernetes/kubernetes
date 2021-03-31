@@ -339,7 +339,7 @@ func TestDial(t *testing.T) {
 		conn:          &fakeConnection{},
 		resp: &http.Response{
 			StatusCode: http.StatusSwitchingProtocols,
-			Body:       ioutil.NopCloser(&bytes.Buffer{}),
+			Body:       io.NopCloser(&bytes.Buffer{}),
 		},
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: upgrader}, "POST", &url.URL{Host: "something.com", Scheme: "https"})

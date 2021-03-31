@@ -151,7 +151,7 @@ func (t *TableServiceClient) queryTables(uri string, headers map[string]string, 
 		return nil, err
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

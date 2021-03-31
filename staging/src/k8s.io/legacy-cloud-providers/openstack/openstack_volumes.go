@@ -503,7 +503,7 @@ func (os *OpenStack) GetDevicePathBySerialID(volumeID string) string {
 		fmt.Sprintf("wwn-0x%s", strings.Replace(volumeID, "-", "", -1)),
 	}
 
-	files, _ := ioutil.ReadDir("/dev/disk/by-id/")
+	files, _ := os.ReadDir("/dev/disk/by-id/")
 
 	for _, f := range files {
 		for _, c := range candidateDeviceNodes {

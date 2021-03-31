@@ -53,10 +53,10 @@ func raw(restClient *rest.RESTClient, streams genericclioptions.IOStreams, url, 
 	var data io.ReadCloser
 	switch {
 	case len(filename) == 0:
-		data = ioutil.NopCloser(bytes.NewBuffer([]byte{}))
+		data = io.NopCloser(bytes.NewBuffer([]byte{}))
 
 	case filename == "-":
-		data = ioutil.NopCloser(streams.In)
+		data = io.NopCloser(streams.In)
 
 	default:
 		var err error

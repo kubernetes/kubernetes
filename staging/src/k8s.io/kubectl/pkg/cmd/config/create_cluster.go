@@ -143,7 +143,7 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	if o.certificateAuthority.Provided() {
 		caPath := o.certificateAuthority.Value()
 		if o.embedCAData.Value() {
-			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
+			modifiedCluster.CertificateAuthorityData, _ = os.ReadFile(caPath)
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {

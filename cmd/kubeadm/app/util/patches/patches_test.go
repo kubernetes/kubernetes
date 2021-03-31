@@ -171,7 +171,7 @@ func TestGetPatchSetsForPathMustBeDirectory(t *testing.T) {
 	}
 	defer os.Remove(tempFile.Name())
 
-	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, ioutil.Discard)
+	_, _, _, err = getPatchSetsFromPath(tempFile.Name(), testKnownTargets, io.Discard)
 	if err == nil {
 		t.Fatalf("expected error for non-directory path %q", tempFile.Name())
 	}
@@ -244,7 +244,7 @@ func TestGetPatchSetsForPath(t *testing.T) {
 				}
 			}
 
-			patchSets, patchFiles, ignoredFiles, err := getPatchSetsFromPath(tempDir, testKnownTargets, ioutil.Discard)
+			patchSets, patchFiles, ignoredFiles, err := getPatchSetsFromPath(tempDir, testKnownTargets, io.Discard)
 			if (err != nil) != tc.expectedError {
 				t.Fatalf("expected error: %v, got: %v, error: %v", tc.expectedError, err != nil, err)
 			}

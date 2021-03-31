@@ -222,7 +222,7 @@ func getCgroupSubsystemsV1() (*CgroupSubsystems, error) {
 
 // getCgroupSubsystemsV2 returns information about the enabled cgroup v2 subsystems
 func getCgroupSubsystemsV2() (*CgroupSubsystems, error) {
-	content, err := ioutil.ReadFile(filepath.Join(util.CgroupRoot, "cgroup.controllers"))
+	content, err := os.ReadFile(filepath.Join(util.CgroupRoot, "cgroup.controllers"))
 	if err != nil {
 		return nil, err
 	}

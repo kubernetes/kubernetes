@@ -117,7 +117,7 @@ func (storagePool *StoragePool) FindVolumeID(volumename string) (volumeID string
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("error reading body")
 	}
@@ -157,7 +157,7 @@ func GetLocalVolumeMap() (mappedVolumes []*SdcMappedVolume, err error) {
 	}
 
 	diskIDPath := "/dev/disk/by-id"
-	files, _ := ioutil.ReadDir(diskIDPath)
+	files, _ := os.ReadDir(diskIDPath)
 	r, _ := regexp.Compile(`^emc-vol-\w*-\w*$`)
 	for _, f := range files {
 		matched := r.MatchString(f.Name())

@@ -41,7 +41,7 @@ func TestListTimeout(t *testing.T) {
 			if req.URL.Query().Get("timeout") != "21s" {
 				t.Fatal(spew.Sdump(req.URL.Query()))
 			}
-			return &http.Response{StatusCode: http.StatusNotFound, Body: ioutil.NopCloser(&bytes.Buffer{})}, nil
+			return &http.Response{StatusCode: http.StatusNotFound, Body: io.NopCloser(&bytes.Buffer{})}, nil
 		}),
 	}
 	clientConfig := &rest.Config{

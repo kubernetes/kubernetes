@@ -79,7 +79,7 @@ func createGCESecrets(client clientset.Interface, ns string) {
 	framework.ExpectNoError(err, "error copying service account key: %s\nstdout: %s\nstderr: %s", err, stdout, stderr)
 	defer shredFile(saFile)
 	// Create Secret with this Service Account
-	fileBytes, err := ioutil.ReadFile(saFile)
+	fileBytes, err := os.ReadFile(saFile)
 	framework.ExpectNoError(err, "Failed to read file %v", saFile)
 
 	s := &v1.Secret{

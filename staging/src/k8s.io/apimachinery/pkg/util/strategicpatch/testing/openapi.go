@@ -46,7 +46,7 @@ func (f *Fake) OpenAPISchema() (*openapi_v2.Document, error) {
 			f.err = err
 			return
 		}
-		spec, err := ioutil.ReadFile(f.Path)
+		spec, err := os.ReadFile(f.Path)
 		if err != nil {
 			f.err = err
 			return

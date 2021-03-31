@@ -82,7 +82,7 @@ standard usage. Eg.
 NOTE: You can also use the library in a non-global setting by creating an instance of a Notebook:
 
 ```go
-notepad = jww.NewNotepad(jww.LevelInfo, jww.LevelTrace, os.Stdout, ioutil.Discard, "", log.Ldate|log.Ltime)
+notepad = jww.NewNotepad(jww.LevelInfo, jww.LevelTrace, os.Stdout, io.Discard, "", log.Ldate|log.Ltime)
 notepad.WARN.Println("Some warning"")
 ```
 

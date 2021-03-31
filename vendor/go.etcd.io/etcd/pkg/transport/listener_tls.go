@@ -168,7 +168,7 @@ func (l *tlsListener) acceptLoop() {
 
 func checkCRL(crlPath string, cert []*x509.Certificate) error {
 	// TODO: cache
-	crlBytes, err := ioutil.ReadFile(crlPath)
+	crlBytes, err := os.ReadFile(crlPath)
 	if err != nil {
 		return err
 	}

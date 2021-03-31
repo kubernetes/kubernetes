@@ -167,7 +167,7 @@ func loadSnap(lg *zap.Logger, dir, name string) (*raftpb.Snapshot, error) {
 
 // Read reads the snapshot named by snapname and returns the snapshot.
 func Read(lg *zap.Logger, snapname string) (*raftpb.Snapshot, error) {
-	b, err := ioutil.ReadFile(snapname)
+	b, err := os.ReadFile(snapname)
 	if err != nil {
 		if lg != nil {
 			lg.Warn("failed to read a snap file", zap.String("path", snapname), zap.Error(err))

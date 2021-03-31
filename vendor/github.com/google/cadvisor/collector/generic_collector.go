@@ -145,7 +145,7 @@ func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (t
 
 	defer response.Body.Close()
 
-	pageContent, err := ioutil.ReadAll(response.Body)
+	pageContent, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nextCollectionTime, nil, err
 	}

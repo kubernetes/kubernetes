@@ -327,7 +327,7 @@ func handleConfigMapFromFileSources(configMap *corev1.ConfigMap, fileSources []s
 			if strings.Contains(fileSource, "=") {
 				return fmt.Errorf("cannot give a key name for a directory path")
 			}
-			fileList, err := ioutil.ReadDir(filePath)
+			fileList, err := os.ReadDir(filePath)
 			if err != nil {
 				return fmt.Errorf("error listing files in %s: %v", filePath, err)
 			}
@@ -375,7 +375,7 @@ func handleConfigMapFromEnvFileSource(configMap *corev1.ConfigMap, envFileSource
 // addKeyFromFileToConfigMap adds a key with the given name to a ConfigMap, populating
 // the value with the content of the given file path, or returns an error.
 func addKeyFromFileToConfigMap(configMap *corev1.ConfigMap, keyName, filePath string) error {
-	data, err := ioutil.ReadFile(filePath)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
 	}

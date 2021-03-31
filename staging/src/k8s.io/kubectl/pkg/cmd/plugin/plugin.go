@@ -120,7 +120,7 @@ func (o *PluginListOptions) Run() error {
 			continue
 		}
 
-		files, err := ioutil.ReadDir(dir)
+		files, err := os.ReadDir(dir)
 		if err != nil {
 			if _, ok := err.(*os.PathError); ok {
 				fmt.Fprintf(o.ErrOut, "Unable to read directory %q from your PATH: %v. Skipping...\n", dir, err)

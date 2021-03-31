@@ -115,7 +115,7 @@ func (p *HelmChartInflationGeneratorPlugin) useValuesLocal() error {
 		var err error
 
 		if filepath.IsAbs(p.Values) {
-			pValues, err = ioutil.ReadFile(p.Values)
+			pValues, err = os.ReadFile(p.Values)
 		} else {
 			pValues, err = p.h.Loader().Load(p.Values)
 		}

@@ -62,7 +62,7 @@ func TestRunDiff(t *testing.T) {
 
 	flags := &diffFlags{
 		cfgPath: "",
-		out:     ioutil.Discard,
+		out:     io.Discard,
 	}
 
 	// TODO: Add test cases for empty cfgPath, it should automatically fetch cfg from cluster

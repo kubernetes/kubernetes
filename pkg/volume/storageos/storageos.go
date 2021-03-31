@@ -450,7 +450,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 	}
 
 	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
-	files, err := ioutil.ReadDir(volumeDir)
+	files, err := os.ReadDir(volumeDir)
 	if err != nil {
 		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
 	}

@@ -63,7 +63,7 @@ func (interceptor *outputInterceptor) StopInterceptingAndReturnOutput() (string,
 	}
 
 	interceptor.redirectFile.Close()
-	output, err := ioutil.ReadFile(interceptor.redirectFile.Name())
+	output, err := os.ReadFile(interceptor.redirectFile.Name())
 	os.Remove(interceptor.redirectFile.Name())
 
 	interceptor.intercepting = false

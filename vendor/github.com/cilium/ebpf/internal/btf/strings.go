@@ -11,7 +11,7 @@ import (
 type stringTable []byte
 
 func readStringTable(r io.Reader) (stringTable, error) {
-	contents, err := ioutil.ReadAll(r)
+	contents, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("can't read string table: %v", err)
 	}

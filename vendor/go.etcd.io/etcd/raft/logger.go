@@ -50,7 +50,7 @@ func SetLogger(l Logger) {
 
 var (
 	defaultLogger = &DefaultLogger{Logger: log.New(os.Stderr, "raft", log.LstdFlags)}
-	discardLogger = &DefaultLogger{Logger: log.New(ioutil.Discard, "", 0)}
+	discardLogger = &DefaultLogger{Logger: log.New(io.Discard, "", 0)}
 	raftLoggerMu  sync.Mutex
 	raftLogger    = Logger(defaultLogger)
 )

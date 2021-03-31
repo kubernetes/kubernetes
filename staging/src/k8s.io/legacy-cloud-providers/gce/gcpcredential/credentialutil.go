@@ -68,7 +68,7 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 	}
 
 	limitedReader := &io.LimitedReader{R: resp.Body, N: maxReadLength}
-	contents, err := ioutil.ReadAll(limitedReader)
+	contents, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}

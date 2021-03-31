@@ -342,7 +342,7 @@ func FileProgram(f *syntax.File, isPredeclared func(string) bool) (*Program, err
 // CompiledProgram produces a new program from the representation
 // of a compiled program previously saved by Program.Write.
 func CompiledProgram(in io.Reader) (*Program, error) {
-	data, err := ioutil.ReadAll(in)
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, err
 	}

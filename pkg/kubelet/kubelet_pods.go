@@ -86,7 +86,7 @@ const (
 
 // Get a list of pods that have data directories.
 func (kl *Kubelet) listPodsFromDisk() ([]types.UID, error) {
-	podInfos, err := ioutil.ReadDir(kl.getPodsDir())
+	podInfos, err := os.ReadDir(kl.getPodsDir())
 	if err != nil {
 		return nil, err
 	}
@@ -348,7 +348,7 @@ func ensureHostsFile(fileName string, hostIPs []string, hostName, hostDomainName
 
 // nodeHostsFileContent reads the content of node's hosts file.
 func nodeHostsFileContent(hostsFilePath string, hostAliases []v1.HostAlias) ([]byte, error) {
-	hostsFileContent, err := ioutil.ReadFile(hostsFilePath)
+	hostsFileContent, err := os.ReadFile(hostsFilePath)
 	if err != nil {
 		return nil, err
 	}

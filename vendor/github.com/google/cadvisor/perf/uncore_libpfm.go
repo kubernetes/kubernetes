@@ -69,7 +69,7 @@ func getPMU(pmus uncorePMUs, gotType uint32) (*pmu, error) {
 type uncorePMUs map[string]pmu
 
 func readUncorePMU(path string, name string, cpumaskRegexp *regexp.Regexp) (*pmu, error) {
-	buf, err := ioutil.ReadFile(filepath.Join(path, pmuTypeFilename))
+	buf, err := os.ReadFile(filepath.Join(path, pmuTypeFilename))
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +79,7 @@ func readUncorePMU(path string, name string, cpumaskRegexp *regexp.Regexp) (*pmu
 		return nil, err
 	}
 
-	buf, err = ioutil.ReadFile(filepath.Join(path, pmuCpumaskFilename))
+	buf, err = os.ReadFile(filepath.Join(path, pmuCpumaskFilename))
 	if err != nil {
 		return nil, err
 	}

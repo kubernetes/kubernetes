@@ -27,7 +27,7 @@ func newNonceTcpTransport(keys string) (transport, error) {
 	if err != nil {
 		return nil, err
 	}
-	b, err := ioutil.ReadFile(noncefile)
+	b, err := os.ReadFile(noncefile)
 	if err != nil {
 		return nil, err
 	}

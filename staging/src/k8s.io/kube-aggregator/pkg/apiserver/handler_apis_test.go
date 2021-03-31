@@ -315,7 +315,7 @@ func TestAPIs(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
 		}
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue
@@ -502,7 +502,7 @@ func TestAPIGroup(t *testing.T) {
 			t.Errorf("%s: %v", tc.name, string(response))
 			continue
 		}
-		bytes, err := ioutil.ReadAll(resp.Body)
+		bytes, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 			continue

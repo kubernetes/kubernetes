@@ -36,7 +36,7 @@ type settableLogger struct {
 func init() {
 	// disable client side logs by default
 	lg = &settableLogger{}
-	SetLogger(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
+	SetLogger(grpclog.NewLoggerV2(io.Discard, io.Discard, io.Discard))
 }
 
 // SetLogger sets client-side Logger.

@@ -144,7 +144,7 @@ func (c *Client) httpGetResponse(postData interface{}, urlPath, infoName string)
 		return nil, fmt.Errorf("received empty response for %q from %q", infoName, urlPath)
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = fmt.Errorf("unable to read all %q from %q: %v", infoName, urlPath, err)
 		return nil, err

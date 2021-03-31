@@ -35,7 +35,7 @@ import (
 
 func rewriteFile(name string, header []byte, rewriteFn func(*token.FileSet, *ast.File) error) error {
 	fset := token.NewFileSet()
-	src, err := ioutil.ReadFile(name)
+	src, err := os.ReadFile(name)
 	if err != nil {
 		return err
 	}

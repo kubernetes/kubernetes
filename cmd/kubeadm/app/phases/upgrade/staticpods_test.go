@@ -572,7 +572,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 func getAPIServerHash(dir string) (string, error) {
 	manifestPath := constants.GetStaticPodFilepath(constants.KubeAPIServer, dir)
 
-	fileBytes, err := ioutil.ReadFile(manifestPath)
+	fileBytes, err := os.ReadFile(manifestPath)
 	if err != nil {
 		return "", err
 	}

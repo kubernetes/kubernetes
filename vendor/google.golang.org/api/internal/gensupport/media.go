@@ -62,7 +62,7 @@ func (cs *contentSniffer) ContentType() (string, bool) {
 	}
 	cs.sniffed = true
 	// If ReadAll hits EOF, it returns err==nil.
-	cs.start, cs.err = ioutil.ReadAll(io.LimitReader(cs.r, sniffBuffSize))
+	cs.start, cs.err = io.ReadAll(io.LimitReader(cs.r, sniffBuffSize))
 
 	// Don't try to detect the content type based on possibly incomplete data.
 	if cs.err != nil {
@@ -295,8 +295,8 @@ func (mi *MediaInfo) UploadRequest(reqHeaders http.Header, body io.Reader) (newB
 		}
 		if fb != nil && fm != nil {
 			getBody = func() (io.ReadCloser, error) {
-				rb := ioutil.NopCloser(fb())
-				rm := ioutil.NopCloser(fm())
+				rb := io.NopCloser(fb())
+				rm := io.NopCloser(fm())
 				var mimeBoundary string
 				if _, params, err := mime.ParseMediaType(ctype); err == nil {
 					mimeBoundary = params["boundary"]

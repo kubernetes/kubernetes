@@ -267,7 +267,7 @@ func probeAttachedVolume() error {
 
 func scsiHostRescan() {
 	scsiPath := "/sys/class/scsi_host/"
-	if dirs, err := ioutil.ReadDir(scsiPath); err == nil {
+	if dirs, err := os.ReadDir(scsiPath); err == nil {
 		for _, f := range dirs {
 			name := scsiPath + f.Name() + "/scan"
 			data := []byte("- - -")

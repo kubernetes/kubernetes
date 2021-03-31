@@ -22,7 +22,7 @@ func PageResultFrom(resp *http.Response) (PageResult, error) {
 	var parsedBody interface{}
 
 	defer resp.Body.Close()
-	rawBody, err := ioutil.ReadAll(resp.Body)
+	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return PageResult{}, err
 	}

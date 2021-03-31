@@ -90,7 +90,7 @@ func LoadFromFile(path string) (*Info, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil, err
 	}
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}

@@ -189,7 +189,7 @@ func fetchFromURL(url string, timeout time.Duration) (string, error) {
 		return "", errors.Errorf("unable to get URL %q: %s", url, err.Error())
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.Errorf("unable to read content of URL %q: %s", url, err.Error())
 	}

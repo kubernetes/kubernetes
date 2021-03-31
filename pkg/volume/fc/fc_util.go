@@ -48,7 +48,7 @@ const (
 )
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	return os.ReadDir(dirname)
 }
 func (handler *osIOHandler) Lstat(name string) (os.FileInfo, error) {
 	return os.Lstat(name)
@@ -339,7 +339,7 @@ func (util *fcUtil) DetachBlockFCDisk(c fcDiskUnmapper, mapPath, devicePath stri
 	if strings.Contains(volumeInfo, "-lun-") {
 		searchPath = byPath
 	}
-	fis, err := ioutil.ReadDir(searchPath)
+	fis, err := os.ReadDir(searchPath)
 	if err != nil {
 		return err
 	}

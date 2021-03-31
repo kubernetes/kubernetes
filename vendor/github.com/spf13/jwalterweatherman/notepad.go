@@ -124,7 +124,7 @@ func (n *Notepad) init() {
 			*logger = log.New(n.createLogWriters(threshold, n.outHandle), prefix, n.flags)
 
 		default:
-			*logger = log.New(n.createLogWriters(threshold, ioutil.Discard), prefix, n.flags)
+			*logger = log.New(n.createLogWriters(threshold, io.Discard), prefix, n.flags)
 		}
 	}
 }

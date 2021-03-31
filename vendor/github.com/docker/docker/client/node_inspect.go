@@ -20,7 +20,7 @@ func (cli *Client) NodeInspectWithRaw(ctx context.Context, nodeID string) (swarm
 		return swarm.Node{}, nil, wrapResponseError(err, serverResp, "node", nodeID)
 	}
 
-	body, err := ioutil.ReadAll(serverResp.body)
+	body, err := io.ReadAll(serverResp.body)
 	if err != nil {
 		return swarm.Node{}, nil, err
 	}

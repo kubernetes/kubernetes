@@ -52,7 +52,7 @@ func ConfFromBytes(bytes []byte) (*NetworkConfig, error) {
 }
 
 func ConfFromFile(filename string) (*NetworkConfig, error) {
-	bytes, err := ioutil.ReadFile(filename)
+	bytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %s", filename, err)
 	}
@@ -127,7 +127,7 @@ func ConfListFromBytes(bytes []byte) (*NetworkConfigList, error) {
 }
 
 func ConfListFromFile(filename string) (*NetworkConfigList, error) {
-	bytes, err := ioutil.ReadFile(filename)
+	bytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %s", filename, err)
 	}
@@ -136,7 +136,7 @@ func ConfListFromFile(filename string) (*NetworkConfigList, error) {
 
 func ConfFiles(dir string, extensions []string) ([]string, error) {
 	// In part, adapted from rkt/networking/podenv.go#listFiles
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	switch {
 	case err == nil: // break
 	case os.IsNotExist(err):

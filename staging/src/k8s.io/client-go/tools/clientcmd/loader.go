@@ -281,7 +281,7 @@ func (rules *ClientConfigLoadingRules) Migrate() error {
 			return fmt.Errorf("cannot migrate %v to %v because it is a directory", source, destination)
 		}
 
-		data, err := ioutil.ReadFile(source)
+		data, err := os.ReadFile(source)
 		if err != nil {
 			return err
 		}
@@ -361,7 +361,7 @@ func (rules *ClientConfigLoadingRules) IsDefaultConfig(config *restclient.Config
 
 // LoadFromFile takes a filename and deserializes the contents into Config object
 func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
-	kubeconfigBytes, err := ioutil.ReadFile(filename)
+	kubeconfigBytes, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

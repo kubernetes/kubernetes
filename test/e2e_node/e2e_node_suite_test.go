@@ -248,7 +248,7 @@ func validateSystem() error {
 }
 
 func maskLocksmithdOnCoreos() {
-	data, err := ioutil.ReadFile("/etc/os-release")
+	data, err := os.ReadFile("/etc/os-release")
 	if err != nil {
 		// Not all distros contain this file.
 		klog.Infof("Could not read /etc/os-release: %v", err)
@@ -340,7 +340,7 @@ func getAPIServerClient() (*clientset.Clientset, error) {
 // loadSystemSpecFromFile returns the system spec from the file with the
 // filename.
 func loadSystemSpecFromFile(filename string) (*system.SysSpec, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

@@ -143,7 +143,7 @@ func findSELinuxfs() string {
 	}
 
 	// check if selinuxfs is available before going the slow path
-	fs, err := ioutil.ReadFile("/proc/filesystems")
+	fs, err := os.ReadFile("/proc/filesystems")
 	if err != nil {
 		return ""
 	}
@@ -289,7 +289,7 @@ func classIndex(class string) (int, error) {
 	permpath := fmt.Sprintf("class/%s/index", class)
 	indexpath := filepath.Join(getSelinuxMountPoint(), permpath)
 
-	indexB, err := ioutil.ReadFile(indexpath)
+	indexB, err := os.ReadFile(indexpath)
 	if err != nil {
 		return -1, err
 	}
@@ -770,7 +770,7 @@ func selinuxEnforcePath() string {
 func enforceMode() int {
 	var enforce int
 
-	enforceB, err := ioutil.ReadFile(selinuxEnforcePath())
+	enforceB, err := os.ReadFile(selinuxEnforcePath())
 	if err != nil {
 		return -1
 	}

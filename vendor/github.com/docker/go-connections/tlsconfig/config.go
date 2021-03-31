@@ -108,7 +108,7 @@ func certPool(caFile string, exclusivePool bool) (*x509.CertPool, error) {
 			return nil, fmt.Errorf("failed to read system certificates: %v", err)
 		}
 	}
-	pem, err := ioutil.ReadFile(caFile)
+	pem, err := os.ReadFile(caFile)
 	if err != nil {
 		return nil, fmt.Errorf("could not read CA certificate %q: %v", caFile, err)
 	}
@@ -178,12 +178,12 @@ func getCert(options Options) ([]tls.Certificate, error) {
 
 	errMessage := "Could not load X509 key pair"
 
-	cert, err := ioutil.ReadFile(options.CertFile)
+	cert, err := os.ReadFile(options.CertFile)
 	if err != nil {
 		return nil, errors.Wrap(err, errMessage)
 	}
 
-	prKeyBytes, err := ioutil.ReadFile(options.KeyFile)
+	prKeyBytes, err := os.ReadFile(options.KeyFile)
 	if err != nil {
 		return nil, errors.Wrap(err, errMessage)
 	}

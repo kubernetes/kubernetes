@@ -59,7 +59,7 @@ var (
 )
 
 func stringBody(body string) io.ReadCloser {
-	return ioutil.NopCloser(bytes.NewReader([]byte(body)))
+	return io.NopCloser(bytes.NewReader([]byte(body)))
 }
 
 func watchBody(events ...watch.Event) string {

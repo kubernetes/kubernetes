@@ -594,7 +594,7 @@ func (c *simpleHTTPClient) Do(ctx context.Context, act httpAction) (*http.Respon
 	var body []byte
 	done := make(chan struct{})
 	go func() {
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 		done <- struct{}{}
 	}()
 

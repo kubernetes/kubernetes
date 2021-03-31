@@ -298,7 +298,7 @@ func setupUser(config *initConfig) error {
 		return err
 	}
 
-	setgroups, err := ioutil.ReadFile("/proc/self/setgroups")
+	setgroups, err := os.ReadFile("/proc/self/setgroups")
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}

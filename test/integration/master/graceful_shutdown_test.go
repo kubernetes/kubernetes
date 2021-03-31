@@ -55,7 +55,7 @@ func TestGracefulShutdown(t *testing.T) {
 		if respErr.err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		bs, err := ioutil.ReadAll(respErr.resp.Body)
+		bs, err := io.ReadAll(respErr.resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +96,7 @@ func TestGracefulShutdown(t *testing.T) {
 		t.Fatal(respErr.err)
 	}
 	defer respErr.resp.Body.Close()
-	bs, err := ioutil.ReadAll(respErr.resp.Body)
+	bs, err := io.ReadAll(respErr.resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

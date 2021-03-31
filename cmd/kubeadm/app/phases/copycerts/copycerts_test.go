@@ -190,7 +190,7 @@ func TestUploadCerts(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error decrypting secret data: %v", err)
 		}
-		diskCertData, err := ioutil.ReadFile(certPath)
+		diskCertData, err := os.ReadFile(certPath)
 		if err != nil {
 			t.Fatalf("error reading certificate from disk: %v", err)
 		}
@@ -234,7 +234,7 @@ func TestDownloadCerts(t *testing.T) {
 	const certFileMode = 0644
 
 	for certName, certPath := range certsToTransfer(initForDownloadConfiguration) {
-		diskCertData, err := ioutil.ReadFile(certPath)
+		diskCertData, err := os.ReadFile(certPath)
 		if err != nil {
 			t.Errorf("error reading certificate from disk: %v", err)
 		}

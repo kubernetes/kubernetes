@@ -276,7 +276,7 @@ func (r *Request) Do() *Response {
 	}
 	if resp.Body != nil {
 		defer resp.Body.Close()
-		body, err = ioutil.ReadAll(resp.Body)
+		body, err = io.ReadAll(resp.Body)
 	}
 	if err != nil {
 		return &Response{err: err}

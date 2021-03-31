@@ -514,7 +514,7 @@ func TestLabelResourceVersion(t *testing.T) {
 					return &http.Response{
 						StatusCode: http.StatusOK,
 						Header:     cmdtesting.DefaultHeader(),
-						Body: ioutil.NopCloser(bytes.NewBufferString(
+						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"10"}}`,
 						))}, nil
 				default:
@@ -524,7 +524,7 @@ func TestLabelResourceVersion(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					body, err := ioutil.ReadAll(req.Body)
+					body, err := io.ReadAll(req.Body)
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -534,7 +534,7 @@ func TestLabelResourceVersion(t *testing.T) {
 					return &http.Response{
 						StatusCode: http.StatusOK,
 						Header:     cmdtesting.DefaultHeader(),
-						Body: ioutil.NopCloser(bytes.NewBufferString(
+						Body: io.NopCloser(bytes.NewBufferString(
 							`{"kind":"Pod","apiVersion":"v1","metadata":{"name":"foo","namespace":"test","resourceVersion":"11"}}`,
 						))}, nil
 				default:

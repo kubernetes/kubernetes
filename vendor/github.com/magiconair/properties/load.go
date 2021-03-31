@@ -91,7 +91,7 @@ func (l *Loader) LoadAll(names []string) (*Properties, error) {
 // If IgnoreMissing is true then a missing file will not be
 // reported as error.
 func (l *Loader) LoadFile(filename string) (*Properties, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		if l.IgnoreMissing && os.IsNotExist(err) {
 			LogPrintf("properties: %s not found. skipping", filename)
@@ -126,7 +126,7 @@ func (l *Loader) LoadURL(url string) (*Properties, error) {
 		return nil, fmt.Errorf("properties: %s returned %d", url, resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("properties: %s error reading response. %s", url, err)
 	}

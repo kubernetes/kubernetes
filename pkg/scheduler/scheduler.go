@@ -281,7 +281,7 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	if err != nil {
 		return fmt.Errorf("missing policy config file %s", policyFile)
 	}
-	data, err := ioutil.ReadFile(policyFile)
+	data, err := os.ReadFile(policyFile)
 	if err != nil {
 		return fmt.Errorf("couldn't read policy config: %v", err)
 	}

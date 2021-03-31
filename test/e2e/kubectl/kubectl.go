@@ -277,7 +277,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 			}
 			framework.Logf("%s modified at %s (current time: %s)", path, info.ModTime(), time.Now())
 
-			data, readError := ioutil.ReadFile(path)
+			data, readError := os.ReadFile(path)
 			if readError != nil {
 				framework.Logf("%s error: %v", path, readError)
 			} else {
@@ -1370,7 +1370,7 @@ metadata:
 			ginkgo.By("specifying a remote filepath " + podSource + " on the pod")
 			framework.RunKubectlOrDie(ns, "cp", podSource, tempDestination.Name())
 			ginkgo.By("verifying that the contents of the remote file " + podSource + " have been copied to a local file " + tempDestination.Name())
-			localData, err := ioutil.ReadAll(tempDestination)
+			localData, err := io.ReadAll(tempDestination)
 			if err != nil {
 				framework.Failf("Failed reading temporary local file: %v", err)
 			}
@@ -1927,7 +1927,7 @@ func curlTransport(url string, transport *http.Transport) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

@@ -49,7 +49,7 @@ func init() {
 // The parsed LeaderMigrationConfiguration may be invalid.
 // It returns an error if the file did not exist.
 func ReadLeaderMigrationConfiguration(configFilePath string) (*internal.LeaderMigrationConfiguration, error) {
-	data, err := ioutil.ReadFile(configFilePath)
+	data, err := os.ReadFile(configFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %v", configFilePath, err)
 	}

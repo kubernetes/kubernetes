@@ -36,7 +36,7 @@ func findTestsInPackage(pkg *build.Package) (testfiles []string) {
 		testfiles = append(testfiles, filepath.Join(pkg.Dir, file))
 	}
 
-	dirFiles, err := ioutil.ReadDir(pkg.Dir)
+	dirFiles, err := os.ReadDir(pkg.Dir)
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error reading dir: '%s'\n%s\n", pkg.Dir, err.Error()))
 	}

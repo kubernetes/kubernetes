@@ -152,7 +152,7 @@ func FlattenContent(path *string, contents *[]byte, baseDir string) error {
 
 		var err error
 		absPath := ResolvePath(*path, baseDir)
-		*contents, err = ioutil.ReadFile(absPath)
+		*contents, err = os.ReadFile(absPath)
 		if err != nil {
 			return err
 		}

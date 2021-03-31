@@ -129,9 +129,9 @@ func (c *Client) Send(ctx context.Context, request *http.Request) (*http.Respons
 		return response, rerr
 	}
 
-	bodyBytes, _ := ioutil.ReadAll(response.Body)
+	bodyBytes, _ := io.ReadAll(response.Body)
 	defer func() {
-		response.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		response.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 	}()
 
 	bodyString := string(bodyBytes)

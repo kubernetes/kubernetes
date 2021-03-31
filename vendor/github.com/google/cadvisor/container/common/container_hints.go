@@ -48,7 +48,7 @@ type networkInterface struct {
 }
 
 func GetContainerHintsFromFile(containerHintsFile string) (ContainerHints, error) {
-	dat, err := ioutil.ReadFile(containerHintsFile)
+	dat, err := os.ReadFile(containerHintsFile)
 	if os.IsNotExist(err) {
 		return ContainerHints{}, nil
 	}

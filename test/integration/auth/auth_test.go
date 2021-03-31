@@ -480,7 +480,7 @@ func TestAuthModeAlwaysAllow(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -630,7 +630,7 @@ func TestAliceNotForbiddenOrUnauthorized(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -729,7 +729,7 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 			if resp.StatusCode != http.StatusUnauthorized {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status %v, but got %v", http.StatusUnauthorized, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
+				b, _ := io.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
 		}()
@@ -1044,7 +1044,7 @@ func TestNamespaceAuthorization(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1129,7 +1129,7 @@ func TestKindAuthorization(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			defer resp.Body.Close()
-			b, _ := ioutil.ReadAll(resp.Body)
+			b, _ := io.ReadAll(resp.Body)
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
@@ -1196,7 +1196,7 @@ func TestReadOnlyAuthorization(t *testing.T) {
 			if _, ok := r.statusCodes[resp.StatusCode]; !ok {
 				t.Logf("case %v", r)
 				t.Errorf("Expected status one of %v, but got %v", r.statusCodes, resp.StatusCode)
-				b, _ := ioutil.ReadAll(resp.Body)
+				b, _ := io.ReadAll(resp.Body)
 				t.Errorf("Body: %v", string(b))
 			}
 		}()

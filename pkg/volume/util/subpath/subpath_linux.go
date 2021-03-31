@@ -225,7 +225,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
 	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
 
-	containerDirs, err := ioutil.ReadDir(subPathDir)
+	containerDirs, err := os.ReadDir(subPathDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil

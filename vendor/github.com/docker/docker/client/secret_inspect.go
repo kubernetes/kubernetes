@@ -23,7 +23,7 @@ func (cli *Client) SecretInspectWithRaw(ctx context.Context, id string) (swarm.S
 		return swarm.Secret{}, nil, wrapResponseError(err, resp, "secret", id)
 	}
 
-	body, err := ioutil.ReadAll(resp.body)
+	body, err := io.ReadAll(resp.body)
 	if err != nil {
 		return swarm.Secret{}, nil, err
 	}

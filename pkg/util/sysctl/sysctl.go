@@ -83,7 +83,7 @@ type procSysctl struct {
 
 // GetSysctl returns the value for the specified sysctl setting
 func (*procSysctl) GetSysctl(sysctl string) (int, error) {
-	data, err := ioutil.ReadFile(path.Join(sysctlBase, sysctl))
+	data, err := os.ReadFile(path.Join(sysctlBase, sysctl))
 	if err != nil {
 		return -1, err
 	}

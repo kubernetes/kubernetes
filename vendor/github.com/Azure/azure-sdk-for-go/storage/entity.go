@@ -118,7 +118,7 @@ func (e *Entity) Get(timeout uint, ml MetadataLevel, options *GetEntityOptions) 
 		return err
 	}
 
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (e *Entity) Insert(ml MetadataLevel, options *EntityOptions) error {
 		if err = checkRespCode(resp, []int{http.StatusCreated}); err != nil {
 			return err
 		}
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return err
 		}

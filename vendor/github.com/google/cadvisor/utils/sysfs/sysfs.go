@@ -134,7 +134,7 @@ func (fs *realSysFs) GetCPUsPaths(cpusPath string) ([]string, error) {
 
 func (fs *realSysFs) GetCoreID(cpuPath string) (string, error) {
 	coreIDFilePath := fmt.Sprintf("%s%s", cpuPath, coreIDFilePath)
-	coreID, err := ioutil.ReadFile(coreIDFilePath)
+	coreID, err := os.ReadFile(coreIDFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -143,7 +143,7 @@ func (fs *realSysFs) GetCoreID(cpuPath string) (string, error) {
 
 func (fs *realSysFs) GetCPUPhysicalPackageID(cpuPath string) (string, error) {
 	packageIDFilePath := fmt.Sprintf("%s%s", cpuPath, packageIDFilePath)
-	packageID, err := ioutil.ReadFile(packageIDFilePath)
+	packageID, err := os.ReadFile(packageIDFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -152,7 +152,7 @@ func (fs *realSysFs) GetCPUPhysicalPackageID(cpuPath string) (string, error) {
 
 func (fs *realSysFs) GetMemInfo(nodePath string) (string, error) {
 	meminfoPath := fmt.Sprintf("%s/%s", nodePath, meminfoFile)
-	meminfo, err := ioutil.ReadFile(meminfoPath)
+	meminfo, err := os.ReadFile(meminfoPath)
 	if err != nil {
 		return "", err
 	}
@@ -160,12 +160,12 @@ func (fs *realSysFs) GetMemInfo(nodePath string) (string, error) {
 }
 
 func (fs *realSysFs) GetHugePagesInfo(hugePagesDirectory string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(hugePagesDirectory)
+	return os.ReadDir(hugePagesDirectory)
 }
 
 func (fs *realSysFs) GetHugePagesNr(hugepagesDirectory string, hugePageName string) (string, error) {
 	hugePageFilePath := fmt.Sprintf("%s%s/%s", hugepagesDirectory, hugePageName, HugePagesNrFile)
-	hugePageFile, err := ioutil.ReadFile(hugePageFilePath)
+	hugePageFile, err := os.ReadFile(hugePageFilePath)
 	if err != nil {
 		return "", err
 	}
@@ -173,11 +173,11 @@ func (fs *realSysFs) GetHugePagesNr(hugepagesDirectory string, hugePageName stri
 }
 
 func (fs *realSysFs) GetBlockDevices() ([]os.FileInfo, error) {
-	return ioutil.ReadDir(blockDir)
+	return os.ReadDir(blockDir)
 }
 
 func (fs *realSysFs) GetBlockDeviceNumbers(name string) (string, error) {
-	dev, err := ioutil.ReadFile(path.Join(blockDir, name, "/dev"))
+	dev, err := os.ReadFile(path.Join(blockDir, name, "/dev"))
 	if err != nil {
 		return "", err
 	}
@@ -185,7 +185,7 @@ func (fs *realSysFs) GetBlockDeviceNumbers(name string) (string, error) {
 }
 
 func (fs *realSysFs) GetBlockDeviceScheduler(name string) (string, error) {
-	sched, err := ioutil.ReadFile(path.Join(blockDir, name, "/queue/scheduler"))
+	sched, err := os.ReadFile(path.Join(blockDir, name, "/queue/scheduler"))
 	if err != nil {
 		return "", err
 	}
@@ -193,7 +193,7 @@ func (fs *realSysFs) GetBlockDeviceScheduler(name string) (string, error) {
 }
 
 func (fs *realSysFs) GetBlockDeviceSize(name string) (string, error) {
-	size, err := ioutil.ReadFile(path.Join(blockDir, name, "/size"))
+	size, err := os.ReadFile(path.Join(blockDir, name, "/size"))
 	if err != nil {
 		return "", err
 	}
@@ -201,7 +201,7 @@ func (fs *realSysFs) GetBlockDeviceSize(name string) (string, error) {
 }
 
 func (fs *realSysFs) GetNetworkDevices() ([]os.FileInfo, error) {
-	files, err := ioutil.ReadDir(netDir)
+	files, err := os.ReadDir(netDir)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +223,7 @@ func (fs *realSysFs) GetNetworkDevices() ([]os.FileInfo, error) {
 }
 
 func (fs *realSysFs) GetNetworkAddress(name string) (string, error) {
-	address, err := ioutil.ReadFile(path.Join(netDir, name, "/address"))
+	address, err := os.ReadFile(path.Join(netDir, name, "/address"))
 	if err != nil {
 		return "", err
 	}
@@ -231,7 +231,7 @@ func (fs *realSysFs) GetNetworkAddress(name string) (string, error) {
 }
 
 func (fs *realSysFs) GetNetworkMtu(name string) (string, error) {
-	mtu, err := ioutil.ReadFile(path.Join(netDir, name, "/mtu"))
+	mtu, err := os.ReadFile(path.Join(netDir, name, "/mtu"))
 	if err != nil {
 		return "", err
 	}
@@ -239,7 +239,7 @@ func (fs *realSysFs) GetNetworkMtu(name string) (string, error) {
 }
 
 func (fs *realSysFs) GetNetworkSpeed(name string) (string, error) {
-	speed, err := ioutil.ReadFile(path.Join(netDir, name, "/speed"))
+	speed, err := os.ReadFile(path.Join(netDir, name, "/speed"))
 	if err != nil {
 		return "", err
 	}
@@ -248,7 +248,7 @@ func (fs *realSysFs) GetNetworkSpeed(name string) (string, error) {
 
 func (fs *realSysFs) GetNetworkStatValue(dev string, stat string) (uint64, error) {
 	statPath := path.Join(netDir, dev, "/statistics", stat)
-	out, err := ioutil.ReadFile(statPath)
+	out, err := os.ReadFile(statPath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read stat from %q for device %q", statPath, dev)
 	}
@@ -262,7 +262,7 @@ func (fs *realSysFs) GetNetworkStatValue(dev string, stat string) (uint64, error
 
 func (fs *realSysFs) GetCaches(id int) ([]os.FileInfo, error) {
 	cpuPath := fmt.Sprintf("%s%d/cache", cacheDir, id)
-	return ioutil.ReadDir(cpuPath)
+	return os.ReadDir(cpuPath)
 }
 
 func bitCount(i uint64) (count int) {
@@ -276,7 +276,7 @@ func bitCount(i uint64) (count int) {
 }
 
 func getCPUCount(cache string) (count int, err error) {
-	out, err := ioutil.ReadFile(path.Join(cache, "/shared_cpu_map"))
+	out, err := os.ReadFile(path.Join(cache, "/shared_cpu_map"))
 	if err != nil {
 		return 0, err
 	}
@@ -294,7 +294,7 @@ func getCPUCount(cache string) (count int, err error) {
 
 func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 	cachePath := fmt.Sprintf("%s%d/cache/%s", cacheDir, id, name)
-	out, err := ioutil.ReadFile(path.Join(cachePath, "/size"))
+	out, err := os.ReadFile(path.Join(cachePath, "/size"))
 	if err != nil {
 		return CacheInfo{}, err
 	}
@@ -305,7 +305,7 @@ func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 	}
 	// convert to bytes
 	size = size * 1024
-	out, err = ioutil.ReadFile(path.Join(cachePath, "/level"))
+	out, err = os.ReadFile(path.Join(cachePath, "/level"))
 	if err != nil {
 		return CacheInfo{}, err
 	}
@@ -315,7 +315,7 @@ func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 		return CacheInfo{}, err
 	}
 
-	out, err = ioutil.ReadFile(path.Join(cachePath, "/type"))
+	out, err = os.ReadFile(path.Join(cachePath, "/type"))
 	if err != nil {
 		return CacheInfo{}, err
 	}
@@ -333,13 +333,13 @@ func (fs *realSysFs) GetCacheInfo(id int, name string) (CacheInfo, error) {
 }
 
 func (fs *realSysFs) GetSystemUUID() (string, error) {
-	if id, err := ioutil.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err == nil {
+	if id, err := os.ReadFile(path.Join(dmiDir, "id", "product_uuid")); err == nil {
 		return strings.TrimSpace(string(id)), nil
-	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "system-id")); err == nil {
+	} else if id, err = os.ReadFile(path.Join(ppcDevTree, "system-id")); err == nil {
 		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
-	} else if id, err = ioutil.ReadFile(path.Join(ppcDevTree, "vm,uuid")); err == nil {
+	} else if id, err = os.ReadFile(path.Join(ppcDevTree, "vm,uuid")); err == nil {
 		return strings.TrimSpace(strings.TrimRight(string(id), "\000")), nil
-	} else if id, err = ioutil.ReadFile(path.Join(s390xDevTree, "machine-id")); err == nil {
+	} else if id, err = os.ReadFile(path.Join(s390xDevTree, "machine-id")); err == nil {
 		return strings.TrimSpace(string(id)), nil
 	} else {
 		return "", err
@@ -394,7 +394,7 @@ func getCPUID(dir string) (uint16, error) {
 // It parses CPU list (such as: 0,3-5,10) into a struct that allows to determine quickly if CPU or particular ID is online.
 // see: https://github.com/opencontainers/runc/blob/ab27e12cebf148aa5d1ee3ad13d9fc7ae12bf0b6/libcontainer/cgroups/fs/cpuset.go#L45
 func isCPUOnline(path string, cpuID uint16) (bool, error) {
-	fileContent, err := ioutil.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return false, err
 	}
@@ -479,13 +479,13 @@ func GetUniqueCPUPropertyCount(cpuBusPath string, propertyName string) int {
 			continue
 		}
 		propertyPath := filepath.Join(sysCPUPath, sysFsCPUTopology, propertyName)
-		propertyVal, err := ioutil.ReadFile(propertyPath)
+		propertyVal, err := os.ReadFile(propertyPath)
 		if err != nil {
 			klog.Warningf("Cannot open %s, assuming 0 for %s of CPU %d", propertyPath, propertyName, cpuID)
 			propertyVal = []byte("0")
 		}
 		packagePath := filepath.Join(sysCPUPath, sysFsCPUTopology, CPUPhysicalPackageID)
-		packageVal, err := ioutil.ReadFile(packagePath)
+		packageVal, err := os.ReadFile(packagePath)
 		if err != nil {
 			klog.Warningf("Cannot open %s, assuming 0 %s of CPU %d", packagePath, CPUPhysicalPackageID, cpuID)
 			packageVal = []byte("0")

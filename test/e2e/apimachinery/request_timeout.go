@@ -100,7 +100,7 @@ func newRequest(f *framework.Framework, timeout string) *http.Request {
 }
 
 func readBody(response *http.Response) string {
-	raw, err := ioutil.ReadAll(response.Body)
+	raw, err := io.ReadAll(response.Body)
 	framework.ExpectNoError(err)
 
 	return string(raw)

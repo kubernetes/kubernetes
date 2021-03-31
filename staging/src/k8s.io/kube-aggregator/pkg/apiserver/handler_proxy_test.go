@@ -307,7 +307,7 @@ func TestProxyHandler(t *testing.T) {
 				t.Errorf("%s: expected %v, got %v", name, e, a)
 				return
 			}
-			bytes, err := ioutil.ReadAll(resp.Body)
+			bytes, err := io.ReadAll(resp.Body)
 			if err != nil {
 				t.Errorf("%s: %v", name, err)
 				return
@@ -567,7 +567,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 	if resp.StatusCode != http.StatusServiceUnavailable {
 		t.Error(err)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}

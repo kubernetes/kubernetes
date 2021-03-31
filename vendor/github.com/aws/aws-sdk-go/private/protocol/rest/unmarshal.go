@@ -67,7 +67,7 @@ func unmarshalBody(r *request.Request, v reflect.Value) error {
 					switch payload.Interface().(type) {
 					case []byte:
 						defer r.HTTPResponse.Body.Close()
-						b, err := ioutil.ReadAll(r.HTTPResponse.Body)
+						b, err := io.ReadAll(r.HTTPResponse.Body)
 						if err != nil {
 							return awserr.New(request.ErrCodeSerialization, "failed to decode REST response", err)
 						}
@@ -76,7 +76,7 @@ func unmarshalBody(r *request.Request, v reflect.Value) error {
 
 					case *string:
 						defer r.HTTPResponse.Body.Close()
-						b, err := ioutil.ReadAll(r.HTTPResponse.Body)
+						b, err := io.ReadAll(r.HTTPResponse.Body)
 						if err != nil {
 							return awserr.New(request.ErrCodeSerialization, "failed to decode REST response", err)
 						}
@@ -90,15 +90,15 @@ func unmarshalBody(r *request.Request, v reflect.Value) error {
 							payload.Set(reflect.ValueOf(r.HTTPResponse.Body))
 
 						case "io.ReadSeeker":
-							b, err := ioutil.ReadAll(r.HTTPResponse.Body)
+							b, err := io.ReadAll(r.HTTPResponse.Body)
 							if err != nil {
 								return awserr.New(request.ErrCodeSerialization,
 									"failed to read response body", err)
 							}
-							payload.Set(reflect.ValueOf(ioutil.NopCloser(bytes.NewReader(b))))
+							payload.Set(reflect.ValueOf(io.NopCloser(bytes.NewReader(b))))
 
 						default:
-							io.Copy(ioutil.Discard, r.HTTPResponse.Body)
+							io.Copy(io.Discard, r.HTTPResponse.Body)
 							r.HTTPResponse.Body.Close()
 							return awserr.New(request.ErrCodeSerialization,
 								"failed to decode REST response",

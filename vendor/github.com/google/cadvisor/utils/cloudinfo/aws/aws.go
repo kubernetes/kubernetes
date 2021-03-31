@@ -48,7 +48,7 @@ func (provider) IsActiveProvider() bool {
 }
 
 func fileContainsAmazonIdentifier(filename string) bool {
-	fileContent, err := ioutil.ReadFile(filename)
+	fileContent, err := os.ReadFile(filename)
 	if err != nil {
 		return false
 	}

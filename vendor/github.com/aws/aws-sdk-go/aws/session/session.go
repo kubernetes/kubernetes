@@ -562,7 +562,7 @@ func loadCustomCABundle(s *Session, bundle io.Reader) error {
 }
 
 func loadCertPool(r io.Reader) (*x509.CertPool, error) {
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, awserr.New("LoadCustomCABundleError",
 			"failed to read custom CA bundle PEM file", err)

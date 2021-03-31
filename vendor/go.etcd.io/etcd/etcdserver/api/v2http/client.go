@@ -707,7 +707,7 @@ func unmarshalRequest(lg *zap.Logger, r *http.Request, req json.Unmarshaler, w h
 		writeError(lg, w, r, httptypes.NewHTTPError(http.StatusUnsupportedMediaType, fmt.Sprintf("Bad Content-Type %s, accept application/json", ctype)))
 		return false
 	}
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeError(lg, w, r, httptypes.NewHTTPError(http.StatusBadRequest, err.Error()))
 		return false

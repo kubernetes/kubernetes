@@ -223,7 +223,7 @@ func main() {
 			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
 		}
 
-		imageConfigData, err := ioutil.ReadFile(configPath)
+		imageConfigData, err := os.ReadFile(configPath)
 		if err != nil {
 			klog.Fatalf("Could not read image config file provided: %v", err)
 		}
@@ -784,7 +784,7 @@ func parseInstanceMetadata(str string) map[string]string {
 		if *imageConfigDir != "" {
 			metaPath = filepath.Join(*imageConfigDir, metaPath)
 		}
-		v, err := ioutil.ReadFile(metaPath)
+		v, err := os.ReadFile(metaPath)
 		if err != nil {
 			klog.Fatalf("Failed to read metadata file %q: %v", metaPath, err)
 			continue

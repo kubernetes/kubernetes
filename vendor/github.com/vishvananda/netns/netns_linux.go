@@ -134,7 +134,7 @@ func GetFromDocker(id string) (NsHandle, error) {
 
 // borrowed from docker/utils/utils.go
 func findCgroupMountpoint(cgroupType string) (string, error) {
-	output, err := ioutil.ReadFile("/proc/mounts")
+	output, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return "", err
 	}
@@ -159,7 +159,7 @@ func findCgroupMountpoint(cgroupType string) (string, error) {
 // borrowed from docker/utils/utils.go
 // modified to get the docker pid instead of using /proc/self
 func getThisCgroup(cgroupType string) (string, error) {
-	dockerpid, err := ioutil.ReadFile("/var/run/docker.pid")
+	dockerpid, err := os.ReadFile("/var/run/docker.pid")
 	if err != nil {
 		return "", err
 	}
@@ -171,7 +171,7 @@ func getThisCgroup(cgroupType string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	output, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	output, err := os.ReadFile(fmt.Sprintf("/proc/%d/cgroup", pid))
 	if err != nil {
 		return "", err
 	}
@@ -241,7 +241,7 @@ func getPidForContainer(id string) (int, error) {
 		return pid, fmt.Errorf("Unable to find container: %v", id[:len(id)-1])
 	}
 
-	output, err := ioutil.ReadFile(filename)
+	output, err := os.ReadFile(filename)
 	if err != nil {
 		return pid, err
 	}

@@ -82,7 +82,7 @@ func IsRunningSystemd() bool {
 // the contents of /etc/machine-id
 // http://www.freedesktop.org/software/systemd/man/sd_id128_get_machine.html
 func GetMachineID() (string, error) {
-	machineID, err := ioutil.ReadFile("/etc/machine-id")
+	machineID, err := os.ReadFile("/etc/machine-id")
 	if err != nil {
 		return "", fmt.Errorf("failed to read /etc/machine-id: %v", err)
 	}

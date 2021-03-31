@@ -149,7 +149,7 @@ func tryConvertFloat64InSlice(s []interface{}) []interface{} {
 // The string is an encoded JSON string returned by Base64
 func FromBase64(base64String string) (Map, error) {
 	decoder := base64.NewDecoder(base64.StdEncoding, strings.NewReader(base64String))
-	decoded, err := ioutil.ReadAll(decoder)
+	decoded, err := io.ReadAll(decoder)
 	if err != nil {
 		return nil, err
 	}

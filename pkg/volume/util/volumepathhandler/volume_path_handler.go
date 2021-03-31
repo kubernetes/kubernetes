@@ -281,7 +281,7 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 // GetDeviceBindMountRefs searches bind mounts under global map path
 func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	var refs []string
-	files, err := ioutil.ReadDir(mapPath)
+	files, err := os.ReadDir(mapPath)
 	if err != nil {
 		return nil, err
 	}

@@ -493,7 +493,7 @@ func (c *cbcCipher) readCipherPacket(seqNum uint32, r io.Reader) ([]byte, error)
 			// data, to make distinguishing between
 			// failing MAC and failing length check more
 			// difficult.
-			io.CopyN(ioutil.Discard, r, int64(c.oracleCamouflage))
+			io.CopyN(io.Discard, r, int64(c.oracleCamouflage))
 		}
 	}
 	return p, err

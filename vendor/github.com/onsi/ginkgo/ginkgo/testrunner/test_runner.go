@@ -508,7 +508,7 @@ func (t *TestRunner) combineCoverprofiles() {
 		}
 
 		coverFile = filepath.Join(t.Suite.Path, coverFile)
-		coverProfile, err := ioutil.ReadFile(coverFile)
+		coverProfile, err := os.ReadFile(coverFile)
 		os.Remove(coverFile)
 
 		if err == nil {

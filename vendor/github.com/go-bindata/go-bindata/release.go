@@ -417,7 +417,7 @@ func uncompressed_memcopy(w io.Writer, asset *Asset, r io.Reader) error {
 		return err
 	}
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}

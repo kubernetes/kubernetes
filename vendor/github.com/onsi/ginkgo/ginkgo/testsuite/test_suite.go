@@ -52,7 +52,7 @@ func SuitesInDir(dir string, recurse bool) []TestSuite {
 		return suites
 	}
 
-	files, _ := ioutil.ReadDir(dir)
+	files, _ := os.ReadDir(dir)
 	re := regexp.MustCompile(`^[^._].*_test\.go$`)
 	for _, file := range files {
 		if !file.IsDir() && re.Match([]byte(file.Name())) {
@@ -104,7 +104,7 @@ func filesHaveGinkgoSuite(dir string, files []os.FileInfo) bool {
 
 	for _, file := range files {
 		if !file.IsDir() && reTestFile.Match([]byte(file.Name())) {
-			contents, _ := ioutil.ReadFile(dir + "/" + file.Name())
+			contents, _ := os.ReadFile(dir + "/" + file.Name())
 			if reGinkgo.Match(contents) {
 				return true
 			}

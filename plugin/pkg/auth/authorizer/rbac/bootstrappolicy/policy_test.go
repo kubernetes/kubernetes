@@ -225,7 +225,7 @@ func TestBootstrapControllerRoleBindings(t *testing.T) {
 
 func testObjects(t *testing.T, list *api.List, fixtureFilename string) {
 	filename := filepath.Join("testdata", fixtureFilename)
-	expectedYAML, err := ioutil.ReadFile(filename)
+	expectedYAML, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -267,7 +267,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				// read self-signed server cert disk
 				pool := x509.NewCertPool()
 				serverCertPath := path.Join(secureOptions.ServerCert.CertDirectory, secureOptions.ServerCert.PairName+".crt")
-				serverCert, err := ioutil.ReadFile(serverCertPath)
+				serverCert, err := os.ReadFile(serverCertPath)
 				if err != nil {
 					t.Fatalf("Failed to read component server cert %q: %v", serverCertPath, err)
 				}
@@ -291,7 +291,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
 
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}
@@ -309,7 +309,7 @@ func testComponent(t *testing.T, tester componentTester, kubeconfig, brokenKubec
 				if err != nil {
 					t.Fatalf("failed to GET %s from component: %v", tt.path, err)
 				}
-				body, err := ioutil.ReadAll(r.Body)
+				body, err := io.ReadAll(r.Body)
 				if err != nil {
 					t.Fatalf("failed to read response body: %v", err)
 				}

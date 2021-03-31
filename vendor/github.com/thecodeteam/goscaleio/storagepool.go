@@ -53,7 +53,7 @@ func (protectionDomain *ProtectionDomain) CreateStoragePool(name string) (string
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", errors.New("error reading body")
 	}

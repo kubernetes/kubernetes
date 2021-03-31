@@ -154,7 +154,7 @@ func (s *searchDatastore) queryMatch(file os.FileInfo) bool {
 }
 
 func (s *searchDatastore) search(ds *types.ManagedObjectReference, folder string, dir string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		log.Printf("search %s: %s", dir, err)
 		return err

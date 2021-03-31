@@ -246,7 +246,7 @@ func (m *podContainerManagerImpl) GetAllPodsFromCgroups() (map[types.UID]CgroupN
 			// get the subsystems QoS cgroup absolute name
 			qcConversion := m.cgroupManager.Name(qosContainerName)
 			qc := path.Join(val, qcConversion)
-			dirInfo, err := ioutil.ReadDir(qc)
+			dirInfo, err := os.ReadDir(qc)
 			if err != nil {
 				if os.IsNotExist(err) {
 					continue

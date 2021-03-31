@@ -357,7 +357,7 @@ func (c *sioClient) getGUID() (string, error) {
 // emc-vol-<mdmID-volID> e.g.:
 // emc-vol-788d9efb0a8f20cb-a2b8419300000000
 func (c *sioClient) getSioDiskPaths() ([]os.FileInfo, error) {
-	files, err := ioutil.ReadDir(sioDiskIDPath)
+	files, err := os.ReadDir(sioDiskIDPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// sioDiskIDPath may not exist yet which is fine

@@ -148,7 +148,7 @@ func handleRunRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("error reading body: %v", err), 400)
 		return

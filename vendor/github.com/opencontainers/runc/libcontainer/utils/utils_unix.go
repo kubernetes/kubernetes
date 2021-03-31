@@ -52,7 +52,7 @@ func CloseExecFrom(minFd int) error {
 		// Intentionally ignore errors from unix.CloseOnExec -- the cases where
 		// this might fail are basically file descriptors that have already
 		// been closed (including and especially the one that was created when
-		// ioutil.ReadDir did the "opendir" syscall).
+		// os.ReadDir did the "opendir" syscall).
 		unix.CloseOnExec(fd)
 	}
 	return nil

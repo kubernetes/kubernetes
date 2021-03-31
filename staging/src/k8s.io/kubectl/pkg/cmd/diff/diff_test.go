@@ -114,7 +114,7 @@ func TestDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestDirectory(t *testing.T) {
 	if !strings.HasPrefix(filepath.Base(dir.Name), "prefix") {
 		t.Fatalf(`Directory doesn't start with "prefix": %q`, dir.Name)
 	}
-	entries, err := ioutil.ReadDir(dir.Name)
+	entries, err := os.ReadDir(dir.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entries, err = ioutil.ReadDir(dir.Name)
+	entries, err = os.ReadDir(dir.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -185,7 +185,7 @@ func TestDiffer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fcontent, err := ioutil.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
+	fcontent, err := os.ReadFile(path.Join(diff.From.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestDiffer(t *testing.T) {
 		t.Fatalf("File has %q, expected %q", string(fcontent), econtent)
 	}
 
-	fcontent, err = ioutil.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
+	fcontent, err = os.ReadFile(path.Join(diff.To.Dir.Name, obj.Name()))
 	if err != nil {
 		t.Fatal(err)
 	}

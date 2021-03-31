@@ -1256,7 +1256,7 @@ func TestFindExistingPrefix(t *testing.T) {
 }
 
 func validateDirEmpty(dir string) error {
-	files, err := ioutil.ReadDir(dir)
+	files, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -1268,7 +1268,7 @@ func validateDirEmpty(dir string) error {
 }
 
 func validateDirExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -1276,7 +1276,7 @@ func validateDirExists(dir string) error {
 }
 
 func validateDirNotExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	}

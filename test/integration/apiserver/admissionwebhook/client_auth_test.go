@@ -247,7 +247,7 @@ func newClientAuthWebhookHandler(t *testing.T, recorder *clientAuthRecorder) htt
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
-		data, err := ioutil.ReadAll(r.Body)
+		data, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 		}

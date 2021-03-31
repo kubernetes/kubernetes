@@ -62,7 +62,7 @@ func (p *fileSystem) init() error {
 	}
 
 	// local zip file
-	p.FsZipData, err = ioutil.ReadFile(p.FsName)
+	p.FsZipData, err = os.ReadFile(p.FsName)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (p *fileSystem) init() error {
 func (p *fileSystem) LoadMessagesFile(domain, local, ext string) ([]byte, error) {
 	if len(p.FsZipData) == 0 {
 		trName := p.makeMessagesFileName(domain, local, ext)
-		rcData, err := ioutil.ReadFile(trName)
+		rcData, err := os.ReadFile(trName)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (p *fileSystem) LoadMessagesFile(domain, local, ext string) ([]byte, error)
 			if err != nil {
 				return nil, err
 			}
-			rcData, err := ioutil.ReadAll(rc)
+			rcData, err := io.ReadAll(rc)
 			rc.Close()
 			return rcData, err
 		}
@@ -105,7 +105,7 @@ func (p *fileSystem) LoadMessagesFile(domain, local, ext string) ([]byte, error)
 func (p *fileSystem) LoadResourceFile(domain, local, name string) ([]byte, error) {
 	if len(p.FsZipData) == 0 {
 		rcName := p.makeResourceFileName(domain, local, name)
-		rcData, err := ioutil.ReadFile(rcName)
+		rcData, err := os.ReadFile(rcName)
 		if err != nil {
 			return nil, err
 		}
@@ -125,7 +125,7 @@ func (p *fileSystem) LoadResourceFile(domain, local, name string) ([]byte, error
 			if err != nil {
 				return nil, err
 			}
-			rcData, err := ioutil.ReadAll(rc)
+			rcData, err := io.ReadAll(rc)
 			rc.Close()
 			return rcData, err
 		}
@@ -173,7 +173,7 @@ func (p *fileSystem) lsZip(data []byte) map[string]bool {
 }
 
 func (p *fileSystem) lsDir(path string) map[string]bool {
-	list, err := ioutil.ReadDir(path)
+	list, err := os.ReadDir(path)
 	if err != nil {
 		return nil
 	}

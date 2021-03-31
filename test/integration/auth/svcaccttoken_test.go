@@ -685,7 +685,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Errorf("got Cache-Control: %v, want: %v", got, want)
 		}
 
-		b, err := ioutil.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -738,7 +738,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			t.Errorf("got Cache-Control: %v, want: %v", got, want)
 		}
 
-		b, err = ioutil.ReadAll(resp.Body)
+		b, err = io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}

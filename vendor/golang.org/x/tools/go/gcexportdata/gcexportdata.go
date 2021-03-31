@@ -70,7 +70,7 @@ func NewReader(r io.Reader) (io.Reader, error) {
 //
 // On return, the state of the reader is undefined.
 func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, path string) (*types.Package, error) {
-	data, err := ioutil.ReadAll(in)
+	data, err := io.ReadAll(in)
 	if err != nil {
 		return nil, fmt.Errorf("reading export data for %q: %v", path, err)
 	}

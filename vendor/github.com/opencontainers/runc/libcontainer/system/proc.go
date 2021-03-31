@@ -64,7 +64,7 @@ type Stat_t struct {
 
 // Stat returns a Stat_t instance for the specified process.
 func Stat(pid int) (stat Stat_t, err error) {
-	bytes, err := ioutil.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
+	bytes, err := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "stat"))
 	if err != nil {
 		return stat, err
 	}

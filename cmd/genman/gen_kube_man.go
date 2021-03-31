@@ -96,8 +96,8 @@ func main() {
 		}
 	case "kubectl":
 		// generate manpage for kubectl
-		// TODO os.Stdin should really be something like ioutil.Discard, but a Reader
-		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, ioutil.Discard, ioutil.Discard)
+		// TODO os.Stdin should really be something like io.Discard, but a Reader
+		kubectl := kubectlcmd.NewKubectlCommand(os.Stdin, io.Discard, io.Discard)
 		genMarkdown(kubectl, "", outDir)
 		for _, c := range kubectl.Commands() {
 			genMarkdown(c, "kubectl", outDir)

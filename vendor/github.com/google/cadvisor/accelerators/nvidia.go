@@ -76,7 +76,7 @@ func (nm *nvidiaManager) setup() error {
 
 // detectDevices returns true if a device with given pci id is present on the node.
 func detectDevices(vendorID string) bool {
-	devices, err := ioutil.ReadDir(sysFsPCIDevicesPath)
+	devices, err := os.ReadDir(sysFsPCIDevicesPath)
 	if err != nil {
 		klog.Warningf("Error reading %q: %v", sysFsPCIDevicesPath, err)
 		return false
@@ -84,7 +84,7 @@ func detectDevices(vendorID string) bool {
 
 	for _, device := range devices {
 		vendorPath := filepath.Join(sysFsPCIDevicesPath, device.Name(), "vendor")
-		content, err := ioutil.ReadFile(vendorPath)
+		content, err := os.ReadFile(vendorPath)
 		if err != nil {
 			klog.V(4).Infof("Error while reading %q: %v", vendorPath, err)
 			continue

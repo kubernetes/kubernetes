@@ -112,7 +112,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	}
 
 	// Wrap with an x509 verifier
-	caData, err := ioutil.ReadFile(clientCA)
+	caData, err := os.ReadFile(clientCA)
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %v", clientCA, err)
 	}

@@ -788,7 +788,7 @@ func (c *Conn) advanceFrame() (int, error) {
 	// 1. Skip remainder of previous frame.
 
 	if c.readRemaining > 0 {
-		if _, err := io.CopyN(ioutil.Discard, c.br, c.readRemaining); err != nil {
+		if _, err := io.CopyN(io.Discard, c.br, c.readRemaining); err != nil {
 			return noFrame, err
 		}
 	}
@@ -1065,7 +1065,7 @@ func (c *Conn) ReadMessage() (messageType int, p []byte, err error) {
 	if err != nil {
 		return messageType, nil, err
 	}
-	p, err = ioutil.ReadAll(r)
+	p, err = io.ReadAll(r)
 	return messageType, p, err
 }
 

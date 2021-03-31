@@ -213,7 +213,7 @@ func readString(dirpath string, file string) string {
 	cgroupFile := path.Join(dirpath, file)
 
 	// Read
-	out, err := ioutil.ReadFile(cgroupFile)
+	out, err := os.ReadFile(cgroupFile)
 	if err != nil {
 		// Ignore non-existent files
 		if !os.IsNotExist(err) {

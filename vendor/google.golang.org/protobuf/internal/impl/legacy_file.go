@@ -51,7 +51,7 @@ func legacyLoadFileDesc(b []byte) protoreflect.FileDescriptor {
 	if err != nil {
 		panic(err)
 	}
-	b2, err := ioutil.ReadAll(zr)
+	b2, err := io.ReadAll(zr)
 	if err != nil {
 		panic(err)
 	}

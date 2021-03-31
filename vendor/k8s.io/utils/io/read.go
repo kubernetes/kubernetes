@@ -38,7 +38,7 @@ func ConsistentRead(filename string, attempts int) ([]byte, error) {
 // introduces a sync callback that can be used by the tests to mutate the file
 // from which the test data is being read
 func consistentReadSync(filename string, attempts int, sync func(int)) ([]byte, error) {
-	oldContent, err := ioutil.ReadFile(filename)
+	oldContent, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +46,7 @@ func consistentReadSync(filename string, attempts int, sync func(int)) ([]byte, 
 		if sync != nil {
 			sync(i)
 		}
-		newContent, err := ioutil.ReadFile(filename)
+		newContent, err := os.ReadFile(filename)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +63,7 @@ func consistentReadSync(filename string, attempts int, sync func(int)) ([]byte, 
 // when `limit` bytes are read.
 func ReadAtMost(r io.Reader, limit int64) ([]byte, error) {
 	limitedReader := &io.LimitedReader{R: r, N: limit}
-	data, err := ioutil.ReadAll(limitedReader)
+	data, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return data, err
 	}

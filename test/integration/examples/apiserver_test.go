@@ -107,7 +107,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 	testAPIGroup(t, wardleClient.Discovery().RESTClient())
 	testAPIResourceList(t, wardleClient.Discovery().RESTClient())
 
-	wardleCA, err := ioutil.ReadFile(directWardleClientConfig.CAFile)
+	wardleCA, err := os.ReadFile(directWardleClientConfig.CAFile)
 	if err != nil {
 		t.Fatal(err)
 	}

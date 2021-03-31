@@ -29,7 +29,7 @@ func main() {
 	req, _ := http.NewRequest("GET", "http://www.example.com/", nil)
 
 	res, _ := http.DefaultClient.Do(req)
-	_, _ = ioutil.ReadAll(res.Body)
+	_, _ = io.ReadAll(res.Body)
 
 	reasons, expires, _ := cachecontrol.CachableResponse(req, res, cachecontrol.Options{})
 
@@ -57,7 +57,7 @@ func main() {
 	req, _ := http.NewRequest("GET", "http://www.example.com/", nil)
 
 	res, _ := http.DefaultClient.Do(req)
-	_, _ = ioutil.ReadAll(res.Body)
+	_, _ = io.ReadAll(res.Body)
 
 	reqDir, _ := cacheobject.ParseRequestCacheControl(req.Header.Get("Cache-Control"))
 

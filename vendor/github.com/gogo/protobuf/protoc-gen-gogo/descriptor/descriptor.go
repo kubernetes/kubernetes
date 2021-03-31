@@ -53,7 +53,7 @@ func extractFile(gz []byte) (*FileDescriptorProto, error) {
 	}
 	defer r.Close()
 
-	b, err := ioutil.ReadAll(r)
+	b, err := io.ReadAll(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to uncompress descriptor: %v", err)
 	}

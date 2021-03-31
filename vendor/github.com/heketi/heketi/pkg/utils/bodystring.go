@@ -36,7 +36,7 @@ func getResponse(r *http.Response, max int64) (string, error) {
 	if r.ContentLength >= 0 {
 		max = r.ContentLength
 	}
-	body, err := ioutil.ReadAll(io.LimitReader(r.Body, max))
+	body, err := io.ReadAll(io.LimitReader(r.Body, max))
 	defer r.Body.Close()
 	if err != nil {
 		return "", err

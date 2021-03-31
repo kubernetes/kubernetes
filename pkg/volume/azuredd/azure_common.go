@@ -166,7 +166,7 @@ type ioHandler interface {
 type osIOHandler struct{}
 
 func (handler *osIOHandler) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	return os.ReadDir(dirname)
 }
 
 func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.FileMode) error {
@@ -178,7 +178,7 @@ func (handler *osIOHandler) Readlink(name string) (string, error) {
 }
 
 func (handler *osIOHandler) ReadFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
 
 func getDiskController(host volume.VolumeHost) (DiskController, error) {

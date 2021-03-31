@@ -221,7 +221,7 @@ func restConfigFromKubeconfig(configAuthInfo *clientcmdapi.AuthInfo) (*rest.Conf
 		config.BearerToken = configAuthInfo.Token
 		config.BearerTokenFile = configAuthInfo.TokenFile
 	} else if len(configAuthInfo.TokenFile) > 0 {
-		tokenBytes, err := ioutil.ReadFile(configAuthInfo.TokenFile)
+		tokenBytes, err := os.ReadFile(configAuthInfo.TokenFile)
 		if err != nil {
 			return nil, err
 		}

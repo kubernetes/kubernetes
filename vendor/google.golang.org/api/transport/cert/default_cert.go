@@ -66,7 +66,7 @@ func newSecureConnectSource() (Source, error) {
 		return nil, nil
 	}
 	filename := filepath.Join(user.HomeDir, metadataPath, metadataFile)
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if os.IsNotExist(err) {
 		// Ignore.
 		return nil, nil

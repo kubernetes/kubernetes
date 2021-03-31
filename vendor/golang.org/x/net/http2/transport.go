@@ -2537,7 +2537,7 @@ func (t *Transport) logf(format string, args ...interface{}) {
 	log.Printf(format, args...)
 }
 
-var noBody io.ReadCloser = ioutil.NopCloser(bytes.NewReader(nil))
+var noBody io.ReadCloser = io.NopCloser(bytes.NewReader(nil))
 
 func strSliceContains(ss []string, s string) bool {
 	for _, v := range ss {

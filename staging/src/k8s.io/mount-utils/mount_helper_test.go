@@ -120,7 +120,7 @@ func TestDoCleanupMountPoint(t *testing.T) {
 }
 
 func validateDirExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if err != nil {
 		return err
 	}
@@ -128,7 +128,7 @@ func validateDirExists(dir string) error {
 }
 
 func validateDirNotExists(dir string) error {
-	_, err := ioutil.ReadDir(dir)
+	_, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
 	}

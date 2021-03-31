@@ -47,7 +47,7 @@ func (c *Client) TemplateCreate(opts types.TemplateCreateOptions) (string, error
 		return "", err
 	}
 	defer resp.Body.Close()
-	out, err := ioutil.ReadAll(resp.Body)
+	out, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

@@ -122,7 +122,7 @@ func TestTimeout(t *testing.T) {
 	if res.StatusCode != http.StatusOK {
 		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusOK)
 	}
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 	if string(body) != resp {
 		t.Errorf("got body %q; expected %q", string(body), resp)
 	}
@@ -144,7 +144,7 @@ func TestTimeout(t *testing.T) {
 	if res.StatusCode != http.StatusGatewayTimeout {
 		t.Errorf("got res.StatusCode %d; expected %d", res.StatusCode, http.StatusServiceUnavailable)
 	}
-	body, _ = ioutil.ReadAll(res.Body)
+	body, _ = io.ReadAll(res.Body)
 	status := &metav1.Status{}
 	if err := json.Unmarshal(body, status); err != nil {
 		t.Fatal(err)

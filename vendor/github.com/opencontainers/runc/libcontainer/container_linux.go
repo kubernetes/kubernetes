@@ -309,7 +309,7 @@ func (c *linuxContainer) exec() error {
 }
 
 func readFromExecFifo(execFifo io.Reader) error {
-	data, err := ioutil.ReadAll(execFifo)
+	data, err := io.ReadAll(execFifo)
 	if err != nil {
 		return err
 	}
@@ -1380,7 +1380,7 @@ func (c *linuxContainer) Restore(process *Process, criuOpts *CriuOpts) error {
 		fds    []string
 		fdJSON []byte
 	)
-	if fdJSON, err = ioutil.ReadFile(filepath.Join(criuOpts.ImagesDirectory, descriptorsFilename)); err != nil {
+	if fdJSON, err = os.ReadFile(filepath.Join(criuOpts.ImagesDirectory, descriptorsFilename)); err != nil {
 		return err
 	}
 

@@ -264,7 +264,7 @@ func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 	}
 	if !notMnt {
 		// testing original mount point, make sure the mount link is valid
-		if _, err := ioutil.ReadDir(dir); err == nil {
+		if _, err := os.ReadDir(dir); err == nil {
 			klog.V(4).Infof("azureFile - already mounted to target %s", dir)
 			return nil
 		}

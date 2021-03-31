@@ -98,9 +98,9 @@ func (RealOS) Pipe() (r *os.File, w *os.File, err error) {
 	return os.Pipe()
 }
 
-// ReadDir will call ioutil.ReadDir to return the files under the directory.
+// ReadDir will call os.ReadDir to return the files under the directory.
 func (RealOS) ReadDir(dirname string) ([]os.FileInfo, error) {
-	return ioutil.ReadDir(dirname)
+	return os.ReadDir(dirname)
 }
 
 // Glob will call filepath.Glob to return the names of all files matching

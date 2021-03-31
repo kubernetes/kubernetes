@@ -159,7 +159,7 @@ func (d *CachedDiscoveryClient) getCachedFile(filename string) ([]byte, error) {
 	}
 
 	// the cache is present and its valid.  Try to read and use it.
-	cachedBytes, err := ioutil.ReadAll(file)
+	cachedBytes, err := io.ReadAll(file)
 	if err != nil {
 		return nil, err
 	}

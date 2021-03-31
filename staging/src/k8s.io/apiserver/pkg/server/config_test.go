@@ -209,7 +209,7 @@ func checkPath(url string, expectedStatusCode int, expectedBody string, t *testi
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -232,7 +232,7 @@ func checkExpectedPathsAtRoot(url string, expectedPaths []string, t *testing.T) 
 		dump, _ := httputil.DumpResponse(resp, true)
 		t.Log(string(dump))
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			t.Fatal(err)
 		}
