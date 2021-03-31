@@ -55,7 +55,7 @@ type nodeIPAMController struct {
 func (nodeIpamController *nodeIPAMController) startNodeIpamControllerWrapper(completedConfig *cloudcontrollerconfig.CompletedConfig, cloud cloudprovider.Interface) app.InitFunc {
 	errors := nodeIpamController.nodeIPAMControllerOptions.Validate()
 	if len(errors) > 0 {
-		klog.Fatal("NodeIPAM controller values are not properly set.")
+		klog.ErrorS("NodeIPAM controller values are not properly set.")
 	}
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
@@ -98,14 +98,14 @@ func startNodeIpamController(ccmConfig *cloudcontrollerconfig.CompletedConfig, n
 	if len(strings.TrimSpace(nodeIPAMConfig.ServiceCIDR)) != 0 {
 		_, serviceCIDR, err = net.ParseCIDR(nodeIPAMConfig.ServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.ServiceCIDR, err)
+			klog.InfoS("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.ServiceCIDR, err)
 		}
 	}
 
 	if len(strings.TrimSpace(nodeIPAMConfig.SecondaryServiceCIDR)) != 0 {
 		_, secondaryServiceCIDR, err = net.ParseCIDR(nodeIPAMConfig.SecondaryServiceCIDR)
 		if err != nil {
-			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.SecondaryServiceCIDR, err)
+			klog.InfoS("Unsuccessful parsing of service CIDR %v: %v", nodeIPAMConfig.SecondaryServiceCIDR, err)
 		}
 	}
 
