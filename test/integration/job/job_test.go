@@ -286,7 +286,7 @@ func TestSuspendJob(t *testing.T) {
 		// false->false cases.
 		{
 			featureGate: true,
-			create:      step{flag: false, wantActive: 2},
+			create:      step{flag: false, wantActive: 2, wantStatus: v1.ConditionFalse, wantReason: ""},
 			update:      step{flag: true, wantActive: 0, wantStatus: v1.ConditionTrue, wantReason: "Suspended"},
 		},
 		{

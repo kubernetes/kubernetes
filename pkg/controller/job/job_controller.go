@@ -535,6 +535,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	}
 	jobConditionsChanged := false
 	manageJobCalled := false
+	var isUpdated bool
 	if jobFailed {
 		// TODO(#28486): Account for pod failures in status once we can track
 		// completions without lingering pods.
@@ -543,10 +544,12 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		// update status values accordingly
 		failed += active
 		active = 0
-		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, v1.ConditionTrue, failureReason, failureMessage))
-		jobConditionsChanged = true
+		job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobFailed, v1.ConditionTrue, failureReason, failureMessage)
+		jobConditionsChanged = jobConditionsChanged || isUpdated
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
+		job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobFailed, v1.ConditionFalse, "", "")
+		jobConditionsChanged = jobConditionsChanged || isUpdated
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
 			manageJobCalled = true
@@ -579,38 +582,48 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			}
 		}
 		if complete {
-			job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobComplete, v1.ConditionTrue, "", ""))
-			jobConditionsChanged = true
+			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobComplete, v1.ConditionTrue, "Job completed", "Job completed")
+			jobConditionsChanged = jobConditionsChanged || isUpdated
 			now := metav1.Now()
 			job.Status.CompletionTime = &now
 			jm.recorder.Event(&job, v1.EventTypeNormal, "Completed", "Job completed")
-		} else if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
+		} else {
+			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobComplete, v1.ConditionFalse, "", "")
+			jobConditionsChanged = jobConditionsChanged || isUpdated
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
 			// updates.
 			if job.Spec.Suspend != nil && *job.Spec.Suspend {
 				// Job can be in the suspended state only if it is NOT completed.
-				var isUpdated bool
 				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended")
+				jobConditionsChanged = jobConditionsChanged || isUpdated
 				if isUpdated {
-					jobConditionsChanged = true
 					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
 				}
 			} else {
-				// Job not suspended.
-				var isUpdated bool
-				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
-				if isUpdated {
-					jobConditionsChanged = true
-					jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
-					// Resumed jobs will always reset StartTime to current time. This is
-					// done because the ActiveDeadlineSeconds timer shouldn't go off
-					// whilst the Job is still suspended and resetting StartTime is
-					// consistent with resuming a Job created in the suspended state.
-					// (ActiveDeadlineSeconds is interpreted as the number of seconds a
-					// Job is continuously active.)
-					now := metav1.Now()
-					job.Status.StartTime = &now
+				// Job not suspended. We want a different reason/message for a Job that
+				// has never been suspended and a Job that was resumed.
+				if hasCondition(job.Status.Conditions, batch.JobSuspended) {
+					job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
+					jobConditionsChanged = jobConditionsChanged || isUpdated
+					if isUpdated {
+						jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
+						// Resumed jobs will always reset StartTime to current time. This is
+						// done because the ActiveDeadlineSeconds timer shouldn't go off
+						// whilst the Job is still suspended and resetting StartTime is
+						// consistent with resuming a Job created in the suspended state.
+						// (ActiveDeadlineSeconds is interpreted as the number of seconds a
+						// Job is continuously active.)
+						now := metav1.Now()
+						job.Status.StartTime = &now
+					}
+				} else {
+					// This will be executed exactly once (only if the feature gate is
+					// enabled, of course).
+					job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "", "")
+					jobConditionsChanged = jobConditionsChanged || isUpdated
 				}
 			}
 		}
@@ -972,11 +985,8 @@ func errorFromChannel(errCh <-chan error) error {
 }
 
 // ensureJobConditionStatus appends or updates an existing job condition of the
-// given type with the given status value. Note that this function will not
-// append to the conditions list if the new condition's status is false
-// (because going from nothing to false is meaningless); it can, however,
-// update the status condition to false. The function returns a bool to let the
-// caller know if the list was changed (either appended or updated).
+// given type with the given status value. The function returns a bool to let
+// the caller know if the list was changed (either appended or updated).
 func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditionType, status v1.ConditionStatus, reason, message string) ([]batch.JobCondition, bool) {
 	for i := range list {
 		if list[i].Type == cType {
@@ -986,13 +996,21 @@ func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditio
 				list[i].Reason = reason
 				list[i].Message = message
 				return list, true
+			} else {
+				return list, false
 			}
-			return list, false
 		}
 	}
-	// A condition with that type doesn't exist in the list.
-	if status != v1.ConditionFalse {
-		return append(list, newCondition(cType, status, reason, message)), true
+	return append(list, newCondition(cType, status, reason, message)), true
+}
+
+// hasCondition checks if the given list has a condition of the given type. It
+// doesn't care about the status.
+func hasCondition(list []batch.JobCondition, cType batch.JobConditionType) bool {
+	for _, jc := range list {
+		if jc.Type == cType {
+			return true
+		}
 	}
-	return list, false
+	return false
 }
