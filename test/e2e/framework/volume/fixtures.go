@@ -615,14 +615,10 @@ func generateWriteFileCmd(content, fullPath string) []string {
 
 // CheckVolumeModeOfPath check mode of volume
 func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
-	// in windows a symlink is created instead of mounting a volume
-	// we just check if the symlink exists
-	if framework.NodeOSDistroIs("windows") {
-		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("ls %s", path))
-		return
-	}
-
 	if volMode == v1.PersistentVolumeBlock {
+		// NOTE: gcepd-csi doesn't support a block volume in windows, this method won't
+		// be called because the test is skipped
+
 		// Check if block exists
 		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -b %s", path))
 

@@ -510,7 +510,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		// CreateSecPodWithNodeSelection make volumes accessible via /mnt/volume({i} + 1)
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
-		ginkgo.By(fmt.Sprintf("Checking if the volume=%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
+		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
 		e2evolume.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {
