@@ -30,7 +30,7 @@ dependencies:
     version: "2.32"
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[Agnhost\] = Config{promoterE2eRegistry, "agnhost", "\d+\.\d+"}
+      match: configs\[Agnhost\] = Config{list\.PromoterE2eRegistry, "agnhost", "\d+\.\d+"}
 
   # CNI plugins
   - name: "cni"
@@ -151,7 +151,7 @@ dependencies:
     - path: build/common.sh
       match: __default_debian_iptables_version=
     - path: test/utils/image/manifest.go
-      match: configs\[DebianIptables\] = Config{buildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
+      match: configs\[DebianIptables\] = Config{list\.BuildImageRegistry, "debian-iptables", "[a-zA-Z]+\-v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)"}
 
   - name: "k8s.gcr.io/go-runner: dependents"
     version: v2.3.1-go1.16.3-buster.0
@@ -215,7 +215,7 @@ dependencies:
     - path: test/utils/runners.go
       match: k8s.gcr.io\/pause:\d+\.\d+
     - path: test/utils/image/manifest.go
-      match: configs\[Pause\] = Config{gcRegistry, "pause", "\d+\.\d+.\d+"}
+      match: configs\[Pause\] = Config{list\.GcRegistry, "pause", "\d+\.\d+.\d+"}
 
   # metadata-concealment: bump this one first
   - name: "metadata-concealment"
@@ -229,4 +229,4 @@ dependencies:
     version: "1.6"
     refPaths:
     - path: test/utils/image/manifest.go
-      match: configs\[CheckMetadataConcealment\] = Config{promoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
+      match: configs\[CheckMetadataConcealment\] = Config{list\.PromoterE2eRegistry, "metadata-concealment", "\d+\.\d+"}
