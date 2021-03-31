@@ -118,7 +118,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
 			}
-			klog.V(1).Infoln("[token] validating mixed arguments")
+			klog.V(1).InfoS("[token] validating mixed arguments")
 			if err := validation.ValidateMixedArguments(tokenCmd.Flags()); err != nil {
 				return err
 			}
@@ -127,7 +127,7 @@ func newCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 				return err
 			}
 
-			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
+			klog.V(1).InfoS("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
 			if err != nil {
@@ -242,14 +242,14 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 	kubeadmscheme.Scheme.Default(clusterCfg)
 
 	// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-	klog.V(1).Infoln("[token] loading configurations")
+	klog.V(1).InfoS("[token] loading configurations")
 
 	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, initCfg, clusterCfg)
 	if err != nil {
 		return err
 	}
 
-	klog.V(1).Infoln("[token] creating token")
+	klog.V(1).InfoS("[token] creating token")
 	if err := tokenphase.CreateNewTokens(client, internalcfg.BootstrapTokens); err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 
 // RunGenerateToken just generates a random token for the user
 func RunGenerateToken(out io.Writer) error {
-	klog.V(1).Infoln("[token] generating random token")
+	klog.V(1).InfoS("[token] generating random token")
 	token, err := bootstraputil.GenerateBootstrapToken()
 	if err != nil {
 		return err
@@ -364,7 +364,7 @@ func (tpf *tokenTextPrintFlags) ToPrinter(outputFormat string) (output.Printer, 
 // RunListTokens lists details on all existing bootstrap tokens on the server.
 func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, printer output.Printer) error {
 	// First, build our selector for bootstrap tokens only
-	klog.V(1).Infoln("[token] preparing selector for bootstrap token")
+	klog.V(1).InfoS("[token] preparing selector for bootstrap token")
 	tokenSelector := fields.SelectorFromSet(
 		map[string]string{
 			"type": string(bootstrapapi.SecretTypeBootstrapToken),
@@ -374,7 +374,7 @@ func RunListTokens(out io.Writer, errW io.Writer, client clientset.Interface, pr
 		FieldSelector: tokenSelector.String(),
 	}
 
-	klog.V(1).Info("[token] retrieving list of bootstrap tokens")
+	klog.V(1).InfoS("[token] retrieving list of bootstrap tokens")
 	secrets, err := client.CoreV1().Secrets(metav1.NamespaceSystem).List(context.TODO(), listOptions)
 	if err != nil {
 		return errors.Wrap(err, "failed to list bootstrap tokens")
@@ -412,7 +412,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 	for _, tokenIDOrToken := range tokenIDsOrTokens {
 		// Assume this is a token id and try to parse it
 		tokenID := tokenIDOrToken
-		klog.V(1).Info("[token] parsing token")
+		klog.V(1).InfoS("[token] parsing token")
 		if !bootstraputil.IsValidBootstrapTokenID(tokenIDOrToken) {
 			// Okay, the full token with both id and secret was probably passed. Parse it and extract the ID only
 			bts, err := kubeadmapiv1beta2.NewBootstrapTokenString(tokenIDOrToken)
@@ -424,7 +424,7 @@ func RunDeleteTokens(out io.Writer, client clientset.Interface, tokenIDsOrTokens
 		}
 
 		tokenSecretName := bootstraputil.BootstrapTokenSecretName(tokenID)
-		klog.V(1).Infof("[token] deleting token %q", tokenID)
+		klog.V(1).InfoS("[token] deleting token %q", tokenID)
 		if err := client.CoreV1().Secrets(metav1.NamespaceSystem).Delete(context.TODO(), tokenSecretName, metav1.DeleteOptions{}); err != nil {
 			return errors.Wrapf(err, "failed to delete bootstrap token %q", tokenID)
 		}
