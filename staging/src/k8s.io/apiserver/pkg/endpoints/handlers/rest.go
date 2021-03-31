@@ -89,8 +89,14 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
+	Resource schema.GroupVersionResource
+	Kind     schema.GroupVersionKind
+
+	// AcceptsGroupVersionDelegate is an optional delegate that can be queried about whether a given GVK
+	// can be accepted in create or update requests. If nil, only scope.Kind is accepted.
+	// Note that this does not enable multi-version support for reads from a single endpoint.
+	AcceptsGroupVersionDelegate rest.GroupVersionAcceptor
+
 	Subresource string
 
 	MetaGroupVersion schema.GroupVersion
@@ -103,6 +109,17 @@ type RequestScope struct {
 
 func (scope *RequestScope) err(err error, w http.ResponseWriter, req *http.Request) {
 	responsewriters.ErrorNegotiated(err, scope.Serializer, scope.Kind.GroupVersion(), w, req)
+}
+
+// AcceptsGroupVersion returns true if the specified GroupVersion is allowed
+// in create and update requests.
+func (scope *RequestScope) AcceptsGroupVersion(gv schema.GroupVersion) bool {
+	// If there's a custom acceptor, delegate to it. This is extremely rare.
+	if scope.AcceptsGroupVersionDelegate != nil {
+		return scope.AcceptsGroupVersionDelegate.AcceptsGroupVersion(gv)
+	}
+	// Fall back to only allowing the singular Kind. This is the typical behavior.
+	return gv == scope.Kind.GroupVersion()
 }
 
 func (scope *RequestScope) AllowsMediaTypeTransform(mimeType, mimeSubType string, gvk *schema.GroupVersionKind) bool {

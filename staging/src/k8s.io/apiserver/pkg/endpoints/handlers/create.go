@@ -123,7 +123,7 @@ func createHandler(r rest.NamedCreater, scope *RequestScope, admit admission.Int
 			scope.err(err, w, req)
 			return
 		}
-		if gvk.GroupVersion() != gv {
+		if !scope.AcceptsGroupVersion(gvk.GroupVersion()) {
 			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%v)", gvk.GroupVersion().String(), gv.String()))
 			scope.err(err, w, req)
 			return
