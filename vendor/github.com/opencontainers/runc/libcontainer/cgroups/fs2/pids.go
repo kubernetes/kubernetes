@@ -3,7 +3,10 @@
 package fs2
 
 import (
+	"io/ioutil"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -51,9 +54,33 @@ func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 	return nil
 }
 
+func readCurrentFromProc() (uint64, error) {
+	fi, err := ioutil.ReadDir("/proc")
+	if err != nil {
+		return 0, err
+	}
+	var ret uint64
+	for _, i := range fi {
+		if !i.IsDir() {
+			continue
+		}
+		if _, err := strconv.ParseInt(i.Name(), 10, 32); err == nil {
+			ret = ret + 1
+		}
+	}
+	return ret, nil
+}
+
 func statPids(dirPath string, stats *cgroups.Stats) error {
 	current, err := fscommon.GetCgroupParamUint(dirPath, "pids.current")
 	if err != nil {
+		if dirPath == UnifiedMountpoint && os.IsNotExist(err) {
+			if current, err = readCurrentFromProc(); err == nil {
+				stats.PidsStats.Current = current
+				stats.PidsStats.Limit = 0
+			}
+			return nil
+		}
 		return errors.Wrap(err, "failed to parse pids.current")
 	}
 
