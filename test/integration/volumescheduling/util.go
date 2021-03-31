@@ -85,7 +85,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		masterConfig.GenericConfig.AdmissionControl = admission
 	}
 
-	_, testCtx.httpServer, testCtx.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, testCtx.httpServer, testCtx.closeFn = framework.RunAnApiserverUsingServer(masterConfig, s, h)
 
 	if nsPrefix != "default" {
 		testCtx.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
