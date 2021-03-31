@@ -167,7 +167,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
-				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
+				klog.InfoS("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
 				utilruntime.HandleError(callErr)
 
 				select {
@@ -179,7 +179,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 					continue
 				}
 			}
-			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+			klog.InfoS("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 			return apierrors.NewInternalError(err)
 		}
 		if rejectionErr, ok := err.(*webhookutil.ErrWebhookRejection); ok {
@@ -265,7 +265,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admiss
 	for k, v := range result.AuditAnnotations {
 		key := h.Name + "/" + k
 		if err := attr.Attributes.AddAnnotation(key, v); err != nil {
-			klog.Warningf("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
+			klog.InfoS("Failed to set admission audit annotation %s to %s for mutating webhook %s: %v", key, v, h.Name, err)
 		}
 	}
 	for _, w := range result.Warnings {
@@ -361,11 +361,11 @@ func (w *webhookAnnotator) addMutationAnnotation(mutated bool) {
 	}
 	value, err := mutationAnnotationValue(w.configuration, w.webhook, mutated)
 	if err != nil {
-		klog.Warningf("unexpected error composing mutating webhook annotation: %v", err)
+		klog.InfoS("unexpected error composing mutating webhook annotation: %v", err)
 		return
 	}
 	if err := w.attr.Attributes.AddAnnotation(w.mutationAnnotationKey, value); err != nil {
-		klog.Warningf("failed to set mutation annotation for mutating webhook key %s to %s: %v", w.mutationAnnotationKey, value, err)
+		klog.InfoS("failed to set mutation annotation for mutating webhook key %s to %s: %v", w.mutationAnnotationKey, value, err)
 	}
 }
 
@@ -379,17 +379,17 @@ func (w *webhookAnnotator) addPatchAnnotation(patch interface{}, patchType admis
 	case admissionv1.PatchTypeJSONPatch:
 		value, err = jsonPatchAnnotationValue(w.configuration, w.webhook, patch)
 		if err != nil {
-			klog.Warningf("unexpected error composing mutating webhook JSON patch annotation: %v", err)
+			klog.InfoS("unexpected error composing mutating webhook JSON patch annotation: %v", err)
 			return
 		}
 	default:
-		klog.Warningf("unsupported patch type for mutating webhook annotation: %v", patchType)
+		klog.InfoS("unsupported patch type for mutating webhook annotation: %v", patchType)
 		return
 	}
 	if err := w.attr.Attributes.AddAnnotationWithLevel(w.patchAnnotationKey, value, auditinternal.LevelRequest); err != nil {
 		// NOTE: we don't log actual patch in kube-apiserver log to avoid potentially
 		// leaking information
-		klog.Warningf("failed to set patch annotation for mutating webhook key %s; confugiration name: %s, webhook name: %s", w.patchAnnotationKey, w.configuration, w.webhook)
+		klog.InfoS("failed to set patch annotation for mutating webhook key %s; confugiration name: %s, webhook name: %s", w.patchAnnotationKey, w.configuration, w.webhook)
 	}
 }
 
