@@ -326,6 +326,12 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			ginkgo.It("should be reschedulable [Slow]", func() {
 				// Only run on providers with default storageclass
 				e2eskipper.SkipUnlessProviderIs("openstack", "gce", "gke", "vsphere", "azure")
+				// testsuites/multivolume tests can now run with windows nodes
+				// This test is not compatible with windows because the default StorageClass
+				// doesn't have the ntfs parameter, we can't change the status of the cluster
+				// to add a StorageClass that's compatible with windows which is also the
+				// default StorageClass
+				e2eskipper.SkipIfNodeOSDistroIs("windows")
 
 				numVols := 4
 
