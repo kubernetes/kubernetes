@@ -77,11 +77,11 @@ func TestFilterEndpoints(t *testing.T) {
 			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
 		},
 	}, {
-		name:               "hints + eps proxying enabled, hints annotation == Auto (wrong capitalization), hints ignored",
+		name:               "hints + eps proxying enabled, hints annotation == aUto (wrong capitalization), hints ignored",
 		hintsEnabled:       true,
 		epsProxyingEnabled: true,
 		nodeLabels:         map[string]string{v1.LabelTopologyZone: "zone-a"},
-		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "Auto"},
+		serviceInfo:        &BaseServiceInfo{nodeLocalExternal: false, hintsAnnotation: "aUto"},
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
@@ -234,9 +234,23 @@ func Test_filterEndpointsWithHints(t *testing.T) {
 		endpoints:         []endpoint{{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")}},
 		expectedEndpoints: []endpoint{{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")}},
 	}, {
-		name:            "normal endpoint filtering",
+		name:            "normal endpoint filtering, auto annotation",
 		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
 		hintsAnnotation: "auto",
+		endpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},
+			{ip: "10.1.2.5", zoneHints: sets.NewString("zone-c")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+		expectedEndpoints: []endpoint{
+			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
+			{ip: "10.1.2.6", zoneHints: sets.NewString("zone-a")},
+		},
+	}, {
+		name:            "normal endpoint filtering, Auto annotation",
+		nodeLabels:      map[string]string{v1.LabelTopologyZone: "zone-a"},
+		hintsAnnotation: "Auto",
 		endpoints: []endpoint{
 			{ip: "10.1.2.3", zoneHints: sets.NewString("zone-a")},
 			{ip: "10.1.2.4", zoneHints: sets.NewString("zone-b")},

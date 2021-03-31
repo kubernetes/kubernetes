@@ -330,9 +330,9 @@ func (r *reconciler) finalize(
 		metrics.EndpointSliceChanges.WithLabelValues("delete").Inc()
 	}
 
-	topologyLabel := "disabled"
+	topologyLabel := "Disabled"
 	if r.topologyCache != nil && hintsEnabled(service.Annotations) {
-		topologyLabel = "auto"
+		topologyLabel = "Auto"
 	}
 
 	numSlicesChanged := len(slicesToCreate) + len(slicesToUpdate) + len(slicesToDelete)

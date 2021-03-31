@@ -386,11 +386,11 @@ func unchangedSlices(existingSlices, slicesToUpdate, slicesToDelete []*discovery
 }
 
 // hintsEnabled returns true if the provided annotations include a
-// corev1.AnnotationTopologyAwareHints key with a value set to "auto".
+// corev1.AnnotationTopologyAwareHints key with a value set to "Auto" or "auto".
 func hintsEnabled(annotations map[string]string) bool {
 	val, ok := annotations[corev1.AnnotationTopologyAwareHints]
 	if !ok {
 		return false
 	}
-	return val == "auto"
+	return val == "Auto" || val == "auto"
 }
