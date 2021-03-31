@@ -9,24 +9,19 @@ var (
 	TestMaps = map[string][]string{
 		// alpha features that are not gated
 		"[Disabled:Alpha]": {
-			// ALPHA features in 1.20, disabled by default.
-			// !!! Review their status as part of the 1.21 rebase.
-			`\[Feature:CSIServiceAccountToken\]`,
-
-			// BETA features in 1.20, enabled by default
-			// Their enablement is tracked via bz's targeted at 4.8.
-			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
+			`\[Feature:StorageVersionAPI\]`,
+			`\[Feature:StatefulSetMinReadySeconds\]`,
+			`\[Feature:PodSecurityPolicy\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
-			`\[Feature:Networking-IPv6\]`, // openshift-sdn doesn't support yet
-			`Monitoring`,                  // Not installed, should be
-			`Cluster level logging`,       // Not installed yet
-			`Kibana`,                      // Not installed
-			`Ubernetes`,                   // Can't set zone labels today
-			`kube-ui`,                     // Not installed by default
-			`Kubernetes Dashboard`,        // Not installed by default (also probably slow image pull)
-			`should proxy to cadvisor`,    // we don't expose cAdvisor port directly for security reasons
+			`Monitoring`,               // Not installed, should be
+			`Cluster level logging`,    // Not installed yet
+			`Kibana`,                   // Not installed
+			`Ubernetes`,                // Can't set zone labels today
+			`kube-ui`,                  // Not installed by default
+			`Kubernetes Dashboard`,     // Not installed by default (also probably slow image pull)
+			`should proxy to cadvisor`, // we don't expose cAdvisor port directly for security reasons
 		},
 		// tests that rely on special configuration that we do not yet support
 		"[Disabled:SpecialConfig]": {
@@ -56,7 +51,6 @@ var (
 			`unchanging, static URL paths for kubernetes api services`,  // the test needs to exclude URLs that are not part of conformance (/logs)
 			`Services should be able to up and down services`,           // we don't have wget installed on nodes
 			`KubeProxy should set TCP CLOSE_WAIT timeout`,               // the test require communication to port 11302 in the cluster nodes
-			`\[NodeFeature:Sysctls\]`,                                   // needs SCC support
 			`should check kube-proxy urls`,                              // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
 			`SSH`,                                                       // TRIAGE
 			`should implement service.kubernetes.io/service-proxy-name`, // this is an optional test that requires SSH. sig-network
@@ -90,6 +84,31 @@ var (
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
+			`should drop INVALID conntrack entries`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1986306
+			`\[sig-cli\] Kubectl client kubectl wait should ignore not found error with --for=delete`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1986307
+			`\[Feature:ServiceInternalTrafficPolicy\]`,
+			`Conntrack should be able to preserve UDP traffic when server pod cycles for a ClusterIP service`,
+			`Networking Granular Checks: Services should function for node-Service: http`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector`,
+			`NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions`,
+			`NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions`,
+			`NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector`,
+			`NetworkPolicy between server and client should deny ingress from pods on other namespaces`,
+			`NetworkPolicy between server and client should enforce updated policy`,
+			`NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors`,
+			`NetworkPolicy between server and client should enforce policy based on any PodSelectors`,
+			`NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector`,
+			`NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy`,
+			`NetworkPolicy between server and client using UDP should enforce policy based on Ports`,
+			`NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector`,
+			`Networking IPerf2`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {
@@ -137,7 +156,7 @@ var (
 		},
 		"[Skipped:gce]": {
 			// Requires creation of a different compute instance in a different zone and is not compatible with volumeBindingMode of WaitForFirstConsumer which we use in 4.x
-			`\[sig-scheduling\] Multi-AZ Cluster Volumes \[sig-storage\] should only be allowed to provision PDs in zones where nodes exist`,
+			`\[sig-storage\] Multi-AZ Cluster Volumes should only be allowed to provision PDs in zones where nodes exist`,
 
 			// The following tests try to ssh directly to a node. None of our nodes have external IPs
 			`\[k8s.io\] \[sig-node\] crictl should be able to run crictl on the node`,
@@ -194,7 +213,8 @@ var (
 			`NetworkPolicy.*[Ee]gress`,  // feature is not supported by openshift-sdn
 			`NetworkPolicy.*named port`, // feature is not supported by openshift-sdn
 
-			`NetworkPolicy between server and client should support a 'default-deny-all' policy`, // uses egress feature
+			`NetworkPolicy between server and client should support a 'default-deny-all' policy`,            // uses egress feature
+			`NetworkPolicy between server and client should stop enforcing policies after they are deleted`, // uses egress feature
 		},
 	}
 
