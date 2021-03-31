@@ -73,7 +73,7 @@ var _ = rest.GroupVersionKindProvider(&EvictionREST{})
 
 // GroupVersionKind specifies a particular GroupVersionKind to discovery
 func (r *EvictionREST) GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind {
-	return schema.GroupVersionKind{Group: "policy", Version: "v1beta1", Kind: "Eviction"}
+	return schema.GroupVersionKind{Group: "policy", Version: "v1", Kind: "Eviction"}
 }
 
 // New creates a new eviction resource
