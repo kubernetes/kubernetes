@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
@@ -99,8 +99,8 @@ type initOptions struct {
 	featureGatesString      string
 	ignorePreflightErrors   []string
 	bto                     *options.BootstrapTokenOptions
-	externalInitCfg         *kubeadmapiv1beta2.InitConfiguration
-	externalClusterCfg      *kubeadmapiv1beta2.ClusterConfiguration
+	externalInitCfg         *kubeadmapiv1.InitConfiguration
+	externalClusterCfg      *kubeadmapiv1.ClusterConfiguration
 	uploadCerts             bool
 	skipCertificateKeyPrint bool
 	patchesDir              string
@@ -204,7 +204,7 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 }
 
 // AddInitConfigFlags adds init flags bound to the config to the specified flagset
-func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfiguration) {
+func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.InitConfiguration) {
 	flagSet.StringVar(
 		&cfg.LocalAPIEndpoint.AdvertiseAddress, options.APIServerAdvertiseAddress, cfg.LocalAPIEndpoint.AdvertiseAddress,
 		"The IP address the API Server will advertise it's listening on. If not set the default network interface will be used.",
@@ -225,7 +225,7 @@ func AddInitConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.InitConfig
 }
 
 // AddClusterConfigFlags adds cluster flags bound to the config to the specified flagset
-func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, featureGatesString *string) {
+func AddClusterConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, featureGatesString *string) {
 	flagSet.StringVar(
 		&cfg.Networking.ServiceSubnet, options.NetworkingServiceSubnet, cfg.Networking.ServiceSubnet,
 		"Use alternative range of IP address for service VIPs.",
@@ -287,10 +287,10 @@ func AddInitOtherFlags(flagSet *flag.FlagSet, initOptions *initOptions) {
 // newInitOptions returns a struct ready for being used for creating cmd init flags.
 func newInitOptions() *initOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalInitCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	externalInitCfg := &kubeadmapiv1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalInitCfg)
 
-	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	externalClusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
 
 	// Create the options object for the bootstrap token-related flags, and override the default value for .Description

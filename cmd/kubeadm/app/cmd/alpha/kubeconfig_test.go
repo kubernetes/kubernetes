@@ -28,7 +28,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -37,19 +37,19 @@ import (
 
 func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, error) {
 	cfgPath := filepath.Join(dir, id)
-	initCfg := kubeadmapiv1beta2.InitConfiguration{
+	initCfg := kubeadmapiv1.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubeadm.k8s.io/v1beta2",
+			APIVersion: "kubeadm.k8s.io/v1beta3",
 			Kind:       "InitConfiguration",
 		},
-		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{
+		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{
 			AdvertiseAddress: "1.2.3.4",
 			BindPort:         1234,
 		},
 	}
-	clusterCfg := kubeadmapiv1beta2.ClusterConfiguration{
+	clusterCfg := kubeadmapiv1.ClusterConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubeadm.k8s.io/v1beta2",
+			APIVersion: "kubeadm.k8s.io/v1beta3",
 			Kind:       "ClusterConfiguration",
 		},
 		CertificatesDir:   certDir,

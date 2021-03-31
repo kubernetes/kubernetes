@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -62,7 +62,7 @@ func NewCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
 	initCfg := cmdutil.DefaultInitConfiguration()
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	clusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 
 	var (
 		token, clientName, cfgPath string

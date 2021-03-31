@@ -91,7 +91,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta2
+	apiVersion: kubeadm.k8s.io/v1beta3
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
@@ -122,7 +122,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta2
+	apiVersion: kubeadm.k8s.io/v1beta3
 	controllerManager: {}
 	dns:
 	  type: CoreDNS

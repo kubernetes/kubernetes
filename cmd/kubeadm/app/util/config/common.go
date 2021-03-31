@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -40,9 +40,9 @@ import (
 func MarshalKubeadmConfigObject(obj runtime.Object) ([]byte, error) {
 	switch internalcfg := obj.(type) {
 	case *kubeadmapi.InitConfiguration:
-		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1beta2.SchemeGroupVersion)
+		return MarshalInitConfigurationToBytes(internalcfg, kubeadmapiv1.SchemeGroupVersion)
 	default:
-		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1beta2.SchemeGroupVersion, kubeadmscheme.Codecs)
+		return kubeadmutil.MarshalToYamlForCodecs(obj, kubeadmapiv1.SchemeGroupVersion, kubeadmscheme.Codecs)
 	}
 }
 

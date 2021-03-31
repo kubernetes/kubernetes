@@ -23,7 +23,7 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -124,8 +124,8 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta2.ClusterConfiguration{
-				APIServer: kubeadmapiv1beta2.APIServer{
+			cfg := &kubeadmapiv1.ClusterConfiguration{
+				APIServer: kubeadmapiv1.APIServer{
 					CertSANs: test.in,
 				},
 			}

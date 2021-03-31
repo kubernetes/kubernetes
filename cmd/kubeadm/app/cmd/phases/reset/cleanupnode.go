@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog/v2"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -85,7 +85,7 @@ func runCleanupNode(c workflow.RunData) error {
 
 	// Remove contents from the config and pki directories
 	klog.V(1).Infoln("[reset] Removing contents from the config and pki directories")
-	if certsDir != kubeadmapiv1beta2.DefaultCertificatesDir {
+	if certsDir != kubeadmapiv1.DefaultCertificatesDir {
 		klog.Warningf("[reset] WARNING: Cleaning a non-default certificates directory: %q\n", certsDir)
 	}
 	resetConfigDir(kubeadmconstants.KubernetesDir, certsDir)

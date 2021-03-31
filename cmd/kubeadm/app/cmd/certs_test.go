@@ -34,7 +34,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -410,7 +410,7 @@ kubernetesVersion: ` + kubeadmconstants.MinimumControlPlaneVersion.String()
 		{
 			name: "default",
 			assertions: []assertion{
-				hasCertDir(kubeadmapiv1beta2.DefaultCertificatesDir),
+				hasCertDir(kubeadmapiv1.DefaultCertificatesDir),
 				hasKubeConfigDir(kubeadmconstants.KubernetesDir),
 			},
 		},

@@ -31,7 +31,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -119,7 +119,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.ClusterConfiguration{
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			})
 			if err != nil {
@@ -146,21 +146,21 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				Etcd: kubeadmapiv1beta2.Etcd{
-					External: &kubeadmapiv1beta2.ExternalEtcd{
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				Etcd: kubeadmapiv1.Etcd{
+					External: &kubeadmapiv1.ExternalEtcd{
 						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
 				},
@@ -170,7 +170,7 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages,
@@ -223,13 +223,13 @@ func TestConfigImagesListOutput(t *testing.T) {
 
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		outputFormat   string
 		expectedOutput string
 	}{
 		{
 			name: "text output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "text",
@@ -244,7 +244,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "JSON output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "json",
@@ -265,7 +265,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "YAML output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: "yaml",
@@ -283,7 +283,7 @@ kind: Images
 		},
 		{
 			name: "go-template output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
@@ -298,7 +298,7 @@ k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 		},
 		{
 			name: "JSONPATH output",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,

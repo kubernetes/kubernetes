@@ -25,7 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiv1beta3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"sigs.k8s.io/yaml"
 )
@@ -111,12 +111,12 @@ func TestLoadInitConfigurationFromFile(t *testing.T) {
 func TestDefaultTaintsMarshaling(t *testing.T) {
 	tests := []struct {
 		desc             string
-		cfg              kubeadmapiv1beta3.InitConfiguration
+		cfg              kubeadmapiv1.InitConfiguration
 		expectedTaintCnt int
 	}{
 		{
 			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
-			cfg: kubeadmapiv1beta3.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta3",
 					Kind:       constants.InitConfigurationKind,
@@ -126,23 +126,23 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		},
 		{
 			desc: "Uninitialized taints field produces a single taint (the master one)",
-			cfg: kubeadmapiv1beta3.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta3",
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta3.NodeRegistrationOptions{},
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{},
 			},
 			expectedTaintCnt: 1,
 		},
 		{
 			desc: "Forsing taints to an empty slice produces no taints",
-			cfg: kubeadmapiv1beta3.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta3",
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta3.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 					Taints: []v1.Taint{},
 				},
 			},
@@ -150,12 +150,12 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 		},
 		{
 			desc: "Custom taints are used",
-			cfg: kubeadmapiv1beta3.InitConfiguration{
+			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: "kubeadm.k8s.io/v1beta3",
 					Kind:       constants.InitConfigurationKind,
 				},
-				NodeRegistration: kubeadmapiv1beta3.NodeRegistrationOptions{
+				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 					Taints: []v1.Taint{
 						{Key: "taint1"},
 						{Key: "taint2"},
