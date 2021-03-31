@@ -8984,6 +8984,22 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.Toleration
           elementRelationship: atomic
+- name: io.k8s.api.policy.v1.Eviction
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: deleteOptions
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.DeleteOptions
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
 - name: io.k8s.api.policy.v1.PodDisruptionBudget
   map:
     fields:

@@ -1139,6 +1139,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnodev1beta1.SchedulingApplyConfiguration{}
 
 		// Group=policy, Version=v1
+	case policyv1.SchemeGroupVersion.WithKind("Eviction"):
+		return &applyconfigurationspolicyv1.EvictionApplyConfiguration{}
 	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudget"):
 		return &applyconfigurationspolicyv1.PodDisruptionBudgetApplyConfiguration{}
 	case policyv1.SchemeGroupVersion.WithKind("PodDisruptionBudgetSpec"):

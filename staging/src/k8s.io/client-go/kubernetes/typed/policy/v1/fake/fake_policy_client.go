@@ -28,6 +28,10 @@ type FakePolicyV1 struct {
 	*testing.Fake
 }
 
+func (c *FakePolicyV1) Evictions(namespace string) v1.EvictionInterface {
+	return &FakeEvictions{c, namespace}
+}
+
 func (c *FakePolicyV1) PodDisruptionBudgets(namespace string) v1.PodDisruptionBudgetInterface {
 	return &FakePodDisruptionBudgets{c, namespace}
 }
