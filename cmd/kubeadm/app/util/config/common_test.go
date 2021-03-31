@@ -60,23 +60,20 @@ func TestValidateSupportedVersion(t *testing.T) {
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
-				Version: "v1alpha3",
-			},
-			allowDeprecated: true,
-			expectedErr:     true,
-		},
-		{
-			gv: schema.GroupVersion{
-				Group:   KubeadmGroupName,
 				Version: "v1beta1",
 			},
-			allowDeprecated: true,
-			expectedErr:     true,
+			expectedErr: true,
 		},
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
 				Version: "v1beta2",
+			},
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta3",
 			},
 		},
 		{
@@ -213,7 +210,7 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "bad config produces error",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			`),
 			expectErr: true,
 		},
@@ -341,13 +338,13 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		{
 			desc: "component configs are not migrated",
 			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1beta1
+			apiVersion: kubeadm.k8s.io/v1beta2
 			kind: JoinConfiguration
 			discovery:
 			  bootstrapToken:

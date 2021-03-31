@@ -81,7 +81,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
 			`, constants.CurrentKubernetesVersion))),
@@ -93,7 +93,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
 			`, constants.MinimumControlPlaneVersion))),
@@ -384,7 +384,7 @@ func TestImagesPull(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	cfg := []byte(dedent.Dedent(`
 		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-		apiVersion: kubeadm.k8s.io/v1beta1
+		apiVersion: kubeadm.k8s.io/v1beta2
 		kind: InitConfiguration
 	`))
 	configFile, cleanup := tempConfig(t, cfg)

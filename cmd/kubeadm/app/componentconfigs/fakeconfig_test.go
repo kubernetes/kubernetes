@@ -33,7 +33,7 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/output"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -206,7 +206,7 @@ var (
 		yaml: dedent.Dedent(`
 			apiServer:
 			  timeoutForControlPlane: 4m
-			apiVersion: kubeadm.k8s.io/v1beta2
+			apiVersion: kubeadm.k8s.io/v1beta3
 			certificatesDir: /etc/kubernetes/pki
 			clusterName: LeCluster
 			controllerManager: {}
@@ -277,7 +277,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 		got := strings.TrimSpace(string(b))
 		expected := strings.TrimSpace(dedent.Dedent(`
 			apiServer: {}
-			apiVersion: kubeadm.k8s.io/v1beta2
+			apiVersion: kubeadm.k8s.io/v1beta3
 			clusterName: LeCluster
 			controllerManager: {}
 			dns:
@@ -327,7 +327,7 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 func TestGeneratedConfigFromCluster(t *testing.T) {
 	fakeKnownContext(func() {
 		testYAML := dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta2
+			apiVersion: kubeadm.k8s.io/v1beta3
 			kind: ClusterConfiguration
 		`)
 		testYAMLHash := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(testYAML)))
@@ -406,7 +406,7 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 			{
 				name: "Unknown kind returns an error",
 				in: dedent.Dedent(`
-					apiVersion: kubeadm.k8s.io/v1beta2
+					apiVersion: kubeadm.k8s.io/v1beta3
 					kind: Configuration
 				`),
 				expectErr: true,

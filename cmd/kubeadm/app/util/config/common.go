@@ -56,16 +56,16 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	// v1.13: v1alpha3 read-only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	// v1.14: v1alpha3 convert only, writes only v1beta1 config. Errors if the user tries to use v1alpha1 or v1alpha2
 	// v1.15: v1beta1 read-only, writes only v1beta2 config. Errors if the user tries to use v1alpha1, v1alpha2 or v1alpha3
+	// v1.22: v1beta2 read-only, writes only v1beta3 config. Errors if the user tries to use v1beta1 and older
 	oldKnownAPIVersions := map[string]string{
 		"kubeadm.k8s.io/v1alpha1": "v1.11",
 		"kubeadm.k8s.io/v1alpha2": "v1.12",
 		"kubeadm.k8s.io/v1alpha3": "v1.14",
+		"kubeadm.k8s.io/v1beta1":  "v1.15",
 	}
 
 	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{
-		"kubeadm.k8s.io/v1beta1": {},
-	}
+	deprecatedAPIVersions := map[string]struct{}{}
 
 	gvString := gv.String()
 
