@@ -273,6 +273,93 @@ var _ = common.SIGDescribe("Conntrack", func() {
 		}
 	})
 
+	// A service with TCP endpoints must clear the conntrack entries to the pods that no longer belong to the service
+	// xref #100698
+	ginkgo.It("should clear TCP connections to pods that no longer belong to a Service ", func() {
+		iperfCmd := "iperf"
+		if framework.TestContext.ClusterIsIPv6() {
+			iperfCmd = "iperf -V"
+		}
+		// Create a ClusterIP service
+		tcpJig := e2eservice.NewTestJig(cs, ns, serviceName)
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in " + ns)
+		tcpService, err := tcpJig.CreateTCPService(func(svc *v1.Service) {
+			svc.Spec.Type = v1.ServiceTypeClusterIP
+			svc.Spec.Ports = []v1.ServicePort{
+				{Port: 5432, Name: "tcp", Protocol: v1.ProtocolTCP, TargetPort: intstr.FromInt(5432)},
+			}
+		})
+		framework.ExpectNoError(err)
+
+		// Add a backend pod to the service in the other node with a TCP server
+		ginkgo.By("creating a backend pod " + podBackend1 + " for the service " + serviceName)
+		serverPod1 := e2epod.NewAgnhostPod(ns, podBackend1, nil, nil, nil)
+		serverPod1.Labels = tcpJig.Labels
+		serverPod1.Spec.NodeName = serverNodeInfo.name
+		cmd := fmt.Sprintf(`%s -s -p %d`, iperfCmd, tcpService.Spec.Ports[0].Port)
+		serverPod1.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		fr.PodClient().CreateSync(serverPod1)
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend1: {80}})
+
+		// Create a pod in one node to create a long lived connection to the service
+		ginkgo.By("creating a client pod for probing the service " + serviceName)
+		clientPod := e2epod.NewAgnhostPod(ns, podClient, nil, nil, nil)
+		clientPod.Spec.NodeName = clientNodeInfo.name
+		// iperf: -i 1 report every second -t 600 during 600 seconds
+		cmd = fmt.Sprintf(`%s -c %s -p %d -i 1 -t 600`, iperfCmd, tcpService.Spec.ClusterIP, tcpService.Spec.Ports[0].Port)
+		clientPod.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		clientPod.Spec.Containers[0].Name = podClient
+		fr.PodClient().CreateSync(clientPod)
+
+		// Read the client pod logs
+		logs, err := e2epod.GetPodLogs(cs, ns, podClient, podClient)
+		framework.ExpectNoError(err)
+		framework.Logf("Pod client logs: %s", logs)
+
+		// Note that the fact that Endpoints object already exists, does NOT mean
+		// that iptables (or whatever else is used) was already programmed.
+		// Additionally take into account that UDP conntract entries timeout is
+		// 30 seconds by default.
+		// Based on the above check if the pod receives the traffic.
+		ginkgo.By("checking client pod connected to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn("connected with", podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to connect to backend 1")
+		}
+
+		// Create a second pod
+		ginkgo.By("creating a second backend pod " + podBackend2 + " for the service " + serviceName)
+		serverPod2 := e2epod.NewAgnhostPod(ns, podBackend2, nil, nil, nil)
+		serverPod2.Labels = tcpJig.Labels
+		serverPod2.Spec.NodeName = serverNodeInfo.name
+		cmd = fmt.Sprintf(`%s -s -p %d`, iperfCmd, tcpService.Spec.Ports[0].Port)
+		serverPod2.Spec.Containers[0].Command = []string{"/bin/sh", "-c", cmd}
+		fr.PodClient().CreateSync(serverPod2)
+
+		// and remove the first pod from the service
+		framework.Logf("Removing %s pod from service", podBackend1)
+		fr.PodClient().Update(podBackend1, func(pod *v1.Pod) {
+			pod.Labels = map[string]string{}
+		})
+
+		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podBackend2: {5432}})
+
+		// Check that the first TCP connection is no longer working
+		ginkgo.By("checking client pod reset the connection to the backend 1 on Node IP " + serverNodeInfo.nodeIP)
+		if err := wait.PollImmediate(5*time.Second, time.Minute, logContainsFn("Connection reset by peer", podClient)); err != nil {
+			logs, err = e2epod.GetPodLogs(cs, ns, podClient, podClient)
+			framework.ExpectNoError(err)
+			framework.Logf("Pod client logs: %s", logs)
+			framework.Failf("Failed to disconnect from backend 1")
+		}
+
+		// TODO: validate that the client pods connect correctly to the new backend
+
+	})
+
 	// Regression test for #74839, where:
 	// Packets considered INVALID by conntrack are now dropped. In particular, this fixes
 	// a problem where spurious retransmits in a long-running TCP connection to a service

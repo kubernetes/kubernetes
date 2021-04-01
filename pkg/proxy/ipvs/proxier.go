@@ -1963,12 +1963,14 @@ func (proxier *Proxier) getExistingChains(buffer *bytes.Buffer, table utiliptabl
 	return nil
 }
 
-// After a UDP or SCTP endpoint has been removed, we must flush any pending conntrack entries to it, or else we
-// risk sending more traffic to it, all of which will be lost (because UDP).
+// After an endpoint has been removed, we must flush any pending conntrack entries to it,
+// or for UDP and SCTP we risk sending more traffic to it, all of which will be lost.
+// In case of TCP, if the pod is still alive, it will keep current connections to the service alive,
+// despite the pod no longer belongs to the service.
 // This assumes the proxier mutex is held
 func (proxier *Proxier) deleteEndpointConnections(connectionMap []proxy.ServiceEndpoint) {
 	for _, epSvcPair := range connectionMap {
-		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok && conntrack.IsClearConntrackNeeded(svcInfo.Protocol()) {
+		if svcInfo, ok := proxier.serviceMap[epSvcPair.ServicePortName]; ok {
 			endpointIP := utilproxy.IPPart(epSvcPair.Endpoint)
 			svcProto := svcInfo.Protocol()
 			err := conntrack.ClearEntriesForNAT(proxier.exec, svcInfo.ClusterIP().String(), endpointIP, svcProto)
