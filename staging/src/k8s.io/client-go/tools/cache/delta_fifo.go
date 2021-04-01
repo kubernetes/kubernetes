@@ -340,7 +340,7 @@ func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	if !ok {
 		return fmt.Errorf("object must be of type deltas, but got: %#v", obj)
 	}
-	id, err := f.KeyOf(deltas.Newest().Object)
+	id, err := f.KeyOf(deltas)
 	if err != nil {
 		return KeyError{obj, err}
 	}

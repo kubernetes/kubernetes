@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -540,6 +541,11 @@ func TestDeltaFIFO_detectLineJumpers(t *testing.T) {
 
 func TestDeltaFIFO_addIfNotPresent(t *testing.T) {
 	f := NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: testFifoObjectKeyFunc})
+
+	emptyDeltas := Deltas{}
+	if err := f.AddIfNotPresent(emptyDeltas); err == nil || !errors.Is(err, ErrZeroLengthDeltasObject) {
+		t.Errorf("Expected error '%v', got %v", ErrZeroLengthDeltasObject, err)
+	}
 
 	f.Add(mkFifoObj("b", 3))
 	b3 := Pop(f)
