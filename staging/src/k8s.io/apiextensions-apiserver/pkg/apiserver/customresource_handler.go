@@ -958,12 +958,10 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 
 		if v.Deprecated {
 			deprecated[v.Name] = true
-			if utilfeature.DefaultFeatureGate.Enabled(features.WarningHeaders) {
-				if v.DeprecationWarning != nil {
-					warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
-				} else {
-					warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
-				}
+			if v.DeprecationWarning != nil {
+				warnings[v.Name] = append(warnings[v.Name], *v.DeprecationWarning)
+			} else {
+				warnings[v.Name] = append(warnings[v.Name], defaultDeprecationWarning(v.Name, crd.Spec))
 			}
 		}
 	}
