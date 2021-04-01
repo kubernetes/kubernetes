@@ -250,11 +250,16 @@ func (b *Bool) Swap(new bool) bool {
 
 // Toggle atomically negates the Boolean and returns the previous value.
 func (b *Bool) Toggle() bool {
-	return truthy(atomic.AddUint32(&b.v, 1) - 1)
+	for {
+		old := b.Load()
+		if b.CAS(old, !old) {
+			return old
+		}
+	}
 }
 
 func truthy(n uint32) bool {
-	return n&1 == 1
+	return n == 1
 }
 
 func boolToInt(b bool) uint32 {
