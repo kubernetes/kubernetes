@@ -39,7 +39,7 @@ type PodConfigNotificationMode int
 const (
 	// PodConfigNotificationUnknown is the default value for
 	// PodConfigNotificationMode when uninitialized.
-	PodConfigNotificationUnknown = iota
+	PodConfigNotificationUnknown PodConfigNotificationMode = iota
 	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
 	// any change occurs.
 	PodConfigNotificationSnapshot
