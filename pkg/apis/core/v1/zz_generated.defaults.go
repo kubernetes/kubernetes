@@ -917,7 +917,7 @@ func SetObjectDefaults_Service(in *v1.Service) {
 	SetDefaults_Service(in)
 	for i := range in.Spec.Ports {
 		a := &in.Spec.Ports[i]
-		if a.Protocol == "" {
+		if reflect.ValueOf(a.Protocol).IsZero() {
 			a.Protocol = "TCP"
 		}
 	}
