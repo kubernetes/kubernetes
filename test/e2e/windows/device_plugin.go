@@ -37,7 +37,7 @@ const (
 	testSlowMultiplier = 60
 )
 
-var _ = SIGDescribe("Device Plugin", func() {
+var _ = SIGDescribe("[Feature:GPUDevicePlugin] Device Plugin", func() {
 	f := framework.NewDefaultFramework("device-plugin")
 
 	var cs clientset.Interface
