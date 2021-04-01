@@ -754,7 +754,7 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 			if tc.shouldFail && err == nil {
 				t.Error("expecting failure, but err is nil")
 			}
-			if tc.initAttachErr != nil {
+			if tc.initAttachErr != nil && err != nil {
 				if tc.initAttachErr.Message != err.Error() {
 					t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
 				}
@@ -1268,7 +1268,7 @@ func TestAttacherMountDevice(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
@@ -1440,7 +1440,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
@@ -1585,7 +1585,7 @@ func TestAttacherUnmountDevice(t *testing.T) {
 				}
 				return
 			}
-			if err == nil && tc.shouldFail {
+			if tc.shouldFail {
 				t.Errorf("test should fail, but no error occurred")
 			}
 
