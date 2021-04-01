@@ -265,6 +265,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}, context.StopCh)
 	})
 
+	// Add a post startup hook here that installs all the objects (generally CRDs) that need to be installed as the api-server comes-up
+	// We will use the LoopbackClientConfig of the api server to create a client and use that client to perform "apply"
+
 	return s, nil
 }
 
