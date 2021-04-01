@@ -502,7 +502,7 @@ func testRSLifeCycle(f *framework.Framework) {
 	_, err = f.ClientSet.AppsV1().ReplicaSets(ns).Patch(context.TODO(), rsName, types.StrategicMergePatchType, []byte(rsPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch ReplicaSet")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	_, err = watchtools.Until(ctx, rsList.ResourceVersion, w, func(event watch.Event) (bool, error) {
 		if rset, ok := event.Object.(*appsv1.ReplicaSet); ok {
