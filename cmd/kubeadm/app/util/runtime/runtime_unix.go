@@ -21,6 +21,8 @@ package util
 import (
 	"net"
 	"net/url"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -34,8 +36,11 @@ func isExistingSocket(path string) bool {
 	if err != nil {
 		return false
 	}
-	// remove it later if we don't support the path anymore
-	if u.Scheme == "" {
+	// TODO: remove this warning and Scheme override once paths without scheme are not supported
+	if u.Scheme != "unix" {
+		klog.Warningf("The Unix socket path %q must be prefixed with \"unix://\". "+
+			"In future releases this can cause an error on the side of the kubelet. "+
+			"Please update your configuration", path)
 		u.Scheme = "unix"
 	}
 	c, err := net.Dial(u.Scheme, u.Path)

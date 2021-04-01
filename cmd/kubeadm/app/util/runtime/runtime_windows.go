@@ -19,6 +19,11 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"k8s.io/klog/v2"
+	"net/url"
+	"strings"
+
 	winio "github.com/Microsoft/go-winio"
 )
 
@@ -29,7 +34,35 @@ const (
 
 // isExistingSocket checks if path exists and is domain socket
 func isExistingSocket(path string) bool {
-	_, err := winio.DialPipe(path, nil)
+	// url.Parse doesn't recognize \, so replace with / first.
+	endpoint := strings.Replace(path, "\\", "/", -1)
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		klog.Warningf("Could not parse the Windows container runtime endpoint: %v", err)
+		return false
+	}
+
+	if u.Scheme == "" {
+		klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+		return false
+	} else if u.Scheme != "tcp" && u.Scheme != "npipe" {
+		klog.Warningf("Protocol %q not supported", u.Scheme)
+		return false
+	}
+
+	var dialPath string
+	if strings.HasPrefix(u.Path, "//./pipe") {
+		dialPath = u.Path
+	} else {
+		// fallback host if not provided.
+		host := u.Host
+		if host == "" {
+			host = "."
+		}
+		dialPath = fmt.Sprintf("//%s%s", host, u.Path)
+	}
+
+	_, err = winio.DialPipe(dialPath, nil)
 	if err != nil {
 		return false
 	}

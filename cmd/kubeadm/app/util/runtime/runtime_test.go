@@ -47,7 +47,7 @@ func TestNewContainerRuntime(t *testing.T) {
 	}{
 		{"valid: default cri socket", execLookPathOK, constants.DefaultDockerCRISocket, true, false},
 		{"valid: cri-o socket url", execLookPathOK, "unix:///var/run/crio/crio.sock", false, false},
-		// not suggested
+		// without unix:// scheme
 		{"valid: cri-o socket path", execLookPathOK, "/var/run/crio/crio.sock", false, false},
 		{"invalid: no crictl", execLookPathErr, "unix:///var/run/crio/crio.sock", false, true},
 	}
