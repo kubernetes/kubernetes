@@ -111,7 +111,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.scan", "-v", "manual")
 	if err != nil {
 		// don't fail if iscsiadm fails or the version does not support node.session.scan - log a warning to highlight the potential exposure
-		klog.Warningf("iscsi: failed to update node with node.session.scan=manual, possible exposure to issue 90982: %v", out)
+		klog.InfoS("iscsi: failed to update node with node.session.scan=manual, possible exposure to issue 90982", "execResult", out)
 	}
 
 	if !b.chapSession {
@@ -256,7 +256,7 @@ func scanOneLun(hostNumber int, lunNumber int) error {
 		return fmt.Errorf("no data written to file: %s", filename)
 	}
 
-	klog.V(3).Infof("Scanned SCSI host %d LUN %d", hostNumber, lunNumber)
+	klog.V(3).InfoS("Scanned SCSI", "host", hostNumber, "lun", lunNumber)
 	return nil
 }
 
@@ -294,7 +294,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	out, err := execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
-		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, out)
+		klog.ErrorS(err, "iscsi: could not read iface", "iface", b.InitIface, "execResult", out)
 		return "", err
 	}
 
@@ -306,7 +306,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	// so create it and copy parameters from the pre-configured one
 	if b.InitiatorName != "" {
 		if err = cloneIface(b); err != nil {
-			klog.Errorf("iscsi: failed to clone iface: %s error: %v", b.InitIface, err)
+			klog.ErrorS(err, "iscsi: failed to clone iface", "iface", b.InitIface)
 			return "", err
 		}
 	}
@@ -322,18 +322,18 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).Infof("AttachDisk portal->host map for %s is %v", b.Iqn, portalHostMap)
+	klog.V(4).InfoS("AttachDisk portal->host map for iqn", "iqn", b.Iqn, "portal", portalHostMap)
 
 	for i := 1; i <= maxAttachAttempts; i++ {
 		for _, tp := range bkpPortal {
 			if _, found := devicePaths[tp]; found {
-				klog.V(4).Infof("Device for portal %q already known", tp)
+				klog.V(4).InfoS("Device for portal already known", "portal", tp)
 				continue
 			}
 
 			hostNumber, loggedIn := portalHostMap[tp]
 			if !loggedIn {
-				klog.V(4).Infof("Could not get SCSI host number for portal %s, will attempt login", tp)
+				klog.V(4).InfoS("Could not get SCSI host number for portal, will attempt to login", "portal", tp)
 
 				// build discoverydb and discover iscsi target
 				execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new")
@@ -373,7 +373,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				_, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
 				if err != nil {
 					// don't fail if we can't set startup mode, but log warning so there is a clue
-					klog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
+					klog.InfoS("Warning: Failed to set iSCSI login mode to manual", "err", err)
 				}
 
 				// Rebuild the host map after logging in
@@ -381,16 +381,16 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				if err != nil {
 					return "", err
 				}
-				klog.V(6).Infof("AttachDisk portal->host map for %s is %v", b.Iqn, portalHostMap)
+				klog.V(6).InfoS("AttachDisk portal->host map for iSCSI", "iqn", b.Iqn, "portal", portalHostMap)
 
 				hostNumber, loggedIn = portalHostMap[tp]
 				if !loggedIn {
-					klog.Warningf("Could not get SCSI host number for portal %s after logging in", tp)
+					klog.InfoS("Could not get SCSI host number for portal after logging in", "portal", tp)
 					continue
 				}
 			}
 
-			klog.V(5).Infof("AttachDisk: scanning SCSI host %d LUN %s", hostNumber, b.Lun)
+			klog.V(5).InfoS("AttachDisk: scanning SCSI", "host", hostNumber, "lun", b.Lun)
 			lunNumber, err := strconv.Atoi(b.Lun)
 			if err != nil {
 				return "", fmt.Errorf("AttachDisk: lun is not a number: %s\nError: %v", b.Lun, err)
@@ -403,8 +403,9 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			}
 
 			if iscsiTransport == "" {
-				klog.Errorf("iscsi: could not find transport name in iface %s", b.Iface)
-				return "", fmt.Errorf("could not parse iface file for %s", b.Iface)
+				parseError := fmt.Errorf("Could not parse iface file for %s", b.Iface)
+				klog.ErrorS(parseError, "iscsi: could not find transport name in iface")
+				return "", parseError
 			}
 			if iscsiTransport == "tcp" {
 				devicePath = strings.Join([]string{"/dev/disk/by-path/ip", tp, "iscsi", b.Iqn, "lun", b.Lun}, "-")
@@ -414,36 +415,37 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 			if exist := waitForPathToExist(&devicePath, deviceDiscoveryTimeout, iscsiTransport); !exist {
 				msg := fmt.Sprintf("Timed out waiting for device at path %s after %ds", devicePath, deviceDiscoveryTimeout)
-				klog.Error(msg)
 				// update last error
 				lastErr = errors.New(msg)
+				klog.ErrorS(lastErr, "Failed to find device")
 				continue
 			} else {
 				devicePaths[tp] = devicePath
 			}
 		}
-		klog.V(4).Infof("iscsi: tried all devices for %q %d times, %d paths found", b.Iqn, i, len(devicePaths))
+		klog.V(4).InfoS("iscsi: tried all devices for iSCSI, and several device paths found",
+			"iqn", b.Iqn, "times", i, "numberOfPaths", len(devicePaths))
 		if len(devicePaths) == 0 {
 			// No path attached, report error and stop trying. kubelet will try again in a short while
 			// delete cloned iface
 			execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
-			klog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
+			klog.ErrorS(lastErr, "iscsi: failed to get any path for iscsi disk")
 			return "", fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 		}
 		if len(devicePaths) == len(bkpPortal) {
 			// We have all paths
-			klog.V(4).Infof("iscsi: all devices for %q found", b.Iqn)
+			klog.V(4).InfoS("iscsi: all devices for iSCSI found", "iqn", b.Iqn)
 			break
 		}
 		if len(devicePaths) >= minMultipathCount && i >= minAttachAttempts {
 			// We have at least two paths for multipath and we tried the other paths long enough
-			klog.V(4).Infof("%d devices found for %q", len(devicePaths), b.Iqn)
+			klog.V(4).InfoS("Several devices found for iSCSI", "numberOfPath", len(devicePaths), "iqn", b.Iqn)
 			break
 		}
 	}
 
 	if lastErr != nil {
-		klog.Errorf("iscsi: last error occurred during iscsi init:\n%v", lastErr)
+		klog.ErrorS(lastErr, "iscsi: last error occurred during iscsi init")
 	}
 
 	devicePathList := []string{}
@@ -466,7 +468,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		devicePath = devicePathList[0]
 	}
 
-	klog.V(5).Infof("iscsi: AttachDisk devicePath: %s", devicePath)
+	klog.V(5).InfoS("iscsi: AttachDisk device path", "devicePath", devicePath)
 
 	if err = util.persistISCSI(b); err != nil {
 		// Return uncertain error so kubelet calls Unmount / Unmap when the pod
@@ -479,7 +481,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 // persistISCSI saves iSCSI volume configuration for DetachDisk into global
 // mount / map directory.
 func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
-	klog.V(5).Infof("iscsi: AttachDisk volumeMode: %s", b.volumeMode)
+	klog.V(5).InfoS("iscsi: AttachDisk with volume mode", "volumeMode", b.volumeMode)
 	var globalPDPath string
 	if b.volumeMode == v1.PersistentVolumeBlock {
 		globalPDPath = b.manager.MakeGlobalVDPDName(*b.iscsiDisk)
@@ -488,7 +490,7 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 	}
 
 	if err := os.MkdirAll(globalPDPath, 0750); err != nil {
-		klog.Errorf("iscsi: failed to mkdir %s, error", globalPDPath)
+		klog.ErrorS(err, "iscsi: failed to mkdir", "path", globalPDPath)
 		return err
 	}
 
@@ -502,7 +504,7 @@ func (util *ISCSIUtil) persistISCSI(b iscsiDiskMounter) error {
 			// persisted the volume metadata. In addition, the metadata is actually *inside*
 			// globalPDPath and we can't write it here, because it was shadowed by the volume
 			// mount.
-			klog.V(4).Infof("Skipping persistISCSI, the volume is already mounted at %s", globalPDPath)
+			klog.V(4).InfoS("Skipping persistISCSI, the volume is already mounted at plugin path", "pluginPath", globalPDPath)
 			return nil
 		}
 	}
@@ -526,7 +528,7 @@ func deleteDevice(deviceName string) error {
 	} else if 0 == written {
 		return fmt.Errorf("no data written to file: %s", filename)
 	}
-	klog.V(4).Infof("Deleted block device: %s", deviceName)
+	klog.V(4).InfoS("Deleted block device", "deviceName", deviceName)
 	return nil
 }
 
@@ -535,14 +537,14 @@ func deleteDevice(deviceName string) error {
 func deleteDevices(c iscsiDiskUnmounter) error {
 	lunNumber, err := strconv.Atoi(c.iscsiDisk.Lun)
 	if err != nil {
-		klog.Errorf("iscsi delete devices: lun is not a number: %s\nError: %v", c.iscsiDisk.Lun, err)
+		klog.ErrorS(err, "iscsi delete devices: lun is not a number", "lun", c.iscsiDisk.Lun)
 		return err
 	}
 	// Enumerate the devices so we can delete them
 	deviceNames, err := c.deviceUtil.FindDevicesForISCSILun(c.iscsiDisk.Iqn, lunNumber)
 	if err != nil {
-		klog.Errorf("iscsi delete devices: could not get devices associated with LUN %d on target %s\nError: %v",
-			lunNumber, c.iscsiDisk.Iqn, err)
+		klog.ErrorS(err, "iscsi delete devices: could not get devices associated with LUN on target iSCSI",
+			"lun", lunNumber, "iqn", c.iscsiDisk.Iqn)
 		return err
 	}
 	// Find the multipath device path(s)
@@ -558,15 +560,15 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	for mpathDevice := range mpathDevices {
 		_, err = c.exec.Command("multipath", "-f", mpathDevice).CombinedOutput()
 		if err != nil {
-			klog.Warningf("Warning: Failed to flush multipath device map: %s\nError: %v", mpathDevice, err)
+			klog.InfoS("Warning: Failed to flush multipath device map", "device", mpathDevice, "err", err)
 			// Fall through -- keep deleting the block devices
 		}
-		klog.V(4).Infof("Flushed multipath device: %s", mpathDevice)
+		klog.V(4).InfoS("Flushed multipath device", "device", mpathDevice)
 	}
 	for _, deviceName := range deviceNames {
 		err = deleteDevice(deviceName)
 		if err != nil {
-			klog.Warningf("Warning: Failed to delete block device: %s\nError: %v", deviceName, err)
+			klog.InfoS("Warning: Failed to delete block device", "device", deviceName, "err", err)
 			// Fall through -- keep deleting other block devices
 		}
 	}
@@ -578,7 +580,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	if pathExists, pathErr := mount.PathExists(mntPath); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", mntPath)
+		klog.InfoS("Warning: Unmount skipped because path does not exist", "mountedPath", mntPath)
 		return nil
 	}
 
@@ -588,7 +590,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 	}
 	if !notMnt {
 		if err := c.mounter.Unmount(mntPath); err != nil {
-			klog.Errorf("iscsi detach disk: failed to unmount: %s\nError: %v", mntPath, err)
+			klog.ErrorS(err, "iscsi detach disk: failed to unmount volume", "mountedPath", mntPath)
 			return err
 		}
 	}
@@ -624,7 +626,7 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 
 	// Delete all the scsi devices and any multipath devices after unmounting
 	if err = deleteDevices(c); err != nil {
-		klog.Warningf("iscsi detach disk: failed to delete devices\nError: %v", err)
+		klog.InfoS("iscsi detach disk: failed to delete devices", "err", err)
 		// Fall through -- even if deleting fails, a logout may fix problems
 	}
 
@@ -654,7 +656,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	if pathExists, pathErr := mount.PathExists(mapPath); pathErr != nil {
 		return fmt.Errorf("error checking if path exists: %w", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmap skipped because path does not exist: %v", mapPath)
+		klog.InfoS("Warning: Unmap skipped because path does not exist", "path", mapPath)
 		return nil
 	}
 	// If we arrive here, device is no longer used, see if need to logout the target
@@ -695,7 +697,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	}
 
 	devicePath := getDevByPath(portals[0], iqn, lun)
-	klog.V(5).Infof("iscsi: devicePath: %s", devicePath)
+	klog.V(5).InfoS("iscsi: get device path", "devicePath", devicePath)
 	if _, err = os.Stat(devicePath); err != nil {
 		return fmt.Errorf("failed to validate devicePath: %s", devicePath)
 	}
@@ -725,19 +727,19 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 			logoutArgs = append(logoutArgs, []string{"-I", iface}...)
 			deleteArgs = append(deleteArgs, []string{"-I", iface}...)
 		}
-		klog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
+		klog.InfoS("iscsi: log out target portal with iqn and iface", "portal", portal, "iqn", iqn, "iface", iface)
 		out, err := exec.Command("iscsiadm", logoutArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
-			klog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
+			klog.ErrorS(err, "iscsi: failed to detach disk", "execResult", string(out))
 			return err
 		}
 		// Delete the node record
-		klog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
+		klog.InfoS("iscsi: delete node record target portal with iqn", "portal", portal, "iqn", iqn)
 		out, err = exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
-			klog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
+			klog.ErrorS(err, "iscsi: failed to delete node record", "execResult", string(out))
 			return err
 		}
 	}
@@ -748,7 +750,7 @@ func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string
 		out, err := exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
-			klog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
+			klog.ErrorS(err, "iscsi: failed to delete iface", "execResult", string(out))
 			return err
 		}
 	}
@@ -873,7 +875,7 @@ func cloneIface(b iscsiDiskMounter) error {
 	if err != nil {
 		exit, ok := err.(utilexec.ExitError)
 		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
-			klog.Infof("iscsi: there is a session already logged in with iface %s", b.Iface)
+			klog.InfoS("iscsi: there is a session already logged in with iface", "iface", b.Iface)
 		} else {
 			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", out, err)
 			return lastErr
@@ -902,14 +904,14 @@ func isSessionBusy(host volume.VolumeHost, portal, iqn string) bool {
 	fsDir := host.GetPluginDir(iscsiPluginName)
 	countFS, err := getVolCount(fsDir, portal, iqn)
 	if err != nil {
-		klog.Errorf("iscsi: could not determine FS volumes in use: %v", err)
+		klog.ErrorS(err, "iscsi: could not determine FS volumes in use")
 		return true
 	}
 
 	blockDir := host.GetVolumeDevicePluginDir(iscsiPluginName)
 	countBlock, err := getVolCount(blockDir, portal, iqn)
 	if err != nil {
-		klog.Errorf("iscsi: could not determine block volumes in use: %v", err)
+		klog.ErrorS(err, "iscsi: could not determine block volumes in use")
 		return true
 	}
 
@@ -961,7 +963,7 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 	}
 	for _, code := range ignoredExitCodes {
 		if exitError.ExitStatus() == code {
-			klog.V(4).Infof("ignored iscsiadm exit code %d", code)
+			klog.V(4).InfoS("ignored iscsiadm exit code", "exitCode", code)
 			return nil
 		}
 	}
@@ -973,8 +975,8 @@ func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error)
 	out, err := b.exec.Command(cmd, args...).CombinedOutput()
 	if klog.V(5).Enabled() {
 		d := time.Since(start)
-		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
-		klog.V(5).Infof("Output: %s", string(out))
+		klog.V(5).InfoS("Executed command with args in a period of time", "command", cmd, "args", args, "duration", d)
+		klog.V(5).InfoS("Executed command leads to output", "output", string(out), "err", err)
 	}
 	return string(out), err
 }
