@@ -591,40 +591,41 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobComplete, v1.ConditionFalse, "", "")
 			jobConditionsChanged = jobConditionsChanged || isUpdated
 		}
-		if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
-			// Update the conditions / emit events only if manageJob was called in
-			// this syncJob. Otherwise wait for the right syncJob call to make
-			// updates.
-			if job.Spec.Suspend != nil && *job.Spec.Suspend {
-				// Job can be in the suspended state only if it is NOT completed.
-				job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended")
-				jobConditionsChanged = jobConditionsChanged || isUpdated
-				if isUpdated {
-					jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
-				}
-			} else {
-				// Job not suspended. We want a different reason/message for a Job that
-				// has never been suspended and a Job that was resumed.
-				if hasCondition(job.Status.Conditions, batch.JobSuspended) {
-					job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
-					jobConditionsChanged = jobConditionsChanged || isUpdated
-					if isUpdated {
-						jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
-						// Resumed jobs will always reset StartTime to current time. This is
-						// done because the ActiveDeadlineSeconds timer shouldn't go off
-						// whilst the Job is still suspended and resetting StartTime is
-						// consistent with resuming a Job created in the suspended state.
-						// (ActiveDeadlineSeconds is interpreted as the number of seconds a
-						// Job is continuously active.)
-						now := metav1.Now()
-						job.Status.StartTime = &now
-					}
-				} else {
-					// This will be executed exactly once (only if the feature gate is
-					// enabled, of course).
-					job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "", "")
-					jobConditionsChanged = jobConditionsChanged || isUpdated
-				}
+
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) {
+			job.Status.Conditions, isUpdated = removeJobCondition(job.Status.Conditions, batch.JobSuspended)
+			jobConditionsChanged = jobConditionsChanged || isUpdated
+		} else if !hasCondition(job.Status.Conditions, batch.JobSuspended) {
+			// The feature gate is enabled, but the condition doesn't exist. This
+			// should never happen, insert the default placeholder with status false.
+			// This will be executed exactly once.
+			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "", "")
+			jobConditionsChanged = jobConditionsChanged || isUpdated
+		}
+		if !utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) || complete || !manageJobCalled {
+			// Do nothing. We only update from suspended -> resumed or vice versa
+			// only if manageJob was called in this syncJob. Otherwise wait for the
+			// right syncJob call to make updates. Also, completed Jobs cannot be
+			// suspended.
+		} else if job.Spec.Suspend != nil && *job.Spec.Suspend {
+			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionTrue, "JobSuspended", "Job suspended")
+			jobConditionsChanged = jobConditionsChanged || isUpdated
+			if isUpdated {
+				jm.recorder.Event(&job, v1.EventTypeNormal, "Suspended", "Job suspended")
+			}
+		} else {
+			job.Status.Conditions, isUpdated = ensureJobConditionStatus(job.Status.Conditions, batch.JobSuspended, v1.ConditionFalse, "JobResumed", "Job resumed")
+			jobConditionsChanged = jobConditionsChanged || isUpdated
+			if isUpdated {
+				jm.recorder.Event(&job, v1.EventTypeNormal, "Resumed", "Job resumed")
+				// Resumed jobs will always reset StartTime to current time. This is
+				// done because the ActiveDeadlineSeconds timer shouldn't go off
+				// whilst the Job is still suspended and resetting StartTime is
+				// consistent with resuming a Job created in the suspended state.
+				// (ActiveDeadlineSeconds is interpreted as the number of seconds a
+				// Job is continuously active.)
+				now := metav1.Now()
+				job.Status.StartTime = &now
 			}
 		}
 	}
@@ -985,8 +986,8 @@ func errorFromChannel(errCh <-chan error) error {
 }
 
 // ensureJobConditionStatus appends or updates an existing job condition of the
-// given type with the given status value. The function returns a bool to let
-// the caller know if the list was changed (either appended or updated).
+// given type with the given status value. The function also returns a bool to
+// let the caller know if the list was updated.
 func ensureJobConditionStatus(list []batch.JobCondition, cType batch.JobConditionType, status v1.ConditionStatus, reason, message string) ([]batch.JobCondition, bool) {
 	for i := range list {
 		if list[i].Type == cType {
@@ -1013,4 +1014,21 @@ func hasCondition(list []batch.JobCondition, cType batch.JobConditionType) bool 
 		}
 	}
 	return false
+}
+
+// removeJobCondition removes a Job condition of the given type from a list.
+// You must not use this feature to signal that a condition is false; instead
+// use the JobCondition.Status field to do that. This should only be used when
+// a JobCondition should never be present (e.g. when a feature gate is
+// disabled). The function also returns a bool to let the caller know if the
+// list was updated.
+func removeJobCondition(list []batch.JobCondition, cType batch.JobConditionType) ([]batch.JobCondition, bool) {
+	var result []batch.JobCondition
+	for _, jc := range list {
+		if jc.Type == cType {
+			continue
+		}
+		result = append(result, jc)
+	}
+	return result, len(result) != len(list)
 }
