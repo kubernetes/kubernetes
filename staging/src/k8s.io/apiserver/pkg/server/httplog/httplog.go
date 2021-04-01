@@ -156,7 +156,7 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 }
 
 func (rl *respLogger) LogArgs() []interface{} {
-	latency := time.Since(rl.startTime)
+	latency := int64(time.Since(rl.startTime))
 	if rl.hijacked {
 		return []interface{}{
 			"verb", rl.req.Method,
