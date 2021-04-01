@@ -693,6 +693,16 @@ EOF
 
 # Set up the inplace agent.
 function gke-setup-inplace {
+  # Setup inplace master pod manifests: inplace-run-once downloads the
+  # component manifests to
+  # ${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/in-place and -setup moves the
+  # master pod manifests to /etc/kubernetes/manifests before cluster starts up.
+  echo "Setup inplace master pod manifests"
+  local src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/in-place"
+  if [[ -d  "${src_dir}" ]]; then
+    copy-manifests "${src_dir}" "/etc/kubernetes/manifests"
+  fi
+  mv ${KUBE_HOME}/inplace/in-place-status.yaml ${KUBE_HOME}/inplace/in-place-status.init.yaml
   cat <<EOF >/etc/systemd/system/inplace.service
 # Systemd configuration for inplace server
 [Unit]
@@ -712,16 +722,6 @@ EOF
 
   systemctl daemon-reload
   systemctl start inplace.service
-}
-
-# Setup inplace master pods manifests
-function setup-inplace-master-pod-manifests {
-  echo "Setup inplace master pod manifests"
-  local src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/in-place"
-  if [[ -d  "${src_dir}" ]]; then
-    copy-manifests "${src_dir}" "/etc/kubernetes/manifests"
-  fi
-  mv ${KUBE_HOME}/inplace/in-place-status.yaml ${KUBE_HOME}/inplace/in-place-status.init.yaml
 }
 
 function deploy-etcd-via-kube-up {
