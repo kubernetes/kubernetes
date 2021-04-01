@@ -161,18 +161,14 @@ PATH=$(dirname "${e2e_test}"):"${PATH}"
 export PATH
 
 # Choose the program to execute.
-program="${ginkgo}"
-program_args="${ginkgo_args[@]}"
+program=("${ginkgo}")
 if [[ "${E2E_TEST_DEBUG_TOOL}" == "delve" ]]; then
-  program="dlv"
-  program_args=("exec")
-fi
-if [[ "${E2E_TEST_DEBUG_TOOL}" == "gdb" ]]; then
-  program="gdb"
-  program_args=("")
+  program=("dlv" "exec")
+elif [[ "${E2E_TEST_DEBUG_TOOL}" == "gdb" ]]; then
+  program=("gdb")
 fi
 
-"${program}" "${program_args[@]:+${program_args[@]}}" "${e2e_test}" -- \
+"${program[@]}" "${ginkgo_args[@]:+${ginkgo_args[@]}}" "${e2e_test}" -- \
   "${auth_config[@]:+${auth_config[@]}}" \
   --ginkgo.flakeAttempts="${FLAKE_ATTEMPTS}" \
   --host="${KUBE_MASTER_URL}" \
