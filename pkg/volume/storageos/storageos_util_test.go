@@ -222,10 +222,4 @@ func TestAttachVolume(t *testing.T) {
 		},
 		deviceDir: tmpDir,
 	}
-	if err != nil {
-		t.Errorf("Failed to make a new Mounter: %v", err)
-	}
-	if mounter == nil {
-		t.Errorf("Got a nil Mounter")
-	}
 }
