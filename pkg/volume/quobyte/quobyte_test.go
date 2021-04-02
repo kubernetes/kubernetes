@@ -91,14 +91,14 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*quobytePlugin).newMounterInternal(spec, pod, mount.NewFakeMounter(nil))
-	volumePath := mounter.GetPath()
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
-		t.Error("Got a nil Mounter")
+		t.Fatal("Got a nil Mounter")
 	}
 
+	volumePath := mounter.GetPath()
 	if volumePath != fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir) {
 		t.Errorf("Got unexpected path: %s expected: %s", volumePath, fmt.Sprintf("%s/plugins/kubernetes.io~quobyte/root#root@vol", tmpDir))
 	}
