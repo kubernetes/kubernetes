@@ -314,7 +314,12 @@ var _ = SIGDescribe("DisruptionController", func() {
 		})
 	}
 
-	ginkgo.It("should block an eviction until the PDB is updated to allow it", func() {
+	/*
+		Release : v1.22
+		Testname: PodDisruptionBudget: block an eviction until the PDB is updated to allow it
+		Description: Eviction API must block an eviction until the PDB is updated to allow it
+	*/
+	framework.ConformanceIt("should block an eviction until the PDB is updated to allow it", func() {
 		ginkgo.By("Creating a pdb that targets all three pods in a test replica set")
 		createPDBMinAvailableOrDie(cs, ns, defaultName, intstr.FromInt(3), defaultLabels)
 		createReplicaSetOrDie(cs, ns, 3, false)
