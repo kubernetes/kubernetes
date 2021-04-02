@@ -24,12 +24,14 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -103,35 +105,21 @@ type waitForDeleteParams struct {
 
 // CheckEvictionSupport uses Discovery API to find out if the server support
 // eviction subresource If support, it will return its groupVersion; Otherwise,
-// it will return an empty string
-func CheckEvictionSupport(clientset kubernetes.Interface) (string, error) {
+// it will return an empty GroupVersion
+func CheckEvictionSupport(clientset kubernetes.Interface) (schema.GroupVersion, error) {
 	discoveryClient := clientset.Discovery()
-	groupList, err := discoveryClient.ServerGroups()
-	if err != nil {
-		return "", err
-	}
-	foundPolicyGroup := false
-	var policyGroupVersion string
-	for _, group := range groupList.Groups {
-		if group.Name == "policy" {
-			foundPolicyGroup = true
-			policyGroupVersion = group.PreferredVersion.GroupVersion
-			break
-		}
-	}
-	if !foundPolicyGroup {
-		return "", nil
-	}
+
+	// version info available in subresources since v1.8.0 in https://github.com/kubernetes/kubernetes/pull/49971
 	resourceList, err := discoveryClient.ServerResourcesForGroupVersion("v1")
 	if err != nil {
-		return "", err
+		return schema.GroupVersion{}, err
 	}
 	for _, resource := range resourceList.APIResources {
-		if resource.Name == EvictionSubresource && resource.Kind == EvictionKind {
-			return policyGroupVersion, nil
+		if resource.Name == EvictionSubresource && resource.Kind == EvictionKind && len(resource.Group) > 0 && len(resource.Version) > 0 {
+			return schema.GroupVersion{Group: resource.Group, Version: resource.Version}, nil
 		}
 	}
-	return "", nil
+	return schema.GroupVersion{}, nil
 }
 
 func (d *Helper) makeDeleteOptions() metav1.DeleteOptions {
@@ -157,7 +145,7 @@ func (d *Helper) DeletePod(pod corev1.Pod) error {
 }
 
 // EvictPod will evict the give pod, or return an error if it couldn't
-func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
+func (d *Helper) EvictPod(pod corev1.Pod, evictionGroupVersion schema.GroupVersion) error {
 	if d.DryRunStrategy == cmdutil.DryRunServer {
 		if err := d.DryRunVerifier.HasSupport(pod.GroupVersionKind()); err != nil {
 			return err
@@ -165,20 +153,30 @@ func (d *Helper) EvictPod(pod corev1.Pod, policyGroupVersion string) error {
 	}
 
 	delOpts := d.makeDeleteOptions()
-	eviction := &policyv1beta1.Eviction{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyGroupVersion,
-			Kind:       EvictionKind,
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-		},
-		DeleteOptions: &delOpts,
-	}
 
-	// Remember to change change the URL manipulation func when Eviction's version change
-	return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(d.getContext(), eviction)
+	switch evictionGroupVersion {
+	case policyv1.SchemeGroupVersion:
+		// send policy/v1 if the server supports it
+		eviction := &policyv1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+			DeleteOptions: &delOpts,
+		}
+		return d.Client.PolicyV1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+
+	default:
+		// otherwise, fall back to policy/v1beta1, supported by all servers that support the eviction subresource
+		eviction := &policyv1beta1.Eviction{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: pod.Namespace,
+			},
+			DeleteOptions: &delOpts,
+		}
+		return d.Client.PolicyV1beta1().Evictions(eviction.Namespace).Evict(context.TODO(), eviction)
+	}
 }
 
 // GetPodsForDeletion receives resource info for a node, and returns those pods as PodDeleteList,
@@ -259,20 +257,20 @@ func (d *Helper) DeleteOrEvictPods(pods []corev1.Pod) error {
 	}
 
 	if !d.DisableEviction {
-		policyGroupVersion, err := CheckEvictionSupport(d.Client)
+		evictionGroupVersion, err := CheckEvictionSupport(d.Client)
 		if err != nil {
 			return err
 		}
 
-		if len(policyGroupVersion) > 0 {
-			return d.evictPods(pods, policyGroupVersion, getPodFn)
+		if !evictionGroupVersion.Empty() {
+			return d.evictPods(pods, evictionGroupVersion, getPodFn)
 		}
 	}
 
 	return d.deletePods(pods, getPodFn)
 }
 
-func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
+func (d *Helper) evictPods(pods []corev1.Pod, evictionGroupVersion schema.GroupVersion, getPodFn func(namespace, name string) (*corev1.Pod, error)) error {
 	returnCh := make(chan error, 1)
 	// 0 timeout means infinite, we use MaxInt64 to represent it.
 	var globalTimeout time.Duration
@@ -313,7 +311,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					refreshPod = false
 				}
 
-				err := d.EvictPod(activePod, policyGroupVersion)
+				err := d.EvictPod(activePod, evictionGroupVersion)
 				if err == nil {
 					break
 				} else if apierrors.IsNotFound(err) {
