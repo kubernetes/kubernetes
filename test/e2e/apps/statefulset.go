@@ -160,6 +160,36 @@ var _ = SIGDescribe("StatefulSet", func() {
 			framework.ExpectNoError(e2estatefulset.ExecInStatefulPods(c, ss, cmd))
 		})
 
+		ginkgo.It("should run the lifecycle of a StatefulSet", func() {
+			ss = e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 0, nil, nil, labels)
+
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			_, err := c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err, "failed to create StatefulSet")
+
+			ginkgo.By("Patching the statefulset")
+			statefulPatch, err := json.Marshal(map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"labels": map[string]string{"test-statefulset": "patched"},
+				},
+			})
+			framework.ExpectNoError(err, "failed to marshal statefulset JSON patch")
+			_, err = f.ClientSet.AppsV1().StatefulSets(ns).Patch(context.TODO(), ssName, types.StrategicMergePatchType, []byte(statefulPatch), metav1.PatchOptions{})
+			framework.ExpectNoError(err, "failed to patch statefulset")
+
+			ginkgo.By("Fetching all statefulsets in namespace " + ns)
+			_, err = c.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err, "failed to fetch all statefulsets")
+
+			ginkgo.By("Deleting all statefulsets in namespace " + ns)
+			err = c.AppsV1().StatefulSets(ns).DeleteCollection(context.TODO(), metav1.DeleteOptions{}, metav1.ListOptions{})
+			framework.ExpectNoError(err, "failed to delete a collection of statefulsets")
+
+			ginkgo.By("Validating that all statefulsets were deleted")
+			err = wait.PollImmediate(statefulSetPoll, statefulSetTimeout, waitAllStatefulSetDeleted(c, ns))
+			framework.ExpectNoError(err, "error waiting for all statefulsets to be completely delete")
+		})
+
 		// This can't be Conformance yet because it depends on a default
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
@@ -1367,6 +1397,19 @@ func updateStatefulSetWithRetries(c clientset.Interface, namespace, name string,
 		pollErr = fmt.Errorf("couldn't apply the provided updated to stateful set %q: %v", name, updateErr)
 	}
 	return statefulSet, pollErr
+}
+
+func waitAllStatefulSetDeleted(c clientset.Interface, ns string) func() (bool, error) {
+	return func() (bool, error) {
+		statefulSetList, err := c.AppsV1().StatefulSets(ns).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, fmt.Errorf("failed to fetch all statefulsets: %v", err)
+		}
+		if len(statefulSetList.Items) > 0 {
+			return false, nil
+		}
+		return true, nil
+	}
 }
 
 // getStatefulSet gets the StatefulSet named name in namespace.
