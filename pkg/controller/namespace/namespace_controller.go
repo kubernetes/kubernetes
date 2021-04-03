@@ -154,7 +154,7 @@ func (nm *NamespaceController) worker() {
 
 		if estimate, ok := err.(*deletion.ResourcesRemainingError); ok {
 			t := estimate.Estimate/2 + 1
-			klog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
+			klog.V(4).InfoS("Content remaining in Namespace", "namespace", key, "waitingSeconds", t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
@@ -177,12 +177,12 @@ func (nm *NamespaceController) worker() {
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing Namespace", "namespace", key, "timeElapsed", time.Since(startTime))
 	}()
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {
-		klog.Infof("Namespace has been deleted %v", key)
+		klog.InfoS("Namespace has been deleted", "namespace", key)
 		return nil
 	}
 	if err != nil {
@@ -197,14 +197,14 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 
-	klog.Infof("Starting namespace controller")
-	defer klog.Infof("Shutting down namespace controller")
+	klog.InfoS("Starting Namespace controller")
+	defer klog.InfoS("Shutting down Namespace controller")
 
 	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 
-	klog.V(5).Info("Starting workers of namespace controller")
+	klog.V(5).InfoS("Starting workers of Namespace controller")
 	for i := 0; i < workers; i++ {
 		go wait.Until(nm.worker, time.Second, stopCh)
 	}

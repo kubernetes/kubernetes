@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -169,8 +169,8 @@ func (jm *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer jm.queue.ShutDown()
 	defer jm.orphanQueue.ShutDown()
 
-	klog.Infof("Starting job controller")
-	defer klog.Infof("Shutting down job controller")
+	klog.InfoS("Starting job controller")
+	defer klog.InfoS("Shutting down job controller")
 
 	if !cache.WaitForNamedCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
@@ -377,7 +377,7 @@ func (jm *Controller) updateJob(old, cur interface{}) {
 			total := time.Duration(*curADS) * time.Second
 			// AddAfter will handle total < passed
 			jm.queue.AddAfter(key, total-passed)
-			klog.V(4).Infof("job %q ActiveDeadlineSeconds updated, will rsync after %d seconds", key, total-passed)
+			klog.V(4).InfoS("Job ActiveDeadlineSeconds updated, will rsync after seconds", "job", key, "rsyncWaitSeconds", total-passed)
 		}
 	}
 }
@@ -554,7 +554,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing job", "job", key, "syncDuration", time.Since(startTime))
 	}()
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
@@ -567,7 +567,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	sharedJob, err := jm.jobLister.Jobs(ns).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("Job has been deleted: %v", key)
+			klog.V(4).InfoS("Job has been deleted", "job", key)
 			jm.expectations.DeleteExpectations(key)
 			return true, nil
 		}
@@ -640,8 +640,8 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		job.Status.StartTime = &now
 		// enqueue a sync to check if job past ActiveDeadlineSeconds
 		if job.Spec.ActiveDeadlineSeconds != nil {
-			klog.V(4).Infof("Job %s has ActiveDeadlineSeconds will sync after %d seconds",
-				key, *job.Spec.ActiveDeadlineSeconds)
+			klog.V(4).InfoS("Job has ActiveDeadlineSeconds and will sync",
+				"job", key, "timeUntilSync", *job.Spec.ActiveDeadlineSeconds)
 			jm.queue.AddAfter(key, time.Duration(*job.Spec.ActiveDeadlineSeconds)*time.Second)
 		}
 	}
@@ -1231,7 +1231,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 
 		jm.expectations.ExpectCreations(jobKey, int(diff))
 		errCh := make(chan error, diff)
-		klog.V(4).Infof("Too few pods running job %q, need %d, creating %d", jobKey, wantActive, diff)
+		klog.V(4).InfoS("Too few Pods running Job", "job", jobKey, "neededJobs", wantActive, "creatingJobs", diff)
 
 		wait := sync.WaitGroup{}
 
@@ -1287,7 +1287,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 					if err != nil {
 						defer utilruntime.HandleError(err)
 						// Decrement the expected number of creates because the informer won't observe this pod
-						klog.V(2).Infof("Failed creation, decrementing expectations for job %q/%q", job.Namespace, job.Name)
+						klog.V(2).InfoS("Failed creation, decrementing expectations for Job", "job", klog.KObj(job))
 						jm.expectations.CreationObserved(jobKey)
 						atomic.AddInt32(&active, -1)
 						errCh <- err
@@ -1298,7 +1298,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 			// any skipped pods that we never attempted to start shouldn't be expected.
 			skippedPods := diff - batchSize
 			if errorCount < len(errCh) && skippedPods > 0 {
-				klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for job %q/%q", skippedPods, job.Namespace, job.Name)
+				klog.V(2).InfoS("Slow-start failure. Skipping creation of Pods, decrementing expectations for Job", "skippedPods", skippedPods, "job", klog.KObj(job))
 				active -= skippedPods
 				for i := int32(0); i < skippedPods; i++ {
 					// Decrement the expected number of creates because the informer won't observe this pod
