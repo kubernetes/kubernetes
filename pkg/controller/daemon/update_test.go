@@ -313,7 +313,7 @@ func setPodReadiness(t *testing.T, dsc *daemonSetsController, ready bool, count 
 		// TODO: workaround UpdatePodCondition calling time.Now() directly
 		setCondition := podutil.GetPodReadyCondition(pod.Status)
 		setCondition.LastTransitionTime.Time = dsc.failedPodsBackoff.Clock.Now()
-		klog.Infof("marked pod %s ready=%t", pod.Name, ready)
+		klog.InfoS("marked pod ready", "pod", klog.KObj(pod), "status", ready)
 		count--
 	}
 	if count > 0 {

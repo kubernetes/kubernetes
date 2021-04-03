@@ -72,7 +72,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 			newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 			if !ok {
 				// let the manage loop clean up this node, and treat it as an unavailable node
-				klog.V(3).Infof("DaemonSet %s/%s has excess pods on node %s, skipping to allow the core loop to process", ds.Namespace, ds.Name, nodeName)
+				klog.V(3).InfoS("DaemonSet has excess Pods on Node, skipping to allow the core loop to process", "daemonset", klog.KObj(ds), "node", nodeName)
 				numUnavailable++
 				continue
 			}
@@ -91,7 +91,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 				switch {
 				case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
 					// the old pod isn't available, so it needs to be replaced
-					klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date and not available, allowing replacement", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+					klog.V(5).InfoS("DaemonSet Pod on Node is out of date and not available, allowing replacement", "daemonset", klog.KObj(ds), "oldPod", klog.KObj(oldPod), "node", nodeName)
 					// record the replacement
 					if allowedReplacementPods == nil {
 						allowedReplacementPods = make([]string, 0, len(nodeToDaemonPods))
@@ -101,7 +101,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 					// no point considering any other candidates
 					continue
 				default:
-					klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date, this is a candidate to replace", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+					klog.V(5).InfoS("DaemonSet Pod on Node is out of date, this is a candidate to replace", "daemonset", klog.KObj(ds), "oldPod", klog.KObj(oldPod), "node", nodeName)
 					// record the candidate
 					if candidatePodsToDelete == nil {
 						candidatePodsToDelete = make([]string, 0, maxUnavailable)
@@ -112,7 +112,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 		}
 
 		// use any of the candidates we can, including the allowedReplacemnntPods
-		klog.V(5).Infof("DaemonSet %s/%s allowing %d replacements, up to %d unavailable, %d new are unavailable, %d candidates", ds.Namespace, ds.Name, len(allowedReplacementPods), maxUnavailable, numUnavailable, len(candidatePodsToDelete))
+		klog.V(5).InfoS("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "allowedReplacementPodsCount", len(allowedReplacementPods), "maxUnavailable", maxUnavailable, "numUnavailable", numUnavailable, "candidatePodsToDeleteCount", len(candidatePodsToDelete))
 		remainingUnavailable := maxUnavailable - numUnavailable
 		if remainingUnavailable < 0 {
 			remainingUnavailable = 0
@@ -147,7 +147,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 		newPod, oldPod, ok := findUpdatedPodsOnNode(ds, pods, hash)
 		if !ok {
 			// let the manage loop clean up this node, and treat it as a surge node
-			klog.V(3).Infof("DaemonSet %s/%s has excess pods on node %s, skipping to allow the core loop to process", ds.Namespace, ds.Name, nodeName)
+			klog.V(3).InfoS("DaemonSet has excess Pods on Node, skipping to allow the core loop to process", "daemonSet", klog.KObj(ds), "node", nodeName)
 			numSurge++
 			continue
 		}
@@ -159,7 +159,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 			switch {
 			case !podutil.IsPodAvailable(oldPod, ds.Spec.MinReadySeconds, metav1.Time{Time: now}):
 				// the old pod isn't available, allow it to become a replacement
-				klog.V(5).Infof("Pod %s on node %s is out of date and not available, allowing replacement", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+				klog.V(5).InfoS("Pod on Node is out of date and not available, allowing replacement", "daemonset", klog.KObj(ds), "oldPod", klog.KObj(oldPod), "node", nodeName)
 				// record the replacement
 				if allowedNewNodes == nil {
 					allowedNewNodes = make([]string, 0, len(nodeToDaemonPods))
@@ -169,7 +169,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 				// no point considering any other candidates
 				continue
 			default:
-				klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is out of date, this is a surge candidate", ds.Namespace, ds.Name, oldPod.Name, nodeName)
+				klog.V(5).InfoS("DaemonSet Pod on Node is out of date, this is a surge candidate", "daemonset", klog.KObj(ds), "oldPod", klog.KObj(oldPod), "node", nodeName)
 				// record the candidate
 				if candidateNewNodes == nil {
 					candidateNewNodes = make([]string, 0, maxSurge)
@@ -184,13 +184,13 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 				continue
 			}
 			// we're available, delete the old pod
-			klog.V(5).Infof("DaemonSet %s/%s pod %s on node %s is available, remove %s", ds.Namespace, ds.Name, newPod.Name, nodeName, oldPod.Name)
+			klog.V(5).InfoS("DaemonSet Pod on Node is available", "daemonset", klog.KObj(ds), "newPod", klog.KObj(newPod), "node", nodeName, "oldPod", klog.KObj(oldPod))
 			oldPodsToDelete = append(oldPodsToDelete, oldPod.Name)
 		}
 	}
 
 	// use any of the candidates we can, including the allowedNewNodes
-	klog.V(5).Infof("DaemonSet %s/%s allowing %d replacements, surge up to %d, %d are in progress, %d candidates", ds.Namespace, ds.Name, len(allowedNewNodes), maxSurge, numSurge, len(candidateNewNodes))
+	klog.V(5).InfoS("DaemonSet allowing replacements", "daemonset", klog.KObj(ds), "allowedNewNodesCount", len(allowedNewNodes), "maxSurge", maxSurge, "numSurge", numSurge, "candidateNewNodesCount", len(candidateNewNodes))
 	remainingSurge := maxSurge - numSurge
 	if remainingSurge < 0 {
 		remainingSurge = 0
@@ -509,7 +509,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 		if updateErr != nil {
 			return nil, updateErr
 		}
-		klog.V(2).Infof("Found a hash collision for DaemonSet %q - bumping collisionCount to %d to resolve it", ds.Name, *currDS.Status.CollisionCount)
+		klog.V(2).InfoS("Found a hash collision for DaemonSet - bumping collisionCount to resolve it", "daemonset", klog.KObj(ds), "collisionCount", *currDS.Status.CollisionCount)
 		return nil, outerErr
 	}
 	return history, err
@@ -545,10 +545,10 @@ func (dsc *DaemonSetsController) updatedDesiredNodeCounts(ds *apps.DaemonSet, no
 	// if the daemonset returned with an impossible configuration, obey the default of unavailable=1 (in the
 	// event the apiserver returns 0 for both surge and unavailability)
 	if desiredNumberScheduled > 0 && maxUnavailable == 0 && maxSurge == 0 {
-		klog.Warningf("DaemonSet %s/%s is not configured for surge or unavailability, defaulting to accepting unavailability", ds.Namespace, ds.Name)
+		klog.InfoS("DaemonSet is not configured for surge or unavailability, defaulting to accepting unavailability", "daemonset", klog.KObj(ds))
 		maxUnavailable = 1
 	}
-	klog.V(5).Infof("DaemonSet %s/%s, maxSurge: %d, maxUnavailable: %d", ds.Namespace, ds.Name, maxSurge, maxUnavailable)
+	klog.V(5).InfoS("DaemonSet info", "daemonset", klog.KObj(ds), "maxSurge", maxSurge, "maxUnavailable", maxUnavailable)
 	return maxSurge, maxUnavailable, nil
 }
 
