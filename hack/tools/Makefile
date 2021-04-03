@@ -21,6 +21,7 @@ DEP_PROGS=\
 	$(GOBIN)/prettybench\
 	$(GOBIN)/staticcheck\
 	$(GOBIN)/logcheck\
+	$(GOBIN)/golangci-lint\
 
 .PHONY: all
 all: clean build
@@ -51,3 +52,6 @@ $(GOBIN)/staticcheck: deps
 
 $(GOBIN)/logcheck: deps
 	go install k8s.io/klog/hack/tools/logcheck
+	
+$(GOBIN)/golangci-lint: deps
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint
