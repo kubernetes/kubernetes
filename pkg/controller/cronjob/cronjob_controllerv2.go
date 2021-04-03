@@ -122,8 +122,13 @@ func (jm *ControllerV2) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 
+<<<<<<< HEAD
 	klog.InfoS("Starting cronjob controller v2")
 	defer klog.InfoS("Shutting down cronjob controller v2")
+=======
+	klog.InfoS("Starting CronJob controller v2")
+	defer klog.InfoS("Shutting down CronJob controller v2")
+>>>>>>> Convert controller cronjob files to structured logs
 
 	if !cache.WaitForNamedCacheSync("cronjob", stopCh, jm.jobListerSynced, jm.cronJobListerSynced) {
 		return
@@ -169,8 +174,13 @@ func (jm *ControllerV2) sync(cronJobKey string) (*time.Duration, error) {
 	cronJob, err := jm.cronJobLister.CronJobs(ns).Get(name)
 	switch {
 	case errors.IsNotFound(err):
+<<<<<<< HEAD
 		// may be cronjob is deleted, don't need to requeue this key
 		klog.V(4).InfoS("CronJob not found, may be it is deleted", "cronjob", klog.KRef(ns, name), "err", err)
+=======
+		// may be cronjob is deleted, dont need to requeue this key
+		klog.V(4).InfoS("CronJob not found, maybe it is deleted", "cronjob", klog.KRef(ns, name), "err", err)
+>>>>>>> Convert controller cronjob files to structured logs
 		return nil, nil
 	case err != nil:
 		// for other transient apiserver error requeue with exponential backoff
