@@ -88,7 +88,7 @@ func (f *fakeAPIs) EmitNodeWarningEvent(nodeName, reason, fmtStr string, args ..
 }
 
 func (f *fakeAPIs) ReportResult(err error) {
-	klog.V(2).Infof("ReportResult %v", err)
+	klog.V(2).InfoS("ReportResult", "err", err)
 	f.results = append(f.results, err)
 	if f.reportChan != nil {
 		f.reportChan <- struct{}{}
@@ -104,7 +104,7 @@ func (f *fakeAPIs) ResyncTimeout() time.Duration {
 
 func (f *fakeAPIs) dumpTrace() {
 	for i, x := range f.calls {
-		klog.Infof("trace %v: %v", i, x)
+		klog.InfoS("Trace", "traceIndex", i, "traceValue", x)
 	}
 }
 

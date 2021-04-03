@@ -88,7 +88,7 @@ func NewNodeIpamController(
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartStructuredLogging(0)
 
-	klog.Infof("Sending events to api server.")
+	klog.InfoS("Sending events to API Server.")
 	eventBroadcaster.StartRecordingToSink(
 		&v1core.EventSinkImpl{
 			Interface: kubeClient.CoreV1().Events(""),
@@ -151,8 +151,8 @@ func NewNodeIpamController(
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting ipam controller")
-	defer klog.Infof("Shutting down ipam controller")
+	klog.InfoS("Starting IPAM controller")
+	defer klog.InfoS("Shutting down IPAM controller")
 
 	if !cache.WaitForNamedCacheSync("node", stopCh, nc.nodeInformerSynced) {
 		return

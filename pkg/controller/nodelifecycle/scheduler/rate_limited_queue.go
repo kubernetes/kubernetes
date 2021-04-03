@@ -236,7 +236,7 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			klog.V(10).Infof("Try rate limited for value: %v", val)
+			klog.V(10).InfoS("Try rate limited for value.", "val", val)
 			// Try again later
 			break
 		}

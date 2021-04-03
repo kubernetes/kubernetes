@@ -91,7 +91,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
 	eventBroadcaster.StartStructuredLogging(0)
-	klog.V(0).Infof("Sending events to api server.")
+	klog.V(0).InfoS("Sending events to the API Server.")
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	gceCloud, ok := cloud.(*gce.Cloud)
@@ -128,15 +128,15 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		DeleteFunc: nodeutil.CreateDeleteNodeHandler(ca.ReleaseCIDR),
 	})
 
-	klog.V(0).Infof("Using cloud CIDR allocator (provider: %v)", cloud.ProviderName())
+	klog.V(0).InfoS("Using cloud CIDR allocator", "provider", cloud.ProviderName())
 	return ca, nil
 }
 
 func (ca *cloudCIDRAllocator) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting cloud CIDR allocator")
-	defer klog.Infof("Shutting down cloud CIDR allocator")
+	klog.InfoS("Starting cloud CIDR allocator")
+	defer klog.InfoS("Shutting down cloud CIDR allocator")
 
 	if !cache.WaitForNamedCacheSync("cidrallocator", stopCh, ca.nodesSynced) {
 		return
@@ -158,18 +158,18 @@ func (ca *cloudCIDRAllocator) worker(stopChan <-chan struct{}) {
 				return
 			}
 			if err := ca.updateCIDRAllocation(workItem); err == nil {
-				klog.V(3).Infof("Updated CIDR for %q", workItem)
+				klog.V(3).InfoS("Updated CIDR for node", "node", workItem)
 			} else {
-				klog.Errorf("Error updating CIDR for %q: %v", workItem, err)
+				klog.ErrorS(err, "Error updating CIDR for node", "node", workItem)
 				if canRetry, timeout := ca.retryParams(workItem); canRetry {
-					klog.V(2).Infof("Retrying update for %q after %v", workItem, timeout)
+					klog.V(2).InfoS("Retrying update for node with timeout", "node", workItem, "timeout", timeout)
 					time.AfterFunc(timeout, func() {
 						// Requeue the failed node for update again.
 						ca.nodeUpdateChannel <- workItem
 					})
 					continue
 				}
-				klog.Errorf("Exceeded retry count for %q, dropping from queue", workItem)
+				klog.ErrorS(nil, "Exceeded retry count for node, dropping from queue", "node", workItem)
 			}
 			ca.removeNodeFromProcessing(workItem)
 		case <-stopChan:
@@ -194,7 +194,7 @@ func (ca *cloudCIDRAllocator) retryParams(nodeName string) (bool, time.Duration)
 
 	entry, ok := ca.nodesInProcessing[nodeName]
 	if !ok {
-		klog.Errorf("Cannot get retryParams for %q as entry does not exist", nodeName)
+		klog.ErrorS(nil, "Cannot get retryParams for Node as entry does not exist", "node", nodeName)
 		return false, 0
 	}
 
@@ -236,7 +236,7 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 		return nil
 	}
 
-	klog.V(4).Infof("Putting node %s into the work queue", node.Name)
+	klog.V(4).InfoS("Putting Node into the work queue", "node", node.Name)
 	ca.nodeUpdateChannel <- node.Name
 	return nil
 }
@@ -353,7 +353,7 @@ func needPodCIDRsUpdate(node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
 }
 
 func (ca *cloudCIDRAllocator) ReleaseCIDR(node *v1.Node) error {
-	klog.V(2).Infof("Node %v PodCIDR (%v) will be released by external cloud provider (not managed by controller)",
-		node.Name, node.Spec.PodCIDR)
+	klog.V(2).InfoS("Node PodCIDR will be released by external cloud provider (not managed by controller)",
+		"node", node.Name, "podCIDR", node.Spec.PodCIDR)
 	return nil
 }

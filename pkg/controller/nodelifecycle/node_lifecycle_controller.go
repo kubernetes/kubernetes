@@ -374,7 +374,7 @@ func NewNodeLifecycleController(
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
 	eventBroadcaster.StartStructuredLogging(0)
 
-	klog.Infof("Sending events to api server.")
+	klog.InfoS("Sending events to the API Server.")
 	eventBroadcaster.StartRecordingToSink(
 		&v1core.EventSinkImpl{
 			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
@@ -434,12 +434,12 @@ func NewNodeLifecycleController(
 			if !isPod {
 				deletedState, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.Errorf("Received unexpected object: %v", obj)
+					klog.ErrorS(nil, "Received unexpected object", "obj", obj)
 					return
 				}
 				pod, ok = deletedState.Obj.(*v1.Pod)
 				if !ok {
-					klog.Errorf("DeletedFinalStateUnknown contained non-Pod object: %v", deletedState.Obj)
+					klog.ErrorS(nil, "DeletedFinalStateUnknown contained non-Pod object", "obj", deletedState.Obj)
 					return
 				}
 			}
@@ -502,7 +502,7 @@ func NewNodeLifecycleController(
 		})
 	}
 
-	klog.Infof("Controller will reconcile labels.")
+	klog.InfoS("Controller will reconcile labels.")
 	nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
 			nc.nodeUpdateQueue.Add(node.Name)
@@ -536,8 +536,8 @@ func NewNodeLifecycleController(
 func (nc *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting node controller")
-	defer klog.Infof("Shutting down node controller")
+	klog.InfoS("Starting Node controller")
+	defer klog.InfoS("Shutting down Node controller")
 
 	if !cache.WaitForNamedCacheSync("taint", stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
@@ -578,7 +578,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	// Incorporate the results of node health signal pushed from kubelet to master.
 	go wait.Until(func() {
 		if err := nc.monitorNodeHealth(); err != nil {
-			klog.Errorf("Error monitoring node health: %v", err)
+			klog.ErrorS(err, "Error monitoring Node health")
 		}
 	}, nc.nodeMonitorPeriod, stopCh)
 
@@ -595,13 +595,13 @@ func (nc *Controller) doNodeProcessingPassWorker() {
 		}
 		nodeName := obj.(string)
 		if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
-			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
+			klog.ErrorS(err, "Failed to taint NoSchedule on Node, requeue it", "node", nodeName)
 			// TODO(k82cn): Add nodeName back to the queue
 		}
 		// TODO: re-evaluate whether there are any labels that need to be
 		// reconcile in 1.19. Remove this function if it's no longer necessary.
 		if err := nc.reconcileNodeLabels(nodeName); err != nil {
-			klog.Errorf("Failed to reconcile labels for node <%s>, requeue it: %v", nodeName, err)
+			klog.ErrorS(err, "Failed to reconcile labels for Node, requeue it", "node", nodeName)
 			// TODO(yujuhong): Add nodeName back to the queue
 		}
 		nc.nodeUpdateQueue.Done(nodeName)
@@ -691,7 +691,7 @@ func (nc *Controller) doNoExecuteTaintingPass() {
 				oppositeTaint = *NotReadyTaintTemplate
 			default:
 				// It seems that the Node is ready again, so there's no need to taint it.
-				klog.V(4).Infof("Node %v was in a taint queue, but it's ready now. Ignoring taint request.", value.Value)
+				klog.V(4).InfoS("Node was in a taint queue, but it's ready now. Ignoring taint request.", "node", value.Value)
 				return true, 0
 			}
 
@@ -734,10 +734,10 @@ func (nc *Controller) doEvictionPass() {
 				return false, 0
 			}
 			if !nc.nodeEvictionMap.setStatus(value.Value, evicted) {
-				klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", value.Value)
+				klog.V(2).InfoS("Node was unregistered in the meantime - skipping setting status", "node", value.Value)
 			}
 			if remaining {
-				klog.Infof("Pods awaiting deletion due to Controller eviction")
+				klog.InfoS("Pods awaiting deletion due to Controller eviction")
 			}
 
 			if node != nil {
@@ -767,7 +767,7 @@ func (nc *Controller) monitorNodeHealth() error {
 	}
 
 	for i := range added {
-		klog.V(1).Infof("Controller observed a new Node: %#v", added[i].Name)
+		klog.V(1).InfoS("Controller observed a new Node", "node", added[i].Name)
 		nodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(added[i])
@@ -779,7 +779,7 @@ func (nc *Controller) monitorNodeHealth() error {
 	}
 
 	for i := range deleted {
-		klog.V(1).Infof("Controller observed a Node deletion: %v", deleted[i].Name)
+		klog.V(1).InfoS("Controller observed a Node deletion", "node", deleted[i].Name)
 		nodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
@@ -798,13 +798,13 @@ func (nc *Controller) monitorNodeHealth() error {
 			name := node.Name
 			node, err = nc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
 			if err != nil {
-				klog.Errorf("Failed while getting a Node to retry updating node health. Probably Node %s was deleted.", name)
+				klog.ErrorS(nil, "Failed while getting a Node to retry updating node health. Node was probably deleted.", "node", name)
 				return false, err
 			}
 			return false, nil
 		}); err != nil {
-			klog.Errorf("Update health of Node '%v' from Controller error: %v. "+
-				"Skipping - no pods will be evicted.", node.Name, err)
+			klog.ErrorS(err, "Update health of Node from Controller error "+
+				"Skipping - no pods will be evicted.", "node", node.Name)
 			continue
 		}
 
@@ -863,12 +863,12 @@ func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondi
 		if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
 			taintToAdd := *NotReadyTaintTemplate
 			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
-				klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
+				klog.ErrorS(nil, "Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
 			}
 		} else if nc.markNodeForTainting(node, v1.ConditionFalse) {
-			klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
-				node.Name,
-				decisionTimestamp,
+			klog.V(2).InfoS("Node is NotReady. Adding it to the Taint queue.",
+				"node", node.Name,
+				"timeStamp", decisionTimestamp,
 			)
 		}
 	case v1.ConditionUnknown:
@@ -876,21 +876,21 @@ func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondi
 		if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
 			taintToAdd := *UnreachableTaintTemplate
 			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
-				klog.Errorf("Failed to instantly swap NotReadyTaint to UnreachableTaint. Will try again in the next cycle.")
+				klog.ErrorS(nil, "Failed to instantly swap NotReadyTaint to UnreachableTaint. Will try again in the next cycle.")
 			}
 		} else if nc.markNodeForTainting(node, v1.ConditionUnknown) {
-			klog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
-				node.Name,
-				decisionTimestamp,
+			klog.V(2).InfoS("Node is unresponsive. Adding it to the Taint queue.",
+				"node", node.Name,
+				"timeStamp", decisionTimestamp,
 			)
 		}
 	case v1.ConditionTrue:
 		removed, err := nc.markNodeAsReachable(node)
 		if err != nil {
-			klog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+			klog.ErrorS(nil, "Failed to remove taints from node. Will retry in next iteration.", "node", node.Name)
 		}
 		if removed {
-			klog.V(2).Infof("Node %s is healthy again, removing all taints", node.Name)
+			klog.V(2).InfoS("Node is healthy again, removing all taints", "node", node.Name)
 		}
 	}
 }
@@ -925,17 +925,17 @@ func (nc *Controller) processNoTaintBaseEviction(node *v1.Node, observedReadyCon
 				return err
 			}
 			if enqueued {
-				klog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
-					node.Name,
-					decisionTimestamp,
-					nodeHealthData.readyTransitionTimestamp,
-					nc.podEvictionTimeout-gracePeriod,
+				klog.V(2).InfoS("Node is unresponsive. Adding Pods on Node to eviction queues",
+					"node", node.Name,
+					"timeStamp", decisionTimestamp,
+					"readyTransitionTimestamp", nodeHealthData.readyTransitionTimestamp,
+					"podEvictionTimeout-gracePeriod", nc.podEvictionTimeout-gracePeriod,
 				)
 			}
 		}
 	case v1.ConditionTrue:
 		if nc.cancelPodEviction(node) {
-			klog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
+			klog.V(2).InfoS("Node is ready again, cancelled pod eviction", "node", node.Name)
 		}
 	}
 	return nil
@@ -1017,14 +1017,14 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 			readyTransitionTimestamp: nc.now(),
 		}
 	} else if savedCondition == nil && currentReadyCondition != nil {
-		klog.V(1).Infof("Creating timestamp entry for newly observed Node %s", node.Name)
+		klog.V(1).InfoS("Creating timestamp entry for newly observed Node", "node", node.Name)
 		nodeHealth = &nodeHealthData{
 			status:                   &node.Status,
 			probeTimestamp:           nc.now(),
 			readyTransitionTimestamp: nc.now(),
 		}
 	} else if savedCondition != nil && currentReadyCondition == nil {
-		klog.Errorf("ReadyCondition was removed from Status of Node %s", node.Name)
+		klog.ErrorS(nil, "ReadyCondition was removed from Status of Node", "node", node.Name)
 		// TODO: figure out what to do in this case. For now we do the same thing as above.
 		nodeHealth = &nodeHealthData{
 			status:                   &node.Status,
@@ -1036,15 +1036,15 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 		// If ReadyCondition changed since the last time we checked, we update the transition timestamp to "now",
 		// otherwise we leave it as it is.
 		if savedCondition.LastTransitionTime != currentReadyCondition.LastTransitionTime {
-			klog.V(3).Infof("ReadyCondition for Node %s transitioned from %v to %v", node.Name, savedCondition, currentReadyCondition)
+			klog.V(3).InfoS("ReadyCondition for Node transitioned", "node", node.Name, "savedCondition", savedCondition, "currentReadyCondition", currentReadyCondition)
 			transitionTime = nc.now()
 		} else {
 			transitionTime = nodeHealth.readyTransitionTimestamp
 		}
 		if klog.V(5).Enabled() {
-			klog.Infof("Node %s ReadyCondition updated. Updating timestamp: %+v vs %+v.", node.Name, nodeHealth.status, node.Status)
+			klog.InfoS("Node ReadyCondition updated. Updating timestamp.", "node", node.Name, "nodeHealthStatus", nodeHealth.status, "nodeStatus", node.Status)
 		} else {
-			klog.V(3).Infof("Node %s ReadyCondition updated. Updating timestamp.", node.Name)
+			klog.V(3).InfoS("Node ReadyCondition updated. Updating timestamp.", "node", node.Name)
 		}
 		nodeHealth = &nodeHealthData{
 			status:                   &node.Status,
@@ -1079,7 +1079,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 		for _, nodeConditionType := range nodeConditionTypes {
 			_, currentCondition := nodeutil.GetNodeCondition(&node.Status, nodeConditionType)
 			if currentCondition == nil {
-				klog.V(2).Infof("Condition %v of node %v was never updated by kubelet", nodeConditionType, node.Name)
+				klog.V(2).InfoS("Condition of Node was never updated by kubelet", "nodeConditionType", nodeConditionType, "node", node.Name)
 				node.Status.Conditions = append(node.Status.Conditions, v1.NodeCondition{
 					Type:               nodeConditionType,
 					Status:             v1.ConditionUnknown,
@@ -1089,8 +1089,8 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 					LastTransitionTime: nowTimestamp,
 				})
 			} else {
-				klog.V(2).Infof("node %v hasn't been updated for %+v. Last %v is: %+v",
-					node.Name, nc.now().Time.Sub(nodeHealth.probeTimestamp.Time), nodeConditionType, currentCondition)
+				klog.V(2).InfoS("Node hasn't been updated for some time.",
+					"node", node.Name, "timeSinceLastUpdate", nc.now().Time.Sub(nodeHealth.probeTimestamp.Time), "nodeConditionType", nodeConditionType, "currentCondition", currentCondition)
 				if currentCondition.Status != v1.ConditionUnknown {
 					currentCondition.Status = v1.ConditionUnknown
 					currentCondition.Reason = "NodeStatusUnknown"
@@ -1104,7 +1104,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 
 		if !apiequality.Semantic.DeepEqual(currentReadyCondition, &observedReadyCondition) {
 			if _, err := nc.kubeClient.CoreV1().Nodes().UpdateStatus(context.TODO(), node, metav1.UpdateOptions{}); err != nil {
-				klog.Errorf("Error updating node %s: %v", node.Name, err)
+				klog.ErrorS(err, "Error updating node", "node", node.Name)
 				return gracePeriod, observedReadyCondition, currentReadyCondition, err
 			}
 			nodeHealth = &nodeHealthData{
@@ -1133,7 +1133,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 		}
 		newZoneStates[k] = newState
 		if _, had := nc.zoneStates[k]; !had {
-			klog.Errorf("Setting initial state for unseen zone: %v", k)
+			klog.ErrorS(nil, "Setting initial state for unseen zone", "initialState", k)
 			nc.zoneStates[k] = stateInitial
 		}
 	}
@@ -1161,12 +1161,12 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 	if !allAreFullyDisrupted || !allWasFullyDisrupted {
 		// We're switching to full disruption mode
 		if allAreFullyDisrupted {
-			klog.V(0).Info("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
+			klog.V(0).InfoS("Controller detected that all Nodes are not-Ready. Entering master disruption mode.")
 			for i := range nodes {
 				if nc.runTaintManager {
 					_, err := nc.markNodeAsReachable(nodes[i])
 					if err != nil {
-						klog.Errorf("Failed to remove taints from Node %v", nodes[i].Name)
+						klog.ErrorS(nil, "Failed to remove taints from Node", "node", nodes[i].Name)
 					}
 				} else {
 					nc.cancelPodEviction(nodes[i])
@@ -1188,7 +1188,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 		}
 		// We're exiting full disruption mode
 		if allWasFullyDisrupted {
-			klog.V(0).Info("Controller detected that some Nodes are Ready. Exiting master disruption mode.")
+			klog.V(0).InfoS("Controller detected that some Nodes are Ready. Exiting master disruption mode.")
 			// When exiting disruption mode update probe timestamps on all Nodes.
 			now := nc.now()
 			for i := range nodes {
@@ -1211,7 +1211,7 @@ func (nc *Controller) handleDisruption(zoneToNodeConditions map[string][]*v1.Nod
 			if v == newState {
 				continue
 			}
-			klog.V(0).Infof("Controller detected that zone %v is now in state %v.", k, newState)
+			klog.V(0).InfoS("Controller detected that zone is now in state.", "zone", k, "zoneState", newState)
 			nc.setLimiterInZone(k, len(zoneToNodeConditions[k]), newState)
 			nc.zoneStates[k] = newState
 		}
@@ -1395,7 +1395,7 @@ func (nc *Controller) addPodEvictorForNewZone(node *v1.Node) {
 					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, scheduler.EvictionRateLimiterBurst))
 		}
 		// Init the metric for the new zone.
-		klog.Infof("Initializing eviction metric for zone: %v", zone)
+		klog.InfoS("Initializing eviction metric for zone", "zone", zone)
 		evictionsNumber.WithLabelValues(zone).Add(0)
 	}
 }
@@ -1407,11 +1407,11 @@ func (nc *Controller) cancelPodEviction(node *v1.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	if !nc.nodeEvictionMap.setStatus(node.Name, unmarked) {
-		klog.V(2).Infof("node %v was unregistered in the meantime - skipping setting status", node.Name)
+		klog.V(2).InfoS("Node was unregistered in the meantime - skipping setting status", "node", node.Name)
 	}
 	wasDeleting := nc.zonePodEvictor[zone].Remove(node.Name)
 	if wasDeleting {
-		klog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
+		klog.V(2).InfoS("Cancelling Pod Eviction on Node", "node", node.Name)
 		return true
 	}
 	return false
@@ -1464,12 +1464,12 @@ func (nc *Controller) markNodeAsReachable(node *v1.Node) (bool, error) {
 	defer nc.evictorLock.Unlock()
 	err := controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, UnreachableTaintTemplate)
 	if err != nil {
-		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		klog.ErrorS(err, "Failed to remove taint from Node.", "node", node.Name)
 		return false, err
 	}
 	err = controller.RemoveTaintOffNode(nc.kubeClient, node.Name, node, NotReadyTaintTemplate)
 	if err != nil {
-		klog.Errorf("Failed to remove taint from node %v: %v", node.Name, err)
+		klog.ErrorS(err, "Failed to remove taint from Node.", "node", node.Name)
 		return false, err
 	}
 	return nc.zoneNoExecuteTainter[utilnode.GetZoneKey(node)].Remove(node.Name), nil

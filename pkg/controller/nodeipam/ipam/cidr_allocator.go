@@ -134,7 +134,7 @@ func listNodes(kubeClient clientset.Interface) (*v1.NodeList, error) {
 			LabelSelector: labels.Everything().String(),
 		})
 		if err != nil {
-			klog.Errorf("Failed to list all nodes: %v", err)
+			klog.ErrorS(err, "Failed to list all nodes")
 			return false, nil
 		}
 		return true, nil

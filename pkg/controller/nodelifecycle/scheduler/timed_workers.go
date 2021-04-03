@@ -110,7 +110,7 @@ func (q *TimedWorkerQueue) getWrappedWorkerFunc(key string) func(args *WorkArgs)
 // AddWork adds a work to the WorkerQueue which will be executed not earlier than `fireAt`.
 func (q *TimedWorkerQueue) AddWork(args *WorkArgs, createdAt time.Time, fireAt time.Time) {
 	key := args.KeyFromWorkArgs()
-	klog.V(4).Infof("Adding TimedWorkerQueue item %v at %v to be fired at %v", key, createdAt, fireAt)
+	klog.V(4).InfoS("Adding TimedWorkerQueue item to be fired.", "TimedWorkerQueueItem", key, "createdTime", createdAt, "fireTime", fireAt)
 
 	q.Lock()
 	defer q.Unlock()
@@ -129,7 +129,7 @@ func (q *TimedWorkerQueue) CancelWork(key string) bool {
 	worker, found := q.workers[key]
 	result := false
 	if found {
-		klog.V(4).Infof("Cancelling TimedWorkerQueue item %v at %v", key, time.Now())
+		klog.V(4).InfoS("Cancelling TimedWorkerQueue item", "TimedWorkerQueueItem", key, "time", time.Now())
 		if worker != nil {
 			result = true
 			worker.Cancel()

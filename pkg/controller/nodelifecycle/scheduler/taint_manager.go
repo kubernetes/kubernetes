@@ -103,7 +103,7 @@ func deletePodHandler(c clientset.Interface, emitEventFunc func(types.Namespaced
 	return func(args *WorkArgs) error {
 		ns := args.NamespacedName.Namespace
 		name := args.NamespacedName.Name
-		klog.V(0).InfoS("NoExecuteTaintManager is deleting pod", "pod", args.NamespacedName.String())
+		klog.V(0).InfoS("NoExecuteTaintManager is deleting Pod", "pod", args.NamespacedName.String())
 		if emitEventFunc != nil {
 			emitEventFunc(args.NamespacedName)
 		}
@@ -160,7 +160,7 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
 	eventBroadcaster.StartStructuredLogging(0)
 	if c != nil {
-		klog.V(0).InfoS("Sending events to api server")
+		klog.V(0).InfoS("Sending events to the API Server")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 	} else {
 		klog.Fatalf("kubeClient is nil when starting NodeController")

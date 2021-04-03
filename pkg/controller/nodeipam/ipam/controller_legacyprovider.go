@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -111,7 +111,7 @@ func NewController(
 // registers the informers for node changes. This will start synchronization
 // of the node and cloud CIDR range allocations.
 func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
-	klog.V(0).Infof("Starting IPAM controller (config=%+v)", c.config)
+	klog.V(0).InfoS("Starting IPAM controller", "config", c.config)
 
 	nodes, err := listNodes(c.adapter.k8s)
 	if err != nil {
@@ -122,9 +122,9 @@ func (c *Controller) Start(nodeInformer informers.NodeInformer) error {
 			_, cidrRange, err := net.ParseCIDR(node.Spec.PodCIDR)
 			if err == nil {
 				c.set.Occupy(cidrRange)
-				klog.V(3).Infof("Occupying CIDR for node %q (%v)", node.Name, node.Spec.PodCIDR)
+				klog.V(3).InfoS("Occupying CIDR for node", "node", node.Name, "PodCIDR", node.Spec.PodCIDR)
 			} else {
-				klog.Errorf("Node %q has an invalid CIDR (%q): %v", node.Name, node.Spec.PodCIDR, err)
+				klog.ErrorS(err, "Node has an invalid CIDR", "node", node.Name, "PodCIDR", node.Spec.PodCIDR)
 			}
 		}
 
@@ -206,7 +206,7 @@ func (c *Controller) onUpdate(_, node *v1.Node) error {
 	if sync, ok := c.syncers[node.Name]; ok {
 		sync.Update(node)
 	} else {
-		klog.Errorf("Received update for non-existent node %q", node.Name)
+		klog.ErrorS(nil, "Received update for non-existent node", "name", node.Name)
 		return fmt.Errorf("unknown node %q", node.Name)
 	}
 

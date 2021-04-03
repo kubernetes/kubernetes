@@ -573,17 +573,17 @@ func TestGetBitforCIDR(t *testing.T) {
 
 		got, err := cs.getIndexForCIDR(subnetCIDR)
 		if err == nil && tc.expectErr {
-			klog.Errorf("expected error but got null for %v", tc.description)
+			klog.ErrorS(nil, "Expected error but got null", "description", tc.description)
 			continue
 		}
 
 		if err != nil && !tc.expectErr {
-			klog.Errorf("unexpected error: %v for %v", err, tc.description)
+			klog.ErrorS(err, "Unexpected error", "description", tc.description)
 			continue
 		}
 
 		if got != tc.expectedBit {
-			klog.Errorf("expected %v, but got %v for %v", tc.expectedBit, got, tc.description)
+			klog.ErrorS(nil, "Unexpected value", "expected", tc.expectedBit, "got", got, "description", tc.description)
 		}
 	}
 }
