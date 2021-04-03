@@ -91,7 +91,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	}
 
 	allPodsCount := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-	klog.V(4).Infof("New replica set %s/%s has %d available pods.", newRS.Namespace, newRS.Name, newRS.Status.AvailableReplicas)
+	klog.V(4).InfoS("New ReplicaSet has available Pods", "replicaset", klog.KObj(newRS), "AvailableReplicas", newRS.Status.AvailableReplicas)
 	maxUnavailable := deploymentutil.MaxUnavailable(*deployment)
 
 	// Check if we can scale down. We can scale down in the following 2 cases:
@@ -137,7 +137,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	if err != nil {
 		return false, nil
 	}
-	klog.V(4).Infof("Cleaned up unhealthy replicas from old RSes by %d", cleanupCount)
+	klog.V(4).InfoS("Cleaned up unhealthy replicas from old RSes", "cleanupCount", cleanupCount)
 
 	// Scale down old replica sets, need check maxUnavailable to ensure we can scale down
 	allRSs = append(oldRSs, newRS)
@@ -145,7 +145,7 @@ func (dc *DeploymentController) reconcileOldReplicaSets(allRSs []*apps.ReplicaSe
 	if err != nil {
 		return false, nil
 	}
-	klog.V(4).Infof("Scaled down old RSes of deployment %s by %d", deployment.Name, scaledDownCount)
+	klog.V(4).InfoS("Scaled down old RSes of Deployment", "deployment", klog.KObj(deployment), "scaledDownCount", scaledDownCount)
 
 	totalScaledDown := cleanupCount + scaledDownCount
 	return totalScaledDown > 0, nil
@@ -166,7 +166,7 @@ func (dc *DeploymentController) cleanupUnhealthyReplicas(oldRSs []*apps.ReplicaS
 			// cannot scale down this replica set.
 			continue
 		}
-		klog.V(4).Infof("Found %d available pods in old RS %s/%s", targetRS.Status.AvailableReplicas, targetRS.Namespace, targetRS.Name)
+		klog.V(4).InfoS("Found available Pods in old RS", "AvailableReplicas", targetRS.Status.AvailableReplicas, "replicaset", klog.KObj(targetRS))
 		if *(targetRS.Spec.Replicas) == targetRS.Status.AvailableReplicas {
 			// no unhealthy replicas found, no scaling required.
 			continue
@@ -200,7 +200,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs [
 		// Cannot scale down.
 		return 0, nil
 	}
-	klog.V(4).Infof("Found %d available pods in deployment %s, scaling down old RSes", availablePodCount, deployment.Name)
+	klog.V(4).InfoS("Found available Pods in Deployment, scaling down old RSes", "availablePodCount", availablePodCount, "deployment", klog.KObj(deployment))
 
 	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
 

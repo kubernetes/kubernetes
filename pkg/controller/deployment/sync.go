@@ -254,7 +254,7 @@ func (dc *DeploymentController) getNewReplicaSet(d *apps.Deployment, rsList, old
 		// error.
 		_, dErr := dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(context.TODO(), d, metav1.UpdateOptions{})
 		if dErr == nil {
-			klog.V(2).Infof("Found a hash collision for deployment %q - bumping collisionCount (%d->%d) to resolve it", d.Name, preCollisionCount, *d.Status.CollisionCount)
+			klog.V(2).InfoS("Found a hash collision for deployment - bumping collisionCount to resolve it", "deployment", klog.KObj(d), "preCollisionCount", preCollisionCount, "CollisionCount", *d.Status.CollisionCount)
 		}
 		return nil, err
 	case errors.HasStatusCause(err, v1.NamespaceTerminatingCause):
@@ -449,7 +449,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 	}
 
 	sort.Sort(deploymentutil.ReplicaSetsByRevision(cleanableRSes))
-	klog.V(4).Infof("Looking to cleanup old replica sets for deployment %q", deployment.Name)
+	klog.V(4).InfoS("Looking to cleanup old ReplicaSets for Deployment", "deployment", klog.KObj(deployment))
 
 	for i := int32(0); i < diff; i++ {
 		rs := cleanableRSes[i]
@@ -457,7 +457,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*apps.ReplicaSet, dep
 		if rs.Status.Replicas != 0 || *(rs.Spec.Replicas) != 0 || rs.Generation > rs.Status.ObservedGeneration || rs.DeletionTimestamp != nil {
 			continue
 		}
-		klog.V(4).Infof("Trying to cleanup replica set %q for deployment %q", rs.Name, deployment.Name)
+		klog.V(4).InfoS("Trying to cleanup ReplicaSet for Deployment", "replicaset", klog.KObj(rs), "deployment", klog.KObj(deployment))
 		if err := dc.client.AppsV1().ReplicaSets(rs.Namespace).Delete(context.TODO(), rs.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			// Return error instead of aggregating and continuing DELETEs on the theory
 			// that we may be overloading the api server.
