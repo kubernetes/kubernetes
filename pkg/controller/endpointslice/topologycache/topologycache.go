@@ -88,7 +88,7 @@ func (t *TopologyCache) AddHints(si *SliceInfo) ([]*discovery.EndpointSlice, []*
 	allocations := t.getAllocations(totalEndpoints)
 
 	if allocations == nil {
-		klog.V(2).Infof("Insufficient endpoints, removing hints from %s Service", si.ServiceKey)
+		klog.V(2).InfoS("Insufficient Endpoints, removing hints from Service", "service", si.ServiceKey)
 		t.RemoveHints(si.ServiceKey, si.AddressType)
 		return RemoveHintsFromSlices(si)
 	}

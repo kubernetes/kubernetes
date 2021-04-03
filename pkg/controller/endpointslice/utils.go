@@ -99,7 +99,7 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 		portProto := servicePort.Protocol
 		portNum, err := podutil.FindPort(pod, servicePort)
 		if err != nil {
-			klog.V(4).Infof("Failed to find port for service %s/%s: %v", service.Namespace, service.Name, err)
+			klog.V(4).InfoS("Failed to find port for Service", "serviceNamespace", service.Namespace, "service", service.Name, "err", err)
 			continue
 		}
 
@@ -352,7 +352,7 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 			addrType = discovery.AddressTypeIPv6
 		}
 		serviceSupportedAddresses[addrType] = struct{}{}
-		klog.V(2).Infof("couldn't find ipfamilies for service: %v/%v. This could happen if controller manager is connected to an old apiserver that does not support ip families yet. EndpointSlices for this Service will use %s as the IP Family based on familyOf(ClusterIP:%v).", service.Namespace, service.Name, addrType, service.Spec.ClusterIP)
+		klog.V(2).InfoS("Couldn't find IPFamilies for Service. This could happen if controller manager is connected to an old API Server that does not support IPFamilies yet.", "serviceNamespace", service.Namespace, "service", service.Name, "IPFamily", addrType, "clusterIP", service.Spec.ClusterIP)
 		return serviceSupportedAddresses
 	}
 
@@ -363,7 +363,7 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 	// since kubelet will need to restart in order to start patching pod status with multiple ips
 	serviceSupportedAddresses[discovery.AddressTypeIPv4] = struct{}{}
 	serviceSupportedAddresses[discovery.AddressTypeIPv6] = struct{}{}
-	klog.V(2).Infof("couldn't find ipfamilies for headless service: %v/%v likely because controller manager is likely connected to an old apiserver that does not support ip families yet. The service endpoint slice will use dual stack families until api-server default it correctly", service.Namespace, service.Name)
+	klog.V(2).InfoS("Couldn't find IPFamilies for headless Service likely because the controller manager is connected to an old API Server that does not support IPFamilies yet. The service endpoint slice will use dual stack families until the API Server defaults correctly", "serviceNamespace", service.Namespace, "service", service.Name)
 	return serviceSupportedAddresses
 }
 

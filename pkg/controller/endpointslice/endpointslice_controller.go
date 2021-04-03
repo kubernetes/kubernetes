@@ -253,8 +253,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting endpoint slice controller")
-	defer klog.Infof("Shutting down endpoint slice controller")
+	klog.InfoS("Starting Endpoint slice controller")
+	defer klog.InfoS("Shutting down Endpoint slice controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced, c.endpointSlicesSynced, c.nodesSynced) {
 		return
@@ -315,7 +315,7 @@ func (c *Controller) handleErr(err error, key interface{}) {
 func (c *Controller) syncService(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing service %q endpoint slices. (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing service Endpoint slices.", "endpoint", key, "syncDuration", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -341,7 +341,7 @@ func (c *Controller) syncService(key string) error {
 		return nil
 	}
 
-	klog.V(5).Infof("About to update endpoint slices for service %q", key)
+	klog.V(5).InfoS("About to update Endpoint slices for Service", "endpoint", key)
 
 	podLabelSelector := labels.Set(service.Spec.Selector).AsSelectorPreValidated()
 	pods, err := c.podLister.Pods(service.Namespace).List(podLabelSelector)
@@ -537,7 +537,7 @@ func (c *Controller) checkNodeTopologyDistribution() {
 	}
 	nodes, err := c.nodeLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error listing Nodes: %v", err)
+		klog.ErrorS(err, "Error listing Nodes")
 	}
 	c.topologyCache.SetNodes(nodes)
 	serviceKeys := c.topologyCache.GetOverloadedServices()

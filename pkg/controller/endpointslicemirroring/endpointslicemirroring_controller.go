@@ -208,14 +208,14 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting EndpointSliceMirroring controller")
-	defer klog.Infof("Shutting down EndpointSliceMirroring controller")
+	klog.InfoS("Starting EndpointSliceMirroring controller")
+	defer klog.InfoS("Shutting down EndpointSliceMirroring controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint_slice_mirroring", stopCh, c.endpointsSynced, c.endpointSlicesSynced, c.servicesSynced) {
 		return
 	}
 
-	klog.V(2).Infof("Starting %d worker threads", workers)
+	klog.V(2).InfoS("Starting worker threads", "workers", workers)
 	for i := 0; i < workers; i++ {
 		go wait.Until(c.worker, c.workerLoopPeriod, stopCh)
 	}
@@ -267,10 +267,10 @@ func (c *Controller) syncEndpoints(key string) error {
 	defer func() {
 		syncDuration := float64(time.Since(startTime).Milliseconds()) / 1000
 		metrics.EndpointsSyncDuration.WithLabelValues().Observe(syncDuration)
-		klog.V(4).Infof("Finished syncing EndpointSlices for %q Endpoints. (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing EndpointSlices for Endpoints. (%v)", "endpoint", key, "syncDuration", time.Since(startTime))
 	}()
 
-	klog.V(4).Infof("syncEndpoints(%q)", key)
+	klog.V(4).InfoS("syncEndpoints", "endpoint", key)
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
@@ -280,7 +280,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	endpoints, err := c.endpointsLister.Endpoints(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("%s/%s Endpoints not found, cleaning up any mirrored EndpointSlices", namespace, name)
+			klog.V(4).InfoS("Endpoints not found, cleaning up any mirrored EndpointSlices", "endpointNamespace", namespace, "endpoint", name)
 			c.endpointSliceTracker.DeleteService(namespace, name)
 			return c.deleteMirroredSlices(namespace, name)
 		}
@@ -288,7 +288,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	}
 
 	if !c.shouldMirror(endpoints) {
-		klog.V(4).Infof("%s/%s Endpoints should not be mirrored, cleaning up any mirrored EndpointSlices", namespace, name)
+		klog.V(4).InfoS("Endpoints should not be mirrored, cleaning up any mirrored EndpointSlices", "endpointNamespace", namespace, "endpoint", name)
 		c.endpointSliceTracker.DeleteService(namespace, name)
 		return c.deleteMirroredSlices(namespace, name)
 	}
@@ -296,7 +296,7 @@ func (c *Controller) syncEndpoints(key string) error {
 	svc, err := c.serviceLister.Services(namespace).Get(name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof("%s/%s Service not found, cleaning up any mirrored EndpointSlices", namespace, name)
+			klog.V(4).InfoS("Service not found, cleaning up any mirrored EndpointSlices", "serviceNamespace", namespace, "service", name)
 			c.endpointSliceTracker.DeleteService(namespace, name)
 			return c.deleteMirroredSlices(namespace, name)
 		}
@@ -399,7 +399,7 @@ func (c *Controller) onEndpointsAdd(obj interface{}) {
 		return
 	}
 	if !c.shouldMirror(endpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		klog.V(5).Infof("Skipping mirroring", "endpointNamespace", endpoints.Namespace, "endpoint", endpoints.Name)
 		return
 	}
 	c.queueEndpoints(obj)
@@ -414,7 +414,7 @@ func (c *Controller) onEndpointsUpdate(prevObj, obj interface{}) {
 		return
 	}
 	if !c.shouldMirror(endpoints) && !c.shouldMirror(prevEndpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		klog.V(5).InfoS("Skipping mirroring", "endpointNamespace", endpoints.Namespace, "endpoint", endpoints.Name)
 		return
 	}
 	c.queueEndpoints(obj)
@@ -428,7 +428,7 @@ func (c *Controller) onEndpointsDelete(obj interface{}) {
 		return
 	}
 	if !c.shouldMirror(endpoints) {
-		klog.V(5).Infof("Skipping mirroring for %s/%s", endpoints.Namespace, endpoints.Name)
+		klog.V(5).InfoS("Skipping mirroring", "endpointNamespace", endpoints.Namespace, "endpoint", endpoints.Name)
 		return
 	}
 	c.queueEndpoints(obj)
