@@ -177,7 +177,7 @@ func NewController(options *ControllerOptions) (*Controller, error) {
 
 // enqueueAll is called at the fullResyncPeriod interval to force a full recalculation of quota usage statistics
 func (rq *Controller) enqueueAll() {
-	defer klog.V(4).Infof("Resource quota controller queued all resource quota for full calculation of usage")
+	defer klog.V(4).InfoS("Resource quota controller queued all resource quota for full calculation of usage")
 	rqs, err := rq.rqLister.List(labels.Everything())
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to enqueue all - error listing resource quotas: %v", err))
@@ -197,7 +197,7 @@ func (rq *Controller) enqueueAll() {
 func (rq *Controller) enqueueResourceQuota(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		klog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		klog.ErrorS(err, "Couldn't get key for object", "obj", obj)
 		return
 	}
 	rq.queue.Add(key)
@@ -206,7 +206,7 @@ func (rq *Controller) enqueueResourceQuota(obj interface{}) {
 func (rq *Controller) addQuota(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		klog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		klog.ErrorS(err, "Couldn't get key for object", "obj", obj)
 		return
 	}
 
@@ -258,7 +258,7 @@ func (rq *Controller) worker(queue workqueue.RateLimitingInterface) func() {
 	return func() {
 		for {
 			if quit := workFunc(); quit {
-				klog.Infof("resource quota controller worker shutting down")
+				klog.InfoS("Resource quota controller worker shutting down")
 				return
 			}
 		}
@@ -270,8 +270,8 @@ func (rq *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rq.queue.ShutDown()
 
-	klog.Infof("Starting resource quota controller")
-	defer klog.Infof("Shutting down resource quota controller")
+	klog.InfoS("Starting resource quota controller")
+	defer klog.InfoS("Shutting down resource quota controller")
 
 	if rq.quotaMonitor != nil {
 		go rq.quotaMonitor.Run(stopCh)
@@ -295,7 +295,7 @@ func (rq *Controller) Run(workers int, stopCh <-chan struct{}) {
 func (rq *Controller) syncResourceQuotaFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing resource quota", "resourceQuota", key, "timeElapsed", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -304,11 +304,11 @@ func (rq *Controller) syncResourceQuotaFromKey(key string) (err error) {
 	}
 	resourceQuota, err := rq.rqLister.ResourceQuotas(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.Infof("Resource quota has been deleted %v", key)
+		klog.InfoS("Resource quota has been deleted", "resourceQuota", key)
 		return nil
 	}
 	if err != nil {
-		klog.Infof("Unable to retrieve resource quota %v from store: %v", key, err)
+		klog.InfoS("Unable to retrieve resource quota from store", "resourceQuota", key, "err", err)
 		return err
 	}
 	return rq.syncResourceQuota(resourceQuota)
@@ -421,7 +421,7 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 
 		// Decide whether discovery has reported a change.
 		if reflect.DeepEqual(oldResources, newResources) {
-			klog.V(4).Infof("no resource updates from discovery, skipping resource quota sync")
+			klog.V(4).InfoS("No resource updates from discovery, skipping resource quota sync")
 			return
 		}
 
@@ -432,7 +432,7 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 
 		// Something has changed, so track the new state and perform a sync.
 		if klog.V(2).Enabled() {
-			klog.Infof("syncing resource quota controller with updated resources from discovery: %s", printDiff(oldResources, newResources))
+			klog.InfoS("Syncing resource quota controller with updated resources from discovery", "resourceDiff", printDiff(oldResources, newResources))
 		}
 
 		// Perform the monitor resync and wait for controllers to report cache sync.
@@ -451,7 +451,7 @@ func (rq *Controller) Sync(discoveryFunc NamespacedResourcesFunc, period time.Du
 
 		// success, remember newly synced resources
 		oldResources = newResources
-		klog.V(2).Infof("synced quota controller")
+		klog.V(2).InfoS("Synced quota controller")
 	}, period, stopCh)
 }
 
