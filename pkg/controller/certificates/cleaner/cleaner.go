@@ -79,8 +79,8 @@ func NewCSRCleanerController(
 func (ccc *CSRCleanerController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting CSR cleaner controller")
-	defer klog.Infof("Shutting down CSR cleaner controller")
+	klog.InfoS("Starting CSR cleaner controller")
+	defer klog.InfoS("Shutting down CSR cleaner controller")
 
 	for i := 0; i < workers; i++ {
 		go wait.Until(ccc.worker, pollingInterval, stopCh)
@@ -93,12 +93,12 @@ func (ccc *CSRCleanerController) Run(workers int, stopCh <-chan struct{}) {
 func (ccc *CSRCleanerController) worker() {
 	csrs, err := ccc.csrLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Unable to list CSRs: %v", err)
+		klog.ErrorS(err, "Unable to list CSRs")
 		return
 	}
 	for _, csr := range csrs {
 		if err := ccc.handle(csr); err != nil {
-			klog.Errorf("Error while attempting to clean CSR %q: %v", csr.Name, err)
+			klog.ErrorS(err, "Error while attempting to clean CSR", "CSR", klog.KObj(csr))
 		}
 	}
 }
@@ -116,9 +116,9 @@ func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) err
 // expiration of the certificate (the NotAfter value) has passed.
 func isIssuedExpired(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
-		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired(csr) {
-			klog.Infof("Cleaning CSR %q as the associated certificate is expired.", csr.Name)
-			return true
+		if c.Type == capi.CertificateApproved && isIssued(csr) && isExpired {
+			klog.InfoS("Cleaning CSR as the associated certificate is expired.", "CSR", klog.KObj(csr))
+			return true, nil
 		}
 	}
 	return false
@@ -131,7 +131,7 @@ func isPendingPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	// If there are no Conditions on the status, the CSR will appear via
 	// `kubectl` as `Pending`.
 	if len(csr.Status.Conditions) == 0 && isOlderThan(csr.CreationTimestamp, pendingExpiration) {
-		klog.Infof("Cleaning CSR %q as it is more than %v old and unhandled.", csr.Name, pendingExpiration)
+		klog.InfoS("Cleaning CSR as it is past expiration and unhandled.", "CSR", klog.KObj(csr), "expiration", pendingExpiration)
 		return true
 	}
 	return false
@@ -143,7 +143,7 @@ func isPendingPastDeadline(csr *capi.CertificateSigningRequest) bool {
 func isDeniedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
 		if c.Type == capi.CertificateDenied && isOlderThan(c.LastUpdateTime, deniedExpiration) {
-			klog.Infof("Cleaning CSR %q as it is more than %v old and denied.", csr.Name, deniedExpiration)
+			klog.InfoS("Cleaning CSR as it is past expiration and unhandled.", "CSR", klog.KObj(csr), "expiration", deniedExpiration, "condition", capi.CertificateDenied)
 			return true
 		}
 	}
@@ -156,7 +156,7 @@ func isDeniedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 func isFailedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
 		if c.Type == capi.CertificateFailed && isOlderThan(c.LastUpdateTime, deniedExpiration) {
-			klog.Infof("Cleaning CSR %q as it is more than %v old and failed.", csr.Name, deniedExpiration)
+			klog.InfoS("Cleaning CSR as it is past expiration and failed.", "CSR", klog.KObj(csr), "deniedExpiration", deniedExpiration, "condition", capi.CertificateFailed)
 			return true
 		}
 	}
@@ -169,7 +169,7 @@ func isFailedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 func isIssuedPastDeadline(csr *capi.CertificateSigningRequest) bool {
 	for _, c := range csr.Status.Conditions {
 		if c.Type == capi.CertificateApproved && isIssued(csr) && isOlderThan(c.LastUpdateTime, approvedExpiration) {
-			klog.Infof("Cleaning CSR %q as it is more than %v old and approved.", csr.Name, approvedExpiration)
+			klog.InfoS("Cleaning CSR as it is past pending expiration and unhandled.", "CSR", klog.KObj(csr), "expiration", pendingExpiration, "condition", capi.CertificateApproved)
 			return true
 		}
 	}

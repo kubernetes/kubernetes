@@ -191,8 +191,8 @@ func (c *ClusterRoleAggregationController) Run(workers int, stopCh <-chan struct
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting ClusterRoleAggregator")
-	defer klog.Infof("Shutting down ClusterRoleAggregator")
+	klog.InfoS("Starting ClusterRoleAggregator")
+	defer klog.InfoS("Shutting down ClusterRoleAggregator")
 
 	if !cache.WaitForNamedCacheSync("ClusterRoleAggregator", stopCh, c.clusterRolesSynced) {
 		return
