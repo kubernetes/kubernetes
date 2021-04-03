@@ -229,9 +229,9 @@ func (m *PodControllerRefManager) AdoptPod(pod *v1.Pod) error {
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
-	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
-		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
-	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID(), m.finalizers...)
+	klog.V(2).InfoS("Patching Pod to remove its controllerRef",
+		"pod", klog.KObj(pod), "controllerGroupVersion", m.controllerKind.GroupVersion(), "controllerKind", m.controllerKind.Kind, "controllerName", m.Controller.GetName())
+	patchBytes, err := deleteOwnerRefStrategicMergePatch(pod.UID, m.Controller.GetUID())
 	if err != nil {
 		return err
 	}
@@ -354,8 +354,8 @@ func (m *ReplicaSetControllerRefManager) AdoptReplicaSet(rs *apps.ReplicaSet) er
 // ReleaseReplicaSet sends a patch to free the ReplicaSet from the control of the Deployment controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ReplicaSetControllerRefManager) ReleaseReplicaSet(replicaSet *apps.ReplicaSet) error {
-	klog.V(2).Infof("patching ReplicaSet %s_%s to remove its controllerRef to %s/%s:%s",
-		replicaSet.Namespace, replicaSet.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+	klog.V(2).InfoS("Patching ReplicaSet to remove its controllerRef",
+		"replicaSet", klog.KObj(replicaSet), "controllerGroupVersion", m.controllerKind.GroupVersion(), "controllerKind", m.controllerKind.Kind, "controllerName", m.Controller.GetName())
 	patchBytes, err := deleteOwnerRefStrategicMergePatch(replicaSet.UID, m.Controller.GetUID())
 	if err != nil {
 		return err
@@ -492,8 +492,8 @@ func (m *ControllerRevisionControllerRefManager) AdoptControllerRevision(history
 // ReleaseControllerRevision sends a patch to free the ControllerRevision from the control of its controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
 func (m *ControllerRevisionControllerRefManager) ReleaseControllerRevision(history *apps.ControllerRevision) error {
-	klog.V(2).Infof("patching ControllerRevision %s_%s to remove its controllerRef to %s/%s:%s",
-		history.Namespace, history.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
+	klog.V(2).InfoS("Patching ControllerRevision to remove its controllerRef",
+		"controllerRevision", klog.KObj(history), "controllerGroupVersion", m.controllerKind.GroupVersion(), "controllerKind", m.controllerKind.Kind, "controller", m.Controller.GetName())
 	patchBytes, err := deleteOwnerRefStrategicMergePatch(history.UID, m.Controller.GetUID())
 	if err != nil {
 		return err
