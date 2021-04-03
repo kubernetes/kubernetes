@@ -19,9 +19,9 @@ package bootstrap
 import (
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 )
@@ -29,24 +29,24 @@ import (
 func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, ok bool) {
 	nameTokenID, ok := bootstrapsecretutil.ParseName(secret.Name)
 	if !ok {
-		klog.V(3).Infof("Invalid secret name: %s. Must be of form %s<secret-id>.", secret.Name, bootstrapapi.BootstrapTokenSecretPrefix)
+		klog.V(3).InfoS("Invalid secret name. Must be of form <bootstrap-secret-prefix><secret-id>.", "secretName", secret.Name)
 		return "", "", false
 	}
 
 	tokenID = bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		klog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenIDKey, secret.Namespace, secret.Name)
+		klog.V(3).InfoS("No key in Secret", "BootstrapTokenIDKey", bootstrapapi.BootstrapTokenIDKey, "secretNamespace", secret.Namespace, "secretName", secret.Name)
 		return "", "", false
 	}
 
 	if nameTokenID != tokenID {
-		klog.V(3).Infof("Token ID (%s) doesn't match secret name: %s", tokenID, nameTokenID)
+		klog.V(3).InfoS("Token ID doesn't match secret name", "tokenID", tokenID, "secretName", nameTokenID)
 		return "", "", false
 	}
 
 	tokenSecret = bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		klog.V(3).Infof("No %s key in %s/%s Secret", bootstrapapi.BootstrapTokenSecretKey, secret.Namespace, secret.Name)
+		klog.V(3).InfoS("No key in Secret", "BootstrapTokenSecretKey", bootstrapapi.BootstrapTokenSecretKey, "secretNamespace", secret.Namespace, "secretName", secret.Name)
 		return "", "", false
 	}
 
