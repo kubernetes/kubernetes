@@ -37,7 +37,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -178,8 +178,8 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer rsc.queue.ShutDown()
 
 	controllerName := strings.ToLower(rsc.Kind)
-	klog.Infof("Starting %v controller", controllerName)
-	defer klog.Infof("Shutting down %v controller", controllerName)
+	klog.InfoS("Starting controller", "controller", controllerName)
+	defer klog.InfoS("Shutting down controller", "controller", controllerName)
 
 	if !cache.WaitForNamedCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
@@ -282,7 +282,7 @@ func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration ti
 
 func (rsc *ReplicaSetController) addRS(obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
-	klog.V(4).Infof("Adding %s %s/%s", rsc.Kind, rs.Namespace, rs.Name)
+	klog.V(4).InfoS("Adding ReplicaSet", "rs", klog.KObj(rs))
 	rsc.enqueueRS(rs)
 }
 
@@ -317,7 +317,7 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 	// that bad as ReplicaSets that haven't met expectations yet won't
 	// sync, and all the listing is done using local stores.
 	if *(oldRS.Spec.Replicas) != *(curRS.Spec.Replicas) {
-		klog.V(4).Infof("%v %v updated. Desired pod count change: %d->%d", rsc.Kind, curRS.Name, *(oldRS.Spec.Replicas), *(curRS.Spec.Replicas))
+		klog.V(4).InfoS("ReplicaSet updated. Desired Pod count can change", "rs", klog.KObj(curRS), "rsPrevCount", *(oldRS.Spec.Replicas), "rsCurrCount", *(curRS.Spec.Replicas))
 	}
 	rsc.enqueueRS(curRS)
 }
@@ -343,7 +343,7 @@ func (rsc *ReplicaSetController) deleteRS(obj interface{}) {
 		return
 	}
 
-	klog.V(4).Infof("Deleting %s %q", rsc.Kind, key)
+	klog.V(4).InfoS("Deleting ReplicaSet", "rscKind", rsc.Kind, "key", key)
 
 	// Delete expectations for the ReplicaSet so if we create a new one with the same name it starts clean
 	rsc.expectations.DeleteExpectations(key)
@@ -372,7 +372,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 		if err != nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
+		klog.V(4).InfoS("Pod created", "pod", klog.KObj(pod))
 		rsc.expectations.CreationObserved(rsKey)
 		rsc.queue.Add(rsKey)
 		return
@@ -386,7 +386,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	if len(rss) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod)
+	klog.V(4).InfoS("Orphan Pod created", "pod", klog.KObj(pod))
 	for _, rs := range rss {
 		rsc.enqueueRS(rs)
 	}
@@ -435,7 +435,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		if rs == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Pod updated", "currPod", klog.KObj(curPod), "prevPod", klog.KObj(oldPod))
 		rsc.enqueueRS(rs)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
@@ -445,7 +445,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		// Note that this still suffers from #29229, we are just moving the problem one level
 		// "closer" to kubelet (from the deployment to the replica set controller).
 		if !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && rs.Spec.MinReadySeconds > 0 {
-			klog.V(2).Infof("%v %q will be enqueued after %ds for availability check", rsc.Kind, rs.Name, rs.Spec.MinReadySeconds)
+			klog.V(2).InfoS("ReplicaSet will be enqueued for availability check", "rscKind", rsc.Kind, klog.KObj(rs), "MinReadySeconds", rs.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
 			rsc.enqueueRSAfter(rs, (time.Duration(rs.Spec.MinReadySeconds)*time.Second)+time.Second)
@@ -460,7 +460,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 		if len(rss) == 0 {
 			return
 		}
-		klog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Orphan Pod updated", "currPod", klog.KObj(curPod), "prevPodObjectMeta", klog.KObj(oldPod))
 		for _, rs := range rss {
 			rsc.enqueueRS(rs)
 		}
@@ -503,7 +503,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", rs, err))
 		return
 	}
-	klog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
+	klog.V(4).InfoS("Pod deleted through caller", "pod", klog.KObj(pod), "caller", utilruntime.GetCaller(), "DeletionTimestamp", pod.DeletionTimestamp)
 	rsc.expectations.DeletionObserved(rsKey, controller.PodKey(pod))
 	rsc.queue.Add(rsKey)
 }
@@ -580,7 +580,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// The skipped pods will be retried later. The next controller resync will
 		// retry the slow start process.
 		if skippedPods := diff - successfulCreations; skippedPods > 0 {
-			klog.V(2).Infof("Slow-start failure. Skipping creation of %d pods, decrementing expectations for %v %v/%v", skippedPods, rsc.Kind, rs.Namespace, rs.Name)
+			klog.V(2).InfoS("Slow-start failure. Skipping creation of Pods, decrementing expectations for ReplicaSet", "skippedPodsNum", skippedPods, "rscKind", rsc.Kind, "rs", klog.KObj(rs))
 			for i := 0; i < skippedPods; i++ {
 				// Decrement the expected number of creates because the informer won't observe this pod
 				rsc.expectations.CreationObserved(rsKey)
@@ -618,7 +618,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 					podKey := controller.PodKey(targetPod)
 					rsc.expectations.DeletionObserved(rsKey, podKey)
 					if !apierrors.IsNotFound(err) {
-						klog.V(2).Infof("Failed to delete %v, decremented expectations for %v %s/%s", podKey, rsc.Kind, rs.Namespace, rs.Name)
+						klog.V(2).InfoS("Failed to delete pod, decremented expectations", "podKey", podKey, "rscKind", rsc.Kind, "replicaSet", klog.KRef(rs.Namespace, rs.Name))
 						errCh <- err
 					}
 				}
@@ -645,7 +645,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing ReplicaSet", "rscKind", rsc.Kind, "rs", key, "timeElapsed", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -654,7 +654,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	}
 	rs, err := rsc.rsLister.ReplicaSets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("%v %v has been deleted", rsc.Kind, key)
+		klog.V(4).InfoS("ReplicaSet has been deleted", "rscKind", rsc.Kind, "rs", key)
 		rsc.expectations.DeleteExpectations(key)
 		return nil
 	}
@@ -779,7 +779,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 		}
 		for _, pod := range pods {
 			if otherRS, found := seen[pod.UID]; found {
-				klog.V(5).Infof("Pod %s/%s is owned by both %v %s/%s and %v %s/%s", pod.Namespace, pod.Name, rsc.Kind, otherRS.Namespace, otherRS.Name, rsc.Kind, relatedRS.Namespace, relatedRS.Name)
+				klog.V(5).InfoS("Pod is owned by both multiple ReplicaSets", "pod", klog.KObj(pod), "rscKind", rsc.Kind, "otherRS", klog.KObj(otherRS), "rscKind", rsc.Kind, "relatedRS", klog.KObj(relatedRS))
 				continue
 			}
 			seen[pod.UID] = relatedRS
@@ -791,7 +791,7 @@ func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) (
 		for _, related := range relatedPods {
 			relatedNames = append(relatedNames, related.Name)
 		}
-		klog.Infof("Found %d related pods for %v %s/%s: %v", len(relatedPods), rsc.Kind, rs.Namespace, rs.Name, strings.Join(relatedNames, ", "))
+		klog.InfoS("Found related Pods", "relatedPodsNum", len(relatedPods), "rscKind", rsc.Kind, "rsNamespace", rs.Namespace, "rs", klog.KObj(rs), "relatedNames", strings.Join(relatedNames, ", "))
 	}
 	return relatedPods, nil
 }

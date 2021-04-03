@@ -1164,7 +1164,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		klog.V(8).InfoS("Waiting for queue to have 1 item", "queueSize", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
@@ -1208,7 +1208,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		klog.V(8).InfoS("Waiting for queue to have 1 item,", "queueSize", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
@@ -1250,7 +1250,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
-		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		klog.V(8).InfoS("Waiting for queue to have 1 item", "queueSize", manager.queue.Len())
 		return manager.queue.Len() == 1, nil
 	})
 	if err != nil {
