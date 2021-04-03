@@ -75,7 +75,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 		nodeListerSynced:       nodeInformer.Informer().HasSynced,
 		nodeQueue:              workqueue.NewNamedDelayingQueue("orphaned_pods_nodes"),
 		deletePod: func(namespace, name string) error {
-			klog.Infof("PodGC is force deleting Pod: %v/%v", namespace, name)
+			klog.InfoS("PodGC is force deleting Pod", "pod", klog.KRef(namespace, name))
 			return kubeClient.CoreV1().Pods(namespace).Delete(context.TODO(), name, *metav1.NewDeleteOptions(0))
 		},
 	}
@@ -86,9 +86,9 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	klog.Infof("Starting GC controller")
+	klog.InfoS("Starting GC controller")
 	defer gcc.nodeQueue.ShutDown()
-	defer klog.Infof("Shutting down GC controller")
+	defer klog.InfoS("Shutting down GC controller")
 
 	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced, gcc.nodeListerSynced) {
 		return
@@ -102,12 +102,12 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 func (gcc *PodGCController) gc() {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error while listing all pods: %v", err)
+		klog.ErrorS(err, "Error while listing all Pods")
 		return
 	}
 	nodes, err := gcc.nodeLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("Error while listing all nodes: %v", err)
+		klog.ErrorS(err, "Error while listing all Nodes")
 		return
 	}
 	if gcc.terminatedPodThreshold > 0 {
@@ -139,7 +139,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 		return
 	}
 
-	klog.Infof("garbage collecting %v pods", deleteCount)
+	klog.InfoS("Garbage collecting Pods", "deleteCount", deleteCount)
 	// sort only when necessary
 	sort.Sort(byCreationTimestamp(terminatedPods))
 	var wait sync.WaitGroup
@@ -158,7 +158,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
 func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
-	klog.V(4).Infof("GC'ing orphaned")
+	klog.V(4).InfoS("GC'ing orphaned")
 	existingNodeNames := sets.NewString()
 	for _, node := range nodes {
 		existingNodeNames.Insert(node.Name)
@@ -179,11 +179,11 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 		if !deletedNodesNames.Has(pod.Spec.NodeName) {
 			continue
 		}
-		klog.V(2).Infof("Found orphaned Pod %v/%v assigned to the Node %v. Deleting.", pod.Namespace, pod.Name, pod.Spec.NodeName)
+		klog.V(2).InfoS("Found orphaned Pod assigned to the Node. Deleting.", "pod", klog.KObj(pod), "node")
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of orphaned Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.V(0).InfoS("Forced deletion of orphaned Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }
@@ -200,7 +200,7 @@ func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) 
 			exists, err := gcc.checkIfNodeExists(nodeName)
 			switch {
 			case err != nil:
-				klog.Errorf("Error while getting node %q: %v", nodeName, err)
+				klog.ErrorS(err, "Error while getting Node", "node", nodeName)
 				// Node will be added back to the queue in the subsequent loop if still needed
 			case !exists:
 				deletedNodesNames.Insert(nodeName)
@@ -221,18 +221,18 @@ func (gcc *PodGCController) checkIfNodeExists(name string) (bool, error) {
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
 func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
-	klog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
+	klog.V(4).InfoS("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
 		if pod.DeletionTimestamp == nil || len(pod.Spec.NodeName) > 0 {
 			continue
 		}
 
-		klog.V(2).Infof("Found unscheduled terminating Pod %v/%v not assigned to any Node. Deleting.", pod.Namespace, pod.Name)
+		klog.V(2).InfoS("Found unscheduled terminating Pod not assigned to any Node. Deleting.", "pod", klog.KObj(pod))
 		if err := gcc.deletePod(pod.Namespace, pod.Name); err != nil {
 			utilruntime.HandleError(err)
 		} else {
-			klog.V(0).Infof("Forced deletion of unscheduled terminating Pod %v/%v succeeded", pod.Namespace, pod.Name)
+			klog.V(0).InfoS("Forced deletion of unscheduled terminating Pod succeeded", "pod", klog.KObj(pod))
 		}
 	}
 }
