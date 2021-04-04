@@ -221,7 +221,7 @@ func asVersionedObject(infos []*resource.Info, forceList bool, specifiedOutputVe
 		if len(actualVersion.Version) > 0 {
 			defaultVersionInfo = fmt.Sprintf("Defaulting to %q", actualVersion.Version)
 		}
-		klog.V(1).Infof("info: the output version specified is invalid. %s\n", defaultVersionInfo)
+		klog.V(1).InfoS("The output version specified is invalid.\n", "defaultVersionInfo", defaultVersionInfo)
 	}
 	return object, nil
 }

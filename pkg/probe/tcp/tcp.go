@@ -55,7 +55,7 @@ func DoTCPProbe(addr string, timeout time.Duration) (probe.Result, string, error
 	}
 	err = conn.Close()
 	if err != nil {
-		klog.Errorf("Unexpected error closing TCP probe socket: %v (%#v)", err, err)
+		klog.ErrorS(err, "Unexpected error closing TCP probe socket")
 	}
 	return probe.Success, "", nil
 }

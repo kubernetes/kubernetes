@@ -59,7 +59,7 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 	}
 	data := dataBuffer.Bytes()
 
-	klog.V(4).Infof("Exec probe response: %q", string(data))
+	klog.V(4).InfoS("Exec probe response", "response", string(data))
 	if err != nil {
 		exit, ok := err.(exec.ExitError)
 		if ok {
@@ -75,7 +75,7 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 				return probe.Failure, string(data), nil
 			}
 
-			klog.Warningf("Exec probe timed out after %s but ExecProbeTimeout feature gate was disabled", timeoutErr.Timeout())
+			klog.InfoS("Exec probe timed out after duration but ExecProbeTimeout feature gate was disabled", "duration", timeoutErr.Timeout())
 		}
 
 		return probe.Unknown, "", err
