@@ -200,7 +200,7 @@ func (e *Signer) signConfigMap() {
 	// First capture the config we are signing
 	content, ok := newCM.Data[bootstrapapi.KubeConfigKey]
 	if !ok {
-		klog.V(3).InfoS("No key in ConfigMap", "key", bootstrapapi.KubeConfigKey, "configMapNamespace", origCM.Namespace, "configMapName", origCM.Name)
+		klog.V(3).InfoS("No key in ConfigMap", "configKey", bootstrapapi.KubeConfigKey, "configMapNamespace", origCM.Namespace, "configMap", origCM.Name)
 		return
 	}
 
@@ -297,7 +297,7 @@ func (e *Signer) getTokens() map[string]string {
 		if _, ok := ret[tokenID]; ok {
 			// This should never happen as we ensure a consistent secret name.
 			// But leave this in here just in case.
-			klog.V(1).InfoS("Duplicate bootstrap tokens found for id, ignoring on in", "tokenID", tokenID, "secretNamespace", secret.Namespace, "secretName", secret.Name)
+			klog.V(1).InfoS("Duplicate bootstrap tokens found for id, ignoring in Secret", "tokenID", tokenID, "secretNamespace", secret.Namespace, "secret", secret.Name)
 			continue
 		}
 

@@ -163,7 +163,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 func (tc *TokenCleaner) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).InfoS("Finished syncing secret", "key", key, "syncTime", time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing Secret", "secret", key, "syncTime", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -173,7 +173,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 	ret, err := tc.secretLister.Secrets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.V(3).InfoS("secret has been deleted", "key", key)
+		klog.V(3).InfoS("Secret has been deleted", "secret", key)
 		return nil
 	}
 
@@ -191,7 +191,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
 	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
 	if alreadyExpired {
-		klog.V(3).InfoS("Deleting expired secret", "secretNamespace", secret.Namespace, "secretName", secret.Name)
+		klog.V(3).InfoS("Deleting expired Secret", "secretNamespace", secret.Namespace, "secret", secret.Name)
 		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
 			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
