@@ -80,8 +80,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting PV protection controller")
-	defer klog.Infof("Shutting down PV protection controller")
+	klog.InfoS("Starting PV protection controller")
+	defer klog.InfoS("Shutting down PV protection controller")
 
 	if !cache.WaitForNamedCacheSync("PV protection", stopCh, c.pvListerSynced) {
 		return
@@ -122,15 +122,15 @@ func (c *Controller) processNextWorkItem() bool {
 }
 
 func (c *Controller) processPV(pvName string) error {
-	klog.V(4).Infof("Processing PV %s", pvName)
+	klog.V(4).InfoS("Processing PV", "pv", pvName)
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
+		klog.V(4).InfoS("Finished processing PV", "pv", pvName, "timeElapsed", time.Since(startTime))
 	}()
 
 	pv, err := c.pvLister.Get(pvName)
 	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("PV %s not found, ignoring", pvName)
+		klog.V(4).InfoS("PV not found, ignoring", "pv", pvName)
 		return nil
 	}
 	if err != nil {
@@ -165,10 +165,10 @@ func (c *Controller) addFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = append(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone, metav1.UpdateOptions{})
 	if err != nil {
-		klog.V(3).Infof("Error adding protection finalizer to PV %s: %v", pv.Name, err)
+		klog.V(3).InfoS("Error adding protection finalizer to PV", "pv", klog.KObj(pv), "err", err)
 		return err
 	}
-	klog.V(3).Infof("Added protection finalizer to PV %s", pv.Name)
+	klog.V(3).InfoS("Added protection finalizer to PV", "pv", klog.KObj(pv))
 	return nil
 }
 
@@ -177,10 +177,10 @@ func (c *Controller) removeFinalizer(pv *v1.PersistentVolume) error {
 	pvClone.ObjectMeta.Finalizers = slice.RemoveString(pvClone.ObjectMeta.Finalizers, volumeutil.PVProtectionFinalizer, nil)
 	_, err := c.client.CoreV1().PersistentVolumes().Update(context.TODO(), pvClone, metav1.UpdateOptions{})
 	if err != nil {
-		klog.V(3).Infof("Error removing protection finalizer from PV %s: %v", pv.Name, err)
+		klog.V(3).InfoS("Error removing protection finalizer from PV", "pv", klog.KObj(pv), "err", err)
 		return err
 	}
-	klog.V(3).Infof("Removed protection finalizer from PV %s", pv.Name)
+	klog.V(3).InfoS("Removed protection finalizer from PV", "pv", klog.KObj(pv))
 	return nil
 }
 
@@ -202,7 +202,7 @@ func (c *Controller) pvAddedUpdated(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("PV informer returned non-PV object: %#v", obj))
 		return
 	}
-	klog.V(4).Infof("Got event on PV %s", pv.Name)
+	klog.V(4).InfoS("Got event on PV", "pv", klog.KObj(pv))
 
 	if protectionutil.NeedToAddFinalizer(pv, volumeutil.PVProtectionFinalizer) || protectionutil.IsDeletionCandidate(pv, volumeutil.PVProtectionFinalizer) {
 		c.queue.Add(pv.Name)

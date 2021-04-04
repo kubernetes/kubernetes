@@ -115,7 +115,7 @@ func (ctrl *PersistentVolumeController) GetServiceAccountTokenFunc() func(_, _ s
 
 func (ctrl *PersistentVolumeController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		klog.Errorf("DeleteServiceAccountToken unsupported in PersistentVolumeController")
+		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in PersistentVolumeController")
 	}
 }
 

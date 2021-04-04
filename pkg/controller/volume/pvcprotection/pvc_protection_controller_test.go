@@ -475,7 +475,7 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 				break
 			}
 			if ctrl.queue.Len() > 0 {
-				klog.V(5).Infof("Test %q: %d events queue, processing one", test.name, ctrl.queue.Len())
+				klog.V(5).InfoS("Test: processing events queue", "test", test.name, "eventsQueueSize", ctrl.queue.Len())
 				ctrl.processNextWorkItem()
 			}
 			if ctrl.queue.Len() > 0 {
@@ -486,7 +486,7 @@ func testPVCProtectionController(t *testing.T, genericEphemeralVolumeFeatureEnab
 			if currentActionCount < len(test.expectedActions) {
 				// Do not log every wait, only when the action count changes.
 				if lastReportedActionCount < currentActionCount {
-					klog.V(5).Infof("Test %q: got %d actions out of %d, waiting for the rest", test.name, currentActionCount, len(test.expectedActions))
+					klog.V(5).InfoS("Test: waiting for actions", "test", test.name, "currentActionCount", currentActionCount, "expectedActionCount", len(test.expectedActions))
 					lastReportedActionCount = currentActionCount
 				}
 				// The test expected more to happen, wait for the actions.

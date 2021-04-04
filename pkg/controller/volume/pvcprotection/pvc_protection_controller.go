@@ -225,7 +225,7 @@ func (c *Controller) isBeingUsed(pvc *v1.PersistentVolumeClaim) (bool, error) {
 	// list.
 	if inUse, err := c.askInformer(pvc); err != nil {
 		// No need to return because a live list will follow.
-		klog.Error(err)
+		klog.ErrorS(err, "Error")
 	} else if inUse {
 		return true, nil
 	}
@@ -350,7 +350,7 @@ func (c *Controller) pvcAddedUpdated(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for Persistent Volume Claim %#v: %v", pvc, err))
 		return
 	}
-	klog.V(4).InfoS("Got event on PVC", key)
+	klog.V(4).InfoS("Got event on PVC", "pvc", key)
 
 	if protectionutil.NeedToAddFinalizer(pvc, volumeutil.PVCProtectionFinalizer) || protectionutil.IsDeletionCandidate(pvc, volumeutil.PVCProtectionFinalizer) {
 		c.queue.Add(key)

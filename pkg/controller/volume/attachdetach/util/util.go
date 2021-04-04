@@ -50,10 +50,10 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 		claimName = pod.Name + "-" + podVolume.Name
 	}
 	if claimName != "" {
-		klog.V(10).Infof(
-			"Found PVC, ClaimName: %q/%q",
-			pod.Namespace,
-			claimName)
+		klog.V(10).InfoS(
+			"Found PVC",
+			"podNamespace", pod.Namespace,
+			"claimName", claimName)
 
 		// If podVolume is a PVC, fetch the real PV behind the claim
 		pvName, pvcUID, err := getPVCFromCacheExtractPV(
@@ -66,12 +66,12 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 				err)
 		}
 
-		klog.V(10).Infof(
-			"Found bound PV for PVC (ClaimName %q/%q pvcUID %v): pvName=%q",
-			pod.Namespace,
-			claimName,
-			pvcUID,
-			pvName)
+		klog.V(10).InfoS(
+			"Found bound PV for PVC",
+			"podNamespace", pod.Namespace,
+			"claimName", claimName,
+			"pvcUID", pvcUID,
+			"pv", pvName)
 
 		// Fetch actual PV object
 		volumeSpec, err := getPVSpecFromCache(
@@ -93,13 +93,13 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 				err)
 		}
 
-		klog.V(10).Infof(
-			"Extracted volumeSpec (%v) from bound PV (pvName %q) and PVC (ClaimName %q/%q pvcUID %v)",
-			volumeSpec.Name(),
-			pvName,
-			pod.Namespace,
-			claimName,
-			pvcUID)
+		klog.V(10).InfoS(
+			"Extracted volumeSpec from bound PV and PVC",
+			"volumeSpec", volumeSpec.Name(),
+			"pv", pvName,
+			"podNamespace", pod.Namespace,
+			"claimName", claimName,
+			"pvcUID", pvcUID)
 
 		return volumeSpec, nil
 	}
@@ -201,28 +201,25 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	}
 
 	if len(pod.Spec.Volumes) <= 0 {
-		klog.V(10).Infof("Skipping processing of pod %q/%q: it has no volumes.",
-			pod.Namespace,
-			pod.Name)
+		klog.V(10).InfoS("Skipping processing of Pod: it has no volumes",
+			"pod", klog.KObj(pod))
 		return
 	}
 
 	nodeName := types.NodeName(pod.Spec.NodeName)
 	if nodeName == "" {
-		klog.V(10).Infof(
-			"Skipping processing of pod %q/%q: it is not scheduled to a node.",
-			pod.Namespace,
-			pod.Name)
+		klog.V(10).InfoS(
+			"Skipping processing of Pod: it is not scheduled to a Node",
+			"pod", klog.KObj(pod))
 		return
 	} else if !desiredStateOfWorld.NodeExists(nodeName) {
 		// If the node the pod is scheduled to does not exist in the desired
 		// state of the world data structure, that indicates the node is not
 		// yet managed by the controller. Therefore, ignore the pod.
-		klog.V(4).Infof(
-			"Skipping processing of pod %q/%q: it is scheduled to node %q which is not managed by the controller.",
-			pod.Namespace,
-			pod.Name,
-			nodeName)
+		klog.V(4).InfoS(
+			"Skipping processing of Pod: it is scheduled to Node which is not managed by the controller",
+			"pod", klog.KObj(pod),
+			"node", nodeName)
 		return
 	}
 
@@ -230,24 +227,22 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	for _, podVolume := range pod.Spec.Volumes {
 		volumeSpec, err := CreateVolumeSpec(podVolume, pod, nodeName, volumePluginMgr, pvcLister, pvLister, csiMigratedPluginManager, csiTranslator)
 		if err != nil {
-			klog.V(10).Infof(
-				"Error processing volume %q for pod %q/%q: %v",
-				podVolume.Name,
-				pod.Namespace,
-				pod.Name,
-				err)
+			klog.V(10).InfoS(
+				"Error processing volume for Pod",
+				"volume", podVolume.Name,
+				"pod", klog.KObj(pod),
+				"err", err)
 			continue
 		}
 
 		attachableVolumePlugin, err :=
 			volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 		if err != nil || attachableVolumePlugin == nil {
-			klog.V(10).Infof(
-				"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
-				podVolume.Name,
-				pod.Namespace,
-				pod.Name,
-				err)
+			klog.V(10).InfoS(
+				"Skipping volume for Pod: it does not implement attacher interface",
+				"volume", podVolume.Name,
+				"pod", klog.KObj(pod),
+				"err", err)
 			continue
 		}
 
@@ -257,12 +252,11 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 			_, err := desiredStateOfWorld.AddPod(
 				uniquePodName, pod, volumeSpec, nodeName)
 			if err != nil {
-				klog.V(10).Infof(
-					"Failed to add volume %q for pod %q/%q to desiredStateOfWorld. %v",
-					podVolume.Name,
-					pod.Namespace,
-					pod.Name,
-					err)
+				klog.V(10).InfoS(
+					"Failed to add volume for Pod to desiredStateOfWorld",
+					"volume", podVolume.Name,
+					"pod", klog.KObj(pod),
+					"err", err)
 			}
 
 		} else {
@@ -270,12 +264,11 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 			uniqueVolumeName, err := util.GetUniqueVolumeNameFromSpec(
 				attachableVolumePlugin, volumeSpec)
 			if err != nil {
-				klog.V(10).Infof(
-					"Failed to delete volume %q for pod %q/%q from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed with %v",
-					podVolume.Name,
-					pod.Namespace,
-					pod.Name,
-					err)
+				klog.V(10).InfoS(
+					"Failed to delete volume for Pod from desiredStateOfWorld. GetUniqueVolumeNameFromSpec failed",
+					"volume", podVolume.Name,
+					"pod", klog.KObj(pod),
+					"err", err)
 				continue
 			}
 			desiredStateOfWorld.DeletePod(

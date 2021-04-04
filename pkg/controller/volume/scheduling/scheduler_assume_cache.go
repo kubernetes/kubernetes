@@ -18,9 +18,10 @@ package scheduling
 
 import (
 	"fmt"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"strconv"
 	"sync"
+
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 
 	"k8s.io/klog/v2"
 
@@ -161,7 +162,7 @@ func (c *assumeCache) add(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.Errorf("add failed: %v", &errObjectName{err})
+		klog.ErrorS(&errObjectName{err}, "Add failed")
 		return
 	}
 
@@ -171,20 +172,20 @@ func (c *assumeCache) add(obj interface{}) {
 	if objInfo, _ := c.getObjInfo(name); objInfo != nil {
 		newVersion, err := c.getObjVersion(name, obj)
 		if err != nil {
-			klog.Errorf("add: couldn't get object version: %v", err)
+			klog.ErrorS(err, "Add: couldn't get object version")
 			return
 		}
 
 		storedVersion, err := c.getObjVersion(name, objInfo.latestObj)
 		if err != nil {
-			klog.Errorf("add: couldn't get stored object version: %v", err)
+			klog.ErrorS(err, "Add: couldn't get stored object version")
 			return
 		}
 
 		// Only update object if version is newer.
 		// This is so we don't override assumed objects due to informer resync.
 		if newVersion <= storedVersion {
-			klog.V(10).Infof("Skip adding %v %v to assume cache because version %v is not newer than %v", c.description, name, newVersion, storedVersion)
+			klog.V(10).InfoS("Skip adding object to assume cache because version is not newest", "objDescription", c.description, "obj", name, "newVersion", newVersion, "storedVersion", storedVersion)
 			return
 		}
 	}
@@ -193,7 +194,7 @@ func (c *assumeCache) add(obj interface{}) {
 	if err = c.store.Update(objInfo); err != nil {
 		klog.Warningf("got error when updating stored object : %v", err)
 	} else {
-		klog.V(10).Infof("Adding %v %v to assume cache: %+v ", c.description, name, obj)
+		klog.V(10).InfoS("Adding object to assume cache", "objDescription", c.description, "objName", name, "obj", obj)
 	}
 }
 
@@ -208,7 +209,7 @@ func (c *assumeCache) delete(obj interface{}) {
 
 	name, err := cache.MetaNamespaceKeyFunc(obj)
 	if err != nil {
-		klog.Errorf("delete failed: %v", &errObjectName{err})
+		klog.ErrorS(&errObjectName{err}, "Delete failed")
 		return
 	}
 
@@ -218,7 +219,7 @@ func (c *assumeCache) delete(obj interface{}) {
 	objInfo := &objInfo{name: name}
 	err = c.store.Delete(objInfo)
 	if err != nil {
-		klog.Errorf("delete: failed to delete %v %v: %v", c.description, name, err)
+		klog.ErrorS(err, "Delete: failed to delete object", "objDescription", c.description, "obj", name)
 	}
 }
 
@@ -280,14 +281,14 @@ func (c *assumeCache) List(indexObj interface{}) []interface{} {
 	allObjs := []interface{}{}
 	objs, err := c.store.Index(c.indexName, &objInfo{latestObj: indexObj})
 	if err != nil {
-		klog.Errorf("list index error: %v", err)
+		klog.ErrorS(err, "List index error")
 		return nil
 	}
 
 	for _, obj := range objs {
 		objInfo, ok := obj.(*objInfo)
 		if !ok {
-			klog.Errorf("list error: %v", &errWrongType{"objInfo", obj})
+			klog.ErrorS(&errWrongType{"objInfo", obj}, "List error")
 			continue
 		}
 		allObjs = append(allObjs, objInfo.latestObj)
@@ -325,7 +326,7 @@ func (c *assumeCache) Assume(obj interface{}) error {
 
 	// Only update the cached object
 	objInfo.latestObj = obj
-	klog.V(4).Infof("Assumed %v %q, version %v", c.description, name, newVersion)
+	klog.V(4).InfoS("Assumed object", "objDescription", c.description, "obj", name, "newVersion", newVersion)
 	return nil
 }
 
@@ -336,10 +337,10 @@ func (c *assumeCache) Restore(objName string) {
 	objInfo, err := c.getObjInfo(objName)
 	if err != nil {
 		// This could be expected if object got deleted
-		klog.V(5).Infof("Restore %v %q warning: %v", c.description, objName, err)
+		klog.V(5).InfoS("Restore object warning: %v", "objDescription", c.description, "obj", objName, "err", err)
 	} else {
 		objInfo.latestObj = objInfo.apiObj
-		klog.V(4).Infof("Restored %v %q", c.description, objName)
+		klog.V(4).InfoS("Restored object", "objDescription", c.description, "obj", objName)
 	}
 }
 
@@ -403,7 +404,7 @@ func (c *pvAssumeCache) ListPVs(storageClassName string) []*v1.PersistentVolume 
 	for _, obj := range objs {
 		pv, ok := obj.(*v1.PersistentVolume)
 		if !ok {
-			klog.Errorf("ListPVs: %v", &errWrongType{"v1.PersistentVolume", obj})
+			klog.ErrorS(&errWrongType{"v1.PersistentVolume", obj}, "ListPVs")
 			continue
 		}
 		pvs = append(pvs, pv)

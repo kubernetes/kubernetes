@@ -99,10 +99,10 @@ func (dswp *desiredStateOfWorldPopulator) populatorLoopFunc() func() {
 		// findAndAddActivePods is called periodically, independently of the main
 		// populator loop.
 		if time.Since(dswp.timeOfLastListPods) < dswp.listPodsRetryDuration {
-			klog.V(5).Infof(
-				"Skipping findAndAddActivePods(). Not permitted until %v (listPodsRetryDuration %v).",
-				dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
-				dswp.listPodsRetryDuration)
+			klog.V(5).InfoS(
+				"Skipping findAndAddActivePods(). Not permitted until a later time.",
+				"permittedTime", dswp.timeOfLastListPods.Add(dswp.listPodsRetryDuration),
+				"listPodsRetryDuration", dswp.listPodsRetryDuration)
 
 			return
 		}
@@ -116,7 +116,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for dswPodUID, dswPodToAdd := range dswp.desiredStateOfWorld.GetPodToAdd() {
 		dswPodKey, err := kcache.MetaNamespaceKeyFunc(dswPodToAdd.Pod)
 		if err != nil {
-			klog.Errorf("MetaNamespaceKeyFunc failed for pod %q (UID %q) with: %v", dswPodKey, dswPodUID, err)
+			klog.ErrorS(err, "MetaNamespaceKeyFunc failed for Pod", dswPodKey, dswPodUID)
 			continue
 		}
 
@@ -131,7 +131,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		case errors.IsNotFound(err):
 			// if we can't find the pod, we need to delete it below
 		case err != nil:
-			klog.Errorf("podLister Get failed for pod %q (UID %q) with %v", dswPodKey, dswPodUID, err)
+			klog.ErrorS(err, "podLister Get failed for Pod", "pod", dswPodKey, "podUID", dswPodUID)
 			continue
 		default:
 			volumeActionFlag := util.DetermineVolumeAction(
@@ -143,7 +143,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 				informerPodUID := volutil.GetUniquePodName(informerPod)
 				// Check whether the unique identifier of the pod from dsw matches the one retrieved from pod informer
 				if informerPodUID == dswPodUID {
-					klog.V(10).Infof("Verified pod %q (UID %q) from dsw exists in pod informer.", dswPodKey, dswPodUID)
+					klog.V(10).InfoS("Verified Pod from dsw exists in pod informer", "pod", dswPodKey, "podUID", dswPodUID)
 					continue
 				}
 			}
@@ -151,7 +151,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 
 		// the pod from dsw does not exist in pod informer, or it does not match the unique identifier retrieved
 		// from the informer, delete it from dsw
-		klog.V(1).Infof("Removing pod %q (UID %q) from dsw because it does not exist in pod informer.", dswPodKey, dswPodUID)
+		klog.V(1).InfoS("Removing Pod from dsw because it does not exist in pod informer", "pod", dswPodKey, "podUID", dswPodUID)
 		dswp.desiredStateOfWorld.DeletePod(dswPodUID, dswPodToAdd.VolumeName, dswPodToAdd.NodeName)
 	}
 
@@ -161,12 +161,12 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 		// The result is returned from CSIDriverLister which is from local cache. So this is not an expensive call.
 		volumeAttachable := volutil.IsAttachableVolume(volumeToAttach.VolumeSpec, dswp.volumePluginMgr)
 		if !volumeAttachable {
-			klog.Infof("Volume %v changes from attachable to non-attachable.", volumeToAttach.VolumeName)
+			klog.InfoS("Volume changes from attachable to non-attachable", "volume", volumeToAttach.VolumeName)
 			for _, scheduledPod := range volumeToAttach.ScheduledPods {
 				podUID := volutil.GetUniquePodName(scheduledPod)
 				dswp.desiredStateOfWorld.DeletePod(podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
-				klog.V(4).Infof("Removing podUID: %v, volume: %v on node: %v from desired state of world"+
-					" because of the change of volume attachability.", podUID, volumeToAttach.VolumeName, volumeToAttach.NodeName)
+				klog.V(4).InfoS("Removing podUID, volume on Node from desired state of world"+
+					" because of the change of volume attachability", "podUID", podUID, "volume", volumeToAttach.VolumeName, "node", volumeToAttach.NodeName)
 			}
 		}
 	}
@@ -175,7 +175,7 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 func (dswp *desiredStateOfWorldPopulator) findAndAddActivePods() {
 	pods, err := dswp.podLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("podLister List failed: %v", err)
+		klog.ErrorS(err, "podLister List failed")
 		return
 	}
 	dswp.timeOfLastListPods = time.Now()

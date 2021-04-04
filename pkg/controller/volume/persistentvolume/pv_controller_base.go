@@ -156,27 +156,27 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 func (ctrl *PersistentVolumeController) initializeCaches(volumeLister corelisters.PersistentVolumeLister, claimLister corelisters.PersistentVolumeClaimLister) {
 	volumeList, err := volumeLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
+		klog.ErrorS(err, "PersistentVolumeController can't initialize caches")
 		return
 	}
 	for _, volume := range volumeList {
 		volumeClone := volume.DeepCopy()
 		if _, err = ctrl.storeVolumeUpdate(volumeClone); err != nil {
-			klog.Errorf("error updating volume cache: %v", err)
+			klog.ErrorS(err, "Error updating volume cache")
 		}
 	}
 
 	claimList, err := claimLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
+		klog.ErrorS(err, "PersistentVolumeController can't initialize caches")
 		return
 	}
 	for _, claim := range claimList {
 		if _, err = ctrl.storeClaimUpdate(claim.DeepCopy()); err != nil {
-			klog.Errorf("error updating claim cache: %v", err)
+			klog.ErrorS(err, "Error updating claim cache")
 		}
 	}
-	klog.V(4).Infof("controller initialized")
+	klog.V(4).InfoS("Controller initialized")
 }
 
 // enqueueWork adds volume or claim to given work queue.
@@ -187,10 +187,10 @@ func (ctrl *PersistentVolumeController) enqueueWork(queue workqueue.Interface, o
 	}
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
-		klog.Errorf("failed to get key from object: %v", err)
+		klog.ErrorS(err, "Failed to get key from object")
 		return
 	}
-	klog.V(5).Infof("enqueued %q for sync", objName)
+	klog.V(5).InfoS("Enqueued object for sync", "obj", objName)
 	queue.Add(objName)
 }
 
@@ -209,7 +209,7 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 	// is an old version.
 	new, err := ctrl.storeVolumeUpdate(volume)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "Error")
 	}
 	if !new {
 		return
@@ -220,9 +220,9 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
 			// recovers from it easily.
-			klog.V(3).Infof("could not sync volume %q: %+v", volume.Name, err)
+			klog.V(3).InfoS("Could not sync volume", "volume", volume.Name, "err", err)
 		} else {
-			klog.Errorf("could not sync volume %q: %+v", volume.Name, err)
+			klog.ErrorS(err, "Could not sync volume", "volume", volume.Name)
 		}
 	}
 }
@@ -230,9 +230,9 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 // deleteVolume runs in worker thread and handles "volume deleted" event.
 func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume) {
 	if err := ctrl.volumes.store.Delete(volume); err != nil {
-		klog.Errorf("volume %q deletion encountered : %v", volume.Name, err)
+		klog.ErrorS(err, "Volume deletion encountered", "volume", volume.Name)
 	} else {
-		klog.V(4).Infof("volume %q deleted", volume.Name)
+		klog.V(4).InfoS("Volume deleted", "volume", volume.Name)
 	}
 	// record deletion metric if a deletion start timestamp is in the cache
 	// the following calls will be a no-op if there is nothing for this volume in the cache
@@ -246,7 +246,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 	// claim here in response to volume deletion prevents the claim from
 	// waiting until the next sync period for its Lost status.
 	claimKey := claimrefToClaimKey(volume.Spec.ClaimRef)
-	klog.V(5).Infof("deleteVolume[%s]: scheduling sync of claim %q", volume.Name, claimKey)
+	klog.V(5).InfoS("deleteVolume: scheduling sync of claim", "volume", volume.Name, "claim", claimKey)
 	ctrl.claimQueue.Add(claimKey)
 }
 
@@ -257,7 +257,7 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 	// an old version.
 	new, err := ctrl.storeClaimUpdate(claim)
 	if err != nil {
-		klog.Errorf("%v", err)
+		klog.ErrorS(err, "Error")
 	}
 	if !new {
 		return
@@ -267,9 +267,9 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
 			// recovers from it easily.
-			klog.V(3).Infof("could not sync claim %q: %+v", claimToClaimKey(claim), err)
+			klog.V(3).InfoS("Could not sync claim", "volume", claimToClaimKey(claim), "err", err)
 		} else {
-			klog.Errorf("could not sync volume %q: %+v", claimToClaimKey(claim), err)
+			klog.ErrorS(err, "Could not sync volume", "volume", claimToClaimKey(claim))
 		}
 	}
 }
@@ -278,24 +278,24 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 // deleteClaim runs in worker thread and handles "claim deleted" event.
 func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeClaim) {
 	if err := ctrl.claims.Delete(claim); err != nil {
-		klog.Errorf("claim %q deletion encountered : %v", claim.Name, err)
+		klog.ErrorS(err, "Claim deletion encountered", "claim", claim.Name)
 	}
 	claimKey := claimToClaimKey(claim)
-	klog.V(4).Infof("claim %q deleted", claimKey)
+	klog.V(4).InfoS("Claim deleted", "claim", claimKey)
 	// clean any possible unfinished provision start timestamp from cache
 	// Unit test [5-8] [5-9]
 	ctrl.operationTimestamps.Delete(claimKey)
 
 	volumeName := claim.Spec.VolumeName
 	if volumeName == "" {
-		klog.V(5).Infof("deleteClaim[%q]: volume not bound", claimKey)
+		klog.V(5).InfoS("deleteClaim: volume not bound", "claim", claimKey)
 		return
 	}
 
 	// sync the volume when its claim is deleted.  Explicitly sync'ing the
 	// volume here in response to claim deletion prevents the volume from
 	// waiting until the next sync period for its Release.
-	klog.V(5).Infof("deleteClaim[%q]: scheduling sync of volume %s", claimKey, volumeName)
+	klog.V(5).InfoS("deleteClaim: scheduling sync of volume", "claim", claimKey, "volume", volumeName)
 	ctrl.volumeQueue.Add(volumeName)
 }
 
@@ -305,8 +305,8 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	defer ctrl.claimQueue.ShutDown()
 	defer ctrl.volumeQueue.ShutDown()
 
-	klog.Infof("Starting persistent volume controller")
-	defer klog.Infof("Shutting down persistent volume controller")
+	klog.InfoS("Starting persistent volume controller")
+	defer klog.InfoS("Shutting down persistent volume controller")
 
 	if !cache.WaitForNamedCacheSync("persistent volume", stopCh, ctrl.volumeListerSynced, ctrl.claimListerSynced, ctrl.classListerSynced, ctrl.podListerSynced, ctrl.NodeListerSynced) {
 		return
@@ -389,7 +389,7 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 	if cmpm.IsMigrationEnabledForPlugin(provisioner) {
 		csiDriverName, err = translator.GetCSINameFromInTreeName(provisioner)
 		if err != nil {
-			klog.Errorf("Could not update volume migration annotations. Migration enabled for plugin %s but could not find corresponding driver name: %v", provisioner, err)
+			klog.ErrorS(err, "Could not update volume migration annotations. Migration enabled for plugin but could not find corresponding driver name", "plugin", provisioner)
 			return false
 		}
 		if migratedToDriver != csiDriverName {
@@ -416,11 +416,11 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 		}
 		defer ctrl.volumeQueue.Done(keyObj)
 		key := keyObj.(string)
-		klog.V(5).Infof("volumeWorker[%s]", key)
+		klog.V(5).InfoS("volumeWorker", "volume", key)
 
 		_, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			klog.V(4).Infof("error getting name of volume %q to get volume from informer: %v", key, err)
+			klog.V(4).InfoS("Error getting name of volume to get volume from informer", "volume", key, "err", err)
 			return false
 		}
 		volume, err := ctrl.volumeLister.Get(name)
@@ -431,7 +431,7 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 			return false
 		}
 		if !errors.IsNotFound(err) {
-			klog.V(2).Infof("error getting volume %q from informer: %v", key, err)
+			klog.V(2).InfoS("Error getting volume from informer", "volume", key, "err", err)
 			return false
 		}
 
@@ -439,18 +439,18 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 		// "delete"
 		volumeObj, found, err := ctrl.volumes.store.GetByKey(key)
 		if err != nil {
-			klog.V(2).Infof("error getting volume %q from cache: %v", key, err)
+			klog.V(2).InfoS("Error getting volume from cache", "volume", key, "err", err)
 			return false
 		}
 		if !found {
 			// The controller has already processed the delete event and
 			// deleted the volume from its cache
-			klog.V(2).Infof("deletion of volume %q was already processed", key)
+			klog.V(2).InfoS("Deletion of volume was already processed", "volume", key)
 			return false
 		}
 		volume, ok := volumeObj.(*v1.PersistentVolume)
 		if !ok {
-			klog.Errorf("expected volume, got %+v", volumeObj)
+			klog.ErrorS(nil, "Expected volume", "volume", volumeObj)
 			return false
 		}
 		ctrl.deleteVolume(volume)
@@ -458,7 +458,7 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 	}
 	for {
 		if quit := workFunc(); quit {
-			klog.Infof("volume worker queue shutting down")
+			klog.InfoS("Volume worker queue shutting down")
 			return
 		}
 	}
@@ -474,11 +474,11 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 		}
 		defer ctrl.claimQueue.Done(keyObj)
 		key := keyObj.(string)
-		klog.V(5).Infof("claimWorker[%s]", key)
+		klog.V(5).InfoS("claimWorker", "claim", key)
 
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
-			klog.V(4).Infof("error getting namespace & name of claim %q to get claim from informer: %v", key, err)
+			klog.V(4).InfoS("Error getting namespace & name of claim to get claim from informer", "claim", key, "err", err)
 			return false
 		}
 		claim, err := ctrl.claimLister.PersistentVolumeClaims(namespace).Get(name)
@@ -489,25 +489,25 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 			return false
 		}
 		if !errors.IsNotFound(err) {
-			klog.V(2).Infof("error getting claim %q from informer: %v", key, err)
+			klog.V(2).InfoS("Error getting claim from informer", "claim", key, "err", err)
 			return false
 		}
 
 		// The claim is not in informer cache, the event must have been "delete"
 		claimObj, found, err := ctrl.claims.GetByKey(key)
 		if err != nil {
-			klog.V(2).Infof("error getting claim %q from cache: %v", key, err)
+			klog.V(2).InfoS("Error getting claim from cache", "claim", key, "err", err)
 			return false
 		}
 		if !found {
 			// The controller has already processed the delete event and
 			// deleted the claim from its cache
-			klog.V(2).Infof("deletion of claim %q was already processed", key)
+			klog.V(2).InfoS("Deletion of claim was already processed", "claim", key)
 			return false
 		}
 		claim, ok := claimObj.(*v1.PersistentVolumeClaim)
 		if !ok {
-			klog.Errorf("expected claim, got %+v", claimObj)
+			klog.ErrorS(nil, "Expected claim", "claim", claimObj)
 			return false
 		}
 		ctrl.deleteClaim(claim)
@@ -515,7 +515,7 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 	}
 	for {
 		if quit := workFunc(); quit {
-			klog.Infof("claim worker queue shutting down")
+			klog.InfoS("Claim worker queue shutting down")
 			return
 		}
 	}
@@ -525,7 +525,7 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 // all consumers of PV/PVC shared informer to have a short resync period,
 // therefore we do our own.
 func (ctrl *PersistentVolumeController) resync() {
-	klog.V(4).Infof("resyncing PV controller")
+	klog.V(4).InfoS("Resyncing PV controller")
 
 	pvcs, err := ctrl.claimLister.List(labels.NewSelector())
 	if err != nil {
@@ -609,7 +609,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	if !found {
 		// This is a new object
-		klog.V(4).Infof("storeObjectUpdate: adding %s %q, version %s", className, objName, objAccessor.GetResourceVersion())
+		klog.V(4).InfoS("storeObjectUpdate: adding obj version", "className", className, "obj", objName, "version", objAccessor.GetResourceVersion())
 		if err = store.Add(obj); err != nil {
 			return false, fmt.Errorf("error adding %s %q to controller cache: %w", className, objName, err)
 		}
@@ -633,11 +633,11 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 	// Throw away only older version, let the same version pass - we do want to
 	// get periodic sync events.
 	if oldObjResourceVersion > objResourceVersion {
-		klog.V(4).Infof("storeObjectUpdate: ignoring %s %q version %s", className, objName, objAccessor.GetResourceVersion())
+		klog.V(4).InfoS("storeObjectUpdate: ignoring obj version", "className", className, "obj", objName, "version", objAccessor.GetResourceVersion())
 		return false, nil
 	}
 
-	klog.V(4).Infof("storeObjectUpdate updating %s %q with version %s", className, objName, objAccessor.GetResourceVersion())
+	klog.V(4).InfoS("storeObjectUpdate updating obj with version", "className", className, "obj", objName, "version", objAccessor.GetResourceVersion())
 	if err = store.Update(obj); err != nil {
 		return false, fmt.Errorf("error updating %s %q in controller cache: %w", className, objName, err)
 	}

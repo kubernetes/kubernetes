@@ -324,8 +324,8 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer adc.pvcQueue.ShutDown()
 
-	klog.Infof("Starting attach detach controller")
-	defer klog.Infof("Shutting down attach detach controller")
+	klog.InfoS("Starting attach detach controller")
+	defer klog.InfoS("Shutting down attach detach controller")
 
 	synced := []kcache.InformerSynced{adc.podsSynced, adc.nodesSynced, adc.pvcsSynced, adc.pvsSynced}
 	if adc.csiNodeSynced != nil {
@@ -344,11 +344,11 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 
 	err := adc.populateActualStateOfWorld()
 	if err != nil {
-		klog.Errorf("Error populating the actual state of world: %v", err)
+		klog.ErrorS(err, "Error populating the actual state of world")
 	}
 	err = adc.populateDesiredStateOfWorld()
 	if err != nil {
-		klog.Errorf("Error populating the desired state of world: %v", err)
+		klog.ErrorS(err, "Error populating the desired state of world")
 	}
 	go adc.reconciler.Run(stopCh)
 	go adc.desiredStateOfWorldPopulator.Run(stopCh)
@@ -366,7 +366,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 }
 
 func (adc *attachDetachController) populateActualStateOfWorld() error {
-	klog.V(5).Infof("Populating ActualStateOfworld")
+	klog.V(5).InfoS("Populating ActualStateOfworld")
 	nodes, err := adc.nodeLister.List(labels.Everything())
 	if err != nil {
 		return err
@@ -383,7 +383,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 			// scans the pods and updates their volumes in the ActualStateOfWorld too.
 			err = adc.actualStateOfWorld.MarkVolumeAsAttached(uniqueName, nil /* VolumeSpec */, nodeName, attachedVolume.DevicePath)
 			if err != nil {
-				klog.Errorf("Failed to mark the volume as attached: %v", err)
+				klog.ErrorS(err, "Failed to mark the volume as attached")
 				continue
 			}
 			adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
@@ -392,7 +392,7 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 	}
 	err = adc.processVolumeAttachments()
 	if err != nil {
-		klog.Errorf("Failed to process volume attachments: %v", err)
+		klog.ErrorS(err, "Failed to process volume attachments")
 	}
 	return err
 }
@@ -420,7 +420,7 @@ func (adc *attachDetachController) getNodeVolumeDevicePath(
 }
 
 func (adc *attachDetachController) populateDesiredStateOfWorld() error {
-	klog.V(5).Infof("Populating DesiredStateOfworld")
+	klog.V(5).InfoS("Populating DesiredStateOfworld")
 
 	pods, err := adc.podLister.List(labels.Everything())
 	if err != nil {
@@ -436,48 +436,41 @@ func (adc *attachDetachController) populateDesiredStateOfWorld() error {
 			// pod will be detached and the spec is irrelevant.
 			volumeSpec, err := util.CreateVolumeSpec(podVolume, podToAdd, nodeName, &adc.volumePluginMgr, adc.pvcLister, adc.pvLister, adc.csiMigratedPluginManager, adc.intreeToCSITranslator)
 			if err != nil {
-				klog.Errorf(
-					"Error creating spec for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				klog.ErrorS(err, "Error creating spec for volume", "volume", podVolume.Name, "pod", klog.KObj(podToAdd))
 				continue
 			}
 			plugin, err := adc.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec)
 			if err != nil || plugin == nil {
-				klog.V(10).Infof(
-					"Skipping volume %q for pod %q/%q: it does not implement attacher interface. err=%v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				klog.V(10).InfoS(
+					"Skipping volume: it does not implement attacher interface",
+					"volume", podVolume.Name,
+					"pod", klog.KObj(podToAdd),
+					"err", err)
 				continue
 			}
 			volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 			if err != nil {
-				klog.Errorf(
-					"Failed to find unique name for volume %q, pod %q/%q: %v",
-					podVolume.Name,
-					podToAdd.Namespace,
-					podToAdd.Name,
-					err)
+				klog.ErrorS(
+					err,
+					"Failed to find unique name for volume",
+					"volume", podVolume.Name,
+					"pod", klog.KObj(podToAdd))
 				continue
 			}
 			attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
 			if attachState == cache.AttachStateAttached {
-				klog.V(10).Infof("Volume %q is attached to node %q. Marking as attached in ActualStateOfWorld",
-					volumeName,
-					nodeName,
+				klog.V(10).InfoS("Volume is attached to Node. Marking as attached in ActualStateOfWorld",
+					"volume", volumeName,
+					"node", nodeName,
 				)
 				devicePath, err := adc.getNodeVolumeDevicePath(volumeName, nodeName)
 				if err != nil {
-					klog.Errorf("Failed to find device path: %v", err)
+					klog.ErrorS(err, "Failed to find device path")
 					continue
 				}
 				err = adc.actualStateOfWorld.MarkVolumeAsAttached(volumeName, volumeSpec, nodeName, devicePath)
 				if err != nil {
-					klog.Errorf("Failed to update volume spec for node %s: %v", nodeName, err)
+					klog.ErrorS(err, "Failed to update volume spec for Node", "node", nodeName)
 				}
 			}
 		}
@@ -576,7 +569,7 @@ func (adc *attachDetachController) nodeDelete(obj interface{}) {
 	nodeName := types.NodeName(node.Name)
 	if err := adc.desiredStateOfWorld.DeleteNode(nodeName); err != nil {
 		// This might happen during drain, but we still want it to appear in our logs
-		klog.Infof("error removing node %q from desired-state-of-world: %v", nodeName, err)
+		klog.InfoS("Error removing Node from desired-state-of-world", "node", nodeName, "err", err)
 	}
 
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
@@ -619,15 +612,15 @@ func (adc *attachDetachController) processNextItem() bool {
 }
 
 func (adc *attachDetachController) syncPVCByKey(key string) error {
-	klog.V(5).Infof("syncPVCByKey[%s]", key)
+	klog.V(5).InfoS("syncPVCByKey", "key", key)
 	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
 	if err != nil {
-		klog.V(4).Infof("error getting namespace & name of pvc %q to get pvc from informer: %v", key, err)
+		klog.V(4).InfoS("Error getting namespace & name of PVC to get pvc from informer", "pvc", key, "err", err)
 		return nil
 	}
 	pvc, err := adc.pvcLister.PersistentVolumeClaims(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.V(4).Infof("error getting pvc %q from informer: %v", key, err)
+		klog.V(4).InfoS("Error getting PVC from informer", "pvc", key, "err", err)
 		return nil
 	}
 	if err != nil {
@@ -669,7 +662,7 @@ func (adc *attachDetachController) syncPVCByKey(key string) error {
 // mounted.
 func (adc *attachDetachController) processVolumesInUse(
 	nodeName types.NodeName, volumesInUse []v1.UniqueVolumeName) {
-	klog.V(4).Infof("processVolumesInUse for node %q", nodeName)
+	klog.V(4).InfoS("processVolumesInUse for Node", "node", nodeName)
 	for _, attachedVolume := range adc.actualStateOfWorld.GetAttachedVolumesForNode(nodeName) {
 		mounted := false
 		for _, volumeInUse := range volumesInUse {
@@ -697,7 +690,7 @@ func (adc *attachDetachController) processVolumesInUse(
 func (adc *attachDetachController) processVolumeAttachments() error {
 	vas, err := adc.volumeAttachmentLister.List(labels.Everything())
 	if err != nil {
-		klog.Errorf("failed to list VolumeAttachment objects: %v", err)
+		klog.ErrorS(err, "Failed to list VolumeAttachment objects")
 		return err
 	}
 	for _, va := range vas {
@@ -711,7 +704,7 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 		}
 		pv, err := adc.pvLister.Get(*pvName)
 		if err != nil {
-			klog.Errorf("Unable to lookup pv object for: %q, err: %v", *pvName, err)
+			klog.ErrorS(err, "Unable to lookup PV object", "pv", *pvName)
 			continue
 		}
 		volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
@@ -727,21 +720,21 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 		}
 		volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
-			klog.Errorf(
-				"Failed to find unique name for volume:%q, va.Name:%q, nodeName:%q: %v",
-				*pvName,
-				va.Name,
-				nodeName,
-				err)
+			klog.ErrorS(
+				err,
+				"Failed to find unique name for volume",
+				"pv", *pvName,
+				"volume", va.Name,
+				"node", nodeName)
 			continue
 		}
 		attachState := adc.actualStateOfWorld.GetAttachState(volumeName, nodeName)
 		if attachState == cache.AttachStateDetached {
-			klog.V(1).Infof("Marking volume attachment as uncertain as volume:%q (%q) is not attached (%v)",
-				volumeName, nodeName, attachState)
+			klog.V(1).InfoS("Marking volume attachment as uncertain as volume is not attached",
+				"volume", volumeName, "node", nodeName, "attachState", attachState)
 			err = adc.actualStateOfWorld.MarkVolumeAsUncertain(volumeName, volumeSpec, nodeName)
 			if err != nil {
-				klog.Errorf("MarkVolumeAsUncertain fail to add the volume %q (%q) to ASW. err: %s", volumeName, nodeName, err)
+				klog.ErrorS(err, "MarkVolumeAsUncertain fail to add the volume to ASW", "volume", volumeName, "node", nodeName)
 			}
 		}
 	}
@@ -849,7 +842,7 @@ func (adc *attachDetachController) GetServiceAccountTokenFunc() func(_, _ string
 
 func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		klog.Errorf("DeleteServiceAccountToken unsupported in attachDetachController")
+		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in attachDetachController")
 	}
 }
 

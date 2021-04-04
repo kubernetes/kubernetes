@@ -219,19 +219,19 @@ func (expc *expandController) syncHandler(key string) error {
 		return nil
 	}
 	if err != nil {
-		klog.V(5).Infof("Error getting PVC %q (uid: %q) from informer : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
+		klog.V(5).InfoS("Error getting PVC from informer", "pvcName", util.GetPersistentVolumeClaimQualifiedName(pvc), "pvcUID", pvc.UID, "err", err)
 		return err
 	}
 
 	pv, err := expc.getPersistentVolume(pvc)
 	if err != nil {
-		klog.V(5).Infof("Error getting Persistent Volume for PVC %q (uid: %q) from informer : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, err)
+		klog.V(5).InfoS("Error getting Persistent Volume for PVC from informer", "pvc", util.GetPersistentVolumeClaimQualifiedName(pvc), "pvcUID", pvc.UID, "err", err)
 		return err
 	}
 
 	if pv.Spec.ClaimRef == nil || pvc.Namespace != pv.Spec.ClaimRef.Namespace || pvc.UID != pv.Spec.ClaimRef.UID {
 		err := fmt.Errorf("persistent Volume is not bound to PVC being updated : %s", util.ClaimToClaimKey(pvc))
-		klog.V(4).Infof("%v", err)
+		klog.V(4).InfoS("Error", "err", err)
 		return err
 	}
 
@@ -248,14 +248,14 @@ func (expc *expandController) syncHandler(key string) error {
 	volumeSpec := volume.NewSpecFromPersistentVolume(pv, false)
 	migratable, err := expc.csiMigratedPluginManager.IsMigratable(volumeSpec)
 	if err != nil {
-		klog.V(4).Infof("failed to check CSI migration status for PVC: %s with error: %v", util.ClaimToClaimKey(pvc), err)
+		klog.V(4).InfoS("Failed to check CSI migration status for PVC with error", "pvc", util.ClaimToClaimKey(pvc), "err", err)
 		return nil
 	}
 	// handle CSI migration scenarios before invoking FindExpandablePluginBySpec for in-tree
 	if migratable {
 		inTreePluginName, err := expc.csiMigratedPluginManager.GetInTreePluginNameFromSpec(volumeSpec.PersistentVolume, volumeSpec.Volume)
 		if err != nil {
-			klog.V(4).Infof("Error getting in-tree plugin name from persistent volume %s: %v", volumeSpec.PersistentVolume.Name, err)
+			klog.V(4).InfoS("Error getting in-tree plugin name from Persistent Volume", "pvc", volumeSpec.PersistentVolume.Name, "err", err)
 			return err
 		}
 
@@ -286,7 +286,7 @@ func (expc *expandController) syncHandler(key string) error {
 			eventType = v1.EventTypeWarning
 		}
 		expc.recorder.Event(pvc, eventType, events.ExternalExpanding, fmt.Sprintf("Ignoring the PVC: %v.", msg))
-		klog.Infof("Ignoring the PVC %q (uid: %q) : %v.", util.GetPersistentVolumeClaimQualifiedName(pvc), pvc.UID, msg)
+		klog.InfoS("Ignoring the PVC", "pvc", util.GetPersistentVolumeClaimQualifiedName(pvc), "pvcUID", pvc.UID, "err", msg)
 		// If we are expecting that an external plugin will handle resizing this volume then
 		// is no point in requeuing this PVC.
 		return nil
@@ -304,16 +304,16 @@ func (expc *expandController) expand(pvc *v1.PersistentVolumeClaim, pv *v1.Persi
 
 	pvc, err := util.MarkResizeInProgressWithResizer(pvc, resizerName, expc.kubeClient)
 	if err != nil {
-		klog.V(5).Infof("Error setting PVC %s in progress with error : %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+		klog.V(5).InfoS("Error setting PVC in progress with error", "pvc", util.GetPersistentVolumeClaimQualifiedName(pvc), "err", err)
 		return err
 	}
 
 	generatedOperations, err := expc.operationGenerator.GenerateExpandVolumeFunc(pvc, pv)
 	if err != nil {
-		klog.Errorf("Error starting ExpandVolume for pvc %s with %v", util.GetPersistentVolumeClaimQualifiedName(pvc), err)
+		klog.ErrorS(err, "Error starting ExpandVolume for PVC with error", "pvc", util.GetPersistentVolumeClaimQualifiedName(pvc))
 		return err
 	}
-	klog.V(5).Infof("Starting ExpandVolume for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+	klog.V(5).InfoS("Starting ExpandVolume for volume", "volume", util.GetPersistentVolumeClaimQualifiedName(pvc))
 	_, detailedErr := generatedOperations.Run()
 
 	return detailedErr
@@ -324,8 +324,8 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer expc.queue.ShutDown()
 
-	klog.Infof("Starting expand controller")
-	defer klog.Infof("Shutting down expand controller")
+	klog.InfoS("Starting expand controller")
+	defer klog.InfoS("Shutting down expand controller")
 
 	if !cache.WaitForNamedCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced) {
 		return
@@ -356,7 +356,7 @@ func (expc *expandController) getPersistentVolume(pvc *v1.PersistentVolumeClaim)
 
 // isNodeExpandComplete returns true if  pvc.Status.Capacity >= pv.Spec.Capacity
 func (expc *expandController) isNodeExpandComplete(pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume) bool {
-	klog.V(4).Infof("pv %q capacity = %v, pvc %s capacity = %v", pv.Name, pv.Spec.Capacity[v1.ResourceStorage], pvc.ObjectMeta.Name, pvc.Status.Capacity[v1.ResourceStorage])
+	klog.V(4).InfoS("PV capacity", "pv", pv.Name, "pvcSpecCapacity", pv.Spec.Capacity[v1.ResourceStorage], "pvcObjectMeta", pvc.ObjectMeta.Name, "pvcStatusCapacity", pvc.Status.Capacity[v1.ResourceStorage])
 	pvcCap, pvCap := pvc.Status.Capacity[v1.ResourceStorage], pv.Spec.Capacity[v1.ResourceStorage]
 	return pvcCap.Cmp(pvCap) >= 0
 }
@@ -442,7 +442,7 @@ func (expc *expandController) GetServiceAccountTokenFunc() func(_, _ string, _ *
 
 func (expc *expandController) DeleteServiceAccountTokenFunc() func(types.UID) {
 	return func(types.UID) {
-		klog.Errorf("DeleteServiceAccountToken unsupported in expandController")
+		klog.ErrorS(nil, "DeleteServiceAccountToken unsupported in expandController")
 	}
 }
 

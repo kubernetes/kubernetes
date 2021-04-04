@@ -65,15 +65,15 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		if errors.IsNotFound(err) {
 			// If node does not exist, its status cannot be updated.
 			// Do nothing so that there is no retry until node is created.
-			klog.V(2).Infof(
-				"Could not update node status. Failed to find node %q in NodeInformer cache. Error: '%v'",
-				nodeName,
-				err)
+			klog.V(2).InfoS(
+				"Could not update Node status. Failed to find Node in NodeInformer cache",
+				"node", nodeName,
+				"err", err)
 			continue
 		} else if err != nil {
 			// For all other errors, log error and reset flag statusUpdateNeeded
 			// back to true to indicate this node status needs to be updated again.
-			klog.V(2).Infof("Error retrieving nodes from node lister. Error: %v", err)
+			klog.V(2).InfoS("Error retrieving Nodes from Node lister", "err", err)
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 			continue
 		}
@@ -83,10 +83,10 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 			// to indicate this node status needs to be updated again
 			nsu.actualStateOfWorld.SetNodeStatusUpdateNeeded(nodeName)
 
-			klog.V(2).Infof(
-				"Could not update node status for %q; re-marking for update. %v",
-				nodeName,
-				err)
+			klog.V(2).InfoS(
+				"Could not update node status for Node; re-marking for update",
+				"node", nodeName,
+				"err", err)
 
 			// We currently always return immediately on error
 			return err
@@ -103,6 +103,6 @@ func (nsu *nodeStatusUpdater) updateNodeStatus(nodeName types.NodeName, nodeObj 
 		return err
 	}
 
-	klog.V(4).Infof("Updating status %q for node %q succeeded. VolumesAttached: %v", patchBytes, nodeName, attachedVolumes)
+	klog.V(4).InfoS("Updating status for Node succeeded. VolumesAttached", "status", patchBytes, "node", nodeName, "attachedVolumes", attachedVolumes)
 	return nil
 }

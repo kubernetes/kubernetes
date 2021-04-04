@@ -354,7 +354,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Test %q controller sync failed: %v", test.name, err)
 		}
-		klog.V(4).Infof("controller synced, starting test")
+		klog.V(4).InfoS("Controller synced, starting test")
 
 		// Call the tested function
 		err = test.test(ctrl, reactor.VolumeReactor, test)

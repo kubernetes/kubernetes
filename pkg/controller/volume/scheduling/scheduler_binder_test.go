@@ -2109,7 +2109,7 @@ func TestBindPodVolumes(t *testing.T) {
 			go func(scenario scenarioType) {
 				time.Sleep(5 * time.Second)
 				// Sleep a while to run after bindAPIUpdate in BindPodVolumes
-				klog.V(5).Infof("Running delay function")
+				klog.V(5).InfoS("Running delay function")
 				scenario.delayFunc(t, testEnv, pod, scenario.initPVs, scenario.initPVCs)
 			}(scenario)
 		}
