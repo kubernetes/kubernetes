@@ -33,6 +33,10 @@ import (
 	utilexec "k8s.io/utils/exec"
 )
 
+const covertToIPVSServiceErrorMsg string = "could not convert local virtual server to IPVS service"
+const covertToLocalVirtualServerErrorMsg string = "could not convert IPVS service to local virtual server"
+const covertToIPVSDestinationErrorMsg string = "could not convert local real server to IPVS destination"
+
 // runner implements ipvs.Interface.
 type runner struct {
 	exec       utilexec.Interface
@@ -60,7 +64,7 @@ func New(exec utilexec.Interface) Interface {
 func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -71,7 +75,7 @@ func (runner *runner) AddVirtualServer(vs *VirtualServer) error {
 func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -82,7 +86,7 @@ func (runner *runner) UpdateVirtualServer(vs *VirtualServer) error {
 func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -93,7 +97,7 @@ func (runner *runner) DeleteVirtualServer(vs *VirtualServer) error {
 func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error) {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return nil, errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	runner.mu.Lock()
 	ipvsSvc, err := runner.ipvsHandle.GetService(svc)
@@ -104,7 +108,7 @@ func (runner *runner) GetVirtualServer(vs *VirtualServer) (*VirtualServer, error
 	}
 	vServ, err := toVirtualServer(ipvsSvc)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not convert IPVS service to local virtual server")
+		return nil, errors.Wrap(err, covertToLocalVirtualServerErrorMsg)
 	}
 	return vServ, nil
 }
@@ -121,7 +125,7 @@ func (runner *runner) GetVirtualServers() ([]*VirtualServer, error) {
 	for _, ipvsSvc := range ipvsSvcs {
 		vs, err := toVirtualServer(ipvsSvc)
 		if err != nil {
-			return nil, errors.Wrap(err, "could not convert IPVS service to local virtual server")
+			return nil, errors.Wrap(err, covertToLocalVirtualServerErrorMsg)
 		}
 		vss = append(vss, vs)
 	}
@@ -139,11 +143,11 @@ func (runner *runner) Flush() error {
 func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local real server to IPVS destination")
+		return errors.Wrap(err, covertToIPVSDestinationErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -154,11 +158,11 @@ func (runner *runner) AddRealServer(vs *VirtualServer, rs *RealServer) error {
 func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local real server to IPVS destination")
+		return errors.Wrap(err, covertToIPVSDestinationErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -168,11 +172,11 @@ func (runner *runner) DeleteRealServer(vs *VirtualServer, rs *RealServer) error 
 func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	dst, err := toIPVSDestination(rs)
 	if err != nil {
-		return errors.Wrap(err, "could not convert local real server to IPVS destination")
+		return errors.Wrap(err, covertToIPVSDestinationErrorMsg)
 	}
 	runner.mu.Lock()
 	defer runner.mu.Unlock()
@@ -183,7 +187,7 @@ func (runner *runner) UpdateRealServer(vs *VirtualServer, rs *RealServer) error 
 func (runner *runner) GetRealServers(vs *VirtualServer) ([]*RealServer, error) {
 	svc, err := toIPVSService(vs)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not convert local virtual server to IPVS service")
+		return nil, errors.Wrap(err, covertToIPVSServiceErrorMsg)
 	}
 	runner.mu.Lock()
 	dsts, err := runner.ipvsHandle.GetDestinations(svc)
