@@ -118,8 +118,8 @@ func (ttlc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ttlc.queue.ShutDown()
 
-	klog.Infof("Starting TTL controller")
-	defer klog.Infof("Shutting down TTL controller")
+	klog.InfoS("Starting TTL controller")
+	defer klog.InfoS("Shutting down TTL controller")
 
 	if !cache.WaitForNamedCacheSync("TTL", stopCh, ttlc.hasSynced) {
 		return
@@ -195,7 +195,7 @@ func (ttlc *Controller) deleteNode(obj interface{}) {
 func (ttlc *Controller) enqueueNode(node *v1.Node) {
 	key, err := controller.KeyFunc(node)
 	if err != nil {
-		klog.Errorf("Couldn't get key for object %+v", node)
+		klog.ErrorS(err, "Couldn't get key for object", "node", klog.KObj(node))
 		return
 	}
 	ttlc.queue.Add(key)
@@ -240,8 +240,8 @@ func getIntFromAnnotation(node *v1.Node, annotationKey string) (int, bool) {
 	}
 	intValue, err := strconv.Atoi(annotationValue)
 	if err != nil {
-		klog.Warningf("Cannot convert the value %q with annotation key %q for the node %q",
-			annotationValue, annotationKey, node.Name)
+		klog.InfoS("Cannot convert the annotation for the node",
+			"annotationValue", annotationValue, "annotationKey", annotationKey, "nodeName", node.Name)
 		return 0, false
 	}
 	return intValue, true

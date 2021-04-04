@@ -299,12 +299,12 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 
 	originalObjJS, err := json.Marshal(nodeCopy)
 	if err != nil {
-		klog.Errorf("Failed to marshal %v", nodeCopy)
+		klog.ErrorS(nil, "Failed to marshal original object", "node", nodeCopy)
 		return nil, nil
 	}
 	var originalNode v1.Node
 	if err = json.Unmarshal(originalObjJS, &originalNode); err != nil {
-		klog.Errorf("Failed to unmarshal original object: %v", err)
+		klog.ErrorS(err, "Failed to unmarshal original object")
 		return nil, nil
 	}
 
@@ -313,31 +313,31 @@ func (m *FakeNodeHandler) Patch(_ context.Context, name string, pt types.PatchTy
 	case types.JSONPatchType:
 		patchObj, err := jsonpatch.DecodePatch(data)
 		if err != nil {
-			klog.Error(err.Error())
+			klog.ErrorS(err, "")
 			return nil, nil
 		}
 		if patchedObjJS, err = patchObj.Apply(originalObjJS); err != nil {
-			klog.Error(err.Error())
+			klog.ErrorS(err, "")
 			return nil, nil
 		}
 	case types.MergePatchType:
 		if patchedObjJS, err = jsonpatch.MergePatch(originalObjJS, data); err != nil {
-			klog.Error(err.Error())
+			klog.ErrorS(err, "")
 			return nil, nil
 		}
 	case types.StrategicMergePatchType:
 		if patchedObjJS, err = strategicpatch.StrategicMergePatch(originalObjJS, data, originalNode); err != nil {
-			klog.Error(err.Error())
+			klog.ErrorS(err, "")
 			return nil, nil
 		}
 	default:
-		klog.Errorf("unknown Content-Type header for patch: %v", pt)
+		klog.ErrorS(nil, "Unknown Content-Type header for patch", "patchType", pt)
 		return nil, nil
 	}
 
 	var updatedNode v1.Node
 	if err = json.Unmarshal(patchedObjJS, &updatedNode); err != nil {
-		klog.Errorf("Failed to unmarshal patched object: %v", err)
+		klog.ErrorS(err, "Failed to unmarshal patched object")
 		return nil, nil
 	}
 
@@ -408,7 +408,7 @@ func (f *FakeRecorder) generateEvent(obj runtime.Object, timestamp metav1.Time, 
 	defer f.Unlock()
 	ref, err := ref.GetReference(legacyscheme.Scheme, obj)
 	if err != nil {
-		klog.Errorf("Encountered error while getting reference: %v", err)
+		klog.ErrorS(err, "Encountered error while getting reference")
 		return
 	}
 	event := f.makeEvent(ref, eventtype, reason, message)

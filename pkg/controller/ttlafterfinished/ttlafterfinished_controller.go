@@ -106,8 +106,8 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer tc.queue.ShutDown()
 
-	klog.Infof("Starting TTL after finished controller")
-	defer klog.Infof("Shutting down TTL after finished controller")
+	klog.InfoS("Starting TTL after finished controller")
+	defer klog.InfoS("Shutting down TTL after finished controller")
 
 	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
 		return
@@ -122,7 +122,7 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 
 func (tc *Controller) addJob(obj interface{}) {
 	job := obj.(*batch.Job)
-	klog.V(4).Infof("Adding job %s/%s", job.Namespace, job.Name)
+	klog.V(4).InfoS("Adding Job", "job", klog.KRef(job.Namespace, job.Name))
 
 	if job.DeletionTimestamp == nil && needsCleanup(job) {
 		tc.enqueue(job)
@@ -131,7 +131,7 @@ func (tc *Controller) addJob(obj interface{}) {
 
 func (tc *Controller) updateJob(old, cur interface{}) {
 	job := cur.(*batch.Job)
-	klog.V(4).Infof("Updating job %s/%s", job.Namespace, job.Name)
+	klog.V(4).InfoS("Updating Job", "job", klog.KRef(job.Namespace, job.Name))
 
 	if job.DeletionTimestamp == nil && needsCleanup(job) {
 		tc.enqueue(job)
@@ -139,7 +139,7 @@ func (tc *Controller) updateJob(old, cur interface{}) {
 }
 
 func (tc *Controller) enqueue(job *batch.Job) {
-	klog.V(4).Infof("Add job %s/%s to cleanup", job.Namespace, job.Name)
+	klog.V(4).InfoS("Add Job to cleanup", "job", klog.KRef(job.Namespace, job.Name))
 	key, err := controller.KeyFunc(job)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", job, err))
@@ -198,7 +198,7 @@ func (tc *Controller) processJob(key string) error {
 		return err
 	}
 
-	klog.V(4).Infof("Checking if Job %s/%s is ready for cleanup", namespace, name)
+	klog.V(4).InfoS("Checking if Job is ready for cleanup", "job", klog.KRef(namespace, name))
 	// Ignore the Jobs that are already deleted or being deleted, or the ones that don't need clean up.
 	job, err := tc.jLister.Jobs(namespace).Get(name)
 	if errors.IsNotFound(err) {
@@ -238,7 +238,7 @@ func (tc *Controller) processJob(key string) error {
 		PropagationPolicy: &policy,
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
-	klog.V(4).Infof("Cleaning up Job %s/%s", namespace, name)
+	klog.V(4).InfoS("Cleaning up Job", "job", klog.KRef(namespace, name))
 	if err := tc.client.BatchV1().Jobs(fresh.Namespace).Delete(context.TODO(), fresh.Name, options); err != nil {
 		return err
 	}
@@ -293,10 +293,10 @@ func timeLeft(j *batch.Job, since *time.Time) (*time.Duration, *time.Time, error
 		return nil, nil, err
 	}
 	if finishAt.After(*since) {
-		klog.Warningf("Warning: Found Job %s/%s finished in the future. This is likely due to time skew in the cluster. Job cleanup will be deferred.", j.Namespace, j.Name)
+		klog.InfoS("Warning: Found Job finished in the future. This is likely due to time skew in the cluster. Job cleanup will be deferred.", "job", klog.KRef(j.Namespace, j.Name))
 	}
 	remaining := expireAt.Sub(*since)
-	klog.V(4).Infof("Found Job %s/%s finished at %v, remaining TTL %v since %v, TTL will expire at %v", j.Namespace, j.Name, finishAt.UTC(), remaining, since.UTC(), expireAt.UTC())
+	klog.V(4).InfoS("Found Job finished", "job", klog.KRef(j.Namespace, j.Name), "finishTime", finishAt.UTC(), "remainingTTL", remaining, "startTime", since.UTC(), "expireTime", expireAt.UTC())
 	return &remaining, expireAt, nil
 }
 

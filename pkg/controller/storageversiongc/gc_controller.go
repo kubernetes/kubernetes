@@ -82,9 +82,9 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.leaseQueue.ShutDown()
 	defer c.storageVersionQueue.ShutDown()
-	defer klog.Infof("Shutting down storage version garbage collector")
+	defer klog.InfoS("Shutting down storage version garbage collector")
 
-	klog.Infof("Starting storage version garbage collector")
+	klog.InfoS("Starting storage version garbage collector")
 
 	if !cache.WaitForCacheSync(stopCh, c.leasesSynced, c.storageVersionSynced) {
 		utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
@@ -232,7 +232,7 @@ func (c *Controller) enqueueStorageVersion(obj *apiserverinternalv1alpha1.Storag
 		if err != nil || lease == nil || lease.Labels == nil ||
 			lease.Labels[controlplane.IdentityLeaseComponentLabelKey] != controlplane.KubeAPIServer {
 			// we cannot find a corresponding identity lease in cache, enqueue the storageversion
-			klog.V(4).Infof("Observed storage version %s with invalid apiserver entry", obj.Name)
+			klog.V(4).InfoS("Observed storage version with invalid API Server entry", "storageVersion", obj.Name)
 			c.storageVersionQueue.Add(obj.Name)
 			return
 		}
@@ -257,7 +257,7 @@ func (c *Controller) onDeleteLease(obj interface{}) {
 	if castObj.Namespace == metav1.NamespaceSystem &&
 		castObj.Labels != nil &&
 		castObj.Labels[controlplane.IdentityLeaseComponentLabelKey] == controlplane.KubeAPIServer {
-		klog.V(4).Infof("Observed lease %s deleted", castObj.Name)
+		klog.V(4).InfoS("Observed lease deleted", "leaseName", castObj.Name)
 		c.enqueueLease(castObj)
 	}
 }
