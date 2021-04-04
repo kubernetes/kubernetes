@@ -176,7 +176,7 @@ type RCConfig struct {
 	NodeDumpFunc      func(c clientset.Interface, nodeNames []string, logFunc func(fmt string, args ...interface{}))
 	ContainerDumpFunc func(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{}))
 
-	// Names of the secrets and configmaps to mount.
+	// Names of the secrets and configmaps to mount volumes and populate environment variables.
 	SecretNames    []string
 	ConfigMapNames []string
 
@@ -1571,10 +1571,11 @@ func (config *SecretConfig) Stop() error {
 	return nil
 }
 
-// TODO: attach secrets using different possibilities: env vars, image pull secrets.
 func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 	volumes := make([]v1.Volume, 0, len(secretNames))
 	mounts := make([]v1.VolumeMount, 0, len(secretNames))
+	envFrom := make([]v1.EnvFromSource, 0, len(secretNames))
+	imagePullSecrets := make([]v1.LocalObjectReference, 0, len(secretNames))
 	for _, name := range secretNames {
 		volumes = append(volumes, v1.Volume{
 			Name: name,
@@ -1588,10 +1589,23 @@ func attachSecrets(template *v1.PodTemplateSpec, secretNames []string) {
 			Name:      name,
 			MountPath: fmt.Sprintf("/%v", name),
 		})
+		envFrom = append(envFrom, v1.EnvFromSource{
+			Prefix: name,
+			SecretRef: &v1.SecretEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		})
+		imagePullSecrets = append(imagePullSecrets, v1.LocalObjectReference{
+			Name: name,
+		})
 	}
 
+	template.Spec.ImagePullSecrets = imagePullSecrets
 	template.Spec.Volumes = volumes
 	template.Spec.Containers[0].VolumeMounts = mounts
+	template.Spec.Containers[0].EnvFrom = envFrom
 }
 
 type ConfigMapConfig struct {
@@ -1629,10 +1643,10 @@ func (config *ConfigMapConfig) Stop() error {
 	return nil
 }
 
-// TODO: attach configmaps using different possibilities: env vars.
 func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
 	volumes := make([]v1.Volume, 0, len(configMapNames))
 	mounts := make([]v1.VolumeMount, 0, len(configMapNames))
+	envFrom := make([]v1.EnvFromSource, 0, len(configMapNames))
 	for _, name := range configMapNames {
 		volumes = append(volumes, v1.Volume{
 			Name: name,
@@ -1648,10 +1662,19 @@ func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
 			Name:      name,
 			MountPath: fmt.Sprintf("/%v", name),
 		})
+		envFrom = append(envFrom, v1.EnvFromSource{
+			Prefix: name,
+			ConfigMapRef: &v1.ConfigMapEnvSource{
+				LocalObjectReference: v1.LocalObjectReference{
+					Name: name,
+				},
+			},
+		})
 	}
 
 	template.Spec.Volumes = volumes
 	template.Spec.Containers[0].VolumeMounts = mounts
+	template.Spec.Containers[0].EnvFrom = envFrom
 }
 
 func (config *RCConfig) getTerminationGracePeriodSeconds(defaultGrace *int64) *int64 {
