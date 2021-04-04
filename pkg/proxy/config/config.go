@@ -458,7 +458,7 @@ func (c *NodeConfig) handleAddNode(obj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(4).Infof("Calling handler.OnNodeAdd")
+		klog.V(4).Infof("Calling handler.OnNodeAdd %+v", node)
 		c.eventHandlers[i].OnNodeAdd(node)
 	}
 }
@@ -475,7 +475,7 @@ func (c *NodeConfig) handleUpdateNode(oldObj, newObj interface{}) {
 		return
 	}
 	for i := range c.eventHandlers {
-		klog.V(5).Infof("Calling handler.OnNodeUpdate")
+		klog.V(5).Infof("Calling handler.OnNodeUpdate %+v", node)
 		c.eventHandlers[i].OnNodeUpdate(oldNode, node)
 	}
 }
