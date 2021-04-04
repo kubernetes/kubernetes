@@ -568,7 +568,7 @@ func TestTokenCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		klog.Infof(k)
+		klog.InfoS(k)
 
 		// Re-seed to reset name generation
 		utilrand.Seed(1)
