@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // Interface -- quota interface
@@ -43,8 +41,4 @@ type Interface interface {
 	// Implementations may assume that any data covered by the
 	// quota has already been removed.
 	ClearQuota(m mount.Interface, path string) error
-}
-
-func enabledQuotasForMonitoring() bool {
-	return utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolationFSQuotaMonitoring)
 }

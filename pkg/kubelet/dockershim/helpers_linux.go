@@ -34,6 +34,14 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
+const (
+	dockerNetNSFmt = "/proc/%v/ns/net"
+)
+
+var (
+	defaultSeccompOpt = []dockerOpt{{"seccomp", v1.SeccompProfileNameUnconfined, ""}}
+)
+
 // DefaultMemorySwap always returns 0 for no memory swap in a sandbox
 func DefaultMemorySwap() int64 {
 	return 0
@@ -98,6 +106,23 @@ func getSeccompSecurityOpts(seccompProfile string, separator rune) ([]string, er
 		return nil, err
 	}
 	return fmtDockerOpts(seccompOpts, separator), nil
+}
+
+// applyContainerSecurityContext updates docker container options according to security context.
+func applyContainerSecurityContext(lc *runtimeapi.LinuxContainerConfig, podSandboxID string, config *dockercontainer.Config, hc *dockercontainer.HostConfig, separator rune) error {
+	if lc == nil {
+		return nil
+	}
+
+	err := modifyContainerConfig(lc.SecurityContext, config)
+	if err != nil {
+		return err
+	}
+	if err := modifyHostConfig(lc.SecurityContext, hc, separator); err != nil {
+		return err
+	}
+	modifyContainerNamespaceOptions(lc.SecurityContext.GetNamespaceOptions(), podSandboxID, hc)
+	return nil
 }
 
 func (ds *dockerService) updateCreateConfig(

@@ -53,8 +53,6 @@ var (
 	// this is hacky, but extremely common.
 	// if a container starts but the executable file is not found, runc gives a message that matches
 	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
-
-	defaultSeccompOpt = []dockerOpt{{"seccomp", v1.SeccompProfileNameUnconfined, ""}}
 )
 
 // generateEnvList converts KeyValue list to a list of strings, in the form of

@@ -30,7 +30,6 @@ import (
 )
 
 const (
-	losetupPath       = "losetup"
 	ErrDeviceNotFound = "device not found"
 )
 

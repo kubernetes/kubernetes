@@ -412,29 +412,6 @@ func TestMapUnmap(t *testing.T) {
 	}
 }
 
-func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
-	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false, nil), pod, volume.VolumeOptions{})
-	if err != nil {
-		return err
-	}
-	if mounter == nil {
-		return fmt.Errorf("got a nil Mounter")
-	}
-
-	volPath := filepath.Join(tmpDir, testMountPath)
-	path := mounter.GetPath()
-	if path != volPath {
-		return fmt.Errorf("got unexpected path: %s", path)
-	}
-
-	var mounterArgs volume.MounterArgs
-	mounterArgs.FsGroup = &fsGroup
-	if err := mounter.SetUp(mounterArgs); err != nil {
-		return err
-	}
-	return nil
-}
-
 func TestConstructVolumeSpec(t *testing.T) {
 	tests := []struct {
 		name         string

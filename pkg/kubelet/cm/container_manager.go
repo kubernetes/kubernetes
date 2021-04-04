@@ -189,6 +189,8 @@ func ParseQOSReserved(m map[string]string) (*map[v1.ResourceName]int64, error) {
 	return &reservations, nil
 }
 
+// Shared code across linux and windows container managers. Requires lint ignores.
+// nolint:deadcode
 func containerDevicesFromResourceDeviceInstances(devs devicemanager.ResourceDeviceInstances) []*podresourcesapi.ContainerDevices {
 	var respDevs []*podresourcesapi.ContainerDevices
 

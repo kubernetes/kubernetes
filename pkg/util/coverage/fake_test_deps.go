@@ -24,6 +24,7 @@ import (
 // no tests are actually run. It does need a concrete implementation of at least ImportPath,
 // which is called unconditionally when running tests.
 //lint:ignore U1000 see comment above, we know it's unused normally.
+// nolint:deadcode
 type fakeTestDeps struct{}
 
 func (fakeTestDeps) ImportPath() string {

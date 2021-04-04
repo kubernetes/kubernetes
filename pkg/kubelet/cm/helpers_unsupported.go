@@ -51,10 +51,6 @@ func GetCgroupSubsystems() (*CgroupSubsystems, error) {
 	return nil, nil
 }
 
-func getCgroupProcs(dir string) ([]int, error) {
-	return nil, nil
-}
-
 // GetPodCgroupNameSuffix returns the last element of the pod CgroupName identifier
 func GetPodCgroupNameSuffix(podUID types.UID) string {
 	return ""

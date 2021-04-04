@@ -50,6 +50,10 @@ import (
 	utilsnet "k8s.io/utils/net"
 )
 
+const (
+	proxyModeKernelspace = "kernelspace"
+)
+
 // NewProxyServer returns a new ProxyServer.
 func NewProxyServer(o *Options) (*ProxyServer, error) {
 	return newProxyServer(o.config, o.CleanupAndExit, o.master)

@@ -87,10 +87,9 @@ import (
 )
 
 const (
-	proxyModeUserspace   = "userspace"
-	proxyModeIPTables    = "iptables"
-	proxyModeIPVS        = "ipvs"
-	proxyModeKernelspace = "kernelspace"
+	proxyModeUserspace = "userspace"
+	proxyModeIPTables  = "iptables"
+	proxyModeIPVS      = "ipvs"
 )
 
 // proxyRun defines the interface to run a specified ProxyServer

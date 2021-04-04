@@ -75,6 +75,8 @@ type HostUtils interface {
 var _ HostUtils = &HostUtil{}
 
 // getFileType checks for file/directory/socket and block/character devices.
+// common lib for linux and windows, requires lint ignores. Please do not remove.
+// nolint:deadcode
 func getFileType(pathname string) (FileType, error) {
 	var pathType FileType
 	info, err := os.Stat(pathname)

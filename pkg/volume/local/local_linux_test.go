@@ -19,13 +19,16 @@ limitations under the License.
 package local
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"syscall"
 	"testing"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 func TestFSGroupMount(t *testing.T) {
@@ -65,4 +68,27 @@ func TestFSGroupMount(t *testing.T) {
 	if fsGroup1 != int64(s.Gid) {
 		t.Errorf("Old Gid %d for volume %s got overwritten by new Gid %d", fsGroup1, tmpDir, int64(s.Gid))
 	}
+}
+
+func testFSGroupMount(plug volume.VolumePlugin, pod *v1.Pod, tmpDir string, fsGroup int64) error {
+	mounter, err := plug.NewMounter(getTestVolume(false, tmpDir, false, nil), pod, volume.VolumeOptions{})
+	if err != nil {
+		return err
+	}
+	if mounter == nil {
+		return fmt.Errorf("got a nil Mounter")
+	}
+
+	volPath := filepath.Join(tmpDir, testMountPath)
+	path := mounter.GetPath()
+	if path != volPath {
+		return fmt.Errorf("got unexpected path: %s", path)
+	}
+
+	var mounterArgs volume.MounterArgs
+	mounterArgs.FsGroup = &fsGroup
+	if err := mounter.SetUp(mounterArgs); err != nil {
+		return err
+	}
+	return nil
 }

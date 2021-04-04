@@ -20,6 +20,7 @@ package options
 
 import (
 	"flag"
+	"fmt"
 	"os"
 
 	"github.com/spf13/pflag"
@@ -33,6 +34,23 @@ import (
 	_ "github.com/google/cadvisor/manager"
 	_ "github.com/google/cadvisor/storage"
 )
+
+// register adds a flag to local that targets the Value associated with the Flag named globalName in global
+func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
+	if f := global.Lookup(globalName); f != nil {
+		pflagFlag := pflag.PFlagFromGoFlag(f)
+		pflagFlag.Name = normalize(pflagFlag.Name)
+		local.AddFlag(pflagFlag)
+	} else {
+		panic(fmt.Sprintf("failed to find flag in global flagset (flag): %s", globalName))
+	}
+}
+
+// registerDeprecated registers the flag with register, and then marks it deprecated
+func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
+	register(global, local, globalName)
+	local.Lookup(normalize(globalName)).Deprecated = deprecated
+}
 
 // addCadvisorFlags adds flags from cadvisor
 func addCadvisorFlags(fs *pflag.FlagSet) {

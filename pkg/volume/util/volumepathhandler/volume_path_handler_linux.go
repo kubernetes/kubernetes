@@ -33,6 +33,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
+const (
+	losetupPath = "losetup"
+)
+
 // AttachFileDevice takes a path to a regular file and makes it available as an
 // attached block device.
 func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {

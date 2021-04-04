@@ -126,6 +126,8 @@ func ParseEtcdVersionPair(s string) (*EtcdVersionPair, error) {
 
 // MustParseEtcdVersionPair parses a "<version>/<storage-version>" string to an EtcdVersionPair
 // or panics if the parse fails.
+// Part of public API, do not remove.
+// nolint:deadcode
 func MustParseEtcdVersionPair(s string) *EtcdVersionPair {
 	pair, err := ParseEtcdVersionPair(s)
 	if err != nil {
@@ -188,6 +190,8 @@ func ParseSupportedVersions(list []string) (SupportedVersions, error) {
 }
 
 // MustParseSupportedVersions parses a comma separated list of etcd versions or panics if the parse fails.
+// Part of public API, do not remove.
+// nolint:deadcode
 func MustParseSupportedVersions(list []string) SupportedVersions {
 	versions, err := ParseSupportedVersions(list)
 	if err != nil {

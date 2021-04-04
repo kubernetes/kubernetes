@@ -22,6 +22,8 @@ import (
 )
 
 // hardEvictionReservation returns a resourcelist that includes reservation of resources based on hard eviction thresholds.
+// Shared code across linux and windows container managers. Requires lint ignores.
+// nolint:deadcode
 func hardEvictionReservation(thresholds []evictionapi.Threshold, capacity v1.ResourceList) v1.ResourceList {
 	if len(thresholds) == 0 {
 		return nil

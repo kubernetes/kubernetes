@@ -141,8 +141,7 @@ func TestRequestNodeCertificate(t *testing.T) {
 type failureType int
 
 const (
-	noError failureType = iota
-	createError
+	createError = iota + 1
 	certificateSigningRequestDenied
 )
 

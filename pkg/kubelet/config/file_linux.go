@@ -37,6 +37,10 @@ import (
 const (
 	retryPeriod    = 1 * time.Second
 	maxRetryPeriod = 20 * time.Second
+
+	podAdd podEventType = iota
+	podModify
+	podDelete
 )
 
 type retryableError struct {
