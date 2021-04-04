@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strconv"
 	"time"
@@ -263,11 +264,13 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
-		klog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.ErrorS(err, "Error determining service IP ranges")
+		os.Exit(1)
 	}
 	leaseStorage, _, err := storagefactory.Create(*config, nil)
 	if err != nil {
-		klog.Fatalf("Error creating storage factory: %v", err)
+		klog.ErrorS(err, "Error creating storage factory")
+		os.Exit(1)
 	}
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
 
@@ -275,7 +278,7 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
-	klog.Infof("Using reconciler: %v", c.ExtraConfig.EndpointReconcilerType)
+	klog.InfoS("Using reconciler", "EndpointReconcilerType", c.ExtraConfig.EndpointReconcilerType)
 	switch c.ExtraConfig.EndpointReconcilerType {
 	// there are numerous test dependencies that depend on a default controller
 	case "", reconcilers.MasterCountReconcilerType:
@@ -285,7 +288,8 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 	case reconcilers.NoneEndpointReconcilerType:
 		return c.createNoneReconciler()
 	default:
-		klog.Fatalf("Reconciler not implemented: %v", c.ExtraConfig.EndpointReconcilerType)
+		klog.ErrorS(nil, "Reconciler not implemented", "reconciler", c.ExtraConfig.EndpointReconcilerType)
+		os.Exit(1)
 	}
 	return nil
 }
@@ -299,7 +303,8 @@ func (c *Config) Complete() CompletedConfig {
 
 	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
 	if err != nil {
-		klog.Fatalf("Error determining service IP ranges: %v", err)
+		klog.ErrorS(err, "Error determining service IP ranges")
+		os.Exit(1)
 	}
 	if cfg.ExtraConfig.ServiceIPRange.IP == nil {
 		cfg.ExtraConfig.ServiceIPRange = serviceIPRange
@@ -319,7 +324,7 @@ func (c *Config) Complete() CompletedConfig {
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
 		cfg.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
-		klog.Infof("Node port range unspecified. Defaulting to %v.", cfg.ExtraConfig.ServiceNodePortRange)
+		klog.InfoS("Node port range unspecified. Using default", "ServiceNodePortRange", cfg.ExtraConfig.ServiceNodePortRange)
 	}
 
 	if cfg.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
@@ -377,9 +382,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			// longer a feature gate and issuer URL is not set, the user may not
 			// expect this feature to be enabled. We log the former case as an Error
 			// and the latter case as an Info.
-			klog.Error(msg)
+			klog.ErrorS(err, msg)
 		} else {
-			klog.Info(msg)
+			klog.InfoS("Endpoints enabled", "msg", msg)
 		}
 	} else {
 		routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
@@ -562,7 +567,7 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
 		if !apiResourceConfigSource.AnyVersionForGroupEnabled(groupName) {
-			klog.V(1).Infof("Skipping disabled API group %q.", groupName)
+			klog.V(1).InfoS("Skipping disabled API group", "apiGroup", groupName)
 			continue
 		}
 		apiGroupInfo, enabled, err := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
@@ -570,7 +575,7 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 			return fmt.Errorf("problem initializing API group %q : %v", groupName, err)
 		}
 		if !enabled {
-			klog.Warningf("API group %q is not enabled, skipping.", groupName)
+			klog.InfoS("API group is not enabled, skipping", "apiGroup", groupName)
 			continue
 		}
 
@@ -579,16 +584,17 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
 		resourceExpirationEvaluator.RemoveDeletedKinds(groupName, apiGroupInfo.Scheme, apiGroupInfo.VersionedResourcesStorageMap)
 		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
-			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
+			klog.V(1).InfoS("Removing API group because it is time to stop serving it because it has no versions per APILifecycle", "apiGroup", groupName)
 			continue
 		}
 
-		klog.V(1).Infof("Enabling API group %q.", groupName)
+		klog.V(1).InfoS("Enabling API group", "apiGroup", groupName)
 
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
-				klog.Fatalf("Error building PostStartHook: %v", err)
+				klog.ErrorS(err, "Error building PostStartHook")
+				os.Exit(1)
 			}
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}

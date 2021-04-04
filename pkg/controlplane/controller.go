@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -88,7 +89,8 @@ type Controller struct {
 func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.LegacyRESTStorage, serviceClient corev1client.ServicesGetter, nsClient corev1client.NamespacesGetter, eventClient corev1client.EventsGetter, readyzClient rest.Interface) *Controller {
 	_, publicServicePort, err := c.GenericConfig.SecureServing.HostPort()
 	if err != nil {
-		klog.Fatalf("failed to get listener address: %v", err)
+		klog.ErrorS(err, "Failed to get listener address")
+		os.Exit(1)
 	}
 
 	systemNamespaces := []string{metav1.NamespaceSystem, metav1.NamespacePublic, corev1.NamespaceNodeLease}
@@ -149,7 +151,7 @@ func (c *Controller) Start() {
 	// Reconcile during first run removing itself until server is ready.
 	endpointPorts := createEndpointPortSpec(c.PublicServicePort, "https", c.ExtraEndpointPorts)
 	if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
+		klog.ErrorS(err, "Unable to remove old endpoints from Kubernetes service")
 	}
 
 	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
@@ -158,11 +160,13 @@ func (c *Controller) Start() {
 	// run all of the controllers once prior to returning from Start.
 	if err := repairClusterIPs.RunOnce(); err != nil {
 		// If we fail to repair cluster IPs apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial IP allocation check: %v", err)
+		klog.ErrorS(err, "Unable to perform initial IP allocation check")
+		os.Exit(1)
 	}
 	if err := repairNodePorts.RunOnce(); err != nil {
 		// If we fail to repair node ports apiserver is useless. We should restart and retry.
-		klog.Fatalf("Unable to perform initial service nodePort check: %v", err)
+		klog.ErrorS(err, "Unable to perform initial service nodePort check")
+		os.Exit(1)
 	}
 
 	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
@@ -178,10 +182,10 @@ func (c *Controller) Stop() {
 	finishedReconciling := make(chan struct{})
 	go func() {
 		defer close(finishedReconciling)
-		klog.Infof("Shutting down kubernetes service endpoint reconciler")
+		klog.InfoS("Shutting down Kubernetes service endpoint reconciler")
 		c.EndpointReconciler.StopReconciling()
 		if err := c.EndpointReconciler.RemoveEndpoints(kubernetesServiceName, c.PublicIP, endpointPorts); err != nil {
-			klog.Error(err)
+			klog.ErrorS(err, "Error")
 		}
 	}()
 
@@ -190,7 +194,7 @@ func (c *Controller) Stop() {
 		// done
 	case <-time.After(2 * c.EndpointInterval):
 		// don't block server shutdown forever if we can't reach etcd to remove ourselves
-		klog.Warning("RemoveEndpoints() timed out")
+		klog.InfoS("RemoveEndpoints() timed out")
 	}
 }
 
@@ -285,7 +289,7 @@ func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, ser
 		// The service already exists.
 		if reconcile {
 			if svc, updated := reconcilers.GetMasterServiceUpdateIfNeeded(s, servicePorts, serviceType); updated {
-				klog.Warningf("Resetting master service %q to %#v", serviceName, svc)
+				klog.InfoS("Resetting master service", "serviceName", serviceName, "service", klog.KObj(svc))
 				_, err := c.ServiceClient.Services(metav1.NamespaceDefault).Update(context.TODO(), svc, metav1.UpdateOptions{})
 				return err
 			}

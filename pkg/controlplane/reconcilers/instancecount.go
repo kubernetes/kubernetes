@@ -100,7 +100,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 			Addresses: []corev1.EndpointAddress{{IP: ip.String()}},
 			Ports:     endpointPorts,
 		}}
-		klog.Warningf("Resetting endpoints for master service %q to %#v", serviceName, e)
+		klog.InfoS("Resetting endpoints for master service", "service", serviceName, "endpoints", klog.KObj(e))
 		_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
 		return err
 	}
@@ -137,7 +137,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		// Reset ports.
 		e.Subsets[0].Ports = endpointPorts
 	}
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, e)
+	klog.InfoS("Resetting endpoints for master service", "service", serviceName, "endpoints", klog.KObj(e))
 	_, err = r.epAdapter.Update(metav1.NamespaceDefault, e)
 	return err
 }

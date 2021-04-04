@@ -87,12 +87,12 @@ func NewCRDRegistrationController(crdinformer crdinformers.CustomResourceDefinit
 			if !ok {
 				tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 				if !ok {
-					klog.V(2).Infof("Couldn't get object from tombstone %#v", obj)
+					klog.V(2).InfoS("Couldn't get object from tombstone", "object", obj)
 					return
 				}
 				cast, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 				if !ok {
-					klog.V(2).Infof("Tombstone contained unexpected object: %#v", obj)
+					klog.V(2).InfoS("Tombstone contained unexpected object", "object", obj)
 					return
 				}
 			}
@@ -108,8 +108,8 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting crd-autoregister controller")
-	defer klog.Infof("Shutting down crd-autoregister controller")
+	klog.InfoS("Starting crd-autoregister controller")
+	defer klog.InfoS("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
 	if !cache.WaitForNamedCacheSync("crd-autoregister", stopCh, c.crdSynced) {

@@ -34,7 +34,7 @@ import (
 func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
-		klog.Warningf("No CIDR for service cluster IPs specified. Default value which was %s is deprecated and will be removed in future releases. Please specify it using --service-cluster-ip-range on kube-apiserver.", kubeoptions.DefaultServiceIPCIDR.String())
+		klog.InfoS("No CIDR for service cluster IPs specified. Default value is deprecated and will be removed in future releases. Please specify it using --service-cluster-ip-range on kube-apiserver", "defaultServiceIPCIDR", kubeoptions.DefaultServiceIPCIDR.String())
 		serviceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 	}
 
@@ -48,7 +48,7 @@ func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, e
 	if err != nil {
 		return net.IPNet{}, net.IP{}, err
 	}
-	klog.V(4).Infof("Setting service IP to %q (read-write).", apiServerServiceIP)
+	klog.V(4).InfoS("Setting service IP (read-write)", "apiServerServiceIP", apiServerServiceIP)
 
 	return serviceClusterIPRange, apiServerServiceIP, nil
 }

@@ -79,7 +79,7 @@ func (s *storageLeases) ListLeases() ([]string, error) {
 		}
 	}
 
-	klog.V(6).Infof("Current master IPs listed in storage are %v", ipList)
+	klog.V(6).InfoS("Current master IPs listed in storage", "masterIPList", ipList)
 
 	return ipList, nil
 }
@@ -105,7 +105,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 		// changing a field.
 		existing.Generation++
 
-		klog.V(6).Infof("Resetting TTL on master IP %q listed in storage to %v", ip, leaseTime)
+		klog.V(6).InfoS("Resetting TTL on master IP listed in storage", "masterIP", ip, "leaseTimeTTL", leaseTime)
 
 		return existing, &leaseTime, nil
 	}, nil)
@@ -230,7 +230,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 		e.Subsets[0].Ports = endpointPorts
 	}
 
-	klog.Warningf("Resetting endpoints for master service %q to %v", serviceName, masterIPs)
+	klog.InfoS("Resetting endpoints for master service", "service", serviceName, "masterIPs", masterIPs)
 	if shouldCreate {
 		if _, err = r.epAdapter.Create(corev1.NamespaceDefault, e); errors.IsAlreadyExists(err) {
 			err = nil

@@ -159,10 +159,10 @@ func (c *Controller) syncConfigMap() error {
 	}
 
 	if equality.Semantic.DeepEqual(authConfigMap, originalAuthConfigMap) {
-		klog.V(5).Info("no changes to configmap")
+		klog.V(5).InfoS("No changes to ConfigMap")
 		return nil
 	}
-	klog.V(2).Infof("writing updated authentication info to  %s configmaps/%s", configMapNamespace, configMapName)
+	klog.V(2).InfoS("Writing updated authentication info to ConfigMaps", "configMap", klog.KRef(configMapNamespace, configMapName))
 
 	if err := createNamespaceIfNeeded(c.namespaceClient, authConfigMap.Namespace); err != nil {
 		return err
@@ -437,8 +437,8 @@ func (c *Controller) Run(threadiness int, stopCh <-chan struct{}) {
 	// make sure the work queue is shutdown which will trigger workers to end
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting cluster_authentication_trust_controller controller")
-	defer klog.Infof("Shutting down cluster_authentication_trust_controller controller")
+	klog.InfoS("Starting cluster_authentication_trust_controller controller")
+	defer klog.InfoS("Shutting down cluster_authentication_trust_controller controller")
 
 	// we have a personal informer that is narrowly scoped, start it.
 	go c.kubeSystemConfigMapInformer.Run(stopCh)
