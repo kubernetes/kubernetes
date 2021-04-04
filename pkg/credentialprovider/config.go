@@ -104,25 +104,25 @@ func ReadDockercfgFile(searchPaths []string) (cfg DockerConfig, err error) {
 	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configFileName))
 		if err != nil {
-			klog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			klog.ErrorS(err, "While trying to canonicalize configpath", "configPath", configPath)
 			continue
 		}
-		klog.V(4).Infof("looking for .dockercfg at %s", absDockerConfigFileLocation)
+		klog.V(4).InfoS("Looking for .dockercfg", "dockerCfgLocation", absDockerConfigFileLocation)
 		contents, err := ioutil.ReadFile(absDockerConfigFileLocation)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+			klog.V(4).InfoS("While trying to read .dockercfg", "dockerCfgLocation", absDockerConfigFileLocation, "err", err)
 			continue
 		}
 		cfg, err := ReadDockerConfigFileFromBytes(contents)
 		if err != nil {
-			klog.V(4).Infof("couldn't get the config from %q contents: %v", absDockerConfigFileLocation, err)
+			klog.V(4).InfoS("Couldn't get the .dockercfg", "dockerCfgLocation", absDockerConfigFileLocation, "err", err)
 			continue
 		}
 
-		klog.V(4).Infof("found .dockercfg at %s", absDockerConfigFileLocation)
+		klog.V(4).InfoS("Found .dockercfg", "dockerCfgLocation", absDockerConfigFileLocation)
 		return cfg, nil
 
 	}
@@ -138,18 +138,18 @@ func ReadDockerConfigJSONFile(searchPaths []string) (cfg DockerConfig, err error
 	for _, configPath := range searchPaths {
 		absDockerConfigFileLocation, err := filepath.Abs(filepath.Join(configPath, configJSONFileName))
 		if err != nil {
-			klog.Errorf("while trying to canonicalize %s: %v", configPath, err)
+			klog.ErrorS(err, "While trying to canonicalize configpath", "configPath", configPath)
 			continue
 		}
-		klog.V(4).Infof("looking for %s at %s", configJSONFileName, absDockerConfigFileLocation)
+		klog.V(4).InfoS("Looking for config", "configJSONFileName", configJSONFileName, "dockercfg", absDockerConfigFileLocation)
 		cfg, err = ReadSpecificDockerConfigJSONFile(absDockerConfigFileLocation)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				klog.V(4).Infof("while trying to read %s: %v", absDockerConfigFileLocation, err)
+				klog.V(4).InfoS("While trying to read config", "dockerCfgLocation", absDockerConfigFileLocation, "err", err)
 			}
 			continue
 		}
-		klog.V(4).Infof("found valid %s at %s", configJSONFileName, absDockerConfigFileLocation)
+		klog.V(4).InfoS("Found valid config", "configJSONFileName", configJSONFileName, "dockerCfgLocation", absDockerConfigFileLocation)
 		return cfg, nil
 	}
 	return nil, fmt.Errorf("couldn't find valid %s after checking in %v", configJSONFileName, searchPaths)
@@ -203,7 +203,7 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		klog.V(2).Infof("body of failing http response: %v", resp.Body)
+		klog.V(2).InfoS("Body of failing HTTP response", "respBody", resp.Body)
 		return nil, &HTTPError{
 			StatusCode: resp.StatusCode,
 			URL:        url,

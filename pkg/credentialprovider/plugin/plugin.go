@@ -185,7 +185,7 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 
 	cachedConfig, found, err := p.getCachedCredentials(image)
 	if err != nil {
-		klog.Errorf("Failed to get cached docker config: %v", err)
+		klog.ErrorS(err, "Failed to get cached Docker config")
 		return credentialprovider.DockerConfig{}
 	}
 
@@ -195,7 +195,7 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 
 	response, err := p.plugin.ExecPlugin(context.Background(), image)
 	if err != nil {
-		klog.Errorf("Failed getting credential from external registry credential provider: %v", err)
+		klog.ErrorS(err, "Failed getting credential from external registry credential provider")
 		return credentialprovider.DockerConfig{}
 	}
 
@@ -209,7 +209,7 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 	case credentialproviderapi.GlobalPluginCacheKeyType:
 		cacheKey = globalCacheKey
 	default:
-		klog.Errorf("credential provider plugin did not return a valid cacheKeyType: %q", cacheKeyType)
+		klog.ErrorS(nil, "Credential provider plugin did not return a valid cacheKeyType", "cacheKeyType", cacheKeyType)
 		return credentialprovider.DockerConfig{}
 	}
 
@@ -245,7 +245,7 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 	}
 
 	if err := p.cache.Add(cachedEntry); err != nil {
-		klog.Errorf("Error adding auth entry to cache: %v", err)
+		klog.ErrorS(err, "Error adding auth entry to cache")
 	}
 
 	return dockerConfig
@@ -356,7 +356,7 @@ func (e *execPlugin) ExecPlugin(ctx context.Context, image string) (*credentialp
 	}
 
 	if err != nil {
-		klog.V(2).Infof("Error execing credential provider plugin, stderr: %v", stderr.String())
+		klog.V(2).InfoS("Error execing credential provider plugin", "err", stderr.String())
 		return nil, fmt.Errorf("error execing credential provider plugin %s for image %s: %w", e.name, image, err)
 	}
 

@@ -91,7 +91,7 @@ func (dk *BasicDockerKeyring) Add(cfg DockerConfig) {
 		}
 		parsed, err := url.Parse(value)
 		if err != nil {
-			klog.Errorf("Entry %q in dockercfg invalid (%v), ignoring", loc, err)
+			klog.ErrorS(err, "Entry in dockercfg invalid, ignoring", "loc", loc)
 			continue
 		}
 

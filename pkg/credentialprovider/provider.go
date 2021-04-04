@@ -79,7 +79,7 @@ func (d *defaultDockerConfigProvider) Provide(image string) DockerConfig {
 	if cfg, err := ReadDockerConfigFile(); err == nil {
 		return cfg
 	} else if !os.IsNotExist(err) {
-		klog.V(2).Infof("Docker config file not found: %v", err)
+		klog.V(2).InfoS("Docker config file not found", "err", err)
 	}
 	return DockerConfig{}
 }
@@ -99,7 +99,7 @@ func (d *CachingDockerConfigProvider) Provide(image string) DockerConfig {
 		return d.cacheDockerConfig
 	}
 
-	klog.V(2).Infof("Refreshing cache for provider: %v", reflect.TypeOf(d.Provider).String())
+	klog.V(2).InfoS("Refreshing cache for provider", "providerType", reflect.TypeOf(d.Provider).String())
 	config := d.Provider.Provide(image)
 	if d.ShouldCache == nil || d.ShouldCache(config) {
 		d.cacheDockerConfig = config

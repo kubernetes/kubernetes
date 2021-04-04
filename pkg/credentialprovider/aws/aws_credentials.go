@@ -166,17 +166,17 @@ func (p *ecrProvider) Provide(image string) credentialprovider.DockerConfig {
 	}
 
 	if cfg, exists := p.getFromCache(parsed); exists {
-		klog.V(3).Infof("Got ECR credentials from cache for %s", parsed.registry)
+		klog.V(6).InfoS("Got ECR credentials from cache", "registry", parsed.registry)
 		return cfg
 	}
-	klog.V(3).Info("unable to get ECR credentials from cache, checking ECR API")
+	klog.V(3).InfoS("Unable to get ECR credentials from cache, checking ECR API")
 
 	cfg, err := p.getFromECR(parsed)
 	if err != nil {
-		klog.Errorf("error getting credentials from ECR for %s %v", parsed.registry, err)
+		klog.ErrorS(err, "Error getting credentials from ECR", "registry", parsed.registry)
 		return credentialprovider.DockerConfig{}
 	}
-	klog.V(3).Infof("Got ECR credentials from ECR API for %s", parsed.registry)
+	klog.V(3).InfoS("Got ECR credentials from ECR API", "registry", parsed.registry)
 	return cfg
 }
 
@@ -186,7 +186,7 @@ func (p *ecrProvider) getFromCache(parsed *parsedURL) (credentialprovider.Docker
 
 	obj, exists, err := p.cache.GetByKey(parsed.registry)
 	if err != nil {
-		klog.Errorf("error getting ECR credentials from cache: %v", err)
+		klog.ErrorS(err, "Error getting ECR credentials from cache")
 		return cfg, false
 	}
 
@@ -284,7 +284,7 @@ func awsHandlerLogger(req *request.Request) {
 		name = req.Operation.Name
 	}
 
-	klog.V(3).Infof("AWS request: %s:%s in %s", service, name, *region)
+	klog.V(3).InfoS("AWS request", "service", service, "name", name, "region", *region)
 }
 
 func newECRTokenGetter(region string) (tokenGetter, error) {

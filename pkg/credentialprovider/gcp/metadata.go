@@ -127,14 +127,14 @@ func onGCEVM() bool {
 		}
 		fields := strings.Split(strings.TrimSpace(string(data)), "\r\n")
 		if len(fields) != 2 {
-			klog.V(2).Infof("Received unexpected value retrieving system model: %q", string(data))
+			klog.V(2).InfoS("Received unexpected value retrieving system model", "data", string(data))
 			return false
 		}
 		name = fields[1]
 	} else {
 		data, err := ioutil.ReadFile(gceProductNameFile)
 		if err != nil {
-			klog.V(2).Infof("Error while reading product_name: %v", err)
+			klog.V(2).InfoS("Error while reading product_name", "err", err)
 			return false
 		}
 		name = strings.TrimSpace(string(data))
@@ -193,7 +193,7 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 	value := runWithBackoff(func() ([]byte, error) {
 		value, err := gcpcredential.ReadURL(serviceAccounts, g.Client, metadataHeader)
 		if err != nil {
-			klog.V(2).Infof("Failed to Get service accounts from gce metadata server: %v", err)
+			klog.V(2).InfoS("Failed to Get service accounts from GCE metadata server", "err", err)
 		}
 		return value, err
 	})
@@ -209,20 +209,20 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 		}
 	}
 	if !defaultServiceAccountExists {
-		klog.V(2).Infof("'default' service account does not exist. Found following service accounts: %q", string(value))
+		klog.V(2).InfoS("'default' service account does not exist. Found service accounts", "serviceaccounts", string(value))
 		return false
 	}
 	url := metadataScopes + "?alt=json"
 	value = runWithBackoff(func() ([]byte, error) {
 		value, err := gcpcredential.ReadURL(url, g.Client, metadataHeader)
 		if err != nil {
-			klog.V(2).Infof("Failed to Get scopes in default service account from gce metadata server: %v", err)
+			klog.V(2).InfoS("Failed to Get scopes in default service account from GCE metadata server", "err", err)
 		}
 		return value, err
 	})
 	var scopes []string
 	if err := json.Unmarshal(value, &scopes); err != nil {
-		klog.Errorf("Failed to unmarshal scopes: %v", err)
+		klog.ErrorS(err, "Failed to unmarshal scopes")
 		return false
 	}
 	for _, v := range scopes {

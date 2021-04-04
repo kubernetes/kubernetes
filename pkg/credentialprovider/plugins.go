@@ -40,7 +40,7 @@ func RegisterCredentialProvider(name string, provider DockerConfigProvider) {
 	if found {
 		klog.Fatalf("Credential provider %q was registered twice", name)
 	}
-	klog.V(4).Infof("Registered credential provider %q", name)
+	klog.V(4).InfoS("Registered credential provider", "credProvider", name)
 	providers[name] = provider
 }
 
@@ -61,7 +61,7 @@ func NewDockerKeyring() DockerKeyring {
 	for _, key := range stringKeys {
 		provider := providers[key]
 		if provider.Enabled() {
-			klog.V(4).Infof("Registering credential provider: %v", key)
+			klog.V(4).InfoS("Registering credential provider", "credProvider", key)
 			keyring.Providers = append(keyring.Providers, provider)
 		}
 	}

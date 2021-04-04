@@ -166,7 +166,7 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 	var err error
 	a.config, err = parseConfig(rdr)
 	if err != nil {
-		klog.Errorf("Failed to load azure credential file: %v", err)
+		klog.ErrorS(err, "Failed to load azure credential file")
 	}
 
 	a.environment, err = auth.ParseAzureEnvironment(a.config.Cloud, a.config.ResourceManagerEndpoint, a.config.IdentitySystem)
@@ -179,26 +179,26 @@ func (a *acrProvider) loadConfig(rdr io.Reader) error {
 
 func (a *acrProvider) Enabled() bool {
 	if a.file == nil || len(*a.file) == 0 {
-		klog.V(5).Infof("Azure config unspecified, disabling")
+		klog.V(5).InfoS("Azure config unspecified, disabling")
 		return false
 	}
 
 	f, err := os.Open(*a.file)
 	if err != nil {
-		klog.Errorf("Failed to load config from file: %s", *a.file)
+		klog.ErrorS(nil, "Failed to load config from file", "file", *a.file)
 		return false
 	}
 	defer f.Close()
 
 	err = a.loadConfig(f)
 	if err != nil {
-		klog.Errorf("Failed to load config from file: %s", *a.file)
+		klog.ErrorS(nil, "Failed to load config from file", "file", *a.file)
 		return false
 	}
 
 	a.servicePrincipalToken, err = auth.GetServicePrincipalToken(a.config, a.environment)
 	if err != nil {
-		klog.Errorf("Failed to create service principal token: %v", err)
+		klog.ErrorS(err, "Failed to create service principal token")
 		return false
 	}
 
@@ -211,7 +211,7 @@ func (a *acrProvider) getFromCache(loginServer string) (credentialprovider.Docke
 	cfg := credentialprovider.DockerConfig{}
 	obj, exists, err := a.cache.GetByKey(loginServer)
 	if err != nil {
-		klog.Errorf("error getting ACR credentials from cache: %v", err)
+		klog.ErrorS(err, "Error getting ACR credentials from cache")
 		return cfg, false
 	}
 	if !exists {
@@ -246,7 +246,7 @@ func (a *acrProvider) getFromACR(loginServer string) (credentialprovider.DockerC
 func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 	loginServer := a.parseACRLoginServerFromImage(image)
 	if loginServer == "" {
-		klog.V(2).Infof("image(%s) is not from ACR, return empty authentication", image)
+		klog.V(2).InfoS("Image is not from ACR, return empty authentication", "image", image)
 		return credentialprovider.DockerConfig{}
 	}
 
@@ -255,13 +255,13 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 		var exists bool
 		cfg, exists = a.getFromCache(loginServer)
 		if exists {
-			klog.V(4).Infof("Got ACR credentials from cache for %s", loginServer)
+			klog.V(4).InfoS("Got ACR credentials from cache for login server", "loginServer", loginServer)
 		} else {
-			klog.V(2).Infof("unable to get ACR credentials from cache for %s, checking ACR API", loginServer)
+			klog.V(2).InfoS("Unable to get ACR credentials from cache, checking ACR API", "loginServer", loginServer)
 			var err error
 			cfg, err = a.getFromACR(loginServer)
 			if err != nil {
-				klog.Errorf("error getting credentials from ACR for %s %v", loginServer, err)
+				klog.ErrorS(err, "Error getting credentials from ACR", "loginServer", loginServer)
 			}
 		}
 	} else {
@@ -315,27 +315,27 @@ func getLoginServer(registry containerregistry.Registry) string {
 func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credentialprovider.DockerConfigEntry, error) {
 	// Run EnsureFresh to make sure the token is valid and does not expire
 	if err := a.servicePrincipalToken.EnsureFresh(); err != nil {
-		klog.Errorf("Failed to ensure fresh service principal token: %v", err)
+		klog.ErrorS(err, "Failed to ensure fresh service principal token")
 		return nil, err
 	}
 	armAccessToken := a.servicePrincipalToken.OAuthToken()
 
-	klog.V(4).Infof("discovering auth redirects for: %s", loginServer)
+	klog.V(4).InfoS("Discovering auth redirects for login server", "loginServer", loginServer)
 	directive, err := receiveChallengeFromLoginServer(loginServer)
 	if err != nil {
-		klog.Errorf("failed to receive challenge: %s", err)
+		klog.ErrorS(err, "Failed to receive challenge")
 		return nil, err
 	}
 
-	klog.V(4).Infof("exchanging an acr refresh_token")
+	klog.V(4).InfoS("Exchanging an acr refresh_token")
 	registryRefreshToken, err := performTokenExchange(
 		loginServer, directive, a.config.TenantID, armAccessToken)
 	if err != nil {
-		klog.Errorf("failed to perform token exchange: %s", err)
+		klog.ErrorS(err, "Failed to perform token exchange")
 		return nil, err
 	}
 
-	klog.V(4).Infof("adding ACR docker config entry for: %s", loginServer)
+	klog.V(4).InfoS("Adding ACR docker config entry for login server", "loginServer", loginServer)
 	return &credentialprovider.DockerConfigEntry{
 		Username: dockerTokenLoginUsernameGUID,
 		Password: registryRefreshToken,
