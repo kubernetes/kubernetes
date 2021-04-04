@@ -126,7 +126,7 @@ func NewStatefulSetController(
 				oldPS := old.(*apps.StatefulSet)
 				curPS := cur.(*apps.StatefulSet)
 				if oldPS.Status.Replicas != curPS.Status.Replicas {
-					klog.V(4).Infof("Observed updated replica count for StatefulSet: %v, %d->%d", curPS.Name, oldPS.Status.Replicas, curPS.Status.Replicas)
+					klog.V(4).InfoS("Observed updated replica count for StatefulSet", "statefulSet", curPS.Name, "prevReplicaCount", oldPS.Status.Replicas, "curReplicaCount", curPS.Status.Replicas)
 				}
 				ssc.enqueueStatefulSet(cur)
 			},
@@ -145,8 +145,8 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ssc.queue.ShutDown()
 
-	klog.Infof("Starting stateful set controller")
-	defer klog.Infof("Shutting down statefulset controller")
+	klog.InfoS("Starting StatefulSet controller")
+	defer klog.InfoS("Shutting down StatefulSet controller")
 
 	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return
@@ -176,7 +176,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 		if set == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s created, labels: %+v", pod.Name, pod.Labels)
+		klog.V(4).InfoS("Pod created with labels", "pod", klog.KObj(pod), "labels", pod.Labels)
 		ssc.enqueueStatefulSet(set)
 		return
 	}
@@ -187,7 +187,7 @@ func (ssc *StatefulSetController) addPod(obj interface{}) {
 	if len(sets) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s created, labels: %+v", pod.Name, pod.Labels)
+	klog.V(4).InfoS("Orphan Pod created with labels", "pod", klog.KObj(pod), "labels", pod.Labels)
 	for _, set := range sets {
 		ssc.enqueueStatefulSet(set)
 	}
@@ -221,13 +221,13 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if set == nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Pod updated", "curPod", klog.KObj(curPod), "prevPod", klog.KObj(oldPod))
 		ssc.enqueueStatefulSet(set)
 		// TODO: MinReadySeconds in the Pod will generate an Available condition to be added in
 		// the Pod status which in turn will trigger a requeue of the owning replica set thus
 		// having its status updated with the newly available replica.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !podutil.IsPodReady(oldPod) && podutil.IsPodReady(curPod) && set.Spec.MinReadySeconds > 0 {
-			klog.V(2).Infof("StatefulSet %s will be enqueued after %ds for availability check", set.Name, set.Spec.MinReadySeconds)
+			klog.V(2).InfoS("StatefulSet will be enqueued after for availability check", "statefulSet", klog.KObj(set), "minReadySeconds", set.Spec.MinReadySeconds)
 			// Add a second to avoid milliseconds skew in AddAfter.
 			// See https://github.com/kubernetes/kubernetes/issues/39785#issuecomment-279959133 for more info.
 			ssc.enqueueSSAfter(set, (time.Duration(set.Spec.MinReadySeconds)*time.Second)+time.Second)
@@ -242,7 +242,7 @@ func (ssc *StatefulSetController) updatePod(old, cur interface{}) {
 		if len(sets) == 0 {
 			return
 		}
-		klog.V(4).Infof("Orphan Pod %s updated, objectMeta %+v -> %+v.", curPod.Name, oldPod.ObjectMeta, curPod.ObjectMeta)
+		klog.V(4).InfoS("Orphan Pod updated", "curPod", klog.KObj(curPod), "prevPod", klog.KObj(oldPod))
 		for _, set := range sets {
 			ssc.enqueueStatefulSet(set)
 		}
@@ -278,7 +278,7 @@ func (ssc *StatefulSetController) deletePod(obj interface{}) {
 	if set == nil {
 		return
 	}
-	klog.V(4).Infof("Pod %s/%s deleted through %v.", pod.Namespace, pod.Name, utilruntime.GetCaller())
+	klog.V(4).InfoS("Pod deleted through caller", "pod", klog.KObj(pod), "caller", utilruntime.GetCaller())
 	ssc.enqueueStatefulSet(set)
 }
 
@@ -428,7 +428,7 @@ func (ssc *StatefulSetController) worker() {
 func (ssc *StatefulSetController) sync(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing StatefulSet", "statefulSet", key, "timeElapsed", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -437,7 +437,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 	}
 	set, err := ssc.setLister.StatefulSets(namespace).Get(name)
 	if errors.IsNotFound(err) {
-		klog.Infof("StatefulSet has been deleted %v", key)
+		klog.InfoS("StatefulSet has been deleted", "statefulSet", key)
 		return nil
 	}
 	if err != nil {
@@ -466,7 +466,7 @@ func (ssc *StatefulSetController) sync(key string) error {
 
 // syncStatefulSet syncs a tuple of (statefulset, []*v1.Pod).
 func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
-	klog.V(4).Infof("Syncing StatefulSet %v/%v with %d pods", set.Namespace, set.Name, len(pods))
+	klog.V(4).InfoS("Syncing StatefulSet with Pods", "statefulSet", klog.KObj(set), "podCount", len(pods))
 	var status *apps.StatefulSetStatus
 	var err error
 	// TODO: investigate where we mutate the set during the update as it is not obvious.
@@ -474,7 +474,7 @@ func (ssc *StatefulSetController) syncStatefulSet(set *apps.StatefulSet, pods []
 	if err != nil {
 		return err
 	}
-	klog.V(4).Infof("Successfully synced StatefulSet %s/%s successful", set.Namespace, set.Name)
+	klog.V(4).InfoS("Successfully synced StatefulSet", "statefulSet", klog.KObj(set))
 	// One more sync to handle the clock skew. This is also helping in requeuing right after status update
 	if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && set.Spec.MinReadySeconds > 0 && status != nil && status.AvailableReplicas != *set.Spec.Replicas {
 		ssc.enqueueSSAfter(set, time.Duration(set.Spec.MinReadySeconds)*time.Second)

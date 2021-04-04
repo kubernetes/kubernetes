@@ -109,19 +109,17 @@ func (ssc *defaultStatefulSetControl) performUpdate(
 	if err != nil {
 		return currentRevision, updateRevision, currentStatus, err
 	}
-	klog.V(4).Infof("StatefulSet %s/%s pod status replicas=%d ready=%d current=%d updated=%d",
-		set.Namespace,
-		set.Name,
-		currentStatus.Replicas,
-		currentStatus.ReadyReplicas,
-		currentStatus.CurrentReplicas,
-		currentStatus.UpdatedReplicas)
+	klog.V(4).InfoS("StatefulSet Pod status",
+		"statefulSet", klog.KObj(set),
+		"replicas", currentStatus.Replicas,
+		"readyReplicas", currentStatus.ReadyReplicas,
+		"currentReplicas", currentStatus.CurrentReplicas,
+		"updatedReplicas", currentStatus.UpdatedReplicas)
 
-	klog.V(4).Infof("StatefulSet %s/%s revisions current=%s update=%s",
-		set.Namespace,
-		set.Name,
-		currentStatus.CurrentRevision,
-		currentStatus.UpdateRevision)
+	klog.V(4).InfoS("StatefulSet revisions",
+		"statefulSet", klog.KObj(set),
+		"currentRevision", currentStatus.CurrentRevision,
+		"updateRevision", currentStatus.UpdateRevision)
 
 	return currentRevision, updateRevision, currentStatus, nil
 }
@@ -373,11 +371,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	}
 
 	if unhealthy > 0 {
-		klog.V(4).Infof("StatefulSet %s/%s has %d unhealthy Pods starting with %s",
-			set.Namespace,
-			set.Name,
-			unhealthy,
-			firstUnhealthyPod.Name)
+		klog.V(4).InfoS("StatefulSet has unhealthy Pods",
+			"statefulSet", klog.KObj(set),
+			"unhealthyPodCount", unhealthy,
+			"firstUnhealthyPod", klog.KObj(firstUnhealthyPod))
 	}
 
 	// If the StatefulSet is being deleted, don't do anything other than updating
@@ -437,22 +434,20 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// If we find a Pod that is currently terminating, we must wait until graceful deletion
 		// completes before we continue to make progress.
 		if isTerminating(replicas[i]) && monotonic {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to Terminate",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to terminate",
+				"statefulSet", klog.KObj(set),
+				"terminatingPod", replicas[i].Name)
 			return &status, nil
 		}
 		// If we have a Pod that has been created but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
 		if !isRunningAndReady(replicas[i]) && monotonic {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to be Running and Ready",
+				"statefulSet", klog.KObj(set),
+				"waitingPod", replicas[i].Name)
 			return &status, nil
 		}
 		// If we have a Pod that has been created but is not available we can not make progress.
@@ -461,11 +456,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
 		// isRunningAndReady block as only Available pods should be brought down.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(replicas[i], set.Spec.MinReadySeconds) && monotonic {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Available",
-				set.Namespace,
-				set.Name,
-				replicas[i].Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod %s to be Available",
+				"statefulSet", klog.KObj(set),
+				"replicaName", replicas[i].Name)
 			return &status, nil
 		}
 		// Enforce the StatefulSet invariants
@@ -487,11 +481,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for target := len(condemned) - 1; target >= 0; target-- {
 		// wait for terminating pods to expire
 		if isTerminating(condemned[target]) {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to Terminate prior to scale down",
-				set.Namespace,
-				set.Name,
-				condemned[target].Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to Terminate prior to scale down",
+				"statefulSet", klog.KObj(set),
+				"terminatingPod", condemned[target].Name)
 			// block if we are in monotonic mode
 			if monotonic {
 				return &status, nil
@@ -500,28 +493,25 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod block
 		if !isRunningAndReady(condemned[target]) && monotonic && condemned[target] != firstUnhealthyPod {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready prior to scale down",
-				set.Namespace,
-				set.Name,
-				firstUnhealthyPod.Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to be Running and Ready prior to scale down",
+				"statefulSet", klog.KObj(set),
+				"firstUnhealthyPod", firstUnhealthyPod.Name)
 			return &status, nil
 		}
 		// if we are in monotonic mode and the condemned target is not the first unhealthy Pod, block.
 		// TODO: Since available is superset of Ready, once we have this featuregate enabled by default, we can remove the
 		// isRunningAndReady block as only Available pods should be brought down.
 		if utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) && !isRunningAndAvailable(condemned[target], set.Spec.MinReadySeconds) && monotonic && condemned[target] != firstUnhealthyPod {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to be Available prior to scale down",
-				set.Namespace,
-				set.Name,
-				firstUnhealthyPod.Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to be Available prior to scale down",
+				"statefulSet", klog.KObj(set),
+				"firstUnhealthyPod", firstUnhealthyPod.Name)
 			return &status, nil
 		}
-		klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for scale down",
-			set.Namespace,
-			set.Name,
-			condemned[target].Name)
+		klog.V(2).InfoS("StatefulSet terminating Pod for scale down",
+			"statefulSet", klog.KObj(set),
+			"waitingPod", condemned[target].Name)
 
 		if err := ssc.podControl.DeleteStatefulPod(set, condemned[target]); err != nil {
 			return &status, err
@@ -552,10 +542,9 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// delete the Pod if it is not already terminating and does not match the update revision.
 		if getPodRevision(replicas[target]) != updateRevision.Name && !isTerminating(replicas[target]) {
-			klog.V(2).Infof("StatefulSet %s/%s terminating Pod %s for update",
-				set.Namespace,
-				set.Name,
-				replicas[target].Name)
+			klog.V(2).InfoS("StatefulSet terminating Pod for update",
+				"statefulSet", klog.KObj(set),
+				"terminatingPod", replicas[target].Name)
 			err := ssc.podControl.DeleteStatefulPod(set, replicas[target])
 			status.CurrentReplicas--
 			return &status, err
@@ -563,11 +552,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 
 		// wait for unhealthy Pods on update
 		if !isHealthy(replicas[target]) {
-			klog.V(4).Infof(
-				"StatefulSet %s/%s is waiting for Pod %s to update",
-				set.Namespace,
-				set.Name,
-				replicas[target].Name)
+			klog.V(4).InfoS(
+				"StatefulSet is waiting for Pod to update",
+				"statefulSet", klog.KObj(set),
+				"waitingPod", replicas[target].Name)
 			return &status, nil
 		}
 
