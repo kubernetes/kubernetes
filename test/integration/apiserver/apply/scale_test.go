@@ -97,7 +97,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to create object using apply: %v", err)
 			}
-			obj := retrieveObject(t, client, test)
+			obj := retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 1)
 			assertReplicasOwnership(t, obj, "apply_test")
 
@@ -115,7 +115,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to scale object: %v", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 5)
 			assertReplicasOwnership(t, obj, "scale_test")
 
@@ -145,7 +145,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error force-updating: %v", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 1)
 			assertReplicasOwnership(t, obj, "apply_test")
 
@@ -180,7 +180,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error updating object by applying scale and forcing: %v ", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 17)
 			assertReplicasOwnership(t, obj, "apply_scale")
 
@@ -197,7 +197,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error replacing object: %v", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 7)
 			assertReplicasOwnership(t, obj, "replace_test")
 
@@ -214,7 +214,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error updating object: %v", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 7)
 			assertReplicasOwnership(t, obj, "replace_test", "co_owning_test")
 
@@ -231,7 +231,7 @@ func TestScaleAllResources(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Error scaling object: %v", err)
 			}
-			obj = retrieveObject(t, client, test)
+			obj = retrieveObject(t, client, test.path, test.resource)
 			assertReplicasValue(t, obj, 5)
 			assertReplicasOwnership(t, obj, "scale_test")
 		})
@@ -379,10 +379,10 @@ func validV1ReplicationController() string {
 	  }`
 }
 
-func retrieveObject(t *testing.T, client clientset.Interface, test scaleTest) *unstructured.Unstructured {
+func retrieveObject(t *testing.T, client clientset.Interface, prefix, resource string) *unstructured.Unstructured {
 	t.Helper()
 
-	urlPath := path.Join(test.path, "namespaces", "default", test.resource, "test")
+	urlPath := path.Join(prefix, "namespaces", "default", resource, "test")
 	bytes, err := client.CoreV1().RESTClient().Get().AbsPath(urlPath).DoRaw(context.TODO())
 	if err != nil {
 		t.Fatalf("Failed to retrieve object: %v", err)

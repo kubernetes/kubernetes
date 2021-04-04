@@ -135,6 +135,9 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 	}
 
 	for manager, versionedSet := range scaleFields {
+		if !versionedSet.Set().Has(replicasPathInScale) {
+			continue
+		}
 		newVersionedSet := fieldpath.NewVersionedSet(
 			fieldpath.NewSet(h.mappings[h.groupVersion.String()]),
 			fieldpath.APIVersion(h.groupVersion.String()),
