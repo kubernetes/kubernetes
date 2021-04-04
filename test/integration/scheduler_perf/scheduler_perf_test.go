@@ -111,6 +111,17 @@ func (tc *testCase) collectsMetrics() bool {
 	return false
 }
 
+func (tc *testCase) workloadNamesUnique() bool {
+	workloadUniqueNames := map[string]bool{}
+	for _, w := range tc.Workloads {
+		if workloadUniqueNames[w.Name] {
+			return false
+		}
+		workloadUniqueNames[w.Name] = true
+	}
+	return true
+}
+
 // workload is a subtest under a testCase that tests the scheduler performance
 // for a certain ordering of ops. The set of nodes created and pods scheduled
 // in a workload may be heterogeneous.
@@ -766,9 +777,17 @@ func validateTestCases(testCases []*testCase) error {
 	if len(testCases) == 0 {
 		return fmt.Errorf("no test cases defined")
 	}
+	testCaseUniqueNames := map[string]bool{}
 	for _, tc := range testCases {
+		if testCaseUniqueNames[tc.Name] {
+			return fmt.Errorf("%s: name is not unique", tc.Name)
+		}
+		testCaseUniqueNames[tc.Name] = true
 		if len(tc.Workloads) == 0 {
 			return fmt.Errorf("%s: no workloads defined", tc.Name)
+		}
+		if !tc.workloadNamesUnique() {
+			return fmt.Errorf("%s: workload names are not unique", tc.Name)
 		}
 		if len(tc.WorkloadTemplate) == 0 {
 			return fmt.Errorf("%s: no ops defined", tc.Name)
