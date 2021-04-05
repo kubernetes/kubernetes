@@ -165,7 +165,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 
 			ginkgo.By("waiting for available Replicas")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 120*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), f.Timeouts.PodStart)
 			defer cancel()
 			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				var rc *v1.ReplicationController
@@ -281,7 +281,7 @@ var _ = SIGDescribe("ReplicationController", func() {
 			framework.ExpectNoError(err, "Failed to patch ReplicationControllerScale")
 			ginkgo.By("waiting for RC to be modified")
 			eventFound = false
-			ctx, cancel = context.WithTimeout(context.Background(), 60*time.Second)
+			ctx, cancel = context.WithTimeout(context.Background(), f.Timeouts.PodStart)
 			defer cancel()
 			_, err = watchUntilWithoutRetry(ctx, retryWatcher, func(watchEvent watch.Event) (bool, error) {
 				if watchEvent.Type != watch.Modified {
