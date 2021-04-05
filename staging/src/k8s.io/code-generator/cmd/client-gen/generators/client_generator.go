@@ -95,7 +95,8 @@ func NameSystems(pluralExceptions map[string]string) namer.NameSystems {
 	return namer.NameSystems{
 		"singularKind":       namer.NewPublicNamer(0),
 		"public":             publicNamer,
-		"private":            privateNamer,
+		"private":            &genutil.GoSafeNamer{privateNamer},
+		"unsafe_private":     privateNamer,
 		"raw":                namer.NewRawNamer("", nil),
 		"publicPlural":       publicPluralNamer,
 		"privatePlural":      privatePluralNamer,
@@ -149,7 +150,7 @@ func packageForGroup(gv clientgentypes.GroupVersion, typeList []*types.Type, cli
 			for _, t := range typeList {
 				generators = append(generators, &genClientForType{
 					DefaultGen: generator.DefaultGen{
-						OptionalName: strings.ToLower(c.Namers["private"].Name(t)),
+						OptionalName: strings.ToLower(c.Namers["unsafe_private"].Name(t)),
 					},
 					outputPackage:             groupVersionClientPackage,
 					inputPackage:              inputPackage,

@@ -54,4 +54,5 @@ pushd "./${SCRIPT_ROOT}/examples"
   go build "k8s.io/code-generator/examples/apiserver/..."
   go build "k8s.io/code-generator/examples/MixedCase/..."
   go build "k8s.io/code-generator/examples/HyphenGroup/..."
+  go build "k8s.io/code-generator/examples/keyword/..."
 popd
