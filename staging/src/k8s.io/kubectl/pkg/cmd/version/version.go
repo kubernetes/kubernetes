@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
@@ -120,7 +121,7 @@ func (o *Options) Run() error {
 	clientVersion := version.Get()
 	versionInfo.ClientVersion = &clientVersion
 
-	if !o.ClientOnly && o.discoveryClient != nil {
+	if !o.ClientOnly && !reflect.ValueOf(o.discoveryClient).IsNil() {
 		// Always request fresh data from the server
 		o.discoveryClient.Invalidate()
 		serverVersion, serverErr = o.discoveryClient.ServerVersion()
