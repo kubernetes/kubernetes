@@ -18,6 +18,8 @@ package statefulset
 
 import (
 	"context"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	appsv1beta2 "k8s.io/api/apps/v1beta2"
@@ -84,7 +86,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	statefulSet.Status = apps.StatefulSetStatus{}
 
 	statefulSet.Generation = 1
-
+	dropStatefulSetDisabledFields(statefulSet, nil)
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
@@ -95,6 +97,7 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	// Update is not allowed to set status
 	newStatefulSet.Status = oldStatefulSet.Status
 
+	dropStatefulSetDisabledFields(newStatefulSet, oldStatefulSet)
 	pod.DropDisabledTemplateFields(&newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
 
 	// Any changes to the spec increment the generation number, any changes to the
@@ -103,7 +106,31 @@ func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	if !apiequality.Semantic.DeepEqual(oldStatefulSet.Spec, newStatefulSet.Spec) {
 		newStatefulSet.Generation = oldStatefulSet.Generation + 1
 	}
+}
 
+// dropStatefulSetDisabledFields drops fields that are not used if their associated feature gates
+// are not enabled.
+// The typical pattern is:
+//     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
+//         newSvc.Spec.MyFeature = nil
+//     }
+func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.StatefulSet) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetMinReadySeconds) {
+		if !minReadySecondsFieldsInUse(oldSS) {
+			newSS.Spec.MinReadySeconds = int32(0)
+		}
+	}
+}
+
+// minReadySecondsFieldsInUse returns true if fields related to StatefulSet minReadySeconds are set and
+// are greater than 0
+func minReadySecondsFieldsInUse(ss *apps.StatefulSet) bool {
+	if ss == nil {
+		return false
+	} else if ss.Spec.MinReadySeconds >= 0 {
+		return true
+	}
+	return false
 }
 
 // Validate validates a new StatefulSet.
