@@ -70,6 +70,7 @@ type PolicyRule struct {
 
 // Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference,
 // or a value for non-objects such as user and group names.
+// +structType=atomic
 type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
@@ -88,6 +89,7 @@ type Subject struct {
 }
 
 // RoleRef contains information that points to the role being used
+// +structType=atomic
 type RoleRef struct {
 	// APIGroup is the group for the resource being referenced
 	APIGroup string `json:"apiGroup" protobuf:"bytes,1,opt,name=apiGroup"`
