@@ -551,7 +551,8 @@ func PVWriteReadSingleNodeCheck(client clientset.Interface, timeouts *framework.
 	command += " || (mount | grep 'on /mnt/test'; false)"
 
 	if framework.NodeOSDistroIs("windows") {
-		command = "select-string 'hello world' /mnt/test/data"
+		// agnhost doesn't support mount
+		command = "grep 'hello world' /mnt/test/data"
 	}
 	RunInPodWithVolume(client, timeouts, claim.Namespace, claim.Name, "pvc-volume-tester-reader", command, e2epod.NodeSelection{Name: actualNodeName})
 
@@ -596,9 +597,6 @@ func PVMultiNodeCheck(client clientset.Interface, timeouts *framework.TimeoutCon
 	e2epod.SetAntiAffinity(&secondNode, actualNodeName)
 	ginkgo.By(fmt.Sprintf("checking the created volume is readable and retains data on another node %+v", secondNode))
 	command = "grep 'hello world' /mnt/test/data"
-	if framework.NodeOSDistroIs("windows") {
-		command = "select-string 'hello world' /mnt/test/data"
-	}
 	pod = StartInPodWithVolume(client, claim.Namespace, claim.Name, "pvc-reader-node2", command, secondNode)
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceTimeout(client, pod.Name, pod.Namespace, timeouts.PodStartSlow))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})

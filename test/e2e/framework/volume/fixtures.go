@@ -616,9 +616,6 @@ func generateWriteFileCmd(content, fullPath string) []string {
 // CheckVolumeModeOfPath check mode of volume
 func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
 	if volMode == v1.PersistentVolumeBlock {
-		// NOTE: gcepd-csi doesn't support a block volume in windows, this method won't
-		// be called because the test is skipped
-
 		// Check if block exists
 		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -b %s", path))
 
