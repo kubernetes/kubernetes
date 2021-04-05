@@ -1168,6 +1168,7 @@ func autoConvert_v1_StatefulSetSpec_To_apps_StatefulSetSpec(in *v1.StatefulSetSp
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
@@ -1186,6 +1187,7 @@ func autoConvert_apps_StatefulSetSpec_To_v1_StatefulSetSpec(in *apps.StatefulSet
 		return err
 	}
 	out.RevisionHistoryLimit = (*int32)(unsafe.Pointer(in.RevisionHistoryLimit))
+	out.MinReadySeconds = in.MinReadySeconds
 	return nil
 }
 
