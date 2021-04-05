@@ -56,8 +56,8 @@ var _ = SIGDescribe("HostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		f.TestContainerOutput("hostPath mode", pod, 0, []string{
-			"mode of file \"/test-volume\": dtrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
+		f.TestContainerOutputRegexp("hostPath mode", pod, 0, []string{
+			"mode of file \"/test-volume\": dg?trwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
 		})
 	})
 
