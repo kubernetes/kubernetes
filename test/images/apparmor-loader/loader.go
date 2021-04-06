@@ -17,19 +17,18 @@ limitations under the License.
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 var (
@@ -65,7 +64,7 @@ func main() {
 	}
 
 	// Check that loaded profiles can be read.
-	if _, err := getLoadedProfiles(); err != nil {
+	if _, err := apparmor.GetLoadedProfiles(apparmorfs); err != nil {
 		klog.Exitf("Unable to access apparmor profiles: %v", err)
 	}
 
@@ -110,7 +109,7 @@ func pollForever() {
 }
 
 func loadNewProfiles() (success bool, newProfiles []string) {
-	loadedProfiles, err := getLoadedProfiles()
+	loadedProfiles, err := apparmor.GetLoadedProfiles(apparmorfs)
 	if err != nil {
 		klog.Errorf("Error reading loaded profiles: %v", err)
 		return false, nil
@@ -222,40 +221,4 @@ func resolveSymlink(basePath string, info os.FileInfo) (os.FileInfo, error) {
 		return nil, fmt.Errorf("error calling stat on %s: %v", resolvedName, err)
 	}
 	return resolvedInfo, nil
-}
-
-// TODO: This is copied from k8s.io/kubernetes/pkg/security/apparmor.getLoadedProfiles.
-//       Refactor that method to expose it in a reusable way, and delete this version.
-func getLoadedProfiles() (map[string]bool, error) {
-	profilesPath := path.Join(apparmorfs, "profiles")
-	profilesFile, err := os.Open(profilesPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)
-	}
-	defer profilesFile.Close()
-
-	profiles := map[string]bool{}
-	scanner := bufio.NewScanner(profilesFile)
-	for scanner.Scan() {
-		profileName := parseProfileName(scanner.Text())
-		if profileName == "" {
-			// Unknown line format; skip it.
-			continue
-		}
-		profiles[profileName] = true
-	}
-	return profiles, nil
-}
-
-// The profiles file is formatted with one profile per line, matching a form:
-//   namespace://profile-name (mode)
-//   profile-name (mode)
-// Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
-// profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
-func parseProfileName(profileLine string) string {
-	modeIndex := strings.IndexRune(profileLine, '(')
-	if modeIndex < 0 {
-		return ""
-	}
-	return strings.TrimSpace(profileLine[:modeIndex])
 }

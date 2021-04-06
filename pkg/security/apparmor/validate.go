@@ -73,7 +73,7 @@ func (v *validator) Validate(pod *v1.Pod) error {
 		return v.validateHostErr
 	}
 
-	loadedProfiles, err := v.getLoadedProfiles()
+	loadedProfiles, err := GetLoadedProfiles(v.appArmorFS)
 	if err != nil {
 		return fmt.Errorf("could not read loaded profiles: %v", err)
 	}
@@ -144,27 +144,6 @@ func ValidateProfileFormat(profile string) error {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 	return nil
-}
-
-func (v *validator) getLoadedProfiles() (map[string]bool, error) {
-	profilesPath := path.Join(v.appArmorFS, "profiles")
-	profilesFile, err := os.Open(profilesPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)
-	}
-	defer profilesFile.Close()
-
-	profiles := map[string]bool{}
-	scanner := bufio.NewScanner(profilesFile)
-	for scanner.Scan() {
-		profileName := parseProfileName(scanner.Text())
-		if profileName == "" {
-			// Unknown line format; skip it.
-			continue
-		}
-		profiles[profileName] = true
-	}
-	return profiles, nil
 }
 
 // The profiles file is formatted with one profile per line, matching a form:

@@ -17,6 +17,10 @@ limitations under the License.
 package apparmor
 
 import (
+	"bufio"
+	"fmt"
+	"os"
+	"path"
 	"strings"
 
 	"k8s.io/api/core/v1"
@@ -59,4 +63,26 @@ func SetProfileNameFromPodAnnotations(annotations map[string]string, containerNa
 	}
 	annotations[v1.AppArmorBetaContainerAnnotationKeyPrefix+containerName] = profileName
 	return nil
+}
+
+// GetLoadedProfiles gets profiles under AppArmor filesystem.
+func GetLoadedProfiles(appArmorFS string) (map[string]bool, error) {
+	profilesPath := path.Join(appArmorFS, "profiles")
+	profilesFile, err := os.Open(profilesPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open %s: %v", profilesPath, err)
+	}
+	defer profilesFile.Close()
+
+	profiles := map[string]bool{}
+	scanner := bufio.NewScanner(profilesFile)
+	for scanner.Scan() {
+		profileName := parseProfileName(scanner.Text())
+		if profileName == "" {
+			// Unknown line format; skip it.
+			continue
+		}
+		profiles[profileName] = true
+	}
+	return profiles, nil
 }
