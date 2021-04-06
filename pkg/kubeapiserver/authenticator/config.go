@@ -151,10 +151,20 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// simply returns an error, the OpenID Connect plugin may query the provider to
 	// update the keys, causing performance hits.
 	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
+		// TODO(enj): wire up the Notifier and ControllerRunner bits when OIDC supports CA reload
+		var oidcCAContent oidc.CAContentProvider
+		if len(config.OIDCCAFile) != 0 {
+			var oidcCAErr error
+			oidcCAContent, oidcCAErr = dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", config.OIDCCAFile)
+			if oidcCAErr != nil {
+				return nil, nil, oidcCAErr
+			}
+		}
+
 		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(oidc.Options{
 			IssuerURL:            config.OIDCIssuerURL,
 			ClientID:             config.OIDCClientID,
-			CAFile:               config.OIDCCAFile,
+			CAContentProvider:    oidcCAContent,
 			UsernameClaim:        config.OIDCUsernameClaim,
 			UsernamePrefix:       config.OIDCUsernamePrefix,
 			GroupsClaim:          config.OIDCGroupsClaim,

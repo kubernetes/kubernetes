@@ -38,6 +38,7 @@ import (
 	oidc "github.com/coreos/go-oidc"
 	jose "gopkg.in/square/go-jose.v2"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/klog/v2"
 )
 
@@ -254,7 +255,11 @@ func (c *claimsTest) run(t *testing.T) {
 	// by writing its root CA certificate into a temporary file.
 	tempFileName := writeTempCert(t, ts.TLS.Certificates[0].Certificate[0])
 	defer os.Remove(tempFileName)
-	c.options.CAFile = tempFileName
+	caContent, err := dynamiccertificates.NewDynamicCAContentFromFile("oidc-authenticator", tempFileName)
+	if err != nil {
+		t.Fatalf("initialize ca: %v", err)
+	}
+	c.options.CAContentProvider = caContent
 
 	// Allow claims to refer to the serving URL of the test server.  For this,
 	// substitute all references to {{.URL}} in appropriate places.

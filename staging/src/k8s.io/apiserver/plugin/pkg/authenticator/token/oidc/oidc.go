@@ -78,8 +78,8 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 	ClientID string
 
-	// Path to a PEM encoded root certificate of the provider.
-	CAFile string
+	// PEM encoded root certificate contents of the provider.
+	CAContentProvider CAContentProvider
 
 	// UsernameClaim is the JWT field to use as the user's username.
 	UsernameClaim string
@@ -114,6 +114,11 @@ type Options struct {
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
+}
+
+// Subset of dynamiccertificates.CAContentProvider that can be used to dynamically load root CAs.
+type CAContentProvider interface {
+	CurrentCABundleContent() []byte
 }
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the
@@ -273,10 +278,11 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 	}
 
 	var roots *x509.CertPool
-	if opts.CAFile != "" {
-		roots, err = certutil.NewPool(opts.CAFile)
+	if opts.CAContentProvider != nil {
+		// TODO(enj): make this reload CA data dynamically
+		roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
 		if err != nil {
-			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
+			return nil, fmt.Errorf("Failed to read the CA contents: %v", err)
 		}
 	} else {
 		klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
