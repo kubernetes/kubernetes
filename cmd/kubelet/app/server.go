@@ -364,21 +364,20 @@ func kubeletConfigFlagPrecedence(kc *kubeletconfiginternal.KubeletConfiguration,
 }
 
 func loadConfigFile(name string) (*kubeletconfiginternal.KubeletConfiguration, error) {
-	const errFmt = "failed to load Kubelet config file %s, error %v"
 	// compute absolute path based on current working dir
 	kubeletConfigFile, err := filepath.Abs(name)
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, err
 	}
 	loader, err := configfiles.NewFsLoader(utilfs.DefaultFs{}, kubeletConfigFile)
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, err
 	}
 	kc, err := loader.Load()
 	if err != nil {
-		return nil, fmt.Errorf(errFmt, name, err)
+		return nil, err
 	}
-	return kc, err
+	return kc, nil
 }
 
 // UnsecuredDependencies returns a Dependencies suitable for being run, or an error if the server setup
