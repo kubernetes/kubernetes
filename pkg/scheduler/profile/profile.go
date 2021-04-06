@@ -99,6 +99,9 @@ func (v *cfgValidator) validate(cfg config.KubeSchedulerProfile) error {
 	if len(cfg.Plugins.QueueSort.Enabled) != 1 {
 		return fmt.Errorf("one queue sort plugin required for profile with scheduler name %q", cfg.SchedulerName)
 	}
+	if len(cfg.Plugins.Bind.Enabled) == 0 {
+		return fmt.Errorf("at least one bind plugin is needed for profile with scheduler name %q", cfg.SchedulerName)
+	}
 	queueSort := cfg.Plugins.QueueSort.Enabled[0].Name
 	var queueSortArgs runtime.Object
 	for _, plCfg := range cfg.PluginConfig {
