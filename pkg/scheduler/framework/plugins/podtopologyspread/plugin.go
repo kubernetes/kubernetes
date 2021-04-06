@@ -65,6 +65,7 @@ var _ framework.PreFilterPlugin = &PodTopologySpread{}
 var _ framework.FilterPlugin = &PodTopologySpread{}
 var _ framework.PreScorePlugin = &PodTopologySpread{}
 var _ framework.ScorePlugin = &PodTopologySpread{}
+var _ framework.EnqueueExtensions = &PodTopologySpread{}
 
 const (
 	// Name is the name of the plugin used in the plugin registry and configurations.
@@ -118,4 +119,22 @@ func (pl *PodTopologySpread) setListers(factory informers.SharedInformerFactory)
 	pl.replicationCtrls = factory.Core().V1().ReplicationControllers().Lister()
 	pl.replicaSets = factory.Apps().V1().ReplicaSets().Lister()
 	pl.statefulSets = factory.Apps().V1().StatefulSets().Lister()
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *PodTopologySpread) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		// All ActionType includes the following events:
+		// - Add. An unschedulable Pod may fail due to violating topology spread constraints,
+		// adding an assigned Pod may make it schedulable.
+		// - Update. Updating on an existing Pod's labels (e.g., removal) may make
+		// an unschedulable Pod schedulable.
+		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's topology spread constraints,
+		// deleting an existing Pod may make it schedulable.
+		{Resource: framework.Pod, ActionType: framework.All},
+		// Node add|delete|updateLabel maybe lead an topology key changed,
+		// and make these pod in scheduling schedulable or unschedulable.
+		{Resource: framework.Node, ActionType: framework.Add | framework.Delete | framework.UpdateNodeLabel},
+	}
 }
