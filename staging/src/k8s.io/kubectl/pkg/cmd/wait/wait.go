@@ -118,7 +118,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 
 		DisableFlagsInUseLine: true,
 		Run: func(cmd *cobra.Command, args []string) {
-			o, err := flags.ToOptions(args)
+			o, err := flags.ToOptions(cmd, args)
 			cmdutil.CheckErr(err)
 			err = o.RunWait()
 			cmdutil.CheckErr(err)
@@ -141,7 +141,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
-func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
+func (flags *WaitFlags) ToOptions(cmd *cobra.Command, args []string) (*WaitOptions, error) {
 	printer, err := flags.PrintFlags.ToPrinter()
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	conditionFn, err := conditionFuncFor(flags.ForCondition, flags.ErrOut)
+	conditionFn, err := conditionFuncFor(cmd, flags.ForCondition, flags.ErrOut)
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 	return o, nil
 }
 
-func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
+func conditionFuncFor(cmd *cobra.Command, condition string, errOut io.Writer) (ConditionFunc, error) {
 	if strings.ToLower(condition) == "delete" {
 		return IsDeleted, nil
 	}
@@ -198,7 +198,7 @@ func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error)
 		}.IsConditionMet, nil
 	}
 
-	return nil, fmt.Errorf("unrecognized condition: %q", condition)
+	return nil, cmdutil.UsageErrorf(cmd, "unrecognized condition: %q", condition)
 }
 
 // ResourceLocation holds the location of a resource
