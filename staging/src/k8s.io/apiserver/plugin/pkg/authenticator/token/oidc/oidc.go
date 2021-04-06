@@ -70,6 +70,9 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 	IssuerURL string
 
+	// Optional KeySet to allow for synchronous initlization instead of fetching from the remote issuer.
+	KeySet oidc.KeySet
+
 	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
 	// client to ensure the plugin can be used with public providers.
 	//
@@ -219,24 +222,6 @@ func (a *Authenticator) Close() {
 	a.cancel()
 }
 
-func New(opts Options) (*Authenticator, error) {
-	return newAuthenticator(opts, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
-		// Asynchronously attempt to initialize the authenticator. This enables
-		// self-hosted providers, providers that run on top of Kubernetes itself.
-		go wait.PollImmediateUntil(time.Second*10, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, a.issuerURL)
-			if err != nil {
-				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
-				return false, nil
-			}
-
-			verifier := provider.Verifier(config)
-			a.setVerifier(verifier)
-			return true, nil
-		}, ctx.Done())
-	})
-}
-
 // whitelist of signing algorithms to ensure users don't mistakenly pass something
 // goofy.
 var allowedSigningAlgs = map[string]bool{
@@ -251,7 +236,7 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS512: true,
 }
 
-func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Authenticator, config *oidc.Config)) (*Authenticator, error) {
+func New(opts Options) (*Authenticator, error) {
 	url, err := url.Parse(opts.IssuerURL)
 	if err != nil {
 		return nil, err
@@ -327,7 +312,25 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		resolver:       resolver,
 	}
 
-	initVerifier(ctx, authenticator, verifierConfig)
+	if opts.KeySet != nil {
+		// We already have a key set, synchronously initialize the verifier.
+		authenticator.setVerifier(oidc.NewVerifier(opts.IssuerURL, opts.KeySet, verifierConfig))
+	} else {
+		// Asynchronously attempt to initialize the authenticator. This enables
+		// self-hosted providers, providers that run on top of Kubernetes itself.
+		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
+			provider, err := oidc.NewProvider(ctx, opts.IssuerURL)
+			if err != nil {
+				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
+				return false, nil
+			}
+
+			verifier := provider.Verifier(verifierConfig)
+			authenticator.setVerifier(verifier)
+			return true, nil
+		}, ctx.Done())
+	}
+
 	return authenticator, nil
 }
 
