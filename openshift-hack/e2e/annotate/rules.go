@@ -95,6 +95,9 @@ var (
 		"[Disabled:Unsupported]": {
 			`\[Driver: rbd\]`,               // OpenShift 4.x does not support Ceph RBD (use CSI instead)
 			`\[Driver: ceph\]`,              // OpenShift 4.x does not support CephFS (use CSI instead)
+			`\[Driver: gluster\]`,           // OpenShift 4.x does not support Gluster
+			`Volumes GlusterFS`,             // OpenShift 4.x does not support Gluster
+			`GlusterDynamicProvisioner`,     // OpenShift 4.x does not support Gluster
 			`\[Feature:PodSecurityPolicy\]`, // OpenShift 4.x does not enable PSP by default
 		},
 		// tests too slow to be part of conformance
