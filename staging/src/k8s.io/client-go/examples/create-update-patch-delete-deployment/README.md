@@ -1,7 +1,7 @@
 # Create, Update & Delete Deployment
 
 This example program demonstrates the fundamental operations for managing on
-[Deployment][1] resources, such as `Create`, `List`, `Update` and `Delete`.
+[Deployment][1] resources, such as `Create`, `List`, `Update`, `Patch` and `Delete`.
 
 You can adopt the source code from this example to write programs that manage
 other types of resources through the Kubernetes API.
@@ -15,7 +15,7 @@ Make sure you have a Kubernetes cluster and `kubectl` is configured:
 Compile this example on your workstation:
 
 ```
-cd create-update-delete-deployment
+cd create-update-patch-delete-deployment
 go build -o ./app
 ```
 
@@ -36,9 +36,13 @@ Running this command will execute the following operations on your cluster:
    image to `nginx:1.13`. You are encouraged to inspect the retry loop that
    handles conflicts. Verify the new replica count and container image with
    `kubectl describe deployment demo`.
-3. **List Deployments:** This will retrieve Deployments in the `default`
+3. **Patch Deployment:** This will restore the deployment resource to the deployment created for the first time. 
+   The `data []byte` needed for the `Patch` can be customized or created by `strategypatch.CreateTwoWayMergePatch`.
+   `Patch` will automatically resolve the conflict on the api-server when the resource conflicts, 
+   and there is no need to retry like the `Update`.
+4. **List Deployments:** This will retrieve Deployments in the `default`
    namespace and print their names and replica counts.
-4. **Delete Deployment:** This will delete the Deployment object and its
+5. **Delete Deployment:** This will delete the Deployment object and its
    dependent ReplicaSet resource. Verify with `kubectl get deployments`.
 
 Each step is separated by an interactive prompt. You must hit the
@@ -55,6 +59,11 @@ Created deployment "demo-deployment".
 
 Updating deployment...
 Updated deployment...
+-> Press Return key to continue.
+
+Patching deployment...
+Patched deployment with patchByte:{"spec": {"replicas":2,"template": {"spec": {"containers": [{"name": "web","image":"nginx:1.12"}]}}}}
+Patched deployment with patchByte:{"spec":{"replicas":2,"template":{"spec":{"$setElementOrder/containers":[{"name":"web"}],"containers":[{"image":"nginx:1.12","name":"web"}]}}}}
 -> Press Return key to continue.
 
 Listing deployments in namespace "default":

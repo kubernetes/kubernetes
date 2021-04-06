@@ -31,8 +31,8 @@ import _ "k8s.io/client-go/plugin/pkg/client/auth/openstack"
 
 ### Basics
 
-- [**Managing resources with API**](./create-update-delete-deployment): Create,
-  get, update, delete a Deployment resource.
+- [**Managing resources with API**](create-update-patch-delete-deployment): Create,
+  get, update, patch, delete a Deployment resource.
 
 ### Advanced Concepts
 

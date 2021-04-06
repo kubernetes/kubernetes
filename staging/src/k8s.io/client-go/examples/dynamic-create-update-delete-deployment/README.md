@@ -90,4 +90,4 @@ cluster is v1.13 or higher in `kubectl version`:
     panic: the server could not find the requested resource
 
 [1]: https://kubernetes.io/docs/user-guide/deployments/
-[2]: ../create-update-delete-deployment
+[2]: ../create-update-patch-delete-deployment
