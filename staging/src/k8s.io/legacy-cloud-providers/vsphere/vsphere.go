@@ -896,7 +896,12 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 }
 
 func (vs *VSphere) isZoneEnabled() bool {
-	return vs.cfg != nil && vs.cfg.Labels.Zone != "" && vs.cfg.Labels.Region != ""
+	isEnabled := vs.cfg != nil && vs.cfg.Labels.Zone != "" && vs.cfg.Labels.Region != ""
+	if isEnabled && vs.isSecretInfoProvided && vs.nodeManager.credentialManager == nil {
+		klog.V(1).Info("Zones can not be populated now due to credentials in Secret, skip.")
+		return false
+	}
+	return isEnabled
 }
 
 // Zones returns an implementation of Zones for vSphere.
