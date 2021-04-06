@@ -151,7 +151,7 @@ func (tt *TruthTable) Compare(other *TruthTable) *TruthTable {
 
 // PrettyPrint produces a nice visual representation.
 func (tt *TruthTable) PrettyPrint(indent string) string {
-	header := indent + strings.Join(append([]string{"-\t"}, tt.Tos...), "\t")
+	header := indent + strings.Join(append([]string{"-"}, tt.Tos...), "\t")
 	lines := []string{header}
 	for _, from := range tt.Froms {
 		line := []string{from}
@@ -163,7 +163,7 @@ func (tt *TruthTable) PrettyPrint(indent string) string {
 			} else if val {
 				mark = "."
 			}
-			line = append(line, mark+"\t")
+			line = append(line, mark)
 		}
 		lines = append(lines, indent+strings.Join(line, "\t"))
 	}
