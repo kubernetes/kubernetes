@@ -786,7 +786,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.Beta},
+	BoundServiceAccountTokenVolume:                 {Default: false, PreRelease: featuregate.Beta},                   // TODO(auth): investigate the impact of enabling this feature (https://bugzilla.redhat.com/show_bug.cgi?id=1946479)
 	ServiceAccountIssuerDiscovery:                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CRIContainerLogRotation:                        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
