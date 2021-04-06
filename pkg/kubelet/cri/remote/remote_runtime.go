@@ -393,7 +393,7 @@ func (r *remoteRuntimeService) ExecSync(containerID string, cmd []string, timeou
 	if err != nil {
 		klog.ErrorS(err, "ExecSync cmd from runtime service failed", "containerID", containerID, "cmd", cmd)
 
-		// interpret DeadlineExceeded gRPC errors as timedout probes
+		// interpret DeadlineExceeded gRPC errors as timeout probes
 		if status.Code(err) == codes.DeadlineExceeded {
 			err = exec.NewTimeoutError(fmt.Errorf("command %q timed out", strings.Join(cmd, " ")), timeout)
 		}
