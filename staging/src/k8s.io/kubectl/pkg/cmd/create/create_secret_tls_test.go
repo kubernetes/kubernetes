@@ -97,17 +97,19 @@ func TestCreateSecretTLS(t *testing.T) {
 	defer tearDown(mismatchCertTmpDir)
 
 	tests := map[string]struct {
-		tlsSecretName string
-		tlsKey        string
-		tlsCert       string
-		appendHash    bool
-		expected      *corev1.Secret
-		expectErr     bool
+		tlsSecretName    string
+		tlsKey           string
+		tlsCert          string
+		tlsCertAuthority string
+		appendHash       bool
+		expected         *corev1.Secret
+		expectErr        bool
 	}{
 		"create_secret_tls": {
-			tlsSecretName: "foo",
-			tlsKey:        validKeyPath,
-			tlsCert:       validCertPath,
+			tlsSecretName:    "foo",
+			tlsKey:           validKeyPath,
+			tlsCert:          validCertPath,
+			tlsCertAuthority: "",
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -125,10 +127,11 @@ func TestCreateSecretTLS(t *testing.T) {
 			expectErr: false,
 		},
 		"create_secret_tls_hash": {
-			tlsSecretName: "foo",
-			tlsKey:        validKeyPath,
-			tlsCert:       validCertPath,
-			appendHash:    true,
+			tlsSecretName:    "foo",
+			tlsKey:           validKeyPath,
+			tlsCert:          validCertPath,
+			tlsCertAuthority: "",
+			appendHash:       true,
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -146,22 +149,25 @@ func TestCreateSecretTLS(t *testing.T) {
 			expectErr: false,
 		},
 		"create_secret_invalid_tls": {
-			tlsSecretName: "foo",
-			tlsKey:        invalidKeyPath,
-			tlsCert:       invalidCertPath,
-			expectErr:     true,
+			tlsSecretName:    "foo",
+			tlsKey:           invalidKeyPath,
+			tlsCert:          invalidCertPath,
+			tlsCertAuthority: "",
+			expectErr:        true,
 		},
 		"create_secret_mismatch_tls": {
-			tlsSecretName: "foo",
-			tlsKey:        mismatchKeyPath,
-			tlsCert:       mismatchCertPath,
-			expectErr:     true,
+			tlsSecretName:    "foo",
+			tlsKey:           mismatchKeyPath,
+			tlsCert:          mismatchCertPath,
+			tlsCertAuthority: "",
+			expectErr:        true,
 		},
 		"create_invalid_filepath_and_certpath_secret_tls": {
-			tlsSecretName: "foo",
-			tlsKey:        "testKeyPath",
-			tlsCert:       "testCertPath",
-			expectErr:     true,
+			tlsSecretName:    "foo",
+			tlsKey:           "testKeyPath",
+			tlsCert:          "testCertPath",
+			tlsCertAuthority: "",
+			expectErr:        true,
 		},
 	}
 
@@ -169,10 +175,11 @@ func TestCreateSecretTLS(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			secretTLSOptions := CreateSecretTLSOptions{
-				Name:       test.tlsSecretName,
-				Key:        test.tlsKey,
-				Cert:       test.tlsCert,
-				AppendHash: test.appendHash,
+				Name:          test.tlsSecretName,
+				Key:           test.tlsKey,
+				Cert:          test.tlsCert,
+				CertAuthority: test.tlsCertAuthority,
+				AppendHash:    test.appendHash,
 			}
 			secretTLS, err := secretTLSOptions.createSecretTLS()
 
