@@ -152,11 +152,26 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		return nil, err
 	}
 
+	// Do not loosen this without making the x509 authenticator cert verification
+	// caching resilient to session renegotiation.
+	if len(s.ConnContextInitializers) > 0 && tlsConfig.Renegotiation != tls.RenegotiateNever {
+		return nil, fmt.Errorf("conn context initializers are not supported with TLS renegotiation")
+	}
+
 	secureServer := &http.Server{
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 		TLSConfig:      tlsConfig,
+	}
+
+	if len(s.ConnContextInitializers) > 0 {
+		secureServer.ConnContext = func(ctx context.Context, c net.Conn) context.Context {
+			for _, cci := range s.ConnContextInitializers {
+				ctx = cci(ctx, c)
+			}
+			return ctx
+		}
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.

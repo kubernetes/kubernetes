@@ -17,6 +17,7 @@ limitations under the License.
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -277,6 +278,9 @@ type SecureServingInfo struct {
 
 	// DisableHTTP2 indicates that http2 should not be enabled.
 	DisableHTTP2 bool
+
+	// ConnContextInitializer
+	ConnContextInitializers []func(ctx context.Context, c net.Conn) context.Context
 }
 
 type AuthenticationInfo struct {
