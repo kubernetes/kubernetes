@@ -69,7 +69,7 @@ func LogOrWriteConfig(fileName string, cfg *kubeschedulerconfig.KubeSchedulerCon
 			return err
 		}
 		configString := string(bytes)
-		klog.Infof("Using component config:\n%+v\n", configString)
+		klog.InfoS("Using component config", "config", configString)
 	}
 
 	if len(fileName) > 0 {
@@ -81,7 +81,7 @@ func LogOrWriteConfig(fileName string, cfg *kubeschedulerconfig.KubeSchedulerCon
 		if err := encoder.Encode(cfg, configFile); err != nil {
 			return err
 		}
-		klog.Infof("Wrote configuration to: %s\n", fileName)
+		klog.InfoS("Wrote configuration", "file", fileName)
 		os.Exit(0)
 	}
 	return nil
