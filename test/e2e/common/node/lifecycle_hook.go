@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -41,7 +43,7 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 		preStopWaitTimeout   = 30 * time.Second
 	)
 	ginkgo.Context("when create a pod with lifecycle hook", func() {
-		var targetIP, targetURL string
+		var targetIP, targetURL, targetNode string
 		ports := []v1.ContainerPort{
 			{
 				ContainerPort: 8080,
@@ -58,6 +60,10 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			if strings.Contains(targetIP, ":") {
 				targetURL = fmt.Sprintf("[%s]", targetIP)
 			}
+
+			pods, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).List(context.TODO(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			targetNode = pods.Items[0].Spec.NodeName
 		})
 		testPodWithHook := func(podWithHook *v1.Pod) {
 			ginkgo.By("create the pod with lifecycle hook")
@@ -111,6 +117,27 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
 			testPodWithHook(podWithHook)
 		})
+
+		ginkgo.It("should execute prestop exec hook properly with pods on different nodes", func() {
+			e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
+			lifecycle := &v1.Lifecycle{
+				PreStop: &v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"sh", "-c", "curl http://" + targetURL + ":8080/echo?msg=prestop"},
+					},
+				},
+			}
+
+			podWithHook := getPodWithHook("pod-with-prestop-exec-hook", imageutils.GetE2EImage(imageutils.Agnhost), lifecycle)
+
+			// make sure we spawn the test pod on a different node than the webserver.
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAntiAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
+
+			testPodWithHook(podWithHook)
+		})
+
 		/*
 			Release: v1.9
 			Testname: Pod Lifecycle, post start http hook
@@ -127,6 +154,27 @@ var _ = SIGDescribe("Container Lifecycle Hook", func() {
 				},
 			}
 			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+
+			testPodWithHook(podWithHook)
+		})
+
+		ginkgo.It("should execute poststart http hook properly with pods on different nodes", func() {
+			lifecycle := &v1.Lifecycle{
+				PostStart: &v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Path: "/echo?msg=poststart",
+						Host: targetIP,
+						Port: intstr.FromInt(8080),
+					},
+				},
+			}
+			podWithHook := getPodWithHook("pod-with-poststart-http-hook", imageutils.GetPauseImageName(), lifecycle)
+
+			// make sure we spawn the test pod on a different node than the webserver.
+			nodeSelection := e2epod.NodeSelection{}
+			e2epod.SetAntiAffinity(&nodeSelection, targetNode)
+			e2epod.SetNodeSelection(&podWithHook.Spec, nodeSelection)
+
 			testPodWithHook(podWithHook)
 		})
 		/*
