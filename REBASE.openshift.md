@@ -80,6 +80,27 @@ Before incorporating upstream changes you may want to:
 - Teach Git to remember how you’ve resolved a conflict so that the next time it can
   resolve it automatically (https://git-scm.com/book/en/v2/Git-Tools-Rerere)
 
+## Send email annoucing you're starting work
+
+To better spread the information send the following email:
+
+```
+Title: k8s <version> bump is starting...
+
+I'm starting the process of updating our fork to bring in
+the latest available version of kubernetes. This means that
+every PR landing in openshift/kubernetes should go through
+extra scrutiny and only 2 exceptions allow merging PRs in the
+upcoming time:
+1. High priority backports which require landing master first
+to start the backport process.
+2. Critical PRs unblocking the org.
+In both cases make sure to reach out to me for final approval.
+
+There is no ETA yet, but feel free to reach out to me with
+any questions.
+```
+
 ## Preparing the local repo clone
 
 Clone from a personal fork of kubernetes via a pushable (ssh) url:
@@ -304,6 +325,28 @@ most. Re-picking carries should not result in conflicts since the base of the
 rebase branch will be the same as before. The only potential sources of conflict
 will be the newly added commits.
 
+## Send email announcing upcoming merge
+
+Second email should be send close O(~3 days) to merging the bump:
+
+```
+Title: k8s <version> bump landing...
+
+<URL to your o/k PR> is bumping k8s to version <version>.
+The following repositories have been already bumped as well:
+
+<URLs to api/client-go/library-go/apiserver-library-go/operators>
+
+Followup work has been assigned to appropriate teams
+through bugzillas linked in the code. Please treat
+them as the highest priority after landing the bump.
+
+Finally, this means we are blocking ALL PRs to our
+kubernetes fork.
+```
+
+After sending the email block the merge queue, see below.
+
 ## Blocking the merge queue
 
 Close to merging a rebase it is good practice to block any merges to openshift/kubernetes
@@ -314,3 +357,21 @@ fork. To do that follow these steps:
 3. Add `tide/merge-blocker` label to issues (you might need group lead for this)
 4. All PR's  (including the rebase) are now forbidden to merge to master branch
 5. Before landing the rebase PR, close this issue
+
+## Send email announcing work done
+
+Last email should be send after merging the bump as a
+reply to previous:
+
+```
+<URL to your o/k PR> just merged.
+It'll take some time to get newer kublet, but in the meantime we'll
+continue to monitor CI. I encourage everyone to hold off from
+merging any major changes to our kubernetes fork to provide clear CI
+signal for the next 2-3 days.
+```
+
+## Followup work
+
+1. Update cluster-kube-apiserver-operator `pre-release-lifecycle` alert's
+`removed_release` version similarly to https://github.com/openshift/cluster-kube-apiserver-operator/pull/1092.
