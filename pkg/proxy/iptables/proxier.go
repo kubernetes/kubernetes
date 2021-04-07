@@ -1606,7 +1606,7 @@ func (proxier *Proxier) syncProxyRules() {
 	numberNatIptablesRules := utilproxy.CountBytesLines(proxier.natRules.Bytes())
 	metrics.IptablesRulesTotal.WithLabelValues(string(utiliptables.TableNAT)).Set(float64(numberNatIptablesRules))
 
-	klog.V(5).InfoS("Restoring iptables", "rules", proxier.iptablesData.Bytes())
+	klog.V(5).InfoS("Restoring iptables", "rules", string(proxier.iptablesData.Bytes()))
 	err = proxier.iptables.RestoreAll(proxier.iptablesData.Bytes(), utiliptables.NoFlushTables, utiliptables.RestoreCounters)
 	if err != nil {
 		klog.ErrorS(err, "Failed to execute iptables-restore")
