@@ -61,6 +61,8 @@ type CreateSecretTLSOptions struct {
 	Key string
 	// Cert is the path to the user's public key certificate.
 	Cert string
+	// CertAuthority is the path to the user's ca certificate.
+	CertAuthority string
 	// AppendHash; if true, derive a hash from the Secret and append it to the name
 	AppendHash bool
 
@@ -89,7 +91,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	o := NewSecretTLSOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run=server|client|none]",
+		Use:                   "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--ca=path/to/ca/file] [--dry-run=server|client|none]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Create a TLS secret"),
 		Long:                  secretForTLSLong,
@@ -109,6 +111,7 @@ func NewCmdCreateSecretTLS(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 
 	cmd.Flags().StringVar(&o.Cert, "cert", o.Cert, i18n.T("Path to PEM encoded public key certificate."))
 	cmd.Flags().StringVar(&o.Key, "key", o.Key, i18n.T("Path to private key associated with given certificate."))
+	cmd.Flags().StringVar(&o.CertAuthority, "ca", o.CertAuthority, i18n.T("Path to PEM encoded CA certificate."))
 	cmd.Flags().BoolVar(&o.AppendHash, "append-hash", o.AppendHash, "Append a hash of the secret to its name.")
 
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
@@ -228,6 +231,13 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
+	tlsCertAuthority := []byte(nil)
+	if len(o.CertAuthority) != 0 {
+		tlsCertAuthority, err = readFile(o.CertAuthority)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if _, err := tls.X509KeyPair(tlsCert, tlsKey); err != nil {
 		return nil, err
 	}
@@ -238,6 +248,9 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	secretTLS := newSecretObj(o.Name, namespace, corev1.SecretTypeTLS)
 	secretTLS.Data[corev1.TLSCertKey] = []byte(tlsCert)
 	secretTLS.Data[corev1.TLSPrivateKeyKey] = []byte(tlsKey)
+	if len(o.CertAuthority) != 0 {
+		secretTLS.Data["ca.crt"] = []byte(tlsCertAuthority)
+	}
 	if o.AppendHash {
 		hash, err := hash.SecretHash(secretTLS)
 		if err != nil {
