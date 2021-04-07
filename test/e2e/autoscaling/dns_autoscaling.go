@@ -55,7 +55,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	var DNSParams3 DNSParamsLinear
 
 	ginkgo.BeforeEach(func() {
-		e2eskipper.SkipUnlessProviderIs("gce", "gke")
+		e2eskipper.SkipUnlessProviderIs("gke")
 		c = f.ClientSet
 
 		nodes, err := e2enode.GetReadySchedulableNodes(c)
