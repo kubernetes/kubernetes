@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/spdystream"
+	"github.com/moby/spdystream"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 

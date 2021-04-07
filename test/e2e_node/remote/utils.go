@@ -78,7 +78,7 @@ func setupCNI(host, workspace string) error {
 
 // configureFirewall configures iptable firewall rules.
 func configureFirewall(host string) error {
-	klog.V(2).Infof("Configure iptables HEYHO firewall rules on %q", host)
+	klog.V(2).Infof("Configure iptables firewall rules on %q", host)
 
 	// Since the goal is to enable connectivity without taking into account current rule,
 	// we can just prepend the accept rules directly without any check

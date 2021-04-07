@@ -1002,6 +1002,9 @@ func autoConvert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(i
 	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
 		return err
 	}
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1012,6 +1015,9 @@ func Convert_v1beta2_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v
 
 func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta2_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta2.RollingUpdateDaemonSet, s conversion.Scope) error {
 	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
 		return err
 	}
 	return nil

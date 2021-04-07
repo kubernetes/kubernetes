@@ -443,6 +443,15 @@ func claimWithAnnotation(name, value string, claims []*v1.PersistentVolumeClaim)
 	return claims
 }
 
+func claimWithDataSource(name, kind, apiGroup string, claims []*v1.PersistentVolumeClaim) []*v1.PersistentVolumeClaim {
+	claims[0].Spec.DataSource = &v1.TypedLocalObjectReference{
+		Name:     name,
+		Kind:     kind,
+		APIGroup: &apiGroup,
+	}
+	return claims
+}
+
 func annotateClaim(claim *v1.PersistentVolumeClaim, ann map[string]string) *v1.PersistentVolumeClaim {
 	if claim.Annotations == nil {
 		claim.Annotations = map[string]string{}
@@ -514,6 +523,7 @@ var (
 	classUnsupportedMountOptions string = "unsupported-mountoptions"
 	classLarge                   string = "large"
 	classWait                    string = "wait"
+	classCSI                     string = "csi"
 
 	modeWait = storage.VolumeBindingWaitForFirstConsumer
 )
@@ -713,7 +723,7 @@ func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*storag
 //    of volumes/claims with expected claims/volumes and report differences.
 // Some limit of calls in enforced to prevent endless loops.
 func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*storage.StorageClass, defaultStorageClass string) {
-	for _, test := range tests {
+	run := func(t *testing.T, test controllerTest) {
 		klog.V(4).Infof("starting multisync test %q", test.name)
 
 		// Initialize the controller
@@ -821,6 +831,13 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*s
 		}
 		evaluateTestResults(ctrl, reactor.VolumeReactor, test, t)
 		klog.V(4).Infof("test %q finished after %d iterations", test.name, counter)
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			run(t, test)
+		})
 	}
 }
 

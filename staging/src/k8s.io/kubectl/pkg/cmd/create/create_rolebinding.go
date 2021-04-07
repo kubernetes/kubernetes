@@ -45,7 +45,7 @@ var (
 		  kubectl create rolebinding admin --clusterrole=admin --user=user1 --user=user2 --group=group1`))
 )
 
-// RoleBindingOpts holds the options for 'create rolebinding' sub command
+// RoleBindingOptions holds the options for 'create rolebinding' sub command
 type RoleBindingOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
 	PrintObj   func(obj runtime.Object) error
@@ -140,11 +140,7 @@ func (o *RoleBindingOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, arg
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicCient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicCient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 	printer, err := o.PrintFlags.ToPrinter()
 	if err != nil {

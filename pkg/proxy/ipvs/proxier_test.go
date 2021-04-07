@@ -33,10 +33,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
-	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
 	"k8s.io/kubernetes/pkg/util/async"
@@ -70,12 +72,12 @@ func (f *fakeIPGetter) BindedIPs() (sets.String, error) {
 
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
-	openPorts []*utilproxy.LocalPort
+	openPorts []*utilnet.LocalPort
 }
 
 // OpenLocalPort fakes out the listen() and bind() used by syncProxyRules
 // to lock a local port.
-func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort, isIPv6 bool) (utilproxy.Closeable, error) {
+func (f *fakePortOpener) OpenLocalPort(lp *utilnet.LocalPort) (utilnet.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
 }
@@ -151,8 +153,8 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		strictARP:             false,
 		localDetector:         proxyutiliptables.NewNoOpLocalDetector(),
 		hostname:              testHostname,
-		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
-		portMapper:            &fakePortOpener{[]*utilproxy.LocalPort{}},
+		portsMap:              make(map[utilnet.LocalPort]utilnet.Closeable),
+		portMapper:            &fakePortOpener{[]*utilnet.LocalPort{}},
 		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         DefaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
@@ -266,7 +268,7 @@ func TestCleanupLeftovers(t *testing.T) {
 	fp.syncProxyRules()
 
 	// test cleanup left over
-	if CleanupLeftovers(ipvs, ipt, ipset, true) {
+	if CleanupLeftovers(ipvs, ipt, ipset) {
 		t.Errorf("Cleanup leftovers failed")
 	}
 }
@@ -1920,6 +1922,75 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 	checkIptables(t, ipt, epIpt)
 }
 
+func TestHealthCheckNodePort(t *testing.T) {
+	ipt, fp := buildFakeProxier()
+
+	svcIP := "10.20.30.41"
+	svcPort := 80
+	svcNodePort := 3000
+	svcPortName := proxy.ServicePortName{
+		NamespacedName: makeNSN("ns1", "svc1"),
+		Port:           "p80",
+	}
+
+	sampleSvc := makeTestService(svcPortName.Namespace, "", func(svc *v1.Service) {
+		svc.Spec.Type = "LoadBalancer"
+		svc.Spec.ClusterIP = svcIP
+		svc.Spec.Ports = []v1.ServicePort{{
+			Name:     svcPortName.Port,
+			Port:     int32(svcPort),
+			Protocol: v1.ProtocolTCP,
+			NodePort: int32(svcNodePort),
+		}}
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+	})
+
+	svc1, svc2, invalidSvc3 := *sampleSvc, *sampleSvc, *sampleSvc
+	svc1.Name, svc1.Spec.HealthCheckNodePort = "valid-svc1", 30000
+	svc2.Name, svc2.Spec.HealthCheckNodePort = "valid-svc2", 30001
+	// make svc3 invalid by setting external traffic policy to cluster
+	invalidSvc3.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+	invalidSvc3.Name, invalidSvc3.Spec.HealthCheckNodePort = "invalid-svc3", 30002
+
+	makeServiceMap(fp,
+		&svc1,
+		&svc2,
+		&invalidSvc3,
+	)
+
+	itf := net.Interface{Index: 0, MTU: 0, Name: "eth0", HardwareAddr: nil, Flags: 0}
+	addrs := []net.Addr{proxyutiltest.AddrStruct{Val: "100.101.102.103/24"}}
+	itf1 := net.Interface{Index: 1, MTU: 0, Name: "eth1", HardwareAddr: nil, Flags: 0}
+	addrs1 := []net.Addr{proxyutiltest.AddrStruct{Val: "2001:db8::0/64"}}
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf, addrs)
+	fp.networkInterfacer.(*proxyutiltest.FakeNetwork).AddInterfaceAddr(&itf1, addrs1)
+	fp.nodePortAddresses = []string{"100.101.102.0/24", "2001:db8::0/64"}
+
+	fp.syncProxyRules()
+
+	// check ipSet rules
+	makeTCPEntry := func(port int) *utilipset.Entry {
+		return &utilipset.Entry{
+			Port:     port,
+			Protocol: strings.ToLower(string(v1.ProtocolTCP)),
+			SetType:  utilipset.BitmapPort,
+		}
+	}
+	epIPSet := netlinktest.ExpectedIPSet{
+		// healthcheck node port set should only contain valid HC node ports
+		kubeHealthCheckNodePortSet: {makeTCPEntry(30000), makeTCPEntry(30001)},
+	}
+	checkIPSet(t, fp, epIPSet)
+
+	// Check iptables chain and rules
+	epIpt := netlinktest.ExpectedIptablesChain{
+		string(KubeNodePortChain): {{
+			JumpChain: "ACCEPT", MatchSet: kubeHealthCheckNodePortSet,
+		}},
+	}
+	checkIptables(t, ipt, epIpt)
+}
+
 func TestLoadBalanceSourceRanges(t *testing.T) {
 	ipt, fp := buildFakeProxier()
 
@@ -2251,7 +2322,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	for i := range services {
 		fp.OnServiceAdd(services[i])
 	}
-	result := proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 12 {
 		t.Errorf("expected service map length 12, got %v", fp.serviceMap)
 	}
@@ -2284,7 +2355,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 	fp.OnServiceDelete(services[2])
 	fp.OnServiceDelete(services[3])
 
-	result = proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 1 {
 		t.Errorf("expected service map length 1, got %v", fp.serviceMap)
 	}
@@ -2331,7 +2402,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	)
 
 	// Headless service should be ignored
-	result := proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %d", len(fp.serviceMap))
 	}
@@ -2361,7 +2432,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 		}),
 	)
 
-	result := proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 0 {
 		t.Errorf("expected service map length 0, got %v", fp.serviceMap)
 	}
@@ -2403,7 +2474,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	fp.OnServiceAdd(servicev1)
 
-	result := proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result := fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -2417,7 +2488,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// Change service to load-balancer
 	fp.OnServiceUpdate(servicev1, servicev2)
-	result = proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -2431,7 +2502,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	// No change; make sure the service map stays the same and there are
 	// no health-check changes
 	fp.OnServiceUpdate(servicev2, servicev2)
-	result = proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -2444,7 +2515,7 @@ func TestBuildServiceMapServiceUpdate(t *testing.T) {
 
 	// And back to ClusterIP
 	fp.OnServiceUpdate(servicev2, servicev1)
-	result = proxy.UpdateServiceMap(fp.serviceMap, fp.serviceChanges)
+	result = fp.serviceMap.Update(fp.serviceChanges)
 	if len(fp.serviceMap) != 2 {
 		t.Errorf("expected service map length 2, got %v", fp.serviceMap)
 	}
@@ -2881,12 +2952,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -2902,12 +2973,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -2925,18 +2996,18 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false},
+				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false},
+				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -2952,24 +3023,24 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false},
+				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false},
+				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -2989,54 +3060,54 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false},
-				{Endpoint: "1.1.1.4:13", IsLocal: true},
+				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:14", IsLocal: false},
-				{Endpoint: "1.1.1.4:14", IsLocal: true},
+				{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:21", IsLocal: false},
-				{Endpoint: "2.2.2.2:21", IsLocal: true},
+				{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:22", IsLocal: false},
-				{Endpoint: "2.2.2.2:22", IsLocal: true},
+				{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p13", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:13", IsLocal: false},
-				{Endpoint: "1.1.1.4:13", IsLocal: true},
+				{Endpoint: "1.1.1.3:13", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.4:13", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p14", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.3:14", IsLocal: false},
-				{Endpoint: "1.1.1.4:14", IsLocal: true},
+				{Endpoint: "1.1.1.3:14", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.4:14", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p21", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:21", IsLocal: false},
-				{Endpoint: "2.2.2.2:21", IsLocal: true},
+				{Endpoint: "2.2.2.1:21", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "2.2.2.2:21", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.1:22", IsLocal: false},
-				{Endpoint: "2.2.2.2:22", IsLocal: true},
+				{Endpoint: "2.2.2.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints:    []proxy.ServiceEndpoint{},
@@ -3056,7 +3127,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3076,7 +3147,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
@@ -3096,17 +3167,17 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3126,17 +3197,17 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "1.1.1.2:11", IsLocal: true},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:11", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:12", IsLocal: false},
-				{Endpoint: "1.1.1.2:12", IsLocal: true},
+				{Endpoint: "1.1.1.1:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
@@ -3161,15 +3232,15 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: true},
+				{Endpoint: "1.1.1.2:12", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -3189,15 +3260,15 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false},
+				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
@@ -3216,12 +3287,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11-2", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
@@ -3242,12 +3313,12 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:22", IsLocal: false},
+				{Endpoint: "1.1.1.1:22", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
@@ -3272,39 +3343,39 @@ func Test_updateEndpointsMap(t *testing.T) {
 		},
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p22", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.2:22", IsLocal: true},
-				{Endpoint: "2.2.2.22:22", IsLocal: true},
+				{Endpoint: "2.2.2.2:22", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "2.2.2.22:22", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns2", "ep2", "p23", v1.ProtocolUDP): {
-				{Endpoint: "2.2.2.3:23", IsLocal: true},
+				{Endpoint: "2.2.2.3:23", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.4:44", IsLocal: true},
-				{Endpoint: "4.4.4.5:44", IsLocal: true},
+				{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "4.4.4.5:44", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns4", "ep4", "p45", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.6:45", IsLocal: true},
+				{Endpoint: "4.4.4.6:45", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "p11", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
-				{Endpoint: "1.1.1.11:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
+				{Endpoint: "1.1.1.11:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p12", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:12", IsLocal: false},
+				{Endpoint: "1.1.1.2:12", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns1", "ep1", "p122", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.2:122", IsLocal: false},
+				{Endpoint: "1.1.1.2:122", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns3", "ep3", "p33", v1.ProtocolUDP): {
-				{Endpoint: "3.3.3.3:33", IsLocal: false},
+				{Endpoint: "3.3.3.3:33", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 			makeServicePortName("ns4", "ep4", "p44", v1.ProtocolUDP): {
-				{Endpoint: "4.4.4.4:44", IsLocal: true},
+				{Endpoint: "4.4.4.4:44", IsLocal: true, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{{
@@ -3342,7 +3413,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 		oldEndpoints: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{},
 		expectedResult: map[proxy.ServicePortName][]*proxy.BaseEndpointInfo{
 			makeServicePortName("ns1", "ep1", "", v1.ProtocolUDP): {
-				{Endpoint: "1.1.1.1:11", IsLocal: false},
+				{Endpoint: "1.1.1.1:11", IsLocal: false, Ready: true, Serving: true, Terminating: false, ZoneHints: sets.String{}},
 			},
 		},
 		expectedStaleEndpoints: []proxy.ServiceEndpoint{},
@@ -4256,6 +4327,10 @@ func TestEndpointSliceE2E(t *testing.T) {
 			Addresses:  []string{"10.0.1.3"},
 			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
+		}, { // not ready endpoints should be ignored
+			Addresses:  []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
 		}},
 	}
 
@@ -4291,6 +4366,61 @@ func TestEndpointSliceE2E(t *testing.T) {
 	assert.Nil(t, rsErr2, "Expected no error getting real servers")
 	assert.Len(t, realServers2, 0, "Expected 0 real servers")
 }
+
+func TestHealthCheckNodePortE2E(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true, v1.IPv4Protocol)
+	fp.servicesSynced = true
+	fp.endpointsSynced = true
+	fp.endpointSlicesSynced = true
+
+	// Add initial service
+	serviceName := "svc1"
+	namespaceName := "ns1"
+
+	svc := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP:             "172.20.1.1",
+			Selector:              map[string]string{"foo": "bar"},
+			Ports:                 []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			Type:                  "LoadBalancer",
+			HealthCheckNodePort:   30000,
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	}
+	fp.OnServiceAdd(&svc)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after service's being created
+	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
+	activeEntries1 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
+	assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
+	assert.Equal(t, true, activeEntries1.Has("30000"), "Expected activeEntries to reference hc node port in spec")
+
+	// Update health check node port in the spec
+	newSvc := svc
+	newSvc.Spec.HealthCheckNodePort = 30001
+	fp.OnServiceUpdate(&svc, &newSvc)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after service's being updated
+	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
+	activeEntries2 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
+	assert.Equal(t, 1, activeEntries2.Len(), "Expected 1 active entry in KUBE-HEALTH-CHECK-NODE-PORT")
+	assert.Equal(t, true, activeEntries2.Has("30001"), "Expected activeEntries to reference updated hc node port in spec")
+
+	fp.OnServiceDelete(&svc)
+	fp.syncProxyRules()
+
+	// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
+	assert.NotNil(t, fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"])
+	activeEntries3 := fp.ipsetList["KUBE-HEALTH-CHECK-NODE-PORT"].activeEntries
+	assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-HEALTH-CHECK-NODE-PORT")
+}
+
 func TestFilterCIDRs(t *testing.T) {
 	var cidrList []string
 	var cidrs []string
@@ -4318,5 +4448,205 @@ func TestFilterCIDRs(t *testing.T) {
 	cidrs = filterCIDRs(false, cidrList)
 	if len(cidrs) > 0 {
 		t.Errorf("cidrs %v is not expected %v", cidrs, expected)
+	}
+}
+
+func TestCreateAndLinkKubeChain(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true, v1.IPv4Protocol)
+	fp.createAndLinkKubeChain()
+	expectedNATChains := `:KUBE-SERVICES - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-FIREWALL - [0:0]
+:KUBE-NODE-PORT - [0:0]
+:KUBE-LOAD-BALANCER - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+`
+	expectedFilterChains := `:KUBE-FORWARD - [0:0]
+:KUBE-NODE-PORT - [0:0]
+`
+	assert.Equal(t, expectedNATChains, fp.natChains.String())
+	assert.Equal(t, expectedFilterChains, fp.filterChains.String())
+}
+
+// This test ensures that the iptables proxier supports translating Endpoints to
+// iptables output when internalTrafficPolicy is specified
+func TestTestInternalTrafficPolicyE2E(t *testing.T) {
+	type endpoint struct {
+		ip       string
+		hostname string
+	}
+
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	local := v1.ServiceInternalTrafficPolicyLocal
+
+	testCases := []struct {
+		name                     string
+		internalTrafficPolicy    *v1.ServiceInternalTrafficPolicyType
+		endpoints                []endpoint
+		expectVirtualServer      bool
+		expectLocalEntries       bool
+		expectLocalRealServerNum int
+		expectLocalRealServers   []string
+	}{
+		{
+			name:                  "internalTrafficPolicy is cluster with non-zero local endpoints",
+			internalTrafficPolicy: &cluster,
+			endpoints: []endpoint{
+				{"10.0.1.1", testHostname},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectVirtualServer:      true,
+			expectLocalEntries:       true,
+			expectLocalRealServerNum: 3,
+			expectLocalRealServers: []string{
+				"10.0.1.1:80",
+				"10.0.1.2:80",
+				"10.0.1.3:80",
+			},
+		},
+		{
+			name:                  "internalTrafficPolicy is cluster with zero local endpoints",
+			internalTrafficPolicy: &cluster,
+			endpoints: []endpoint{
+				{"10.0.1.1", "host0"},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectVirtualServer:      false,
+			expectLocalEntries:       false,
+			expectLocalRealServerNum: 3,
+			expectLocalRealServers: []string{
+				"10.0.1.1:80",
+				"10.0.1.2:80",
+				"10.0.1.3:80",
+			},
+		},
+		{
+			name:                  "internalTrafficPolicy is local with non-zero local endpoints",
+			internalTrafficPolicy: &local,
+			endpoints: []endpoint{
+				{"10.0.1.1", testHostname},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectVirtualServer:      true,
+			expectLocalEntries:       true,
+			expectLocalRealServerNum: 1,
+			expectLocalRealServers: []string{
+				"10.0.1.1:80",
+			},
+		},
+		{
+			name:                  "internalTrafficPolicy is local with zero local endpoints",
+			internalTrafficPolicy: &local,
+			endpoints: []endpoint{
+				{"10.0.1.1", "host0"},
+				{"10.0.1.2", "host1"},
+				{"10.0.1.3", "host2"},
+			},
+			expectVirtualServer:      false,
+			expectLocalEntries:       false,
+			expectLocalRealServerNum: 0,
+			expectLocalRealServers:   []string{},
+		},
+	}
+	for _, tc := range testCases {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, true)()
+
+		ipt := iptablestest.NewFake()
+		ipvs := ipvstest.NewFake()
+		ipset := ipsettest.NewFake(testIPSetVersion)
+		fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true, v1.IPv4Protocol)
+		fp.servicesSynced = true
+		fp.endpointsSynced = true
+		fp.endpointSlicesSynced = true
+
+		// Add initial service
+		serviceName := "svc1"
+		namespaceName := "ns1"
+
+		svc := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+			Spec: v1.ServiceSpec{
+				ClusterIP: "172.20.1.1",
+				Selector:  map[string]string{"foo": "bar"},
+				Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+			},
+		}
+		if tc.internalTrafficPolicy != nil {
+			svc.Spec.InternalTrafficPolicy = tc.internalTrafficPolicy
+		}
+
+		fp.OnServiceAdd(svc)
+
+		// Add initial endpoint slice
+		tcpProtocol := v1.ProtocolTCP
+		endpointSlice := &discovery.EndpointSlice{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("%s-1", serviceName),
+				Namespace: namespaceName,
+				Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+			},
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr(""),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &tcpProtocol,
+			}},
+			AddressType: discovery.AddressTypeIPv4,
+		}
+
+		for _, ep := range tc.endpoints {
+			endpointSlice.Endpoints = append(endpointSlice.Endpoints, discovery.Endpoint{
+				Addresses:  []string{ep.ip},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology:   map[string]string{"kubernetes.io/hostname": ep.hostname},
+			})
+		}
+
+		fp.OnEndpointSliceAdd(endpointSlice)
+		fp.syncProxyRules()
+
+		// Ensure that Proxier updates ipvs appropriately after EndpointSlice update
+		assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+
+		activeEntries1 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+
+		if tc.expectLocalEntries {
+			assert.Equal(t, 1, activeEntries1.Len(), "Expected 1 active entry in KUBE-LOOP-BACK")
+		} else {
+			assert.Equal(t, 0, activeEntries1.Len(), "Expected no active entry in KUBE-LOOP-BACK")
+		}
+
+		if tc.expectVirtualServer {
+			virtualServers1, vsErr1 := ipvs.GetVirtualServers()
+			assert.Nil(t, vsErr1, "Expected no error getting virtual servers")
+
+			assert.Len(t, virtualServers1, 1, "Expected 1 virtual server")
+			realServers1, rsErr1 := ipvs.GetRealServers(virtualServers1[0])
+			assert.Nil(t, rsErr1, "Expected no error getting real servers")
+
+			assert.Len(t, realServers1, tc.expectLocalRealServerNum, fmt.Sprintf("Expected %d real servers", tc.expectLocalRealServerNum))
+			for i := 0; i < tc.expectLocalRealServerNum; i++ {
+				assert.Equal(t, realServers1[i].String(), tc.expectLocalRealServers[i])
+			}
+		}
+
+		fp.OnEndpointSliceDelete(endpointSlice)
+		fp.syncProxyRules()
+
+		// Ensure that Proxier updates ipvs appropriately after EndpointSlice delete
+		assert.NotNil(t, fp.ipsetList["KUBE-LOOP-BACK"])
+		activeEntries3 := fp.ipsetList["KUBE-LOOP-BACK"].activeEntries
+		assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-LOOP-BACK")
+		virtualServers2, vsErr2 := ipvs.GetVirtualServers()
+		assert.Nil(t, vsErr2, "Expected no error getting virtual servers")
+		assert.Len(t, virtualServers2, 1, "Expected 1 virtual server")
+		realServers2, rsErr2 := ipvs.GetRealServers(virtualServers2[0])
+		assert.Nil(t, rsErr2, "Expected no error getting real servers")
+		assert.Len(t, realServers2, 0, "Expected 0 real servers")
 	}
 }

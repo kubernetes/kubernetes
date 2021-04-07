@@ -71,7 +71,7 @@ func (info *serviceInfo) isAlive() bool {
 func logTimeout(err error) bool {
 	if e, ok := err.(net.Error); ok {
 		if e.Timeout() {
-			klog.V(3).Infof("connection to endpoint closed due to inactivity")
+			klog.V(3).InfoS("connection to endpoint closed due to inactivity")
 			return true
 		}
 	}
@@ -124,7 +124,7 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, netsh netsh.Interfac
 		return nil, fmt.Errorf("failed to select a host interface: %v", err)
 	}
 
-	klog.V(2).Infof("Setting proxy IP to %v", hostIP)
+	klog.V(2).InfoS("Setting proxy", "ip", hostIP)
 	return createProxier(loadBalancer, listenIP, netsh, hostIP, syncPeriod, udpIdleTimeout)
 }
 
@@ -150,7 +150,7 @@ func (proxier *Proxier) SyncLoop() {
 	defer t.Stop()
 	for {
 		<-t.C
-		klog.V(6).Infof("Periodic sync")
+		klog.V(6).InfoS("Periodic sync")
 		proxier.Sync()
 	}
 }
@@ -217,7 +217,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 		if existed, err := proxier.netsh.EnsureIPAddress(args, serviceIP); err != nil {
 			return nil, err
 		} else if !existed {
-			klog.V(3).Infof("Added ip address to fowarder interface for service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(port)), protocol)
+			klog.V(3).InfoS("Added ip address to fowarder interface for service", "servicePortPortalName", servicePortPortalName.String(), "addr", net.JoinHostPort(listenIP, strconv.Itoa(port)), "protocol", protocol)
 		}
 	}
 
@@ -242,7 +242,7 @@ func (proxier *Proxier) addServicePortPortal(servicePortPortalName ServicePortPo
 	}
 	proxier.setServiceInfo(servicePortPortalName, si)
 
-	klog.V(2).Infof("Proxying for service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(port)), protocol)
+	klog.V(2).InfoS("Proxying for service", "servicePortPortalName", servicePortPortalName.String(), "addr", net.JoinHostPort(listenIP, strconv.Itoa(port)), "protocol", protocol)
 	go func(service ServicePortPortalName, proxier *Proxier) {
 		defer runtime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
@@ -296,7 +296,7 @@ func (proxier *Proxier) mergeService(service *v1.Service) map[ServicePortPortalN
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to clusterIP", "svcName", svcName, "ip", service.Spec.ClusterIP)
 		return nil
 	}
 	existingPortPortals := make(map[ServicePortPortalName]bool)
@@ -320,19 +320,19 @@ func (proxier *Proxier) mergeService(service *v1.Service) map[ServicePortPortalN
 				continue
 			}
 			if exists {
-				klog.V(4).Infof("Something changed for service %q: stopping it", servicePortPortalName)
+				klog.V(4).InfoS("Something changed for service: stopping it", "servicePortPortalName", servicePortPortalName.String())
 				if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
-					klog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
+					klog.ErrorS(err, "Failed to close service port portal", "servicePortPortalName", servicePortPortalName.String())
 				}
 			}
-			klog.V(1).Infof("Adding new service %q at %s/%s", servicePortPortalName, net.JoinHostPort(listenIP, strconv.Itoa(listenPort)), protocol)
+			klog.V(1).InfoS("Adding new service", "servicePortPortalName", servicePortPortalName.String(), "addr", net.JoinHostPort(listenIP, strconv.Itoa(listenPort)), "protocol", protocol)
 			info, err := proxier.addServicePortPortal(servicePortPortalName, protocol, listenIP, listenPort, proxier.udpIdleTimeout)
 			if err != nil {
-				klog.Errorf("Failed to start proxy for %q: %v", servicePortPortalName, err)
+				klog.ErrorS(err, "Failed to start proxy", "servicePortPortalName", servicePortPortalName.String())
 				continue
 			}
 			info.sessionAffinityType = service.Spec.SessionAffinity
-			klog.V(10).Infof("info: %#v", info)
+			klog.V(10).InfoS("record serviceInfo", "info", info)
 		}
 		if len(listenIPPortMap) > 0 {
 			// only one loadbalancer per service port portal
@@ -360,7 +360,7 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals 
 	}
 	svcName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 	if !helper.IsServiceIPSet(service) {
-		klog.V(3).Infof("Skipping service %s due to clusterIP = %q", svcName, service.Spec.ClusterIP)
+		klog.V(3).InfoS("Skipping service due to clusterIP", "svcName", svcName, "ip", service.Spec.ClusterIP)
 		return
 	}
 
@@ -392,15 +392,15 @@ func (proxier *Proxier) unmergeService(service *v1.Service, existingPortPortals 
 				continue
 			}
 
-			klog.V(1).Infof("Stopping service %q", servicePortPortalName)
+			klog.V(1).InfoS("Stopping service", "servicePortPortalName", servicePortPortalName.String())
 			info, exists := proxier.getServiceInfo(servicePortPortalName)
 			if !exists {
-				klog.Errorf("Service %q is being removed but doesn't exist", servicePortPortalName)
+				klog.ErrorS(nil, "Service is being removed but doesn't exist", "servicePortPortalName", servicePortPortalName.String())
 				continue
 			}
 
 			if err := proxier.closeServicePortPortal(servicePortPortalName, info); err != nil {
-				klog.Errorf("Failed to close service port portal %q: %v", servicePortPortalName, err)
+				klog.ErrorS(err, "Failed to close service port portal", "servicePortPortalName", servicePortPortalName)
 			}
 		}
 

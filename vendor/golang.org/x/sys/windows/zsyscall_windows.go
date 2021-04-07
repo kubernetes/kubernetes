@@ -46,10 +46,12 @@ var (
 	modntdll    = NewLazySystemDLL("ntdll.dll")
 	modole32    = NewLazySystemDLL("ole32.dll")
 	modpsapi    = NewLazySystemDLL("psapi.dll")
+	modsechost  = NewLazySystemDLL("sechost.dll")
 	modsecur32  = NewLazySystemDLL("secur32.dll")
 	modshell32  = NewLazySystemDLL("shell32.dll")
 	moduser32   = NewLazySystemDLL("user32.dll")
 	moduserenv  = NewLazySystemDLL("userenv.dll")
+	modwintrust = NewLazySystemDLL("wintrust.dll")
 	modws2_32   = NewLazySystemDLL("ws2_32.dll")
 	modwtsapi32 = NewLazySystemDLL("wtsapi32.dll")
 
@@ -95,6 +97,7 @@ var (
 	procImpersonateSelf                                      = modadvapi32.NewProc("ImpersonateSelf")
 	procInitializeSecurityDescriptor                         = modadvapi32.NewProc("InitializeSecurityDescriptor")
 	procInitiateSystemShutdownExW                            = modadvapi32.NewProc("InitiateSystemShutdownExW")
+	procIsTokenRestricted                                    = modadvapi32.NewProc("IsTokenRestricted")
 	procIsValidSecurityDescriptor                            = modadvapi32.NewProc("IsValidSecurityDescriptor")
 	procIsValidSid                                           = modadvapi32.NewProc("IsValidSid")
 	procIsWellKnownSid                                       = modadvapi32.NewProc("IsWellKnownSid")
@@ -115,6 +118,7 @@ var (
 	procQueryServiceStatusEx                                 = modadvapi32.NewProc("QueryServiceStatusEx")
 	procRegCloseKey                                          = modadvapi32.NewProc("RegCloseKey")
 	procRegEnumKeyExW                                        = modadvapi32.NewProc("RegEnumKeyExW")
+	procRegNotifyChangeKeyValue                              = modadvapi32.NewProc("RegNotifyChangeKeyValue")
 	procRegOpenKeyExW                                        = modadvapi32.NewProc("RegOpenKeyExW")
 	procRegQueryInfoKeyW                                     = modadvapi32.NewProc("RegQueryInfoKeyW")
 	procRegQueryValueExW                                     = modadvapi32.NewProc("RegQueryValueExW")
@@ -122,6 +126,7 @@ var (
 	procReportEventW                                         = modadvapi32.NewProc("ReportEventW")
 	procRevertToSelf                                         = modadvapi32.NewProc("RevertToSelf")
 	procSetEntriesInAclW                                     = modadvapi32.NewProc("SetEntriesInAclW")
+	procSetKernelObjectSecurity                              = modadvapi32.NewProc("SetKernelObjectSecurity")
 	procSetNamedSecurityInfoW                                = modadvapi32.NewProc("SetNamedSecurityInfoW")
 	procSetSecurityDescriptorControl                         = modadvapi32.NewProc("SetSecurityDescriptorControl")
 	procSetSecurityDescriptorDacl                            = modadvapi32.NewProc("SetSecurityDescriptorDacl")
@@ -139,13 +144,24 @@ var (
 	procCertCloseStore                                       = modcrypt32.NewProc("CertCloseStore")
 	procCertCreateCertificateContext                         = modcrypt32.NewProc("CertCreateCertificateContext")
 	procCertDeleteCertificateFromStore                       = modcrypt32.NewProc("CertDeleteCertificateFromStore")
+	procCertDuplicateCertificateContext                      = modcrypt32.NewProc("CertDuplicateCertificateContext")
 	procCertEnumCertificatesInStore                          = modcrypt32.NewProc("CertEnumCertificatesInStore")
+	procCertFindCertificateInStore                           = modcrypt32.NewProc("CertFindCertificateInStore")
+	procCertFindChainInStore                                 = modcrypt32.NewProc("CertFindChainInStore")
+	procCertFindExtension                                    = modcrypt32.NewProc("CertFindExtension")
 	procCertFreeCertificateChain                             = modcrypt32.NewProc("CertFreeCertificateChain")
 	procCertFreeCertificateContext                           = modcrypt32.NewProc("CertFreeCertificateContext")
 	procCertGetCertificateChain                              = modcrypt32.NewProc("CertGetCertificateChain")
+	procCertGetNameStringW                                   = modcrypt32.NewProc("CertGetNameStringW")
 	procCertOpenStore                                        = modcrypt32.NewProc("CertOpenStore")
 	procCertOpenSystemStoreW                                 = modcrypt32.NewProc("CertOpenSystemStoreW")
 	procCertVerifyCertificateChainPolicy                     = modcrypt32.NewProc("CertVerifyCertificateChainPolicy")
+	procCryptAcquireCertificatePrivateKey                    = modcrypt32.NewProc("CryptAcquireCertificatePrivateKey")
+	procCryptDecodeObject                                    = modcrypt32.NewProc("CryptDecodeObject")
+	procCryptProtectData                                     = modcrypt32.NewProc("CryptProtectData")
+	procCryptQueryObject                                     = modcrypt32.NewProc("CryptQueryObject")
+	procCryptUnprotectData                                   = modcrypt32.NewProc("CryptUnprotectData")
+	procPFXImportCertStore                                   = modcrypt32.NewProc("PFXImportCertStore")
 	procDnsNameCompare_W                                     = moddnsapi.NewProc("DnsNameCompare_W")
 	procDnsQuery_W                                           = moddnsapi.NewProc("DnsQuery_W")
 	procDnsRecordListFree                                    = moddnsapi.NewProc("DnsRecordListFree")
@@ -177,9 +193,12 @@ var (
 	procDuplicateHandle                                      = modkernel32.NewProc("DuplicateHandle")
 	procExitProcess                                          = modkernel32.NewProc("ExitProcess")
 	procFindClose                                            = modkernel32.NewProc("FindClose")
+	procFindCloseChangeNotification                          = modkernel32.NewProc("FindCloseChangeNotification")
+	procFindFirstChangeNotificationW                         = modkernel32.NewProc("FindFirstChangeNotificationW")
 	procFindFirstFileW                                       = modkernel32.NewProc("FindFirstFileW")
 	procFindFirstVolumeMountPointW                           = modkernel32.NewProc("FindFirstVolumeMountPointW")
 	procFindFirstVolumeW                                     = modkernel32.NewProc("FindFirstVolumeW")
+	procFindNextChangeNotification                           = modkernel32.NewProc("FindNextChangeNotification")
 	procFindNextFileW                                        = modkernel32.NewProc("FindNextFileW")
 	procFindNextVolumeMountPointW                            = modkernel32.NewProc("FindNextVolumeMountPointW")
 	procFindNextVolumeW                                      = modkernel32.NewProc("FindNextVolumeW")
@@ -248,6 +267,7 @@ var (
 	procGetVolumePathNamesForVolumeNameW                     = modkernel32.NewProc("GetVolumePathNamesForVolumeNameW")
 	procGetWindowsDirectoryW                                 = modkernel32.NewProc("GetWindowsDirectoryW")
 	procIsWow64Process                                       = modkernel32.NewProc("IsWow64Process")
+	procIsWow64Process2                                      = modkernel32.NewProc("IsWow64Process2")
 	procLoadLibraryExW                                       = modkernel32.NewProc("LoadLibraryExW")
 	procLoadLibraryW                                         = modkernel32.NewProc("LoadLibraryW")
 	procLocalFree                                            = modkernel32.NewProc("LocalFree")
@@ -277,12 +297,15 @@ var (
 	procSetConsoleCursorPosition                             = modkernel32.NewProc("SetConsoleCursorPosition")
 	procSetConsoleMode                                       = modkernel32.NewProc("SetConsoleMode")
 	procSetCurrentDirectoryW                                 = modkernel32.NewProc("SetCurrentDirectoryW")
+	procSetDefaultDllDirectories                             = modkernel32.NewProc("SetDefaultDllDirectories")
+	procSetDllDirectoryW                                     = modkernel32.NewProc("SetDllDirectoryW")
 	procSetEndOfFile                                         = modkernel32.NewProc("SetEndOfFile")
 	procSetEnvironmentVariableW                              = modkernel32.NewProc("SetEnvironmentVariableW")
 	procSetErrorMode                                         = modkernel32.NewProc("SetErrorMode")
 	procSetEvent                                             = modkernel32.NewProc("SetEvent")
 	procSetFileAttributesW                                   = modkernel32.NewProc("SetFileAttributesW")
 	procSetFileCompletionNotificationModes                   = modkernel32.NewProc("SetFileCompletionNotificationModes")
+	procSetFileInformationByHandle                           = modkernel32.NewProc("SetFileInformationByHandle")
 	procSetFilePointer                                       = modkernel32.NewProc("SetFilePointer")
 	procSetFileTime                                          = modkernel32.NewProc("SetFileTime")
 	procSetHandleInformation                                 = modkernel32.NewProc("SetHandleInformation")
@@ -323,16 +346,21 @@ var (
 	procCoTaskMemFree                                        = modole32.NewProc("CoTaskMemFree")
 	procStringFromGUID2                                      = modole32.NewProc("StringFromGUID2")
 	procEnumProcesses                                        = modpsapi.NewProc("EnumProcesses")
+	procSubscribeServiceChangeNotifications                  = modsechost.NewProc("SubscribeServiceChangeNotifications")
+	procUnsubscribeServiceChangeNotifications                = modsechost.NewProc("UnsubscribeServiceChangeNotifications")
 	procGetUserNameExW                                       = modsecur32.NewProc("GetUserNameExW")
 	procTranslateNameW                                       = modsecur32.NewProc("TranslateNameW")
 	procCommandLineToArgvW                                   = modshell32.NewProc("CommandLineToArgvW")
 	procSHGetKnownFolderPath                                 = modshell32.NewProc("SHGetKnownFolderPath")
 	procShellExecuteW                                        = modshell32.NewProc("ShellExecuteW")
 	procExitWindowsEx                                        = moduser32.NewProc("ExitWindowsEx")
+	procGetShellWindow                                       = moduser32.NewProc("GetShellWindow")
+	procGetWindowThreadProcessId                             = moduser32.NewProc("GetWindowThreadProcessId")
 	procMessageBoxW                                          = moduser32.NewProc("MessageBoxW")
 	procCreateEnvironmentBlock                               = moduserenv.NewProc("CreateEnvironmentBlock")
 	procDestroyEnvironmentBlock                              = moduserenv.NewProc("DestroyEnvironmentBlock")
 	procGetUserProfileDirectoryW                             = moduserenv.NewProc("GetUserProfileDirectoryW")
+	procWinVerifyTrustEx                                     = modwintrust.NewProc("WinVerifyTrustEx")
 	procFreeAddrInfoW                                        = modws2_32.NewProc("FreeAddrInfoW")
 	procGetAddrInfoW                                         = modws2_32.NewProc("GetAddrInfoW")
 	procWSACleanup                                           = modws2_32.NewProc("WSACleanup")
@@ -342,6 +370,7 @@ var (
 	procWSARecvFrom                                          = modws2_32.NewProc("WSARecvFrom")
 	procWSASend                                              = modws2_32.NewProc("WSASend")
 	procWSASendTo                                            = modws2_32.NewProc("WSASendTo")
+	procWSASocketW                                           = modws2_32.NewProc("WSASocketW")
 	procWSAStartup                                           = modws2_32.NewProc("WSAStartup")
 	procbind                                                 = modws2_32.NewProc("bind")
 	procclosesocket                                          = modws2_32.NewProc("closesocket")
@@ -753,6 +782,15 @@ func InitiateSystemShutdownEx(machineName *uint16, message *uint16, timeout uint
 	return
 }
 
+func isTokenRestricted(tokenHandle Token) (ret bool, err error) {
+	r0, _, e1 := syscall.Syscall(procIsTokenRestricted.Addr(), 1, uintptr(tokenHandle), 0, 0)
+	ret = r0 != 0
+	if !ret {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func isValidSecurityDescriptor(sd *SECURITY_DESCRIPTOR) (isValid bool) {
 	r0, _, _ := syscall.Syscall(procIsValidSecurityDescriptor.Addr(), 1, uintptr(unsafe.Pointer(sd)), 0, 0)
 	isValid = r0 != 0
@@ -913,6 +951,22 @@ func RegEnumKeyEx(key Handle, index uint32, name *uint16, nameLen *uint32, reser
 	return
 }
 
+func RegNotifyChangeKeyValue(key Handle, watchSubtree bool, notifyFilter uint32, event Handle, asynchronous bool) (regerrno error) {
+	var _p0 uint32
+	if watchSubtree {
+		_p0 = 1
+	}
+	var _p1 uint32
+	if asynchronous {
+		_p1 = 1
+	}
+	r0, _, _ := syscall.Syscall6(procRegNotifyChangeKeyValue.Addr(), 5, uintptr(key), uintptr(_p0), uintptr(notifyFilter), uintptr(event), uintptr(_p1), 0)
+	if r0 != 0 {
+		regerrno = syscall.Errno(r0)
+	}
+	return
+}
+
 func RegOpenKeyEx(key Handle, subkey *uint16, options uint32, desiredAccess uint32, result *Handle) (regerrno error) {
 	r0, _, _ := syscall.Syscall6(procRegOpenKeyExW.Addr(), 5, uintptr(key), uintptr(unsafe.Pointer(subkey)), uintptr(options), uintptr(desiredAccess), uintptr(unsafe.Pointer(result)), 0)
 	if r0 != 0 {
@@ -966,6 +1020,14 @@ func setEntriesInAcl(countExplicitEntries uint32, explicitEntries *EXPLICIT_ACCE
 	r0, _, _ := syscall.Syscall6(procSetEntriesInAclW.Addr(), 4, uintptr(countExplicitEntries), uintptr(unsafe.Pointer(explicitEntries)), uintptr(unsafe.Pointer(oldACL)), uintptr(unsafe.Pointer(newACL)), 0, 0)
 	if r0 != 0 {
 		ret = syscall.Errno(r0)
+	}
+	return
+}
+
+func SetKernelObjectSecurity(handle Handle, securityInformation SECURITY_INFORMATION, securityDescriptor *SECURITY_DESCRIPTOR) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetKernelObjectSecurity.Addr(), 3, uintptr(handle), uintptr(securityInformation), uintptr(unsafe.Pointer(securityDescriptor)))
+	if r1 == 0 {
+		err = errnoErr(e1)
 	}
 	return
 }
@@ -1056,8 +1118,11 @@ func setSecurityDescriptorSacl(sd *SECURITY_DESCRIPTOR, saclPresent bool, sacl *
 	return
 }
 
-func SetSecurityInfo(handle Handle, objectType SE_OBJECT_TYPE, securityInformation SECURITY_INFORMATION, owner *SID, group *SID, dacl *ACL, sacl *ACL) {
-	syscall.Syscall9(procSetSecurityInfo.Addr(), 7, uintptr(handle), uintptr(objectType), uintptr(securityInformation), uintptr(unsafe.Pointer(owner)), uintptr(unsafe.Pointer(group)), uintptr(unsafe.Pointer(dacl)), uintptr(unsafe.Pointer(sacl)), 0, 0)
+func SetSecurityInfo(handle Handle, objectType SE_OBJECT_TYPE, securityInformation SECURITY_INFORMATION, owner *SID, group *SID, dacl *ACL, sacl *ACL) (ret error) {
+	r0, _, _ := syscall.Syscall9(procSetSecurityInfo.Addr(), 7, uintptr(handle), uintptr(objectType), uintptr(securityInformation), uintptr(unsafe.Pointer(owner)), uintptr(unsafe.Pointer(group)), uintptr(unsafe.Pointer(dacl)), uintptr(unsafe.Pointer(sacl)), 0, 0)
+	if r0 != 0 {
+		ret = syscall.Errno(r0)
+	}
 	return
 }
 
@@ -1134,12 +1199,42 @@ func CertDeleteCertificateFromStore(certContext *CertContext) (err error) {
 	return
 }
 
+func CertDuplicateCertificateContext(certContext *CertContext) (dupContext *CertContext) {
+	r0, _, _ := syscall.Syscall(procCertDuplicateCertificateContext.Addr(), 1, uintptr(unsafe.Pointer(certContext)), 0, 0)
+	dupContext = (*CertContext)(unsafe.Pointer(r0))
+	return
+}
+
 func CertEnumCertificatesInStore(store Handle, prevContext *CertContext) (context *CertContext, err error) {
 	r0, _, e1 := syscall.Syscall(procCertEnumCertificatesInStore.Addr(), 2, uintptr(store), uintptr(unsafe.Pointer(prevContext)), 0)
 	context = (*CertContext)(unsafe.Pointer(r0))
 	if context == nil {
 		err = errnoErr(e1)
 	}
+	return
+}
+
+func CertFindCertificateInStore(store Handle, certEncodingType uint32, findFlags uint32, findType uint32, findPara unsafe.Pointer, prevCertContext *CertContext) (cert *CertContext, err error) {
+	r0, _, e1 := syscall.Syscall6(procCertFindCertificateInStore.Addr(), 6, uintptr(store), uintptr(certEncodingType), uintptr(findFlags), uintptr(findType), uintptr(findPara), uintptr(unsafe.Pointer(prevCertContext)))
+	cert = (*CertContext)(unsafe.Pointer(r0))
+	if cert == nil {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CertFindChainInStore(store Handle, certEncodingType uint32, findFlags uint32, findType uint32, findPara unsafe.Pointer, prevChainContext *CertChainContext) (certchain *CertChainContext, err error) {
+	r0, _, e1 := syscall.Syscall6(procCertFindChainInStore.Addr(), 6, uintptr(store), uintptr(certEncodingType), uintptr(findFlags), uintptr(findType), uintptr(findPara), uintptr(unsafe.Pointer(prevChainContext)))
+	certchain = (*CertChainContext)(unsafe.Pointer(r0))
+	if certchain == nil {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CertFindExtension(objId *byte, countExtensions uint32, extensions *CertExtension) (ret *CertExtension) {
+	r0, _, _ := syscall.Syscall(procCertFindExtension.Addr(), 3, uintptr(unsafe.Pointer(objId)), uintptr(countExtensions), uintptr(unsafe.Pointer(extensions)))
+	ret = (*CertExtension)(unsafe.Pointer(r0))
 	return
 }
 
@@ -1164,10 +1259,16 @@ func CertGetCertificateChain(engine Handle, leaf *CertContext, time *Filetime, a
 	return
 }
 
+func CertGetNameString(certContext *CertContext, nameType uint32, flags uint32, typePara unsafe.Pointer, name *uint16, size uint32) (chars uint32) {
+	r0, _, _ := syscall.Syscall6(procCertGetNameStringW.Addr(), 6, uintptr(unsafe.Pointer(certContext)), uintptr(nameType), uintptr(flags), uintptr(typePara), uintptr(unsafe.Pointer(name)), uintptr(size))
+	chars = uint32(r0)
+	return
+}
+
 func CertOpenStore(storeProvider uintptr, msgAndCertEncodingType uint32, cryptProv uintptr, flags uint32, para uintptr) (handle Handle, err error) {
 	r0, _, e1 := syscall.Syscall6(procCertOpenStore.Addr(), 5, uintptr(storeProvider), uintptr(msgAndCertEncodingType), uintptr(cryptProv), uintptr(flags), uintptr(para), 0)
 	handle = Handle(r0)
-	if handle == InvalidHandle {
+	if handle == 0 {
 		err = errnoErr(e1)
 	}
 	return
@@ -1185,6 +1286,60 @@ func CertOpenSystemStore(hprov Handle, name *uint16) (store Handle, err error) {
 func CertVerifyCertificateChainPolicy(policyOID uintptr, chain *CertChainContext, para *CertChainPolicyPara, status *CertChainPolicyStatus) (err error) {
 	r1, _, e1 := syscall.Syscall6(procCertVerifyCertificateChainPolicy.Addr(), 4, uintptr(policyOID), uintptr(unsafe.Pointer(chain)), uintptr(unsafe.Pointer(para)), uintptr(unsafe.Pointer(status)), 0, 0)
 	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptAcquireCertificatePrivateKey(cert *CertContext, flags uint32, parameters unsafe.Pointer, cryptProvOrNCryptKey *Handle, keySpec *uint32, callerFreeProvOrNCryptKey *bool) (err error) {
+	var _p0 uint32
+	if *callerFreeProvOrNCryptKey {
+		_p0 = 1
+	}
+	r1, _, e1 := syscall.Syscall6(procCryptAcquireCertificatePrivateKey.Addr(), 6, uintptr(unsafe.Pointer(cert)), uintptr(flags), uintptr(parameters), uintptr(unsafe.Pointer(cryptProvOrNCryptKey)), uintptr(unsafe.Pointer(keySpec)), uintptr(unsafe.Pointer(&_p0)))
+	*callerFreeProvOrNCryptKey = _p0 != 0
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptDecodeObject(encodingType uint32, structType *byte, encodedBytes *byte, lenEncodedBytes uint32, flags uint32, decoded unsafe.Pointer, decodedLen *uint32) (err error) {
+	r1, _, e1 := syscall.Syscall9(procCryptDecodeObject.Addr(), 7, uintptr(encodingType), uintptr(unsafe.Pointer(structType)), uintptr(unsafe.Pointer(encodedBytes)), uintptr(lenEncodedBytes), uintptr(flags), uintptr(decoded), uintptr(unsafe.Pointer(decodedLen)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptProtectData(dataIn *DataBlob, name *uint16, optionalEntropy *DataBlob, reserved uintptr, promptStruct *CryptProtectPromptStruct, flags uint32, dataOut *DataBlob) (err error) {
+	r1, _, e1 := syscall.Syscall9(procCryptProtectData.Addr(), 7, uintptr(unsafe.Pointer(dataIn)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(optionalEntropy)), uintptr(reserved), uintptr(unsafe.Pointer(promptStruct)), uintptr(flags), uintptr(unsafe.Pointer(dataOut)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptQueryObject(objectType uint32, object unsafe.Pointer, expectedContentTypeFlags uint32, expectedFormatTypeFlags uint32, flags uint32, msgAndCertEncodingType *uint32, contentType *uint32, formatType *uint32, certStore *Handle, msg *Handle, context *unsafe.Pointer) (err error) {
+	r1, _, e1 := syscall.Syscall12(procCryptQueryObject.Addr(), 11, uintptr(objectType), uintptr(object), uintptr(expectedContentTypeFlags), uintptr(expectedFormatTypeFlags), uintptr(flags), uintptr(unsafe.Pointer(msgAndCertEncodingType)), uintptr(unsafe.Pointer(contentType)), uintptr(unsafe.Pointer(formatType)), uintptr(unsafe.Pointer(certStore)), uintptr(unsafe.Pointer(msg)), uintptr(unsafe.Pointer(context)), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func CryptUnprotectData(dataIn *DataBlob, name **uint16, optionalEntropy *DataBlob, reserved uintptr, promptStruct *CryptProtectPromptStruct, flags uint32, dataOut *DataBlob) (err error) {
+	r1, _, e1 := syscall.Syscall9(procCryptUnprotectData.Addr(), 7, uintptr(unsafe.Pointer(dataIn)), uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(optionalEntropy)), uintptr(reserved), uintptr(unsafe.Pointer(promptStruct)), uintptr(flags), uintptr(unsafe.Pointer(dataOut)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func PFXImportCertStore(pfx *CryptDataBlob, password *uint16, flags uint32) (store Handle, err error) {
+	r0, _, e1 := syscall.Syscall(procPFXImportCertStore.Addr(), 3, uintptr(unsafe.Pointer(pfx)), uintptr(unsafe.Pointer(password)), uintptr(flags))
+	store = Handle(r0)
+	if store == 0 {
 		err = errnoErr(e1)
 	}
 	return
@@ -1326,7 +1481,7 @@ func CreateHardLink(filename *uint16, existingfilename *uint16, reserved uintptr
 	return
 }
 
-func CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uint32, threadcnt uint32) (handle Handle, err error) {
+func CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uintptr, threadcnt uint32) (handle Handle, err error) {
 	r0, _, e1 := syscall.Syscall6(procCreateIoCompletionPort.Addr(), 4, uintptr(filehandle), uintptr(cphandle), uintptr(key), uintptr(threadcnt), 0, 0)
 	handle = Handle(r0)
 	if handle == 0 {
@@ -1460,6 +1615,36 @@ func FindClose(handle Handle) (err error) {
 	return
 }
 
+func FindCloseChangeNotification(handle Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procFindCloseChangeNotification.Addr(), 1, uintptr(handle), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func FindFirstChangeNotification(path string, watchSubtree bool, notifyFilter uint32) (handle Handle, err error) {
+	var _p0 *uint16
+	_p0, err = syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return
+	}
+	return _FindFirstChangeNotification(_p0, watchSubtree, notifyFilter)
+}
+
+func _FindFirstChangeNotification(path *uint16, watchSubtree bool, notifyFilter uint32) (handle Handle, err error) {
+	var _p1 uint32
+	if watchSubtree {
+		_p1 = 1
+	}
+	r0, _, e1 := syscall.Syscall(procFindFirstChangeNotificationW.Addr(), 3, uintptr(unsafe.Pointer(path)), uintptr(_p1), uintptr(notifyFilter))
+	handle = Handle(r0)
+	if handle == InvalidHandle {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func findFirstFile1(name *uint16, data *win32finddata1) (handle Handle, err error) {
 	r0, _, e1 := syscall.Syscall(procFindFirstFileW.Addr(), 2, uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(data)), 0)
 	handle = Handle(r0)
@@ -1482,6 +1667,14 @@ func FindFirstVolume(volumeName *uint16, bufferLength uint32) (handle Handle, er
 	r0, _, e1 := syscall.Syscall(procFindFirstVolumeW.Addr(), 2, uintptr(unsafe.Pointer(volumeName)), uintptr(bufferLength), 0)
 	handle = Handle(r0)
 	if handle == InvalidHandle {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func FindNextChangeNotification(handle Handle) (err error) {
+	r1, _, e1 := syscall.Syscall(procFindNextChangeNotification.Addr(), 1, uintptr(handle), 0, 0)
+	if r1 == 0 {
 		err = errnoErr(e1)
 	}
 	return
@@ -1727,7 +1920,7 @@ func GetFileType(filehandle Handle) (n uint32, err error) {
 	return
 }
 
-func GetFinalPathNameByHandleW(file syscall.Handle, filePath *uint16, filePathSize uint32, flags uint32) (n uint32, err error) {
+func GetFinalPathNameByHandle(file Handle, filePath *uint16, filePathSize uint32, flags uint32) (n uint32, err error) {
 	r0, _, e1 := syscall.Syscall6(procGetFinalPathNameByHandleW.Addr(), 4, uintptr(file), uintptr(unsafe.Pointer(filePath)), uintptr(filePathSize), uintptr(flags), 0, 0)
 	n = uint32(r0)
 	if n == 0 {
@@ -1874,7 +2067,7 @@ func GetProcessWorkingSetSizeEx(hProcess Handle, lpMinimumWorkingSetSize *uintpt
 	return
 }
 
-func GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uint32, overlapped **Overlapped, timeout uint32) (err error) {
+func GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uintptr, overlapped **Overlapped, timeout uint32) (err error) {
 	r1, _, e1 := syscall.Syscall6(procGetQueuedCompletionStatus.Addr(), 5, uintptr(cphandle), uintptr(unsafe.Pointer(qty)), uintptr(unsafe.Pointer(key)), uintptr(unsafe.Pointer(overlapped)), uintptr(timeout), 0)
 	if r1 == 0 {
 		err = errnoErr(e1)
@@ -2055,6 +2248,18 @@ func IsWow64Process(handle Handle, isWow64 *bool) (err error) {
 	return
 }
 
+func IsWow64Process2(handle Handle, processMachine *uint16, nativeMachine *uint16) (err error) {
+	err = procIsWow64Process2.Find()
+	if err != nil {
+		return
+	}
+	r1, _, e1 := syscall.Syscall(procIsWow64Process2.Addr(), 3, uintptr(handle), uintptr(unsafe.Pointer(processMachine)), uintptr(unsafe.Pointer(nativeMachine)))
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func LoadLibraryEx(libname string, zero Handle, flags uintptr) (handle Handle, err error) {
 	var _p0 *uint16
 	_p0, err = syscall.UTF16PtrFromString(libname)
@@ -2194,7 +2399,7 @@ func OpenThread(desiredAccess uint32, inheritHandle bool, threadId uint32) (hand
 	return
 }
 
-func PostQueuedCompletionStatus(cphandle Handle, qty uint32, key uint32, overlapped *Overlapped) (err error) {
+func PostQueuedCompletionStatus(cphandle Handle, qty uint32, key uintptr, overlapped *Overlapped) (err error) {
 	r1, _, e1 := syscall.Syscall6(procPostQueuedCompletionStatus.Addr(), 4, uintptr(cphandle), uintptr(qty), uintptr(key), uintptr(unsafe.Pointer(overlapped)), 0, 0)
 	if r1 == 0 {
 		err = errnoErr(e1)
@@ -2340,6 +2545,31 @@ func SetCurrentDirectory(path *uint16) (err error) {
 	return
 }
 
+func SetDefaultDllDirectories(directoryFlags uint32) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetDefaultDllDirectories.Addr(), 1, uintptr(directoryFlags), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func SetDllDirectory(path string) (err error) {
+	var _p0 *uint16
+	_p0, err = syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return
+	}
+	return _SetDllDirectory(_p0)
+}
+
+func _SetDllDirectory(path *uint16) (err error) {
+	r1, _, e1 := syscall.Syscall(procSetDllDirectoryW.Addr(), 1, uintptr(unsafe.Pointer(path)), 0, 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
 func SetEndOfFile(handle Handle) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetEndOfFile.Addr(), 1, uintptr(handle), 0, 0)
 	if r1 == 0 {
@@ -2380,6 +2610,14 @@ func SetFileAttributes(name *uint16, attrs uint32) (err error) {
 
 func SetFileCompletionNotificationModes(handle Handle, flags uint8) (err error) {
 	r1, _, e1 := syscall.Syscall(procSetFileCompletionNotificationModes.Addr(), 2, uintptr(handle), uintptr(flags), 0)
+	if r1 == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func SetFileInformationByHandle(handle Handle, class uint32, inBuffer *byte, inBufferLen uint32) (err error) {
+	r1, _, e1 := syscall.Syscall6(procSetFileInformationByHandle.Addr(), 4, uintptr(handle), uintptr(class), uintptr(unsafe.Pointer(inBuffer)), uintptr(inBufferLen), 0, 0)
 	if r1 == 0 {
 		err = errnoErr(e1)
 	}
@@ -2718,6 +2956,27 @@ func EnumProcesses(processIds []uint32, bytesReturned *uint32) (err error) {
 	return
 }
 
+func SubscribeServiceChangeNotifications(service Handle, eventType uint32, callback uintptr, callbackCtx uintptr, subscription *uintptr) (ret error) {
+	ret = procSubscribeServiceChangeNotifications.Find()
+	if ret != nil {
+		return
+	}
+	r0, _, _ := syscall.Syscall6(procSubscribeServiceChangeNotifications.Addr(), 5, uintptr(service), uintptr(eventType), uintptr(callback), uintptr(callbackCtx), uintptr(unsafe.Pointer(subscription)), 0)
+	if r0 != 0 {
+		ret = syscall.Errno(r0)
+	}
+	return
+}
+
+func UnsubscribeServiceChangeNotifications(subscription uintptr) (err error) {
+	err = procUnsubscribeServiceChangeNotifications.Find()
+	if err != nil {
+		return
+	}
+	syscall.Syscall(procUnsubscribeServiceChangeNotifications.Addr(), 1, uintptr(subscription), 0, 0)
+	return
+}
+
 func GetUserNameEx(nameFormat uint32, nameBuffre *uint16, nSize *uint32) (err error) {
 	r1, _, e1 := syscall.Syscall(procGetUserNameExW.Addr(), 3, uintptr(nameFormat), uintptr(unsafe.Pointer(nameBuffre)), uintptr(unsafe.Pointer(nSize)))
 	if r1&0xff == 0 {
@@ -2767,7 +3026,22 @@ func ExitWindowsEx(flags uint32, reason uint32) (err error) {
 	return
 }
 
-func MessageBox(hwnd Handle, text *uint16, caption *uint16, boxtype uint32) (ret int32, err error) {
+func GetShellWindow() (shellWindow HWND) {
+	r0, _, _ := syscall.Syscall(procGetShellWindow.Addr(), 0, 0, 0, 0)
+	shellWindow = HWND(r0)
+	return
+}
+
+func GetWindowThreadProcessId(hwnd HWND, pid *uint32) (tid uint32, err error) {
+	r0, _, e1 := syscall.Syscall(procGetWindowThreadProcessId.Addr(), 2, uintptr(hwnd), uintptr(unsafe.Pointer(pid)), 0)
+	tid = uint32(r0)
+	if tid == 0 {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func MessageBox(hwnd HWND, text *uint16, caption *uint16, boxtype uint32) (ret int32, err error) {
 	r0, _, e1 := syscall.Syscall6(procMessageBoxW.Addr(), 4, uintptr(hwnd), uintptr(unsafe.Pointer(text)), uintptr(unsafe.Pointer(caption)), uintptr(boxtype), 0, 0)
 	ret = int32(r0)
 	if ret == 0 {
@@ -2800,6 +3074,14 @@ func GetUserProfileDirectory(t Token, dir *uint16, dirLen *uint32) (err error) {
 	r1, _, e1 := syscall.Syscall(procGetUserProfileDirectoryW.Addr(), 3, uintptr(t), uintptr(unsafe.Pointer(dir)), uintptr(unsafe.Pointer(dirLen)))
 	if r1 == 0 {
 		err = errnoErr(e1)
+	}
+	return
+}
+
+func WinVerifyTrustEx(hwnd HWND, actionId *GUID, data *WinTrustData) (ret error) {
+	r0, _, _ := syscall.Syscall(procWinVerifyTrustEx.Addr(), 3, uintptr(hwnd), uintptr(unsafe.Pointer(actionId)), uintptr(unsafe.Pointer(data)))
+	if r0 != 0 {
+		ret = syscall.Errno(r0)
 	}
 	return
 }
@@ -2869,6 +3151,15 @@ func WSASend(s Handle, bufs *WSABuf, bufcnt uint32, sent *uint32, flags uint32, 
 func WSASendTo(s Handle, bufs *WSABuf, bufcnt uint32, sent *uint32, flags uint32, to *RawSockaddrAny, tolen int32, overlapped *Overlapped, croutine *byte) (err error) {
 	r1, _, e1 := syscall.Syscall9(procWSASendTo.Addr(), 9, uintptr(s), uintptr(unsafe.Pointer(bufs)), uintptr(bufcnt), uintptr(unsafe.Pointer(sent)), uintptr(flags), uintptr(unsafe.Pointer(to)), uintptr(tolen), uintptr(unsafe.Pointer(overlapped)), uintptr(unsafe.Pointer(croutine)))
 	if r1 == socket_error {
+		err = errnoErr(e1)
+	}
+	return
+}
+
+func WSASocket(af int32, typ int32, protocol int32, protoInfo *WSAProtocolInfo, group uint32, flags uint32) (handle Handle, err error) {
+	r0, _, e1 := syscall.Syscall6(procWSASocketW.Addr(), 6, uintptr(af), uintptr(typ), uintptr(protocol), uintptr(unsafe.Pointer(protoInfo)), uintptr(group), uintptr(flags))
+	handle = Handle(r0)
+	if handle == InvalidHandle {
 		err = errnoErr(e1)
 	}
 	return

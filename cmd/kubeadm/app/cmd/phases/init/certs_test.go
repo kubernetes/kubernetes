@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -40,6 +41,12 @@ func (t *testCertsData) CertificateDir() string             { return t.cfg.Certi
 func (t *testCertsData) CertificateWriteDir() string        { return t.cfg.CertificatesDir }
 
 func TestCertsWithCSRs(t *testing.T) {
+	// restore global variables
+	defer func() {
+		csrOnly = false
+		csrDir = ""
+	}()
+
 	csrDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(csrDir)
 	certDir := testutil.SetupTempDir(t)
@@ -51,12 +58,9 @@ func TestCertsWithCSRs(t *testing.T) {
 	}
 	certsData.cfg.CertificatesDir = certDir
 
-	// global vars
+	// set global vars for the test
 	csrOnly = true
 	csrDir = certDir
-	defer func() {
-		csrOnly = false
-	}()
 
 	phase := NewCertsPhase()
 	// find the api cert phase
@@ -85,6 +89,8 @@ func TestCertsWithCSRs(t *testing.T) {
 func TestCreateSparseCerts(t *testing.T) {
 	for _, test := range certstestutil.GetSparseCertTestCases(t) {
 		t.Run(test.Name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)
 

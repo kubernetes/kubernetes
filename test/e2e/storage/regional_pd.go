@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
@@ -74,7 +75,7 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 
 	ginkgo.Describe("RegionalPD", func() {
 		ginkgo.It("should provision storage [Slow]", func() {
-			testVolumeProvisioning(c, ns)
+			testVolumeProvisioning(c, f.Timeouts, ns)
 		})
 
 		ginkgo.It("should provision storage with delayed binding [Slow]", func() {
@@ -97,7 +98,7 @@ var _ = utils.SIGDescribe("Regional PD", func() {
 	})
 })
 
-func testVolumeProvisioning(c clientset.Interface, ns string) {
+func testVolumeProvisioning(c clientset.Interface, t *framework.TimeoutContext, ns string) {
 	cloudZones := getTwoRandomZones(c)
 
 	// This test checks that dynamic provisioning can provision a volume
@@ -107,6 +108,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			Name:           "HDD Regional PD on GCE/GKE",
 			CloudProviders: []string{"gce", "gke"},
 			Provisioner:    "kubernetes.io/gce-pd",
+			Timeouts:       framework.NewTimeoutContextWithDefaults(),
 			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"zones":            strings.Join(cloudZones, ","),
@@ -115,7 +117,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, t, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -129,6 +131,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			Name:           "HDD Regional PD with auto zone selection on GCE/GKE",
 			CloudProviders: []string{"gce", "gke"},
 			Provisioner:    "kubernetes.io/gce-pd",
+			Timeouts:       framework.NewTimeoutContextWithDefaults(),
 			Parameters: map[string]string{
 				"type":             "pd-standard",
 				"replication-type": "regional-pd",
@@ -136,7 +139,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, t, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -157,6 +160,9 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			StorageClassName: &(test.Class.Name),
 			VolumeMode:       &test.VolumeMode,
 		}, ns)
+		_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
+		defer clearStorageClass()
+
 		test.TestDynamicProvisioning()
 	}
 }
@@ -166,6 +172,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	testSpec := testsuites.StorageClassTest{
 		Name:           "Regional PD Failover on GCE/GKE",
 		CloudProviders: []string{"gce", "gke"},
+		Timeouts:       framework.NewTimeoutContextWithDefaults(),
 		Provisioner:    "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
 			"type":             "pd-standard",
@@ -231,10 +238,10 @@ func testZonalFailover(c clientset.Interface, ns string) {
 	nodeName := pod.Spec.NodeName
 	node, err := c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
-	podZone := node.Labels[v1.LabelFailureDomainBetaZone]
+	podZone := node.Labels[v1.LabelTopologyZone]
 
 	ginkgo.By("tainting nodes in the zone the pod is scheduled in")
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelFailureDomainBetaZone: podZone}))
+	selector := labels.SelectorFromSet(labels.Set(map[string]string{v1.LabelTopologyZone: podZone}))
 	nodesInZone, err := c.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
 	framework.ExpectNoError(err)
 	removeTaintFunc := addTaint(c, ns, nodesInZone.Items, podZone)
@@ -262,7 +269,7 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		if err != nil {
 			return false, nil
 		}
-		newPodZone := node.Labels[v1.LabelFailureDomainBetaZone]
+		newPodZone := node.Labels[v1.LabelTopologyZone]
 		return newPodZone == otherZone, nil
 	})
 	framework.ExpectNoError(waitErr, "Error waiting for pod to be scheduled in a different zone (%q): %v", otherZone, err)
@@ -326,6 +333,7 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 		Client:      c,
 		Name:        "Regional PD storage class with waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
@@ -349,9 +357,9 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
-	zone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
+	zone, ok := node.Labels[v1.LabelTopologyZone]
 	if !ok {
-		framework.Failf("label %s not found on Node", v1.LabelFailureDomainBetaZone)
+		framework.Failf("label %s not found on Node", v1.LabelTopologyZone)
 	}
 	for _, pv := range pvs {
 		checkZoneFromLabelAndAffinity(pv, zone, false)
@@ -362,6 +370,7 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	test := testsuites.StorageClassTest{
 		Name:        "Regional PD storage class with allowedTopologies test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Parameters: map[string]string{
 			"type":             "pd-standard",
 			"replication-type": "regional-pd",
@@ -382,6 +391,9 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 		VolumeMode:       &test.VolumeMode,
 	}, ns)
 
+	_, clearStorageClass := testsuites.SetupStorageClass(test.Client, test.Class)
+	defer clearStorageClass()
+
 	pv := test.TestDynamicProvisioning()
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
 }
@@ -389,6 +401,7 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns string, pvcCount int) {
 	test := testsuites.StorageClassTest{
 		Client:      c,
+		Timeouts:    framework.NewTimeoutContextWithDefaults(),
 		Name:        "Regional PD storage class with allowedTopologies and waitForFirstConsumer test on GCE",
 		Provisioner: "kubernetes.io/gce-pd",
 		Parameters: map[string]string{
@@ -416,9 +429,9 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	if node == nil {
 		framework.Failf("unexpected nil node found")
 	}
-	nodeZone, ok := node.Labels[v1.LabelFailureDomainBetaZone]
+	nodeZone, ok := node.Labels[v1.LabelTopologyZone]
 	if !ok {
-		framework.Failf("label %s not found on Node", v1.LabelFailureDomainBetaZone)
+		framework.Failf("label %s not found on Node", v1.LabelTopologyZone)
 	}
 	zoneFound := false
 	for _, zone := range topoZones {
@@ -459,7 +472,7 @@ func addAllowedTopologiesToStorageClass(c clientset.Interface, sc *storagev1.Sto
 	term := v1.TopologySelectorTerm{
 		MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 			{
-				Key:    v1.LabelFailureDomainBetaZone,
+				Key:    v1.LabelTopologyZone,
 				Values: zones,
 			},
 		},
@@ -561,7 +574,7 @@ func getTwoRandomZones(c clientset.Interface) []string {
 // If match is true, check if zones in PV exactly match zones given.
 // Otherwise, check whether zones in PV is superset of zones given.
 func verifyZonesInPV(volume *v1.PersistentVolume, zones sets.String, match bool) error {
-	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelFailureDomainBetaZone])
+	pvZones, err := volumehelpers.LabelZonesToSet(volume.Labels[v1.LabelTopologyZone])
 	if err != nil {
 		return err
 	}
@@ -578,17 +591,17 @@ func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZo
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zone), matchZone)
 }
 
-// checkZoneLabelAndAffinity checks the LabelFailureDomainBetaZone label of PV and terms
-// with key LabelFailureDomainBetaZone in PV's node affinity contains zone
+// checkZoneLabelAndAffinity checks the LabelTopologyZone label of PV and terms
+// with key LabelTopologyZone in PV's node affinity contains zone
 // matchZones is used to indicate if zones should match perfectly
 func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
 	ginkgo.By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
 		framework.Failf("nil pv passed")
 	}
-	pvLabel, ok := pv.Labels[v1.LabelFailureDomainBetaZone]
+	pvLabel, ok := pv.Labels[v1.LabelTopologyZone]
 	if !ok {
-		framework.Failf("label %s not found on PV", v1.LabelFailureDomainBetaZone)
+		framework.Failf("label %s not found on PV", v1.LabelTopologyZone)
 	}
 
 	zonesFromLabel, err := volumehelpers.LabelZonesToSet(pvLabel)
@@ -596,10 +609,10 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 		framework.Failf("unable to parse zone labels %s: %v", pvLabel, err)
 	}
 	if matchZones && !zonesFromLabel.Equal(zones) {
-		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelFailureDomainBetaZone, zonesFromLabel, zones)
+		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelTopologyZone, zonesFromLabel, zones)
 	}
 	if !matchZones && !zonesFromLabel.IsSuperset(zones) {
-		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelFailureDomainBetaZone, zonesFromLabel, zones)
+		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelTopologyZone, zonesFromLabel, zones)
 	}
 	if pv.Spec.NodeAffinity == nil {
 		framework.Failf("node affinity not found in PV spec %v", pv.Spec)
@@ -611,7 +624,7 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
 		keyFound := false
 		for _, r := range term.MatchExpressions {
-			if r.Key != v1.LabelFailureDomainBetaZone {
+			if r.Key != v1.LabelTopologyZone {
 				continue
 			}
 			keyFound = true
@@ -625,7 +638,7 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 			break
 		}
 		if !keyFound {
-			framework.Failf("label %s not found in term %v", v1.LabelFailureDomainBetaZone, term)
+			framework.Failf("label %s not found in term %v", v1.LabelTopologyZone, term)
 		}
 	}
 }

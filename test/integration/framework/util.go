@@ -31,8 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	v1helper "k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 )
 
@@ -266,7 +266,8 @@ func isNodeUntainted(node *v1.Node) bool {
 		n = nodeCopy
 	}
 
-	return v1helper.TolerationsTolerateTaintsWithFilter(fakePod.Spec.Tolerations, n.Spec.Taints, func(t *v1.Taint) bool {
+	_, untolerated := v1helper.FindMatchingUntoleratedTaint(n.Spec.Taints, fakePod.Spec.Tolerations, func(t *v1.Taint) bool {
 		return t.Effect == v1.TaintEffectNoExecute || t.Effect == v1.TaintEffectNoSchedule
 	})
+	return !untolerated
 }

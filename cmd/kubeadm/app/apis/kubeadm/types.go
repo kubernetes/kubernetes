@@ -107,7 +107,7 @@ type ClusterConfiguration struct {
 
 	// ImageRepository sets the container registry to pull images from.
 	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
-	// `gcr.io/kubernetes-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
+	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
 	// will be used for all the other images.
 	ImageRepository string
 
@@ -156,9 +156,6 @@ type DNSAddOnType string
 const (
 	// CoreDNS add-on type
 	CoreDNS DNSAddOnType = "CoreDNS"
-
-	// KubeDNS add-on type
-	KubeDNS DNSAddOnType = "kube-dns"
 )
 
 // DNS defines the DNS addon that should be used in the cluster
@@ -451,6 +448,12 @@ type ComponentConfig interface {
 
 	// SetUserSupplied sets the state of the component config "user supplied" flag to, either true, or false.
 	SetUserSupplied(userSupplied bool)
+
+	// Set can be used to set the internal configuration in the ComponentConfig
+	Set(interface{})
+
+	// Get can be used to get the internal configuration in the ComponentConfig
+	Get() interface{}
 }
 
 // ComponentConfigMap is a map between a group name (as in GVK group) and a ComponentConfig

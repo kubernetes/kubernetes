@@ -104,14 +104,14 @@ func WithImpersonation(handler http.Handler, a authorizer.Authorizer, s runtime.
 				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
 
 			default:
-				klog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				klog.V(4).InfoS("unknown impersonation request type", "Request", impersonationRequest)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, fmt.Sprintf("unknown impersonation request type: %v", impersonationRequest), s)
 				return
 			}
 
 			decision, reason, err := a.Authorize(ctx, actingAsAttributes)
 			if err != nil || decision != authorizer.DecisionAllow {
-				klog.V(4).Infof("Forbidden: %#v, Reason: %s, Error: %v", req.RequestURI, reason, err)
+				klog.V(4).InfoS("Forbidden", "URI", req.RequestURI, "Reason", reason, "Error", err)
 				responsewriters.Forbidden(ctx, actingAsAttributes, w, req, reason, s)
 				return
 			}

@@ -31,8 +31,8 @@ import (
 
 var joinCommandTemplate = template.Must(template.New("join").Parse(`` +
 	`kubeadm join {{.ControlPlaneHostPort}} --token {{.Token}} \
-    {{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
-    --control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
+	{{range $h := .CAPubKeyPins}}--discovery-token-ca-cert-hash {{$h}} {{end}}{{if .ControlPlane}}\
+	--control-plane {{if .CertificateKey}}--certificate-key {{.CertificateKey}}{{end}}{{end}}`,
 ))
 
 // GetJoinWorkerCommand returns the kubeadm join command for a given token and

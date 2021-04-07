@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/record"
 
 	"k8s.io/klog/v2"
 )
@@ -40,15 +41,17 @@ type fsResourceAnalyzer struct {
 	calcPeriod        time.Duration
 	cachedVolumeStats atomic.Value
 	startOnce         sync.Once
+	eventRecorder     record.EventRecorder
 }
 
 var _ fsResourceAnalyzerInterface = &fsResourceAnalyzer{}
 
 // newFsResourceAnalyzer returns a new fsResourceAnalyzer implementation
-func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration) *fsResourceAnalyzer {
+func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duration, eventRecorder record.EventRecorder) *fsResourceAnalyzer {
 	r := &fsResourceAnalyzer{
 		statsProvider: statsProvider,
 		calcPeriod:    calcVolumePeriod,
+		eventRecorder: eventRecorder,
 	}
 	r.cachedVolumeStats.Store(make(statCache))
 	return r
@@ -58,10 +61,10 @@ func newFsResourceAnalyzer(statsProvider Provider, calcVolumePeriod time.Duratio
 func (s *fsResourceAnalyzer) Start() {
 	s.startOnce.Do(func() {
 		if s.calcPeriod <= 0 {
-			klog.Info("Volume stats collection disabled.")
+			klog.InfoS("Volume stats collection disabled")
 			return
 		}
-		klog.Info("Starting FS ResourceAnalyzer")
+		klog.InfoS("Starting FS ResourceAnalyzer")
 		go wait.Forever(func() { s.updateCachedPodVolumeStats() }, s.calcPeriod)
 	})
 }
@@ -74,7 +77,7 @@ func (s *fsResourceAnalyzer) updateCachedPodVolumeStats() {
 	// Copy existing entries to new map, creating/starting new entries for pods missing from the cache
 	for _, pod := range s.statsProvider.GetPods() {
 		if value, found := oldCache[pod.GetUID()]; !found {
-			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod).StartOnce()
+			newCache[pod.GetUID()] = newVolumeStatCalculator(s.statsProvider, s.calcPeriod, pod, s.eventRecorder).StartOnce()
 		} else {
 			newCache[pod.GetUID()] = value
 		}

@@ -24,6 +24,10 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/core/v1"
@@ -38,7 +42,6 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestCRDShadowGroup(t *testing.T) {
@@ -72,17 +75,25 @@ func TestCRDShadowGroup(t *testing.T) {
 	}
 
 	t.Logf("Trying to shadow networking group")
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "foos." + networkingv1.GroupName,
+			Name:        "foos." + networkingv1.GroupName,
+			Annotations: map[string]string{"api-approved.kubernetes.io": "unapproved, test-only"},
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   networkingv1.GroupName,
-			Version: networkingv1.SchemeGroupVersion.Version,
-			Scope:   apiextensionsv1beta1.ClusterScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: networkingv1.GroupName,
+			Scope: apiextensionsv1.ClusterScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    networkingv1.SchemeGroupVersion.Version,
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
 			},
 		},
 	}
@@ -122,17 +133,24 @@ func TestCRD(t *testing.T) {
 	}
 
 	t.Logf("Trying to create a custom resource without conflict")
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
+			},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    networkingv1.SchemeGroupVersion.Version,
+					Served:  true,
+					Storage: true,
+					Schema:  fixtures.AllowAllSchema(),
+				},
 			},
 		},
 	}
@@ -161,9 +179,13 @@ func TestCRDOpenAPI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	dynamicClient, err := dynamic.NewForConfig(result.ClientConfig)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 
 	t.Logf("Trying to create a CustomResourceDefinitions")
-	nonStructuralCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	nonStructuralBetaCRD := &apiextensionsv1beta1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.nonstructural.cr.bar.com",
 		},
@@ -185,30 +207,38 @@ func TestCRDOpenAPI(t *testing.T) {
 			},
 		},
 	}
-	structuralCRD := &apiextensionsv1beta1.CustomResourceDefinition{
+	structuralCRD := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foos.structural.cr.bar.com",
 		},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-			Group:   "structural.cr.bar.com",
-			Version: "v1",
-			Scope:   apiextensionsv1beta1.NamespaceScoped,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+			Group: "structural.cr.bar.com",
+			Scope: apiextensionsv1.NamespaceScoped,
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural: "foos",
 				Kind:   "Foo",
 			},
-			PreserveUnknownFields: utilpointer.BoolPtr(false),
-			Validation: &apiextensionsv1beta1.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
-					Type: "object",
-					Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
-						"foo": {Type: "string"},
+			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+				{
+					Name:    "v1",
+					Served:  true,
+					Storage: true,
+					Schema: &apiextensionsv1.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensionsv1.JSONSchemaProps{
+								"foo": {Type: "string"},
+							},
+						},
 					},
 				},
 			},
 		},
 	}
-	etcd.CreateTestCRDs(t, apiextensionsclient, false, nonStructuralCRD)
+	nonStructuralCRD, err := fixtures.CreateCRDUsingRemovedAPI(result.EtcdClient, result.EtcdStoragePrefix, nonStructuralBetaCRD, apiextensionsclient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, structuralCRD)
 
 	getPublishedSchema := func(defName string) (*spec.Schema, error) {
@@ -230,7 +260,7 @@ func TestCRDOpenAPI(t *testing.T) {
 		return &d, nil
 	}
 
-	waitForSpec := func(crd *apiextensionsv1beta1.CustomResourceDefinition, expectedType string) {
+	waitForSpec := func(crd *apiextensionsv1.CustomResourceDefinition, expectedType string) {
 		t.Logf(`Waiting for {properties: {"foo": {"type":"%s"}}} to show up in schema`, expectedType)
 		lastMsg := ""
 		if err := wait.PollImmediate(500*time.Millisecond, 10*time.Second, func() (bool, error) {
@@ -262,14 +292,14 @@ func TestCRDOpenAPI(t *testing.T) {
 
 	t.Logf("Check that structural schema is published")
 	waitForSpec(structuralCRD, "string")
-	structuralCRD, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(context.TODO(), structuralCRD.Name, metav1.GetOptions{})
+	structuralCRD, err = apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), structuralCRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	prop := structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"]
+	prop := structuralCRD.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["foo"]
 	prop.Type = "boolean"
-	structuralCRD.Spec.Validation.OpenAPIV3Schema.Properties["foo"] = prop
-	if _, err = apiextensionsclient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(context.TODO(), structuralCRD, metav1.UpdateOptions{}); err != nil {
+	structuralCRD.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["foo"] = prop
+	if _, err = apiextensionsclient.ApiextensionsV1().CustomResourceDefinitions().Update(context.TODO(), structuralCRD, metav1.UpdateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 	waitForSpec(structuralCRD, "boolean")
@@ -287,10 +317,10 @@ func TestCRDOpenAPI(t *testing.T) {
 	}
 }
 
-func crdDefinitionName(crd *apiextensionsv1beta1.CustomResourceDefinition) string {
+func crdDefinitionName(crd *apiextensionsv1.CustomResourceDefinition) string {
 	sgmts := strings.Split(crd.Spec.Group, ".")
 	reverse(sgmts)
-	return strings.Join(append(sgmts, crd.Spec.Version, crd.Spec.Names.Kind), ".")
+	return strings.Join(append(sgmts, crd.Spec.Versions[0].Name, crd.Spec.Names.Kind), ".")
 }
 
 func reverse(s []string) {

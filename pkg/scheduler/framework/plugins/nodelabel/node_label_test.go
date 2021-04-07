@@ -110,6 +110,11 @@ func TestNodeLabelFilter(t *testing.T) {
 			},
 			res: framework.UnschedulableAndUnresolvable,
 		},
+		{
+			name: "no label",
+			args: config.NodeLabelArgs{},
+			res:  framework.Success,
+		},
 	}
 
 	for _, test := range tests {
@@ -231,13 +236,18 @@ func TestNodeLabelScore(t *testing.T) {
 			},
 			name: "two present labels one matches, two absent labels mismatch",
 		},
+		{
+			want: 0,
+			args: config.NodeLabelArgs{},
+			name: "no label preference",
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{"foo": "", "bar": ""}}}
-			fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, []*v1.Node{node})))
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, []*v1.Node{node})))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %+v", err)
@@ -271,7 +281,7 @@ func TestNodeLabelFilterWithoutNode(t *testing.T) {
 
 func TestNodeLabelScoreWithoutNode(t *testing.T) {
 	t.Run("node does not exist", func(t *testing.T) {
-		fh, _ := runtime.NewFramework(nil, nil, nil, runtime.WithSnapshotSharedLister(cache.NewEmptySnapshot()))
+		fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewEmptySnapshot()))
 		p, err := New(&config.NodeLabelArgs{}, fh)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %+v", err)

@@ -1,68 +1,140 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
-- [v1.19.4](#v1194)
-  - [Downloads for v1.19.4](#downloads-for-v1194)
+- [v1.19.9](#v1199)
+  - [Downloads for v1.19.9](#downloads-for-v1199)
     - [Source Code](#source-code)
     - [Client binaries](#client-binaries)
     - [Server binaries](#server-binaries)
     - [Node binaries](#node-binaries)
-  - [Changelog since v1.19.3](#changelog-since-v1193)
+  - [Changelog since v1.19.8](#changelog-since-v1198)
   - [Changes by Kind](#changes-by-kind)
+    - [Failing Test](#failing-test)
     - [Bug or Regression](#bug-or-regression)
   - [Dependencies](#dependencies)
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
-- [v1.19.3](#v1193)
-  - [Downloads for v1.19.3](#downloads-for-v1193)
+- [v1.19.8](#v1198)
+  - [Downloads for v1.19.8](#downloads-for-v1198)
     - [Source Code](#source-code-1)
     - [Client binaries](#client-binaries-1)
     - [Server binaries](#server-binaries-1)
     - [Node binaries](#node-binaries-1)
-  - [Changelog since v1.19.2](#changelog-since-v1192)
+  - [Changelog since v1.19.7](#changelog-since-v1197)
   - [Changes by Kind](#changes-by-kind-1)
-    - [Feature](#feature)
-    - [Design](#design)
+    - [API Change](#api-change)
     - [Bug or Regression](#bug-or-regression-1)
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake)
   - [Dependencies](#dependencies-1)
     - [Added](#added-1)
     - [Changed](#changed-1)
     - [Removed](#removed-1)
-- [v1.19.2](#v1192)
-  - [Downloads for v1.19.2](#downloads-for-v1192)
+- [v1.19.7](#v1197)
+  - [Downloads for v1.19.7](#downloads-for-v1197)
     - [Source Code](#source-code-2)
     - [Client binaries](#client-binaries-2)
     - [Server binaries](#server-binaries-2)
     - [Node binaries](#node-binaries-2)
-  - [Changelog since v1.19.1](#changelog-since-v1191)
+  - [Changelog since v1.19.6](#changelog-since-v1196)
   - [Changes by Kind](#changes-by-kind-2)
-    - [API Change](#api-change)
     - [Bug or Regression](#bug-or-regression-2)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
   - [Dependencies](#dependencies-2)
     - [Added](#added-2)
     - [Changed](#changed-2)
     - [Removed](#removed-2)
-- [v1.19.1](#v1191)
-  - [Downloads for v1.19.1](#downloads-for-v1191)
+- [v1.19.6](#v1196)
+  - [Downloads for v1.19.6](#downloads-for-v1196)
     - [Source Code](#source-code-3)
     - [Client binaries](#client-binaries-3)
     - [Server binaries](#server-binaries-3)
     - [Node binaries](#node-binaries-3)
-  - [Changelog since v1.19.0](#changelog-since-v1190)
+  - [Changelog since v1.19.5](#changelog-since-v1195)
   - [Changes by Kind](#changes-by-kind-3)
+    - [Feature](#feature)
     - [Bug or Regression](#bug-or-regression-3)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-1)
   - [Dependencies](#dependencies-3)
     - [Added](#added-3)
     - [Changed](#changed-3)
     - [Removed](#removed-3)
+- [v1.19.5](#v1195)
+  - [Downloads for v1.19.5](#downloads-for-v1195)
+    - [Source Code](#source-code-4)
+    - [Client binaries](#client-binaries-4)
+    - [Server binaries](#server-binaries-4)
+    - [Node binaries](#node-binaries-4)
+  - [Changelog since v1.19.4](#changelog-since-v1194)
+  - [Changes by Kind](#changes-by-kind-4)
+    - [Feature](#feature-1)
+    - [Failing Test](#failing-test-1)
+    - [Bug or Regression](#bug-or-regression-4)
+  - [Dependencies](#dependencies-4)
+    - [Added](#added-4)
+    - [Changed](#changed-4)
+    - [Removed](#removed-4)
+- [v1.19.4](#v1194)
+  - [Downloads for v1.19.4](#downloads-for-v1194)
+    - [Source Code](#source-code-5)
+    - [Client binaries](#client-binaries-5)
+    - [Server binaries](#server-binaries-5)
+    - [Node binaries](#node-binaries-5)
+  - [Changelog since v1.19.3](#changelog-since-v1193)
+  - [Changes by Kind](#changes-by-kind-5)
+    - [Bug or Regression](#bug-or-regression-5)
+  - [Dependencies](#dependencies-5)
+    - [Added](#added-5)
+    - [Changed](#changed-5)
+    - [Removed](#removed-5)
+- [v1.19.3](#v1193)
+  - [Downloads for v1.19.3](#downloads-for-v1193)
+    - [Source Code](#source-code-6)
+    - [Client binaries](#client-binaries-6)
+    - [Server binaries](#server-binaries-6)
+    - [Node binaries](#node-binaries-6)
+  - [Changelog since v1.19.2](#changelog-since-v1192)
+  - [Changes by Kind](#changes-by-kind-6)
+    - [Feature](#feature-2)
+    - [Design](#design)
+    - [Bug or Regression](#bug-or-regression-6)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-2)
+  - [Dependencies](#dependencies-6)
+    - [Added](#added-6)
+    - [Changed](#changed-6)
+    - [Removed](#removed-6)
+- [v1.19.2](#v1192)
+  - [Downloads for v1.19.2](#downloads-for-v1192)
+    - [Source Code](#source-code-7)
+    - [Client binaries](#client-binaries-7)
+    - [Server binaries](#server-binaries-7)
+    - [Node binaries](#node-binaries-7)
+  - [Changelog since v1.19.1](#changelog-since-v1191)
+  - [Changes by Kind](#changes-by-kind-7)
+    - [API Change](#api-change-1)
+    - [Bug or Regression](#bug-or-regression-7)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
+  - [Dependencies](#dependencies-7)
+    - [Added](#added-7)
+    - [Changed](#changed-7)
+    - [Removed](#removed-7)
+- [v1.19.1](#v1191)
+  - [Downloads for v1.19.1](#downloads-for-v1191)
+    - [Source Code](#source-code-8)
+    - [Client binaries](#client-binaries-8)
+    - [Server binaries](#server-binaries-8)
+    - [Node binaries](#node-binaries-8)
+  - [Changelog since v1.19.0](#changelog-since-v1190)
+  - [Changes by Kind](#changes-by-kind-8)
+    - [Bug or Regression](#bug-or-regression-8)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
+  - [Dependencies](#dependencies-8)
+    - [Added](#added-8)
+    - [Changed](#changed-8)
+    - [Removed](#removed-8)
 - [v1.19.0](#v1190)
   - [Downloads for v1.19.0](#downloads-for-v1190)
-    - [Client Binaries](#client-binaries-4)
-    - [Server Binaries](#server-binaries-4)
-    - [Node Binaries](#node-binaries-4)
+    - [Client Binaries](#client-binaries-9)
+    - [Server Binaries](#server-binaries-9)
+    - [Node Binaries](#node-binaries-9)
   - [Changelog since v1.18.0](#changelog-since-v1180)
   - [What’s New (Major Themes)](#whats-new-major-themes)
     - [Deprecation warnings](#deprecation-warnings)
@@ -86,181 +158,607 @@
   - [Known Issues](#known-issues)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
-  - [Changes by Kind](#changes-by-kind-4)
+  - [Changes by Kind](#changes-by-kind-9)
     - [Deprecation](#deprecation)
-    - [API Change](#api-change-1)
-    - [Feature](#feature-1)
-    - [Documentation](#documentation)
-    - [Failing Test](#failing-test)
-    - [Bug or Regression](#bug-or-regression-4)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-3)
-  - [Dependencies](#dependencies-4)
-    - [Added](#added-4)
-    - [Changed](#changed-4)
-    - [Removed](#removed-4)
-  - [Dependencies](#dependencies-5)
-    - [Added](#added-5)
-    - [Changed](#changed-5)
-    - [Removed](#removed-5)
-- [v1.19.0-rc.4](#v1190-rc4)
-  - [Downloads for v1.19.0-rc.4](#downloads-for-v1190-rc4)
-    - [Source Code](#source-code-4)
-    - [Client binaries](#client-binaries-5)
-    - [Server binaries](#server-binaries-5)
-    - [Node binaries](#node-binaries-5)
-  - [Changelog since v1.19.0-rc.3](#changelog-since-v1190-rc3)
-  - [Changes by Kind](#changes-by-kind-5)
-    - [Deprecation](#deprecation-1)
-    - [Bug or Regression](#bug-or-regression-5)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-4)
-  - [Dependencies](#dependencies-6)
-    - [Added](#added-6)
-    - [Changed](#changed-6)
-    - [Removed](#removed-6)
-- [v1.19.0-rc.3](#v1190-rc3)
-  - [Downloads for v1.19.0-rc.3](#downloads-for-v1190-rc3)
-    - [Source Code](#source-code-5)
-    - [Client binaries](#client-binaries-6)
-    - [Server binaries](#server-binaries-6)
-    - [Node binaries](#node-binaries-6)
-  - [Changelog since v1.19.0-rc.2](#changelog-since-v1190-rc2)
-  - [Changes by Kind](#changes-by-kind-6)
     - [API Change](#api-change-2)
-    - [Bug or Regression](#bug-or-regression-6)
-  - [Dependencies](#dependencies-7)
-    - [Added](#added-7)
-    - [Changed](#changed-7)
-    - [Removed](#removed-7)
-- [v1.19.0-rc.2](#v1190-rc2)
-  - [Downloads for v1.19.0-rc.2](#downloads-for-v1190-rc2)
-    - [Source Code](#source-code-6)
-    - [Client binaries](#client-binaries-7)
-    - [Server binaries](#server-binaries-7)
-    - [Node binaries](#node-binaries-7)
-  - [Changelog since v1.19.0-rc.1](#changelog-since-v1190-rc1)
-  - [Changes by Kind](#changes-by-kind-7)
-    - [API Change](#api-change-3)
-    - [Feature](#feature-2)
-    - [Bug or Regression](#bug-or-regression-7)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
-  - [Dependencies](#dependencies-8)
-    - [Added](#added-8)
-    - [Changed](#changed-8)
-    - [Removed](#removed-8)
-- [v1.19.0-rc.1](#v1190-rc1)
-  - [Downloads for v1.19.0-rc.1](#downloads-for-v1190-rc1)
-    - [Source Code](#source-code-7)
-    - [Client binaries](#client-binaries-8)
-    - [Server binaries](#server-binaries-8)
-    - [Node binaries](#node-binaries-8)
-  - [Changelog since v1.19.0-rc.0](#changelog-since-v1190-rc0)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
-  - [Changes by Kind](#changes-by-kind-8)
-    - [Deprecation](#deprecation-2)
-    - [API Change](#api-change-4)
     - [Feature](#feature-3)
-    - [Failing Test](#failing-test-1)
-    - [Bug or Regression](#bug-or-regression-8)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-6)
+    - [Documentation](#documentation)
+    - [Failing Test](#failing-test-2)
+    - [Bug or Regression](#bug-or-regression-9)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-5)
   - [Dependencies](#dependencies-9)
     - [Added](#added-9)
     - [Changed](#changed-9)
     - [Removed](#removed-9)
-- [v1.19.0-beta.2](#v1190-beta2)
-  - [Downloads for v1.19.0-beta.2](#downloads-for-v1190-beta2)
-    - [Source Code](#source-code-8)
-    - [Client binaries](#client-binaries-9)
-    - [Server binaries](#server-binaries-9)
-    - [Node binaries](#node-binaries-9)
-  - [Changelog since v1.19.0-beta.1](#changelog-since-v1190-beta1)
-  - [Changes by Kind](#changes-by-kind-9)
-    - [Deprecation](#deprecation-3)
-    - [API Change](#api-change-5)
-    - [Feature](#feature-4)
-    - [Bug or Regression](#bug-or-regression-9)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-7)
   - [Dependencies](#dependencies-10)
     - [Added](#added-10)
     - [Changed](#changed-10)
     - [Removed](#removed-10)
-- [v1.19.0-beta.1](#v1190-beta1)
-  - [Downloads for v1.19.0-beta.1](#downloads-for-v1190-beta1)
+- [v1.19.0-rc.4](#v1190-rc4)
+  - [Downloads for v1.19.0-rc.4](#downloads-for-v1190-rc4)
     - [Source Code](#source-code-9)
     - [Client binaries](#client-binaries-10)
     - [Server binaries](#server-binaries-10)
     - [Node binaries](#node-binaries-10)
-  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3)
-  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
-    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
+  - [Changelog since v1.19.0-rc.3](#changelog-since-v1190-rc3)
   - [Changes by Kind](#changes-by-kind-10)
-    - [API Change](#api-change-6)
-    - [Feature](#feature-5)
+    - [Deprecation](#deprecation-1)
     - [Bug or Regression](#bug-or-regression-10)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-8)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-6)
   - [Dependencies](#dependencies-11)
     - [Added](#added-11)
     - [Changed](#changed-11)
     - [Removed](#removed-11)
-- [v1.19.0-beta.0](#v1190-beta0)
-  - [Downloads for v1.19.0-beta.0](#downloads-for-v1190-beta0)
+- [v1.19.0-rc.3](#v1190-rc3)
+  - [Downloads for v1.19.0-rc.3](#downloads-for-v1190-rc3)
     - [Source Code](#source-code-10)
     - [Client binaries](#client-binaries-11)
     - [Server binaries](#server-binaries-11)
     - [Node binaries](#node-binaries-11)
-  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3-1)
+  - [Changelog since v1.19.0-rc.2](#changelog-since-v1190-rc2)
   - [Changes by Kind](#changes-by-kind-11)
-    - [API Change](#api-change-7)
-    - [Feature](#feature-6)
+    - [API Change](#api-change-3)
     - [Bug or Regression](#bug-or-regression-11)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-9)
   - [Dependencies](#dependencies-12)
     - [Added](#added-12)
     - [Changed](#changed-12)
     - [Removed](#removed-12)
+- [v1.19.0-rc.2](#v1190-rc2)
+  - [Downloads for v1.19.0-rc.2](#downloads-for-v1190-rc2)
+    - [Source Code](#source-code-11)
+    - [Client binaries](#client-binaries-12)
+    - [Server binaries](#server-binaries-12)
+    - [Node binaries](#node-binaries-12)
+  - [Changelog since v1.19.0-rc.1](#changelog-since-v1190-rc1)
+  - [Changes by Kind](#changes-by-kind-12)
+    - [API Change](#api-change-4)
+    - [Feature](#feature-4)
+    - [Bug or Regression](#bug-or-regression-12)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-7)
+  - [Dependencies](#dependencies-13)
+    - [Added](#added-13)
+    - [Changed](#changed-13)
+    - [Removed](#removed-13)
+- [v1.19.0-rc.1](#v1190-rc1)
+  - [Downloads for v1.19.0-rc.1](#downloads-for-v1190-rc1)
+    - [Source Code](#source-code-12)
+    - [Client binaries](#client-binaries-13)
+    - [Server binaries](#server-binaries-13)
+    - [Node binaries](#node-binaries-13)
+  - [Changelog since v1.19.0-rc.0](#changelog-since-v1190-rc0)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-1)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-1)
+  - [Changes by Kind](#changes-by-kind-13)
+    - [Deprecation](#deprecation-2)
+    - [API Change](#api-change-5)
+    - [Feature](#feature-5)
+    - [Failing Test](#failing-test-3)
+    - [Bug or Regression](#bug-or-regression-13)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-8)
+  - [Dependencies](#dependencies-14)
+    - [Added](#added-14)
+    - [Changed](#changed-14)
+    - [Removed](#removed-14)
+- [v1.19.0-beta.2](#v1190-beta2)
+  - [Downloads for v1.19.0-beta.2](#downloads-for-v1190-beta2)
+    - [Source Code](#source-code-13)
+    - [Client binaries](#client-binaries-14)
+    - [Server binaries](#server-binaries-14)
+    - [Node binaries](#node-binaries-14)
+  - [Changelog since v1.19.0-beta.1](#changelog-since-v1190-beta1)
+  - [Changes by Kind](#changes-by-kind-14)
+    - [Deprecation](#deprecation-3)
+    - [API Change](#api-change-6)
+    - [Feature](#feature-6)
+    - [Bug or Regression](#bug-or-regression-14)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-9)
+  - [Dependencies](#dependencies-15)
+    - [Added](#added-15)
+    - [Changed](#changed-15)
+    - [Removed](#removed-15)
+- [v1.19.0-beta.1](#v1190-beta1)
+  - [Downloads for v1.19.0-beta.1](#downloads-for-v1190-beta1)
+    - [Source Code](#source-code-14)
+    - [Client binaries](#client-binaries-15)
+    - [Server binaries](#server-binaries-15)
+    - [Node binaries](#node-binaries-15)
+  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3)
+  - [Urgent Upgrade Notes](#urgent-upgrade-notes-2)
+    - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-2)
+  - [Changes by Kind](#changes-by-kind-15)
+    - [API Change](#api-change-7)
+    - [Feature](#feature-7)
+    - [Bug or Regression](#bug-or-regression-15)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-10)
+  - [Dependencies](#dependencies-16)
+    - [Added](#added-16)
+    - [Changed](#changed-16)
+    - [Removed](#removed-16)
+- [v1.19.0-beta.0](#v1190-beta0)
+  - [Downloads for v1.19.0-beta.0](#downloads-for-v1190-beta0)
+    - [Source Code](#source-code-15)
+    - [Client binaries](#client-binaries-16)
+    - [Server binaries](#server-binaries-16)
+    - [Node binaries](#node-binaries-16)
+  - [Changelog since v1.19.0-alpha.3](#changelog-since-v1190-alpha3-1)
+  - [Changes by Kind](#changes-by-kind-16)
+    - [API Change](#api-change-8)
+    - [Feature](#feature-8)
+    - [Bug or Regression](#bug-or-regression-16)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-11)
+  - [Dependencies](#dependencies-17)
+    - [Added](#added-17)
+    - [Changed](#changed-17)
+    - [Removed](#removed-17)
 - [v1.19.0-alpha.3](#v1190-alpha3)
   - [Downloads for v1.19.0-alpha.3](#downloads-for-v1190-alpha3)
-    - [Client Binaries](#client-binaries-12)
-    - [Server Binaries](#server-binaries-12)
-    - [Node Binaries](#node-binaries-12)
+    - [Client Binaries](#client-binaries-17)
+    - [Server Binaries](#server-binaries-17)
+    - [Node Binaries](#node-binaries-17)
   - [Changelog since v1.19.0-alpha.2](#changelog-since-v1190-alpha2)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-3)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-3)
-  - [Changes by Kind](#changes-by-kind-12)
+  - [Changes by Kind](#changes-by-kind-17)
     - [Deprecation](#deprecation-4)
-    - [API Change](#api-change-8)
-    - [Feature](#feature-7)
-    - [Bug or Regression](#bug-or-regression-12)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-10)
+    - [API Change](#api-change-9)
+    - [Feature](#feature-9)
+    - [Bug or Regression](#bug-or-regression-17)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-12)
 - [v1.19.0-alpha.2](#v1190-alpha2)
   - [Downloads for v1.19.0-alpha.2](#downloads-for-v1190-alpha2)
-    - [Client Binaries](#client-binaries-13)
-    - [Server Binaries](#server-binaries-13)
-    - [Node Binaries](#node-binaries-13)
+    - [Client Binaries](#client-binaries-18)
+    - [Server Binaries](#server-binaries-18)
+    - [Node Binaries](#node-binaries-18)
   - [Changelog since v1.19.0-alpha.1](#changelog-since-v1190-alpha1)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-4)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-4)
-  - [Changes by Kind](#changes-by-kind-13)
-    - [API Change](#api-change-9)
-    - [Feature](#feature-8)
-    - [Bug or Regression](#bug-or-regression-13)
-    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-11)
+  - [Changes by Kind](#changes-by-kind-18)
+    - [API Change](#api-change-10)
+    - [Feature](#feature-10)
+    - [Bug or Regression](#bug-or-regression-18)
+    - [Other (Cleanup or Flake)](#other-cleanup-or-flake-13)
 - [v1.19.0-alpha.1](#v1190-alpha1)
   - [Downloads for v1.19.0-alpha.1](#downloads-for-v1190-alpha1)
-    - [Client Binaries](#client-binaries-14)
-    - [Server Binaries](#server-binaries-14)
-    - [Node Binaries](#node-binaries-14)
+    - [Client Binaries](#client-binaries-19)
+    - [Server Binaries](#server-binaries-19)
+    - [Node Binaries](#node-binaries-19)
   - [Changelog since v1.19.0-alpha.0](#changelog-since-v1190-alpha0)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-5)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-5)
-  - [Changes by Kind](#changes-by-kind-14)
+  - [Changes by Kind](#changes-by-kind-19)
     - [Deprecation](#deprecation-5)
-    - [API Change](#api-change-10)
-    - [Feature](#feature-9)
+    - [API Change](#api-change-11)
+    - [Feature](#feature-11)
     - [Documentation](#documentation-1)
     - [Other (Bug, Cleanup or Flake)](#other-bug-cleanup-or-flake)
 
 <!-- END MUNGE: GENERATED_TOC -->
+
+# v1.19.9
+
+
+## Downloads for v1.19.9
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes.tar.gz) | bd8fbded9a25c672c05655ccdf4b78a86b2e4f0d8763c7d55a9fb84369c5ac9e7ce28d3a8abfe0dfafea1cb5480cc8da43c1ba1fb9b9974d364986d9fb4c839b
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-src.tar.gz) | 1ae5568ea9d0c545150267ed082072854437da53992bfc17a20d3ab5509e8a2376ebb57b4cdc54811844645d97ffbb853fd8776c034fbe9c244e1e2c3b792f0d
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-darwin-amd64.tar.gz) | 1c4f09c7a1b8f0d6bc6b748988e9e37b8eb124e71dd4f4b0bd95885a17060b0f887cbf8cc4f79b915a8562cfdf4a51786e663a96f961f6f67437d33af11079b6
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-386.tar.gz) | 6d7b6832d9ca2080842941cc571f7fb37260080f8bfee229fd350b77be2e6d2a66eb1240392aecc5a393be80d8c40ad46138f3bbc5029415dd776170794d8a25
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-amd64.tar.gz) | 3ef3140c77703c1e28c17aeae9b022d6abeff6ab1d6ceff5812babbfd847f09c93fdb9e97c7bb64ae47d6025d7354ce716d8c5b4e27f9c8dbb80be579730c854
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-arm.tar.gz) | 49a41a22c2d526d673c0654c17915c8ee7b01909973c703e41bbe6db258b5c0a71921dce4f358af273308dbc8a26a811a773b77f7f6b79560a15d8f8e655ff22
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-arm64.tar.gz) | 0e17f7d9ed73e8474fd16d1e9feb5b02b4d1750f9c9750b356dd3c0db7ab39501414c0ef91f0c765680809b38eb0f5b380ed79d3ccf2ef7477c257021095a64a
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-ppc64le.tar.gz) | ecd484f98dac83db5500023b8571e274c1943a0430280e59b1897502b38d7b0c5b56eb68ca9af7f092d17e61c563ee5dcb5ddf8fe2d92905f82a895baa405237
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-linux-s390x.tar.gz) | 975a7dd4f229aac51c47f2501c8536be6073f447839510d1f67d6e721ad16ddbb374670522c9d39d19c5a4479ef596cb26a16e9511e3d6fc9b7e679d162f05f2
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-windows-386.tar.gz) | fc0656df2344fcb62a0c7e619ecd1211b55e2673efefd5884135a944393a5d7df79885ad7e39e5d91679fa4ae5f3f159cd2636dc6f8df203de6371da21349852
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-client-windows-amd64.tar.gz) | bfc8c09fa129ac1a0debc402627ba2bc982c8f062d940aacf966789e6d268501590d071f27d0a88848039fbf593d1ee5956c31f21035465ab11165338f3391f4
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-server-linux-amd64.tar.gz) | 29136843826dde131dfa95fca5ecee0d47c89c91db882f46517611dc1ad3beabe149c0829a1390303592efc6527eb9e429faf7e3d0ff69ef14dc40fa9b81fb5f
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-server-linux-arm.tar.gz) | 1c1071f72d1df60b6d37e3bab192064088542ba8a0e7593be22fd5328364ee2f19f44bb781d96536f4f9a07e7ea8fe5b578a0ac92e3ac8d116345148a04509b2
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-server-linux-arm64.tar.gz) | 1fead6815e6343955f0c5028282b4399b8c0705f0b71f823d420bd86cc924d8e93aaa9a7f81e113bae24f3c9489025271f147ef0079626d9f54151218d88a05f
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-server-linux-ppc64le.tar.gz) | 328e9a0c0e5813d3844bc31c27aec0724e3608d2f0ffd8a933bbae4ce6d811f9bea4f63070c6bfa0b13583b54d7017519d9ffd66a755e32081913b4ef359ed1e
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-server-linux-s390x.tar.gz) | 171b1e0eaa5fe8ba0719d328f6526c1814c753b09163891a7e3bd8cd0f50eb779e947c5d6c9a0b32c581b4a75afa02cf2bdf2ed7c6e14d31deb83f82028bd0c9
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-linux-amd64.tar.gz) | 0d6cfe1bed8a960b373d5403fc849621d08ce302ca2dd8a4ac1f1dee7dd6ee03a5875a6846f237b45432f4511bdd3cd6d1085d466cad4c3c33fbe1ed28e599ad
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-linux-arm.tar.gz) | 0f17c7076856b6b8346595697b32306f1bf576ceda7fab364dd2c15af1c6c5be9474110a2a52f2162fd997894eddf4e53af567e37727e50c317e0bc37efcfddd
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-linux-arm64.tar.gz) | a585a87bf74f257de1ac8777aa8dd278268f2a60ba073f4e81ea56c256d251dba92da11d48fb24118e850f4c32b47b894ac16eb384f4ce1fcc776bfc4816961f
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-linux-ppc64le.tar.gz) | 009695a736a23c3dd30007f2ec29ef87d44a79edda5694b44d23724adfa8c8d8ec578413748b1cbdf265f90743b99929bf4a61ff2c33b9f09397c35078f971c5
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-linux-s390x.tar.gz) | 19d1676db1cb91280b133a9c23e0fd0465c6aefa77dee010307149bc92ad23923ff349dad5ee3fba69c0521bc6243d3179db3fae41bed4b28db3dda91650c9ce
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.9/kubernetes-node-windows-amd64.tar.gz) | aeb9e49ebc758b1fc583b9c28503d6c573989517722f62b753fea5fd076afe548d3ce4f5d81117899ba20ad5d0eef2ee9045152c474fe8eea49a3d6ed42d85a5
+
+## Changelog since v1.19.8
+
+## Changes by Kind
+
+### Failing Test
+
+- Fix handing special characters in the volume path on Windows ([#99137](https://github.com/kubernetes/kubernetes/pull/99137), [@yujuhong](https://github.com/yujuhong)) [SIG Storage]
+
+### Bug or Regression
+
+- Count pod overhead against an entity's ResourceQuota ([#99600](https://github.com/kubernetes/kubernetes/pull/99600), [@gjkim42](https://github.com/gjkim42)) [SIG API Machinery and Node]
+- EndpointSlice controller is now less likely to emit FailedToUpdateEndpointSlices events. ([#100114](https://github.com/kubernetes/kubernetes/pull/100114), [@robscott](https://github.com/robscott)) [SIG Apps and Network]
+- EndpointSliceMirroring controller is now less likely to emit FailedToUpdateEndpointSlices events. ([#100144](https://github.com/kubernetes/kubernetes/pull/100144), [@robscott](https://github.com/robscott)) [SIG Apps and Network]
+- Fixed bug that caused cAdvisor to incorrectly detect single-socket multi-NUMA topology. ([#99209](https://github.com/kubernetes/kubernetes/pull/99209), [@iwankgb](https://github.com/iwankgb)) [SIG Node]
+- Fixes kubelet to retrieve number of sockets from cAdvisor MachineInfo, instead of assuming it to be equal to number of NUMA nodes. ([#99771](https://github.com/kubernetes/kubernetes/pull/99771), [@iwankgb](https://github.com/iwankgb)) [SIG Node]
+- Fixing a bug where a failed node may not have the NoExecute taint set correctly ([#98140](https://github.com/kubernetes/kubernetes/pull/98140), [@CKchen0726](https://github.com/CKchen0726)) [SIG Apps and Node]
+- Kubelet now cleans up orphaned volume directories automatically ([#95301](https://github.com/kubernetes/kubernetes/pull/95301), [@lorenz](https://github.com/lorenz)) [SIG Node and Storage]
+- Resolves spurious `Failed to list *v1.Secret` or `Failed to list *v1.ConfigMap` messages in kubelet logs. ([#99538](https://github.com/kubernetes/kubernetes/pull/99538), [@liggitt](https://github.com/liggitt)) [SIG Auth and Node]
+- Using NUMA nodes instead of sockets for CPU manager hints. ([#99276](https://github.com/kubernetes/kubernetes/pull/99276), [@iwankgb](https://github.com/iwankgb)) [SIG Node]
+- We will no longer automatically delete all data when a failure is detected during creation of the volume data file on a CSI volume. Now we will only remove the data file and volume path. ([#96021](https://github.com/kubernetes/kubernetes/pull/96021), [@huffmanca](https://github.com/huffmanca)) [SIG Storage]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- github.com/google/cadvisor: [v0.37.4 → v0.37.5](https://github.com/google/cadvisor/compare/v0.37.4...v0.37.5)
+- sigs.k8s.io/apiserver-network-proxy/konnectivity-client: v0.0.9 → v0.0.15
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.19.8
+
+
+## Downloads for v1.19.8
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes.tar.gz) | 14a4920a56fdecf8aae54d86e27cd194f8245760602809be4d0ea7f0a28b8fce667f55c46c552cb8695592892d480ecb2c619bc0e467310a8cb774aac09e43dc
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-src.tar.gz) | 9de221764ff93eacc665994e1b7bebcd130ba531160fc73964e46395fdb59d4731af9abed81a36c45c7781499bb1d349de6d6b3082d6b49dd1597ab5782df690
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-darwin-amd64.tar.gz) | 181ab8b4f45db829afe9e0f97f1e3395d1c2ed472df11d0cee2a515e8493859964a52a5d29f8256ecb59be640fe9a7f89c0b95a8c1073d4b3e590e9aae363166
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-386.tar.gz) | 32fa49bf25a2b599a91d044c7fca8375d164b15925f02d0947d4341bab90fd0cbc749c124930df691c457c43ae03041a7c806802865461cfc3057064ed64f0ed
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-amd64.tar.gz) | 9f22cea299e8a852ccd859f2e8e390b580bc23508cf2d2341114192ce883d98923076f350d02b45735b51096965030a90b25a2768ab55508e2f5f56204fd84e9
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-arm.tar.gz) | fb47723f17ee9bcd1d1e63b6ea1f7c0556795f37253abfc353f6970acb662c9870bcc974c3f63f64c5280d6f8dc1023910858e8d63a4d0a4e81982268a1a91fc
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-arm64.tar.gz) | 55605b02f00a0eff401df9e599f773d0bb47fd36816f215c653fe8424e07f3f1576129462e84eecad7195cc0ab25351206fc0dbd8365440a1efd14d6be60134e
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-ppc64le.tar.gz) | 8608d1c656512f369ef060d6a67740f0c1909a62679764a9b2d8dcc691813de903bc30aa1da649f9056fbfc6114ce6d6980797ae4c5b7f51e1ba0157e6486be8
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-linux-s390x.tar.gz) | edbb64b3fe175fbfe8f4011cdb5a7eda9ad6843e906df053cbffd42e7bd7c02bef797a03e2b54a764d592b66ffa050e46b8efda95404b08bd8f5ab96536da75c
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-windows-386.tar.gz) | e34ccf76cc67b553b6dd872cfda445f8cd58110aa46c5af0f59828b510e4187f841b341c3b8a95bf63e866f56dc4347a97fc96f19dc95ef37d13364f54a379dd
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-client-windows-amd64.tar.gz) | 0581dc0ee100bb407fb28b77106c430559adeb0f734e1a6a18b2ef5840467da86e762da95ff0281449119c2cca978a48f564a74f20b25f8aef00b17e1d1e4fbf
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-server-linux-amd64.tar.gz) | 62b8798a64a743e2f7566b98d5d6097069c62a6273a9f8d4e08f9c88b2e6d2491a618fd309e70e0128ad400123ac3753e32b6bac28b5bdde4cd54aa1b84087f4
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-server-linux-arm.tar.gz) | f25703791ab3f36ddcf3aacae426f1cb1fe02835ba15ad3d07c5ff16d9494f9bec633735d0f444883cb01b79e461829233b880a26f7f085512ee89e444379193
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-server-linux-arm64.tar.gz) | 3c30a49fe5afd484176f412f33da5314d9874dd9a06729a8d2e50b70b3f6346585b0e4b33a6f3bbbf56ef6ee283f027bf14425f0be88a2f60c08ce6f9bc991d8
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-server-linux-ppc64le.tar.gz) | 8c033a97e03001c8b9bf774bc584becab51c2a17e658ecc916dc6f90fa004c3131267491a3b5c8ce3ebeca50879932d5b15fbf9bd4630628c07ecd0c32206f52
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-server-linux-s390x.tar.gz) | cd92abb29f3e4f963a781fd81d77372a4f294b5482f2b2a8491712a1b228c48ebfc63fab75d0b3075c54aaeee1dea4b9c0e0875484b28e1c557946eda8c32422
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-linux-amd64.tar.gz) | a49e385be0ff6d6e36b9387524384825ce0b4f2ecb9647b5e9f293cc42023355e59902bafaf5b35fad486d70ecc19713360138b2802809d2ccc9ab3b83fd85e6
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-linux-arm.tar.gz) | 18d825c48e55def55aa4b14b65550acd77184f6935ac15a6b779bc13a90d4db46adb33159fefc1cb255e7b104df4d7d039011368c502310370b37b76067f43fd
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-linux-arm64.tar.gz) | ded3f97eaa517d26207d99af9df065e6a22a05da54b7c07c27cda65f2fba26677c66c08376d982bffefff9300120d50a74a2a6714d5c26d249c907f9ba301be8
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-linux-ppc64le.tar.gz) | 58b2148771e3bcd0d4ffd5958872a237178f0cd4cc9934e65c9f7999daa83c2540b2a535ed78b2b5b7e720223cdafd7721eac3d81adf4e080ac30626968926b4
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-linux-s390x.tar.gz) | b6bae4aba560128777abca64fc551a42d34f87d36d770e825e0aaafc7cc7c4efc7124e5661f3cec1cd7e26eceaaca1c295bb0a579f8d924cb34f1c2051cafd62
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.8/kubernetes-node-windows-amd64.tar.gz) | 25f57ad17f65baa2dd145624008b92b221aaa47b6a28312e615153f4dc4ffdf6534bfb75f8ec1c50c66948f6f7ca4990ed7c9ed1d2e1afc1bafb4764c76b9246
+
+## Changelog since v1.19.7
+
+## Changes by Kind
+
+### API Change
+
+- Kubernetes is now built using go1.15.8 ([#99093](https://github.com/kubernetes/kubernetes/pull/99093), [@cpanato](https://github.com/cpanato)) [SIG Cloud Provider, Instrumentation, Release and Testing]
+
+### Bug or Regression
+
+- Aggregate errors when putting vmss ([#98350](https://github.com/kubernetes/kubernetes/pull/98350), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Avoid marking node as Ready until node has synced with API servers at least once ([#97996](https://github.com/kubernetes/kubernetes/pull/97996), [@ehashman](https://github.com/ehashman)) [SIG Node]
+- Cleanup subnet in frontend IP configs to prevent huge subnet request bodies in some scenarios. ([#98288](https://github.com/kubernetes/kubernetes/pull/98288), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
+- Fix CSI-migrated inline EBS volumes failing to mount if their volumeID is prefixed by aws:// ([#96821](https://github.com/kubernetes/kubernetes/pull/96821), [@wongma7](https://github.com/wongma7)) [SIG Storage]
+- Fix azure file migration issue ([#97877](https://github.com/kubernetes/kubernetes/pull/97877), [@andyzhangx](https://github.com/andyzhangx)) [SIG Auth, Cloud Provider and Storage]
+- Fix the description of command line flags that can override --config ([#98873](https://github.com/kubernetes/kubernetes/pull/98873), [@changshuchao](https://github.com/changshuchao)) [SIG Scheduling]
+- Fix to recover CSI volumes from certain dangling attachments ([#96617](https://github.com/kubernetes/kubernetes/pull/96617), [@yuga711](https://github.com/yuga711)) [SIG Apps and Storage]
+- Fixed a bug that the kubelet cannot start on BtrfS. ([#98015](https://github.com/kubernetes/kubernetes/pull/98015), [@gjkim42](https://github.com/gjkim42)) [SIG Node]
+- Fixed a bug where aggregator_unavailable_apiservice metrics were reported for deleted apiservices. ([#96421](https://github.com/kubernetes/kubernetes/pull/96421), [@dgrisonnet](https://github.com/dgrisonnet)) [SIG API Machinery and Instrumentation]
+- Fixed provisioning of Cinder volumes migrated to CSI when StorageClass with AllowedTopologies was used. ([#98311](https://github.com/kubernetes/kubernetes/pull/98311), [@jsafrane](https://github.com/jsafrane)) [SIG Storage]
+- Fixes a panic in the disruption budget controller for PDB objects with invalid selectors ([#98776](https://github.com/kubernetes/kubernetes/pull/98776), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Apps]
+- Kubeadm: get k8s CI version markers from k8s infra bucket ([#98836](https://github.com/kubernetes/kubernetes/pull/98836), [@hasheddan](https://github.com/hasheddan)) [SIG Cluster Lifecycle and Release]
+- Kubelet should ignore cgroup driver check on Windows node. ([#98385](https://github.com/kubernetes/kubernetes/pull/98385), [@pacoxu](https://github.com/pacoxu)) [SIG Node]
+- Performance regression [#97685](https://github.com/kubernetes/kubernetes/pull/97685) has been fixed ([#98432](https://github.com/kubernetes/kubernetes/pull/98432), [@tkashem](https://github.com/tkashem)) [SIG API Machinery]
+- Static pods will be deleted gracefully. ([#98103](https://github.com/kubernetes/kubernetes/pull/98103), [@gjkim42](https://github.com/gjkim42)) [SIG Node]
+- Truncates a message if it hits the NoteLengthLimit when the scheduler records an event for the pod that indicates the pod has failed to schedule. ([#98715](https://github.com/kubernetes/kubernetes/pull/98715), [@carlory](https://github.com/carlory)) [SIG Scheduling]
+- Warning about using a deprecated volume plugin is logged only once. ([#96751](https://github.com/kubernetes/kubernetes/pull/96751), [@jsafrane](https://github.com/jsafrane)) [SIG Storage]
+
+### Other (Cleanup or Flake)
+
+- Kubeadm: change the default image repository for CI images from 'gcr.io/kubernetes-ci-images' to 'gcr.io/k8s-staging-ci-images' ([#97087](https://github.com/kubernetes/kubernetes/pull/97087), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
+- Resolves flakes in the Ingress conformance tests due to conflicts with controllers updating the Ingress object ([#98430](https://github.com/kubernetes/kubernetes/pull/98430), [@liggitt](https://github.com/liggitt)) [SIG Network and Testing]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- github.com/google/cadvisor: [v0.37.3 → v0.37.4](https://github.com/google/cadvisor/compare/v0.37.3...v0.37.4)
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.19.7
+
+
+## Downloads for v1.19.7
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes.tar.gz) | c073db59462f36e9e57ba8676e6f3472dec44cedb74b4c4be726524d954f871f1b603b4e636e83e2a2017de8bfbb631e1cc5a258e54585d30f7af34e7e7f7e32
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-src.tar.gz) | ac033dffa72cb28b833b0549058771e3802332a2d8648e9dfcfdbe2defd033070b677272c2a46c6dee2523687c40721cfd48b2e8099540fed8bd979d99f72b85
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-darwin-amd64.tar.gz) | 037a74331e267c3fa02ec118d9f108e7c34088b5003934a8317e1eb82f653fffc40ba70a1ed9dc61b6b35155bd395dae4e7f517b3a47bfb8bde90ef7b436453b
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-386.tar.gz) | 9bddf106a5035cf7450899bfd86b16ec2408da5d06bc82cc916c6ade9c35757da503f947a32b05ca535de21e024d1815fb330523fd2c016de1ab3789c3adbb09
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-amd64.tar.gz) | 8c9606088b91e02bcfe3dd2f26357cd3d2acd1d46b41301cf5247c7e8365e9acacfa3bfecc1865bc7459425beaeb38c8991365ae3c03d3522f1695c2b775ab20
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-arm.tar.gz) | 7e13b4b9e8e7388af86db476049c8e4d345acdcf7e94ca234fe9d2f19ba56ef0d52bf7716b1cb647db3b4bec4f996eedb7d6d5e89894b5f79713444e5e1988f4
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-arm64.tar.gz) | c29f5799f84996fa235b48e2273e9949178e4372cf38e766fdc4f0b87318468765d0c175b4f1d836ef108e4ad1dd6d6d66188692173b2c061be514a313352f1e
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-ppc64le.tar.gz) | 760aa4df9ce366f69afd6da5d426dee8ad118de4eb293670549e567bb8412f463ae8204f6896503f2aa57beebd577f72a0a4359be33835d561a1f1ebf30f0d16
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-linux-s390x.tar.gz) | c6161992444e4ad059e0cb8593245d0d8757a97d2a136104497df5141d1faaaff65cb43ab760b08da8b6668334076e1f33dcbdc3e56a87e602b842ff4c7c5fc1
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-windows-386.tar.gz) | ba31f39d0e4efc11a5d40169f6b24762334e3dba1dcc406a173967a8042edefb1fb3c0f09b91cc021938b8778cadc83ae2a22710f643be807794a039f4d7ed22
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-client-windows-amd64.tar.gz) | def2e28f82e84783b2c67d5defcd4e2cc9ab919710ae2eea6d7c12fd81f7c12266b263600b0ea4390fec7d09c5d96e98784f187362471ad21467f6d558a6dc1c
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-server-linux-amd64.tar.gz) | 1164b701494072f7d33edb4489d4697ffc93107ef8389dfdfbc9ab524f636dcf948a5d36e676cd1f9502b26ad36a0e33700a94a2341a134b2304571c2f47aa89
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-server-linux-arm.tar.gz) | a245d6389040a800181a1fa72fc1184ecb0959916ac764e4583237cdb96a3211ea615e0366668d1fff69cc3e2887d56929026b271ca599196a6a39fcdbb0a4da
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-server-linux-arm64.tar.gz) | bc1f2d9d0d4d06067f2272fcd3e67f5674c49751d46a3d682815dda20b1a9c608085075a71472cd85c232c241521b87352c553e703aef40a8f65bd3617b5c892
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-server-linux-ppc64le.tar.gz) | 09676a4af0ca2d49bf326780843dcd0b8173ba97f1a296475b36217f03663ccdc6e06825e2b4b492568de356e9215dbc1c764ee4dd4d9303c40963d6630275c6
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-server-linux-s390x.tar.gz) | e66927689e40444d731097c5d49e5d9001b77a5ee18dfeb94c639a7fa7fd54e80c580f076336d357b7cd356c6b3cf30fc12e7184e433fa906b19696b962b2178
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-linux-amd64.tar.gz) | 919b7420aa5b3e7306b3f267ef158587d00894cbe2434699c020d5968479dff5232ee129cfabb79aab85a755f43b7529336c46226c91c3079f55a90c053c5218
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-linux-arm.tar.gz) | 469bed7cb022164a90687d09d90f008763e69e232d7d638a23f27411769a4b58ad8e99d23ee7b3c622aeaa22aa04dd04a40c30267aab5a9052ecb2168c2a770e
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-linux-arm64.tar.gz) | f595fd94acc6800857b1feec753fe51d6a072caaf3a4f5c4e93fec884ffe453e22244154f1d869c6a62ba8125977b780974dd4bc2ed4d0d827c18d7b585db6c2
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-linux-ppc64le.tar.gz) | 46fb0e05c17759876e5cf16d535ddcb4dac9c51011872253dd09c6376ea1fc022ea4bab7a057ebb14df1fc245e75f008664b4adc35169648d535c2801bc4ba75
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-linux-s390x.tar.gz) | aa6952d09131db46c835f31d3e743a509dad07bf26b83a890cbaca332d8f5865cb8d4de91bb69fec2173673fd56c43c95f41a12c0c79cfdf672da5e982f48ea8
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.7/kubernetes-node-windows-amd64.tar.gz) | b6f0c21525f9bba2163d66c35f2fdbbdf44382063a9280d886abf289dfc6a2513533b55696aff2af847edad5dba035cdba7328c1be3099038ae42679f1b0eb3c
+
+## Changelog since v1.19.6
+
+## Changes by Kind
+
+### Bug or Regression
+
+- Fix Azure file share not deleted issue when the namespace is deleted ([#97417](https://github.com/kubernetes/kubernetes/pull/97417), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fix counting error in service/nodeport/loadbalancer quota check ([#97828](https://github.com/kubernetes/kubernetes/pull/97828), [@pacoxu](https://github.com/pacoxu)) [SIG API Machinery and Network]
+- Fix missing cadvisor machine metrics. ([#97006](https://github.com/kubernetes/kubernetes/pull/97006), [@lingsamuel](https://github.com/lingsamuel)) [SIG Node]
+- Fix: azure file latency issue for metadata-heavy workloads ([#97082](https://github.com/kubernetes/kubernetes/pull/97082), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+- Fixed bug in CPUManager with race on container map access ([#97427](https://github.com/kubernetes/kubernetes/pull/97427), [@klueska](https://github.com/klueska)) [SIG Node]
+- GCE Internal LoadBalancer sync loop will now release the ILB IP address upon sync failure. An error in ILB forwarding rule creation will no longer leak IP addresses. ([#97740](https://github.com/kubernetes/kubernetes/pull/97740), [@prameshj](https://github.com/prameshj)) [SIG Cloud Provider and Network]
+- Kubeadm: avoid detection of the container runtime for commands that do not need it ([#97848](https://github.com/kubernetes/kubernetes/pull/97848), [@pacoxu](https://github.com/pacoxu)) [SIG Cluster Lifecycle]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+_Nothing has changed._
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.19.6
+
+
+## Downloads for v1.19.6
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes.tar.gz) | f5a137b6d023699e75c7569fa713742f71b9284bc8b612e55b1e00ae697be18d44eac24b781c3fa1a4bacdd8c0d39fc9a617182f5dff4e5803e97647d5b268ff
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-src.tar.gz) | 1f3e7070d8b1860dcb26f8ed3aa0a4d2041251463c9325f1430185310ee551f33fb55344130520dfa9c1c0059920a1872dd1044de89a3ec6fc76dd190b2bee41
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-darwin-amd64.tar.gz) | 9ff7ba681dd8e29161099ae1a59957b86c61cc963ef4eca944b75fd56ae3930bbf66f9194f17f0a082b9f006a7a1653ca37d96cc19ec7fba615f010066e9db57
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-386.tar.gz) | 0cee35ed2d360f599248cd2bf83bcf7660e507d45281aae1d8d21b78a4a2b769686d156ad5d9639debfc8adca8b081109b55f5dc7bad9d770e7e7eba3ab73ac4
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-amd64.tar.gz) | 89105850409f55f6ee29185f17dce4fcabf6b646a42a38cf9339c21d5113e950e0f032ff533116054ee743a65cc097184e18bd970733696b77745db9baf789ed
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-arm.tar.gz) | 64bc8312bd3d46cd48d44b5b8ddd965061a92487c0011a0628592b8d238b8ca13a7c39fb85c5b9b9c59c4d116eff8ad86364a621eb513cbd269ddaaf816e4c5d
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-arm64.tar.gz) | a363e86843924de559c9e69a7396074d57d1df0a05b4f5ba48b0466801fef6954712db187f4aa9006dbc1623b9e3f1fcd63123b74f19965ef08dc40caf1bec74
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-ppc64le.tar.gz) | a1deea76ca396aeb99e045ee2cc52c15ac51c0dcebc56ee8a091123d19e149893558536eecf05c5030ebd56f403234cb7a379f34b9979ef878da76f78b06edf3
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-linux-s390x.tar.gz) | fef20e9184c3441cd1a26d3ed69d4b7dc5749025c4df7f03ec87ada56a932d9543abcb4738a818b784f4c3c5860616b78f274e514a0791675bf94d7b86ba3f41
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-windows-386.tar.gz) | 024185fbea43431d1af3a7974c1437fa53fb84af0701796a43da8662d431b413d826fea0a3bd28116f835f12c3a13031323102340e75ae4bd283ba4ada9ae206
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-client-windows-amd64.tar.gz) | 1b415b9838adce0df4caef73bffdc76e41ea71d65404c333e605b6b691d1ccbab9b9d6b9cebf15d97f8a8d9181ec8c31daafde90c11b6e884d3a53fec272064b
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-server-linux-amd64.tar.gz) | 126f6ab16d9e007ff75c58fab20fbaf4c6ff16212b8bbf5e71105f0f3611867ad1410ee05cd39b4e4e6cb3b6313fcff4b12ec91fa430b38f29d72221dda8c624
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-server-linux-arm.tar.gz) | 49212bdd65119efc2bbac9bb652ac3cca56f27d1096ca195d620c0ec9ada4f49b49aa537878cd48f97a31f732af9cf19ae6c1bffbdd8464691fd246c0770840b
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-server-linux-arm64.tar.gz) | 836a5e5f36162ae8df95cc9d4c3e53e7450f90106517b1067cdad58c03dfe1dcbd1b259c29bd29e96f71c1cf86596a92d8c8a7ec651ee66392c707c41c7ce597
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-server-linux-ppc64le.tar.gz) | 967f89cbaa868f1271db0e7560605885c8ad9fd986daaa15a193e303c464614675aec4997b3d6745b5fba2bbadb567772ecf20a74dbdb64f6b949fc6d22de76b
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-server-linux-s390x.tar.gz) | 47454601315d25ac039afa36b1119f98b2242bc968c1735358028c872c9d7a9bd60de8eb1f937412512a6d4398adafd8aa85c8f4163251075a9bf2f3d7d4bc49
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-linux-amd64.tar.gz) | 52cd9c9e69b4203d3901124725f5e95635d8356fd39eed9278e39e174fb91d1aae84704bf51e6b6ed1158b37dbffc49bb9e620ff80238f5a76d7252947754e1c
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-linux-arm.tar.gz) | 74735b5528b8d229d0b08014981adc3b5be6e46c5de869405e69f669721d00cdf8b1f608aac872d21841ca0e3fe12ef4c5fd6b793e3fb53ade397ca40ac19c71
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-linux-arm64.tar.gz) | 1f0ecd704e16b11d87c3fa5e8f4f23a87647a2f72cce64b646be444a88d781225c6ab49b049bb4b3b19300dc9ac70f3be85538b9beea43e376a044258d1e341a
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-linux-ppc64le.tar.gz) | 58e690b9801ad62ddeaf90b4daf085f8e5417a7ca099d7f6bb0682eabe7d18c21c2af47cbe33853eff18e0f296baa992785df78f64f7d12a8ea027b605a57562
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-linux-s390x.tar.gz) | 2f3afca1bf845d23d5cd376484e130aaa1668b368e0570690c274aed4fa547b2d99797d7d861f5b2d84861617a53f1c313a391f7b8df8a876d7e6b383d2684cb
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.6/kubernetes-node-windows-amd64.tar.gz) | 4d9610da600adc851cd5c08d08795e32cf14e715df3e5df45a9141f33ef756c54e8d4809a86b89c394a923068820a5500009d1081b7a8500ebe4f7d99ce83cfc
+
+## Changelog since v1.19.5
+
+## Changes by Kind
+
+### Feature
+
+- Kubernetes is now built using go1.15.5
+  - build: Update to k/repo-infra@v0.1.3 (supports go1.15.5) ([#97246](https://github.com/kubernetes/kubernetes/pull/97246), [@justaugustus](https://github.com/justaugustus)) [SIG Cloud Provider, Release and Testing]
+
+### Bug or Regression
+
+- AcceleratorStats will be available in the Summary API of kubelet when cri_stats_provider is used. ([#97017](https://github.com/kubernetes/kubernetes/pull/97017), [@ruiwen-zhao](https://github.com/ruiwen-zhao)) [SIG Node]
+- Exposes and sets a default timeout for the SubjectAccessReview client for DelegatingAuthorizationOptions ([#95910](https://github.com/kubernetes/kubernetes/pull/95910), [@p0lyn0mial](https://github.com/p0lyn0mial)) [SIG API Machinery and Cloud Provider]
+- Fix the panic when kubelet registers if a node object already exists with no Status.Capacity or Status.Allocatable ([#96297](https://github.com/kubernetes/kubernetes/pull/96297), [@SataQiu](https://github.com/SataQiu)) [SIG Node]
+- Fixed FibreChannel volume plugin corrupting filesystems on detach of multipath volumes. ([#97013](https://github.com/kubernetes/kubernetes/pull/97013), [@jsafrane](https://github.com/jsafrane)) [SIG Storage]
+- Fixed a bug in kubelet that will saturate CPU utilization after containerd got restarted. ([#97176](https://github.com/kubernetes/kubernetes/pull/97176), [@hanlins](https://github.com/hanlins)) [SIG Node]
+- Remove ready file and its directory (which is created during volume SetUp) during emptyDir volume TearDown. ([#95770](https://github.com/kubernetes/kubernetes/pull/95770), [@jingxu97](https://github.com/jingxu97)) [SIG Storage]
+- Volumebinding: report UnschedulableAndUnresolvable status instead of an error when PVC not found ([#96850](https://github.com/kubernetes/kubernetes/pull/96850), [@cofyc](https://github.com/cofyc)) [SIG Scheduling and Storage]
+
+### Other (Cleanup or Flake)
+
+- Client-go header logging (at verbosity levels >= 9) now masks `Authorization` header contents ([#95316](https://github.com/kubernetes/kubernetes/pull/95316), [@sfowl](https://github.com/sfowl)) [SIG API Machinery]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- github.com/google/cadvisor: [v0.37.2 → v0.37.3](https://github.com/google/cadvisor/compare/v0.37.2...v0.37.3)
+
+### Removed
+_Nothing has changed._
+
+
+
+# v1.19.5
+
+
+## Downloads for v1.19.5
+
+### Source Code
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes.tar.gz) | 9f4e7d2cc7f608859fa50ae473e0e446599035d3b7bc9b5bc43baef776c5333a46496220082ed4c690dcaf15d2aecaad6dddb055a91c6358d9fa34ccdd25a741
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-src.tar.gz) | a4ba613ada12818b93cf70f463521a7651041117c83e5f41108f79782ead1e4a20e928544ad24f2425d632b76b825144ee7724b13f4c69ea5b26fc8dc4b32d84
+
+### Client binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-darwin-amd64.tar.gz) | 6005ce690c2dd11618ab5d5665963aed705741ab5aec50738c1296b0ba2408c751615bdcc7f2de683dc82d0a856a66af53d09c826ade1f7ba8408a58c9df3bf5
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-386.tar.gz) | 8fd98b021de6414d7d225b819545ecf59b8610be5e57b732b1f5ce4cfc27f985d6d411deec588cd8633ae3b438ca873e29d90d62ff771e52c908ed89be364967
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-amd64.tar.gz) | 185c67561c11651a076a46ade8659d9079d38fd0a585e4b5a9a1e8c4b701c22ba952e7a50d54f1b073e37f1fd96a0071cd758e6a1dafacab68f303069124c831
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-arm.tar.gz) | d73c77c4a17bbc5fd536bec0a6dc0c1cd4d4ae17d6a0ef3cfbd2801876b02c2d197bb8a019e3d10adb77545e9f5984c6d0b6246d9774b1d5761ce6b957fe6577
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-arm64.tar.gz) | 702b038836632014d143f586fd87b7a6b0f5821ca0181c3efd295dce3fad49d91396df60ab746c6b81d0f876b44f44e2ab961fe6582a6d9f81ae76573417fb6a
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-ppc64le.tar.gz) | a91187aeeccf1b06f241758feca5b99c52885dcb93c1f53047d502a7b5fc0a0f082123e7d7690a76c28e8fd74b7e870920f4c78e875ed5f09da98f84e4deec8c
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-linux-s390x.tar.gz) | 1b91d1bd28ac6063b8fba47f0ce84b350a50fdbaa70fb21da64b8dc9114ce5dd7b39f1ec3f347f6f81624c8b0ddb4f2326de69334921e0e20a45f3a6467f0e79
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-windows-386.tar.gz) | 332c7fadbafb6dac757d0d5174dd7451bbff5d4db5dee1b69534e05543b332d11bbe7db36eee7395733e0c2bb23cbb7de790604cfa71ee249760c2cde8adc85e
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-client-windows-amd64.tar.gz) | 279ebb7594cfcce7c35d49db9c2b96e7bce708b199d7c47f6206587c13082f3f331052d67fc512e64000fd865c91726f2856844e8bf65082b6d56c23308ee43e
+
+### Server binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-server-linux-amd64.tar.gz) | a86feb6f1904c105451eec8d54908ad403b8efa565db24f18b8cd6371d39f534d67a575a69fa890dca07e5a306e0bc4d5bb76a8241897ebe5e458636948b7622
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-server-linux-arm.tar.gz) | a757ad831a05561ef42bba9861baada27545321acb151811dba0af4c7a13d3537a54dbb59a74e8e38eec9c4b7c2976bf2166f756d20a0ae81902adeba34a29f9
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-server-linux-arm64.tar.gz) | 79d9644918c36136663eac1970f5a56fcac45b53718c460eca60cd25e0bed687616ca1e0a2bb089af1e26626fff499fa433d7093e0705887346a17ad0605405a
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-server-linux-ppc64le.tar.gz) | 71cfa89200b51a025e5ba074443ec5fff1681298c608c315cebb587b4531096fc4c57ffb4e0922da2ff69afc12141bed1aee6d289a8a555f8564137a4cd15e1f
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-server-linux-s390x.tar.gz) | a4caf2dbf93979b1913af06e0e1c06b9f529d2ca6b0c595ede4a37aa756b5df2b2b2f85de081b35e2420da38ffe1a9021abec39d1cdf23a33d623b64ad687263
+
+### Node binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-linux-amd64.tar.gz) | 596bf48ce5d710663d30266d9925ed7f36e5c1c3ab8a6aac729bf4aacdbeaf2d77c1962e298f3a7cd06cfc8071205e2514a2b94bcbf215e22dbe623658490508
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-linux-arm.tar.gz) | 9af3b048ab25cb19e303f189ed56c7fd767e74019c8ce3ddbb513fc8d71960ac225a7c56e34f5a6f92d27b99c19d7c92e4b594a5a71fca9b13b80890307c8576
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-linux-arm64.tar.gz) | e11d6bab63478b47e6c84964463c292ddc26924c2b9fd66e25042aa73101e4a44f24e66ef689d2eb4ec7cdf14175a7ecf37622af83a502daa4e8edd070bb5d1e
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-linux-ppc64le.tar.gz) | 3f3f926996d423d7ca1e45ed4154c072cd24057a9da0890954f91a60952e82e952e1ffd0baedf01db050c5f9cc56acd6d7a38dd7771682397720953c3a452b93
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-linux-s390x.tar.gz) | cb053789568e149f332eb58d2400f051bf9afc4681eb983cc4152557ac2712e5bbcb0a3eb72a82aa1d03422d54cea88febc97a88325999d61ab3baef2c1546dc
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.19.5/kubernetes-node-windows-amd64.tar.gz) | 1de0df9fd99abbef688261fc093bf5f277d29dc0b3b0d906d38e7e579d5bb99adeb69f066ab5c47e57a20ffcb22621e77902617034346e103c0c478d20f49222
+
+## Changelog since v1.19.4
+
+## Changes by Kind
+
+### Feature
+
+- Add a new flag to set priority for the kubelet on Windows nodes so that workloads cannot overwhelm the node there by disrupting kubelet process. ([#96157](https://github.com/kubernetes/kubernetes/pull/96157), [@ravisantoshgudimetla](https://github.com/ravisantoshgudimetla)) [SIG Node and Windows]
+
+### Failing Test
+
+- Resolves an issue running Ingress conformance tests on clusters which use finalizers on Ingress objects to manage releasing load balancer resources ([#96742](https://github.com/kubernetes/kubernetes/pull/96742), [@spencerhance](https://github.com/spencerhance)) [SIG Network and Testing]
+
+### Bug or Regression
+
+- Bump node-problem-detector version to v0.8.5 to fix OOM detection in with Linux kernels 5.1+ ([#96716](https://github.com/kubernetes/kubernetes/pull/96716), [@tosi3k](https://github.com/tosi3k)) [SIG Cloud Provider, Scalability and Testing]
+- Exposes and sets a default timeout for the SubjectAccessReview client for DelegatingAuthorizationOptions ([#95910](https://github.com/kubernetes/kubernetes/pull/95910), [@p0lyn0mial](https://github.com/p0lyn0mial)) [SIG API Machinery and Cloud Provider]
+- Fix a bug that DefaultPreemption plugin is disabled when using (legacy) scheduler policy. ([#96472](https://github.com/kubernetes/kubernetes/pull/96472), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
+- Fix bug in JSON path parser where an error occurs when a range is empty ([#95933](https://github.com/kubernetes/kubernetes/pull/95933), [@brianpursley](https://github.com/brianpursley)) [SIG API Machinery]
+- Fix memory leak in kube-apiserver when underlying time goes forth and back. ([#96266](https://github.com/kubernetes/kubernetes/pull/96266), [@chenyw1990](https://github.com/chenyw1990)) [SIG API Machinery]
+- Fix pull image error from multiple ACRs using azure managed identity ([#96355](https://github.com/kubernetes/kubernetes/pull/96355), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fix: resize Azure disk issue when it's in attached state ([#96705](https://github.com/kubernetes/kubernetes/pull/96705), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
+- Fixed a bug that prevents kubectl to validate CRDs with schema using x-kubernetes-preserve-unknown-fields on object fields.
+  Fix kubectl SchemaError on CRDs with schema using x-kubernetes-preserve-unknown-fields on array types. ([#96562](https://github.com/kubernetes/kubernetes/pull/96562), [@gautierdelorme](https://github.com/gautierdelorme)) [SIG API Machinery and Testing]
+- Fixes an issue with the max-in-flight API server filter where the filter could take a long time to process an incoming request if it had been a long time since the last request. ([#96282](https://github.com/kubernetes/kubernetes/pull/96282), [@staebler](https://github.com/staebler)) [SIG API Machinery]
+- HTTP/2 connection health check is enabled by default in all Kubernetes clients. The feature should work out-of-the-box. If needed, users can tune the feature via the HTTP2_READ_IDLE_TIMEOUT_SECONDS and HTTP2_PING_TIMEOUT_SECONDS environment variables. The feature is disabled if HTTP2_READ_IDLE_TIMEOUT_SECONDS is set to 0. ([#96778](https://github.com/kubernetes/kubernetes/pull/96778), [@caesarxuchao](https://github.com/caesarxuchao)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Node]
+- Kubeadm: Fixes a kubeadm upgrade bug that could cause a custom CoreDNS configuration to be replaced with the default. ([#97016](https://github.com/kubernetes/kubernetes/pull/97016), [@rajansandeep](https://github.com/rajansandeep)) [SIG Cluster Lifecycle]
+- Kubeadm: fix coredns migration should be triggered when there are newdefault configs during kubeadm upgrade ([#96970](https://github.com/kubernetes/kubernetes/pull/96970), [@pacoxu](https://github.com/pacoxu)) [SIG Cluster Lifecycle]
+- Metric names for CSI and flexvolume drivers will include the driver name as well as the CSI plugin name. ([#96477](https://github.com/kubernetes/kubernetes/pull/96477), [@mattcary](https://github.com/mattcary)) [SIG Instrumentation and Storage]
+- New Azure instance types do now have correct max data disk count information. ([#94340](https://github.com/kubernetes/kubernetes/pull/94340), [@ialidzhikov](https://github.com/ialidzhikov)) [SIG Cloud Provider and Storage]
+- Resolves a regression in 1.19+ with workloads targeting deprecated beta os/arch labels getting stuck in NodeAffinity status on node startup. ([#96810](https://github.com/kubernetes/kubernetes/pull/96810), [@liggitt](https://github.com/liggitt)) [SIG Node]
+- Volume binding: report UnschedulableAndUnresolvable status instead of an error when bound PVs not found ([#96291](https://github.com/kubernetes/kubernetes/pull/96291), [@cofyc](https://github.com/cofyc)) [SIG Apps, Scheduling and Storage]
+
+## Dependencies
+
+### Added
+_Nothing has changed._
+
+### Changed
+- github.com/google/cadvisor: [v0.37.0 → v0.37.2](https://github.com/google/cadvisor/compare/v0.37.0...v0.37.2)
+- golang.org/x/net: ab34263 → 69a7880
+- golang.org/x/sys: ed371f2 → 5cba982
+
+### Removed
+_Nothing has changed._
+
+
 
 # v1.19.4
 
@@ -327,7 +825,7 @@ filename | sha512 hash
 - Fixed a regression which prevented pods with `docker/default` seccomp annotations from being created in 1.19 if a PodSecurityPolicy was in place which did not allow `runtime/default` seccomp profiles. ([#95990](https://github.com/kubernetes/kubernetes/pull/95990), [@saschagrunert](https://github.com/saschagrunert)) [SIG Auth]
 - Fixed kubelet creating extra sandbox for pods with RestartPolicyOnFailure after all containers succeeded ([#92614](https://github.com/kubernetes/kubernetes/pull/92614), [@tnqn](https://github.com/tnqn)) [SIG Node and Testing]
 - Fixes high CPU usage in kubectl drain ([#95260](https://github.com/kubernetes/kubernetes/pull/95260), [@amandahla](https://github.com/amandahla)) [SIG CLI]
-- If we set SelectPolicy MinPolicySelect on scaleUp behavior or scaleDown behavior,Horizontal Pod Autoscaler doesn`t automatically scale the number of pods correctly ([#95647](https://github.com/kubernetes/kubernetes/pull/95647), [@JoshuaAndrew](https://github.com/JoshuaAndrew)) [SIG Apps and Autoscaling]
+- If we set SelectPolicy MinPolicySelect on scaleUp behavior or scaleDown behavior,Horizontal Pod Autoscaler doesn't automatically scale the number of pods correctly ([#95647](https://github.com/kubernetes/kubernetes/pull/95647), [@JoshuaAndrew](https://github.com/JoshuaAndrew)) [SIG Apps and Autoscaling]
 - Kube-proxy now trims extra spaces found in loadBalancerSourceRanges to match Service validation. ([#94107](https://github.com/kubernetes/kubernetes/pull/94107), [@robscott](https://github.com/robscott)) [SIG Network]
 - Kubeadm: add missing "--experimental-patches" flag to "kubeadm init phase control-plane" ([#95786](https://github.com/kubernetes/kubernetes/pull/95786), [@Sh4d1](https://github.com/Sh4d1)) [SIG Cluster Lifecycle]
 
@@ -414,7 +912,7 @@ filename | sha512 hash
   
   - bazel: output go_binary rule directly from go_binary_conditional_pure
     
-    From: @mikedanese:
+    From: [@mikedanese](https://github.com/mikedanese):
     Instead of aliasing. Aliases are annoying in a number of ways. This is
     specifically bugging me now because they make the action graph harder to
     analyze programmatically. By using aliases here, we would need to handle
@@ -438,7 +936,7 @@ filename | sha512 hash
 - Do not fail sorting empty elements. ([#94666](https://github.com/kubernetes/kubernetes/pull/94666), [@soltysh](https://github.com/soltysh)) [SIG CLI]
 - Ensure getPrimaryInterfaceID not panic when network interfaces for Azure VMSS are null ([#94802](https://github.com/kubernetes/kubernetes/pull/94802), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Fix azure file migration panic ([#94853](https://github.com/kubernetes/kubernetes/pull/94853), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
-- Fix bug where loadbalancer deletion gets stuck because of missing resource group &#35;75198 ([#93962](https://github.com/kubernetes/kubernetes/pull/93962), [@phiphi282](https://github.com/phiphi282)) [SIG Cloud Provider]
+- Fix bug where loadbalancer deletion gets stuck because of missing resource group [#75198](https://github.com/kubernetes/kubernetes/issues/75198) ([#93962](https://github.com/kubernetes/kubernetes/pull/93962), [@phiphi282](https://github.com/phiphi282)) [SIG Cloud Provider]
 - Fix detach azure disk issue when vm not exist ([#95177](https://github.com/kubernetes/kubernetes/pull/95177), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider]
 - Fix etcd_object_counts metric reported by kube-apiserver ([#94819](https://github.com/kubernetes/kubernetes/pull/94819), [@tkashem](https://github.com/tkashem)) [SIG API Machinery]
 - Fix network_programming_latency metric reporting for Endpoints/EndpointSlice deletions, where we don't have correct timestamp ([#95363](https://github.com/kubernetes/kubernetes/pull/95363), [@wojtek-t](https://github.com/wojtek-t)) [SIG Network and Scalability]
@@ -623,7 +1121,7 @@ filename | sha512 hash
 - Fix a concurrent map writes error in kubelet ([#93773](https://github.com/kubernetes/kubernetes/pull/93773), [@knight42](https://github.com/knight42)) [SIG Node]
 - Fix a regression where kubeadm bails out with a fatal error when an optional version command line argument is supplied to the "kubeadm upgrade plan" command ([#94421](https://github.com/kubernetes/kubernetes/pull/94421), [@rosti](https://github.com/rosti)) [SIG Cluster Lifecycle]
 - Fixed bug in reflector that couldn't recover from "Too large resource version" errors with API servers 1.17.0-1.18.5 ([#94316](https://github.com/kubernetes/kubernetes/pull/94316), [@janeczku](https://github.com/janeczku)) [SIG API Machinery]
-- Kubeadm: make the kubeconfig files for the kube-controller-manager and kube-scheduler use the LocalAPIEndpoint instead of the ControlPlaneEndpoint. This makes kubeadm clusters more reseliant to version skew problems during immutable upgrades: https://kubernetes.io/docs/setup/release/version-skew-policy/&#35;kube-controller-manager-kube-scheduler-and-cloud-controller-manager ([#94398](https://github.com/kubernetes/kubernetes/pull/94398), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
+- Kubeadm: make the kubeconfig files for the kube-controller-manager and kube-scheduler use the LocalAPIEndpoint instead of the ControlPlaneEndpoint. This makes kubeadm clusters more reseliant to version skew problems during immutable upgrades: https://kubernetes.io/docs/setup/release/version-skew-policy/#kube-controller-manager-kube-scheduler-and-cloud-controller-manager ([#94398](https://github.com/kubernetes/kubernetes/pull/94398), [@neolit123](https://github.com/neolit123)) [SIG Cluster Lifecycle]
 - Update default etcd server version to 3.4.13 ([#94536](https://github.com/kubernetes/kubernetes/pull/94536), [@jingyih](https://github.com/jingyih)) [SIG API Machinery, Cloud Provider, Cluster Lifecycle and Testing]
 - Upon successful authorization check, an impersonated user is added to the system:authenticated group.
   system:anonymous when impersonated is added to the system:unauthenticated group. ([#94408](https://github.com/kubernetes/kubernetes/pull/94408), [@tkashem](https://github.com/tkashem)) [SIG API Machinery and Testing]
@@ -836,13 +1334,13 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
  - Upgrade kubescheduler.config.k8s.io/v1alpha2 to kubescheduler.config.k8s.io/v1beta1
   
    - `.bindTimeoutSeconds` was moved as part of plugin args for `VolumeBinding`,
-     which can be configured separately per [profile](&#35;profiles).
+     which can be configured separately per profile.
    - `.extenders` are updated to satisfy API standards. In particular:
      - `.extenders` decoding is case sensitive. All fields are affected.
      - `.extenders[*].httpTimeout` is of type `metav1.Duration`.
      - `.extenders[*].enableHttps` is renamed to `.extenders[*].enableHTTPS`.
    - `RequestedToCapacityRatio` args decoding is case sensitive. All fields are affected.
-   - `DefaultPodTopologySpread` [plugin](&#35;scheduling-plugins) is renamed to `SelectorSpread`.
+   - `DefaultPodTopologySpread` plugin is renamed to `SelectorSpread`.
    - `Unreserve` extension point is removed from Profile definition. All `Reserve`
      plugins implement an `Unreserve` call.
    - `.disablePreemption` was removed. Users can disable preemption by disabling the
@@ -883,7 +1381,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 ### API Change
 
 - A new alpha-level field, `SupportsFsGroup`, has been introduced for CSIDrivers to allow them to specify whether they support volume ownership and permission modifications. The `CSIVolumeSupportFSGroup` feature gate must be enabled to allow this field to be used. ([#92001](https://github.com/kubernetes/kubernetes/pull/92001), [@huffmanca](https://github.com/huffmanca)) [SIG API Machinery, CLI and Storage]
-- Added pod version skew strategy for seccomp profile to synchronize the deprecated annotations with the new API Server fields. Please see the corresponding section [in the KEP](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190717-seccomp-ga.md&#35;version-skew-strategy) for more detailed explanations. ([#91408](https://github.com/kubernetes/kubernetes/pull/91408), [@saschagrunert](https://github.com/saschagrunert)) [SIG Apps, Auth, CLI and Node]
+- Added pod version skew strategy for seccomp profile to synchronize the deprecated annotations with the new API Server fields. Please see the corresponding section [in the KEP](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/135-seccomp/README.md#version-skew-strategy) for more detailed explanations. ([#91408](https://github.com/kubernetes/kubernetes/pull/91408), [@saschagrunert](https://github.com/saschagrunert)) [SIG Apps, Auth, CLI and Node]
 - Adds the ability to disable Accelerator/GPU metrics collected by Kubelet ([#91930](https://github.com/kubernetes/kubernetes/pull/91930), [@RenaudWasTaken](https://github.com/RenaudWasTaken)) [SIG Node]
 - Admission webhooks can now return warning messages that are surfaced to API clients, using the `.response.warnings` field in the admission review response. ([#92667](https://github.com/kubernetes/kubernetes/pull/92667), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Testing]
 - CertificateSigningRequest API conditions were updated:
@@ -967,7 +1465,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 
 - A defaultpreemption plugin is registered and enabled in scheduler which replaces the legacy hard-coded Pod preemption logic. ([#92049](https://github.com/kubernetes/kubernetes/pull/92049), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
 - A new extension point `PostFilter` is introduced to scheduler framework which runs after Filter phase to resolve scheduling filter failures. A typical implementation is running preemption logic. ([#91314](https://github.com/kubernetes/kubernetes/pull/91314), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling and Testing]
-- ACTION REQUIRED : In CoreDNS v1.7.0, [metrics names have been changed](https://github.com/coredns/coredns/blob/master/notes/coredns-1.7.0.md&#35;metric-changes) which will be backward incompatible with existing reporting formulas that use the old metrics' names. Adjust your formulas to the new names before upgrading. 
+- ACTION REQUIRED : In CoreDNS v1.7.0, [metrics names have been changed](https://github.com/coredns/coredns/blob/master/notes/coredns-1.7.0.md#metric-changes) which will be backward incompatible with existing reporting formulas that use the old metrics' names. Adjust your formulas to the new names before upgrading. 
   
   Kubeadm now includes CoreDNS version v1.7.0. Some of the major changes include:
   -  Fixed a bug that could cause CoreDNS to stop updating service records.
@@ -1015,15 +1513,15 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 - Feat: change azure disk api-version ([#89250](https://github.com/kubernetes/kubernetes/pull/89250), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
 - Feat: support [Azure shared disk](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/disks-shared-enable), added a new field(`maxShares`) in azure disk storage class:
   
-  kind: StorageClass
-  apiVersion: storage.k8s.io/v1
-  metadata:
-    name: shared-disk
-  provisioner: kubernetes.io/azure-disk
-  parameters:
-    skuname: Premium_LRS  &#35; Currently only available with premium SSDs.
-    cachingMode: None  &#35; ReadOnly host caching is not available for premium SSDs with maxShares>1
-    maxShares: 2 ([#89328](https://github.com/kubernetes/kubernetes/pull/89328), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
+  - kind: StorageClass
+  - apiVersion: storage.k8s.io/v1
+  - metadata:
+    - name: shared-disk
+  - provisioner: kubernetes.io/azure-disk
+  - parameters:
+    - skuname: Premium_LRS  # Currently only available with premium SSDs.
+    - cachingMode: None # ReadOnly host caching is not available for premium SSDs with maxShares>1
+    - maxShares: 2 ([#89328](https://github.com/kubernetes/kubernetes/pull/89328), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
 - Improves IPVS proxy performance by only running `EnsureDummyInterface` if the virtual server address is not binded already. ([#92609](https://github.com/kubernetes/kubernetes/pull/92609), [@andrewsykim](https://github.com/andrewsykim)) [SIG Network]
 - Kube-Proxy now supports EndpointSlices on Windows with the EndpointSliceProxying feature gate. ([#90909](https://github.com/kubernetes/kubernetes/pull/90909), [@kumarvin123](https://github.com/kumarvin123)) [SIG Network and Windows]
 - Kube-Proxy now supports IPv6DualStack on Windows with the IPv6DualStack feature gate. ([#90853](https://github.com/kubernetes/kubernetes/pull/90853), [@kumarvin123](https://github.com/kumarvin123)) [SIG Network, Node and Windows]
@@ -1054,7 +1552,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 - Rename pod_preemption_metrics to preemption_metrics. ([#93256](https://github.com/kubernetes/kubernetes/pull/93256), [@ahg-g](https://github.com/ahg-g)) [SIG Instrumentation and Scheduling]
 - Rest.Config now supports a flag to override proxy configuration that was previously only configurable through environment variables. ([#81443](https://github.com/kubernetes/kubernetes/pull/81443), [@mikedanese](https://github.com/mikedanese)) [SIG API Machinery and Node]
 - Scores from PodTopologySpreading have reduced differentiation as maxSkew increases. ([#90820](https://github.com/kubernetes/kubernetes/pull/90820), [@alculquicondor](https://github.com/alculquicondor)) [SIG Scheduling]
-- Server-side apply behavior has been regularized in the case where a field is removed from the applied configuration. Removed fields which have no other owners are deleted from the live object, or reset to their default value if they have one. Safe ownership transfers, such as the transfer of a `replicas` field from a user to an HPA without resetting to the default value are documented in [Transferring Ownership](https://kubernetes.io/docs/reference/using-api/api-concepts/&#35;transferring-ownership) ([#92661](https://github.com/kubernetes/kubernetes/pull/92661), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Testing]
+- Server-side apply behavior has been regularized in the case where a field is removed from the applied configuration. Removed fields which have no other owners are deleted from the live object, or reset to their default value if they have one. Safe ownership transfers, such as the transfer of a `replicas` field from a user to an HPA without resetting to the default value are documented in [Transferring Ownership](https://kubernetes.io/docs/reference/using-api/api-concepts/#transferring-ownership) ([#92661](https://github.com/kubernetes/kubernetes/pull/92661), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Testing]
 - Service controller: only sync LB node pools when relevant fields in Node changes ([#90769](https://github.com/kubernetes/kubernetes/pull/90769), [@andrewsykim](https://github.com/andrewsykim)) [SIG Apps and Network]
 - Set CSIMigrationvSphere feature gates to beta.
   Users should enable CSIMigration + CSIMigrationvSphere features and install the vSphere CSI Driver (https://github.com/kubernetes-sigs/vsphere-csi-driver) to move workload from the in-tree vSphere plugin "kubernetes.io/vsphere-volume" to vSphere CSI Driver.
@@ -1227,7 +1725,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
   cm.NodeAllocatableRoot(s.CgroupRoot, s.CgroupDriver)
   
   kubeDeps.CAdvisorInterface, err = cadvisor.New(imageFsInfoProvider, s.RootDirectory, cgroupRoots, cadvisor.UsingLegacyCadvisorStats(s.ContainerRuntime, s.RemoteRuntimeEndpoint))
-  the above funtion，as we use cgroupRoots to create cadvisor interface，the wrong parameter cgroupRoots will lead eviction manager not  to collect metric from /docker, then kubelet frequently print those error：
+  the above function，as we use cgroupRoots to create cadvisor interface，the wrong parameter cgroupRoots will lead eviction manager not  to collect metric from /docker, then kubelet frequently print those error：
   E0303 17:25:03.436781 63839 summary_sys_containers.go:47] Failed to get system container stats for "/docker": failed to get cgroup stats for "/docker": failed to get container info for "/docker": unknown container "/docker"
   E0303 17:25:03.436809 63839 helpers.go:680] eviction manager: failed to construct signal: "allocatableMemory.available" error: system container "pods" not found in metrics ([#88970](https://github.com/kubernetes/kubernetes/pull/88970), [@mysunshine92](https://github.com/mysunshine92)) [SIG Node]
 - In a HA env, during the period a standby scheduler lost connection to API server, if a Pod is deleted and recreated, and the standby scheduler becomes master afterwards, there could be a scheduler cache corruption. This PR fixes this issue. ([#91126](https://github.com/kubernetes/kubernetes/pull/91126), [@Huang-Wei](https://github.com/Huang-Wei)) [SIG Scheduling]
@@ -1333,7 +1831,6 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
 - Kubeadm now forwards the IPv6DualStack feature gate using the kubelet component config, instead of the kubelet command line ([#90840](https://github.com/kubernetes/kubernetes/pull/90840), [@rosti](https://github.com/rosti)) [SIG Cluster Lifecycle]
 - Kubeadm: do not use a DaemonSet for the pre-pull of control-plane images during "kubeadm upgrade apply". Individual node upgrades now pull the required images using a preflight check. The flag "--image-pull-timeout" for "kubeadm upgrade apply" is now deprecated and will be removed in a future release following a GA deprecation policy. ([#90788](https://github.com/kubernetes/kubernetes/pull/90788), [@xlgao-zju](https://github.com/xlgao-zju)) [SIG Cluster Lifecycle]
 - Kubeadm: use two separate checks on /livez and /readyz for the kube-apiserver static Pod instead of using /healthz ([#90970](https://github.com/kubernetes/kubernetes/pull/90970), [@johscheuer](https://github.com/johscheuer)) [SIG Cluster Lifecycle]
-- NONE ([#91597](https://github.com/kubernetes/kubernetes/pull/91597), [@elmiko](https://github.com/elmiko)) [SIG Autoscaling and Testing]
 - Openapi-controller: remove the trailing `1` character literal from the rate limiting metric `APIServiceOpenAPIAggregationControllerQueue1` and rename it to `open_api_aggregation_controller` to adhere to Prometheus best practices. ([#77979](https://github.com/kubernetes/kubernetes/pull/77979), [@s-urbaniak](https://github.com/s-urbaniak)) [SIG API Machinery]
 - Reduce event spam during a volume operation error. ([#89794](https://github.com/kubernetes/kubernetes/pull/89794), [@msau42](https://github.com/msau42)) [SIG Storage]
 - Refactor the local nodeipam range allocator and instrument the cidrset used to store the allocated CIDRs with the following metrics:
@@ -2132,13 +2629,13 @@ filename | sha512 hash
 
 ### API Change
 
-- Added pod version skew strategy for seccomp profile to synchronize the deprecated annotations with the new API Server fields. Please see the corresponding section [in the KEP](https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/20190717-seccomp-ga.mdversion-skew-strategy) for more detailed explanations. ([#91408](https://github.com/kubernetes/kubernetes/pull/91408), [@saschagrunert](https://github.com/saschagrunert)) [SIG Apps, Auth, CLI and Node]
+- Added pod version skew strategy for seccomp profile to synchronize the deprecated annotations with the new API Server fields. Please see the corresponding section [in the KEP](https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/135-seccomp#version-skew-strategy) for more detailed explanations. ([#91408](https://github.com/kubernetes/kubernetes/pull/91408), [@saschagrunert](https://github.com/saschagrunert)) [SIG Apps, Auth, CLI and Node]
 - Custom Endpoints are now mirrored to EndpointSlices by a new EndpointSliceMirroring controller. ([#91637](https://github.com/kubernetes/kubernetes/pull/91637), [@robscott](https://github.com/robscott)) [SIG API Machinery, Apps, Auth, Cloud Provider, Instrumentation, Network and Testing]
 - Generic ephemeral volumes, a new alpha feature under the `GenericEphemeralVolume` feature gate, provide a more flexible alternative to `EmptyDir` volumes: as with `EmptyDir`, volumes are created and deleted for each pod automatically by Kubernetes. But because the normal provisioning process is used (`PersistentVolumeClaim`), storage can be provided by third-party storage vendors and all of the usual volume features work. Volumes don't need to be empt; for example, restoring from snapshot is supported. ([#92784](https://github.com/kubernetes/kubernetes/pull/92784), [@pohly](https://github.com/pohly)) [SIG API Machinery, Apps, Auth, CLI, Instrumentation, Node, Scheduling, Storage and Testing]
 
 ### Feature
 
-- ACTION REQUIRED : In CoreDNS v1.7.0, [metrics names have been changed](https://github.com/coredns/coredns/blob/master/notes/coredns-1.7.0.md&#35;metric-changes) which will be backward incompatible with existing reporting formulas that use the old metrics' names. Adjust your formulas to the new names before upgrading. 
+- ACTION REQUIRED : In CoreDNS v1.7.0, [metrics names have been changed](https://github.com/coredns/coredns/blob/master/notes/coredns-1.7.0.md#metric-changes) which will be backward incompatible with existing reporting formulas that use the old metrics' names. Adjust your formulas to the new names before upgrading. 
   
   Kubeadm now includes CoreDNS version v1.7.0. Some of the major changes include:
   -  Fixed a bug that could cause CoreDNS to stop updating service records.
@@ -2151,7 +2648,7 @@ filename | sha512 hash
 - Audit events for API requests to deprecated API versions now include a `"k8s.io/deprecated": "true"` audit annotation. If a target removal release is identified, the audit event includes a `"k8s.io/removal-release": "<majorVersion>.<minorVersion>"` audit annotation as well. ([#92842](https://github.com/kubernetes/kubernetes/pull/92842), [@liggitt](https://github.com/liggitt)) [SIG API Machinery and Instrumentation]
 - Cloud node-controller use InstancesV2 ([#91319](https://github.com/kubernetes/kubernetes/pull/91319), [@gongguan](https://github.com/gongguan)) [SIG Apps, Cloud Provider, Scalability and Storage]
 - Kubeadm: deprecate the "--csr-only" and "--csr-dir" flags of the "kubeadm init phase certs" subcommands. Please use "kubeadm alpha certs generate-csr" instead. This new command allows you to generate new private keys and certificate signing requests for all the control-plane components, so that the certificates can be signed by an external CA. ([#92183](https://github.com/kubernetes/kubernetes/pull/92183), [@wallrj](https://github.com/wallrj)) [SIG Cluster Lifecycle]
-- Server-side apply behavior has been regularized in the case where a field is removed from the applied configuration. Removed fields which have no other owners are deleted from the live object, or reset to their default value if they have one. Safe ownership transfers, such as the transfer of a `replicas` field from a user to an HPA without resetting to the default value are documented in [Transferring Ownership](https://kubernetes.io/docs/reference/using-api/api-concepts/&#35;transferring-ownership) ([#92661](https://github.com/kubernetes/kubernetes/pull/92661), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Testing]
+- Server-side apply behavior has been regularized in the case where a field is removed from the applied configuration. Removed fields which have no other owners are deleted from the live object, or reset to their default value if they have one. Safe ownership transfers, such as the transfer of a `replicas` field from a user to an HPA without resetting to the default value are documented in [Transferring Ownership](https://kubernetes.io/docs/reference/using-api/api-concepts/#transferring-ownership) ([#92661](https://github.com/kubernetes/kubernetes/pull/92661), [@jpbetz](https://github.com/jpbetz)) [SIG API Machinery, CLI, Cloud Provider, Cluster Lifecycle, Instrumentation and Testing]
 - Set CSIMigrationvSphere feature gates to beta.
   Users should enable CSIMigration + CSIMigrationvSphere features and install the vSphere CSI Driver (https://github.com/kubernetes-sigs/vsphere-csi-driver) to move workload from the in-tree vSphere plugin "kubernetes.io/vsphere-volume" to vSphere CSI Driver.
   
@@ -2486,7 +2983,6 @@ filename | sha512 hash
 - Kubeadm now forwards the IPv6DualStack feature gate using the kubelet component config, instead of the kubelet command line ([#90840](https://github.com/kubernetes/kubernetes/pull/90840), [@rosti](https://github.com/rosti)) [SIG Cluster Lifecycle]
 - Kubeadm: do not use a DaemonSet for the pre-pull of control-plane images during "kubeadm upgrade apply". Individual node upgrades now pull the required images using a preflight check. The flag "--image-pull-timeout" for "kubeadm upgrade apply" is now deprecated and will be removed in a future release following a GA deprecation policy. ([#90788](https://github.com/kubernetes/kubernetes/pull/90788), [@xlgao-zju](https://github.com/xlgao-zju)) [SIG Cluster Lifecycle]
 - Kubeadm: use two separate checks on /livez and /readyz for the kube-apiserver static Pod instead of using /healthz ([#90970](https://github.com/kubernetes/kubernetes/pull/90970), [@johscheuer](https://github.com/johscheuer)) [SIG Cluster Lifecycle]
-- NONE ([#91597](https://github.com/kubernetes/kubernetes/pull/91597), [@elmiko](https://github.com/elmiko)) [SIG Autoscaling and Testing]
 - Remove deprecated --server-dry-run flag from kubectl apply ([#91308](https://github.com/kubernetes/kubernetes/pull/91308), [@julianvmodesto](https://github.com/julianvmodesto)) [SIG CLI and Testing]
 - The "HostPath should give a volume the correct mode" is no longer a conformance test ([#90861](https://github.com/kubernetes/kubernetes/pull/90861), [@dims](https://github.com/dims)) [SIG Architecture and Testing]
 - The Kubelet's --experimental-mounter-path and --experimental-check-node-capabilities-before-mount options are now marked as deprecated. ([#91373](https://github.com/kubernetes/kubernetes/pull/91373), [@knabben](https://github.com/knabben)) [SIG Node]
@@ -2848,7 +3344,6 @@ filename | sha512 hash
 - Drop some conformance tests that rely on Kubelet API directly ([#90615](https://github.com/kubernetes/kubernetes/pull/90615), [@dims](https://github.com/dims)) [SIG Architecture, Network, Release and Testing]
 - Kube-proxy exposes a new metric, `kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds`, that indicates the last time a change for kube-proxy was queued to be applied. ([#90175](https://github.com/kubernetes/kubernetes/pull/90175), [@squeed](https://github.com/squeed)) [SIG Instrumentation and Network]
 - Kubeadm: fix badly formatted error message for small service CIDRs ([#90411](https://github.com/kubernetes/kubernetes/pull/90411), [@johscheuer](https://github.com/johscheuer)) [SIG Cluster Lifecycle]
-- None. ([#90484](https://github.com/kubernetes/kubernetes/pull/90484), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Remove the repeated calculation of nodeName and hostname during kubelet startup, these parameters are all calculated in the `RunKubelet` method ([#90284](https://github.com/kubernetes/kubernetes/pull/90284), [@wawa0210](https://github.com/wawa0210)) [SIG Node]
 - UI change ([#87743](https://github.com/kubernetes/kubernetes/pull/87743), [@u2takey](https://github.com/u2takey)) [SIG Apps and Node]
 - Update opencontainers/runtime-spec dependency to v1.0.2 ([#89644](https://github.com/kubernetes/kubernetes/pull/89644), [@saschagrunert](https://github.com/saschagrunert)) [SIG Node]
@@ -2971,7 +3466,7 @@ filename | sha512 hash
 - In the kubelet resource metrics endpoint at /metrics/resource, change the names of the following metrics:
   - node_cpu_usage_seconds --> node_cpu_usage_seconds_total
   - container_cpu_usage_seconds --> container_cpu_usage_seconds_total
-  This is a partial revert of &#35;86282, which was added in 1.18.0, and initially removed the _total suffix ([#89540](https://github.com/kubernetes/kubernetes/pull/89540), [@dashpole](https://github.com/dashpole)) [SIG Instrumentation and Node]
+  This is a partial revert of [#86282](https://github.com/kubernetes/kubernetes/pull/86282), which was added in 1.18.0, and initially removed the _total suffix ([#89540](https://github.com/kubernetes/kubernetes/pull/89540), [@dashpole](https://github.com/dashpole)) [SIG Instrumentation and Node]
 - Kube-apiserver: multiple comma-separated protocols in a single X-Stream-Protocol-Version header are now recognized, in addition to multiple headers, complying with RFC2616 ([#89857](https://github.com/kubernetes/kubernetes/pull/89857), [@tedyu](https://github.com/tedyu)) [SIG API Machinery]
 - Kubeadm increased to 5 minutes its timeout for the TLS bootstrapping process to complete upon join ([#89735](https://github.com/kubernetes/kubernetes/pull/89735), [@rosti](https://github.com/rosti)) [SIG Cluster Lifecycle]
 - Kubeadm: during join when a check is performed that a Node with the same name already exists in the cluster, make sure the NodeReady condition is properly validated ([#89602](https://github.com/kubernetes/kubernetes/pull/89602), [@kvaps](https://github.com/kvaps)) [SIG Cluster Lifecycle]
@@ -2988,7 +3483,6 @@ filename | sha512 hash
 - Change beta.kubernetes.io/os  to kubernetes.io/os ([#89460](https://github.com/kubernetes/kubernetes/pull/89460), [@wawa0210](https://github.com/wawa0210)) [SIG Testing and Windows]
 - Changes not found message when using `kubectl get` to retrieve not namespaced resources ([#89861](https://github.com/kubernetes/kubernetes/pull/89861), [@rccrdpccl](https://github.com/rccrdpccl)) [SIG CLI]
 - Node ([#76443](https://github.com/kubernetes/kubernetes/pull/76443), [@mgdevstack](https://github.com/mgdevstack)) [SIG Architecture, Network, Node, Testing and Windows]
-- None. ([#90273](https://github.com/kubernetes/kubernetes/pull/90273), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Reduce event spam during a volume operation error. ([#89794](https://github.com/kubernetes/kubernetes/pull/89794), [@msau42](https://github.com/msau42)) [SIG Storage]
 - The PR adds functionality to generate events when a PV or PVC processing encounters certain failures. The events help users to know the reason for the failure so they can take necessary recovery actions. ([#89845](https://github.com/kubernetes/kubernetes/pull/89845), [@yuga711](https://github.com/yuga711)) [SIG Apps]
 - The PodShareProcessNamespace feature gate has been removed, and the PodShareProcessNamespace is unconditionally enabled. ([#90099](https://github.com/kubernetes/kubernetes/pull/90099), [@tanjunchen](https://github.com/tanjunchen)) [SIG Node]
@@ -3074,9 +3568,9 @@ filename | sha512 hash
 - Allow user to specify fsgroup permission change policy for pods ([#88488](https://github.com/kubernetes/kubernetes/pull/88488), [@gnufied](https://github.com/gnufied)) [SIG Apps and Storage]
 - AppProtocol is a new field on Service and Endpoints resources, enabled with the ServiceAppProtocol feature gate. ([#88503](https://github.com/kubernetes/kubernetes/pull/88503), [@robscott](https://github.com/robscott)) [SIG Apps and Network]
 - BlockVolume and CSIBlockVolume features are now GA. ([#88673](https://github.com/kubernetes/kubernetes/pull/88673), [@jsafrane](https://github.com/jsafrane)) [SIG Apps, Node and Storage]
-- Consumers of the 'certificatesigningrequests/approval' API must now grant permission to 'approve' CSRs for the 'signerName' specified on the CSR. More information on the new signerName field can be found at https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/20190607-certificates-api.md&#35;signers ([#88246](https://github.com/kubernetes/kubernetes/pull/88246), [@munnerz](https://github.com/munnerz)) [SIG API Machinery, Apps, Auth, CLI, Node and Testing]
-- CustomResourceDefinition schemas that use `x-kubernetes-list-map-keys` to specify properties that uniquely identify list items must make those properties required or have a default value, to ensure those properties are present for all list items. See https://kubernetes.io/docs/reference/using-api/api-concepts/&#35;merge-strategy for details. ([#88076](https://github.com/kubernetes/kubernetes/pull/88076), [@eloyekunle](https://github.com/eloyekunle)) [SIG API Machinery and Testing]
-- Fixed missing validation of uniqueness of list items in lists with `x-kubernetes-list-type: map` or x-kubernetes-list-type: set` in CustomResources. ([#84920](https://github.com/kubernetes/kubernetes/pull/84920), [@sttts](https://github.com/sttts)) [SIG API Machinery]
+- Consumers of the 'certificatesigningrequests/approval' API must now grant permission to 'approve' CSRs for the 'signerName' specified on the CSR. More information on the new signerName field can be found at https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/1513-certificate-signing-request/README.md/#signers ([#88246](https://github.com/kubernetes/kubernetes/pull/88246), [@munnerz](https://github.com/munnerz)) [SIG API Machinery, Apps, Auth, CLI, Node and Testing]
+- CustomResourceDefinition schemas that use `x-kubernetes-list-map-keys` to specify properties that uniquely identify list items must make those properties required or have a default value, to ensure those properties are present for all list items. See https://kubernetes.io/docs/reference/using-api/api-concepts/#merge-strategy for details. ([#88076](https://github.com/kubernetes/kubernetes/pull/88076), [@eloyekunle](https://github.com/eloyekunle)) [SIG API Machinery and Testing]
+- Fixed missing validation of uniqueness of list items in lists with `x-kubernetes-list-type: map` or `x-kubernetes-list-type: set` in CustomResources. ([#84920](https://github.com/kubernetes/kubernetes/pull/84920), [@sttts](https://github.com/sttts)) [SIG API Machinery]
 - Fixes a regression with clients prior to 1.15 not being able to update podIP in pod status, or podCIDR in node spec, against >= 1.16 API servers ([#88505](https://github.com/kubernetes/kubernetes/pull/88505), [@liggitt](https://github.com/liggitt)) [SIG Apps and Network]
 - Ingress: Add Exact and Prefix maching to Ingress PathTypes ([#88587](https://github.com/kubernetes/kubernetes/pull/88587), [@cmluciano](https://github.com/cmluciano)) [SIG Apps, Cluster Lifecycle and Network]
 - Ingress: Add alternate backends via TypedLocalObjectReference ([#88775](https://github.com/kubernetes/kubernetes/pull/88775), [@cmluciano](https://github.com/cmluciano)) [SIG Apps and Network]
@@ -3084,7 +3578,7 @@ filename | sha512 hash
 - Introduces optional --detect-local flag to kube-proxy. 
   Currently the only supported value is "cluster-cidr", 
   which is the default if not specified. ([#87748](https://github.com/kubernetes/kubernetes/pull/87748), [@satyasm](https://github.com/satyasm)) [SIG Cluster Lifecycle, Network and Scheduling]
-- Kube-controller-manager and kube-scheduler expose profiling by default to match the kube-apiserver.  Use `--enable-profiling=false` to disable. ([#88663](https://github.com/kubernetes/kubernetes/pull/88663), [@deads2k](https://github.com/deads2k)) [SIG API Machinery, Cloud Provider and Scheduling]
+- Kube-controller-manager and kube-scheduler expose profiling by default to match the kube-apiserver.  Use `--profiling=false` to disable. ([#88663](https://github.com/kubernetes/kubernetes/pull/88663), [@deads2k](https://github.com/deads2k)) [SIG API Machinery, Cloud Provider and Scheduling]
 - Kube-scheduler can run more than one scheduling profile. Given a pod, the profile is selected by using its `.spec.SchedulerName`. ([#88285](https://github.com/kubernetes/kubernetes/pull/88285), [@alculquicondor](https://github.com/alculquicondor)) [SIG Apps, Scheduling and Testing]
 - Move TaintBasedEvictions feature gates to GA ([#87487](https://github.com/kubernetes/kubernetes/pull/87487), [@skilxn-go](https://github.com/skilxn-go)) [SIG API Machinery, Apps, Node, Scheduling and Testing]
 - Moving Windows RunAsUserName feature to GA ([#87790](https://github.com/kubernetes/kubernetes/pull/87790), [@marosset](https://github.com/marosset)) [SIG Apps and Windows]
@@ -3092,7 +3586,7 @@ filename | sha512 hash
 - New flag `--show-hidden-metrics-for-version` in kubelet can be used to show all hidden metrics that deprecated in the previous minor release. ([#85282](https://github.com/kubernetes/kubernetes/pull/85282), [@serathius](https://github.com/serathius)) [SIG Node]
 - Removes ConfigMap as suggestion for IngressClass parameters ([#89093](https://github.com/kubernetes/kubernetes/pull/89093), [@robscott](https://github.com/robscott)) [SIG Network]
 - Scheduler Extenders can now be configured in the v1alpha2 component config ([#88768](https://github.com/kubernetes/kubernetes/pull/88768), [@damemi](https://github.com/damemi)) [SIG Release, Scheduling and Testing]
-- The apiserver/v1alph1&#35;EgressSelectorConfiguration API is now beta. ([#88502](https://github.com/kubernetes/kubernetes/pull/88502), [@caesarxuchao](https://github.com/caesarxuchao)) [SIG API Machinery]
+- The apiserver/v1alph1 #EgressSelectorConfiguration API is now beta. ([#88502](https://github.com/kubernetes/kubernetes/pull/88502), [@caesarxuchao](https://github.com/caesarxuchao)) [SIG API Machinery]
 - The storage.k8s.io/CSIDriver has moved to GA, and is now available for use. ([#84814](https://github.com/kubernetes/kubernetes/pull/84814), [@huffmanca](https://github.com/huffmanca)) [SIG API Machinery, Apps, Auth, Node, Scheduling, Storage and Testing]
 - VolumePVCDataSource moves to GA in 1.18 release ([#88686](https://github.com/kubernetes/kubernetes/pull/88686), [@j-griffith](https://github.com/j-griffith)) [SIG Apps, CLI and Cluster Lifecycle]
 
@@ -3110,21 +3604,21 @@ filename | sha512 hash
   After the connection closed(received GOAWAY), the client's other in-flight requests won't be affected, and the client will reconnect. 
   The flag min value is 0 (off), max is .02 (1/50 requests); .001 (1/1000) is a recommended starting point.
   Clusters with single apiservers, or which don't use a load balancer, should NOT enable this. ([#88567](https://github.com/kubernetes/kubernetes/pull/88567), [@answer1991](https://github.com/answer1991)) [SIG API Machinery]
-- Azure Cloud Provider now supports using Azure network resources (Virtual Network, Load Balancer, Public IP, Route Table, Network Security Group, etc.) in different AAD Tenant and Subscription than those for the Kubernetes cluster. To use the feature, please reference https://github.com/kubernetes-sigs/cloud-provider-azure/blob/master/docs/cloud-provider-config.md&#35;host-network-resources-in-different-aad-tenant-and-subscription. ([#88384](https://github.com/kubernetes/kubernetes/pull/88384), [@bowen5](https://github.com/bowen5)) [SIG Cloud Provider]
+- Azure Cloud Provider now supports using Azure network resources (Virtual Network, Load Balancer, Public IP, Route Table, Network Security Group, etc.) in different AAD Tenant and Subscription than those for the Kubernetes cluster. To use the feature, please reference https://github.com/kubernetes-sigs/cloud-provider-azure/blob/master/docs/cloud-provider-config.md/#host-network-resources-in-different-aad-tenant-and-subscription. ([#88384](https://github.com/kubernetes/kubernetes/pull/88384), [@bowen5](https://github.com/bowen5)) [SIG Cloud Provider]
 - Azure: add support for single stack IPv6 ([#88448](https://github.com/kubernetes/kubernetes/pull/88448), [@aramase](https://github.com/aramase)) [SIG Cloud Provider]
 - DefaultConstraints can be specified for the PodTopologySpread plugin in the component config ([#88671](https://github.com/kubernetes/kubernetes/pull/88671), [@alculquicondor](https://github.com/alculquicondor)) [SIG Scheduling]
 - EndpointSlice controller waits longer to retry failed sync. ([#89438](https://github.com/kubernetes/kubernetes/pull/89438), [@robscott](https://github.com/robscott)) [SIG Apps and Network]
 - Feat: change azure disk api-version ([#89250](https://github.com/kubernetes/kubernetes/pull/89250), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
 - Feat: support [Azure shared disk](https://docs.microsoft.com/en-us/azure/virtual-machines/windows/disks-shared-enable), added a new field(`maxShares`) in azure disk storage class:
   
-  kind: StorageClass
-  apiVersion: storage.k8s.io/v1
-  metadata:
-    name: shared-disk
-  provisioner: kubernetes.io/azure-disk
-  parameters:
-    skuname: Premium_LRS  &#35; Currently only available with premium SSDs.
-    cachingMode: None  &#35; ReadOnly host caching is not available for premium SSDs with maxShares>1
+  - kind: StorageClass
+  - apiVersion: storage.k8s.io/v1
+  - metadata:
+    - name: shared-disk
+  - provisioner: kubernetes.io/azure-disk
+  - parameters:
+    - skuname: Premium_LRS  # Currently only available with premium SSDs.
+    - cachingMode: None  # ReadOnly host caching is not available for premium SSDs with maxShares>1
     maxShares: 2 ([#89328](https://github.com/kubernetes/kubernetes/pull/89328), [@andyzhangx](https://github.com/andyzhangx)) [SIG Cloud Provider and Storage]
 - Kube-apiserver, kube-scheduler and kube-controller manager now use SO_REUSEPORT socket option when listening on address defined by --bind-address and --secure-port flags, when running on Unix systems (Windows is NOT supported). This allows to run multiple instances of those processes on a single host with the same configuration, which allows to update/restart them in a graceful way, without causing downtime. ([#88893](https://github.com/kubernetes/kubernetes/pull/88893), [@invidian](https://github.com/invidian)) [SIG API Machinery, Scheduling and Testing]
 - Kubeadm: The ClusterStatus struct present in the kubeadm-config ConfigMap is deprecated and will be removed on a future version. It is going to be maintained by kubeadm until it gets removed. The same information can be found on `etcd` and `kube-apiserver` pod annotations, `kubeadm.kubernetes.io/etcd.advertise-client-urls` and `kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint` respectively. ([#87656](https://github.com/kubernetes/kubernetes/pull/87656), [@ereslibre](https://github.com/ereslibre)) [SIG Cluster Lifecycle]

@@ -42,6 +42,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	cmoptions "k8s.io/controller-manager/options"
 	"k8s.io/controller-manager/pkg/clientbuilder"
+
 	// add the related feature gates
 	_ "k8s.io/controller-manager/pkg/features/register"
 )
@@ -98,7 +99,6 @@ func NewCloudControllerManagerOptions() (*CloudControllerManagerOptions, error) 
 
 	s.Authentication.RemoteKubeConfigFileOptional = true
 	s.Authorization.RemoteKubeConfigFileOptional = true
-	s.Authorization.AlwaysAllowPaths = []string{"/healthz"}
 
 	// Set the PairName but leave certificate directory blank to generate in-memory by default
 	s.SecureServing.ServerCert.CertDirectory = ""
@@ -188,20 +188,16 @@ func (o *CloudControllerManagerOptions) ApplyTo(c *config.Config, userAgent stri
 		return err
 	}
 
-	c.LeaderElectionClient = clientset.NewForConfigOrDie(restclient.AddUserAgent(c.Kubeconfig, "leader-election"))
-
 	c.EventRecorder = createRecorder(c.Client, userAgent)
 
 	rootClientBuilder := clientbuilder.SimpleControllerClientBuilder{
 		ClientConfig: c.Kubeconfig,
 	}
 	if c.ComponentConfig.KubeCloudShared.UseServiceAccountCredentials {
-		c.ClientBuilder = clientbuilder.SAControllerClientBuilder{
-			ClientConfig:         restclient.AnonymousClientConfig(c.Kubeconfig),
-			CoreClient:           c.Client.CoreV1(),
-			AuthenticationClient: c.Client.AuthenticationV1(),
-			Namespace:            metav1.NamespaceSystem,
-		}
+		c.ClientBuilder = clientbuilder.NewDynamicClientBuilder(
+			restclient.AnonymousClientConfig(c.Kubeconfig),
+			c.Client.CoreV1(),
+			metav1.NamespaceSystem)
 	} else {
 		c.ClientBuilder = rootClientBuilder
 	}

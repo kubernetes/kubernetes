@@ -257,7 +257,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 		if exists {
 			klog.V(4).Infof("Got ACR credentials from cache for %s", loginServer)
 		} else {
-			klog.V(2).Info("unable to get ACR credentials from cache for %s, checking ACR API", loginServer)
+			klog.V(2).Infof("unable to get ACR credentials from cache for %s, checking ACR API", loginServer)
 			var err error
 			cfg, err = a.getFromACR(loginServer)
 			if err != nil {

@@ -60,30 +60,34 @@
         "ports": [
           {
             "protocol": "Ǐ2啗塧ȱ蓿彭聡A3fƻfʣ",
-            "port": 2
+            "port": 2,
+            "endPort": -420211493
           }
         ],
         "from": [
           {
             "podSelector": {
               "matchLabels": {
-                "yg--79-e-a74bc-v--0jjy45-17-053.zyyms7-tk1po6c-m61733-x-2v4r--5-xgc3-yz-7-x--c0-w5-6r/78A6.6O": "17_.8CnT"
+                "5__.h-J-M.9_T.q-o7.y-SQ.9A-F-.4--_vLW.jj-.5B.._.5_3-4": "31-4.xXe..03f_--0..L.0qQ6W-.d.20h-OK-_g"
               },
               "matchExpressions": [
                 {
-                  "key": "3--2---u--80k1-57----1-x1z-4/r.i1_7z.WH-.._Td2-N_Y.t--_0..--_6V",
+                  "key": "R6S17_.8CnK_O.d-._NwcGnP-w-Sf5_Or.i1_7z.WH-.._Td2-N_Y.v",
                   "operator": "Exists"
                 }
               ]
             },
             "namespaceSelector": {
               "matchLabels": {
-                "g--5.-Z3P__D__6t-2.-_-8wE._._3.-.83_iq_-y.-25C.A-7": "9dfn3Y8d_0_.---M_4FpF_W-1._-vL_i.-_-a--G-I.-_Y33--.8U.-.5-R"
+                "pl6-2-316/NgO-d.iUaC_wYSJfB._.zS-._..3le-Q4-R-083.S5": "U_D__6t-2.-_-8wE._._3.-.83_iq_-y.-25C.A-j..9dfn3Y8d_0_.-y"
               },
               "matchExpressions": [
                 {
-                  "key": "2_28.-.7_8B.HF-U-_ik_--DSXr.n-A9..9__Y-H-Mqpt._.-_..051",
-                  "operator": "DoesNotExist"
+                  "key": "f9wk-3--652xh.2a-ik-ak---r0nh-9289---x-p-qpt6-1w-3205c1lxeqyn-5--9d5a3-7bq/4FpF_W-1._-vL_i.-_-a--G-I.-_Y33--.8U.-.5--_zm-.-_RJt2X",
+                  "operator": "In",
+                  "values": [
+                    "g4"
+                  ]
                 }
               ]
             },
@@ -101,37 +105,32 @@
       {
         "ports": [
           {
-            "protocol": "ɗ",
-            "port": 3
+            "protocol": "s3!Zɾģ毋",
+            "port": 3,
+            "endPort": -630252364
           }
         ],
         "to": [
           {
             "podSelector": {
               "matchLabels": {
-                "hg1-o-p665--4-j8---t6-r7---d--uml-8rdh6844-i-18-850-4s2o8.x4--s--xu-d42--clo90---461v-07r--0---8-30iu/s6.0_OHz_.B-.-_w_--.8_r_N-.3n-x.-_-_-Nm-_X3.1d_YH3x---.._1_.NX": "f-AH-Q.GM72_-c-.-.6--3-___t-8"
+                "P1s-V.9.3": "9..c_uo3a"
               },
               "matchExpressions": [
                 {
-                  "key": "b_2_-8-----yY",
-                  "operator": "NotIn",
-                  "values": [
-                    "M24"
-                  ]
+                  "key": "1_o_p665O_4Gj._BXt.O-7___-Y_um-_8r--684._-_18_...E.-2oy",
+                  "operator": "DoesNotExist"
                 }
               ]
             },
             "namespaceSelector": {
               "matchLabels": {
-                "P____K_1": "Xfr.4_.-_-_-...1py_8-3..s._.x.2K_2qu_0S-CqW.D_8--21kv"
+                "5l-59g-qy5--ar-gn58nc2-3--6-o-h-9-15v-5925a-x12a-214-3sc/M.JP_oA_4A.J2s3.XL6_EU--AH-Q.GM7B": "N-_-vv-Q2qz.W..4....-h._.GgT7_7B_D-..-.k4uz"
               },
               "matchExpressions": [
                 {
-                  "key": "4a--0o8m3-d0w7p8vl-1z---883d-v3j4-7y-5.9-q390/niTl.1-.VT--5mj_9.M.134-5-.q6H5",
-                  "operator": "NotIn",
-                  "values": [
-                    "7-.p_3_J_SA995IKCR.sm"
-                  ]
+                  "key": "7u-tie4-7--gm3.38vl-1z---883d-v3j4-7y-p--u/d-4_4--.-_Z4.LA3HVG93_._.I3.__-.0-z_z0sn8",
+                  "operator": "DoesNotExist"
                 }
               ]
             },
@@ -146,7 +145,7 @@
       }
     ],
     "policyTypes": [
-      "ĨǔvÄ"
+      "(dŊiɢz"
     ]
   }
 }

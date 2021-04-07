@@ -54,7 +54,7 @@ type RR interface {
 	// parse parses an RR from zone file format.
 	//
 	// This will only be called on a new and empty RR type with only the header populated.
-	parse(c *zlexer, origin, file string) *ParseError
+	parse(c *zlexer, origin string) *ParseError
 
 	// isDuplicate returns whether the two RRs are duplicates.
 	isDuplicate(r2 RR) bool
@@ -105,7 +105,7 @@ func (h *RR_Header) unpack(msg []byte, off int) (int, error) {
 	panic("dns: internal error: unpack should never be called on RR_Header")
 }
 
-func (h *RR_Header) parse(c *zlexer, origin, file string) *ParseError {
+func (h *RR_Header) parse(c *zlexer, origin string) *ParseError {
 	panic("dns: internal error: parse should never be called on RR_Header")
 }
 

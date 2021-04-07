@@ -16,10 +16,12 @@ limitations under the License.
 
 package queue
 
+import (
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+)
+
 // Events that trigger scheduler queue to change.
 const (
-	// Unknown event
-	Unknown = "Unknown"
 	// PodAdd is the event when a new pod is added to API server.
 	PodAdd = "PodAdd"
 	// NodeAdd is the event when a new node is added to the cluster.
@@ -63,10 +65,35 @@ const (
 	NodeSpecUnschedulableChange = "NodeSpecUnschedulableChange"
 	// NodeAllocatableChange is the event when node allocatable is changed.
 	NodeAllocatableChange = "NodeAllocatableChange"
-	// NodeLabelsChange is the event when node label is changed.
+	// NodeLabelChange is the event when node label is changed.
 	NodeLabelChange = "NodeLabelChange"
-	// NodeTaintsChange is the event when node taint is changed.
+	// NodeTaintChange is the event when node taint is changed.
 	NodeTaintChange = "NodeTaintChange"
 	// NodeConditionChange is the event when node condition is changed.
 	NodeConditionChange = "NodeConditionChange"
 )
+
+// TODO: benchmark the perf gain if making the keys as enums (int), and then
+// making clusterEventReg a []framework.ClusterEvent.
+var clusterEventReg = map[string]framework.ClusterEvent{
+	AssignedPodAdd:              {Resource: framework.Pod, ActionType: framework.Add},
+	AssignedPodUpdate:           {Resource: framework.Pod, ActionType: framework.Update},
+	AssignedPodDelete:           {Resource: framework.Pod, ActionType: framework.Delete},
+	NodeAdd:                     {Resource: framework.Node, ActionType: framework.Add},
+	NodeSpecUnschedulableChange: {Resource: framework.Node, ActionType: framework.UpdateNodeTaint},
+	NodeAllocatableChange:       {Resource: framework.Node, ActionType: framework.UpdateNodeAllocatable},
+	NodeLabelChange:             {Resource: framework.Node, ActionType: framework.UpdateNodeLabel},
+	NodeTaintChange:             {Resource: framework.Node, ActionType: framework.UpdateNodeTaint},
+	NodeConditionChange:         {Resource: framework.Node, ActionType: framework.UpdateNodeCondition},
+	PvAdd:                       {Resource: framework.PersistentVolume, ActionType: framework.Add},
+	PvUpdate:                    {Resource: framework.PersistentVolume, ActionType: framework.Update},
+	PvcAdd:                      {Resource: framework.PersistentVolumeClaim, ActionType: framework.Add},
+	PvcUpdate:                   {Resource: framework.PersistentVolumeClaim, ActionType: framework.Update},
+	StorageClassAdd:             {Resource: framework.StorageClass, ActionType: framework.Add},
+	CSINodeAdd:                  {Resource: framework.CSINode, ActionType: framework.Add},
+	CSINodeUpdate:               {Resource: framework.CSINode, ActionType: framework.Update},
+	ServiceAdd:                  {Resource: framework.Service, ActionType: framework.Add},
+	ServiceUpdate:               {Resource: framework.Service, ActionType: framework.Update},
+	ServiceDelete:               {Resource: framework.Service, ActionType: framework.Delete},
+	UnschedulableTimeout:        framework.WildCardEvent,
+}

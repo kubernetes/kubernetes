@@ -37,13 +37,12 @@ import (
 	autoscalingv2beta2 "k8s.io/client-go/kubernetes/typed/autoscaling/v2beta2"
 	batchv1 "k8s.io/client-go/kubernetes/typed/batch/v1"
 	batchv1beta1 "k8s.io/client-go/kubernetes/typed/batch/v1beta1"
-	batchv2alpha1 "k8s.io/client-go/kubernetes/typed/batch/v2alpha1"
 	certificatesv1 "k8s.io/client-go/kubernetes/typed/certificates/v1"
 	certificatesv1beta1 "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	coordinationv1beta1 "k8s.io/client-go/kubernetes/typed/coordination/v1beta1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryv1alpha1 "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryv1 "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	discoveryv1beta1 "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	eventsv1 "k8s.io/client-go/kubernetes/typed/events/v1"
 	eventsv1beta1 "k8s.io/client-go/kubernetes/typed/events/v1beta1"
@@ -55,6 +54,7 @@ import (
 	nodev1 "k8s.io/client-go/kubernetes/typed/node/v1"
 	nodev1alpha1 "k8s.io/client-go/kubernetes/typed/node/v1alpha1"
 	nodev1beta1 "k8s.io/client-go/kubernetes/typed/node/v1beta1"
+	policyv1 "k8s.io/client-go/kubernetes/typed/policy/v1"
 	policyv1beta1 "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	rbacv1 "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbacv1alpha1 "k8s.io/client-go/kubernetes/typed/rbac/v1alpha1"
@@ -86,13 +86,12 @@ type Interface interface {
 	AutoscalingV2beta2() autoscalingv2beta2.AutoscalingV2beta2Interface
 	BatchV1() batchv1.BatchV1Interface
 	BatchV1beta1() batchv1beta1.BatchV1beta1Interface
-	BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface
 	CertificatesV1() certificatesv1.CertificatesV1Interface
 	CertificatesV1beta1() certificatesv1beta1.CertificatesV1beta1Interface
 	CoordinationV1beta1() coordinationv1beta1.CoordinationV1beta1Interface
 	CoordinationV1() coordinationv1.CoordinationV1Interface
 	CoreV1() corev1.CoreV1Interface
-	DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface
+	DiscoveryV1() discoveryv1.DiscoveryV1Interface
 	DiscoveryV1beta1() discoveryv1beta1.DiscoveryV1beta1Interface
 	EventsV1() eventsv1.EventsV1Interface
 	EventsV1beta1() eventsv1beta1.EventsV1beta1Interface
@@ -104,6 +103,7 @@ type Interface interface {
 	NodeV1() nodev1.NodeV1Interface
 	NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface
 	NodeV1beta1() nodev1beta1.NodeV1beta1Interface
+	PolicyV1() policyv1.PolicyV1Interface
 	PolicyV1beta1() policyv1beta1.PolicyV1beta1Interface
 	RbacV1() rbacv1.RbacV1Interface
 	RbacV1beta1() rbacv1beta1.RbacV1beta1Interface
@@ -135,13 +135,12 @@ type Clientset struct {
 	autoscalingV2beta2           *autoscalingv2beta2.AutoscalingV2beta2Client
 	batchV1                      *batchv1.BatchV1Client
 	batchV1beta1                 *batchv1beta1.BatchV1beta1Client
-	batchV2alpha1                *batchv2alpha1.BatchV2alpha1Client
 	certificatesV1               *certificatesv1.CertificatesV1Client
 	certificatesV1beta1          *certificatesv1beta1.CertificatesV1beta1Client
 	coordinationV1beta1          *coordinationv1beta1.CoordinationV1beta1Client
 	coordinationV1               *coordinationv1.CoordinationV1Client
 	coreV1                       *corev1.CoreV1Client
-	discoveryV1alpha1            *discoveryv1alpha1.DiscoveryV1alpha1Client
+	discoveryV1                  *discoveryv1.DiscoveryV1Client
 	discoveryV1beta1             *discoveryv1beta1.DiscoveryV1beta1Client
 	eventsV1                     *eventsv1.EventsV1Client
 	eventsV1beta1                *eventsv1beta1.EventsV1beta1Client
@@ -153,6 +152,7 @@ type Clientset struct {
 	nodeV1                       *nodev1.NodeV1Client
 	nodeV1alpha1                 *nodev1alpha1.NodeV1alpha1Client
 	nodeV1beta1                  *nodev1beta1.NodeV1beta1Client
+	policyV1                     *policyv1.PolicyV1Client
 	policyV1beta1                *policyv1beta1.PolicyV1beta1Client
 	rbacV1                       *rbacv1.RbacV1Client
 	rbacV1beta1                  *rbacv1beta1.RbacV1beta1Client
@@ -240,11 +240,6 @@ func (c *Clientset) BatchV1beta1() batchv1beta1.BatchV1beta1Interface {
 	return c.batchV1beta1
 }
 
-// BatchV2alpha1 retrieves the BatchV2alpha1Client
-func (c *Clientset) BatchV2alpha1() batchv2alpha1.BatchV2alpha1Interface {
-	return c.batchV2alpha1
-}
-
 // CertificatesV1 retrieves the CertificatesV1Client
 func (c *Clientset) CertificatesV1() certificatesv1.CertificatesV1Interface {
 	return c.certificatesV1
@@ -270,9 +265,9 @@ func (c *Clientset) CoreV1() corev1.CoreV1Interface {
 	return c.coreV1
 }
 
-// DiscoveryV1alpha1 retrieves the DiscoveryV1alpha1Client
-func (c *Clientset) DiscoveryV1alpha1() discoveryv1alpha1.DiscoveryV1alpha1Interface {
-	return c.discoveryV1alpha1
+// DiscoveryV1 retrieves the DiscoveryV1Client
+func (c *Clientset) DiscoveryV1() discoveryv1.DiscoveryV1Interface {
+	return c.discoveryV1
 }
 
 // DiscoveryV1beta1 retrieves the DiscoveryV1beta1Client
@@ -328,6 +323,11 @@ func (c *Clientset) NodeV1alpha1() nodev1alpha1.NodeV1alpha1Interface {
 // NodeV1beta1 retrieves the NodeV1beta1Client
 func (c *Clientset) NodeV1beta1() nodev1beta1.NodeV1beta1Interface {
 	return c.nodeV1beta1
+}
+
+// PolicyV1 retrieves the PolicyV1Client
+func (c *Clientset) PolicyV1() policyv1.PolicyV1Interface {
+	return c.policyV1
 }
 
 // PolicyV1beta1 retrieves the PolicyV1beta1Client
@@ -461,10 +461,6 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.batchV2alpha1, err = batchv2alpha1.NewForConfig(&configShallowCopy)
-	if err != nil {
-		return nil, err
-	}
 	cs.certificatesV1, err = certificatesv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -485,7 +481,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	cs.discoveryV1alpha1, err = discoveryv1alpha1.NewForConfig(&configShallowCopy)
+	cs.discoveryV1, err = discoveryv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -530,6 +526,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 		return nil, err
 	}
 	cs.nodeV1beta1, err = nodev1beta1.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	cs.policyV1, err = policyv1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -600,13 +600,12 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.autoscalingV2beta2 = autoscalingv2beta2.NewForConfigOrDie(c)
 	cs.batchV1 = batchv1.NewForConfigOrDie(c)
 	cs.batchV1beta1 = batchv1beta1.NewForConfigOrDie(c)
-	cs.batchV2alpha1 = batchv2alpha1.NewForConfigOrDie(c)
 	cs.certificatesV1 = certificatesv1.NewForConfigOrDie(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.NewForConfigOrDie(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.NewForConfigOrDie(c)
 	cs.coordinationV1 = coordinationv1.NewForConfigOrDie(c)
 	cs.coreV1 = corev1.NewForConfigOrDie(c)
-	cs.discoveryV1alpha1 = discoveryv1alpha1.NewForConfigOrDie(c)
+	cs.discoveryV1 = discoveryv1.NewForConfigOrDie(c)
 	cs.discoveryV1beta1 = discoveryv1beta1.NewForConfigOrDie(c)
 	cs.eventsV1 = eventsv1.NewForConfigOrDie(c)
 	cs.eventsV1beta1 = eventsv1beta1.NewForConfigOrDie(c)
@@ -618,6 +617,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	cs.nodeV1 = nodev1.NewForConfigOrDie(c)
 	cs.nodeV1alpha1 = nodev1alpha1.NewForConfigOrDie(c)
 	cs.nodeV1beta1 = nodev1beta1.NewForConfigOrDie(c)
+	cs.policyV1 = policyv1.NewForConfigOrDie(c)
 	cs.policyV1beta1 = policyv1beta1.NewForConfigOrDie(c)
 	cs.rbacV1 = rbacv1.NewForConfigOrDie(c)
 	cs.rbacV1beta1 = rbacv1beta1.NewForConfigOrDie(c)
@@ -651,13 +651,12 @@ func New(c rest.Interface) *Clientset {
 	cs.autoscalingV2beta2 = autoscalingv2beta2.New(c)
 	cs.batchV1 = batchv1.New(c)
 	cs.batchV1beta1 = batchv1beta1.New(c)
-	cs.batchV2alpha1 = batchv2alpha1.New(c)
 	cs.certificatesV1 = certificatesv1.New(c)
 	cs.certificatesV1beta1 = certificatesv1beta1.New(c)
 	cs.coordinationV1beta1 = coordinationv1beta1.New(c)
 	cs.coordinationV1 = coordinationv1.New(c)
 	cs.coreV1 = corev1.New(c)
-	cs.discoveryV1alpha1 = discoveryv1alpha1.New(c)
+	cs.discoveryV1 = discoveryv1.New(c)
 	cs.discoveryV1beta1 = discoveryv1beta1.New(c)
 	cs.eventsV1 = eventsv1.New(c)
 	cs.eventsV1beta1 = eventsv1beta1.New(c)
@@ -669,6 +668,7 @@ func New(c rest.Interface) *Clientset {
 	cs.nodeV1 = nodev1.New(c)
 	cs.nodeV1alpha1 = nodev1alpha1.New(c)
 	cs.nodeV1beta1 = nodev1beta1.New(c)
+	cs.policyV1 = policyv1.New(c)
 	cs.policyV1beta1 = policyv1beta1.New(c)
 	cs.rbacV1 = rbacv1.New(c)
 	cs.rbacV1beta1 = rbacv1beta1.New(c)

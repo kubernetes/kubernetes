@@ -1,6 +1,6 @@
 # Kubernetes (K8s)
 
-[![GoDoc Widget]][GoDoc] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
+[![GoPkg Widget]][GoPkg] [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/569/badge)](https://bestpractices.coreinfrastructure.org/projects/569)
 
 <img src="https://github.com/kubernetes/kubernetes/raw/master/logo/logo.png" width="100">
 
@@ -79,8 +79,8 @@ That said, if you have questions, reach out to us
 [developer's documentation]: https://git.k8s.io/community/contributors/devel#readme
 [Docker environment]: https://docs.docker.com/engine
 [Go environment]: https://golang.org/doc/install
-[GoDoc]: https://godoc.org/k8s.io/kubernetes
-[GoDoc Widget]: https://godoc.org/k8s.io/kubernetes?status.svg
+[GoPkg]: https://pkg.go.dev/k8s.io/kubernetes
+[GoPkg Widget]: https://pkg.go.dev/badge/k8s.io/kubernetes.svg
 [interactive tutorial]: https://kubernetes.io/docs/tutorials/kubernetes-basics
 [kubernetes.io]: https://kubernetes.io
 [Scalable Microservices with Kubernetes]: https://www.udacity.com/course/scalable-microservices-with-kubernetes--ud615

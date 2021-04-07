@@ -1,10 +1,21 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 approvers:
-  - sig-release-approvers
-  - release-engineering-approvers
+  - wilsonehusin # 1.21 Release Notes Lead
+  - cpanato # Release Manager
+  - feiskyer # Release Manager
+  - hasheddan # Release Manager / SIG Technical Lead
+  - idealhack # Release Manager
+  - justaugustus # Release Manager / SIG Chair
+  - puerco # Release Manager
+  - saschagrunert # Release Manager / SIG Chair
+  - xmudrii # Release Manager
 reviewers:
-  - release-engineering-reviewers
+  - wilsonehusin # 1.21 Release Notes Lead
+  - ashnehete # 1.21 Release Notes shadow
+  - melodychn # 1.21 Release Notes shadow
+  - pmmalinov01 # 1.21 Release Notes shadow
+  - soniasingla # 1.21 Release Notes shadow
 
 labels:
   - sig/release

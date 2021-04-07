@@ -283,7 +283,7 @@ func TestCleanUp(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			w.stop() // Stop should be callable multiple times without consequence.
 		}
-		if err := waitForWorkerExit(m, []probeKey{key}); err != nil {
+		if err := waitForWorkerExit(t, m, []probeKey{key}); err != nil {
 			t.Fatalf("[%s] error waiting for worker exit: %v", probeType, err)
 		}
 

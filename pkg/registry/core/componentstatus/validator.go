@@ -78,12 +78,12 @@ func (server *Server) DoServerCheck() (probe.Result, string, error) {
 		return probe.Unknown, "", err
 	}
 	if result == probe.Failure {
-		return probe.Failure, string(data), err
+		return probe.Failure, data, err
 	}
 	if server.Validate != nil {
 		if err := server.Validate([]byte(data)); err != nil {
-			return probe.Failure, string(data), err
+			return probe.Failure, data, err
 		}
 	}
-	return result, string(data), nil
+	return result, data, nil
 }

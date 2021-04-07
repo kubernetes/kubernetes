@@ -44,7 +44,7 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
 	named, err := dockerref.ParseNormalizedNamed(image)
 	if err != nil {
-		klog.V(4).Infof("couldn't parse image reference %q: %v", image, err)
+		klog.V(4).InfoS("Couldn't parse image reference", "image", image, "err", err)
 		return false
 	}
 	_, isTagged := named.(dockerref.Tagged)
@@ -102,7 +102,7 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 		for _, repoDigest := range inspected.RepoDigests {
 			named, err := dockerref.ParseNormalizedNamed(repoDigest)
 			if err != nil {
-				klog.V(4).Infof("couldn't parse image RepoDigest reference %q: %v", repoDigest, err)
+				klog.V(4).InfoS("Couldn't parse image RepoDigest reference", "digest", repoDigest, "err", err)
 				continue
 			}
 			if d, isDigested := named.(dockerref.Digested); isDigested {
@@ -116,14 +116,14 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 		// process the ID as a digest
 		id, err := godigest.Parse(inspected.ID)
 		if err != nil {
-			klog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
+			klog.V(4).InfoS("Couldn't parse image ID reference", "imageID", id, "err", err)
 			return false
 		}
 		if digest.Digest().Algorithm().String() == id.Algorithm().String() && digest.Digest().Hex() == id.Hex() {
 			return true
 		}
 	}
-	klog.V(4).Infof("Inspected image (%q) does not match %s", inspected.ID, image)
+	klog.V(4).InfoS("Inspected image ID does not match image", "inspectedImageID", inspected.ID, "image", image)
 	return false
 }
 
@@ -140,19 +140,19 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 	// Otherwise, we should try actual parsing to be more correct
 	ref, err := dockerref.Parse(image)
 	if err != nil {
-		klog.V(4).Infof("couldn't parse image reference %q: %v", image, err)
+		klog.V(4).InfoS("Couldn't parse image reference", "image", image, "err", err)
 		return false
 	}
 
 	digest, isDigested := ref.(dockerref.Digested)
 	if !isDigested {
-		klog.V(4).Infof("the image reference %q was not a digest reference", image)
+		klog.V(4).InfoS("The image reference was not a digest reference", "image", image)
 		return false
 	}
 
 	id, err := godigest.Parse(inspected.ID)
 	if err != nil {
-		klog.V(4).Infof("couldn't parse image ID reference %q: %v", id, err)
+		klog.V(4).InfoS("Couldn't parse image ID reference", "imageID", id, "err", err)
 		return false
 	}
 
@@ -160,6 +160,6 @@ func matchImageIDOnly(inspected dockertypes.ImageInspect, image string) bool {
 		return true
 	}
 
-	klog.V(4).Infof("The reference %s does not directly refer to the given image's ID (%q)", image, inspected.ID)
+	klog.V(4).InfoS("The image reference does not directly refer to the given image's ID", "image", image, "inspectedImageID", inspected.ID)
 	return false
 }

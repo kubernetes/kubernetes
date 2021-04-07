@@ -25,7 +25,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1101,5 +1101,283 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 		}
 		applySeccompVersionSkew(test.pod)
 		test.validation(t, test.pod)
+	}
+}
+
+// TestEphemeralVolumeEnablement checks the behavior of the API server
+// when the GenericEphemeralVolume feature is turned on and then off:
+// the Ephemeral struct must be preserved even during updates.
+func TestEphemeralVolumeEnablement(t *testing.T) {
+	// Enable the Feature Gate during the first pod creation
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
+
+	pod := createPodWithGenericEphemeralVolume()
+	expectedPod := pod.DeepCopy()
+
+	Strategy.PrepareForCreate(context.Background(), pod)
+	require.Equal(t, expectedPod.Spec, pod.Spec, "pod spec")
+
+	errs := Strategy.Validate(context.Background(), pod)
+	require.Empty(t, errs, "errors from validation")
+
+	// Now let's disable the Feature Gate, update some other field from the Pod and expect the volume to remain present
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, false)()
+	updatePod := testUpdatePod(t, pod, "aaa")
+
+	// And let's enable the FG again, add another from and check if the volume is still present
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, true)()
+	testUpdatePod(t, updatePod, "bbb")
+}
+
+// TestEphemeralVolumeDisabled checks the behavior of the API server
+// when the GenericEphemeralVolume is off: the Ephemeral struct gets dropped,
+// validation fails.
+func TestEphemeralVolumeDisabled(t *testing.T) {
+	// Disable the Feature Gate during the first pod creation
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.GenericEphemeralVolume, false)()
+
+	pod := createPodWithGenericEphemeralVolume()
+	expectedPod := pod.DeepCopy()
+	expectedPod.Spec.Volumes[0].VolumeSource.Ephemeral = nil
+
+	Strategy.PrepareForCreate(context.Background(), pod)
+	require.Equal(t, expectedPod.Spec, pod.Spec, "pod spec")
+
+	errs := Strategy.Validate(context.Background(), pod)
+	require.NotEmpty(t, errs, "no errors from validation")
+}
+
+func testUpdatePod(t *testing.T, oldPod *api.Pod, labelValue string) *api.Pod {
+	updatedPod := oldPod.DeepCopy()
+	updatedPod.Labels = map[string]string{"XYZ": labelValue}
+	expectedPod := updatedPod.DeepCopy()
+	Strategy.PrepareForUpdate(context.Background(), updatedPod, oldPod)
+	require.Equal(t, expectedPod.Spec, updatedPod.Spec, "updated pod spec")
+	errs := Strategy.Validate(context.Background(), updatedPod)
+	require.Empty(t, errs, "errors from validation")
+	return updatedPod
+}
+
+func createPodWithGenericEphemeralVolume() *api.Pod {
+	return &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "pod",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers: []api.Container{{
+				Name:                     "foo",
+				Image:                    "example",
+				TerminationMessagePolicy: api.TerminationMessageReadFile,
+				ImagePullPolicy:          api.PullAlways,
+			}},
+			Volumes: []api.Volume{
+				{
+					Name: "ephemeral",
+					VolumeSource: api.VolumeSource{
+						Ephemeral: &api.EphemeralVolumeSource{
+							VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+								Spec: api.PersistentVolumeClaimSpec{
+									AccessModes: []api.PersistentVolumeAccessMode{
+										api.ReadWriteOnce,
+									},
+									Resources: api.ResourceRequirements{
+										Requests: api.ResourceList{
+											api.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func newPodtWithHugePageValue(reousreceName api.ResourceName, value resource.Quantity) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace:       "default",
+			Name:            "foo",
+			ResourceVersion: "1",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSDefault,
+			Containers: []api.Container{{
+				Name:                     "foo",
+				Image:                    "image",
+				ImagePullPolicy:          "IfNotPresent",
+				TerminationMessagePolicy: "File",
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("10"),
+						reousreceName:   value,
+					},
+					Limits: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("10"),
+						reousreceName:   value,
+					},
+				}},
+			},
+		},
+	}
+}
+
+func TestPodStrategyValidate(t *testing.T) {
+	const containerName = "container"
+	errTest := []struct {
+		name string
+		pod  *api.Pod
+	}{
+		{
+			name: "a new pod setting container with indivisible hugepages values",
+			pod:  newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"1Mi", resource.MustParse("1.1Mi")),
+		},
+		{
+			name: "a new pod setting init-container with indivisible hugepages values",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					InitContainers: []api.Container{{
+						Name:                     containerName,
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "64Ki"): resource.MustParse("127Ki"),
+							},
+						}},
+					},
+				},
+			},
+		},
+		{
+			name: "a new pod setting init-container with indivisible hugepages values while container with divisible hugepages values",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					InitContainers: []api.Container{{
+						Name:                     containerName,
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "2Mi"): resource.MustParse("5.1Mi"),
+							},
+						}},
+					},
+					Containers: []api.Container{{
+						Name:                     containerName,
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName(api.ResourceHugePagesPrefix + "1Gi"): resource.MustParse("2Gi"),
+							},
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range errTest {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) == 0 {
+				t.Error("expected failure")
+			}
+		})
+	}
+
+	tests := []struct {
+		name string
+		pod  *api.Pod
+	}{
+		{
+			name: "a new pod setting container with divisible hugepages values",
+			pod: &api.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "default",
+					Name:      "foo",
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyAlways,
+					DNSPolicy:     api.DNSDefault,
+					Containers: []api.Container{{
+						Name:                     containerName,
+						Image:                    "image",
+						ImagePullPolicy:          "IfNotPresent",
+						TerminationMessagePolicy: "File",
+						Resources: api.ResourceRequirements{
+							Requests: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+							},
+							Limits: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):                     resource.MustParse("10"),
+								api.ResourceName(api.ResourceHugePagesPrefix + "1Mi"): resource.MustParse("2Mi"),
+							},
+						}},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.Validate(genericapirequest.NewContext(), tc.pod); len(errs) != 0 {
+				t.Errorf("unexpected error:%v", errs)
+			}
+		})
+	}
+}
+
+func TestPodStrategyValidateUpdate(t *testing.T) {
+	test := []struct {
+		name   string
+		newPod *api.Pod
+		oldPod *api.Pod
+	}{
+		{
+			name:   "an existing pod with indivisible hugepages values to a new pod with indivisible hugepages values",
+			newPod: newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+			oldPod: newPodtWithHugePageValue(api.ResourceHugePagesPrefix+"2Mi", resource.MustParse("2.1Mi")),
+		},
+	}
+
+	for _, tc := range test {
+		t.Run(tc.name, func(t *testing.T) {
+			if errs := Strategy.ValidateUpdate(genericapirequest.NewContext(), tc.newPod, tc.oldPod); len(errs) != 0 {
+				t.Errorf("unexpected error:%v", errs)
+			}
+		})
 	}
 }

@@ -26,8 +26,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	dnsutil "github.com/miekg/dns"
-
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -37,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	dnsclient "k8s.io/kubernetes/third_party/forked/golang/net"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -430,7 +429,7 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 	fileNames = append(fileNames, podARecByTCPFileName)
 
 	if len(ptrLookupIP) > 0 {
-		ptrLookup, err := dnsutil.ReverseAddr(ptrLookupIP)
+		ptrLookup, err := dnsclient.Reverseaddr(ptrLookupIP)
 		if err != nil {
 			framework.Failf("Unable to obtain reverse IP address record from IP %s: %v", ptrLookupIP, err)
 		}

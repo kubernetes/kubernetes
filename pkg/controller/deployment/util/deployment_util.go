@@ -319,7 +319,7 @@ func copyDeploymentAnnotationsToReplicaSet(deployment *apps.Deployment, rs *apps
 		// newRS revision is updated automatically in getNewReplicaSet, and the deployment's revision number is then updated
 		// by copying its newRS revision number. We should not copy deployment's revision to its newRS, since the update of
 		// deployment revision number may fail (revision becomes stale) and the revision number in newRS is more reliable.
-		if skipCopyAnnotation(k) || rs.Annotations[k] == v {
+		if _, exist := rs.Annotations[k]; skipCopyAnnotation(k) || (exist && rs.Annotations[k] == v) {
 			continue
 		}
 		rs.Annotations[k] = v
@@ -948,4 +948,19 @@ func GetDeploymentsForReplicaSet(deploymentLister appslisters.DeploymentLister, 
 	}
 
 	return deployments, nil
+}
+
+// ReplicaSetsByRevision sorts a list of ReplicaSet by revision, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsByRevision []*apps.ReplicaSet
+
+func (o ReplicaSetsByRevision) Len() int      { return len(o) }
+func (o ReplicaSetsByRevision) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsByRevision) Less(i, j int) bool {
+	revision1, err1 := Revision(o[i])
+	revision2, err2 := Revision(o[j])
+	if err1 != nil || err2 != nil || revision1 == revision2 {
+		return controller.ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return revision1 < revision2
 }

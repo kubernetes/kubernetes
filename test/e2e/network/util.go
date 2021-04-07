@@ -37,19 +37,20 @@ import (
 const secondNodePortSvcName = "second-node-port-service"
 
 // GetHTTPContent returns the content of the given url by HTTP.
-func GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
+func GetHTTPContent(host string, port int, timeout time.Duration, url string) (string, error) {
 	var body bytes.Buffer
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+	pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
 		result := e2enetwork.PokeHTTP(host, port, url, nil)
 		if result.Status == e2enetwork.HTTPSuccess {
 			body.Write(result.Body)
 			return true, nil
 		}
 		return false, nil
-	}); pollErr != nil {
-		framework.Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
+	})
+	if pollErr != nil {
+		framework.Logf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
 	}
-	return body
+	return body.String(), pollErr
 }
 
 // GetHTTPContentFromTestContainer returns the content of the given url by HTTP via a test container.

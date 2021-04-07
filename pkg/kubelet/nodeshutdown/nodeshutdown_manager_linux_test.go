@@ -224,7 +224,7 @@ func TestManager(t *testing.T) {
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, true)()
 
-			manager := NewManager(activePodsFunc, killPodsFunc, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
+			manager, _ := NewManager(activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, tc.shutdownGracePeriodCriticalPods)
 			manager.clock = clock.NewFakeClock(time.Now())
 
 			err := manager.Start()
@@ -236,6 +236,7 @@ func TestManager(t *testing.T) {
 				assert.NoError(t, err, "expected manager.Start() to not return error")
 				assert.True(t, fakeDbus.didInhibitShutdown, "expected that manager inhibited shutdown")
 				assert.NoError(t, manager.ShutdownStatus(), "expected that manager does not return error since shutdown is not active")
+				assert.Equal(t, manager.Admit(nil).Admit, true)
 
 				// Send fake shutdown event
 				fakeShutdownChan <- true
@@ -253,9 +254,54 @@ func TestManager(t *testing.T) {
 				}
 
 				assert.Error(t, manager.ShutdownStatus(), "expected that manager returns error since shutdown is active")
+				assert.Equal(t, manager.Admit(nil).Admit, false)
 				assert.Equal(t, tc.expectedPodToGracePeriodOverride, killedPodsToGracePeriods)
 				assert.Equal(t, tc.expectedDidOverrideInhibitDelay, fakeDbus.didOverrideInhibitDelay, "override system inhibit delay differs")
 			}
+		})
+	}
+}
+
+func TestFeatureEnabled(t *testing.T) {
+	var tests = []struct {
+		desc                         string
+		shutdownGracePeriodRequested time.Duration
+		featureGateEnabled           bool
+		expectEnabled                bool
+	}{
+		{
+			desc:                         "shutdownGracePeriodRequested 0; disables feature",
+			shutdownGracePeriodRequested: time.Duration(0 * time.Second),
+			featureGateEnabled:           true,
+			expectEnabled:                false,
+		},
+		{
+			desc:                         "feature gate disabled; disables feature",
+			shutdownGracePeriodRequested: time.Duration(100 * time.Second),
+			featureGateEnabled:           false,
+			expectEnabled:                false,
+		},
+		{
+			desc:                         "feature gate enabled; shutdownGracePeriodRequested > 0; enables feature",
+			shutdownGracePeriodRequested: time.Duration(100 * time.Second),
+			featureGateEnabled:           true,
+			expectEnabled:                true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			activePodsFunc := func() []*v1.Pod {
+				return nil
+			}
+			killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+				return nil
+			}
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
+
+			manager, _ := NewManager(activePodsFunc, killPodsFunc, func() {}, tc.shutdownGracePeriodRequested, 0 /*shutdownGracePeriodCriticalPods*/)
+			manager.clock = clock.NewFakeClock(time.Now())
+
+			assert.Equal(t, tc.expectEnabled, manager.isFeatureEnabled())
 		})
 	}
 }

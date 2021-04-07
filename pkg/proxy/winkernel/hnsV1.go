@@ -65,6 +65,11 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
+
+		// only ready and not terminating endpoints were added to HNS
+		ready:       true,
+		serving:     true,
+		terminating: false,
 	}, nil
 }
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
@@ -90,6 +95,11 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
 				hns:        hns,
+
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
 			}, nil
 		}
 	}
@@ -137,6 +147,10 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		hnsID:           createdEndpoint.Id,
 		providerAddress: ep.providerAddress, //TODO get from createdEndpoint
 		hns:             hns,
+
+		ready:       ep.ready,
+		serving:     ep.serving,
+		terminating: ep.terminating,
 	}, nil
 }
 func (hns hnsV1) deleteEndpoint(hnsID string) error {
@@ -178,7 +192,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 			} else if len(elbPolicy.VIPs) != 0 {
 				continue
 			}
-			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
 				hnsID: plist.ID,
 			}, nil
@@ -204,7 +218,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFl
 	)
 
 	if err == nil {
-		LogJson(lb, "Hns loadbalancer policy resource", 1)
+		LogJson("policyList", lb, "Hns loadbalancer policy resource", 1)
 	} else {
 		return nil, err
 	}
@@ -223,7 +237,7 @@ func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 	if err != nil {
 		return err
 	}
-	LogJson(hnsloadBalancer, "Removing Policy", 2)
+	LogJson("policyList", hnsloadBalancer, "Removing Policy", 2)
 
 	_, err = hnsloadBalancer.Delete()
 	return err

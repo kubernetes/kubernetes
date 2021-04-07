@@ -50,7 +50,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(c, framework.TestContext.NodeSchedulableTimeout))
 	})
 
-	utils.SIGDescribe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
+	ginkgo.Describe("persistentvolumereclaim:vsphere [Feature:vsphere]", func() {
 		ginkgo.BeforeEach(func() {
 			e2eskipper.SkipUnlessProviderIs("vsphere")
 			Bootstrap(f)
@@ -110,7 +110,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimDelete)
 			framework.ExpectNoError(err)
 			// Wait for PV and PVC to Bind
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 
 			ginkgo.By("Creating the Pod")
 			pod, err := e2epod.CreateClientPod(c, ns, pvc)
@@ -173,7 +173,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			volumePath, pv, pvc, err = testSetupVSpherePersistentVolumeReclaim(c, nodeInfo, ns, v1.PersistentVolumeReclaimRetain)
 			framework.ExpectNoError(err)
 
-			writeContentToVSpherePV(c, pvc, volumeFileContent)
+			writeContentToVSpherePV(c, f.Timeouts, pvc, volumeFileContent)
 
 			ginkgo.By("Delete PVC")
 			framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
@@ -196,8 +196,8 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:vsphere][Feature:ReclaimPo
 			framework.ExpectNoError(err)
 
 			ginkgo.By("wait for the pv and pvc to bind")
-			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
-			verifyContentOfVSpherePV(c, pvc, volumeFileContent)
+			framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
+			verifyContentOfVSpherePV(c, f.Timeouts, pvc, volumeFileContent)
 
 		})
 	})
@@ -243,7 +243,7 @@ func deletePVCAfterBind(c clientset.Interface, ns string, pvc *v1.PersistentVolu
 	var err error
 
 	ginkgo.By("wait for the pv and pvc to bind")
-	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, ns, pv, pvc))
+	framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Timeouts, ns, pv, pvc))
 
 	ginkgo.By("delete pvc")
 	framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)

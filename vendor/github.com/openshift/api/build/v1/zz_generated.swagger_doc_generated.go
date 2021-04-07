@@ -99,8 +99,9 @@ func (BuildConfigSpec) SwaggerDoc() map[string]string {
 }
 
 var map_BuildConfigStatus = map[string]string{
-	"":            "BuildConfigStatus contains current state of the build config object.",
-	"lastVersion": "lastVersion is used to inform about number of last triggered build.",
+	"":                    "BuildConfigStatus contains current state of the build config object.",
+	"lastVersion":         "lastVersion is used to inform about number of last triggered build.",
+	"imageChangeTriggers": "ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including reconciled values of the lastTriggeredImageID and paused fields.",
 }
 
 func (BuildConfigStatus) SwaggerDoc() map[string]string {
@@ -276,7 +277,7 @@ func (BuildTriggerCause) SwaggerDoc() map[string]string {
 
 var map_BuildTriggerPolicy = map[string]string{
 	"":            "BuildTriggerPolicy describes a policy for a single trigger that results in a new Build.",
-	"type":        "type is the type of build trigger",
+	"type":        "type is the type of build trigger. Valid values:\n\n- GitHub GitHubWebHookBuildTriggerType represents a trigger that launches builds on GitHub webhook invocations\n\n- Generic GenericWebHookBuildTriggerType represents a trigger that launches builds on generic webhook invocations\n\n- GitLab GitLabWebHookBuildTriggerType represents a trigger that launches builds on GitLab webhook invocations\n\n- Bitbucket BitbucketWebHookBuildTriggerType represents a trigger that launches builds on Bitbucket webhook invocations\n\n- ImageChange ImageChangeBuildTriggerType represents a trigger that launches builds on availability of a new version of an image\n\n- ConfigChange ConfigChangeBuildTriggerType will trigger a build on an initial build config creation WARNING: In the future the behavior will change to trigger a build on any config change",
 	"github":      "github contains the parameters for a GitHub webhook type of trigger",
 	"generic":     "generic contains the parameters for a Generic webhook type of trigger",
 	"imageChange": "imageChange contains parameters for an ImageChange type of trigger",
@@ -299,6 +300,7 @@ var map_CommonSpec = map[string]string{
 	"postCommit":                "postCommit is a build hook executed after the build output image is committed, before it is pushed to a registry.",
 	"completionDeadlineSeconds": "completionDeadlineSeconds is an optional duration in seconds, counted from the time when a build pod gets scheduled in the system, that the build may be active on a node before the system actively tries to terminate the build; value must be positive integer",
 	"nodeSelector":              "nodeSelector is a selector which must be true for the build pod to fit on a node If nil, it can be overridden by default build nodeselector values for the cluster. If set to an empty map or a map with any values, default build nodeselector values are ignored.",
+	"mountTrustedCA":            "mountTrustedCA bind mounts the cluster's trusted certificate authorities, as defined in the cluster's proxy configuration, into the build. This lets processes within a build trust components signed by custom PKI certificate authorities, such as private artifact repositories and HTTPS proxies.\n\nWhen this field is set to true, the contents of `/etc/pki/ca-trust` within the build are managed by the build container, and any changes to this directory or its subdirectories (for example - within a Dockerfile `RUN` instruction) are not persisted in the build's output image.",
 }
 
 func (CommonSpec) SwaggerDoc() map[string]string {
@@ -457,13 +459,25 @@ func (ImageChangeCause) SwaggerDoc() map[string]string {
 
 var map_ImageChangeTrigger = map[string]string{
 	"":                     "ImageChangeTrigger allows builds to be triggered when an ImageStream changes",
-	"lastTriggeredImageID": "lastTriggeredImageID is used internally by the ImageChangeController to save last used image ID for build",
+	"lastTriggeredImageID": "lastTriggeredImageID is used internally by the ImageChangeController to save last used image ID for build This field is deprecated and will be removed in a future release. Deprecated",
 	"from":                 "from is a reference to an ImageStreamTag that will trigger a build when updated It is optional. If no From is specified, the From image from the build strategy will be used. Only one ImageChangeTrigger with an empty From reference is allowed in a build configuration.",
 	"paused":               "paused is true if this trigger is temporarily disabled. Optional.",
 }
 
 func (ImageChangeTrigger) SwaggerDoc() map[string]string {
 	return map_ImageChangeTrigger
+}
+
+var map_ImageChangeTriggerStatus = map[string]string{
+	"":                     "ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy specified in the BuildConfigSpec.Triggers struct.",
+	"lastTriggeredImageID": "lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered. It is not necessarily the sha/id of the image change that triggered a build. This field is updated for all image change triggers when any of them triggers a build.",
+	"from":                 "from is the ImageStreamTag that is used as the source of the trigger. This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.",
+	"paused":               "paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.",
+	"lastTriggerTime":      "lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.",
+}
+
+func (ImageChangeTriggerStatus) SwaggerDoc() map[string]string {
+	return map_ImageChangeTriggerStatus
 }
 
 var map_ImageLabel = map[string]string{

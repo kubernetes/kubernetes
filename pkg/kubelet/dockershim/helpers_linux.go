@@ -119,6 +119,7 @@ func (ds *dockerService) updateCreateConfig(
 				CPUQuota:   rOpts.CpuQuota,
 				CPUPeriod:  rOpts.CpuPeriod,
 				CpusetCpus: rOpts.CpusetCpus,
+				CpusetMems: rOpts.CpusetMems,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
 		}
@@ -153,8 +154,4 @@ func getNetworkNamespace(c *dockertypes.ContainerJSON) (string, error) {
 		return "", fmt.Errorf("cannot find network namespace for the terminated container %q", c.ID)
 	}
 	return fmt.Sprintf(dockerNetNSFmt, c.State.Pid), nil
-}
-
-// applyExperimentalCreateConfig applys experimental configures from sandbox annotations.
-func applyExperimentalCreateConfig(createConfig *dockertypes.ContainerCreateConfig, annotations map[string]string) {
 }

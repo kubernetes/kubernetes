@@ -16,6 +16,7 @@ limitations under the License.
 
 package types
 
+// Label keys for labels used in this package.
 const (
 	KubernetesPodNameLabel       = "io.kubernetes.pod.name"
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
@@ -23,18 +24,22 @@ const (
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
 )
 
+// GetContainerName returns the value of the KubernetesContainerNameLabel.
 func GetContainerName(labels map[string]string) string {
 	return labels[KubernetesContainerNameLabel]
 }
 
+// GetPodName returns the value of the KubernetesPodNameLabel.
 func GetPodName(labels map[string]string) string {
 	return labels[KubernetesPodNameLabel]
 }
 
+// GetPodUID returns the value of the KubernetesPodUIDLabel.
 func GetPodUID(labels map[string]string) string {
 	return labels[KubernetesPodUIDLabel]
 }
 
+// GetPodNamespace returns the value of the KubernetesPodNamespaceLabel.
 func GetPodNamespace(labels map[string]string) string {
 	return labels[KubernetesPodNamespaceLabel]
 }

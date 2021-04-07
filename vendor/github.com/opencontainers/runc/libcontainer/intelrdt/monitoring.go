@@ -2,11 +2,12 @@ package intelrdt
 
 import (
 	"bufio"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,10 +22,10 @@ type monFeatures struct {
 
 func getMonFeatures(intelRdtRoot string) (monFeatures, error) {
 	file, err := os.Open(filepath.Join(intelRdtRoot, "info", "L3_MON", "mon_features"))
-	defer file.Close()
 	if err != nil {
 		return monFeatures{}, err
 	}
+	defer file.Close()
 	return parseMonFeatures(file)
 }
 

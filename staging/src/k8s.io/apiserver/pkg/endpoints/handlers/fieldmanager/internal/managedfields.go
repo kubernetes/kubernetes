@@ -77,15 +77,6 @@ func RemoveObjectManagedFields(obj runtime.Object) {
 	accessor.SetManagedFields(nil)
 }
 
-// DecodeObjectManagedFields extracts and converts the objects ManagedFields into a fieldpath.ManagedFields.
-func DecodeObjectManagedFields(from []metav1.ManagedFieldsEntry) (ManagedInterface, error) {
-	managed, err := decodeManagedFields(from)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert managed fields from API: %v", err)
-	}
-	return &managed, nil
-}
-
 // EncodeObjectManagedFields converts and stores the fieldpathManagedFields into the objects ManagedFields
 func EncodeObjectManagedFields(obj runtime.Object, managed ManagedInterface) error {
 	accessor, err := meta.Accessor(obj)
@@ -102,32 +93,41 @@ func EncodeObjectManagedFields(obj runtime.Object, managed ManagedInterface) err
 	return nil
 }
 
-// decodeManagedFields converts ManagedFields from the wire format (api format)
+// DecodeManagedFields converts ManagedFields from the wire format (api format)
 // to the format used by sigs.k8s.io/structured-merge-diff
-func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (managed managedStruct, err error) {
+func DecodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (ManagedInterface, error) {
+	managed := managedStruct{}
 	managed.fields = make(fieldpath.ManagedFields, len(encodedManagedFields))
 	managed.times = make(map[string]*metav1.Time, len(encodedManagedFields))
 
 	for i, encodedVersionedSet := range encodedManagedFields {
+		switch encodedVersionedSet.Operation {
+		case metav1.ManagedFieldsOperationApply, metav1.ManagedFieldsOperationUpdate:
+		default:
+			return nil, fmt.Errorf("operation must be `Apply` or `Update`")
+		}
+		if len(encodedVersionedSet.APIVersion) < 1 {
+			return nil, fmt.Errorf("apiVersion must not be empty")
+		}
 		switch encodedVersionedSet.FieldsType {
 		case "FieldsV1":
 			// Valid case.
 		case "":
-			return managedStruct{}, fmt.Errorf("missing fieldsType in managed fields entry %d", i)
+			return nil, fmt.Errorf("missing fieldsType in managed fields entry %d", i)
 		default:
-			return managedStruct{}, fmt.Errorf("invalid fieldsType %q in managed fields entry %d", encodedVersionedSet.FieldsType, i)
+			return nil, fmt.Errorf("invalid fieldsType %q in managed fields entry %d", encodedVersionedSet.FieldsType, i)
 		}
 		manager, err := BuildManagerIdentifier(&encodedVersionedSet)
 		if err != nil {
-			return managedStruct{}, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
+			return nil, fmt.Errorf("error decoding manager from %v: %v", encodedVersionedSet, err)
 		}
 		managed.fields[manager], err = decodeVersionedSet(&encodedVersionedSet)
 		if err != nil {
-			return managedStruct{}, fmt.Errorf("error decoding versioned set from %v: %v", encodedVersionedSet, err)
+			return nil, fmt.Errorf("error decoding versioned set from %v: %v", encodedVersionedSet, err)
 		}
 		managed.times[manager] = encodedVersionedSet.Time
 	}
-	return managed, nil
+	return &managed, nil
 }
 
 // BuildManagerIdentifier creates a manager identifier string from a ManagedFieldsEntry

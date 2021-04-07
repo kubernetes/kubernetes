@@ -149,7 +149,7 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 			exists = true
 		}
 		if exists {
-			klog.V(4).Infof("found %s in cache after waiting", a.GetNamespace())
+			klog.V(4).InfoS("Namespace existed in cache after waiting", "namespace", klog.KRef("", a.GetNamespace()))
 		}
 	}
 
@@ -170,7 +170,8 @@ func (l *Lifecycle) Admit(ctx context.Context, a admission.Attributes, o admissi
 		case err != nil:
 			return errors.NewInternalError(err)
 		}
-		klog.V(4).Infof("found %s via storage lookup", a.GetNamespace())
+
+		klog.V(4).InfoS("Found namespace via storage lookup", "namespace", klog.KRef("", a.GetNamespace()))
 	}
 
 	// ensure that we're not trying to create objects in terminating namespaces

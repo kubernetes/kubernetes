@@ -174,7 +174,6 @@ EOF
   "${KUBECTL}" create -f "${RESOURCE_DIRECTORY}/kubemark-ns.json"
   # Create configmap for configuring hollow- kubelet, proxy and npd.
   "${KUBECTL}" create configmap "node-configmap" --namespace="kubemark" \
-    --from-literal=content.type="${TEST_CLUSTER_API_CONTENT_TYPE}" \
     --from-file=kernel.monitor="${RESOURCE_DIRECTORY}/kernel-monitor.json"
 
   # Create secret for passing kubeconfigs to kubelet, kubeproxy and npd.

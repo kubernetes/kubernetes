@@ -71,6 +71,7 @@ type PriorityClassOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewPriorityClassOptions returns an initialized PriorityClassOptions instance
 func NewPriorityClassOptions(ioStreams genericclioptions.IOStreams) *PriorityClassOptions {
 	return &PriorityClassOptions{
 		Value:            0,
@@ -137,11 +138,7 @@ func (o *PriorityClassOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, a
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -180,7 +177,7 @@ func (o *PriorityClassOptions) Run() error {
 		var err error
 		priorityClass, err = o.Client.PriorityClasses().Create(context.TODO(), priorityClass, createOptions)
 		if err != nil {
-			return fmt.Errorf("failed to create clusterrolebinding: %v", err)
+			return fmt.Errorf("failed to create priorityclass: %v", err)
 		}
 	}
 

@@ -25,14 +25,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
+var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 
 	ginkgo.Describe("container runtime conformance blackbox test", func() {
@@ -68,7 +68,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 				ginkgo.It(testCase.description+" [NodeConformance]", func() {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-					container := common.ConformanceContainer{
+					container := node.ConformanceContainer{
 						PodClient: f.PodClient(),
 						Container: v1.Container{
 							Name:    name,
@@ -98,13 +98,13 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 						if !testCase.waiting {
 							if status.State.Running == nil {
 								return fmt.Errorf("expected container state: Running, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 						}
 						if testCase.waiting {
 							if status.State.Waiting == nil {
 								return fmt.Errorf("expected container state: Waiting, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 							reason := status.State.Waiting.Reason
 							if reason != images.ErrImagePull.Error() &&
@@ -130,7 +130,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 						ginkgo.By("create the container")
 						container.Create()
 						ginkgo.By("check the container status")
-						for start := time.Now(); time.Since(start) < common.ContainerStatusRetryTimeout; time.Sleep(common.ContainerStatusPollInterval) {
+						for start := time.Now(); time.Since(start) < node.ContainerStatusRetryTimeout; time.Sleep(node.ContainerStatusPollInterval) {
 							if err = checkContainerStatus(); err == nil {
 								break
 							}

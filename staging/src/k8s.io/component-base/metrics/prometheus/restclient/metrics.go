@@ -17,6 +17,8 @@ limitations under the License.
 package restclient
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"net/url"
 	"time"
@@ -103,6 +105,17 @@ var (
 			},
 		},
 	)
+
+	execPluginCalls = k8smetrics.NewCounterVec(
+		&k8smetrics.CounterOpts{
+			Name: "rest_client_exec_plugin_call_total",
+			Help: "Number of calls to an exec plugin, partitioned by the type of " +
+				"event encountered (no_error, plugin_execution_error, plugin_not_found_error, " +
+				"client_internal_error) and an optional exit code. The exit code will " +
+				"be set to 0 if and only if the plugin call was successful.",
+		},
+		[]string{"code", "call_status"},
+	)
 )
 
 func init() {
@@ -117,6 +130,7 @@ func init() {
 		RequestLatency:        &latencyAdapter{m: requestLatency},
 		RateLimiterLatency:    &latencyAdapter{m: rateLimiterLatency},
 		RequestResult:         &resultAdapter{requestResult},
+		ExecPluginCalls:       &callsAdapter{m: execPluginCalls},
 	})
 }
 
@@ -124,16 +138,16 @@ type latencyAdapter struct {
 	m *k8smetrics.HistogramVec
 }
 
-func (l *latencyAdapter) Observe(verb string, u url.URL, latency time.Duration) {
-	l.m.WithLabelValues(verb, u.String()).Observe(latency.Seconds())
+func (l *latencyAdapter) Observe(ctx context.Context, verb string, u url.URL, latency time.Duration) {
+	l.m.WithContext(ctx).WithLabelValues(verb, u.String()).Observe(latency.Seconds())
 }
 
 type resultAdapter struct {
 	m *k8smetrics.CounterVec
 }
 
-func (r *resultAdapter) Increment(code, method, host string) {
-	r.m.WithLabelValues(code, method, host).Inc()
+func (r *resultAdapter) Increment(ctx context.Context, code, method, host string) {
+	r.m.WithContext(ctx).WithLabelValues(code, method, host).Inc()
 }
 
 type expiryToTTLAdapter struct {
@@ -150,4 +164,12 @@ type rotationAdapter struct {
 
 func (r *rotationAdapter) Observe(d time.Duration) {
 	r.m.Observe(d.Seconds())
+}
+
+type callsAdapter struct {
+	m *k8smetrics.CounterVec
+}
+
+func (r *callsAdapter) Increment(code int, callStatus string) {
+	r.m.WithLabelValues(fmt.Sprintf("%d", code), callStatus).Inc()
 }

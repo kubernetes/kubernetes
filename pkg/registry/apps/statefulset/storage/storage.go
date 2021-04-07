@@ -37,6 +37,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/statefulset"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // StatefulSetStorage includes dummy storage for StatefulSets, and their Status and Scale subresource.
@@ -72,9 +73,10 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 		NewListFunc:              func() runtime.Object { return &apps.StatefulSetList{} },
 		DefaultQualifiedResource: apps.Resource("statefulsets"),
 
-		CreateStrategy: statefulset.Strategy,
-		UpdateStrategy: statefulset.Strategy,
-		DeleteStrategy: statefulset.Strategy,
+		CreateStrategy:      statefulset.Strategy,
+		UpdateStrategy:      statefulset.Strategy,
+		DeleteStrategy:      statefulset.Strategy,
+		ResetFieldsStrategy: statefulset.Strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -85,6 +87,7 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 
 	statusStore := *store
 	statusStore.UpdateStrategy = statefulset.StatusStrategy
+	statusStore.ResetFieldsStrategy = statefulset.StatusStrategy
 	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
@@ -116,6 +119,11 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }
 
 // Implement ShortNamesProvider

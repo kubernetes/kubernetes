@@ -358,10 +358,9 @@ func TestServiceDefaultOnRead(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name      string
-		input     runtime.Object
-		expectErr bool
-		expect    runtime.Object
+		name   string
+		input  runtime.Object
+		expect runtime.Object
 	}{{
 		name:   "no change v4",
 		input:  makeService(nil),
@@ -403,9 +402,8 @@ func TestServiceDefaultOnRead(t *testing.T) {
 		}),
 		expect: makeService(nil),
 	}, {
-		name:      "not Service or ServiceList",
-		input:     &api.Pod{},
-		expectErr: false,
+		name:  "not Service or ServiceList",
+		input: &api.Pod{},
 	}}
 
 	for _, tc := range testCases {
@@ -435,13 +433,7 @@ func TestServiceDefaultOnRead(t *testing.T) {
 			defer storage.Store.DestroyFunc()
 
 			tmp := tc.input.DeepCopyObject()
-			err := storage.defaultOnRead(tmp)
-			if err != nil && !tc.expectErr {
-				t.Errorf("unexpected error: %v", err)
-			}
-			if err == nil && tc.expectErr {
-				t.Errorf("unexpected success")
-			}
+			storage.defaultOnRead(tmp)
 
 			svc, ok := tmp.(*api.Service)
 			if !ok {

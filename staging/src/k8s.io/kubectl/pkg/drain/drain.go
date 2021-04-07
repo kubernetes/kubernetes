@@ -46,11 +46,17 @@ const (
 
 // Helper contains the parameters to control the behaviour of drainer
 type Helper struct {
-	Ctx                 context.Context
-	Client              kubernetes.Interface
-	Force               bool
-	GracePeriodSeconds  int
+	Ctx    context.Context
+	Client kubernetes.Interface
+	Force  bool
+
+	// GracePeriodSeconds is how long to wait for a pod to terminate.
+	// IMPORTANT: 0 means "delete immediately"; set to a negative value
+	// to use the pod's terminationGracePeriodSeconds.
+	GracePeriodSeconds int
+
 	IgnoreAllDaemonSets bool
+	IgnoreErrors        bool
 	Timeout             time.Duration
 	DeleteEmptyDirData  bool
 	Selector            string

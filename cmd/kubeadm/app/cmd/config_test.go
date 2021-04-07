@@ -175,16 +175,6 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			},
 			expectedImages: defaultNumberOfImages,
 		},
-		{
-			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				KubernetesVersion: dummyKubernetesVersionStr,
-				DNS: kubeadmapiv1beta2.DNS{
-					Type: kubeadmapiv1beta2.KubeDNS,
-				},
-			},
-			expectedImages: defaultNumberOfImages + 2,
-		},
 	}
 
 	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
@@ -249,7 +239,7 @@ k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
 k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 k8s.gcr.io/pause:{{.PauseVersion}}
 k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -268,7 +258,7 @@ k8s.gcr.io/coredns:{{.CoreDNSVersion}}
         "k8s.gcr.io/kube-proxy:{{.KubeVersion}}",
         "k8s.gcr.io/pause:{{.PauseVersion}}",
         "k8s.gcr.io/etcd:{{.EtcdVersion}}",
-        "k8s.gcr.io/coredns:{{.CoreDNSVersion}}"
+        "k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}"
     ]
 }
 `,
@@ -287,7 +277,7 @@ images:
 - k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 - k8s.gcr.io/pause:{{.PauseVersion}}
 - k8s.gcr.io/etcd:{{.EtcdVersion}}
-- k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+- k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 kind: Images
 `,
 		},
@@ -303,7 +293,7 @@ k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
 k8s.gcr.io/kube-proxy:{{.KubeVersion}}
 k8s.gcr.io/pause:{{.PauseVersion}}
 k8s.gcr.io/etcd:{{.EtcdVersion}}
-k8s.gcr.io/coredns:{{.CoreDNSVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
 `,
 		},
 		{
@@ -313,7 +303,7 @@ k8s.gcr.io/coredns:{{.CoreDNSVersion}}
 			},
 			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
 			expectedOutput: "k8s.gcr.io/kube-apiserver:{{.KubeVersion}} k8s.gcr.io/kube-controller-manager:{{.KubeVersion}} k8s.gcr.io/kube-scheduler:{{.KubeVersion}} " +
-				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns:{{.CoreDNSVersion}} ",
+				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}} ",
 		},
 	}
 

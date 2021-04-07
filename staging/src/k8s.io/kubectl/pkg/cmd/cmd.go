@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
@@ -152,17 +153,47 @@ __kubectl_parse_get()
     fi
 }
 
+# Same as __kubectl_get_resources (with s) but allows completion for only one resource name.
 __kubectl_get_resource()
 {
     if [[ ${#nouns[@]} -eq 0 ]]; then
-      local kubectl_out
-      if kubectl_out=$(__kubectl_debug_out "kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s --verbs=get"); then
-          COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
-          return 0
-      fi
-      return 1
+      __kubectl_get_resource_helper "" "$cur"
+      return # the return status is that of the last command executed in the function body
     fi
     __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+# Same as __kubectl_get_resource (without s) but allows completion for multiple, comma-separated resource names.
+__kubectl_get_resources()
+{
+    local SEPARATOR=','
+    if [[ ${#nouns[@]} -eq 0 ]]; then
+      local kubectl_out HEAD TAIL
+      HEAD=""
+      TAIL="$cur"
+      # if SEPARATOR is contained in $cur, e.g. "pod,sec"
+      if [[ "$cur" = *${SEPARATOR}* ]] ; then
+        # set HEAD to "pod,"
+        HEAD="${cur%${SEPARATOR}*}${SEPARATOR}"
+        # set TAIL to "sec"
+        TAIL="${cur##*${SEPARATOR}}"
+      fi
+      __kubectl_get_resource_helper "$HEAD" "$TAIL"
+      return # the return status is that of the last command executed in the function body
+    fi
+    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+}
+
+__kubectl_get_resource_helper()
+{
+    local kubectl_out HEAD TAIL
+    HEAD="$1"
+    TAIL="$2"
+    if kubectl_out=$(__kubectl_debug_out "kubectl api-resources $(__kubectl_override_flags) -o name --cached --request-timeout=5s --verbs=get"); then
+        COMPREPLY=( $( compgen -P "$HEAD" -W "${kubectl_out[*]}" -- "$TAIL" ) )
+        return 0
+    fi
+    return 1
 }
 
 __kubectl_get_resource_namespace()
@@ -251,7 +282,11 @@ __kubectl_cp()
 
 __kubectl_custom_func() {
     case ${last_command} in
-        kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
+        kubectl_get)
+            __kubectl_get_resources
+            return
+            ;;
+        kubectl_describe | kubectl_delete | kubectl_label | kubectl_edit | kubectl_patch |\
         kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_* |\
         kubectl_apply_edit-last-applied | kubectl_apply_view-last-applied)
             __kubectl_get_resource
@@ -287,6 +322,8 @@ __kubectl_custom_func() {
 }
 `
 )
+
+const kubectlCmdHeaders = "KUBECTL_COMMAND_HEADERS"
 
 var (
 	bashCompletionFlags = map[string]string{
@@ -435,7 +472,6 @@ func HandlePluginCommand(pluginHandler PluginHandler, cmdArgs []string) error {
 func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	warningHandler := rest.NewWarningWriter(err, rest.WarningWriterOptions{Deduplicate: true, Color: term.AllowsColorOutput(err)})
 	warningsAsErrors := false
-
 	// Parent command to which all subcommands are added.
 	cmds := &cobra.Command{
 		Use:   "kubectl",
@@ -487,6 +523,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	kubeConfigFlags.AddFlags(flags)
 	matchVersionKubeConfigFlags := cmdutil.NewMatchVersionFlags(kubeConfigFlags)
 	matchVersionKubeConfigFlags.AddFlags(cmds.PersistentFlags())
+	// Updates hooks to add kubectl command headers: SIG CLI KEP 859.
+	addCmdHeaderHooks(cmds, kubeConfigFlags)
 
 	cmds.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
@@ -504,6 +542,12 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	ioStreams := genericclioptions.IOStreams{In: in, Out: out, ErrOut: err}
 
+	// Proxy command is incompatible with CommandHeaderRoundTripper, so
+	// clear the WrapConfigFn before running proxy command.
+	proxyCmd := proxy.NewCmdProxy(f, ioStreams)
+	proxyCmd.PreRun = func(cmd *cobra.Command, args []string) {
+		kubeConfigFlags.WrapConfigFn = nil
+	}
 	groups := templates.CommandGroups{
 		{
 			Message: "Basic Commands (Beginner):",
@@ -551,10 +595,10 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 				attach.NewCmdAttach(f, ioStreams),
 				cmdexec.NewCmdExec(f, ioStreams),
 				portforward.NewCmdPortForward(f, ioStreams),
-				proxy.NewCmdProxy(f, ioStreams),
+				proxyCmd,
 				cp.NewCmdCp(f, ioStreams),
 				auth.NewCmdAuth(f, ioStreams),
-				debug.NewCmdDebug(f, ioStreams, false),
+				debug.NewCmdDebug(f, ioStreams),
 			},
 		},
 		{
@@ -610,6 +654,38 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(options.NewCmdOptions(ioStreams.Out))
 
 	return cmds
+}
+
+// addCmdHeaderHooks performs updates on two hooks:
+//   1) Modifies the passed "cmds" persistent pre-run function to parse command headers.
+//      These headers will be subsequently added as X-headers to every
+//      REST call.
+//   2) Adds CommandHeaderRoundTripper as a wrapper around the standard
+//      RoundTripper. CommandHeaderRoundTripper adds X-Headers then delegates
+//      to standard RoundTripper.
+// For alpha, these hooks are only updated if the KUBECTL_COMMAND_HEADERS
+// environment variable is set.
+// See SIG CLI KEP 859 for more information:
+//   https://github.com/kubernetes/enhancements/tree/master/keps/sig-cli/859-kubectl-headers
+func addCmdHeaderHooks(cmds *cobra.Command, kubeConfigFlags *genericclioptions.ConfigFlags) {
+	if _, exists := os.LookupEnv(kubectlCmdHeaders); !exists {
+		return
+	}
+	crt := &genericclioptions.CommandHeaderRoundTripper{}
+	existingPreRunE := cmds.PersistentPreRunE
+	// Add command parsing to the existing persistent pre-run function.
+	cmds.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		crt.ParseCommandHeaders(cmd, args)
+		return existingPreRunE(cmd, args)
+	}
+	// Wraps CommandHeaderRoundTripper around standard RoundTripper.
+	kubeConfigFlags.WrapConfigFn = func(c *rest.Config) *rest.Config {
+		c.Wrap(func(rt http.RoundTripper) http.RoundTripper {
+			crt.Delegate = rt
+			return crt
+		})
+		return c
+	}
 }
 
 func runHelp(cmd *cobra.Command, args []string) {

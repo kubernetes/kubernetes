@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -100,16 +101,6 @@ type Lister interface {
 	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
 	// TableConvertor ensures all list implementers also implement table conversion
 	TableConvertor
-}
-
-// Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
-// if export is generally supported for that type. Errors can still be returned during the actual Export when certain
-// instances of the type are not exportable.
-type Exporter interface {
-	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
-	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
-	// retained, otherwise they are stripped also.
-	Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -214,7 +205,7 @@ type UpdatedObjectInfo interface {
 }
 
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+// if the hook cannot be completed. A ValidateObjectFunc may NOT transform the provided
 // object.
 type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
@@ -348,4 +339,24 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+// ResetFieldsStrategy is an optional interface that a storage object can
+// implement if it wishes to provide the fields reset by its strategies.
+type ResetFieldsStrategy interface {
+	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
+}
+
+// CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy
+// and ResetFieldsStrategy.
+type CreateUpdateResetFieldsStrategy interface {
+	RESTCreateUpdateStrategy
+	ResetFieldsStrategy
+}
+
+// UpdateResetFieldsStrategy is a union of RESTUpdateStrategy
+// and ResetFieldsStrategy.
+type UpdateResetFieldsStrategy interface {
+	RESTUpdateStrategy
+	ResetFieldsStrategy
 }

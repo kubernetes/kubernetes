@@ -1002,9 +1002,10 @@ func getKillMapWithInitContainers(pod *v1.Pod, status *kubecontainer.PodStatus, 
 
 func verifyActions(t *testing.T, expected, actual *podActions, desc string) {
 	if actual.ContainersToKill != nil {
-		// Clear the message field since we don't need to verify the message.
+		// Clear the message and reason fields since we don't need to verify them.
 		for k, info := range actual.ContainersToKill {
 			info.message = ""
+			info.reason = ""
 			actual.ContainersToKill[k] = info
 		}
 	}

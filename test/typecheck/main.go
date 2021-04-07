@@ -48,10 +48,10 @@ var (
 	// interesting OS-based errors happen earlier.
 	crossPlatforms = []string{
 		"linux/amd64", "windows/386",
-		"darwin/amd64", "linux/arm",
-		"linux/386", "windows/amd64",
-		"linux/arm64", "linux/ppc64le",
-		"linux/s390x",
+		"darwin/amd64", "darwin/arm64",
+		"linux/arm", "linux/386",
+		"windows/amd64", "linux/arm64",
+		"linux/ppc64le", "linux/s390x",
 	}
 
 	// directories we always ignore

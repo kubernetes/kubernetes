@@ -59,6 +59,7 @@ const (
 	offsetFsTotalUsageBytes
 	offsetFsBaseUsageBytes
 	offsetFsInodeUsage
+	offsetAcceleratorDutyCycle
 )
 
 var (
@@ -498,6 +499,16 @@ func getTestContainerInfo(seed int, podName string, podNamespace string, contain
 			TotalUsageBytes: &totalUsageBytes,
 			BaseUsageBytes:  &baseUsageBytes,
 			InodeUsage:      &inodeUsage,
+		},
+		Accelerators: []cadvisorapiv1.AcceleratorStats{
+			{
+				Make:        "nvidia",
+				Model:       "Tesla K80",
+				ID:          "foobar",
+				MemoryTotal: uint64(seed + offsetMemUsageBytes),
+				MemoryUsed:  uint64(seed + offsetMemUsageBytes),
+				DutyCycle:   uint64(seed + offsetAcceleratorDutyCycle),
+			},
 		},
 	}
 	stats.Cpu.Usage.Total = uint64(seed + offsetCPUUsageCoreSeconds)

@@ -111,10 +111,12 @@ func TestMoreImportantPod(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		got := MoreImportantPod(v.p1, v.p2)
-		if got != v.expected {
-			t.Errorf("%s failed, expected %t but got %t", k, v.expected, got)
-		}
+		t.Run(k, func(t *testing.T) {
+			got := MoreImportantPod(v.p1, v.p2)
+			if got != v.expected {
+				t.Errorf("expected %t but got %t", v.expected, got)
+			}
+		})
 	}
 }
 

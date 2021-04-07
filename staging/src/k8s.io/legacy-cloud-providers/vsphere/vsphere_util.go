@@ -25,6 +25,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -766,6 +767,21 @@ func IsUUIDSupportedNode(node *v1.Node) (bool, error) {
 		return true, nil
 	}
 	return false, nil
+}
+
+func isGuestHardwareVersionDeprecated(vmHardwareversion string) (bool, error) {
+	vmHardwareDeprecated := false
+	// vmconfig.Version returns vm hardware version as vmx-11, vmx-13, vmx-14, vmx-15 etc.
+	version := strings.Trim(vmHardwareversion, "vmx-")
+	value, err := strconv.ParseInt(version, 0, 64)
+	if err != nil {
+		return false, fmt.Errorf("failed to parse vm hardware version: %v Err: %v", version, err)
+	} else {
+		if value < 15 {
+			vmHardwareDeprecated = true
+		}
+	}
+	return vmHardwareDeprecated, nil
 }
 
 func GetNodeUUID(node *v1.Node) (string, error) {

@@ -2,18 +2,17 @@
 
 module k8s.io/csi-translation-lib
 
-go 1.15
+go 1.16
 
 require (
 	github.com/stretchr/testify v1.6.1
-	k8s.io/api v0.20.0
-	k8s.io/apimachinery v0.20.0
-	k8s.io/klog/v2 v2.4.0
+	k8s.io/api v0.21.0-rc.0
+	k8s.io/apimachinery v0.21.0-rc.0
+	k8s.io/klog/v2 v2.8.0
 )
 
 replace (
-	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
-	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
+	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib

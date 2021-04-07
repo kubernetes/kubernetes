@@ -38,4 +38,3 @@ If you don't want to push the images, run `make` or `make build` instead
 kubectl create -f conformance-e2e.yaml
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/conformance/README.md?pixel)]()

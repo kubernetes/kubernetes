@@ -119,7 +119,7 @@ func TestAllPrimitiveFieldPaths(t *testing.T) {
 		unexpected := result.Difference(expect)
 
 		if len(missing) > 0 {
-			t.Errorf("the following fields were exepcted, but missing from the result:\n%s", strings.Join(missing.List(), "\n"))
+			t.Errorf("the following fields were expected, but missing from the result:\n%s", strings.Join(missing.List(), "\n"))
 		}
 		if len(unexpected) > 0 {
 			t.Errorf("the following fields were in the result, but unexpected:\n%s", strings.Join(unexpected.List(), "\n"))
@@ -165,7 +165,9 @@ var (
 		"ContentType",
 		"EnableContentionProfiling",
 		"EnableControllerAttachDetach",
+		"EnableDebugFlagsHandler",
 		"EnableDebuggingHandlers",
+		"EnableProfilingHandler",
 		"EnableServer",
 		"EnableSystemLogHandler",
 		"EnforceNodeAllocatable[*]",
@@ -206,6 +208,7 @@ var (
 		"StaticPodURLHeader[*][*]",
 		"MaxOpenFiles",
 		"MaxPods",
+		"MemoryManagerPolicy",
 		"NodeLeaseDurationSeconds",
 		"NodeStatusMaxImages",
 		"NodeStatusUpdateFrequency.Duration",
@@ -220,6 +223,14 @@ var (
 		"ReadOnlyPort",
 		"RegistryBurst",
 		"RegistryPullQPS",
+		"ReservedMemory[*].Limits[*].Format",
+		"ReservedMemory[*].Limits[*].d.Dec.scale",
+		"ReservedMemory[*].Limits[*].d.Dec.unscaled.abs[*]",
+		"ReservedMemory[*].Limits[*].d.Dec.unscaled.neg",
+		"ReservedMemory[*].Limits[*].i.scale",
+		"ReservedMemory[*].Limits[*].i.value",
+		"ReservedMemory[*].Limits[*].s",
+		"ReservedMemory[*].NumaNode",
 		"ReservedSystemCPUs",
 		"RuntimeRequestTimeout.Duration",
 		"RunOnce",

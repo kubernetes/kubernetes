@@ -35,8 +35,7 @@ type SchedulerSpec struct {
 	// Valid values are "LowNodeUtilization", "HighNodeUtilization", "NoScoring"
 	// Defaults to "LowNodeUtilization"
 	// +optional
-	// +kubebuilder:default=LowNodeUtilization
-	Profile SchedulerProfile `json:"profile"`
+	Profile SchedulerProfile `json:"profile,omitempty"`
 	// defaultNodeSelector helps set the cluster-wide default node selector to
 	// restrict pod placement to specific nodes. This is applied to the pods
 	// created in all namespaces and creates an intersection with any existing

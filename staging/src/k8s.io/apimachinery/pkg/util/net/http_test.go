@@ -1107,3 +1107,21 @@ func TestPingTimeoutSeconds(t *testing.T) {
 	}
 	reset()
 }
+
+func Benchmark_ParseQuotedString(b *testing.B) {
+	str := `"The quick brown" fox jumps over the lazy dog`
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		quoted, remainder, err := parseQuotedString(str)
+		if err != nil {
+			b.Errorf("Unexpected error %s", err)
+		}
+		if quoted != "The quick brown" {
+			b.Errorf("Unexpected quoted string %s", quoted)
+		}
+		if remainder != "fox jumps over the lazy dog" {
+			b.Errorf("Unexpected remainder string %s", quoted)
+		}
+	}
+}

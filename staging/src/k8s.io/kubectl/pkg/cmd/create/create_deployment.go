@@ -79,6 +79,7 @@ type CreateDeploymentOptions struct {
 	genericclioptions.IOStreams
 }
 
+// NewCreateDeploymentOptions returns an initialized CreateDeploymentOptions instance
 func NewCreateDeploymentOptions(ioStreams genericclioptions.IOStreams) *CreateDeploymentOptions {
 	return &CreateDeploymentOptions{
 		Port:       -1,
@@ -155,11 +156,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
 
 	printer, err := o.PrintFlags.ToPrinter()
@@ -173,6 +170,7 @@ func (o *CreateDeploymentOptions) Complete(f cmdutil.Factory, cmd *cobra.Command
 	return nil
 }
 
+// Validate makes sure there is no discrepency in provided option values
 func (o *CreateDeploymentOptions) Validate() error {
 	if len(o.Images) > 1 && len(o.Command) > 0 {
 		return fmt.Errorf("cannot specify multiple --image options and command")

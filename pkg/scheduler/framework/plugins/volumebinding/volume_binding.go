@@ -32,7 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 const (
@@ -40,6 +42,8 @@ const (
 	DefaultBindTimeoutSeconds = 600
 
 	stateKey framework.StateKey = Name
+
+	maxUtilization = 100
 )
 
 // the state is initialized in PreFilter phase. because we save the pointer in
@@ -68,12 +72,14 @@ type VolumeBinding struct {
 	Binder                               scheduling.SchedulerVolumeBinder
 	PVCLister                            corelisters.PersistentVolumeClaimLister
 	GenericEphemeralVolumeFeatureEnabled bool
+	scorer                               volumeCapacityScorer
 }
 
 var _ framework.PreFilterPlugin = &VolumeBinding{}
 var _ framework.FilterPlugin = &VolumeBinding{}
 var _ framework.ReservePlugin = &VolumeBinding{}
 var _ framework.PreBindPlugin = &VolumeBinding{}
+var _ framework.ScorePlugin = &VolumeBinding{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "VolumeBinding"
@@ -196,7 +202,7 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	podVolumes, reasons, err := pl.Binder.FindPodVolumes(pod, state.boundClaims, state.claimsToBind, node)
 
 	if err != nil {
-		return framework.NewStatus(framework.Error, err.Error())
+		return framework.AsStatus(err)
 	}
 
 	if len(reasons) > 0 {
@@ -211,6 +217,55 @@ func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, p
 	state.Lock()
 	state.podVolumesByNode[node.Name] = podVolumes
 	state.Unlock()
+	return nil
+}
+
+var (
+	// TODO (for alpha) make it configurable in config.VolumeBindingArgs
+	defaultShapePoint = []config.UtilizationShapePoint{
+		{
+			Utilization: 0,
+			Score:       0,
+		},
+		{
+			Utilization: 100,
+			Score:       int32(config.MaxCustomPriorityScore),
+		},
+	}
+)
+
+// Score invoked at the score extension point.
+func (pl *VolumeBinding) Score(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	if pl.scorer == nil {
+		return 0, nil
+	}
+	state, err := getStateData(cs)
+	if err != nil {
+		return 0, framework.AsStatus(err)
+	}
+	podVolumes, ok := state.podVolumesByNode[nodeName]
+	if !ok {
+		return 0, nil
+	}
+	// group by storage class
+	classResources := make(classResourceMap)
+	for _, staticBinding := range podVolumes.StaticBindings {
+		class := staticBinding.StorageClassName()
+		storageResource := staticBinding.StorageResource()
+		if _, ok := classResources[class]; !ok {
+			classResources[class] = &scheduling.StorageResource{
+				Requested: 0,
+				Capacity:  0,
+			}
+		}
+		classResources[class].Requested += storageResource.Requested
+		classResources[class].Capacity += storageResource.Capacity
+	}
+	return pl.scorer(classResources), nil
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *VolumeBinding) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
@@ -254,13 +309,13 @@ func (pl *VolumeBinding) PreBind(ctx context.Context, cs *framework.CycleState, 
 	if !ok {
 		return framework.AsStatus(fmt.Errorf("no pod volumes found for node %q", nodeName))
 	}
-	klog.V(5).Infof("Trying to bind volumes for pod \"%v/%v\"", pod.Namespace, pod.Name)
+	klog.V(5).InfoS("Trying to bind volumes for pod", "pod", klog.KObj(pod))
 	err = pl.Binder.BindPodVolumes(pod, podVolumes)
 	if err != nil {
-		klog.V(1).Infof("Failed to bind volumes for pod \"%v/%v\": %v", pod.Namespace, pod.Name, err)
+		klog.V(1).InfoS("Failed to bind volumes for pod", "pod", klog.KObj(pod), "err", err)
 		return framework.AsStatus(err)
 	}
-	klog.V(5).Infof("Success binding volumes for pod \"%v/%v\"", pod.Namespace, pod.Name)
+	klog.V(5).InfoS("Success binding volumes for pod", "pod", klog.KObj(pod))
 	return nil
 }
 
@@ -286,7 +341,7 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type VolumeBindingArgs, got %T", plArgs)
 	}
-	if err := validateArgs(args); err != nil {
+	if err := validation.ValidateVolumeBindingArgs(args); err != nil {
 		return nil, err
 	}
 	podInformer := fh.SharedInformerFactory().Core().V1().Pods()
@@ -299,20 +354,27 @@ func New(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		capacityCheck = &scheduling.CapacityCheck{
 			CSIDriverInformer:          fh.SharedInformerFactory().Storage().V1().CSIDrivers(),
-			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1alpha1().CSIStorageCapacities(),
+			CSIStorageCapacityInformer: fh.SharedInformerFactory().Storage().V1beta1().CSIStorageCapacities(),
 		}
 	}
 	binder := scheduling.NewVolumeBinder(fh.ClientSet(), podInformer, nodeInformer, csiNodeInformer, pvcInformer, pvInformer, storageClassInformer, capacityCheck, time.Duration(args.BindTimeoutSeconds)*time.Second)
+
+	// build score function
+	var scorer volumeCapacityScorer
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		shape := make(helper.FunctionShape, 0, len(defaultShapePoint))
+		for _, point := range defaultShapePoint {
+			shape = append(shape, helper.FunctionShapePoint{
+				Utilization: int64(point.Utilization),
+				Score:       int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+			})
+		}
+		scorer = buildScorerFunction(shape)
+	}
 	return &VolumeBinding{
 		Binder:                               binder,
 		PVCLister:                            pvcInformer.Lister(),
 		GenericEphemeralVolumeFeatureEnabled: utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume),
+		scorer:                               scorer,
 	}, nil
-}
-
-func validateArgs(args *config.VolumeBindingArgs) error {
-	if args.BindTimeoutSeconds <= 0 {
-		return fmt.Errorf("invalid BindTimeoutSeconds: %d, must be positive integer", args.BindTimeoutSeconds)
-	}
-	return nil
 }

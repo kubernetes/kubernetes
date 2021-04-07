@@ -60,11 +60,7 @@ kube::test::find_dirs() {
   )
 }
 
-# The default timeout of 120s is not sufficient for the following packages
-# whose successful execution takes longer than that.
-# - k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler
-# - k8s.io/kubernetes/pkg/volume/csi
-KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=180s}
+KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
 # The directory to save test coverage reports to, if generating them. If unset,
@@ -230,9 +226,10 @@ produceJUnitXMLReport() {
   junit_xml_filename="${junit_filename_prefix}.xml"
 
   if ! command -v gotestsum >/dev/null 2>&1; then
-    kube::log::error "gotestsum not found; please cd to hack/tools and install with " \
-      "GO111MODULE=on go install gotest.tools/gotestsum"
-    return
+    kube::log::status "gotestsum not found; installing from hack/tools"
+    pushd "${KUBE_ROOT}/hack/tools" >/dev/null
+      GO111MODULE=on go install gotest.tools/gotestsum
+    popd >/dev/null
   fi
   gotestsum --junitfile "${junit_xml_filename}" --raw-command cat "${junit_filename_prefix}"*.stdout
   if [[ ! ${KUBE_KEEP_VERBOSE_TEST_OUTPUT} =~ ^[yY]$ ]]; then

@@ -23,8 +23,10 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -40,7 +42,6 @@ import (
 // with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
@@ -68,10 +69,16 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	return allErrs
 }
 
-// ValidatePodDisruptionBudgetStatus validates a PodDisruptionBudgetStatus and returns an ErrorList
+// ValidatePodDisruptionBudgetStatusUpdate validates a PodDisruptionBudgetStatus and returns an ErrorList
 // with any errors.
-func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
+func ValidatePodDisruptionBudgetStatusUpdate(status, oldStatus policy.PodDisruptionBudgetStatus, fldPath *field.Path, apiVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
+	// Don't run other validations for v1beta1 since we don't want to introduce
+	// new validations retroactively.
+	if apiVersion == policyapiv1beta1.SchemeGroupVersion {
+		return allErrs
+	}
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DisruptionsAllowed), fldPath.Child("disruptionsAllowed"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
@@ -85,19 +92,26 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 // trailing dashes are allowed.
 var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
+// PodSecurityPolicyValidationOptions contains additional parameters for ValidatePodSecurityPolicy.
+type PodSecurityPolicyValidationOptions struct {
+	// AllowEphemeralVolumeType determines whether Ephemeral is a valid entry
+	// in PodSecurityPolicySpec.Volumes.
+	AllowEphemeralVolumeType bool
+}
+
 // ValidatePodSecurityPolicy validates a PodSecurityPolicy and returns an ErrorList
 // with any errors.
-func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
+func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(psp.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 
 // ValidatePodSecurityPolicySpec validates a PodSecurityPolicySpec and returns an ErrorList
 // with any errors.
-func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *field.Path) field.ErrorList {
+func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, opts PodSecurityPolicyValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
@@ -105,7 +119,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
-	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(opts, fldPath, spec.Volumes)...)
 	if len(spec.RequiredDropCapabilities) > 0 && hasCap(policy.AllowAllCapabilities, spec.AllowedCapabilities) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("requiredDropCapabilities"), spec.RequiredDropCapabilities,
 			"must be empty when all capabilities are allowed by a wildcard"))
@@ -313,11 +327,15 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 }
 
 // validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
-func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
+func validatePodSecurityPolicyVolumes(opts PodSecurityPolicyValidationOptions, fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allowed := psputil.GetAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	allowed.Insert(string(policy.All))
+	// Ephemeral may or may not be allowed.
+	if !opts.AllowEphemeralVolumeType {
+		allowed.Delete(string(policy.Ephemeral))
+	}
 	for _, v := range volumes {
 		if !allowed.Has(string(v)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))
@@ -512,11 +530,11 @@ func validateRuntimeClassStrategy(fldPath *field.Path, rc *policy.RuntimeClassSt
 }
 
 // ValidatePodSecurityPolicyUpdate validates a PSP for updates.
-func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy) field.ErrorList {
+func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 

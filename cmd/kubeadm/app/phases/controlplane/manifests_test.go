@@ -33,6 +33,7 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
@@ -597,6 +598,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				KubernetesVersion: cpVersion,
 				CertificatesDir:   testCertsDir,
 				ClusterName:       "some-other-cluster-name",
+				FeatureGates:      map[string]bool{features.IPv6DualStack: false},
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -614,6 +616,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--feature-gates=IPv6DualStack=false",
 				"--cluster-name=some-other-cluster-name",
 			},
 		},
@@ -678,6 +681,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
+				FeatureGates:      map[string]bool{features.IPv6DualStack: false},
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -695,6 +699,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--feature-gates=IPv6DualStack=false",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=10.0.1.15/16",
 				"--service-cluster-ip-range=172.20.0.0/24",
@@ -765,6 +770,41 @@ func TestGetControllerManagerCommand(t *testing.T) {
 			},
 		},
 		{
+			name: "IPv6 networking custom extra-args for " + cpVersion,
+			cfg: &kubeadmapi.ClusterConfiguration{
+				Networking: kubeadmapi.Networking{
+					PodSubnet:     "2001:db8::/64",
+					ServiceSubnet: "fd03::/112",
+					DNSDomain:     "cluster.local",
+				},
+				ControllerManager: kubeadmapi.ControlPlaneComponent{
+					ExtraArgs: map[string]string{"allocate-node-cidrs": "false"},
+				},
+				CertificatesDir:   testCertsDir,
+				KubernetesVersion: cpVersion,
+			},
+			expected: []string{
+				"kube-controller-manager",
+				"--port=0",
+				"--bind-address=127.0.0.1",
+				"--leader-elect=true",
+				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--root-ca-file=" + testCertsDir + "/ca.crt",
+				"--service-account-private-key-file=" + testCertsDir + "/sa.key",
+				"--cluster-signing-cert-file=" + testCertsDir + "/ca.crt",
+				"--cluster-signing-key-file=" + testCertsDir + "/ca.key",
+				"--use-service-account-credentials=true",
+				"--controllers=*,bootstrapsigner,tokencleaner",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
+				"--client-ca-file=" + testCertsDir + "/ca.crt",
+				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
+				"--allocate-node-cidrs=false",
+				"--cluster-cidr=2001:db8::/64",
+				"--service-cluster-ip-range=fd03::/112",
+			},
+		},
+		{
 			name: "dual-stack networking for " + cpVersion,
 			cfg: &kubeadmapi.ClusterConfiguration{
 				Networking: kubeadmapi.Networking{
@@ -810,7 +850,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				},
 				CertificatesDir:   testCertsDir,
 				KubernetesVersion: cpVersion,
-				FeatureGates:      map[string]bool{features.IPv6DualStack: true},
 			},
 			expected: []string{
 				"kube-controller-manager",
@@ -828,7 +867,6 @@ func TestGetControllerManagerCommand(t *testing.T) {
 				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/controller-manager.conf",
 				"--client-ca-file=" + testCertsDir + "/ca.crt",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
-				"--feature-gates=IPv6DualStack=true",
 				"--allocate-node-cidrs=true",
 				"--cluster-cidr=10.0.1.15/16,2001:db8::/64",
 				"--node-cidr-mask-size-ipv4=20",
@@ -920,6 +958,8 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			// Create temp folder for the test case
 			tmpdir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpdir)

@@ -224,33 +224,6 @@ func TestGetAllImages(t *testing.T) {
 			},
 			expect: constants.CoreDNSImageName,
 		},
-		{
-			name: "main kube-dns image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSKubeDNSImageName,
-		},
-		{
-			name: "kube-dns sidecar image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSSidecarImageName,
-		},
-		{
-			name: "kube-dns dnsmasq-nanny image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
-				},
-			},
-			expect: constants.KubeDNSDnsMasqNannyImageName,
-		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {

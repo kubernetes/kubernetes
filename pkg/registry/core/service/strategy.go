@@ -18,7 +18,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"reflect"
 
@@ -33,11 +32,12 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
 	netutil "k8s.io/utils/net"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 type Strategy interface {
 	rest.RESTCreateUpdateStrategy
-	rest.RESTExportStrategy
+	rest.ResetFieldsStrategy
 }
 
 // svcStrategy implements behavior for Services
@@ -92,6 +92,18 @@ func (svcStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (svcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate sets contextual defaults and clears fields that are not allowed to be set by end users on creation.
 func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
@@ -139,30 +151,6 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	t, ok := obj.(*api.Service)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	// TODO: service does not yet have a prepare create strategy (see above)
-	t.Status = api.ServiceStatus{}
-	if exact {
-		return nil
-	}
-	//set ClusterIPs as nil - if ClusterIPs[0] != None
-	if len(t.Spec.ClusterIPs) > 0 && t.Spec.ClusterIPs[0] != api.ClusterIPNone {
-		t.Spec.ClusterIP = ""
-		t.Spec.ClusterIPs = nil
-	}
-	if t.Spec.Type == api.ServiceTypeNodePort {
-		for i := range t.Spec.Ports {
-			t.Spec.Ports[i].NodePort = 0
-		}
-	}
-	return nil
-}
-
 // dropServiceDisabledFields drops fields that are not used if their associated feature gates
 // are not enabled.  The typical pattern is:
 //     if !utilfeature.DefaultFeatureGate.Enabled(features.MyFeature) && !myFeatureInUse(oldSvc) {
@@ -182,7 +170,7 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 		newSvc.Spec.TopologyKeys = nil
 	}
 
-	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl if not enabled
+	// Clear AllocateLoadBalancerNodePorts if ServiceLBNodePortControl is not enabled
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLBNodePortControl) {
 		if !allocateLoadBalancerNodePortsInUse(oldSvc) {
 			newSvc.Spec.AllocateLoadBalancerNodePorts = nil
@@ -197,6 +185,20 @@ func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
 			for i := range newSvc.Status.LoadBalancer.Ingress {
 				newSvc.Status.LoadBalancer.Ingress[i].Ports = nil
 			}
+		}
+	}
+
+	// Drop LoadBalancerClass if LoadBalancerClass is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceLoadBalancerClass) {
+		if !loadBalancerClassInUse(oldSvc) {
+			newSvc.Spec.LoadBalancerClass = nil
+		}
+	}
+
+	// Clear InternalTrafficPolicy if not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
+		if !serviceInternalTrafficPolicyInUse(oldSvc) {
+			newSvc.Spec.InternalTrafficPolicy = nil
 		}
 	}
 }
@@ -251,6 +253,21 @@ func loadBalancerPortsInUse(svc *api.Service) bool {
 	return false
 }
 
+// returns true if svc.Spec.LoadBalancerClass field is in use
+func loadBalancerClassInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Spec.LoadBalancerClass != nil
+}
+
+func serviceInternalTrafficPolicyInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	return svc.Spec.InternalTrafficPolicy != nil
+}
+
 type serviceStatusStrategy struct {
 	Strategy
 }
@@ -258,6 +275,18 @@ type serviceStatusStrategy struct {
 // NewServiceStatusStrategy creates a status strategy for the provided base strategy.
 func NewServiceStatusStrategy(strategy Strategy) Strategy {
 	return serviceStatusStrategy{strategy}
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (serviceStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
@@ -416,6 +445,12 @@ func dropTypeDependentFields(newSvc *api.Service, oldSvc *api.Service) {
 		}
 	}
 
+	// If a user is switching to a type that doesn't need LoadBalancerClass AND they did not change
+	// this field, it is safe to drop it.
+	if canSetLoadBalancerClass(oldSvc) && !canSetLoadBalancerClass(newSvc) && sameLoadBalancerClass(oldSvc, newSvc) {
+		newSvc.Spec.LoadBalancerClass = nil
+	}
+
 	// NOTE: there are other fields like `selector` which we could wipe.
 	// Historically we did not wipe them and they are not allocated from
 	// finite pools, so we are (currently) choosing to leave them alone.
@@ -488,6 +523,20 @@ func needsHCNodePort(svc *api.Service) bool {
 
 func sameHCNodePort(oldSvc, newSvc *api.Service) bool {
 	return oldSvc.Spec.HealthCheckNodePort == newSvc.Spec.HealthCheckNodePort
+}
+
+func canSetLoadBalancerClass(svc *api.Service) bool {
+	return svc.Spec.Type == api.ServiceTypeLoadBalancer
+}
+
+func sameLoadBalancerClass(oldSvc, newSvc *api.Service) bool {
+	if (oldSvc.Spec.LoadBalancerClass == nil) != (newSvc.Spec.LoadBalancerClass == nil) {
+		return false
+	}
+	if oldSvc.Spec.LoadBalancerClass == nil {
+		return true // both are nil
+	}
+	return *oldSvc.Spec.LoadBalancerClass == *newSvc.Spec.LoadBalancerClass
 }
 
 // this func allows user to downgrade a service by just changing

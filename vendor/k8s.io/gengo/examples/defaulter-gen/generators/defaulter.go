@@ -23,6 +23,7 @@ import (
 	"io"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"k8s.io/gengo/args"
@@ -50,7 +51,7 @@ var typeZeroValue = map[string]interface{}{
 	"int16":       0.,
 	"int32":       0.,
 	"int64":       0.,
-	"byte":        0,
+	"byte":        0.,
 	"float64":     0.,
 	"float32":     0.,
 	"bool":        false,
@@ -839,6 +840,12 @@ type callNode struct {
 	// For example 1 corresponds to setting a default value and taking its pointer while
 	// 2 corresponds to setting a default value and taking its pointer's pointer
 	// 0 implies that no pointers are used
+	// This is used in situations where a field is a pointer to a primitive value rather than a primitive value itself.
+	//
+	//     type A {
+	//       +default="foo"
+	//       Field *string
+	//     }
 	defaultDepth int
 
 	// defaultType is the type of the default value.
@@ -899,80 +906,90 @@ func (n *callNode) writeCalls(varName string, isVarPointer bool, sw *generator.S
 	}
 }
 
+func getTypeZeroValue(t string) (interface{}, error) {
+	defaultZero, ok := typeZeroValue[t]
+	if !ok {
+		return nil, fmt.Errorf("Cannot find zero value for type %v in typeZeroValue", t)
+	}
+
+	// To generate the code for empty string, they must be quoted
+	if defaultZero == "" {
+		defaultZero = strconv.Quote(defaultZero.(string))
+	}
+	return defaultZero, nil
+}
+
 func (n *callNode) writeDefaulter(varName string, index string, isVarPointer bool, sw *generator.SnippetWriter) {
 	if n.defaultValue == "" {
 		return
 	}
-	varPointer := varName
-	if !isVarPointer {
-		varPointer = "&" + varPointer
-	}
-
 	args := generator.Args{
 		"defaultValue": n.defaultValue,
-		"varPointer":   varPointer,
 		"varName":      varName,
 		"index":        index,
 		"varDepth":     n.defaultDepth,
 		"varType":      n.defaultType,
 	}
 
-	if n.index {
-		sw.Do("if reflect.ValueOf($.var$[$.index$]).IsZero() {\n", generator.Args{"var": varName, "index": index})
-		if n.defaultIsPrimitive {
-			if n.defaultDepth > 0 {
-				sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
-				for i := n.defaultDepth; i > 0; i-- {
-					sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
-				}
-				sw.Do("$.varName$[$.index$] = ptrVar0", args)
-			} else {
-				sw.Do("$.varName$[$.index$] = $.defaultValue$", args)
-			}
-		} else {
-			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), $.varPointer$[$.index$]); err != nil {\n", args)
-			sw.Do("panic(err)\n", nil)
-			sw.Do("}\n", nil)
-		}
-	} else if n.key {
-		mapDefaultVar := index + "_default"
-		args["mapDefaultVar"] = mapDefaultVar
-		sw.Do("if reflect.ValueOf($.var$[$.index$]).IsZero() {\n", generator.Args{"var": varName, "index": index})
+	variablePlaceholder := ""
 
-		if n.defaultIsPrimitive {
-			if n.defaultDepth > 0 {
-				sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
-				for i := n.defaultDepth; i > 0; i-- {
-					sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
-				}
-				sw.Do("$.varName$[$.index$] = ptrVar0", args)
-			} else {
-				sw.Do("$.varName$[$.index$] = $.defaultValue$", args)
+	if n.index {
+		// Defaulting for array
+		variablePlaceholder = "$.varName$[$.index$]"
+	} else if n.key {
+		// Defaulting for map
+		variablePlaceholder = "$.varName$[$.index$]"
+		mapDefaultVar := args["index"].(string) + "_default"
+		args["mapDefaultVar"] = mapDefaultVar
+	} else {
+		// Defaulting for primitive type
+		variablePlaceholder = "$.varName$"
+	}
+
+	// defaultIsPrimitive is true if the type or underlying type (in an array/map) is primitive
+	// or is a pointer to a primitive type
+	// (Eg: int, map[string]*string, []int)
+	if n.defaultIsPrimitive {
+		// If the default value is a primitive when the assigned type is a pointer
+		// keep using the address-of operator on the primitive value until the types match
+		if n.defaultDepth > 0 {
+			sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
+			sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
+			// We iterate until a depth of 1 instead of 0 because the following line
+			// `if $.varName$ == &ptrVar1` accounts for 1 level already
+			for i := n.defaultDepth; i > 1; i-- {
+				sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
 			}
+			sw.Do(fmt.Sprintf("%s = &ptrVar1", variablePlaceholder), args)
 		} else {
-			sw.Do("$.mapDefaultVar$ := $.varName$[$.index$]\n", args)
-			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
-			sw.Do("panic(err)\n", nil)
-			sw.Do("}\n", nil)
-			sw.Do("$.varName$[$.index$] = $.mapDefaultVar$\n", args)
+			// For primitive types, nil checks cannot be used and the zero value must be determined
+			defaultZero, err := getTypeZeroValue(n.defaultType)
+			if err != nil {
+				klog.Error(err)
+			}
+			args["defaultZero"] = defaultZero
+
+			sw.Do(fmt.Sprintf("if %s == $.defaultZero$ {\n", variablePlaceholder), args)
+			sw.Do(fmt.Sprintf("%s = $.defaultValue$", variablePlaceholder), args)
 		}
 	} else {
-		sw.Do("if reflect.ValueOf($.var$).IsZero() {\n", generator.Args{"var": varName})
-
-		if n.defaultIsPrimitive {
-			if n.defaultDepth > 0 {
-				sw.Do("var ptrVar$.varDepth$ $.varType$ = $.defaultValue$\n", args)
-				for i := n.defaultDepth; i > 0; i-- {
-					sw.Do("ptrVar$.ptri$ := &ptrVar$.i$\n", generator.Args{"i": fmt.Sprintf("%d", i), "ptri": fmt.Sprintf("%d", (i - 1))})
-				}
-				sw.Do("$.varName$ = ptrVar0", args)
-			} else {
-				sw.Do("$.varName$ = $.defaultValue$", args)
-			}
+		sw.Do(fmt.Sprintf("if %s == nil {\n", variablePlaceholder), args)
+		// Map values are not directly addressable and we need a temporary variable to do json unmarshalling
+		// This applies to maps with non-primitive values (eg: map[string]SubStruct)
+		if n.key {
+			sw.Do("$.mapDefaultVar$ := $.varName$[$.index$]\n", args)
+			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), &$.mapDefaultVar$); err != nil {\n", args)
 		} else {
-			sw.Do("if err := json.Unmarshal([]byte(`$.defaultValue$`), $.varPointer$); err != nil {\n", args)
-			sw.Do("panic(err)\n", nil)
-			sw.Do("}\n", nil)
+			variablePointer := variablePlaceholder
+			if !isVarPointer {
+				variablePointer = "&" + variablePointer
+			}
+			sw.Do(fmt.Sprintf("if err := json.Unmarshal([]byte(`$.defaultValue$`), %s); err != nil {\n", variablePointer), args)
+		}
+		sw.Do("panic(err)\n", nil)
+		sw.Do("}\n", nil)
+		if n.key {
+			sw.Do("$.varName$[$.index$] = $.mapDefaultVar$\n", args)
 		}
 	}
 	sw.Do("}\n", nil)

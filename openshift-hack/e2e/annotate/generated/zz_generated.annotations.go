@@ -7,284 +7,6 @@ import (
 )
 
 var annotations = map[string]string{
-	"[Top Level] Recreate [Feature:Recreate] recreate nodes and ensure they function upon restart": "recreate nodes and ensure they function upon restart [Disabled:Broken] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]": "CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] should scale down empty nodes [Feature:ClusterAutoscalerScalability3]": "should scale down empty nodes [Feature:ClusterAutoscalerScalability3] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4]": "should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] should scale up at all [Feature:ClusterAutoscalerScalability1]": "should scale up at all [Feature:ClusterAutoscalerScalability1] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] should scale up twice [Feature:ClusterAutoscalerScalability2]": "should scale up twice [Feature:ClusterAutoscalerScalability2] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Cluster size autoscaler scalability [Slow] shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5]": "shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5] [sig-cluster-lifecycle] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly [NodeConformance] [Conformance]": "should execute poststart exec hook properly [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly [NodeConformance] [Conformance]": "should execute poststart http hook properly [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly [NodeConformance] [Conformance]": "should execute prestop exec hook properly [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly [NodeConformance] [Conformance]": "should execute prestop http hook properly [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]": "should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret [NodeConformance]": "should be able to pull from private registry with secret [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test when running a container with a new image should be able to pull image [NodeConformance]": "should be able to pull image [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test when running a container with a new image should not be able to pull from private registry without secret [NodeConformance]": "should not be able to pull from private registry without secret [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test when running a container with a new image should not be able to pull image from invalid registry [NodeConformance]": "should not be able to pull image from invalid registry [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Container Runtime blackbox test when starting a container that exits should run with the expected status [NodeConformance] [Conformance]": "should run with the expected status [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Docker Containers should be able to override the image's default arguments (docker cmd) [NodeConformance] [Conformance]": "should be able to override the image's default arguments (docker cmd) [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Docker Containers should be able to override the image's default command (docker entrypoint) [NodeConformance] [Conformance]": "should be able to override the image's default command (docker entrypoint) [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Docker Containers should be able to override the image's default command and arguments [NodeConformance] [Conformance]": "should be able to override the image's default command and arguments [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Docker Containers should use the image defaults if command and args are blank [NodeConformance] [Conformance]": "should use the image defaults if command and args are blank [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage] Downward API tests for local ephemeral storage should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars": "should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage] Downward API tests for local ephemeral storage should provide default limits.ephemeral-storage from node allocatable": "should provide default limits.ephemeral-storage from node allocatable [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] GKE local SSD [Feature:GKELocalSSD] should write and read from node local SSD [Feature:GKELocalSSD]": "should write and read from node local SSD [Feature:GKELocalSSD] [sig-arch] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] GKE node pools [Feature:GKENodePool] should create a cluster with multiple node pools [Feature:GKENodePool]": "should create a cluster with multiple node pools [Feature:GKENodePool] [sig-arch] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] InitContainer [NodeConformance] should invoke init containers on a RestartAlways pod [Conformance]": "should invoke init containers on a RestartAlways pod [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] InitContainer [NodeConformance] should invoke init containers on a RestartNever pod [Conformance]": "should invoke init containers on a RestartNever pod [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] InitContainer [NodeConformance] should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance]": "should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] InitContainer [NodeConformance] should not start app containers if init containers fail on a RestartAlways pod [Conformance]": "should not start app containers if init containers fail on a RestartAlways pod [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Kubelet when scheduling a busybox Pod with hostAliases should write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance]": "should write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]": "should print the output to logs [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Kubelet when scheduling a busybox command that always fails in a pod should be possible to delete [NodeConformance] [Conformance]": "should be possible to delete [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Kubelet when scheduling a busybox command that always fails in a pod should have an terminated reason [NodeConformance] [Conformance]": "should have an terminated reason [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Kubelet when scheduling a read only busybox container should not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance]": "should not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] KubeletManagedEtcHosts should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance] [Conformance]": "should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Lease lease API should be available [Conformance]": "lease API should be available [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] NodeLease when the NodeLease feature is enabled should have OwnerReferences set": "should have OwnerReferences set [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] NodeLease when the NodeLease feature is enabled the kubelet should create and update a lease in the kube-node-lease namespace": "the kubelet should create and update a lease in the kube-node-lease namespace [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] NodeLease when the NodeLease feature is enabled the kubelet should report node status infrequently": "the kubelet should report node status infrequently [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should allow activeDeadlineSeconds to be updated [NodeConformance] [Conformance]": "should allow activeDeadlineSeconds to be updated [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should be submitted and removed [NodeConformance] [Conformance]": "should be submitted and removed [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should be updated [NodeConformance] [Conformance]": "should be updated [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should cap back-off at MaxContainerBackOff [Slow][NodeConformance]": "should cap back-off at MaxContainerBackOff [Slow][NodeConformance] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should contain environment variables for services [NodeConformance] [Conformance]": "should contain environment variables for services [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should delete a collection of pods [Conformance]": "should delete a collection of pods [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should get a host IP [NodeConformance] [Conformance]": "should get a host IP [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]": "should have their auto-restart back-off timer reset on image update [Slow][NodeConformance] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should run through the lifecycle of Pods and PodStatus [Conformance]": "should run through the lifecycle of Pods and PodStatus [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should support pod readiness gates [NodeFeature:PodReadinessGate]": "should support pod readiness gates [NodeFeature:PodReadinessGate] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should support remote command execution over websockets [NodeConformance] [Conformance]": "should support remote command execution over websockets [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Pods should support retrieving logs from the container over websockets [NodeConformance] [Conformance]": "should support retrieving logs from the container over websockets [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] PrivilegedPod [NodeConformance] should enable privileged commands [LinuxOnly]": "should enable privileged commands [LinuxOnly] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should *not* be restarted by liveness probe because startup probe delays it": "should *not* be restarted by liveness probe because startup probe delays it [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should *not* be restarted with a non-local redirect http liveness probe": "should *not* be restarted with a non-local redirect http liveness probe [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should *not* be restarted with a tcp:8080 liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a tcp:8080 liveness probe [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted by liveness probe after startup probe enables it": "should be restarted by liveness probe after startup probe enables it [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted startup probe fails": "should be restarted startup probe fails [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted with a docker exec liveness probe with timeout ": "should be restarted with a docker exec liveness probe with timeout  [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should be restarted with a local redirect http liveness probe": "should be restarted with a local redirect http liveness probe [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should have monotonically increasing restart count [NodeConformance] [Conformance]": "should have monotonically increasing restart count [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should not be ready until startupProbe succeeds": "should not be ready until startupProbe succeeds [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container should not be ready with a docker exec readiness probe timeout ": "should not be ready with a docker exec readiness probe timeout  [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container with readiness probe should not be ready before initial delay and never restart [NodeConformance] [Conformance]": "with readiness probe should not be ready before initial delay and never restart [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Probing container with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance]": "with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsNonRoot should not run with an explicit root user ID [LinuxOnly]": "should not run with an explicit root user ID [LinuxOnly] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsNonRoot should not run without a specified user ID": "should not run without a specified user ID [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsNonRoot should run with an explicit non-root user ID [LinuxOnly]": "should run with an explicit non-root user ID [LinuxOnly] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsNonRoot should run with an image specified user ID": "should run with an image specified user ID [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsUser should run the container with uid 0 [LinuxOnly] [NodeConformance]": "should run the container with uid 0 [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a container with runAsUser should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]": "should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a pod with privileged should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]": "should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a pod with privileged should run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]": "should run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a pod with readOnlyRootFilesystem should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]": "should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context When creating a pod with readOnlyRootFilesystem should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance] [Conformance]": "should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]": "should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when true [LinuxOnly] [NodeConformance]": "should allow privilege escalation when true [LinuxOnly] [NodeConformance] [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance]": "should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node": "should not launch unsafe, but not explicitly enabled sysctls on the node [Disabled:Broken] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls": "should reject invalid sysctls [Disabled:Broken] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls": "should support sysctls [Disabled:Broken] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually whitelisted": "should support unsafe sysctls which are actually whitelisted [Disabled:Broken] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": "should allow composing env vars into new env vars [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should allow substituting values in a container's args [NodeConformance] [Conformance]": "should allow substituting values in a container's args [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should allow substituting values in a container's command [NodeConformance] [Conformance]": "should allow substituting values in a container's command [NodeConformance] [Conformance] [sig-node] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should allow substituting values in a volume subpath [sig-storage] [Conformance]": "should allow substituting values in a volume subpath [sig-storage] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should fail substituting values in a volume subpath with absolute path [sig-storage][Slow] [Conformance]": "should fail substituting values in a volume subpath with absolute path [sig-storage][Slow] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should fail substituting values in a volume subpath with backticks [sig-storage][Slow] [Conformance]": "should fail substituting values in a volume subpath with backticks [sig-storage][Slow] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should succeed in writing subpaths in container [sig-storage][Slow] [Conformance]": "should succeed in writing subpaths in container [sig-storage][Slow] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] Variable Expansion should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance]": "should verify that a failing subpath expansion can be modified during the lifecycle of a container [sig-storage][Slow] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [Feature:Example] [k8s.io] Downward API should create a pod that prints his name and namespace": "should create a pod that prints his name and namespace [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [Feature:Example] [k8s.io] Liveness liveness pods should be automatically restarted": "liveness pods should be automatically restarted [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [Feature:Example] [k8s.io] Secret should create a pod that reads a secret": "should create a pod that reads a secret [sig-node] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [Feature:TTLAfterFinished][NodeAlphaFeature:TTLAfterFinished] job should be deleted once it finishes after TTL seconds": "job should be deleted once it finishes after TTL seconds [Disabled:Alpha] [sig-node] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] AppArmor load AppArmor profiles can disable an AppArmor profile, using unconfined": "can disable an AppArmor profile, using unconfined [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile": "should enforce an AppArmor profile [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Events should be sent by kubelets and the scheduler about pods scheduling and running  [Conformance]": "should be sent by kubelets and the scheduler about pods scheduling and running  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Kubelet [Serial] [Slow] [k8s.io] [sig-node] experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking] resource tracking for 100 pods per node": "resource tracking for 100 pods per node [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Kubelet [Serial] [Slow] [k8s.io] [sig-node] regular resource usage tracking [Feature:RegularResourceUsageTracking] resource tracking for 0 pods per node": "resource tracking for 0 pods per node [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Kubelet [Serial] [Slow] [k8s.io] [sig-node] regular resource usage tracking [Feature:RegularResourceUsageTracking] resource tracking for 100 pods per node": "resource tracking for 100 pods per node [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Mount propagation should propagate mounts to the host": "should propagate mounts to the host [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with minTolerationSeconds [Disruptive] [Conformance]": "evicts pods with minTolerationSeconds [Disruptive] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] only evicts pods without tolerations from tainted nodes": "only evicts pods without tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] doesn't evict pod with tolerations from tainted nodes": "doesn't evict pod with tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] eventually evict pod with finite tolerations from tainted nodes": "eventually evict pod with finite tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] evicts pods from tainted nodes": "evicts pods from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] removing taint cancels eviction [Disruptive] [Conformance]": "removing taint cancels eviction [Disruptive] [Conformance] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] NodeProblemDetector [DisabledForLargeClusters] should run without error": "should run without error [Disabled:SpecialConfig] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Pod garbage collector [Feature:PodGarbageCollector] [Slow] should handle the creation of 1000 pods": "should handle the creation of 1000 pods [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Pods Extended [k8s.io] Delete Grace Period should be submitted and removed": "should be submitted and removed [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Pods Extended [k8s.io] Pod Container Status should never report success for a pending container": "should never report success for a pending container [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Pods Extended [k8s.io] Pod Container lifecycle should not create extra sandbox if all containers are done": "should not create extra sandbox if all containers are done [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Pods Extended [k8s.io] Pods Set QOS Class should be set on Pods with matching resource requests and limits for memory and cpu [Conformance]": "should be set on Pods with matching resource requests and limits for memory and cpu [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] PreStop graceful pod terminated should wait until preStop hook completes the process": "graceful pod terminated should wait until preStop hook completes the process [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] PreStop should call prestop when killing a pod  [Conformance]": "should call prestop when killing a pod  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] SSH should SSH to all nodes and run commands": "should SSH to all nodes and run commands [Disabled:Broken] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly]": "should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support container.SecurityContext.RunAsUser [LinuxOnly]": "should support container.SecurityContext.RunAsUser [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly]": "should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]": "should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]": "should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support seccomp default which is unconfined [LinuxOnly]": "should support seccomp default which is unconfined [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support seccomp runtime/default [LinuxOnly]": "should support seccomp runtime/default [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support seccomp unconfined on the container [LinuxOnly]": "should support seccomp unconfined on the container [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support seccomp unconfined on the pod [LinuxOnly]": "should support seccomp unconfined on the pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support volume SELinux relabeling [Flaky] [LinuxOnly]": "should support volume SELinux relabeling [Flaky] [LinuxOnly] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly]": "should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] Security Context should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]": "should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] crictl should be able to run crictl on the node": "should be able to run crictl on the node [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] kubelet [k8s.io] [sig-node] Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.": "kubelet should be able to delete 10 pods per node in 1m0s. [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] kubelet [k8s.io] [sig-node] host cleanup with volume mounts [sig-storage][HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.": "after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed. [Suite:k8s]",
-
-	"[Top Level] [k8s.io] [sig-node] kubelet [k8s.io] [sig-node] host cleanup with volume mounts [sig-storage][HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": "after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed. [Suite:k8s]",
-
 	"[Top Level] [sig-api-machinery] API priority and fairness should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration": "should ensure that requests can be classified by adding FlowSchema and PriorityLevelConfiguration [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] API priority and fairness should ensure that requests can't be drowned out (fairness)": "should ensure that requests can't be drowned out (fairness) [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -371,10 +93,6 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] Etcd failure [Disruptive] should recover from network partition with master": "should recover from network partition with master [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] Events should delete a collection of events [Conformance]": "should delete a collection of events [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-api-machinery] Events should ensure that an event can be fetched, patched, deleted, and listed [Conformance]": "should ensure that an event can be fetched, patched, deleted, and listed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
 	"[Top Level] [sig-api-machinery] Garbage collector should delete RS created by deployment when not orphaning [Conformance]": "should delete RS created by deployment when not orphaning [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Garbage collector should delete jobs and pods created by cronjob": "should delete jobs and pods created by cronjob [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -411,6 +129,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance]": "should patch a Namespace [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-api-machinery] ResourceQuota [Feature:CrossNamespacePodAffinity] [alpha] should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.": "should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors. [Disabled:Alpha] [Suite:k8s]",
+
 	"[Top Level] [sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes.": "should verify ResourceQuota's multiple priority class scope (quota set to pod count: 2) against 2 pods with same priority classes. [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] ResourceQuota [Feature:PodPriority] should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class.": "should verify ResourceQuota's priority class scope (cpu, memory quota set) against a pod with same priority class. [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -435,9 +155,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a custom resource.": "should create a ResourceQuota and capture the life of a custom resource. [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage]": "should create a ResourceQuota and capture the life of a persistent volume claim with a storage class. [sig-storage] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim with a storage class": "should create a ResourceQuota and capture the life of a persistent volume claim with a storage class [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage]": "should create a ResourceQuota and capture the life of a persistent volume claim. [sig-storage] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim": "should create a ResourceQuota and capture the life of a persistent volume claim [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a pod. [Conformance]": "should create a ResourceQuota and capture the life of a pod. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -455,19 +175,25 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes. [Conformance]": "should verify ResourceQuota with terminating scopes. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-api-machinery] Secrets should be consumable from pods in env vars [NodeConformance] [Conformance]": "should be consumable from pods in env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-api-machinery] Secrets should be consumable via the environment [NodeConformance] [Conformance]": "should be consumable via the environment [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-api-machinery] Secrets should fail to create secret due to empty secret key [Conformance]": "should fail to create secret due to empty secret key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-api-machinery] Secrets should patch a secret [Conformance]": "should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
 	"[Top Level] [sig-api-machinery] Server request timeout default timeout should be used if the specified timeout in the request URL is 0s": "default timeout should be used if the specified timeout in the request URL is 0s [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Server request timeout should return HTTP status code 400 if the user specifies an invalid timeout in the request URL": "should return HTTP status code 400 if the user specifies an invalid timeout in the request URL [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Server request timeout the request should be served with a default timeout if the specified timeout in the request URL exceeds maximum allowed": "the request should be served with a default timeout if the specified timeout in the request URL exceeds maximum allowed [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should create an applied object if it does not already exist": "should create an applied object if it does not already exist [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should give up ownership of a field if forced applied by a controller": "should give up ownership of a field if forced applied by a controller [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should ignore conflict errors if force apply is used": "should ignore conflict errors if force apply is used [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should not remove a field if an owner unsets the field but other managers still have ownership of the field": "should not remove a field if an owner unsets the field but other managers still have ownership of the field [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should remove a field if it is owned but removed in the apply request": "should remove a field if it is owned but removed in the apply request [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should work for CRDs": "should work for CRDs [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] ServerSideApply should work for subresources": "should work for subresources [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Servers with support for API chunking should return chunks of results for list calls": "should return chunks of results for list calls [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -480,6 +206,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-api-machinery] Servers with support for Table transformation should return generic metadata details across all namespaces for nodes": "should return generic metadata details across all namespaces for nodes [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Servers with support for Table transformation should return pod details": "should return pod details [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-api-machinery] StorageVersion resources [Feature:StorageVersionAPI] storage version with non-existing id should be GC'ed": "storage version with non-existing id should be GC'ed [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-api-machinery] Watchers should be able to restart watching from the last resource version observed by the previous watch [Conformance]": "should be able to restart watching from the last resource version observed by the previous watch [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -511,15 +239,17 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] CronJob should not emit unexpected warnings": "should not emit unexpected warnings [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] CronJob should not schedule jobs when suspended [Slow]": "should not schedule jobs when suspended [Slow] [Suite:k8s]",
+	"[Top Level] [sig-apps] CronJob should not schedule jobs when suspended [Slow] [Conformance]": "should not schedule jobs when suspended [Slow] [Conformance] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] CronJob should not schedule new jobs when ForbidConcurrent [Slow]": "should not schedule new jobs when ForbidConcurrent [Slow] [Suite:k8s]",
+	"[Top Level] [sig-apps] CronJob should not schedule new jobs when ForbidConcurrent [Slow] [Conformance]": "should not schedule new jobs when ForbidConcurrent [Slow] [Conformance] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] CronJob should remove from active list jobs that have been deleted": "should remove from active list jobs that have been deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] CronJob should replace jobs when ReplaceConcurrent": "should replace jobs when ReplaceConcurrent [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] CronJob should replace jobs when ReplaceConcurrent [Conformance]": "should replace jobs when ReplaceConcurrent [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] CronJob should schedule multiple jobs concurrently": "should schedule multiple jobs concurrently [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] CronJob should schedule multiple jobs concurrently [Conformance]": "should schedule multiple jobs concurrently [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] CronJob should support CronJob API operations [Conformance]": "should support CronJob API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] Daemon set [Serial] should not update pod when spec was updated and update strategy is OnDelete": "should not update pod when spec was updated and update strategy is OnDelete [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -533,6 +263,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance]": "should run and stop simple daemon [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-apps] Daemon set [Serial] should surge pods onto nodes when spec was updated and update strategy is RollingUpdate [Feature:DaemonSetUpdateSurge]": "should surge pods onto nodes when spec was updated and update strategy is RollingUpdate [Feature:DaemonSetUpdateSurge] [Disabled:Alpha] [Suite:k8s]",
+
 	"[Top Level] [sig-apps] Daemon set [Serial] should update pod when spec was updated and update strategy is RollingUpdate [Conformance]": "should update pod when spec was updated and update strategy is RollingUpdate [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] DaemonRestart [Disruptive] Controller Manager should not create/delete replicas across restart": "Controller Manager should not create/delete replicas across restart [Serial] [Suite:k8s]",
@@ -542,6 +274,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-apps] DaemonRestart [Disruptive] Kubelet should not restart containers across restart": "Kubelet should not restart containers across restart [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] DaemonRestart [Disruptive] Scheduler should continue assigning pods to nodes across restart": "Scheduler should continue assigning pods to nodes across restart [Serial] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] Deployment Deployment should have a working scale subresource [Conformance]": "Deployment should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] Deployment RecreateDeployment should delete old pods and create new ones [Conformance]": "RecreateDeployment should delete old pods and create new ones [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -563,7 +297,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] Deployment test Deployment ReplicaSet orphaning and adoption regarding controllerRef": "test Deployment ReplicaSet orphaning and adoption regarding controllerRef [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] DisruptionController Listing PodDisruptionBudgets for all namespaces should list and delete a collection of PodDisruptionBudgets": "should list and delete a collection of PodDisruptionBudgets [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] DisruptionController Listing PodDisruptionBudgets for all namespaces should list and delete a collection of PodDisruptionBudgets [Conformance]": "should list and delete a collection of PodDisruptionBudgets [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] DisruptionController evictions: enough pods, absolute => should allow an eviction": "evictions: enough pods, absolute => should allow an eviction [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -581,11 +315,17 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] DisruptionController should block an eviction until the PDB is updated to allow it": "should block an eviction until the PDB is updated to allow it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] DisruptionController should create a PodDisruptionBudget": "should create a PodDisruptionBudget [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] DisruptionController should create a PodDisruptionBudget [Conformance]": "should create a PodDisruptionBudget [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] DisruptionController should observe PodDisruptionBudget status updated": "should observe PodDisruptionBudget status updated [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] DisruptionController should observe PodDisruptionBudget status updated [Conformance]": "should observe PodDisruptionBudget status updated [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] DisruptionController should update/patch PodDisruptionBudget status": "should update/patch PodDisruptionBudget status [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] DisruptionController should update/patch PodDisruptionBudget status [Conformance]": "should update/patch PodDisruptionBudget status [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] Job [Feature:IndexedJob] should create pods for an Indexed job with completion indexes": "[Feature:IndexedJob] should create pods for an Indexed job with completion indexes [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] Job [Feature:SuspendJob] should delete pods when suspended": "[Feature:SuspendJob] should delete pods when suspended [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] Job [Feature:SuspendJob] should not create pods when created in suspend state": "[Feature:SuspendJob] should not create pods when created in suspend state [Disabled:Alpha] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] Job should adopt matching orphans and release non-matching pods [Conformance]": "should adopt matching orphans and release non-matching pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -603,19 +343,23 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] Job should run a job to completion when tasks succeed": "should run a job to completion when tasks succeed [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] Pods should be evicted from unready Node [Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be evicted after eviction timeout passes": "[Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be evicted after eviction timeout passes [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] Pods should be evicted from unready Node [Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be evicted after eviction timeout passes": "[Feature:TaintEviction] All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be evicted after eviction timeout passes [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] Pods should return to running and ready state after network partition is healed All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout": "All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] Pods should return to running and ready state after network partition is healed All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout": "All pods on the unreachable node should be marked as NotReady upon the node turn NotReady AND all pods should be mark back to Ready when the node get back to Ready before pod eviction timeout [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] [Job] should create new pods when node is partitioned": "should create new pods when node is partitioned [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [Job] should create new pods when node is partitioned": "should create new pods when node is partitioned [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] [ReplicationController] should eagerly create replacement pod during network partition when termination grace is non-zero": "should eagerly create replacement pod during network partition when termination grace is non-zero [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [ReplicationController] should eagerly create replacement pod during network partition when termination grace is non-zero": "should eagerly create replacement pod during network partition when termination grace is non-zero [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] [ReplicationController] should recreate pods scheduled on the unreachable node AND allow scheduling of pods on a node after it rejoins the cluster": "should recreate pods scheduled on the unreachable node AND allow scheduling of pods on a node after it rejoins the cluster [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [ReplicationController] should recreate pods scheduled on the unreachable node AND allow scheduling of pods on a node after it rejoins the cluster": "should recreate pods scheduled on the unreachable node AND allow scheduling of pods on a node after it rejoins the cluster [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] [StatefulSet] should come back up if node goes down [Slow] [Disruptive]": "should come back up if node goes down [Slow] [Disruptive] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [StatefulSet] should come back up if node goes down [Slow] [Disruptive]": "should come back up if node goes down [Slow] [Disruptive] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [k8s.io] [StatefulSet] should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]": "should not reschedule stateful pods if there is a network partition [Slow] [Disruptive] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-apps] Network Partition [Disruptive] [Slow] [StatefulSet] should not reschedule stateful pods if there is a network partition [Slow] [Disruptive]": "should not reschedule stateful pods if there is a network partition [Slow] [Disruptive] [Serial] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] ReplicaSet Replace and Patch tests [Conformance]": "Replace and Patch tests [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-apps] ReplicaSet Replicaset should have a working scale subresource [Conformance]": "Replicaset should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-apps] ReplicaSet should adopt matching pods on creation and release no longer matching pods [Conformance]": "should adopt matching pods on creation and release no longer matching pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -637,35 +381,37 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-apps] ReplicationController should test the lifecycle of a ReplicationController [Conformance]": "should test the lifecycle of a ReplicationController [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]": "Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance]": "Burst scaling should run to completion even with unhealthy pods [Slow] [Conformance] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow] [Conformance]": "Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow] [Conformance] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow] [Conformance]": "Scaling should happen in predictable order and halt if any stateful pod is unhealthy [Slow] [Conformance] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] Should recreate evicted statefulset [Conformance]": "Should recreate evicted statefulset [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] Should recreate evicted statefulset [Conformance]": "Should recreate evicted statefulset [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods": "should adopt matching orphans and release non-matching pods [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should adopt matching orphans and release non-matching pods": "should adopt matching orphans and release non-matching pods [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should have a working scale subresource [Conformance]": "should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should have a working scale subresource [Conformance]": "should have a working scale subresource [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should implement legacy replacement when the update strategy is OnDelete": "should implement legacy replacement when the update strategy is OnDelete [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should implement legacy replacement when the update strategy is OnDelete": "should implement legacy replacement when the update strategy is OnDelete [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails": "should not deadlock when a pod's predecessor fails [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should not deadlock when a pod's predecessor fails": "should not deadlock when a pod's predecessor fails [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications [Conformance]": "should perform canary updates and phased rolling updates of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform canary updates and phased rolling updates of template modifications [Conformance]": "should perform canary updates and phased rolling updates of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications [Conformance]": "should perform rolling updates and roll backs of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications [Conformance]": "should perform rolling updates and roll backs of template modifications [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs": "should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs": "should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity": "should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity": "should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working CockroachDB cluster": "should creating a working CockroachDB cluster [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working CockroachDB cluster": "should creating a working CockroachDB cluster [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working mysql cluster": "should creating a working mysql cluster [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working mysql cluster": "should creating a working mysql cluster [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working redis cluster": "should creating a working redis cluster [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working redis cluster": "should creating a working redis cluster [Suite:k8s]",
 
-	"[Top Level] [sig-apps] StatefulSet [k8s.io] Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working zookeeper cluster": "should creating a working zookeeper cluster [Suite:k8s]",
+	"[Top Level] [sig-apps] StatefulSet Deploy clustered applications [Feature:StatefulSet] [Slow] should creating a working zookeeper cluster": "should creating a working zookeeper cluster [Suite:k8s]",
+
+	"[Top Level] [sig-apps] [Feature:TTLAfterFinished] job should be deleted once it finishes after TTL seconds": "job should be deleted once it finishes after TTL seconds [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] Certificates API [Privileged:ClusterAdmin] should support CSR API operations [Conformance]": "should support CSR API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -679,11 +425,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-auth] PodSecurityPolicy [Feature:PodSecurityPolicy] should forbid pod creation when no PSP is available": "should forbid pod creation when no PSP is available [Disabled:Unsupported] [Suite:k8s]",
 
+	"[Top Level] [sig-auth] ServiceAccounts ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer [Conformance]": "ServiceAccountIssuerDiscovery should support OIDC discovery of service account issuer [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
 	"[Top Level] [sig-auth] ServiceAccounts should allow opting out of API token automount  [Conformance]": "should allow opting out of API token automount  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] ServiceAccounts should ensure a single API token exists": "should ensure a single API token exists [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in any namespace": "should guarantee kube-root-ca.crt exist in any namespace [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-auth] ServiceAccounts should guarantee kube-root-ca.crt exist in any namespace [Conformance]": "should guarantee kube-root-ca.crt exist in any namespace [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] ServiceAccounts should mount an API token into pods  [Conformance]": "should mount an API token into pods  [Conformance] [Disabled:Broken] [Suite:k8s]",
 
@@ -694,8 +442,6 @@ var annotations = map[string]string{
 	"[Top Level] [sig-auth] ServiceAccounts should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup]": "should set ownership and permission when RunAsUser or FsGroup is present [LinuxOnly] [NodeFeature:FSGroup] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] ServiceAccounts should support InClusterConfig with token rotation [Slow]": "should support InClusterConfig with token rotation [Slow] [Suite:k8s]",
-
-	"[Top Level] [sig-auth] ServiceAccounts should support OIDC discovery of service account issuer [Feature:ServiceAccountIssuerDiscovery]": "should support OIDC discovery of service account issuer [Feature:ServiceAccountIssuerDiscovery] [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] [Feature:NodeAuthenticator] The kubelet can delegate ServiceAccount tokens to the API server": "The kubelet can delegate ServiceAccount tokens to the API server [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -714,6 +460,18 @@ var annotations = map[string]string{
 	"[Top Level] [sig-auth] [Feature:NodeAuthorizer] Getting an existing configmap should exit with the Forbidden error": "Getting an existing configmap should exit with the Forbidden error [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-auth] [Feature:NodeAuthorizer] Getting an existing secret should exit with the Forbidden error": "Getting an existing secret should exit with the Forbidden error [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6]": "CA ignores unschedulable pods while scheduling schedulable pods [Feature:ClusterAutoscalerScalability6] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] should scale down empty nodes [Feature:ClusterAutoscalerScalability3]": "should scale down empty nodes [Feature:ClusterAutoscalerScalability3] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4]": "should scale down underutilized nodes [Feature:ClusterAutoscalerScalability4] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] should scale up at all [Feature:ClusterAutoscalerScalability1]": "should scale up at all [Feature:ClusterAutoscalerScalability1] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] should scale up twice [Feature:ClusterAutoscalerScalability2]": "should scale up twice [Feature:ClusterAutoscalerScalability2] [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] Cluster size autoscaler scalability [Slow] shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5]": "shouldn't scale down with underutilized nodes due to host port conflicts [Feature:ClusterAutoscalerScalability5] [Suite:k8s]",
 
 	"[Top Level] [sig-autoscaling] Cluster size autoscaling [Slow] Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown]": "Should be able to scale a node group down to 0[Feature:ClusterSizeAutoscalingScaleDown] [Suite:k8s]",
 
@@ -777,25 +535,25 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-autoscaling] Cluster size autoscaling [Slow] shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp]": "shouldn't trigger additional scale-ups during processing scale-up [Feature:ClusterSizeAutoscalingScaleUp] [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] DNS horizontal autoscaling [DisabledForLargeClusters] kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios": "[DisabledForLargeClusters] kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios [Disabled:SpecialConfig] [Suite:k8s]",
-
 	"[Top Level] [sig-autoscaling] DNS horizontal autoscaling [Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed": "[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] ReplicationController light Should scale from 1 pod to 2 pods": "Should scale from 1 pod to 2 pods [Flaky] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] DNS horizontal autoscaling kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios": "kube-dns-autoscaler should scale kube-dns pods in both nonfaulty and faulty scenarios [Disabled:SpecialConfig] [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] ReplicationController light Should scale from 2 pods to 1 pod [Slow]": "Should scale from 2 pods to 1 pod [Slow] [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) ReplicationController light Should scale from 1 pod to 2 pods": "Should scale from 1 pod to 2 pods [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] Deployment Should scale from 1 pod to 3 pods and from 3 to 5": "Should scale from 1 pod to 3 pods and from 3 to 5 [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) ReplicationController light Should scale from 2 pods to 1 pod [Slow]": "Should scale from 2 pods to 1 pod [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] Deployment Should scale from 5 pods to 3 pods and from 3 to 1": "Should scale from 5 pods to 3 pods and from 3 to 1 [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] Deployment Should scale from 1 pod to 3 pods and from 3 to 5": "Should scale from 1 pod to 3 pods and from 3 to 5 [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5": "Should scale from 1 pod to 3 pods and from 3 to 5 [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] Deployment Should scale from 5 pods to 3 pods and from 3 to 1": "Should scale from 5 pods to 3 pods and from 3 to 1 [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1": "Should scale from 5 pods to 3 pods and from 3 to 1 [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5": "Should scale from 1 pod to 3 pods and from 3 to 5 [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] ReplicationController Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability": "Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1": "Should scale from 5 pods to 3 pods and from 3 to 1 [Suite:k8s]",
 
-	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [sig-autoscaling] [Serial] [Slow] ReplicationController Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability": "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability [Suite:k8s]",
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] ReplicationController Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability": "Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability [Suite:k8s]",
+
+	"[Top Level] [sig-autoscaling] [Feature:HPA] Horizontal pod autoscaling (scale resource: CPU) [Serial] [Slow] ReplicationController Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability": "Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability [Suite:k8s]",
 
 	"[Top Level] [sig-autoscaling] [HPA] Horizontal pod autoscaling (scale resource: Custom Metrics from Stackdriver) should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling]": "should scale down with Custom Metric of type Object from Stackdriver [Feature:CustomMetricsAutoscaling] [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -915,6 +673,10 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-instrumentation] Events API should ensure that an event can be fetched, patched, deleted, and listed [Conformance]": "should ensure that an event can be fetched, patched, deleted, and listed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-instrumentation] Events should delete a collection of events [Conformance]": "should delete a collection of events [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-instrumentation] Events should ensure that an event can be fetched, patched, deleted, and listed [Conformance]": "should ensure that an event can be fetched, patched, deleted, and listed [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
 	"[Top Level] [sig-instrumentation] Kibana Logging Instances Is Alive [Feature:Elasticsearch] should check that the Kibana logging instance is alive": "should check that the Kibana logging instance is alive [Disabled:Unimplemented] [Suite:k8s]",
 
 	"[Top Level] [sig-instrumentation] Logging soak [Performance] [Slow] [Disruptive] should survive logging 1KB every 1s seconds, for a duration of 2m0s": "should survive logging 1KB every 1s seconds, for a duration of 2m0s [Serial] [Suite:k8s]",
@@ -945,6 +707,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Conntrack should be able to preserve UDP traffic when server pod cycles for a NodePort service": "should be able to preserve UDP traffic when server pod cycles for a NodePort service [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[Top Level] [sig-network] Conntrack should drop INVALID conntrack entries": "should drop INVALID conntrack entries [Disabled:Broken] [Suite:k8s]",
+
 	"[Top Level] [sig-network] DNS configMap nameserver Change stubDomain should be able to change stubDomain configuration [Slow][Serial]": "should be able to change stubDomain configuration [Slow][Serial] [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[Top Level] [sig-network] DNS configMap nameserver Forward PTR lookup should forward PTR records lookup to upstream nameserver [Slow][Serial]": "should forward PTR records lookup to upstream nameserver [Slow][Serial] [Disabled:SpecialConfig] [Suite:k8s]",
@@ -973,7 +737,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] DNS should support configurable pod resolv.conf": "should support configurable pod resolv.conf [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] ESIPP [Slow] should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters]": "should handle updates to ExternalTrafficPolicy field [DisabledForLargeClusters] [Suite:k8s]",
+	"[Top Level] [sig-network] ESIPP [Slow] should handle updates to ExternalTrafficPolicy field": "should handle updates to ExternalTrafficPolicy field [Suite:k8s]",
 
 	"[Top Level] [sig-network] ESIPP [Slow] should only target nodes with endpoints": "should only target nodes with endpoints [Suite:k8s]",
 
@@ -983,17 +747,23 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] ESIPP [Slow] should work from pods": "should work from pods [Suite:k8s]",
 
-	"[Top Level] [sig-network] EndpointSlice should create Endpoints and EndpointSlices for Pods matching a Service": "should create Endpoints and EndpointSlices for Pods matching a Service [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] EndpointSlice should create Endpoints and EndpointSlices for Pods matching a Service [Conformance]": "should create Endpoints and EndpointSlices for Pods matching a Service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices for a Service with a selector specified": "should create and delete Endpoints and EndpointSlices for a Service with a selector specified [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] EndpointSlice should create and delete Endpoints and EndpointSlices for a Service with a selector specified [Conformance]": "should create and delete Endpoints and EndpointSlices for a Service with a selector specified [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] EndpointSlice should have Endpoints and EndpointSlices pointing to API Server": "should have Endpoints and EndpointSlices pointing to API Server [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] EndpointSlice should have Endpoints and EndpointSlices pointing to API Server [Conformance]": "should have Endpoints and EndpointSlices pointing to API Server [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] EndpointSliceMirroring should mirror a custom Endpoints resource through create update and delete": "should mirror a custom Endpoints resource through create update and delete [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] EndpointSlice should support creating EndpointSlice API operations [Conformance]": "should support creating EndpointSlice API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-network] EndpointSliceMirroring should mirror a custom Endpoints resource through create update and delete [Conformance]": "should mirror a custom Endpoints resource through create update and delete [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Firewall rule [Slow] [Serial] should create valid firewall rules for LoadBalancer type service": "[Slow] [Serial] should create valid firewall rules for LoadBalancer type service [Suite:k8s]",
 
+	"[Top Level] [sig-network] Firewall rule control plane should not expose well-known ports": "control plane should not expose well-known ports [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-network] Firewall rule should have correct firewall rules for e2e cluster": "should have correct firewall rules for e2e cluster [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[Top Level] [sig-network] HostPort validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance]": "validates that there is no conflict between pods with same hostPort but different hostIP and protocol [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Ingress API should support creating Ingress API operations [Conformance]": "should support creating Ingress API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1005,27 +775,45 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] IngressClass [Feature:Ingress] should set default value on new IngressClass [Serial]": "should set default value on new IngressClass [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] KubeProxy should resolve connection reset issue #74839 [Slow]": "should resolve connection reset issue #74839 [Slow] [Suite:k8s]",
-
 	"[Top Level] [sig-network] KubeProxy should set TCP CLOSE_WAIT timeout [Privileged]": "should set TCP CLOSE_WAIT timeout [Privileged] [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should be able to change the type and ports of a TCP service [Slow]": "should be able to change the type and ports of a TCP service [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should be able to change the type and ports of a UDP service [Slow]": "should be able to change the type and ports of a UDP service [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should be able to create an internal type load balancer [Slow]": "should be able to create an internal type load balancer [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should handle load balancer cleanup finalizer for service [Slow]": "should handle load balancer cleanup finalizer for service [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should only allow access from service loadbalancer source ranges [Slow]": "should only allow access from service loadbalancer source ranges [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-network] LoadBalancers should reconcile LB health check interval [Slow][Serial]": "should reconcile LB health check interval [Slow][Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:Ingress] multicluster ingress should get instance group annotation": "multicluster ingress should get instance group annotation [Suite:k8s]",
 
 	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:Ingress] should conform to Ingress spec": "should conform to Ingress spec [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] rolling update backend pods should not cause service disruption": "rolling update backend pods should not cause service disruption [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] rolling update backend pods should not cause service disruption": "rolling update backend pods should not cause service disruption [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should be able to create a ClusterIP service": "should be able to create a ClusterIP service [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should be able to create a ClusterIP service": "should be able to create a ClusterIP service [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should be able to switch between IG and NEG modes": "should be able to switch between IG and NEG modes [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should be able to switch between IG and NEG modes": "should be able to switch between IG and NEG modes [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should conform to Ingress spec": "should conform to Ingress spec [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should conform to Ingress spec": "should conform to Ingress spec [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise": "should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise": "should create NEGs for all ports with the Ingress annotation, and NEGs for the standalone annotation otherwise [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should sync endpoints for both Ingress-referenced NEG and standalone NEG": "should sync endpoints for both Ingress-referenced NEG and standalone NEG [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should sync endpoints for both Ingress-referenced NEG and standalone NEG": "should sync endpoints for both Ingress-referenced NEG and standalone NEG [Suite:k8s]",
 
-	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] should sync endpoints to NEG": "should sync endpoints to NEG [Suite:k8s]",
+	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:NEG] [Flaky] should sync endpoints to NEG": "should sync endpoints to NEG [Suite:k8s]",
 
 	"[Top Level] [sig-network] Loadbalancing: L7 GCE [Slow] [Feature:kubemci] should conform to Ingress spec": "should conform to Ingress spec [Suite:k8s]",
 
@@ -1043,6 +831,98 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Loadbalancing: L7 [Slow] Nginx should conform to Ingress spec": "should conform to Ingress spec [Suite:k8s]",
 
+	"[Top Level] [sig-network] Netpol API should support creating NetworkPolicy API operations": "should support creating NetworkPolicy API operations [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:UDPConnectivity][LinuxOnly] NetworkPolicy between server and client using UDP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:UDPConnectivity][LinuxOnly] NetworkPolicy between server and client using UDP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [Feature:UDPConnectivity][LinuxOnly] NetworkPolicy between server and client using UDP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": "should allow egress access on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy]": "should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy]": "should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated namespace [Feature:NetworkPolicy]": "should allow ingress access from updated namespace [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated pod [Feature:NetworkPolicy]": "should allow ingress access from updated pod [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy]": "should allow ingress access on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should deny egress from all pods in a namespace [Feature:NetworkPolicy] ": "should deny egress from all pods in a namespace [Feature:NetworkPolicy]  [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should deny egress from pods based on PodSelector [Feature:NetworkPolicy] ": "should deny egress from pods based on PodSelector [Feature:NetworkPolicy]  [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should deny ingress access to updated pod [Feature:NetworkPolicy]": "should deny ingress access to updated pod [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should deny ingress from pods on other namespaces [Feature:NetworkPolicy]": "should deny ingress from pods on other namespaces [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]": "should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP]": "should enforce ingress policy allowing any port traffic to a server on a specific protocol [Feature:NetworkPolicy] [Feature:UDP] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]": "should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]": "should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on Multiple PodSelectors and NamespaceSelectors [Feature:NetworkPolicy]": "should enforce policy based on Multiple PodSelectors and NamespaceSelectors [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy based on any PodSelectors [Feature:NetworkPolicy]": "should enforce policy based on any PodSelectors [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow ingress traffic for a target [Feature:NetworkPolicy] ": "should enforce policy to allow ingress traffic for a target [Feature:NetworkPolicy]  [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow ingress traffic from pods in all namespaces [Feature:NetworkPolicy]": "should enforce policy to allow ingress traffic from pods in all namespaces [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should enforce updated policy [Feature:NetworkPolicy]": "should enforce updated policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]": "should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]": "should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy] [Feature:UDP]": "should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy] [Feature:UDP] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should stop enforcing policies after they are deleted [Feature:NetworkPolicy]": "should stop enforcing policies after they are deleted [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy]": "should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should support allow-all policy [Feature:NetworkPolicy]": "should support allow-all policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy]": "should support denying of egress traffic on the client side (even if the server explicitly allows this traffic) [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Netpol [LinuxOnly] NetworkPolicy between server and client should work with Ingress, Egress specified together [Feature:NetworkPolicy]": "should work with Ingress, Egress specified together [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
+
 	"[Top Level] [sig-network] NetworkPolicy API should support creating NetworkPolicy API operations": "should support creating NetworkPolicy API operations [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
@@ -1051,63 +931,63 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny' policy [Feature:NetworkPolicy]": "should support a 'default-deny' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": "should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": "should allow egress access on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy]": "should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access to server in CIDR block [Feature:NetworkPolicy]": "should allow egress access to server in CIDR block [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy]": "should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from namespace on one named port [Feature:NetworkPolicy]": "should allow ingress access from namespace on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated namespace [Feature:NetworkPolicy]": "should allow ingress access from updated namespace [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated namespace [Feature:NetworkPolicy]": "should allow ingress access from updated namespace [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated pod [Feature:NetworkPolicy]": "should allow ingress access from updated pod [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access from updated pod [Feature:NetworkPolicy]": "should allow ingress access from updated pod [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy]": "should allow ingress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow ingress access on one named port [Feature:NetworkPolicy]": "should allow ingress access on one named port [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should deny ingress access to updated pod [Feature:NetworkPolicy]": "should deny ingress access to updated pod [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should deny ingress access to updated pod [Feature:NetworkPolicy]": "should deny ingress access to updated pod [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce egress policy allowing traffic to a server in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]": "should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy]": "should enforce except clause while egress access to server in CIDR block [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple egress policies with egress allow-all policy taking precedence [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy]": "should enforce multiple ingress policies with ingress allow-all policy taking precedence [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]": "should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy]": "should enforce multiple, stacked policies with overlapping podSelectors [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]": "should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy]": "should enforce policies to check ingress and egress policies can be controlled independently based on PodSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on NamespaceSelector with MatchExpressions[Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy based on PodSelector or NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy]": "should enforce policy based on PodSelector with MatchExpressions[Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic from pods within server namespace based on PodSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a different namespace, based on NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce updated policy [Feature:NetworkPolicy]": "should enforce updated policy [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should enforce updated policy [Feature:NetworkPolicy]": "should enforce updated policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]": "should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy]": "should ensure an IP overlapping both IPBlock.CIDR and IPBlock.Except is allowed [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]": "should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]": "should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should stop enforcing policies after they are deleted [Feature:NetworkPolicy]": "should stop enforcing policies after they are deleted [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should stop enforcing policies after they are deleted [Feature:NetworkPolicy]": "should stop enforcing policies after they are deleted [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy]": "should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-all' policy [Feature:NetworkPolicy]": "should support a 'default-deny-all' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support allow-all policy [Feature:NetworkPolicy]": "should support allow-all policy [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should support allow-all policy [Feature:NetworkPolicy]": "should support allow-all policy [Feature:NetworkPolicy] [Disabled:Alpha] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy]": "should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should work with Ingress,Egress specified together [Feature:NetworkPolicy]": "should work with Ingress,Egress specified together [Feature:NetworkPolicy] [Disabled:Alpha] [Skipped:Network/OpenShiftSDN] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance]": "should function for intra-pod communication: http [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1163,7 +1043,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should update nodePort: udp [Slow]": "should update nodePort: udp [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking IPerf [Experimental] [Slow] [Feature:Networking-Performance] should transfer ~ 1GB onto the service endpoint 1 servers (maximum of 1 clients)": "should transfer ~ 1GB onto the service endpoint 1 servers (maximum of 1 clients) [Suite:k8s]",
+	"[Top Level] [sig-network] Networking IPerf2 [Feature:Networking-Performance] should run iperf2": "should run iperf2 [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking should check kube-proxy urls": "should check kube-proxy urls [Disabled:Broken] [Suite:k8s]",
 
@@ -1176,6 +1056,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-network] Networking should recreate its iptables rules if they are deleted [Disruptive]": "should recreate its iptables rules if they are deleted [Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] NoSNAT [Feature:NoSNAT] [Slow] Should be able to send traffic between Pods without SNAT": "Should be able to send traffic between Pods without SNAT [Suite:k8s]",
+
+	"[Top Level] [sig-network] Proxy version v1 A set of valid responses are returned for both pod and service ProxyWithPath [Conformance]": "A set of valid responses are returned for both pod and service ProxyWithPath [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Proxy version v1 should proxy logs on node using proxy subresource ": "should proxy logs on node using proxy subresource  [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1195,8 +1077,6 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should allow pods to hairpin back to themselves through services": "should allow pods to hairpin back to themselves through services [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters]": "should be able to change the type and ports of a service [Slow] [DisabledForLargeClusters] [Suite:k8s]",
-
 	"[Top Level] [sig-network] Services should be able to change the type from ClusterIP to ExternalName [Conformance]": "should be able to change the type from ClusterIP to ExternalName [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should be able to change the type from ExternalName to ClusterIP [Conformance]": "should be able to change the type from ExternalName to ClusterIP [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1207,12 +1087,6 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should be able to create a functioning NodePort service [Conformance]": "should be able to create a functioning NodePort service [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should be able to create an internal type load balancer [Slow]": "should be able to create an internal type load balancer [Slow] [Suite:k8s]",
-
-	"[Top Level] [sig-network] Services should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should be able to switch session affinity for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
-
-	"[Top Level] [sig-network] Services should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should be able to switch session affinity for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
-
 	"[Top Level] [sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance]": "should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should be able to switch session affinity for service with type clusterIP [LinuxOnly] [Conformance]": "should be able to switch session affinity for service with type clusterIP [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
@@ -1221,23 +1095,21 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should be able to update service type to NodePort listening on same port number but different protocols": "should be able to update service type to NodePort listening on same port number but different protocols [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[Top Level] [sig-network] Services should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node": "should be possible to connect to a service via ExternalIP when the external IP is not assigned to a node [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-network] Services should be rejected when no endpoints exist": "should be rejected when no endpoints exist [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should check NodePort out-of-range": "should check NodePort out-of-range [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-network] Services should complete a service status lifecycle [Conformance]": "should complete a service status lifecycle [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should create endpoints for unready pods": "should create endpoints for unready pods [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should find a service from listing all namespaces [Conformance]": "should find a service from listing all namespaces [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should handle load balancer cleanup finalizer for service [Slow]": "should handle load balancer cleanup finalizer for service [Slow] [Suite:k8s]",
-
 	"[Top Level] [sig-network] Services should have session affinity timeout work for NodePort service [LinuxOnly] [Conformance]": "should have session affinity timeout work for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should have session affinity timeout work for service with type clusterIP [LinuxOnly] [Conformance]": "should have session affinity timeout work for service with type clusterIP [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-network] Services should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should have session affinity work for LoadBalancer service with ESIPP off [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
-
-	"[Top Level] [sig-network] Services should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly]": "should have session affinity work for LoadBalancer service with ESIPP on [Slow] [DisabledForLargeClusters] [LinuxOnly] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should have session affinity work for NodePort service [LinuxOnly] [Conformance]": "should have session affinity work for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1247,15 +1119,11 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should implement service.kubernetes.io/service-proxy-name": "should implement service.kubernetes.io/service-proxy-name [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Services should only allow access from service loadbalancer source ranges [Slow]": "should only allow access from service loadbalancer source ranges [Slow] [Suite:k8s]",
-
 	"[Top Level] [sig-network] Services should preserve source pod IP for traffic thru service cluster IP [LinuxOnly]": "should preserve source pod IP for traffic thru service cluster IP [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should prevent NodePort collisions": "should prevent NodePort collisions [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should provide secure master service  [Conformance]": "should provide secure master service  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
-
-	"[Top Level] [sig-network] Services should reconcile LB health check interval [Slow][Serial]": "should reconcile LB health check interval [Slow][Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Services should release NodePorts on delete": "should release NodePorts on delete [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1269,51 +1137,57 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should work after restarting kube-proxy [Disruptive]": "should work after restarting kube-proxy [Disruptive] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: http": "should be able to handle large requests: http [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: http": "should be able to handle large requests: http [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: udp": "should be able to handle large requests: udp [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: udp": "should be able to handle large requests: udp [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: http [LinuxOnly]": "should function for client IP based session affinity: http [LinuxOnly] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: http [LinuxOnly]": "should function for client IP based session affinity: http [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: udp [LinuxOnly]": "should function for client IP based session affinity: udp [LinuxOnly] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: udp [LinuxOnly]": "should function for client IP based session affinity: udp [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: http": "should function for endpoint-Service: http [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: http": "should function for endpoint-Service: http [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: udp": "should function for endpoint-Service: udp [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: udp": "should function for endpoint-Service: udp [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: http": "should function for node-Service: http [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: http": "should function for node-Service: http [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: udp": "should function for node-Service: udp [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: udp": "should function for node-Service: udp [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: http": "should function for pod-Service: http [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: http": "should function for pod-Service: http [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: udp": "should function for pod-Service: udp [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: udp": "should function for pod-Service: udp [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: http": "should update endpoints: http [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for service endpoints using hostNetwork": "should function for service endpoints using hostNetwork [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: udp": "should update endpoints: udp [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: http": "should update endpoints: http [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStackAlphaFeature:Phase2]": "should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: udp": "should update endpoints: udp [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStackAlphaFeature:Phase2]": "should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack]": "should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create pod, add ipv6 and ipv4 ip to pod ips": "should create pod, add ipv6 and ipv4 ip to pod ips [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack]": "should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create service with ipv4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]": "should create service with ipv4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create pod, add ipv6 and ipv4 ip to pod ips": "should create pod, add ipv6 and ipv4 ip to pod ips [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create service with ipv4,v6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]": "should create service with ipv4,v6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create service with ipv6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]": "should create service with ipv6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should create service with ipv6,v4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]": "should create service with ipv6,v4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2] [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should have ipv4 and ipv6 internal node ip": "should have ipv4 and ipv6 internal node ip [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStackAlphaFeature] [LinuxOnly] should have ipv4 and ipv6 node podCIDRs": "should have ipv4 and ipv6 node podCIDRs [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 internal node ip": "should have ipv4 and ipv6 internal node ip [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 node podCIDRs": "should have ipv4 and ipv6 node podCIDRs [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-network] [Feature:PerformanceDNS][Serial] Should answer DNS query for maximum number of services per cluster": "Should answer DNS query for maximum number of services per cluster [Slow] [Suite:k8s]",
+
+	"[Top Level] [sig-node] AppArmor load AppArmor profiles can disable an AppArmor profile, using unconfined": "can disable an AppArmor profile, using unconfined [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] AppArmor load AppArmor profiles should enforce an AppArmor profile": "should enforce an AppArmor profile [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] ConfigMap should be consumable via environment variable [NodeConformance] [Conformance]": "should be consumable via environment variable [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1324,6 +1198,46 @@ var annotations = map[string]string{
 	"[Top Level] [sig-node] ConfigMap should run through a ConfigMap lifecycle [Conformance]": "should run through a ConfigMap lifecycle [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-node] ConfigMap should update ConfigMap successfully": "should update ConfigMap successfully [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart exec hook properly [NodeConformance] [Conformance]": "should execute poststart exec hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute poststart http hook properly [NodeConformance] [Conformance]": "should execute poststart http hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop exec hook properly [NodeConformance] [Conformance]": "should execute prestop exec hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Lifecycle Hook when create a pod with lifecycle hook should execute prestop http hook properly [NodeConformance] [Conformance]": "should execute prestop http hook properly [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] as empty when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] from file when pod succeeds and TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] from log output if TerminationMessagePolicy FallbackToLogsOnError is set [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance]": "should report termination message [LinuxOnly] if TerminationMessagePath is set [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test on terminated container should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance] [Conformance]": "should report termination message [LinuxOnly] if TerminationMessagePath is set as non-root user and at a non-default path [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test when running a container with a new image should be able to pull from private registry with secret [NodeConformance]": "should be able to pull from private registry with secret [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test when running a container with a new image should be able to pull image [NodeConformance]": "should be able to pull image [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test when running a container with a new image should not be able to pull from private registry without secret [NodeConformance]": "should not be able to pull from private registry without secret [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test when running a container with a new image should not be able to pull image from invalid registry [NodeConformance]": "should not be able to pull image from invalid registry [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Container Runtime blackbox test when starting a container that exits should run with the expected status [NodeConformance] [Conformance]": "should run with the expected status [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Docker Containers should be able to override the image's default arguments (docker cmd) [NodeConformance] [Conformance]": "should be able to override the image's default arguments (docker cmd) [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Docker Containers should be able to override the image's default command (docker entrypoint) [NodeConformance] [Conformance]": "should be able to override the image's default command (docker entrypoint) [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Docker Containers should be able to override the image's default command and arguments [NodeConformance] [Conformance]": "should be able to override the image's default command and arguments [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Docker Containers should use the image defaults if command and args are blank [NodeConformance] [Conformance]": "should use the image defaults if command and args are blank [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages] Downward API tests for hugepages should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars": "should provide container's limits.hugepages-<pagesize> and requests.hugepages-<pagesize> as env vars [Suite:k8s]",
+
+	"[Top Level] [sig-node] Downward API [Serial] [Disruptive] [NodeFeature:DownwardAPIHugePages] Downward API tests for hugepages should provide default limits.hugepages-<pagesize> from node allocatable": "should provide default limits.hugepages-<pagesize> from node allocatable [Suite:k8s]",
 
 	"[Top Level] [sig-node] Downward API should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance] [Conformance]": "should provide container's limits.cpu/memory and requests.cpu/memory as env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1337,9 +1251,137 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Downward API should provide pod name, namespace and IP address as env vars [NodeConformance] [Conformance]": "should provide pod name, namespace and IP address as env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-node] Events should be sent by kubelets and the scheduler about pods scheduling and running  [Conformance]": "should be sent by kubelets and the scheduler about pods scheduling and running  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] InitContainer [NodeConformance] should invoke init containers on a RestartAlways pod [Conformance]": "should invoke init containers on a RestartAlways pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] InitContainer [NodeConformance] should invoke init containers on a RestartNever pod [Conformance]": "should invoke init containers on a RestartNever pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] InitContainer [NodeConformance] should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance]": "should not start app containers and fail the pod if init containers fail on a RestartNever pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] InitContainer [NodeConformance] should not start app containers if init containers fail on a RestartAlways pod [Conformance]": "should not start app containers if init containers fail on a RestartAlways pod [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet [Serial] [Slow] experimental resource usage tracking [Feature:ExperimentalResourceUsageTracking] resource tracking for 100 pods per node": "resource tracking for 100 pods per node [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet [Serial] [Slow] regular resource usage tracking [Feature:RegularResourceUsageTracking] resource tracking for 0 pods per node": "resource tracking for 0 pods per node [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet [Serial] [Slow] regular resource usage tracking [Feature:RegularResourceUsageTracking] resource tracking for 100 pods per node": "resource tracking for 100 pods per node [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet when scheduling a busybox Pod with hostAliases should write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance]": "should write entries to /etc/hosts [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet when scheduling a busybox command in a pod should print the output to logs [NodeConformance] [Conformance]": "should print the output to logs [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet when scheduling a busybox command that always fails in a pod should be possible to delete [NodeConformance] [Conformance]": "should be possible to delete [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet when scheduling a busybox command that always fails in a pod should have an terminated reason [NodeConformance] [Conformance]": "should have an terminated reason [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Kubelet when scheduling a read only busybox container should not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance]": "should not write to root filesystem [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] KubeletManagedEtcHosts should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance] [Conformance]": "should test kubelet managed /etc/hosts file [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Lease lease API should be available [Conformance]": "lease API should be available [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Mount propagation should propagate mounts to the host": "should propagate mounts to the host [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] evicts pods with minTolerationSeconds [Disruptive] [Conformance]": "evicts pods with minTolerationSeconds [Disruptive] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] only evicts pods without tolerations from tainted nodes": "only evicts pods without tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Single Pod [Serial] doesn't evict pod with tolerations from tainted nodes": "doesn't evict pod with tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Single Pod [Serial] eventually evict pod with finite tolerations from tainted nodes": "eventually evict pod with finite tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Single Pod [Serial] evicts pods from tainted nodes": "evicts pods from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NoExecuteTaintManager Single Pod [Serial] removing taint cancels eviction [Disruptive] [Conformance]": "removing taint cancels eviction [Disruptive] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NodeLease when the NodeLease feature is enabled should have OwnerReferences set": "should have OwnerReferences set [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NodeLease when the NodeLease feature is enabled the kubelet should create and update a lease in the kube-node-lease namespace": "the kubelet should create and update a lease in the kube-node-lease namespace [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NodeLease when the NodeLease feature is enabled the kubelet should report node status infrequently": "the kubelet should report node status infrequently [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] NodeProblemDetector should run without error": "should run without error [Disabled:SpecialConfig] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pod garbage collector [Feature:PodGarbageCollector] [Slow] should handle the creation of 1000 pods": "should handle the creation of 1000 pods [Suite:k8s]",
+
 	"[Top Level] [sig-node] PodTemplates should delete a collection of pod templates [Conformance]": "should delete a collection of pod templates [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-node] PodTemplates should run the lifecycle of PodTemplates [Conformance]": "should run the lifecycle of PodTemplates [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods Extended Delete Grace Period should be submitted and removed": "should be submitted and removed [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods Extended Pod Container Status should never report success for a pending container": "should never report success for a pending container [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods Extended Pod Container lifecycle should not create extra sandbox if all containers are done": "should not create extra sandbox if all containers are done [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods Extended Pods Set QOS Class should be set on Pods with matching resource requests and limits for memory and cpu [Conformance]": "should be set on Pods with matching resource requests and limits for memory and cpu [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should allow activeDeadlineSeconds to be updated [NodeConformance] [Conformance]": "should allow activeDeadlineSeconds to be updated [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should be submitted and removed [NodeConformance] [Conformance]": "should be submitted and removed [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should be updated [NodeConformance] [Conformance]": "should be updated [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should cap back-off at MaxContainerBackOff [Slow][NodeConformance]": "should cap back-off at MaxContainerBackOff [Slow][NodeConformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should contain environment variables for services [NodeConformance] [Conformance]": "should contain environment variables for services [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should delete a collection of pods [Conformance]": "should delete a collection of pods [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should get a host IP [NodeConformance] [Conformance]": "should get a host IP [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should have their auto-restart back-off timer reset on image update [Slow][NodeConformance]": "should have their auto-restart back-off timer reset on image update [Slow][NodeConformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should run through the lifecycle of Pods and PodStatus [Conformance]": "should run through the lifecycle of Pods and PodStatus [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should support pod readiness gates [NodeFeature:PodReadinessGate]": "should support pod readiness gates [NodeFeature:PodReadinessGate] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should support remote command execution over websockets [NodeConformance] [Conformance]": "should support remote command execution over websockets [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Pods should support retrieving logs from the container over websockets [NodeConformance] [Conformance]": "should support retrieving logs from the container over websockets [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] PreStop graceful pod terminated should wait until preStop hook completes the process": "graceful pod terminated should wait until preStop hook completes the process [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] PreStop should call prestop when killing a pod  [Conformance]": "should call prestop when killing a pod  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] PrivilegedPod [NodeConformance] should enable privileged commands [LinuxOnly]": "should enable privileged commands [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should *not* be restarted by liveness probe because startup probe delays it": "should *not* be restarted by liveness probe because startup probe delays it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should *not* be restarted with a non-local redirect http liveness probe": "should *not* be restarted with a non-local redirect http liveness probe [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should *not* be restarted with a tcp:8080 liveness probe [NodeConformance] [Conformance]": "should *not* be restarted with a tcp:8080 liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be ready immediately after startupProbe succeeds": "should be ready immediately after startupProbe succeeds [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted by liveness probe after startup probe enables it": "should be restarted by liveness probe after startup probe enables it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted startup probe fails": "should be restarted startup probe fails [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance]": "should be restarted with a /healthz http liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted with a local redirect http liveness probe": "should be restarted with a local redirect http liveness probe [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]": "should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should have monotonically increasing restart count [NodeConformance] [Conformance]": "should have monotonically increasing restart count [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance]": "should not be ready with an exec readiness probe timeout [MinimumKubeletVersion:1.20] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod]": "should override timeoutGracePeriodSeconds when LivenessProbe field is set [Feature:ProbeTerminationGracePeriod] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod]": "should override timeoutGracePeriodSeconds when StartupProbe field is set [Feature:ProbeTerminationGracePeriod] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container with readiness probe should not be ready before initial delay and never restart [NodeConformance] [Conformance]": "with readiness probe should not be ready before initial delay and never restart [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Probing container with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance]": "with readiness probe that fails should never be ready and never restart [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-node] RuntimeClass  should support RuntimeClasses API operations [Conformance]": " should support RuntimeClasses API operations [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1357,15 +1399,109 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] RuntimeClass should run a Pod requesting a RuntimeClass with scheduling without taints ": "should run a Pod requesting a RuntimeClass with scheduling without taints  [Disabled:Broken] [Suite:k8s]",
 
+	"[Top Level] [sig-node] SSH should SSH to all nodes and run commands": "should SSH to all nodes and run commands [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Secrets should be consumable from pods in env vars [NodeConformance] [Conformance]": "should be consumable from pods in env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Secrets should be consumable via the environment [NodeConformance] [Conformance]": "should be consumable via the environment [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Secrets should fail to create secret due to empty secret key [Conformance]": "should fail to create secret due to empty secret key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Secrets should patch a secret [Conformance]": "should patch a secret [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsNonRoot should not run with an explicit root user ID [LinuxOnly]": "should not run with an explicit root user ID [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsNonRoot should not run without a specified user ID": "should not run without a specified user ID [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsNonRoot should run with an explicit non-root user ID [LinuxOnly]": "should run with an explicit non-root user ID [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsNonRoot should run with an image specified user ID": "should run with an image specified user ID [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsUser should run the container with uid 0 [LinuxOnly] [NodeConformance]": "should run the container with uid 0 [LinuxOnly] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a container with runAsUser should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance]": "should run the container with uid 65534 [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a pod with privileged should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]": "should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a pod with privileged should run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance]": "should run the container as unprivileged when false [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a pod with readOnlyRootFilesystem should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance]": "should run the container with readonly rootfs when readOnlyRootFilesystem=true [LinuxOnly] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context When creating a pod with readOnlyRootFilesystem should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance] [Conformance]": "should run the container with writable rootfs when readOnlyRootFilesystem=false [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]": "should support container.SecurityContext.RunAsUser And container.SecurityContext.RunAsGroup [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support container.SecurityContext.RunAsUser [LinuxOnly]": "should support container.SecurityContext.RunAsUser [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly] [Conformance]": "should support pod.Spec.SecurityContext.RunAsUser And pod.Spec.SecurityContext.RunAsGroup [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly]": "should support pod.Spec.SecurityContext.RunAsUser [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly]": "should support pod.Spec.SecurityContext.SupplementalGroups [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support seccomp default which is unconfined [LinuxOnly]": "should support seccomp default which is unconfined [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support seccomp runtime/default [LinuxOnly]": "should support seccomp runtime/default [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support seccomp unconfined on the container [LinuxOnly]": "should support seccomp unconfined on the container [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support seccomp unconfined on the pod [LinuxOnly]": "should support seccomp unconfined on the pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support volume SELinux relabeling [Flaky] [LinuxOnly]": "should support volume SELinux relabeling [Flaky] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly]": "should support volume SELinux relabeling when using hostIPC [Flaky] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly]": "should support volume SELinux relabeling when using hostPID [Flaky] [LinuxOnly] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance]": "should allow privilege escalation when not explicitly set and uid != 0 [LinuxOnly] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should allow privilege escalation when true [LinuxOnly] [NodeConformance]": "should allow privilege escalation when true [LinuxOnly] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance]": "should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node": "should not launch unsafe, but not explicitly enabled sysctls on the node [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls": "should reject invalid sysctls [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls": "should support sysctls [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually whitelisted": "should support unsafe sysctls which are actually whitelisted [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": "should allow composing env vars into new env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should allow substituting values in a container's args [NodeConformance] [Conformance]": "should allow substituting values in a container's args [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should allow substituting values in a container's command [NodeConformance] [Conformance]": "should allow substituting values in a container's command [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should allow substituting values in a volume subpath [Conformance]": "should allow substituting values in a volume subpath [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should fail substituting values in a volume subpath with absolute path [Slow] [Conformance]": "should fail substituting values in a volume subpath with absolute path [Slow] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should fail substituting values in a volume subpath with backticks [Slow] [Conformance]": "should fail substituting values in a volume subpath with backticks [Slow] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should succeed in writing subpaths in container [Slow] [Conformance]": "should succeed in writing subpaths in container [Slow] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] Variable Expansion should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow] [Conformance]": "should verify that a failing subpath expansion can be modified during the lifecycle of a container [Slow] [Conformance] [Suite:k8s]",
+
+	"[Top Level] [sig-node] [Feature:Example] Downward API should create a pod that prints his name and namespace": "should create a pod that prints his name and namespace [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] [Feature:Example] Liveness liveness pods should be automatically restarted": "liveness pods should be automatically restarted [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] [Feature:Example] Secret should create a pod that reads a secret": "should create a pod that reads a secret [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] crictl should be able to run crictl on the node": "should be able to run crictl on the node [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-node] kubelet Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.": "kubelet should be able to delete 10 pods per node in 1m0s. [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed.": "after stopping the nfs-server and deleting the (active) client pod, the NFS mount and the pod's UID directory should be removed. [Suite:k8s]",
+
+	"[Top Level] [sig-node] kubelet host cleanup with volume mounts [HostCleanup][Flaky] Host cleanup after disrupting NFS volume [NFS] after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed.": "after stopping the nfs-server and deleting the (sleeping) client pod, the NFS mount and the pod's UID directory should be removed. [Suite:k8s]",
+
 	"[Top Level] [sig-scheduling] GPUDevicePluginAcrossRecreate [Feature:Recreate] run Nvidia GPU Device Plugin tests with a recreation": "run Nvidia GPU Device Plugin tests with a recreation [Disabled:SpecialConfig] [Suite:k8s]",
 
 	"[Top Level] [sig-scheduling] LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance]": "should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-scheduling] Multi-AZ Cluster Volumes [sig-storage] should only be allowed to provision PDs in zones where nodes exist": "should only be allowed to provision PDs in zones where nodes exist [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [sig-scheduling] Multi-AZ Cluster Volumes [sig-storage] should schedule pods in the same zones as statically provisioned PVs": "should schedule pods in the same zones as statically provisioned PVs [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a replication controller across zones [Serial]": "should spread the pods of a replication controller across zones [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a replication controller across zones [Serial]": "should spread the pods of a replication controller across zones [Serial] [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-scheduling] Multi-AZ Clusters should spread the pods of a service across zones [Serial]": "should spread the pods of a service across zones [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -1391,7 +1527,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-scheduling] SchedulerPredicates [Serial] validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP [Conformance]": "validates that there exists conflict between pods with same hostPort and protocol but one using 0.0.0.0 hostIP [Conformance] [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-scheduling] SchedulerPredicates [Serial] validates that there is no conflict between pods with same hostPort but different hostIP and protocol [Conformance]": "validates that there is no conflict between pods with same hostPort but different hostIP and protocol [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]",
+	"[Top Level] [sig-scheduling] SchedulerPredicates [Serial] validates that there is no conflict between pods with same hostPort but different hostIP and protocol": "validates that there is no conflict between pods with same hostPort but different hostIP and protocol [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-scheduling] SchedulerPreemption [Serial] PodTopologySpread Preemption validates proper pods are preempted": "validates proper pods are preempted [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -1466,6 +1602,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1561,6 +1699,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node [LinuxOnly]": "should concurrently access the single volume from pods on the same node [LinuxOnly] [Suite:k8s]",
 
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] volume-lifecycle-performance should provision volumes at scale within performance constraints [Slow] [Serial]": "should provision volumes at scale within performance constraints [Slow] [Serial] [Suite:k8s]",
+
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] volumeLimits should support volume limits [Serial]": "should support volume limits [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": "should fail to use a volume in a pod with mismatched mode [Slow] [Suite:k8s]",
@@ -1571,59 +1711,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -1637,21 +1777,21 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should check snapshot fields, check restore correctly works after modifying source data, check deletion": "should check snapshot fields, check restore correctly works after modifying source data, check deletion [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1703,9 +1843,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -1807,9 +1947,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -1872,6 +2012,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -1967,6 +2109,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] multiVolume [Slow] should concurrently access the single volume from pods on the same node [LinuxOnly]": "should concurrently access the single volume from pods on the same node [LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] volume-lifecycle-performance should provision volumes at scale within performance constraints [Slow] [Serial]": "should provision volumes at scale within performance constraints [Slow] [Serial] [Skipped:gce] [Suite:k8s]",
+
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] volumeLimits should support volume limits [Serial]": "should support volume limits [Serial] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (filesystem volmode)] volumeMode should fail to use a volume in a pod with mismatched mode [Slow]": "should fail to use a volume in a pod with mismatched mode [Slow] [Skipped:gce] [Suite:k8s]",
@@ -1977,59 +2121,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -2043,21 +2187,21 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should check snapshot fields, check restore correctly works after modifying source data, check deletion": "should check snapshot fields, check restore correctly works after modifying source data, check deletion [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) [Feature:GenericEphemeralVolume] (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -2109,9 +2253,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -2213,9 +2357,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: pd.csi.storage.gke.io][Serial] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -2244,6 +2388,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] CSI mock volume CSI NodeStage error cases [Slow] should retry NodeStage after NodeStage final error": "should retry NodeStage after NodeStage final error [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI mock volume CSI Volume Snapshots [Feature:VolumeSnapshotDataSource] volumesnapshotcontent and pvc in Bound state with deletion timestamp set should not get deleted while snapshot finalizer exists": "volumesnapshotcontent and pvc in Bound state with deletion timestamp set should not get deleted while snapshot finalizer exists [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] CSI mock volume CSI Volume Snapshots secrets [Feature:VolumeSnapshotDataSource] volume snapshot create/delete with secrets": "volume snapshot create/delete with secrets [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI mock volume CSI Volume expansion should expand volume by restarting pod if attach=off, nodeExpansion=on": "should expand volume by restarting pod if attach=off, nodeExpansion=on [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2275,21 +2421,21 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI mock volume CSI workload information using mock driver should not be passed when podInfoOnMount=nil": "should not be passed when podInfoOnMount=nil [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken [Feature:CSIServiceAccountToken] token should be plumbed down when csiServiceAccountTokenEnabled=true": "token should be plumbed down when csiServiceAccountTokenEnabled=true [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken token should be plumbed down when csiServiceAccountTokenEnabled=true": "token should be plumbed down when csiServiceAccountTokenEnabled=true [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken [Feature:CSIServiceAccountToken] token should not be plumbed down when CSIDriver is not deployed": "token should not be plumbed down when CSIDriver is not deployed [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken token should not be plumbed down when CSIDriver is not deployed": "token should not be plumbed down when CSIDriver is not deployed [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken [Feature:CSIServiceAccountToken] token should not be plumbed down when csiServiceAccountTokenEnabled=false": "token should not be plumbed down when csiServiceAccountTokenEnabled=false [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIServiceAccountToken token should not be plumbed down when csiServiceAccountTokenEnabled=false": "token should not be plumbed down when csiServiceAccountTokenEnabled=false [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity [Feature:CSIStorageCapacity] CSIStorageCapacity disabled": "CSIStorageCapacity disabled [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity disabled": "CSIStorageCapacity disabled [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity [Feature:CSIStorageCapacity] CSIStorageCapacity unused": "CSIStorageCapacity unused [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity unused": "CSIStorageCapacity unused [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity [Feature:CSIStorageCapacity] CSIStorageCapacity used, have capacity": "CSIStorageCapacity used, have capacity [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, have capacity": "CSIStorageCapacity used, have capacity [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity [Feature:CSIStorageCapacity] CSIStorageCapacity used, insufficient capacity": "CSIStorageCapacity used, insufficient capacity [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, insufficient capacity": "CSIStorageCapacity used, insufficient capacity [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity [Feature:CSIStorageCapacity] CSIStorageCapacity used, no capacity": "CSIStorageCapacity used, no capacity [Disabled:Alpha] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI mock volume CSIStorageCapacity CSIStorageCapacity used, no capacity": "CSIStorageCapacity used, no capacity [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI mock volume storage capacity exhausted, immediate binding": "exhausted, immediate binding [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2327,9 +2473,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] ConfigMap should be consumable in multiple volumes in the same pod [NodeConformance] [Conformance]": "should be consumable in multiple volumes in the same pod [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] ConfigMap should be immutable if `immutable` field is set": "should be immutable if `immutable` field is set [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] ConfigMap should be immutable if `immutable` field is set [Conformance]": "should be immutable if `immutable` field is set [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] ConfigMap updates should be reflected in volume [NodeConformance] [Conformance]": "updates should be reflected in volume [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage] Downward API tests for local ephemeral storage should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars": "should provide container's limits.ephemeral-storage and requests.ephemeral-storage as env vars [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Downward API [Serial] [Disruptive] [NodeFeature:EphemeralStorage] Downward API tests for local ephemeral storage should provide default limits.ephemeral-storage from node allocatable": "should provide default limits.ephemeral-storage from node allocatable [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Downward API volume should provide container's cpu limit [NodeConformance] [Conformance]": "should provide container's cpu limit [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -2375,9 +2525,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Dynamic Provisioning DynamicProvisioner [Slow] should test that deleting a claim before the volume is provisioned deletes the volume.": "should test that deleting a claim before the volume is provisioned deletes the volume. [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Dynamic Provisioning Invalid AWS KMS key should report an error and create no PV": "should report an error and create no PV [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Dynamic Provisioning GlusterDynamicProvisioner should create and delete persistent volumes [fast]": "should create and delete persistent volumes [fast] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Dynamic Provisioning [k8s.io] GlusterDynamicProvisioner should create and delete persistent volumes [fast]": "should create and delete persistent volumes [fast] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Dynamic Provisioning Invalid AWS KMS key should report an error and create no PV": "should report an error and create no PV [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] EmptyDir volumes pod should support memory backed volumes of specified size": "pod should support memory backed volumes of specified size [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -2439,11 +2589,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Flexvolumes should be mountable when non-attachable": "should be mountable when non-attachable [Skipped:gce] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] GCP Volumes GlusterFS should be mountable": "should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [sig-storage] GCP Volumes NFSv3 should be mountable for NFSv3": "should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
-	"[Top Level] [sig-storage] GCP Volumes NFSv4 should be mountable for NFSv4": "should be mountable for NFSv4 [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] GKE local SSD [Feature:GKELocalSSD] should write and read from node local SSD [Feature:GKELocalSSD]": "should write and read from node local SSD [Feature:GKELocalSSD] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] GenericPersistentVolume[Disruptive] When kubelet restarts Should test that a file written to the mount before kubelet restart is readable after restart.": "Should test that a file written to the mount before kubelet restart is readable after restart. [Serial] [Suite:k8s]",
 
@@ -2573,6 +2719,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with different fsgroup applied to the volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, volume contents ownership changed in first pod, new pod with different fsgroup applied to the volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -2677,59 +2825,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -2785,9 +2933,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -2889,9 +3037,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: aws] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -2942,6 +3090,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -3047,59 +3197,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -3155,9 +3305,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -3259,9 +3409,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: azure-disk] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -3314,6 +3464,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Disabled:Unsupported] [Suite:k8s]",
 
@@ -3419,59 +3571,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -3527,9 +3679,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -3633,9 +3785,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: ceph][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -3686,6 +3838,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -3791,59 +3945,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -3899,9 +4053,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4003,9 +4157,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: cinder] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4058,6 +4212,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -4163,59 +4319,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4271,9 +4427,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4377,9 +4533,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: emptydir] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4430,6 +4586,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -4535,59 +4693,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4643,9 +4801,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4747,9 +4905,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gcepd] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -4802,6 +4960,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -4907,59 +5067,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5015,9 +5175,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5121,9 +5281,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: gluster] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5176,6 +5336,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -5281,59 +5443,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5389,9 +5551,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5495,9 +5657,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPathSymlink] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5550,6 +5712,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -5655,59 +5819,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5763,9 +5927,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5869,9 +6033,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: hostPath] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -5922,6 +6086,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Broken] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Disabled:Broken] [Suite:k8s]",
 
@@ -6027,59 +6193,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Broken] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
@@ -6135,9 +6301,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
@@ -6239,9 +6405,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Broken] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: iscsi][Feature:Volumes] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Broken] [Suite:k8s]",
 
@@ -6292,6 +6458,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -6397,59 +6565,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -6505,9 +6673,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -6609,9 +6777,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: block] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -6664,6 +6832,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -6769,59 +6939,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -6877,9 +7047,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -6983,9 +7153,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: blockfs] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7038,6 +7208,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -7143,59 +7315,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7251,9 +7423,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7357,9 +7529,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-bindmounted] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7412,6 +7584,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -7517,59 +7691,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7625,9 +7799,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7731,9 +7905,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link-bindmounted] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7786,6 +7960,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -7891,59 +8067,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -7999,9 +8175,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -8105,9 +8281,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir-link] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -8160,6 +8336,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -8265,59 +8443,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -8373,9 +8551,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -8479,9 +8657,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -8534,6 +8712,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
@@ -8639,59 +8819,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Skipped:gce] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Skipped:gce] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -8747,9 +8927,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -8853,9 +9033,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Skipped:gce] [Suite:openshift/conformance/serial] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: gce-localssd-scsi-fs] [Serial] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Skipped:gce] [Suite:k8s]",
 
@@ -8908,6 +9088,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -9013,59 +9195,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9121,9 +9303,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9227,9 +9409,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: tmpfs] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9282,6 +9464,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -9387,59 +9571,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9495,9 +9679,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9601,9 +9785,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: nfs] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -9654,6 +9838,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Disabled:Unsupported] [Suite:k8s]",
 
@@ -9759,59 +9945,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -9867,9 +10053,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -9971,9 +10157,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: rbd][Feature:Volumes][Serial] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Disabled:Unsupported] [Suite:k8s]",
 
@@ -10026,6 +10212,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -10131,59 +10319,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10239,9 +10427,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10345,9 +10533,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: vsphere] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10400,6 +10588,8 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (default fs)] capacity provides storage capacity information": "provides storage capacity information [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (default fs)] fsgroupchangepolicy (Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents": "(Always)[LinuxOnly], pod created with an initial fsgroup, new pod fsgroup applied to volume contents [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -10505,59 +10695,59 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (immediate binding)] topology should provision a volume and schedule a pod with AllowedTopologies": "should provision a volume and schedule a pod with AllowedTopologies [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand Verify if offline PVC expansion works": "Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][sig-windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)(allowExpansion)][Feature:Windows] volume-expand should resize volume when PVC is edited while pod is using it": "should resize volume when PVC is edited while pod is using it [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with mount options": "should provision storage with mount options [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source in parallel [Slow]": "should provision storage with pvc data source in parallel [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with pvc data source": "should provision storage with pvc data source [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] provisioning should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource]": "should provision storage with snapshot data source [Feature:VolumeSnapshotDataSource] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if non-existent subpath is outside the volume [Slow][LinuxOnly]": "should fail if non-existent subpath is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath directory is outside the volume [Slow][LinuxOnly]": "should fail if subpath directory is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath file is outside the volume [Slow][LinuxOnly]": "should fail if subpath file is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly]": "should fail if subpath with backstepping is outside the volume [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support creating multiple subpath from same volumes [Slow]": "should support creating multiple subpath from same volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directories when readOnly specified in the volumeSource": "should support existing directories when readOnly specified in the volumeSource [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing directory": "should support existing directory [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support existing single file [LinuxOnly]": "should support existing single file [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support file as subpath [LinuxOnly]": "should support file as subpath [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support non-existent path": "should support non-existent path [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly directory specified in the volumeMount": "should support readOnly directory specified in the volumeMount [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly]": "should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using directory as subpath [Slow]": "should support restarting containers using directory as subpath [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should support restarting containers using file as subpath [Slow][LinuxOnly]": "should support restarting containers using file as subpath [Slow][LinuxOnly] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is force deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly]": "should unmount if pod is gracefully deleted while kubelet is down [Disruptive][Slow][LinuxOnly] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] subPath should verify container cannot write to subpath readonly volumes [Slow]": "should verify container cannot write to subpath readonly volumes [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volume-expand should not allow expansion of pvcs without AllowVolumeExpansion property": "should not allow expansion of pvcs without AllowVolumeExpansion property [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Dynamic PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10613,9 +10803,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (ext4)] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Inline-volume (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10719,9 +10909,9 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (filesystem volmode)] volumeMode should not mount / map unused volumes in a pod [LinuxOnly]": "should not mount / map unused volumes in a pod [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (ntfs)][sig-windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (ntfs)][Feature:Windows] volumes should store data": "should store data [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] In-tree Volumes [Driver: windows-gcepd] [Testpattern: Pre-provisioned PV (xfs)][Slow] volumes should allow exec of files on the volume": "should allow exec of files on the volume [Suite:k8s]",
 
@@ -10730,6 +10920,10 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] Mounted flexvolume volume expand [Slow] [Feature:ExpandInUsePersistentVolumes] should be resizable when mounted": "should be resizable when mounted [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Mounted volume expand Should verify mounted devices can be resized": "Should verify mounted devices can be resized [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Multi-AZ Cluster Volumes should only be allowed to provision PDs in zones where nodes exist": "should only be allowed to provision PDs in zones where nodes exist [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Multi-AZ Cluster Volumes should schedule pods in the same zones as statically provisioned PVs": "should schedule pods in the same zones as statically provisioned PVs [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] NFSPersistentVolumes[Disruptive][Flaky] when kube-controller-manager restarts should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash": "should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash [Serial] [Suite:k8s]",
 
@@ -10777,13 +10971,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] PersistentVolumes NFS with multiple PVs and PVCs all in same ns should create 4 PVs and 2 PVCs: test write access [Slow]": "should create 4 PVs and 2 PVCs: test write access [Slow] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:LabelSelector] [sig-storage] Selector-Label Volume Binding:vsphere [Feature:vsphere] should bind volume with claim for given label": "should bind volume with claim for given label [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:LabelSelector] Selector-Label Volume Binding:vsphere [Feature:vsphere] should bind volume with claim for given label": "should bind volume with claim for given label [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] [sig-storage] persistentvolumereclaim:vsphere [Feature:vsphere] should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted": "should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted": "should delete persistent volume when reclaimPolicy set to delete and associated claim is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] [sig-storage] persistentvolumereclaim:vsphere [Feature:vsphere] should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod": "should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod": "should not detach and unmount PV when associated pvc with delete as reclaimPolicy is deleted when it is in use by the pod [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] [sig-storage] persistentvolumereclaim:vsphere [Feature:vsphere] should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted": "should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] PersistentVolumes [Feature:vsphere][Feature:ReclaimPolicy] persistentvolumereclaim:vsphere [Feature:vsphere] should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted": "should retain persistent volume when reclaimPolicy set to retain when associated claim is deleted [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] PersistentVolumes-local  Local volume that cannot be mounted [Slow] should fail due to non-existent path": "should fail due to non-existent path [Suite:k8s]",
 
@@ -11067,7 +11261,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Secrets should be consumable in multiple volumes in a pod [NodeConformance] [Conformance]": "should be consumable in multiple volumes in a pod [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Secrets should be immutable if `immutable` field is set": "should be immutable if `immutable` field is set [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Secrets should be immutable if `immutable` field is set [Conformance]": "should be immutable if `immutable` field is set [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Storage Policy Based Volume Provisioning [Feature:vsphere] verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass": "verify VSAN storage capability with invalid capability name objectSpaceReserve is not honored for dynamically provisioned pvc using storageclass [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -11148,6 +11342,12 @@ var annotations = map[string]string{
 	"[Top Level] [sig-storage] Volume limits should verify that all nodes have volume limits": "should verify that all nodes have volume limits [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Volumes ConfigMap should be mountable": "should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Volumes GlusterFS should be mountable": "should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Volumes NFSv3 should be mountable for NFSv3": "should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
+	"[Top Level] [sig-storage] Volumes NFSv4 should be mountable for NFSv4": "should be mountable for NFSv4 [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Zone Support [Feature:vsphere] Verify PVC creation fails if no zones are specified in the storage class (No shared datastores exist among all the nodes)": "Verify PVC creation fails if no zones are specified in the storage class (No shared datastores exist among all the nodes) [Suite:openshift/conformance/parallel] [Suite:k8s]",
 

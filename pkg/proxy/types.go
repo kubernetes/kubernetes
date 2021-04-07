@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy/config"
 )
 
@@ -83,10 +84,16 @@ type ServicePort interface {
 	HealthCheckNodePort() int
 	// GetNodePort returns a service Node port if present. If return 0, it means not present.
 	NodePort() int
-	// GetOnlyNodeLocalEndpoints returns if a service has only node local endpoints
-	OnlyNodeLocalEndpoints() bool
+	// NodeLocalExternal returns if a service has only node local endpoints for external traffic.
+	NodeLocalExternal() bool
+	// NodeLocalInternal returns if a service has only node local endpoints for internal traffic.
+	NodeLocalInternal() bool
+	// InternalTrafficPolicy returns service InternalTrafficPolicy
+	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
 	// TopologyKeys returns service TopologyKeys as a string array.
 	TopologyKeys() []string
+	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
+	HintsAnnotation() string
 }
 
 // Endpoint in an interface which abstracts information about an endpoint.
@@ -97,8 +104,25 @@ type Endpoint interface {
 	String() string
 	// GetIsLocal returns true if the endpoint is running in same host as kube-proxy, otherwise returns false.
 	GetIsLocal() bool
+	// IsReady returns true if an endpoint is ready and not terminating.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// true since only ready endpoints are read from Endpoints.
+	IsReady() bool
+	// IsServing returns true if an endpoint is ready. It does not account
+	// for terminating state.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// true since only ready endpoints are read from Endpoints.
+	IsServing() bool
+	// IsTerminating retruns true if an endpoint is terminating. For pods,
+	// that is any pod with a deletion timestamp.
+	// This is only set when watching EndpointSlices. If using Endpoints, this is always
+	// false since terminating endpoints are always excluded from Endpoints.
+	IsTerminating() bool
 	// GetTopology returns the topology information of the endpoint.
 	GetTopology() map[string]string
+	// GetZoneHint returns the zone hint for the endpoint. This is based on
+	// endpoint.hints.forZones[0].name in the EndpointSlice API.
+	GetZoneHints() sets.String
 	// IP returns IP part of the endpoint.
 	IP() string
 	// Port returns the Port part of the endpoint.

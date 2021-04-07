@@ -32,7 +32,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -40,7 +39,6 @@ import (
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/features"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
@@ -199,12 +197,6 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 		}
 	}
 
-	if o.ServiceAccounts != nil && utilfeature.DefaultFeatureGate.Enabled(features.BoundServiceAccountTokenVolume) {
-		if !utilfeature.DefaultFeatureGate.Enabled(features.RootCAConfigMap) {
-			allErrors = append(allErrors, errors.New("BoundServiceAccountTokenVolume feature depends on RootCAConfigMap feature, but RootCAConfigMap features is not enabled"))
-		}
-	}
-
 	if o.ServiceAccounts != nil {
 		if len(o.ServiceAccounts.Issuer) == 0 {
 			allErrors = append(allErrors, errors.New("service-account-issuer is a required flag"))
@@ -213,18 +205,14 @@ func (o *BuiltInAuthenticationOptions) Validate() []error {
 			allErrors = append(allErrors, errors.New("service-account-key-file is a required flag"))
 		}
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-			// Validate the JWKS URI when it is explicitly set.
-			// When unset, it is later derived from ExternalHost.
-			if o.ServiceAccounts.JWKSURI != "" {
-				if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
-				} else if u.Scheme != "https" {
-					allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
-				}
+		// Validate the JWKS URI when it is explicitly set.
+		// When unset, it is later derived from ExternalHost.
+		if o.ServiceAccounts.JWKSURI != "" {
+			if u, err := url.Parse(o.ServiceAccounts.JWKSURI); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri must be a valid URL: %v", err))
+			} else if u.Scheme != "https" {
+				allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri requires https scheme, parsed as: %v", u.String()))
 			}
-		} else if len(o.ServiceAccounts.JWKSURI) > 0 {
-			allErrors = append(allErrors, fmt.Errorf("service-account-jwks-uri may only be set when the ServiceAccountIssuerDiscovery feature gate is enabled"))
 		}
 	}
 

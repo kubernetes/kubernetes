@@ -29,7 +29,6 @@ RUN tar -xzvf /coredns.tgz &&\
     mv iperf-2.0.9-win64 iperf &&\
     mkdir /uploads
 
-FROM e2eteam/busybox-helper:1.29.0 as busybox-helper
 FROM --platform=linux/amd64 $REGISTRY/windows-servercore-cache:1.0-linux-amd64-$OS_VERSION as servercore-helper
 FROM $BASEIMAGE
 
@@ -42,7 +41,6 @@ FROM $BASEIMAGE
 # - curl, nc: used by a lot of e2e tests (inherited from BASEIMAGE)
 # from iperf image
 # install necessary packages: iperf
-COPY --from=busybox-helper /dig /dig
 COPY --from=servercore-helper /Windows/System32/netapi32.dll /Windows/System32/netapi32.dll
 COPY --from=prep /coredns.exe /coredns.exe
 COPY --from=prep /iperf /iperf

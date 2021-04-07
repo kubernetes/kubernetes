@@ -46,6 +46,7 @@ import (
 	"k8s.io/apiserver/pkg/storageversion"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	versioninfo "k8s.io/component-base/version"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
@@ -253,18 +254,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if !isMetadata {
 		storageMeta = defaultStorageMetadata{}
 	}
-	exporter, isExporter := storage.(rest.Exporter)
-	if !isExporter {
-		exporter = nil
-	}
-
-	versionedExportOptions, err := a.group.Creater.New(optionsExternalVersion.WithKind("ExportOptions"))
-	if err != nil {
-		return nil, nil, err
-	}
 
 	if isNamedCreater {
 		isCreater = true
+	}
+
+	var resetFields map[fieldpath.APIVersion]*fieldpath.Set
+	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		if resetFieldsStrategy, isResetFieldsStrategy := storage.(rest.ResetFieldsStrategy); isResetFieldsStrategy {
+			resetFields = resetFieldsStrategy.GetResetFields()
+		}
 	}
 
 	var versionedList interface{}
@@ -522,6 +521,10 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, nil, err
 		}
+		decodableVersions := []schema.GroupVersion{}
+		if a.group.ConvertabilityChecker != nil {
+			decodableVersions = a.group.ConvertabilityChecker.VersionsForGroupKind(fqKindToRegister.GroupKind())
+		}
 		resourceInfo = &storageversion.ResourceInfo{
 			GroupResource: schema.GroupResource{
 				Group:    a.group.GroupVersion.Group,
@@ -532,6 +535,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			// DecodableVersions immediately because API installation must
 			// be completed first for us to know equivalent APIs
 			EquivalentResourceMapper: a.group.EquivalentResourceRegistry,
+
+			DirectlyDecodableVersions: decodableVersions,
 		}
 	}
 
@@ -600,6 +605,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
 			isSubresource,
+			resetFields,
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create field manager: %v", err)
@@ -684,7 +690,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			if isGetterWithOptions {
 				handler = restfulGetResourceWithOptions(getterWithOptions, reqScope, isSubresource)
 			} else {
-				handler = restfulGetResource(getter, exporter, reqScope)
+				handler = restfulGetResource(getter, reqScope)
 			}
 
 			if needOverride {
@@ -710,11 +716,6 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 				Writes(producedObject)
 			if isGetterWithOptions {
 				if err := AddObjectParams(ws, route, versionedGetOptions); err != nil {
-					return nil, nil, err
-				}
-			}
-			if isExporter {
-				if err := AddObjectParams(ws, route, versionedExportOptions); err != nil {
 					return nil, nil, err
 				}
 			}
@@ -1227,9 +1228,9 @@ func restfulPatchResource(r rest.Patcher, scope handlers.RequestScope, admit adm
 	}
 }
 
-func restfulGetResource(r rest.Getter, e rest.Exporter, scope handlers.RequestScope) restful.RouteFunction {
+func restfulGetResource(r rest.Getter, scope handlers.RequestScope) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
-		handlers.GetResource(r, e, &scope)(res.ResponseWriter, req.Request)
+		handlers.GetResource(r, &scope)(res.ResponseWriter, req.Request)
 	}
 }
 

@@ -67,13 +67,13 @@ func validateOOMScoreAdjSettingIsInRange(pid int, expectedMinOOMScoreAdj, expect
 	if oomScore < expectedMinOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be >= %d; found %d", pid, expectedMinOOMScoreAdj, oomScore)
 	}
-	if oomScore < expectedMaxOOMScoreAdj {
+	if oomScore >= expectedMaxOOMScoreAdj {
 		return fmt.Errorf("expected pid %d's oom_score_adj to be < %d; found %d", pid, expectedMaxOOMScoreAdj, oomScore)
 	}
 	return nil
 }
 
-var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
+var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-manager")
 	ginkgo.Describe("Validate OOM score adjustments [NodeFeature:OOMScoreAdj]", func() {
 		ginkgo.Context("once the node is setup", func() {

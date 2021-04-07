@@ -22,7 +22,7 @@ import (
 	"reflect"
 	"time"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -31,8 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/util/dryrun"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	"k8s.io/client-go/util/retry"
+	pdbhelper "k8s.io/component-helpers/apps/poddisruptionbudget"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -303,17 +304,17 @@ func resourceVersionIsUnset(options *metav1.DeleteOptions) bool {
 }
 
 func createTooManyRequestsError(name string) error {
-	// TODO(mml): Add a Retry-After header.  Once there are time-based
+	// TODO: Once there are time-based
 	// budgets, we can sometimes compute a sensible suggested value.  But
-	// even without that, we can give a suggestion (10 minutes?) that
+	// even without that, we can give a suggestion (even if small) that
 	// prevents well-behaved clients from hammering us.
-	err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 0)
+	err := errors.NewTooManyRequests("Cannot evict pod as it would violate the pod's disruption budget.", 10)
 	err.ErrStatus.Details.Causes = append(err.ErrStatus.Details.Causes, metav1.StatusCause{Type: "DisruptionBudget", Message: fmt.Sprintf("The disruption budget %s is still being processed by the server.", name)})
 	return err
 }
 
 // checkAndDecrement checks if the provided PodDisruptionBudget allows any disruption.
-func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1beta1.PodDisruptionBudget, dryRun bool) error {
+func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb policyv1.PodDisruptionBudget, dryRun bool) error {
 	if pdb.Status.ObservedGeneration < pdb.Generation {
 
 		return createTooManyRequestsError(pdb.Name)
@@ -331,6 +332,10 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 	}
 
 	pdb.Status.DisruptionsAllowed--
+	if pdb.Status.DisruptionsAllowed == 0 {
+		pdbhelper.UpdateDisruptionAllowedCondition(&pdb)
+	}
+
 	// If this is a dry-run, we don't need to go any further than that.
 	if dryRun == true {
 		return nil
@@ -353,17 +358,13 @@ func (r *EvictionREST) checkAndDecrement(namespace string, podName string, pdb p
 }
 
 // getPodDisruptionBudgets returns any PDBs that match the pod or err if there's an error.
-func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod) ([]policyv1beta1.PodDisruptionBudget, error) {
-	if len(pod.Labels) == 0 {
-		return nil, nil
-	}
-
+func (r *EvictionREST) getPodDisruptionBudgets(ctx context.Context, pod *api.Pod) ([]policyv1.PodDisruptionBudget, error) {
 	pdbList, err := r.podDisruptionBudgetClient.PodDisruptionBudgets(pod.Namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	var pdbs []policyv1beta1.PodDisruptionBudget
+	var pdbs []policyv1.PodDisruptionBudget
 	for _, pdb := range pdbList.Items {
 		if pdb.Namespace != pod.Namespace {
 			continue

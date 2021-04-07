@@ -18,12 +18,13 @@ package storage
 
 import (
 	"context"
+
 	"github.com/onsi/ginkgo"
 
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -77,6 +78,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		prefix := "pvc-protection"
 		e2epv.SkipIfNoDefaultStorageClass(client)
 		t := testsuites.StorageClassTest{
+			Timeouts:  f.Timeouts,
 			ClaimSize: "1Gi",
 		}
 		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
@@ -94,7 +96,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")
-		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, e2epv.ClaimBindingTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, f.Timeouts.ClaimBound)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 		ginkgo.By("Checking that PVC Protection finalizer is set")

@@ -125,7 +125,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	}()
 
 	ginkgo.By("Waiting for claim to be in bound phase")
-	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, f.Timeouts.ClaimProvision)
 	framework.ExpectNoError(err)
 
 	// Get new copy of the claim

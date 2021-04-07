@@ -409,15 +409,14 @@ func (pp *PostFilterPlugin) PostFilter(ctx context.Context, state *framework.Cyc
 		return nil, framework.NewStatus(framework.Error, err.Error())
 	}
 
-	ph := pp.fh.PreemptHandle()
 	for _, nodeInfo := range nodeInfos {
-		ph.RunFilterPlugins(ctx, state, pod, nodeInfo)
+		pp.fh.RunFilterPlugins(ctx, state, pod, nodeInfo)
 	}
 	var nodes []*v1.Node
 	for _, nodeInfo := range nodeInfos {
 		nodes = append(nodes, nodeInfo.Node())
 	}
-	ph.RunScorePlugins(ctx, state, pod, nodes)
+	pp.fh.RunScorePlugins(ctx, state, pod, nodes)
 
 	if pp.failPostFilter {
 		return nil, framework.NewStatus(framework.Error, fmt.Sprintf("injecting failure for pod %v", pod.Name))
@@ -459,7 +458,7 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState,
 		if pp.waitAndRejectPermit {
 			pp.rejectingPod = pod.Name
 			pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) {
-				wp.Reject(fmt.Sprintf("reject pod %v", wp.GetPod().Name))
+				wp.Reject(pp.name, fmt.Sprintf("reject pod %v", wp.GetPod().Name))
 			})
 			return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 		}
@@ -479,7 +478,7 @@ func (pp *PermitPlugin) allowAllPods() {
 
 // rejectAllPods rejects all waiting pods.
 func (pp *PermitPlugin) rejectAllPods() {
-	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject("rejectAllPods") })
+	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject(pp.name, "rejectAllPods") })
 }
 
 // reset used to reset permit plugin.
@@ -514,7 +513,7 @@ func TestPreFilterPlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			PreFilter: &schedulerconfig.PluginSet{
+			PreFilter: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: prefilterPluginName},
 				},
@@ -657,12 +656,12 @@ func TestPostFilterPlugin(t *testing.T) {
 			prof := schedulerconfig.KubeSchedulerProfile{
 				SchedulerName: v1.DefaultSchedulerName,
 				Plugins: &schedulerconfig.Plugins{
-					Filter: &schedulerconfig.PluginSet{
+					Filter: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{Name: filterPluginName},
 						},
 					},
-					Score: &schedulerconfig.PluginSet{
+					Score: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{Name: scorePluginName},
 						},
@@ -672,7 +671,7 @@ func TestPostFilterPlugin(t *testing.T) {
 							{Name: "*"},
 						},
 					},
-					PostFilter: &schedulerconfig.PluginSet{
+					PostFilter: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{Name: postfilterPluginName},
 						},
@@ -744,7 +743,7 @@ func TestScorePlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Score: &schedulerconfig.PluginSet{
+			Score: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: scorePluginName},
 				},
@@ -820,7 +819,7 @@ func TestNormalizeScorePlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Score: &schedulerconfig.PluginSet{
+			Score: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{Name: scoreWithNormalizePluginName},
 				},
@@ -864,7 +863,7 @@ func TestReservePluginReserve(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Reserve: &schedulerconfig.PluginSet{
+			Reserve: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{
 						Name: reservePluginName,
@@ -935,7 +934,7 @@ func TestPrebindPlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			PreBind: &schedulerconfig.PluginSet{
+			PreBind: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{
 						Name: preBindPluginName,
@@ -1061,10 +1060,10 @@ func TestReservePluginUnreserve(t *testing.T) {
 			prof := schedulerconfig.KubeSchedulerProfile{
 				SchedulerName: v1.DefaultSchedulerName,
 				Plugins: &schedulerconfig.Plugins{
-					Reserve: &schedulerconfig.PluginSet{
+					Reserve: schedulerconfig.PluginSet{
 						// filled by looping over reservePlugins
 					},
-					PreBind: &schedulerconfig.PluginSet{
+					PreBind: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{
 								Name: preBindPluginName,
@@ -1159,15 +1158,15 @@ func TestBindPlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Reserve: &schedulerconfig.PluginSet{
+			Reserve: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{{Name: reservePlugin.Name()}},
 			},
-			Bind: &schedulerconfig.PluginSet{
+			Bind: schedulerconfig.PluginSet{
 				// Put DefaultBinder last.
 				Enabled:  []schedulerconfig.Plugin{{Name: bindPlugin1.Name()}, {Name: bindPlugin2.Name()}, {Name: defaultbinder.Name}},
 				Disabled: []schedulerconfig.Plugin{{Name: defaultbinder.Name}},
 			},
-			PostBind: &schedulerconfig.PluginSet{
+			PostBind: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{{Name: postBindPlugin.Name()}},
 			},
 		},
@@ -1345,14 +1344,14 @@ func TestPostBindPlugin(t *testing.T) {
 			prof := schedulerconfig.KubeSchedulerProfile{
 				SchedulerName: v1.DefaultSchedulerName,
 				Plugins: &schedulerconfig.Plugins{
-					PreBind: &schedulerconfig.PluginSet{
+					PreBind: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{
 								Name: preBindPluginName,
 							},
 						},
 					},
-					PostBind: &schedulerconfig.PluginSet{
+					PostBind: schedulerconfig.PluginSet{
 						Enabled: []schedulerconfig.Plugin{
 							{
 								Name: postBindPluginName,
@@ -1691,7 +1690,7 @@ func TestFilterPlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			Filter: &schedulerconfig.PluginSet{
+			Filter: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{
 						Name: filterPluginName,
@@ -1763,7 +1762,7 @@ func TestPreScorePlugin(t *testing.T) {
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			PreScore: &schedulerconfig.PluginSet{
+			PreScore: schedulerconfig.PluginSet{
 				Enabled: []schedulerconfig.Plugin{
 					{
 						Name: preScorePluginName,
@@ -1929,7 +1928,7 @@ func initRegistryAndConfig(pp ...*PermitPlugin) (registry frameworkruntime.Regis
 
 	prof.SchedulerName = v1.DefaultSchedulerName
 	prof.Plugins = &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
+		Permit: schedulerconfig.PluginSet{
 			Enabled: plugins,
 		},
 	}

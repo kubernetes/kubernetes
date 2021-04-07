@@ -131,7 +131,7 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Infof("HTTP2 has been explicitly disabled")
+		klog.Info("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
 		if err := configureHTTP2Transport(t); err != nil {
 			klog.Warningf("Transport failed http2 configuration: %v", err)
@@ -693,7 +693,7 @@ func parseQuotedString(quotedString string) (string, string, error) {
 	var remainder string
 	escaping := false
 	closedQuote := false
-	result := &bytes.Buffer{}
+	result := &strings.Builder{}
 loop:
 	for i := 0; i < len(quotedString); i++ {
 		b := quotedString[i]

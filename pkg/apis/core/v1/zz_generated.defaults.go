@@ -21,8 +21,6 @@ limitations under the License.
 package v1
 
 import (
-	"reflect"
-
 	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -93,7 +91,7 @@ func SetObjectDefaults_EphemeralContainers(in *v1.EphemeralContainers) {
 		SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -160,6 +158,7 @@ func SetObjectDefaults_LimitRangeList(in *v1.LimitRangeList) {
 }
 
 func SetObjectDefaults_Namespace(in *v1.Namespace) {
+	SetDefaults_Namespace(in)
 	SetDefaults_NamespaceStatus(&in.Status)
 }
 
@@ -291,7 +290,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -341,7 +340,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -391,7 +390,7 @@ func SetObjectDefaults_Pod(in *v1.Pod) {
 		SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -511,7 +510,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -561,7 +560,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -611,7 +610,7 @@ func SetObjectDefaults_PodTemplate(in *v1.PodTemplate) {
 		SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -733,7 +732,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]
-				if reflect.ValueOf(b.Protocol).IsZero() {
+				if b.Protocol == "" {
 					b.Protocol = "TCP"
 				}
 			}
@@ -783,7 +782,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_Container(a)
 			for j := range a.Ports {
 				b := &a.Ports[j]
-				if reflect.ValueOf(b.Protocol).IsZero() {
+				if b.Protocol == "" {
 					b.Protocol = "TCP"
 				}
 			}
@@ -833,7 +832,7 @@ func SetObjectDefaults_ReplicationController(in *v1.ReplicationController) {
 			SetDefaults_EphemeralContainer(a)
 			for j := range a.EphemeralContainerCommon.Ports {
 				b := &a.EphemeralContainerCommon.Ports[j]
-				if reflect.ValueOf(b.Protocol).IsZero() {
+				if b.Protocol == "" {
 					b.Protocol = "TCP"
 				}
 			}
@@ -915,6 +914,12 @@ func SetObjectDefaults_SecretList(in *v1.SecretList) {
 
 func SetObjectDefaults_Service(in *v1.Service) {
 	SetDefaults_Service(in)
+	for i := range in.Spec.Ports {
+		a := &in.Spec.Ports[i]
+		if a.Protocol == "" {
+			a.Protocol = "TCP"
+		}
+	}
 }
 
 func SetObjectDefaults_ServiceList(in *v1.ServiceList) {

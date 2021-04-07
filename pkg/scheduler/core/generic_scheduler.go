@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -29,14 +27,15 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
-	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/util/feature"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -53,41 +52,8 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
-// FitError describes a fit error of a pod.
-type FitError struct {
-	Pod                   *v1.Pod
-	NumAllNodes           int
-	FilteredNodesStatuses framework.NodeToStatusMap
-}
-
 // ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
 var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
-
-const (
-	// NoNodeAvailableMsg is used to format message when no nodes available.
-	NoNodeAvailableMsg = "0/%v nodes are available"
-)
-
-// Error returns detailed information of why the pod failed to fit on each node
-func (f *FitError) Error() string {
-	reasons := make(map[string]int)
-	for _, status := range f.FilteredNodesStatuses {
-		for _, reason := range status.Reasons() {
-			reasons[reason]++
-		}
-	}
-
-	sortReasonsHistogram := func() []string {
-		var reasonStrings []string
-		for k, v := range reasons {
-			reasonStrings = append(reasonStrings, fmt.Sprintf("%v %v", v, k))
-		}
-		sort.Strings(reasonStrings)
-		return reasonStrings
-	}
-	reasonMsg := fmt.Sprintf(NoNodeAvailableMsg+": %v.", f.NumAllNodes, strings.Join(sortReasonsHistogram(), ", "))
-	return reasonMsg
-}
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
@@ -141,17 +107,17 @@ func (g *genericScheduler) Schedule(ctx context.Context, fwk framework.Framework
 		return result, ErrNoNodesAvailable
 	}
 
-	feasibleNodes, filteredNodesStatuses, err := g.findNodesThatFitPod(ctx, fwk, state, pod)
+	feasibleNodes, diagnosis, err := g.findNodesThatFitPod(ctx, fwk, state, pod)
 	if err != nil {
 		return result, err
 	}
 	trace.Step("Computing predicates done")
 
 	if len(feasibleNodes) == 0 {
-		return result, &FitError{
-			Pod:                   pod,
-			NumAllNodes:           g.nodeInfoSnapshot.NumNodes(),
-			FilteredNodesStatuses: filteredNodesStatuses,
+		return result, &framework.FitError{
+			Pod:         pod,
+			NumAllNodes: g.nodeInfoSnapshot.NumNodes(),
+			Diagnosis:   diagnosis,
 		}
 	}
 
@@ -159,7 +125,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, fwk framework.Framework
 	if len(feasibleNodes) == 1 {
 		return ScheduleResult{
 			SuggestedHost:  feasibleNodes[0].Name,
-			EvaluatedNodes: 1 + len(filteredNodesStatuses),
+			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
 			FeasibleNodes:  1,
 		}, nil
 	}
@@ -174,7 +140,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, fwk framework.Framework
 
 	return ScheduleResult{
 		SuggestedHost:  host,
-		EvaluatedNodes: len(feasibleNodes) + len(filteredNodesStatuses),
+		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
 		FeasibleNodes:  len(feasibleNodes),
 	}, err
 }
@@ -232,58 +198,96 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 	return numNodes
 }
 
-// Filters the nodes to find the ones that fit the pod based on the framework
-// filter plugins and filter extenders.
-func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.NodeToStatusMap, error) {
-	filteredNodesStatuses := make(framework.NodeToStatusMap)
-
-	// Run "prefilter" plugins.
-	s := fwk.RunPreFilterPlugins(ctx, state, pod)
-	if !s.IsSuccess() {
-		if !s.IsUnschedulable() {
-			return nil, nil, s.AsError()
-		}
-		// All nodes will have the same status. Some non trivial refactoring is
-		// needed to avoid this copy.
-		allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
-		if err != nil {
-			return nil, nil, err
-		}
-		for _, n := range allNodes {
-			filteredNodesStatuses[n.Node().Name] = s
-		}
-		return nil, filteredNodesStatuses, nil
-	}
-
-	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, filteredNodesStatuses)
+func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Pod, fwk framework.Framework, state *framework.CycleState, diagnosis framework.Diagnosis) ([]*v1.Node, error) {
+	nnn := pod.Status.NominatedNodeName
+	nodeInfo, err := g.nodeInfoSnapshot.Get(nnn)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	feasibleNodes, err = g.findNodesThatPassExtenders(pod, feasibleNodes, filteredNodesStatuses)
-	if err != nil {
-		return nil, nil, err
-	}
-	return feasibleNodes, filteredNodesStatuses, nil
-}
-
-// findNodesThatPassFilters finds the nodes that fit the filter plugins.
-func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
-	allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
+	node := []*framework.NodeInfo{nodeInfo}
+	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, node)
 	if err != nil {
 		return nil, err
 	}
 
-	numNodesToFind := g.numFeasibleNodesToFind(int32(len(allNodes)))
+	feasibleNodes, err = g.findNodesThatPassExtenders(pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return feasibleNodes, nil
+}
+
+// Filters the nodes to find the ones that fit the pod based on the framework
+// filter plugins and filter extenders.
+func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
+	diagnosis := framework.Diagnosis{
+		NodeToStatusMap:      make(framework.NodeToStatusMap),
+		UnschedulablePlugins: sets.NewString(),
+	}
+
+	// Run "prefilter" plugins.
+	s := fwk.RunPreFilterPlugins(ctx, state, pod)
+	allNodes, err := g.nodeInfoSnapshot.NodeInfos().List()
+	if err != nil {
+		return nil, diagnosis, err
+	}
+	if !s.IsSuccess() {
+		if !s.IsUnschedulable() {
+			return nil, diagnosis, s.AsError()
+		}
+		// All nodes will have the same status. Some non trivial refactoring is
+		// needed to avoid this copy.
+		for _, n := range allNodes {
+			diagnosis.NodeToStatusMap[n.Node().Name] = s
+		}
+		// Status satisfying IsUnschedulable() gets injected into diagnosis.UnschedulablePlugins.
+		diagnosis.UnschedulablePlugins.Insert(s.FailedPlugin())
+		return nil, diagnosis, nil
+	}
+
+	// "NominatedNodeName" can potentially be set in a previous scheduling cycle as a result of preemption.
+	// This node is likely the only candidate that will fit the pod, and hence we try it first before iterating over all nodes.
+	if len(pod.Status.NominatedNodeName) > 0 && feature.DefaultFeatureGate.Enabled(features.PreferNominatedNode) {
+		feasibleNodes, err := g.evaluateNominatedNode(ctx, pod, fwk, state, diagnosis)
+		if err != nil {
+			klog.ErrorS(err, "Evaluation failed on nominated node", "pod", klog.KObj(pod), "node", pod.Status.NominatedNodeName)
+		}
+		// Nominated node passes all the filters, scheduler is good to assign this node to the pod.
+		if len(feasibleNodes) != 0 {
+			return feasibleNodes, diagnosis, nil
+		}
+	}
+	feasibleNodes, err := g.findNodesThatPassFilters(ctx, fwk, state, pod, diagnosis, allNodes)
+	if err != nil {
+		return nil, diagnosis, err
+	}
+
+	feasibleNodes, err = g.findNodesThatPassExtenders(pod, feasibleNodes, diagnosis.NodeToStatusMap)
+	if err != nil {
+		return nil, diagnosis, err
+	}
+	return feasibleNodes, diagnosis, nil
+}
+
+// findNodesThatPassFilters finds the nodes that fit the filter plugins.
+func (g *genericScheduler) findNodesThatPassFilters(
+	ctx context.Context,
+	fwk framework.Framework,
+	state *framework.CycleState,
+	pod *v1.Pod,
+	diagnosis framework.Diagnosis,
+	nodes []*framework.NodeInfo) ([]*v1.Node, error) {
+	numNodesToFind := g.numFeasibleNodesToFind(int32(len(nodes)))
 
 	// Create feasible list with enough space to avoid growing it
 	// and allow assigning.
 	feasibleNodes := make([]*v1.Node, numNodesToFind)
 
 	if !fwk.HasFilterPlugins() {
-		length := len(allNodes)
+		length := len(nodes)
 		for i := range feasibleNodes {
-			feasibleNodes[i] = allNodes[(g.nextStartNodeIndex+i)%length].Node()
+			feasibleNodes[i] = nodes[(g.nextStartNodeIndex+i)%length].Node()
 		}
 		g.nextStartNodeIndex = (g.nextStartNodeIndex + len(feasibleNodes)) % length
 		return feasibleNodes, nil
@@ -296,13 +300,13 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 	checkNode := func(i int) {
 		// We check the nodes starting from where we left off in the previous scheduling cycle,
 		// this is to make sure all nodes have the same chance of being examined across pods.
-		nodeInfo := allNodes[(g.nextStartNodeIndex+i)%len(allNodes)]
-		fits, status, err := PodPassesFiltersOnNode(ctx, fwk.PreemptHandle(), state, pod, nodeInfo)
-		if err != nil {
-			errCh.SendErrorWithCancel(err, cancel)
+		nodeInfo := nodes[(g.nextStartNodeIndex+i)%len(nodes)]
+		status := fwk.RunFilterPluginsWithNominatedPods(ctx, state, pod, nodeInfo)
+		if status.Code() == framework.Error {
+			errCh.SendErrorWithCancel(status.AsError(), cancel)
 			return
 		}
-		if fits {
+		if status.IsSuccess() {
 			length := atomic.AddInt32(&feasibleNodesLen, 1)
 			if length > numNodesToFind {
 				cancel()
@@ -311,11 +315,10 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 				feasibleNodes[length-1] = nodeInfo.Node()
 			}
 		} else {
-			if !status.IsSuccess() {
-				statusesLock.Lock()
-				statuses[nodeInfo.Node().Name] = status
-				statusesLock.Unlock()
-			}
+			statusesLock.Lock()
+			diagnosis.NodeToStatusMap[nodeInfo.Node().Name] = status
+			diagnosis.UnschedulablePlugins.Insert(status.FailedPlugin())
+			statusesLock.Unlock()
 		}
 	}
 
@@ -330,9 +333,9 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 
 	// Stops searching for more nodes once the configured number of feasible nodes
 	// are found.
-	parallelize.Until(ctx, len(allNodes), checkNode)
-	processedNodes := int(feasibleNodesLen) + len(statuses)
-	g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % len(allNodes)
+	fwk.Parallelizer().Until(ctx, len(nodes), checkNode)
+	processedNodes := int(feasibleNodesLen) + len(diagnosis.NodeToStatusMap)
+	g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % len(nodes)
 
 	feasibleNodes = feasibleNodes[:feasibleNodesLen]
 	if err := errCh.ReceiveError(); err != nil {
@@ -343,6 +346,9 @@ func (g *genericScheduler) findNodesThatPassFilters(ctx context.Context, fwk fra
 }
 
 func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes []*v1.Node, statuses framework.NodeToStatusMap) ([]*v1.Node, error) {
+	// Extenders are called sequentially.
+	// Nodes in original feasibleNodes can be excluded in one extender, and pass on to the next
+	// extender in a decreasing manner.
 	for _, extender := range g.extenders {
 		if len(feasibleNodes) == 0 {
 			break
@@ -350,116 +356,46 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 		if !extender.IsInterested(pod) {
 			continue
 		}
-		feasibleList, failedMap, err := extender.Filter(pod, feasibleNodes)
+
+		// Status of failed nodes in failedAndUnresolvableMap will be added or overwritten in <statuses>,
+		// so that the scheduler framework can respect the UnschedulableAndUnresolvable status for
+		// particular nodes, and this may eventually improve preemption efficiency.
+		// Note: users are recommended to configure the extenders that may return UnschedulableAndUnresolvable
+		// status ahead of others.
+		feasibleList, failedMap, failedAndUnresolvableMap, err := extender.Filter(pod, feasibleNodes)
 		if err != nil {
 			if extender.IsIgnorable() {
-				klog.Warningf("Skipping extender %v as it returned error %v and has ignorable flag set",
-					extender, err)
+				klog.InfoS("Skipping extender as it returned error and has ignorable flag set", "extender", extender, "err", err)
 				continue
 			}
 			return nil, err
 		}
 
+		for failedNodeName, failedMsg := range failedAndUnresolvableMap {
+			var aggregatedReasons []string
+			if _, found := statuses[failedNodeName]; found {
+				aggregatedReasons = statuses[failedNodeName].Reasons()
+			}
+			aggregatedReasons = append(aggregatedReasons, failedMsg)
+			statuses[failedNodeName] = framework.NewStatus(framework.UnschedulableAndUnresolvable, aggregatedReasons...)
+		}
+
 		for failedNodeName, failedMsg := range failedMap {
+			if _, found := failedAndUnresolvableMap[failedNodeName]; found {
+				// failedAndUnresolvableMap takes precedence over failedMap
+				// note that this only happens if the extender returns the node in both maps
+				continue
+			}
 			if _, found := statuses[failedNodeName]; !found {
 				statuses[failedNodeName] = framework.NewStatus(framework.Unschedulable, failedMsg)
 			} else {
 				statuses[failedNodeName].AppendReason(failedMsg)
 			}
 		}
+
 		feasibleNodes = feasibleList
 	}
 	return feasibleNodes, nil
-}
-
-// addNominatedPods adds pods with equal or greater priority which are nominated
-// to run on the node. It returns 1) whether any pod was added, 2) augmented cycleState,
-// 3) augmented nodeInfo.
-func addNominatedPods(ctx context.Context, ph framework.PreemptHandle, pod *v1.Pod, state *framework.CycleState, nodeInfo *framework.NodeInfo) (bool, *framework.CycleState, *framework.NodeInfo, error) {
-	if ph == nil || nodeInfo == nil || nodeInfo.Node() == nil {
-		// This may happen only in tests.
-		return false, state, nodeInfo, nil
-	}
-	nominatedPods := ph.NominatedPodsForNode(nodeInfo.Node().Name)
-	if len(nominatedPods) == 0 {
-		return false, state, nodeInfo, nil
-	}
-	nodeInfoOut := nodeInfo.Clone()
-	stateOut := state.Clone()
-	podsAdded := false
-	for _, p := range nominatedPods {
-		if corev1helpers.PodPriority(p) >= corev1helpers.PodPriority(pod) && p.UID != pod.UID {
-			nodeInfoOut.AddPod(p)
-			status := ph.RunPreFilterExtensionAddPod(ctx, stateOut, pod, p, nodeInfoOut)
-			if !status.IsSuccess() {
-				return false, state, nodeInfo, status.AsError()
-			}
-			podsAdded = true
-		}
-	}
-	return podsAdded, stateOut, nodeInfoOut, nil
-}
-
-// PodPassesFiltersOnNode checks whether a node given by NodeInfo satisfies the
-// filter plugins.
-// This function is called from two different places: Schedule and Preempt.
-// When it is called from Schedule, we want to test whether the pod is
-// schedulable on the node with all the existing pods on the node plus higher
-// and equal priority pods nominated to run on the node.
-// When it is called from Preempt, we should remove the victims of preemption
-// and add the nominated pods. Removal of the victims is done by
-// SelectVictimsOnNode(). Preempt removes victims from PreFilter state and
-// NodeInfo before calling this function.
-// TODO: move this out so that plugins don't need to depend on <core> pkg.
-func PodPassesFiltersOnNode(
-	ctx context.Context,
-	ph framework.PreemptHandle,
-	state *framework.CycleState,
-	pod *v1.Pod,
-	info *framework.NodeInfo,
-) (bool, *framework.Status, error) {
-	var status *framework.Status
-
-	podsAdded := false
-	// We run filters twice in some cases. If the node has greater or equal priority
-	// nominated pods, we run them when those pods are added to PreFilter state and nodeInfo.
-	// If all filters succeed in this pass, we run them again when these
-	// nominated pods are not added. This second pass is necessary because some
-	// filters such as inter-pod affinity may not pass without the nominated pods.
-	// If there are no nominated pods for the node or if the first run of the
-	// filters fail, we don't run the second pass.
-	// We consider only equal or higher priority pods in the first pass, because
-	// those are the current "pod" must yield to them and not take a space opened
-	// for running them. It is ok if the current "pod" take resources freed for
-	// lower priority pods.
-	// Requiring that the new pod is schedulable in both circumstances ensures that
-	// we are making a conservative decision: filters like resources and inter-pod
-	// anti-affinity are more likely to fail when the nominated pods are treated
-	// as running, while filters like pod affinity are more likely to fail when
-	// the nominated pods are treated as not running. We can't just assume the
-	// nominated pods are running because they are not running right now and in fact,
-	// they may end up getting scheduled to a different node.
-	for i := 0; i < 2; i++ {
-		stateToUse := state
-		nodeInfoToUse := info
-		if i == 0 {
-			var err error
-			podsAdded, stateToUse, nodeInfoToUse, err = addNominatedPods(ctx, ph, pod, state, info)
-			if err != nil {
-				return false, nil, err
-			}
-		} else if !podsAdded || !status.IsSuccess() {
-			break
-		}
-
-		statusMap := ph.RunFilterPlugins(ctx, stateToUse, pod, nodeInfoToUse)
-		status = statusMap.Merge()
-		if !status.IsSuccess() && !status.IsUnschedulable() {
-			return false, status, status.AsError()
-		}
-	}
-
-	return status.IsSuccess(), status, nil
 }
 
 // prioritizeNodes prioritizes the nodes by running the score plugins,
@@ -501,7 +437,9 @@ func (g *genericScheduler) prioritizeNodes(
 
 	if klog.V(10).Enabled() {
 		for plugin, nodeScoreList := range scoresMap {
-			klog.Infof("Plugin %s scores on %v/%v => %v", plugin, pod.Namespace, pod.Name, nodeScoreList)
+			for _, nodeScore := range nodeScoreList {
+				klog.InfoS("Plugin scored node for pod", "pod", klog.KObj(pod), "plugin", plugin, "node", nodeScore.Name, "score", nodeScore.Score)
+			}
 		}
 	}
 
@@ -525,9 +463,9 @@ func (g *genericScheduler) prioritizeNodes(
 			}
 			wg.Add(1)
 			go func(extIndex int) {
-				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Inc()
+				metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Inc()
 				defer func() {
-					metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Dec()
+					metrics.SchedulerGoroutines.WithLabelValues(metrics.PrioritizingExtender).Dec()
 					wg.Done()
 				}()
 				prioritizedList, weight, err := g.extenders[extIndex].Prioritize(pod, nodes)
@@ -539,7 +477,7 @@ func (g *genericScheduler) prioritizeNodes(
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
 					if klog.V(10).Enabled() {
-						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, g.extenders[extIndex].Name(), score)
+						klog.InfoS("Extender scored node for pod", "pod", klog.KObj(pod), "extender", g.extenders[extIndex].Name(), "node", host, "score", score)
 					}
 					combinedScores[host] += score * weight
 				}
@@ -557,7 +495,7 @@ func (g *genericScheduler) prioritizeNodes(
 
 	if klog.V(10).Enabled() {
 		for i := range result {
-			klog.Infof("Host %s => Score %d", result[i].Name, result[i].Score)
+			klog.InfoS("Calculated node's final score for pod", "pod", klog.KObj(pod), "node", result[i].Name, "score", result[i].Score)
 		}
 	}
 	return result, nil

@@ -57,6 +57,11 @@ func TestZapLoggerInfo(t *testing.T) {
 			format:     "{\"ts\":%f,\"msg\":\"non-string key argument passed to logging, ignoring all later arguments\",\"v\":0}\n{\"ts\":0.000123,\"msg\":\"test for non-string key argument\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2, 200, "replica", "Running", 10},
 		},
+		{
+			msg:        "test for duration value argument",
+			format:     "{\"ts\":%f,\"msg\":\"test for duration value argument\",\"v\":0,\"duration\":\"5s\"}\n",
+			keysValues: []interface{}{"duration", time.Duration(5 * time.Second)},
+		},
 	}
 
 	for _, data := range testDataInfo {

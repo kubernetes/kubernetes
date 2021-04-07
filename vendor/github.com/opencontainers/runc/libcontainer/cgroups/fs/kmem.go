@@ -5,11 +5,11 @@ package fs
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"path/filepath"
 	"strconv"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"golang.org/x/sys/unix"
 )
 
@@ -42,7 +42,7 @@ func setKernelMemory(path string, kernelMemoryLimit int64) error {
 		// doesn't support it we *must* error out.
 		return errors.New("kernel memory accounting not supported by this kernel")
 	}
-	if err := ioutil.WriteFile(filepath.Join(path, cgroupKernelMemoryLimit), []byte(strconv.FormatInt(kernelMemoryLimit, 10)), 0700); err != nil {
+	if err := fscommon.WriteFile(path, cgroupKernelMemoryLimit, strconv.FormatInt(kernelMemoryLimit, 10)); err != nil {
 		// Check if the error number returned by the syscall is "EBUSY"
 		// The EBUSY signal is returned on attempts to write to the
 		// memory.kmem.limit_in_bytes file if the cgroup has children or
@@ -50,7 +50,7 @@ func setKernelMemory(path string, kernelMemoryLimit int64) error {
 		if errors.Is(err, unix.EBUSY) {
 			return fmt.Errorf("failed to set %s, because either tasks have already joined this cgroup or it has children", cgroupKernelMemoryLimit)
 		}
-		return fmt.Errorf("failed to write %v to %v: %v", kernelMemoryLimit, cgroupKernelMemoryLimit, err)
+		return err
 	}
 	return nil
 }

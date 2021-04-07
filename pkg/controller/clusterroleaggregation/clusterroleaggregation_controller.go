@@ -22,6 +22,8 @@ import (
 	"sort"
 	"time"
 
+	"k8s.io/apiserver/pkg/features"
+	rbacv1ac "k8s.io/client-go/applyconfigurations/rbac/v1"
 	"k8s.io/klog/v2"
 
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -31,11 +33,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	rbacinformers "k8s.io/client-go/informers/rbac/v1"
 	rbacclient "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -121,15 +125,56 @@ func (c *ClusterRoleAggregationController) syncClusterRole(key string) error {
 		return nil
 	}
 
-	// we need to update
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		err = c.applyClusterRoles(sharedClusterRole.Name, newPolicyRules)
+		if errors.IsUnsupportedMediaType(err) { // TODO: Remove this fallback at least one release after ServerSideApply GA
+			// When Server Side Apply is not enabled, fallback to Update. This is required when running
+			// 1.21 since api-server can be 1.20 during the upgrade/downgrade.
+			// Since Server Side Apply is enabled by default in Beta, this fallback only kicks in
+			// if the feature has been disabled using its feature flag.
+			err = c.updateClusterRoles(sharedClusterRole, newPolicyRules)
+		}
+	} else {
+		err = c.updateClusterRoles(sharedClusterRole, newPolicyRules)
+	}
+	return err
+}
+
+func (c *ClusterRoleAggregationController) applyClusterRoles(name string, newPolicyRules []rbacv1.PolicyRule) error {
+	clusterRoleApply := rbacv1ac.ClusterRole(name).
+		WithRules(toApplyPolicyRules(newPolicyRules)...)
+
+	opts := metav1.ApplyOptions{FieldManager: "clusterrole-aggregation-controller", Force: true}
+	_, err := c.clusterRoleClient.ClusterRoles().Apply(context.TODO(), clusterRoleApply, opts)
+	return err
+}
+
+func (c *ClusterRoleAggregationController) updateClusterRoles(sharedClusterRole *rbacv1.ClusterRole, newPolicyRules []rbacv1.PolicyRule) error {
 	clusterRole := sharedClusterRole.DeepCopy()
 	clusterRole.Rules = nil
 	for _, rule := range newPolicyRules {
 		clusterRole.Rules = append(clusterRole.Rules, *rule.DeepCopy())
 	}
-	_, err = c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{})
-
+	_, err := c.clusterRoleClient.ClusterRoles().Update(context.TODO(), clusterRole, metav1.UpdateOptions{})
 	return err
+}
+
+func toApplyPolicyRules(rules []rbacv1.PolicyRule) []*rbacv1ac.PolicyRuleApplyConfiguration {
+	var result []*rbacv1ac.PolicyRuleApplyConfiguration
+	for _, rule := range rules {
+		result = append(result, toApplyPolicyRule(rule))
+	}
+	return result
+}
+
+func toApplyPolicyRule(rule rbacv1.PolicyRule) *rbacv1ac.PolicyRuleApplyConfiguration {
+	result := rbacv1ac.PolicyRule()
+	result.Resources = rule.Resources
+	result.ResourceNames = rule.ResourceNames
+	result.APIGroups = rule.APIGroups
+	result.NonResourceURLs = rule.NonResourceURLs
+	result.Verbs = rule.Verbs
+	return result
 }
 
 func ruleExists(haystack []rbacv1.PolicyRule, needle rbacv1.PolicyRule) bool {

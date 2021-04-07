@@ -227,8 +227,8 @@ func TestCheckpointStateRestore(t *testing.T) {
 			restoredState, err := NewCheckpointState(testingDir, testingCheckpoint, tc.policyName, tc.initialContainers)
 			if err != nil {
 				if strings.TrimSpace(tc.expectedError) != "" {
-					tc.expectedError = "could not restore state from checkpoint: " + tc.expectedError
-					if strings.HasPrefix(err.Error(), tc.expectedError) {
+					if strings.Contains(err.Error(), "could not restore state from checkpoint") &&
+						strings.Contains(err.Error(), tc.expectedError) {
 						t.Logf("got expected error: %v", err)
 						return
 					}

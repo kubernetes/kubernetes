@@ -26,23 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 )
 
 const (
 	// RequestedToCapacityRatioName is the name of this plugin.
 	RequestedToCapacityRatioName = "RequestedToCapacityRatio"
-	minUtilization               = 0
 	maxUtilization               = 100
 )
-
-type functionShape []functionShapePoint
-
-type functionShapePoint struct {
-	// Utilization is function argument.
-	utilization int64
-	// Score is function value.
-	score int64
-}
 
 // NewRequestedToCapacityRatio initializes a new plugin and returns it.
 func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, error) {
@@ -55,14 +46,14 @@ func NewRequestedToCapacityRatio(plArgs runtime.Object, handle framework.Handle)
 		return nil, err
 	}
 
-	shape := make([]functionShapePoint, 0, len(args.Shape))
+	shape := make([]helper.FunctionShapePoint, 0, len(args.Shape))
 	for _, point := range args.Shape {
-		shape = append(shape, functionShapePoint{
-			utilization: int64(point.Utilization),
+		shape = append(shape, helper.FunctionShapePoint{
+			Utilization: int64(point.Utilization),
 			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by requested to capacity ratio to the score range
 			// used by the scheduler.
-			score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
+			Score: int64(point.Score) * (framework.MaxNodeScore / config.MaxCustomPriorityScore),
 		})
 	}
 
@@ -111,7 +102,7 @@ func (pl *RequestedToCapacityRatio) Name() string {
 func (pl *RequestedToCapacityRatio) Score(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
 	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+		return 0, framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", nodeName, err))
 	}
 	return pl.score(pod, nodeInfo)
 }
@@ -121,8 +112,8 @@ func (pl *RequestedToCapacityRatio) ScoreExtensions() framework.ScoreExtensions 
 	return nil
 }
 
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape functionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
-	rawScoringFunction := buildBrokenLinearFunction(scoringFunctionShape)
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape helper.FunctionShape, resourceToWeightMap resourceToWeightMap) func(resourceToValueMap, resourceToValueMap, bool, int, int) int64 {
+	rawScoringFunction := helper.BuildBrokenLinearFunction(scoringFunctionShape)
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
 			return rawScoringFunction(maxUtilization)
@@ -143,28 +134,5 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape functionSh
 			return 0
 		}
 		return int64(math.Round(float64(nodeScore) / float64(weightSum)))
-	}
-}
-
-// Creates a function which is built using linear segments. Segments are defined via shape array.
-// Shape[i].utilization slice represents points on "utilization" axis where different segments meet.
-// Shape[i].score represents function values at meeting points.
-//
-// function f(p) is defined as:
-//   shape[0].score for p < f[0].utilization
-//   shape[i].score for p == shape[i].utilization
-//   shape[n-1].score for p > shape[n-1].utilization
-// and linear between points (p < shape[i].utilization)
-func buildBrokenLinearFunction(shape functionShape) func(int64) int64 {
-	return func(p int64) int64 {
-		for i := 0; i < len(shape); i++ {
-			if p <= int64(shape[i].utilization) {
-				if i == 0 {
-					return shape[0].score
-				}
-				return shape[i-1].score + (shape[i].score-shape[i-1].score)*(p-shape[i-1].utilization)/(shape[i].utilization-shape[i-1].utilization)
-			}
-		}
-		return shape[len(shape)-1].score
 	}
 }

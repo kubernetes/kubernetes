@@ -103,14 +103,15 @@ func BuildSwagger(crd *apiextensionsv1.CustomResourceDefinition, version string,
 				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
 					schema = ss
 
+					// This adds ValueValidation fields (anyOf, allOf) which may be stripped below if opts.StripValueValidation is true
+					schema = schema.Unfold()
+
 					if opts.StripValueValidation {
 						schema = schema.StripValueValidations()
 					}
 					if opts.StripNullable {
 						schema = schema.StripNullable()
 					}
-
-					schema = schema.Unfold()
 				}
 			}
 		}

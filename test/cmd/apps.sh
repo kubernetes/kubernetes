@@ -43,7 +43,7 @@ run_daemonset_tests() {
   kubectl set resources daemonsets/bind "${kube_flags[@]:?}" --limits=cpu=200m,memory=512Mi
   kube::test::get_object_assert 'daemonsets bind' "{{${generation_field:?}}}" '4'
   # pod has field for kubectl set field manager
-  output_message=$(kubectl get daemonsets bind -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get daemonsets bind --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-set'
 
   # Rollout restart should change generation
@@ -340,7 +340,7 @@ run_deployment_tests() {
   rs="$(kubectl get rs "${newrs}" -o yaml)"
   kube::test::if_has_string "${rs}" "deployment.kubernetes.io/revision: \"6\""
   # Deployment has field for kubectl rollout field manager
-  output_message=$(kubectl get deployment nginx -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get deployment nginx --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-rollout'
   # Create second deployment
   ${SED} "s/name: nginx$/name: nginx2/" hack/testdata/deployment-revision1.yaml | kubectl create -f - "${kube_flags[@]:?}"
@@ -636,12 +636,8 @@ run_rs_tests() {
   kubectl expose rs frontend --port=80 "${kube_flags[@]:?}"
   # Post-condition: service exists and the port is unnamed
   kube::test::get_object_assert 'service frontend' "{{${port_name:?}}} {{${port_field:?}}}" '<no value> 80'
-  # Create a service using service/v1 generator
-  kubectl expose rs frontend --port=80 --name=frontend-2 --generator=service/v1 "${kube_flags[@]:?}"
-  # Post-condition: service exists and the port is named default.
-  kube::test::get_object_assert 'service frontend-2' "{{${port_name:?}}} {{${port_field:?}}}" 'default 80'
   # Cleanup services
-  kubectl delete service frontend{,-2} "${kube_flags[@]:?}"
+  kubectl delete service frontend "${kube_flags[@]:?}"
 
   # Test set commands
   # Pre-condition: frontend replica set exists at generation 1
@@ -662,7 +658,7 @@ run_rs_tests() {
   kube::test::get_object_assert 'rs frontend' "{{${generation_field:?}}}" '5'
 
   # RS has field for kubectl set field manager
-  output_message=$(kubectl get rs frontend -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get rs frontend --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-set'
 
   ### Delete replica set with id

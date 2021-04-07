@@ -22,3 +22,8 @@ func InitSeccomp(config *configs.Seccomp) error {
 func IsEnabled() bool {
 	return false
 }
+
+// Version returns major, minor, and micro.
+func Version() (uint, uint, uint) {
+	return 0, 0, 0
+}

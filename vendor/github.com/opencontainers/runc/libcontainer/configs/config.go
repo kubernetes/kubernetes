@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/opencontainers/runc/libcontainer/devices"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -92,6 +93,9 @@ type Config struct {
 	// Path to a directory containing the container's root filesystem.
 	Rootfs string `json:"rootfs"`
 
+	// Umask is the umask to use inside of the container.
+	Umask *uint32 `json:"umask"`
+
 	// Readonlyfs will remount the container's rootfs as readonly where only externally mounted
 	// bind mounts are writtable.
 	Readonlyfs bool `json:"readonlyfs"`
@@ -104,7 +108,7 @@ type Config struct {
 	Mounts []*Mount `json:"mounts"`
 
 	// The device nodes that should be automatically created within the container upon container start.  Note, make sure that the node is marked as allowed in the cgroup as well!
-	Devices []*Device `json:"devices"`
+	Devices []*devices.Device `json:"devices"`
 
 	MountLabel string `json:"mount_label"`
 

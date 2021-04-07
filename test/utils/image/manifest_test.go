@@ -62,13 +62,6 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"gcr.io/kubernetes-e2e-test-images/volume/test:123",
-		result{
-			result: "test.io/kubernetes-e2e-test-images/volume/test:123",
-			err:    nil,
-		},
-	},
-	{
 		"k8s.gcr.io/test:123",
 		result{
 			result: "test.io/test:123",
@@ -83,16 +76,16 @@ var registryTests = []struct {
 		},
 	},
 	{
-		"gcr.io/gke-release/test:latest",
+		"gcr.io/google-samples/test:latest",
 		result{
-			result: "test.io/gke-release/test:latest",
+			result: "test.io/google-samples/test:latest",
 			err:    nil,
 		},
 	},
 	{
-		"gcr.io/google-samples/test:latest",
+		"gcr.io/gke-release/test:latest",
 		result{
-			result: "test.io/google-samples/test:latest",
+			result: "test.io/gke-release/test:latest",
 			err:    nil,
 		},
 	},
@@ -117,7 +110,6 @@ func TestReplaceRegistryInImageURL(t *testing.T) {
 	// Set custom registries
 	dockerLibraryRegistry = "test.io/library"
 	e2eRegistry = "test.io/kubernetes-e2e-test-images"
-	e2eVolumeRegistry = "test.io/kubernetes-e2e-test-images/volume"
 	gcRegistry = "test.io"
 	gcrReleaseRegistry = "test.io/gke-release"
 	PrivateRegistry = "test.io/k8s-authenticated-test"
@@ -157,7 +149,7 @@ func TestGetMappedImageConfigs(t *testing.T) {
 		actual[source.GetE2EImage()] = mapping.GetE2EImage()
 	}
 	expected := map[string]string{
-		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
+		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ekf1DrFA",
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatal(diff.ObjectReflectDiff(expected, actual))

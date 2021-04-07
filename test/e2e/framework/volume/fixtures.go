@@ -52,10 +52,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
+	clientexec "k8s.io/client-go/util/exec"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	uexec "k8s.io/utils/exec"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -362,7 +363,7 @@ func TestServerCleanup(f *framework.Framework, config TestConfig) {
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 }
 
-func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
+func runVolumeTesterPod(client clientset.Interface, timeouts *framework.TimeoutContext, config TestConfig, podSuffix string, privileged bool, fsGroup *int64, tests []Test, slow bool) (*v1.Pod, error) {
 	ginkgo.By(fmt.Sprint("starting ", config.Prefix, "-", podSuffix))
 	var gracePeriod int64 = 1
 	var command string
@@ -388,17 +389,17 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 			Containers: []v1.Container{
 				{
 					Name:       config.Prefix + "-" + podSuffix,
-					Image:      GetDefaultTestImage(),
+					Image:      e2epod.GetDefaultTestImage(),
 					WorkingDir: "/opt",
 					// An imperative and easily debuggable container which reads/writes vol contents for
 					// us to scan in the tests or by eye.
 					// We expect that /opt is empty in the minimal containers which we use in this test.
-					Command:      GenerateScriptCmd(command),
+					Command:      e2epod.GenerateScriptCmd(command),
 					VolumeMounts: []v1.VolumeMount{},
 				},
 			},
 			TerminationGracePeriodSeconds: &gracePeriod,
-			SecurityContext:               GeneratePodSecurityContext(fsGroup, seLinuxOptions),
+			SecurityContext:               e2epod.GeneratePodSecurityContext(fsGroup, seLinuxOptions),
 			Volumes:                       []v1.Volume{},
 		},
 	}
@@ -415,7 +416,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		if privileged && test.Mode == v1.PersistentVolumeBlock {
 			privileged = false
 		}
-		clientPod.Spec.Containers[0].SecurityContext = GenerateSecurityContext(privileged)
+		clientPod.Spec.Containers[0].SecurityContext = e2epod.GenerateContainerSecurityContext(privileged)
 
 		if test.Mode == v1.PersistentVolumeBlock {
 			clientPod.Spec.Containers[0].VolumeDevices = append(clientPod.Spec.Containers[0].VolumeDevices, v1.VolumeDevice{
@@ -439,13 +440,13 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 		return nil, err
 	}
 	if slow {
-		err = e2epod.WaitForPodRunningInNamespaceSlow(client, clientPod.Name, clientPod.Namespace)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStartSlow)
 	} else {
-		err = e2epod.WaitForPodRunningInNamespace(client, clientPod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(client, clientPod.Name, clientPod.Namespace, timeouts.PodStart)
 	}
 	if err != nil {
 		e2epod.DeletePodOrFail(client, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(client, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 		return nil, err
 	}
 	return clientPod, nil
@@ -462,7 +463,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 			framework.ExpectNoError(err, "failed: finding the contents of the block device %s.", deviceName)
 
 			// Check that it's a real block device
-			utils.CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
+			CheckVolumeModeOfPath(f, pod, test.Mode, deviceName)
 		} else {
 			// Filesystem: check content
 			fileName := fmt.Sprintf("/opt/%d/%s", i, test.File)
@@ -472,7 +473,7 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 
 			// Check that a directory has been mounted
 			dirName := filepath.Dir(fileName)
-			utils.CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
+			CheckVolumeModeOfPath(f, pod, test.Mode, dirName)
 
 			if !framework.NodeOSDistroIs("windows") {
 				// Filesystem: check fsgroup
@@ -514,13 +515,14 @@ func TestVolumeClientSlow(f *framework.Framework, config TestConfig, fsGroup *in
 }
 
 func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test, slow bool) {
-	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests, slow)
+	timeouts := f.Timeouts
+	clientPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "client", false, fsGroup, tests, slow)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, clientPod.Namespace, clientPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, clientPod.Namespace, clientPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
@@ -531,17 +533,18 @@ func testVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64,
 // The volume must be writable.
 func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
 	privileged := true
+	timeouts := f.Timeouts
 	if framework.NodeOSDistroIs("windows") {
 		privileged = false
 	}
-	injectorPod, err := runVolumeTesterPod(f.ClientSet, config, "injector", privileged, fsGroup, tests, false /*slow*/)
+	injectorPod, err := runVolumeTesterPod(f.ClientSet, timeouts, config, "injector", privileged, fsGroup, tests, false /*slow*/)
 	if err != nil {
 		framework.Failf("Failed to create injector pod: %v", err)
 		return
 	}
 	defer func() {
 		e2epod.DeletePodOrFail(f.ClientSet, injectorPod.Namespace, injectorPod.Name)
-		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, framework.PodDeleteTimeout)
+		e2epod.WaitForPodToDisappear(f.ClientSet, injectorPod.Namespace, injectorPod.Name, labels.Everything(), framework.Poll, timeouts.PodDelete)
 	}()
 
 	ginkgo.By("Writing text file contents in the container.")
@@ -564,18 +567,6 @@ func InjectContent(f *framework.Framework, config TestConfig, fsGroup *int64, fs
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
 	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
-}
-
-// GenerateScriptCmd generates the corresponding command lines to execute a command.
-// Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
-func GenerateScriptCmd(command string) []string {
-	var commands []string
-	if !framework.NodeOSDistroIs("windows") {
-		commands = []string{"/bin/sh", "-c", command}
-	} else {
-		commands = []string{"powershell", "/c", command}
-	}
-	return commands
 }
 
 // generateWriteCmd is used by generateWriteBlockCmd and generateWriteFileCmd
@@ -626,73 +617,69 @@ func generateWriteFileCmd(content, fullPath string) []string {
 	return generateWriteCmd(content, fullPath)
 }
 
-// GenerateSecurityContext generates the corresponding container security context with the given inputs
-// If the Node OS is windows, currently we will ignore the inputs and return nil.
-// TODO: Will modify it after windows has its own security context
-func GenerateSecurityContext(privileged bool) *v1.SecurityContext {
+// CheckVolumeModeOfPath check mode of volume
+func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.PersistentVolumeMode, path string) {
+	if volMode == v1.PersistentVolumeBlock {
+		// Check if block exists
+		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -b %s", path))
+
+		// Double check that it's not directory
+		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -d %s", path), 1)
+	} else {
+		// Check if directory exists
+		VerifyExecInPodSucceed(f, pod, fmt.Sprintf("test -d %s", path))
+
+		// Double check that it's not block
+		VerifyExecInPodFail(f, pod, fmt.Sprintf("test -b %s", path), 1)
+	}
+}
+
+// PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
 	if framework.NodeOSDistroIs("windows") {
-		return nil
+		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
 	}
-	return &v1.SecurityContext{
-		Privileged: &privileged,
+	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
+}
+
+// VerifyExecInPodSucceed verifies shell cmd in target pod succeed
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
+	stdout, stderr, err := PodExec(f, pod, shExec)
+	if err != nil {
+
+		if exiterr, ok := err.(uexec.CodeExitError); ok {
+			exitCode := exiterr.ExitStatus()
+			framework.ExpectNoError(err,
+				"%q should succeed, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, exiterr, stdout, stderr)
+		} else {
+			framework.ExpectNoError(err,
+				"%q should succeed, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, err, stdout, stderr)
+		}
 	}
 }
 
-// GeneratePodSecurityContext generates the corresponding pod security context with the given inputs
-// If the Node OS is windows, currently we will ignore the inputs and return nil.
-// TODO: Will modify it after windows has its own security context
-func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
-	if framework.NodeOSDistroIs("windows") {
-		return nil
+// VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
+// TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
+// is resolved. Otherwise there will be dependency issue.
+func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
+	stdout, stderr, err := PodExec(f, pod, shExec)
+	if err != nil {
+		if exiterr, ok := err.(clientexec.ExitError); ok {
+			actualExitCode := exiterr.ExitStatus()
+			framework.ExpectEqual(actualExitCode, exitCode,
+				"%q should fail with exit code %d, but failed with exit code %d and error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, actualExitCode, exiterr, stdout, stderr)
+		} else {
+			framework.ExpectNoError(err,
+				"%q should fail with exit code %d, but failed with error message %q\nstdout: %s\nstderr: %s",
+				shExec, exitCode, err, stdout, stderr)
+		}
 	}
-	return &v1.PodSecurityContext{
-		SELinuxOptions: seLinuxOptions,
-		FSGroup:        fsGroup,
-	}
-}
-
-// GetTestImage returns the image name with the given input
-// If the Node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImage(id int) string {
-	if framework.NodeOSDistroIs("windows") {
-		return imageutils.GetE2EImage(imageutils.Agnhost)
-	}
-	return imageutils.GetE2EImage(id)
-}
-
-// GetTestImageID returns the image id with the given input
-// If the Node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-func GetTestImageID(id int) int {
-	if framework.NodeOSDistroIs("windows") {
-		return imageutils.Agnhost
-	}
-	return id
-}
-
-// GetDefaultTestImage returns the default test image based on OS.
-// If the node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-// If the node OS is linux, return busybox image
-func GetDefaultTestImage() string {
-	return imageutils.GetE2EImage(GetDefaultTestImageID())
-}
-
-// GetDefaultTestImageID returns the default test image id based on OS.
-// If the node OS is windows, currently we return Agnhost image for Windows node
-// due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
-// If the node OS is linux, return busybox image
-func GetDefaultTestImageID() int {
-	return GetTestImageID(imageutils.BusyBox)
-}
-
-// GetLinuxLabel returns the default SELinuxLabel based on OS.
-// If the node OS is windows, it will return nil
-func GetLinuxLabel() *v1.SELinuxOptions {
-	if framework.NodeOSDistroIs("windows") {
-		return nil
-	}
-	return &v1.SELinuxOptions{
-		Level: "s0:c0,c1"}
+	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }

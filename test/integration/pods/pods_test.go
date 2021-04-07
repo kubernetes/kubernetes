@@ -22,7 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -661,4 +662,61 @@ func TestPodUpdateEphemeralContainers(t *testing.T) {
 
 		integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 	}
+}
+
+// TestPodEphemeralContainersDisabled tests that the API server returns a 404 when the feature is disabled (because the subresource won't exist).
+// This validates that the feature gate is working, but kubectl also uses the 404 to guess that the feature is disabled on the server.
+func TestPodEphemeralContainersDisabled(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
+
+	_, s, closeFn := framework.RunAMaster(nil)
+	defer closeFn()
+
+	ns := framework.CreateTestingNamespace("pod-ephemeral-containers-disabled", s, t)
+	defer framework.DeleteTestingNamespace(ns, s, t)
+
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "ephemeral-container-pod",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				},
+			},
+		},
+	}
+	if err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, nil); err != nil {
+		t.Error(err)
+	}
+
+	ec, err := client.CoreV1().Pods(ns.Name).GetEphemeralContainers(context.TODO(), pod.Name, metav1.GetOptions{})
+	if err == nil {
+		t.Errorf("got nil error when getting ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
+	} else if se := err.(*errors.StatusError); se.ErrStatus.Reason != metav1.StatusReasonNotFound {
+		t.Errorf("got error reason %q when getting ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
+	}
+
+	ec.EphemeralContainers = []v1.EphemeralContainer{
+		{
+			EphemeralContainerCommon: v1.EphemeralContainerCommon{
+				Name:                     "debugger",
+				Image:                    "debugimage",
+				ImagePullPolicy:          "Always",
+				TerminationMessagePolicy: "File",
+			},
+		},
+	}
+
+	if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, ec, metav1.UpdateOptions{}); err == nil {
+		t.Errorf("got nil error when updating ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
+	} else if se := err.(*errors.StatusError); se.ErrStatus.Reason != metav1.StatusReasonNotFound {
+		t.Errorf("got error reason %q when updating ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
+	}
+
+	integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 }

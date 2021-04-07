@@ -357,19 +357,41 @@ type RollingUpdateDaemonSet struct {
 	// The maximum number of DaemonSet pods that can be unavailable during the
 	// update. Value can be an absolute number (ex: 5) or a percentage of total
 	// number of DaemonSet pods at the start of the update (ex: 10%). Absolute
-	// number is calculated from percentage by rounding up.
-	// This cannot be 0.
+	// number is calculated from percentage by rounding down to a minimum of one.
+	// This cannot be 0 if MaxSurge is 0
 	// Default value is 1.
 	// Example: when this is set to 30%, at most 30% of the total number of nodes
 	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
-	// can have their pods stopped for an update at any given
-	// time. The update starts by stopping at most 30% of those DaemonSet pods
-	// and then brings up new DaemonSet pods in their place. Once the new pods
-	// are available, it then proceeds onto other DaemonSet pods, thus ensuring
-	// that at least 70% of original number of DaemonSet pods are available at
-	// all times during the update.
+	// can have their pods stopped for an update at any given time. The update
+	// starts by stopping at most 30% of those DaemonSet pods and then brings
+	// up new DaemonSet pods in their place. Once the new pods are available,
+	// it then proceeds onto other DaemonSet pods, thus ensuring that at least
+	// 70% of original number of DaemonSet pods are available at all times during
+	// the update.
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty" protobuf:"bytes,1,opt,name=maxUnavailable"`
+
+	// The maximum number of nodes with an existing available DaemonSet pod that
+	// can have an updated DaemonSet pod during during an update.
+	// Value can be an absolute number (ex: 5) or a percentage of desired pods (ex: 10%).
+	// This can not be 0 if MaxUnavailable is 0.
+	// Absolute number is calculated from percentage by rounding up to a minimum of 1.
+	// Default value is 0.
+	// Example: when this is set to 30%, at most 30% of the total number of nodes
+	// that should be running the daemon pod (i.e. status.desiredNumberScheduled)
+	// can have their a new pod created before the old pod is marked as deleted.
+	// The update starts by launching new pods on 30% of nodes. Once an updated
+	// pod is available (Ready for at least minReadySeconds) the old DaemonSet pod
+	// on that node is marked deleted. If the old pod becomes unavailable for any
+	// reason (Ready transitions to false, is evicted, or is drained) an updated
+	// pod is immediatedly created on that node without considering surge limits.
+	// Allowing surge implies the possibility that the resources consumed by the
+	// daemonset on any given node can double if the readiness check fails, and
+	// so resource intensive daemonsets should take into account that they may
+	// cause evictions during disruption.
+	// This is an alpha field and requires enabling DaemonSetUpdateSurge feature gate.
+	// +optional
+	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty" protobuf:"bytes,2,opt,name=maxSurge"`
 }
 
 // DaemonSetSpec is the specification of a daemon set.
@@ -1387,7 +1409,7 @@ type NetworkPolicySpec struct {
 	Egress []NetworkPolicyEgressRule `json:"egress,omitempty" protobuf:"bytes,3,rep,name=egress"`
 
 	// List of rule types that the NetworkPolicy relates to.
-	// Valid options are "Ingress", "Egress", or "Ingress,Egress".
+	// Valid options are ["Ingress"], ["Egress"], or ["Ingress", "Egress"].
 	// If this field is not specified, it will default based on the existence of Ingress or Egress rules;
 	// policies that contain an Egress section are assumed to affect Egress, and all policies
 	// (whether or not they contain an Ingress section) are assumed to affect Ingress.
@@ -1449,13 +1471,21 @@ type NetworkPolicyPort struct {
 	// +optional
 	Protocol *v1.Protocol `json:"protocol,omitempty" protobuf:"bytes,1,opt,name=protocol,casttype=k8s.io/api/core/v1.Protocol"`
 
-	// If specified, the port on the given protocol.  This can
-	// either be a numerical or named port on a pod.  If this field is not provided,
-	// this matches all port names and numbers.
-	// If present, only traffic on the specified protocol AND port
-	// will be matched.
+	// The port on the given protocol. This can either be a numerical or named
+	// port on a pod. If this field is not provided, this matches all port names and
+	// numbers.
+	// If present, only traffic on the specified protocol AND port will be matched.
 	// +optional
 	Port *intstr.IntOrString `json:"port,omitempty" protobuf:"bytes,2,opt,name=port"`
+
+	// If set, indicates that the range of ports from port to endPort, inclusive,
+	// should be allowed by the policy. This field cannot be defined if the port field
+	// is not defined or if the port field is defined as a named (string) port.
+	// The endPort must be equal or greater than port.
+	// This feature is in Alpha state and should be enabled using the Feature Gate
+	// "NetworkPolicyEndPort".
+	// +optional
+	EndPort *int32 `json:"endPort,omitempty" protobuf:"bytes,3,opt,name=endPort"`
 }
 
 // DEPRECATED 1.9 - This group version of IPBlock is deprecated by networking/v1/IPBlock.

@@ -94,8 +94,8 @@ func (c *APIServiceRegistrationController) Run(stopCh <-chan struct{}, handlerSy
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting APIServiceRegistrationController")
-	defer klog.Infof("Shutting down APIServiceRegistrationController")
+	klog.Info("Starting APIServiceRegistrationController")
+	defer klog.Info("Shutting down APIServiceRegistrationController")
 
 	if !controllers.WaitForCacheSync("APIServiceRegistrationController", stopCh, c.apiServiceSynced) {
 		return

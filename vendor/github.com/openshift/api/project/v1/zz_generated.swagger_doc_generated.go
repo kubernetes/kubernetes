@@ -31,7 +31,7 @@ func (ProjectList) SwaggerDoc() map[string]string {
 }
 
 var map_ProjectRequest = map[string]string{
-	"":            "ProjecRequest is the set of options necessary to fully qualify a project request",
+	"":            "ProjectRequest is the set of options necessary to fully qualify a project request",
 	"displayName": "DisplayName is the display name to apply to a project",
 	"description": "Description is the description to apply to a project",
 }

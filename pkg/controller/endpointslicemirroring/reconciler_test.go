@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +43,7 @@ func TestReconcile(t *testing.T) {
 	testCases := []struct {
 		testName                 string
 		subsets                  []corev1.EndpointSubset
+		epLabels                 map[string]string
 		endpointsDeletionPending bool
 		maxEndpointsPerSubset    int32
 		existingEndpointSlices   []*discovery.EndpointSlice
@@ -105,6 +106,102 @@ func TestReconcile(t *testing.T) {
 		existingEndpointSlices:   []*discovery.EndpointSlice{},
 		expectedNumSlices:        0,
 		expectedClientActions:    0,
+	}, {
+		testName: "Endpoints with 1 subset, port, and address and existing slice with same fields",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-ep-1",
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 0,
+	}, {
+		testName: "Endpoints with 1 subset, port, and address and existing slice with an additional annotation",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-ep-1",
+				Annotations: map[string]string{"foo": "bar"},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
+	}, {
+		testName: "Endpoints with 1 subset, port, label and address and existing slice with same fields but the label",
+		subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{
+				Name:     "http",
+				Port:     80,
+				Protocol: corev1.ProtocolTCP,
+			}},
+			Addresses: []corev1.EndpointAddress{{
+				IP:       "10.0.0.1",
+				Hostname: "pod-1",
+			}},
+		}},
+		epLabels: map[string]string{"foo": "bar"},
+		existingEndpointSlices: []*discovery.EndpointSlice{{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:        "test-ep-1",
+				Annotations: map[string]string{"foo": "bar"},
+			},
+			AddressType: discovery.AddressTypeIPv4,
+			Ports: []discovery.EndpointPort{{
+				Name:     utilpointer.StringPtr("http"),
+				Port:     utilpointer.Int32Ptr(80),
+				Protocol: &protoTCP,
+			}},
+			Endpoints: []discovery.Endpoint{{
+				Addresses:  []string{"10.0.0.1"},
+				Hostname:   utilpointer.StringPtr("pod-1"),
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			}},
+		}},
+		expectedNumSlices:     1,
+		expectedClientActions: 1,
 	}, {
 		testName: "Endpoints with 1 subset, 2 ports, and 2 addresses",
 		subsets: []corev1.EndpointSubset{{
@@ -375,12 +472,12 @@ func TestReconcile(t *testing.T) {
 			Endpoints: []discovery.Endpoint{{
 				Addresses:  []string{"10.0.0.1"},
 				Hostname:   utilpointer.StringPtr("pod-1"),
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				NodeName:   utilpointer.StringPtr("node-1"),
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			}, {
 				Addresses:  []string{"10.0.0.2"},
 				Hostname:   utilpointer.StringPtr("pod-2"),
-				Topology:   map[string]string{"kubernetes.io/hostname": "node-2"},
+				NodeName:   utilpointer.StringPtr("node-2"),
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 			}},
 		}},
@@ -641,7 +738,7 @@ func TestReconcile(t *testing.T) {
 			setupMetrics()
 			namespace := "test"
 			endpoints := corev1.Endpoints{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ep", Namespace: namespace, Labels: tc.epLabels},
 				Subsets:    tc.subsets,
 			}
 
@@ -656,7 +753,7 @@ func TestReconcile(t *testing.T) {
 					discovery.LabelServiceName: endpoints.Name,
 					discovery.LabelManagedBy:   controllerName,
 				}
-				_, err := client.DiscoveryV1beta1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
+				_, err := client.DiscoveryV1().EndpointSlices(namespace).Create(context.TODO(), epSlice, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Expected no error creating EndpointSlice, got %v", err)
 				}
@@ -846,11 +943,11 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 		}
 
 		if expectedEndpoint.epAddress.NodeName != nil {
-			topologyHostname, ok := endpoint.Topology["kubernetes.io/hostname"]
-			if !ok {
-				t.Errorf("Expected topology[kubernetes.io/hostname] to be set")
-			} else if *expectedEndpoint.epAddress.NodeName != topologyHostname {
-				t.Errorf("Expected topology[kubernetes.io/hostname] to be %s, got %s", *expectedEndpoint.epAddress.NodeName, topologyHostname)
+			if endpoint.NodeName == nil {
+				t.Errorf("Expected nodeName to be set")
+			}
+			if *expectedEndpoint.epAddress.NodeName != *endpoint.NodeName {
+				t.Errorf("Expected nodeName to be %s, got %s", *expectedEndpoint.epAddress.NodeName, *endpoint.NodeName)
 			}
 		}
 	}
@@ -858,7 +955,7 @@ func expectMatchingAddresses(t *testing.T, epSubset corev1.EndpointSubset, esEnd
 
 func fetchEndpointSlices(t *testing.T, client *fake.Clientset, namespace string) []discovery.EndpointSlice {
 	t.Helper()
-	fetchedSlices, err := client.DiscoveryV1beta1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
+	fetchedSlices, err := client.DiscoveryV1().EndpointSlices(namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: discovery.LabelManagedBy + "=" + controllerName,
 	})
 	if err != nil {

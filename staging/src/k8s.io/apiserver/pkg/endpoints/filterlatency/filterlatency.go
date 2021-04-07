@@ -56,8 +56,8 @@ func TrackStarted(handler http.Handler, name string) http.Handler {
 // TrackCompleted measures the timestamp the given handler has completed execution and then
 // it updates the corresponding metric with the filter latency duration.
 func TrackCompleted(handler http.Handler) http.Handler {
-	return trackCompleted(handler, utilclock.RealClock{}, func(fr *requestFilterRecord, completedAt time.Time) {
-		metrics.RecordFilterLatency(fr.name, completedAt.Sub(fr.startedTimestamp))
+	return trackCompleted(handler, utilclock.RealClock{}, func(ctx context.Context, fr *requestFilterRecord, completedAt time.Time) {
+		metrics.RecordFilterLatency(ctx, fr.name, completedAt.Sub(fr.startedTimestamp))
 	})
 }
 
@@ -81,7 +81,7 @@ func trackStarted(handler http.Handler, name string, clock utilclock.PassiveCloc
 	})
 }
 
-func trackCompleted(handler http.Handler, clock utilclock.PassiveClock, action func(*requestFilterRecord, time.Time)) http.Handler {
+func trackCompleted(handler http.Handler, clock utilclock.PassiveClock, action func(context.Context, *requestFilterRecord, time.Time)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// The previous filter has just completed.
 		completedAt := clock.Now()
@@ -90,7 +90,7 @@ func trackCompleted(handler http.Handler, clock utilclock.PassiveClock, action f
 
 		ctx := r.Context()
 		if fr := requestFilterRecordFrom(ctx); fr != nil {
-			action(fr, completedAt)
+			action(ctx, fr, completedAt)
 		}
 	})
 }

@@ -17,11 +17,15 @@ limitations under the License.
 package transport
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/klog/v2"
 )
 
 type testRoundTripper struct {
@@ -410,5 +414,104 @@ func TestHeaderEscapeRoundTrip(t *testing.T) {
 				t.Errorf("url.PathUnescape(headerKeyEscape(%q)) returned %q, wanted %q", tc.key, unescaped, tc.key)
 			}
 		})
+	}
+}
+
+func TestDebuggingRoundTripper(t *testing.T) {
+	t.Parallel()
+
+	rawURL := "https://127.0.0.1:12345/api/v1/pods?limit=500"
+	req := &http.Request{
+		Method: http.MethodGet,
+		Header: map[string][]string{
+			"Authorization":  {"bearer secretauthtoken"},
+			"X-Test-Request": {"test"},
+		},
+	}
+	res := &http.Response{
+		Status:     "OK",
+		StatusCode: http.StatusOK,
+		Header: map[string][]string{
+			"X-Test-Response": {"test"},
+		},
+	}
+	tcs := []struct {
+		levels              []DebugLevel
+		expectedOutputLines []string
+	}{
+		{
+			levels:              []DebugLevel{DebugJustURL},
+			expectedOutputLines: []string{fmt.Sprintf("%s %s", req.Method, rawURL)},
+		},
+		{
+			levels: []DebugLevel{DebugRequestHeaders},
+			expectedOutputLines: func() []string {
+				lines := []string{fmt.Sprintf("Request Headers:\n")}
+				for key, values := range req.Header {
+					for _, value := range values {
+						if key == "Authorization" {
+							value = "bearer <masked>"
+						}
+						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
+					}
+				}
+				return lines
+			}(),
+		},
+		{
+			levels: []DebugLevel{DebugResponseHeaders},
+			expectedOutputLines: func() []string {
+				lines := []string{fmt.Sprintf("Response Headers:\n")}
+				for key, values := range res.Header {
+					for _, value := range values {
+						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
+					}
+				}
+				return lines
+			}(),
+		},
+		{
+			levels:              []DebugLevel{DebugURLTiming},
+			expectedOutputLines: []string{fmt.Sprintf("%s %s %s", req.Method, rawURL, res.Status)},
+		},
+		{
+			levels:              []DebugLevel{DebugResponseStatus},
+			expectedOutputLines: []string{fmt.Sprintf("Response Status: %s", res.Status)},
+		},
+		{
+			levels:              []DebugLevel{DebugCurlCommand},
+			expectedOutputLines: []string{fmt.Sprintf("curl -k -v -X")},
+		},
+	}
+
+	for _, tc := range tcs {
+		// hijack the klog output
+		tmpWriteBuffer := bytes.NewBuffer(nil)
+		klog.SetOutput(tmpWriteBuffer)
+		klog.LogToStderr(false)
+
+		// parse rawURL
+		parsedURL, err := url.Parse(rawURL)
+		if err != nil {
+			t.Fatalf("url.Parse(%q) returned error: %v", rawURL, err)
+		}
+		req.URL = parsedURL
+
+		// execute the round tripper
+		rt := &testRoundTripper{
+			Response: res,
+		}
+		NewDebuggingRoundTripper(rt, tc.levels...).RoundTrip(req)
+
+		// call Flush to ensure the text isn't still buffered
+		klog.Flush()
+
+		// check if klog's output contains the expected lines
+		actual := tmpWriteBuffer.String()
+		for _, expected := range tc.expectedOutputLines {
+			if !strings.Contains(actual, expected) {
+				t.Errorf("%q does not contain expected output %q", actual, expected)
+			}
+		}
 	}
 }

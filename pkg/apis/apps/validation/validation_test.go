@@ -131,7 +131,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	for i, successCase := range successCases {
 		t.Run("success case "+strconv.Itoa(i), func(t *testing.T) {
-			if errs := ValidateStatefulSet(&successCase); len(errs) != 0 {
+			if errs := ValidateStatefulSet(&successCase, corevalidation.PodValidationOptions{}); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		})
@@ -356,7 +356,7 @@ func TestValidateStatefulSet(t *testing.T) {
 
 	for k, v := range errorCases {
 		t.Run(k, func(t *testing.T) {
-			errs := ValidateStatefulSet(&v)
+			errs := ValidateStatefulSet(&v, corevalidation.PodValidationOptions{})
 			if len(errs) == 0 {
 				t.Errorf("expected failure for %s", k)
 			}
@@ -2969,5 +2969,184 @@ func TestValidateReplicaSet(t *testing.T) {
 				t.Errorf("%s: missing prefix for: %v", k, errs[i])
 			}
 		}
+	}
+}
+
+func TestDaemonSetUpdateMaxSurge(t *testing.T) {
+	testCases := map[string]struct {
+		ds          *apps.RollingUpdateDaemonSet
+		enableSurge bool
+		expectError bool
+	}{
+		"invalid: unset": {
+			ds:          &apps.RollingUpdateDaemonSet{},
+			expectError: true,
+		},
+		"invalid: zero percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("0%"),
+			},
+			expectError: true,
+		},
+		"invalid: zero": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(0),
+			},
+			expectError: true,
+		},
+		"valid: one": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(1),
+			},
+		},
+		"valid: one percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("1%"),
+			},
+		},
+		"valid: 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("100%"),
+			},
+		},
+		"invalid: greater than 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("101%"),
+			},
+			expectError: true,
+		},
+
+		"valid: surge and unavailable set": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("1%"),
+				MaxSurge:       intstr.FromString("1%"),
+			},
+		},
+
+		"invalid: surge enabled, unavailable zero percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("0%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"invalid: surge enabled, unavailable zero": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(0),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"valid: surge enabled, unavailable one": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(1),
+			},
+			enableSurge: true,
+		},
+		"valid: surge enabled, unavailable one percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("1%"),
+			},
+			enableSurge: true,
+		},
+		"valid: surge enabled, unavailable 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("100%"),
+			},
+			enableSurge: true,
+		},
+		"invalid: surge enabled, unavailable greater than 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("101%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+
+		"invalid: surge enabled, surge zero percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromString("0%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"invalid: surge enabled, surge zero": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromInt(0),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"valid: surge enabled, surge one": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromInt(1),
+			},
+			enableSurge: true,
+		},
+		"valid: surge enabled, surge one percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromString("1%"),
+			},
+			enableSurge: true,
+		},
+		"valid: surge enabled, surge 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromString("100%"),
+			},
+			enableSurge: true,
+		},
+		"invalid: surge enabled, surge greater than 100%": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxSurge: intstr.FromString("101%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+
+		"invalid: surge enabled, surge and unavailable set": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("1%"),
+				MaxSurge:       intstr.FromString("1%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+
+		"invalid: surge enabled, surge and unavailable zero percent": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromString("0%"),
+				MaxSurge:       intstr.FromString("0%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"invalid: surge enabled, surge and unavailable zero": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(0),
+				MaxSurge:       intstr.FromInt(0),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+		"invalid: surge enabled, surge and unavailable mixed zero": {
+			ds: &apps.RollingUpdateDaemonSet{
+				MaxUnavailable: intstr.FromInt(0),
+				MaxSurge:       intstr.FromString("0%"),
+			},
+			enableSurge: true,
+			expectError: true,
+		},
+	}
+	for tcName, tc := range testCases {
+		t.Run(tcName, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, tc.enableSurge)()
+			errs := ValidateRollingUpdateDaemonSet(tc.ds, field.NewPath("spec", "updateStrategy", "rollingUpdate"))
+			if tc.expectError && len(errs) == 0 {
+				t.Errorf("Unexpected success")
+			}
+			if !tc.expectError && len(errs) != 0 {
+				t.Errorf("Unexpected error(s): %v", errs)
+			}
+		})
 	}
 }

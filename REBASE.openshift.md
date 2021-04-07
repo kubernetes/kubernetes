@@ -181,6 +181,13 @@ commit.
 If you first pick all the pick+squash commits first and push them for review it is easier for you
 and your reviewers to check the code changes and you squash it at the end.
 
+When filling in Clean column in the spreadsheet make sure to use the following
+number to express the complexity of the pick:
+- 0 - clean
+- 1 - format fixups
+- 2 - code fixups
+- 3 - logic changes
+
 Explicit commit rules:
 - Anything touching `openshift-hack/`, openshift specific READMEs or similar files
   should be squashed to 1 commit named "UPSTREAM: <carry>: Add OpenShift specific files"
@@ -261,7 +268,7 @@ regression in behavior) can often be skipped and addressed post-merge.
   - Alternatively, run it in the same container as CI is using for build_root that already has
     the etcd at correct version
 ```
-podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.svc.ci.openshift.org/openshift/release:rhel-8-release-golang-1.15-openshift-4.7 make update OS_RUN_WITHOUT_DOCKER=yes
+podman run -it --rm -v $( pwd ):/go/k8s.io/kubernetes:Z --workdir=/go/k8s.io/kubernetes registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.16-openshift-4.8 make update OS_RUN_WITHOUT_DOCKER=yes
 ```
 - Commit the resulting changes as `UPSTREAM: <drop>: make update`.
 
@@ -296,3 +303,14 @@ With good tooling, the cost of this procedure should be ~10 minutes at
 most. Re-picking carries should not result in conflicts since the base of the
 rebase branch will be the same as before. The only potential sources of conflict
 will be the newly added commits.
+
+## Blocking the merge queue
+
+Close to merging a rebase it is good practice to block any merges to openshift/kubernetes
+fork. To do that follow these steps:
+
+1. Open new issues in openshift/kubernetes
+2. Use `Master Branch Frozen For Kubernetes Merging | branch:master` as issue title
+3. Add `tide/merge-blocker` label to issues (you might need group lead for this)
+4. All PR's  (including the rebase) are now forbidden to merge to master branch
+5. Before landing the rebase PR, close this issue

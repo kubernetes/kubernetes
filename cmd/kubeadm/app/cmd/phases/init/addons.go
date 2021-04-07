@@ -43,7 +43,7 @@ var (
 func NewAddonPhase() workflow.Phase {
 	return workflow.Phase{
 		Name:  "addon",
-		Short: "Install required addons for passing Conformance tests",
+		Short: "Install required addons for passing conformance tests",
 		Long:  cmdutil.MacroCommandLongDescription,
 		Phases: []workflow.Phase{
 			{

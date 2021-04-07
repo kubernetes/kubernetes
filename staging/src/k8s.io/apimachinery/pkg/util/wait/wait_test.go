@@ -692,7 +692,7 @@ func TestContextForChannel(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(ForeverTestTimeout):
-		t.Errorf("unexepcted timeout waiting for parent to cancel child contexts")
+		t.Errorf("unexpected timeout waiting for parent to cancel child contexts")
 	}
 }
 

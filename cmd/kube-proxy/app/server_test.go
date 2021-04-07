@@ -498,7 +498,7 @@ udpIdleTimeout: 250ms`)
 		}
 		opt.proxyServer = tc.proxyServer
 
-		errCh := make(chan error)
+		errCh := make(chan error, 1)
 		go func() {
 			errCh <- opt.runLoop()
 		}()

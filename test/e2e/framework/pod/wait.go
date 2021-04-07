@@ -210,14 +210,16 @@ func WaitForPodsRunningReady(c clientset.Interface, ns string, minPods, allowedN
 // WaitForPodCondition waits a pods to be matched to the given condition.
 func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeout time.Duration, condition podCondition) error {
 	e2elog.Logf("Waiting up to %v for pod %q in namespace %q to be %q", timeout, podName, ns, desc)
+	var lastPodError error
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		pod, err := c.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
+		lastPodError = err
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				e2elog.Logf("Pod %q in namespace %q not found. Error: %v", podName, ns, err)
-				return err
+			} else {
+				e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			}
-			e2elog.Logf("Get pod %q in namespace %q failed, ignoring for %v. Error: %v", podName, ns, poll, err)
 			continue
 		}
 		// log now so that current pod info is reported before calling `condition()`
@@ -229,6 +231,10 @@ func WaitForPodCondition(c clientset.Interface, ns, podName, desc string, timeou
 			}
 			return err
 		}
+	}
+	if apierrors.IsNotFound(lastPodError) {
+		// return for compatbility with other functions testing for IsNotFound
+		return lastPodError
 	}
 	return fmt.Errorf("Gave up after waiting %v for pod %q to be %q", timeout, podName, desc)
 }
@@ -252,8 +258,8 @@ func WaitForPodTerminatedInNamespace(c clientset.Interface, podName, reason, nam
 	})
 }
 
-// waitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
-func waitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
+// WaitForPodSuccessInNamespaceTimeout returns nil if the pod reached state success, or an error if it reached failure or ran too long.
+func WaitForPodSuccessInNamespaceTimeout(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return WaitForPodCondition(c, namespace, podName, fmt.Sprintf("%s or %s", v1.PodSucceeded, v1.PodFailed), timeout, func(pod *v1.Pod) (bool, error) {
 		if pod.Spec.RestartPolicy == v1.RestartPolicyAlways {
 			return true, fmt.Errorf("pod %q will never terminate with a succeeded state since its restart policy is Always", podName)
@@ -357,7 +363,7 @@ func WaitForPodNoLongerRunningInNamespace(c clientset.Interface, podName, namesp
 	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, defaultPodDeletionTimeout)
 }
 
-// WaitTimeoutForPodReadyInNamespace waits the given timeout diration for the
+// WaitTimeoutForPodReadyInNamespace waits the given timeout duration for the
 // specified pod to be ready and running.
 func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podRunningAndReady(c, podName, namespace))
@@ -372,12 +378,12 @@ func WaitForPodNotPending(c clientset.Interface, ns, podName string) error {
 
 // WaitForPodSuccessInNamespace returns nil if the pod reached state success, or an error if it reached failure or until podStartupTimeout.
 func WaitForPodSuccessInNamespace(c clientset.Interface, podName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, podStartTimeout)
+	return WaitForPodSuccessInNamespaceTimeout(c, podName, namespace, podStartTimeout)
 }
 
 // WaitForPodSuccessInNamespaceSlow returns nil if the pod reached state success, or an error if it reached failure or until slowPodStartupTimeout.
 func WaitForPodSuccessInNamespaceSlow(c clientset.Interface, podName string, namespace string) error {
-	return waitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
+	return WaitForPodSuccessInNamespaceTimeout(c, podName, namespace, slowPodStartTimeout)
 }
 
 // WaitForPodNotFoundInNamespace returns an error if it takes too long for the pod to fully terminate.
@@ -541,4 +547,9 @@ func WaitForNRestartablePods(ps *testutils.PodStore, expect int, timeout time.Du
 // reason set, which should match the given reason.
 func WaitForPodContainerToFail(c clientset.Interface, namespace, podName string, containerIndex int, reason string, timeout time.Duration) error {
 	return wait.PollImmediate(poll, timeout, podContainerFailed(c, namespace, podName, containerIndex, reason))
+}
+
+// WaitForPodContainerStarted waits for the given Pod container to start, after a successful run of the startupProbe.
+func WaitForPodContainerStarted(c clientset.Interface, namespace, podName string, containerIndex int, timeout time.Duration) error {
+	return wait.PollImmediate(poll, timeout, podContainerStarted(c, namespace, podName, containerIndex))
 }

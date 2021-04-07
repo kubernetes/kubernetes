@@ -137,13 +137,13 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 				ID:   containers[i].id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, nil); err != nil {
-				klog.Errorf("Failed to stop container %q: %v", containers[i].id, err)
+			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
+				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
 		}
 		if err := cgc.manager.removeContainer(containers[i].id); err != nil {
-			klog.Errorf("Failed to remove container %q: %v", containers[i].id, err)
+			klog.ErrorS(err, "Failed to remove container", "containerID", containers[i].id)
 		}
 	}
 
@@ -168,16 +168,16 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 
 // removeSandbox removes the sandbox by sandboxID.
 func (cgc *containerGC) removeSandbox(sandboxID string) {
-	klog.V(4).Infof("Removing sandbox %q", sandboxID)
+	klog.V(4).InfoS("Removing sandbox", "sandboxID", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
 	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to stop sandbox %q before removing: %v", sandboxID, err)
+		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
 		return
 	}
 	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
-		klog.Errorf("Failed to remove sandbox %q: %v", sandboxID, err)
+		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
 	}
 }
 
@@ -342,7 +342,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 			}
 			err := osInterface.RemoveAll(filepath.Join(podLogsRootDirectory, name))
 			if err != nil {
-				klog.Errorf("Failed to remove pod logs directory %q: %v", name, err)
+				klog.ErrorS(err, "Failed to remove pod logs directory", "path", name)
 			}
 		}
 	}
@@ -357,7 +357,7 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 				if err != nil {
 					// TODO: we should handle container not found (i.e. container was deleted) case differently
 					// once https://github.com/kubernetes/kubernetes/issues/63336 is resolved
-					klog.Infof("Error getting ContainerStatus for containerID %q: %v", containerID, err)
+					klog.InfoS("Error getting ContainerStatus for containerID", "containerID", containerID, "err", err)
 				} else if status.State != runtimeapi.ContainerState_CONTAINER_EXITED {
 					// Here is how container log rotation works (see containerLogManager#rotateLatestLog):
 					//
@@ -370,17 +370,17 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 					// See https://github.com/kubernetes/kubernetes/issues/52172
 					//
 					// We only remove unhealthy symlink for dead containers
-					klog.V(5).Infof("Container %q is still running, not removing symlink %q.", containerID, logSymlink)
+					klog.V(5).InfoS("Container is still running, not removing symlink", "containerID", containerID, "path", logSymlink)
 					continue
 				}
 			} else {
-				klog.V(4).Infof("unable to obtain container Id: %v", err)
+				klog.V(4).InfoS("Unable to obtain container ID", "err", err)
 			}
 			err := osInterface.Remove(logSymlink)
 			if err != nil {
-				klog.Errorf("Failed to remove container log dead symlink %q: %v", logSymlink, err)
+				klog.ErrorS(err, "Failed to remove container log dead symlink", "path", logSymlink)
 			} else {
-				klog.V(4).Infof("removed symlink %s", logSymlink)
+				klog.V(4).InfoS("Removed symlink", "path", logSymlink)
 			}
 		}
 	}

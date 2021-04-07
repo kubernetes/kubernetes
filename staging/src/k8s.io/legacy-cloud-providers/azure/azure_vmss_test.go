@@ -1436,7 +1436,7 @@ func TestGetVMSetNames(t *testing.T) {
 			expectedVMSetNames: &[]string{"vmss"},
 		},
 		{
-			description: "GetVMSetNames should return nil if the service has auto mode annotation",
+			description: "GetVMSetNames should return all scale sets if the service has auto mode annotation",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ServiceAnnotationLoadBalancerMode: ServiceAnnotationLoadBalancerAutoModeValue}},
 			},
@@ -1447,6 +1447,7 @@ func TestGetVMSetNames(t *testing.T) {
 					},
 				},
 			},
+			expectedVMSetNames: &[]string{"vmss"},
 		},
 		{
 			description: "GetVMSetNames should report the error if there's no such vmss",
@@ -1516,7 +1517,7 @@ func TestGetVMSetNames(t *testing.T) {
 
 		vmSetNames, err := ss.GetVMSetNames(test.service, test.nodes)
 		assert.Equal(t, test.expectedErr, err, test.description+", but an error occurs")
-		assert.Equal(t, test.expectedVMSetNames, vmSetNames)
+		assert.Equal(t, test.expectedVMSetNames, vmSetNames, test.description)
 	}
 }
 

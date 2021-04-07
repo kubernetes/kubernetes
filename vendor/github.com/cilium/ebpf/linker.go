@@ -84,3 +84,50 @@ func needSection(insns, section asm.Instructions) (bool, error) {
 	// None of the functions in the section are called.
 	return false, nil
 }
+
+func fixupJumpsAndCalls(insns asm.Instructions) error {
+	symbolOffsets := make(map[string]asm.RawInstructionOffset)
+	iter := insns.Iterate()
+	for iter.Next() {
+		ins := iter.Ins
+
+		if ins.Symbol == "" {
+			continue
+		}
+
+		if _, ok := symbolOffsets[ins.Symbol]; ok {
+			return fmt.Errorf("duplicate symbol %s", ins.Symbol)
+		}
+
+		symbolOffsets[ins.Symbol] = iter.Offset
+	}
+
+	iter = insns.Iterate()
+	for iter.Next() {
+		i := iter.Index
+		offset := iter.Offset
+		ins := iter.Ins
+
+		switch {
+		case ins.IsFunctionCall() && ins.Constant == -1:
+			// Rewrite bpf to bpf call
+			callOffset, ok := symbolOffsets[ins.Reference]
+			if !ok {
+				return fmt.Errorf("instruction %d: reference to missing symbol %s", i, ins.Reference)
+			}
+
+			ins.Constant = int64(callOffset - offset - 1)
+
+		case ins.OpCode.Class() == asm.JumpClass && ins.Offset == -1:
+			// Rewrite jump to label
+			jumpOffset, ok := symbolOffsets[ins.Reference]
+			if !ok {
+				return fmt.Errorf("instruction %d: reference to missing symbol %s", i, ins.Reference)
+			}
+
+			ins.Offset = int16(jumpOffset - offset - 1)
+		}
+	}
+
+	return nil
+}

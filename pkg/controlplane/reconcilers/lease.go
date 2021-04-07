@@ -113,7 +113,7 @@ func (s *storageLeases) UpdateLease(ip string) error {
 
 // RemoveLease removes the lease on a master IP in storage
 func (s *storageLeases) RemoveLease(ip string) error {
-	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc)
+	return s.storage.Delete(apirequest.NewDefaultContext(), s.baseKey+"/"+ip, &corev1.Endpoints{}, nil, rest.ValidateAllObjectFunc, nil)
 }
 
 // NewLeases creates a new etcd-based Leases implementation.

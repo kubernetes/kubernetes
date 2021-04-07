@@ -77,10 +77,38 @@ type InfrastructureStatus struct {
 	// like kubelets, to contact the Kubernetes API server using the
 	// infrastructure provider rather than Kubernetes networking.
 	APIServerInternalURL string `json:"apiServerInternalURI"`
+
+	// controlPlaneTopology expresses the expectations for operands that normally run on control nodes.
+	// The default is 'HighlyAvailable', which represents the behavior operators have in a "normal" cluster.
+	// The 'SingleReplica' mode will be used in single-node deployments
+	// and the operators should not configure the operand for highly-available operation
+	// +kubebuilder:default=HighlyAvailable
+	ControlPlaneTopology TopologyMode `json:"controlPlaneTopology"`
+
+	// infrastructureTopology expresses the expectations for infrastructure services that do not run on control
+	// plane nodes, usually indicated by a node selector for a `role` value
+	// other than `master`.
+	// The default is 'HighlyAvailable', which represents the behavior operators have in a "normal" cluster.
+	// The 'SingleReplica' mode will be used in single-node deployments
+	// and the operators should not configure the operand for highly-available operation
+	// +kubebuilder:default=HighlyAvailable
+	InfrastructureTopology TopologyMode `json:"infrastructureTopology"`
 }
 
+// TopologyMode defines the topology mode of the control/infra nodes.
+// +kubebuilder:validation:Enum=HighlyAvailable;SingleReplica
+type TopologyMode string
+
+const (
+	// "HighlyAvailable" is for operators to configure high-availability as much as possible.
+	HighlyAvailableTopologyMode TopologyMode = "HighlyAvailable"
+
+	// "SingleReplica" is for operators to avoid spending resources for high-availability purpose.
+	SingleReplicaTopologyMode TopologyMode = "SingleReplica"
+)
+
 // PlatformType is a specific supported infrastructure provider.
-// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt
+// +kubebuilder:validation:Enum="";AWS;Azure;BareMetal;GCP;Libvirt;OpenStack;None;VSphere;oVirt;IBMCloud;KubeVirt;EquinixMetal
 type PlatformType string
 
 const (
@@ -116,6 +144,9 @@ const (
 
 	// KubevirtPlatformType represents KubeVirt/Openshift Virtualization infrastructure.
 	KubevirtPlatformType PlatformType = "KubeVirt"
+
+	// EquinixMetalPlatformType represents Equinix Metal infrastructure.
+	EquinixMetalPlatformType PlatformType = "EquinixMetal"
 )
 
 // IBMCloudProviderType is a specific supported IBM Cloud provider cluster type
@@ -138,7 +169,7 @@ type PlatformSpec struct {
 	// balancers, dynamic volume provisioning, machine creation and deletion, and
 	// other integrations are enabled. If None, no infrastructure automation is
 	// enabled. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt",
-	// "OpenStack", "VSphere", "oVirt", "KubeVirt" and "None". Individual components may not support
+	// "OpenStack", "VSphere", "oVirt", "KubeVirt", "EquinixMetal", and "None". Individual components may not support
 	// all platforms, and must handle unrecognized platforms as None if they do
 	// not support that platform.
 	//
@@ -180,6 +211,10 @@ type PlatformSpec struct {
 	// Kubevirt contains settings specific to the kubevirt infrastructure provider.
 	// +optional
 	Kubevirt *KubevirtPlatformSpec `json:"kubevirt,omitempty"`
+
+	// EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.
+	// +optional
+	EquinixMetal *EquinixMetalPlatformSpec `json:"equinixMetal,omitempty"`
 }
 
 // PlatformStatus holds the current status specific to the underlying infrastructure provider
@@ -191,7 +226,7 @@ type PlatformStatus struct {
 	// balancers, dynamic volume provisioning, machine creation and deletion, and
 	// other integrations are enabled. If None, no infrastructure automation is
 	// enabled. Allowed values are "AWS", "Azure", "BareMetal", "GCP", "Libvirt",
-	// "OpenStack", "VSphere", "oVirt", and "None". Individual components may not support
+	// "OpenStack", "VSphere", "oVirt", "EquinixMetal", and "None". Individual components may not support
 	// all platforms, and must handle unrecognized platforms as None if they do
 	// not support that platform.
 	//
@@ -234,6 +269,10 @@ type PlatformStatus struct {
 	// Kubevirt contains settings specific to the kubevirt infrastructure provider.
 	// +optional
 	Kubevirt *KubevirtPlatformStatus `json:"kubevirt,omitempty"`
+
+	// EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.
+	// +optional
+	EquinixMetal *EquinixMetalPlatformStatus `json:"equinixMetal,omitempty"`
 }
 
 // AWSServiceEndpoint store the configuration of a custom url to
@@ -451,6 +490,23 @@ type KubevirtPlatformSpec struct{}
 
 // KubevirtPlatformStatus holds the current status of the kubevirt infrastructure provider.
 type KubevirtPlatformStatus struct {
+	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
+	// by components inside the cluster, like kubelets using the infrastructure rather
+	// than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI
+	// points to. It is the IP for a self-hosted load balancer in front of the API servers.
+	APIServerInternalIP string `json:"apiServerInternalIP,omitempty"`
+
+	// ingressIP is an external IP which routes to the default ingress controller.
+	// The IP is a suitable target of a wildcard DNS record used to resolve default route host names.
+	IngressIP string `json:"ingressIP,omitempty"`
+}
+
+// EquinixMetalPlatformSpec holds the desired state of the Equinix Metal infrastructure provider.
+// This only includes fields that can be modified in the cluster.
+type EquinixMetalPlatformSpec struct{}
+
+// EquinixMetalPlatformStatus holds the current status of the Equinix Metal infrastructure provider.
+type EquinixMetalPlatformStatus struct {
 	// apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used
 	// by components inside the cluster, like kubelets using the infrastructure rather
 	// than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI

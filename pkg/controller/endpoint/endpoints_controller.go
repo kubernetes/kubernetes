@@ -60,6 +60,11 @@ const (
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
 	maxRetries = 15
 
+	// maxCapacity represents the maximum number of addresses that should be
+	// stored in an Endpoints resource. In a future release, this controller
+	// may truncate endpoints exceeding this length.
+	maxCapacity = 1000
+
 	// TolerateUnreadyEndpointsAnnotation is an annotation on the Service denoting if the endpoints
 	// controller should go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
@@ -510,7 +515,8 @@ func (e *Controller) syncService(key string) error {
 	}
 	if !createEndpoints &&
 		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
-		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) {
+		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
+		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
 		klog.V(5).Infof("endpoints are equal for %s/%s, skipping update", service.Namespace, service.Name)
 		return nil
 	}
@@ -526,6 +532,12 @@ func (e *Controller) syncService(key string) error {
 			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
+	}
+
+	if overCapacity(newEndpoints.Subsets) {
+		newEndpoints.Annotations[v1.EndpointsOverCapacity] = "warning"
+	} else {
+		delete(newEndpoints.Annotations, v1.EndpointsOverCapacity)
 	}
 
 	if newEndpoints.Labels == nil {
@@ -645,4 +657,25 @@ func endpointPortFromServicePort(servicePort *v1.ServicePort, portNum int) *v1.E
 		AppProtocol: servicePort.AppProtocol,
 	}
 	return epp
+}
+
+// overCapacity returns true if there are more addresses in the provided subsets
+// than the maxCapacity.
+func overCapacity(subsets []v1.EndpointSubset) bool {
+	numEndpoints := 0
+	for _, subset := range subsets {
+		numEndpoints += len(subset.Addresses) + len(subset.NotReadyAddresses)
+	}
+	return numEndpoints > maxCapacity
+}
+
+// capacityAnnotationSetCorrectly returns true if overCapacity() is true and the
+// EndpointsOverCapacity annotation is set to "warning" or if overCapacity()
+// is false and the annotation is not set.
+func capacityAnnotationSetCorrectly(annotations map[string]string, subsets []v1.EndpointSubset) bool {
+	val, ok := annotations[v1.EndpointsOverCapacity]
+	if overCapacity(subsets) {
+		return ok && val == "warning"
+	}
+	return !ok
 }

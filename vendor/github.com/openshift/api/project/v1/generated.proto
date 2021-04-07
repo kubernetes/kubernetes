@@ -43,7 +43,7 @@ message ProjectList {
   repeated Project items = 2;
 }
 
-// ProjecRequest is the set of options necessary to fully qualify a project request
+// ProjectRequest is the set of options necessary to fully qualify a project request
 message ProjectRequest {
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 

@@ -247,6 +247,9 @@ func validateGroupVersionString(groupVersion string) error {
 	if !knownGroupVersion(gv) {
 		return fmt.Errorf("invalid group version, allowed versions are %q", knownGroupVersions)
 	}
+	if gv != auditv1.SchemeGroupVersion {
+		klog.Warningf("%q is deprecated and will be removed in a future release, use %q instead", gv, auditv1.SchemeGroupVersion)
+	}
 	return nil
 }
 
@@ -308,7 +311,8 @@ func (o *AuditOptions) ApplyTo(
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for webhook backend")
 		} else {
 			if c.EgressSelector != nil {
-				egressDialer, err := c.EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
+				var egressDialer utilnet.DialFunc
+				egressDialer, err = c.EgressSelector.Lookup(egressselector.ControlPlane.AsNetworkContext())
 				if err != nil {
 					return err
 				}

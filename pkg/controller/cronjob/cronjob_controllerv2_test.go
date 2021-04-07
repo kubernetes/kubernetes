@@ -17,24 +17,26 @@ limitations under the License.
 package cronjob
 
 import (
-	"fmt"
-	"github.com/robfig/cron"
-	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"github.com/robfig/cron"
+
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	batchv1listers "k8s.io/client-go/listers/batch/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/controller"
 )
 
 func justASecondBeforeTheHour() time.Time {
@@ -45,7 +47,7 @@ func justASecondBeforeTheHour() time.Time {
 	return T1
 }
 
-func Test_syncOne2(t *testing.T) {
+func TestControllerV2SyncCronJob(t *testing.T) {
 	// Check expectations on deadline parameters
 	if shortDead/60/60 >= 1 {
 		t.Errorf("shortDead should be less than one hour")
@@ -61,7 +63,7 @@ func Test_syncOne2(t *testing.T) {
 
 	testCases := map[string]struct {
 		// cj spec
-		concurrencyPolicy batchv1beta1.ConcurrencyPolicy
+		concurrencyPolicy batchv1.ConcurrencyPolicy
 		suspend           bool
 		schedule          string
 		deadline          int64
@@ -84,70 +86,72 @@ func Test_syncOne2(t *testing.T) {
 		expectRequeueAfter         bool
 		jobStillNotFoundInLister   bool
 		jobPresentInCJActiveStatus bool
+		jobCreateError             error
 	}{
-		"never ran, not valid schedule, A":      {A, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T},
-		"never ran, not valid schedule, F":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T},
-		"never ran, not valid schedule, R":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T},
-		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterThePriorHour(), justAfterTheHour(), F, F, 0, 0, F, F, F, T},
-		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterThePriorHour(), justAfterTheHour(), F, F, 0, 0, F, T, F, T},
-		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
+		"never ran, not valid schedule, A":      {A, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not valid schedule, F":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not valid schedule, R":      {f, F, errorSchedule, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 1, F, F, F, T, nil},
+		"never ran, not time, A":                {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, not time, F":                {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, not time, R":                {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, is time, A":                 {A, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, F":                 {f, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, R":                 {R, F, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"never ran, is time, suspended":         {A, T, onTheHour, noDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
+		"never ran, is time, past deadline":     {A, F, onTheHour, shortDead, F, F, justAfterThePriorHour(), justAfterTheHour().Add(time.Minute * time.Duration(shortDead+1)), F, F, 0, 0, F, T, F, T, nil},
+		"never ran, is time, not past deadline": {A, F, onTheHour, longDead, F, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, not time, A":                {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"prev ran but done, not time, F":                {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"prev ran but done, not time, R":                {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
-		"prev ran but done, is time, A":                 {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, is time, F":                 {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, is time, R":                 {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, is time, suspended":         {A, T, onTheHour, noDead, T, F, justAfterThePriorHour(), justAfterTheHour(), F, F, 0, 0, F, F, F, T},
-		"prev ran but done, is time, past deadline":     {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), justAfterTheHour(), F, F, 0, 0, F, T, F, T},
-		"prev ran but done, is time, not past deadline": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), justAfterTheHour(), T, F, 1, 0, F, T, F, T},
+		"prev ran but done, not time, A":                {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, not time, F":                {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, not time, R":                {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, is time, A":                 {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, F":                 {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, R":                 {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, is time, suspended":         {A, T, onTheHour, noDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, F, F, T, nil},
+		"prev ran but done, is time, past deadline":     {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), F, F, 0, 0, F, T, F, T, nil},
+		"prev ran but done, is time, not past deadline": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), *justAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"still active, not time, A":                {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T},
-		"still active, not time, F":                {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T},
-		"still active, not time, R":                {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T},
-		"still active, is time, A":                 {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justAfterTheHour(), T, F, 2, 0, F, T, F, T},
-		"still active, is time, F":                 {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justAfterTheHour(), F, F, 1, 0, F, T, F, T},
-		"still active, is time, R":                 {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justAfterTheHour(), T, T, 1, 0, F, T, F, T},
-		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterThePriorHour(), justAfterTheHour(), F, F, 1, 0, F, F, F, T},
-		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterThePriorHour(), justAfterTheHour(), F, F, 1, 0, F, T, F, T},
-		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterThePriorHour(), justAfterTheHour(), T, F, 2, 0, F, T, F, T},
+		"still active, not time, A":                {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, not time, F":                {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, not time, R":                {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), justBeforeTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, A":                 {A, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
+		"still active, is time, F":                 {f, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, R":                 {R, F, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, T, 1, 0, F, T, F, T, nil},
+		"still active, is time, suspended":         {A, T, onTheHour, noDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, F, F, T, nil},
+		"still active, is time, past deadline":     {A, F, onTheHour, shortDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), F, F, 1, 0, F, T, F, T, nil},
+		"still active, is time, not past deadline": {A, F, onTheHour, longDead, T, T, justAfterThePriorHour(), *justAfterTheHour(), T, F, 2, 0, F, T, F, T, nil},
 
 		// Controller should fail to schedule these, as there are too many missed starting times
 		// and either no deadline or a too long deadline.
-		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
-		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
-		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
-		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
-		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
-		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T},
+		"prev ran but done, long overdue, not past deadline, A": {A, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, R": {R, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, not past deadline, F": {f, F, onTheHour, longDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, A":       {A, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, R":       {R, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
+		"prev ran but done, long overdue, no deadline, F":       {f, F, onTheHour, noDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 1, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
+		"prev ran but done, long overdue, past medium deadline, A": {A, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, A":  {A, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
+		"prev ran but done, long overdue, past medium deadline, R": {R, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, R":  {R, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
-		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
-		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T},
+		"prev ran but done, long overdue, past medium deadline, F": {f, F, onTheHour, mediumDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
+		"prev ran but done, long overdue, past short deadline, F":  {f, F, onTheHour, shortDead, T, F, justAfterThePriorHour(), weekAfterTheHour(), T, F, 1, 0, F, T, F, T, nil},
 
 		// Tests for time skews
-		"this ran but done, time drifted back, F": {f, F, onTheHour, noDead, T, F, justAfterTheHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, T},
+		// the controller sees job is created, takes no actions
+		"this ran but done, time drifted back, F": {f, F, onTheHour, noDead, T, F, *justAfterTheHour(), justBeforeTheHour(), F, F, 0, 0, F, T, F, F, errors.NewAlreadyExists(schema.GroupResource{Resource: "jobs", Group: "batch"}, "")},
 
 		// Tests for slow job lister
-		"this started but went missing, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T},
-		"this started but went missing, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T},
-		"this started but went missing, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T},
+		"this started but went missing, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
+		"this started but went missing, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, T, T, nil},
 
 		// Tests for slow cronjob list
-		"this started but is not present in cronjob active list, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F},
-		"this started but is not present in cronjob active list, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F},
-		"this started but is not present in cronjob active list, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F},
+		"this started but is not present in cronjob active list, not past deadline, A": {A, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, f": {f, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
+		"this started but is not present in cronjob active list, not past deadline, R": {R, F, onTheHour, longDead, T, T, topOfTheHour().Add(time.Millisecond * 100), justAfterTheHour().Add(time.Millisecond * 100), F, F, 1, 0, F, T, F, F, nil},
 	}
 	for name, tc := range testCases {
 		name := name
@@ -199,7 +203,7 @@ func Test_syncOne2(t *testing.T) {
 				}
 			}
 
-			jc := &fakeJobControl{Job: job}
+			jc := &fakeJobControl{Job: job, CreateErr: tc.jobCreateError}
 			cjc := &fakeCJControl{CronJob: realCJ}
 			recorder := record.NewFakeRecorder(10)
 
@@ -238,7 +242,7 @@ func Test_syncOne2(t *testing.T) {
 				if controllerRef == nil {
 					t.Errorf("%s: expected job to have ControllerRef: %#v", name, job)
 				} else {
-					if got, want := controllerRef.APIVersion, "batch/v1beta1"; got != want {
+					if got, want := controllerRef.APIVersion, "batch/v1"; got != want {
 						t.Errorf("%s: controllerRef.APIVersion = %q, want %q", name, got, want)
 					}
 					if got, want := controllerRef.Kind, "CronJob"; got != want {
@@ -307,246 +311,168 @@ func Test_syncOne2(t *testing.T) {
 
 }
 
+type fakeQueue struct {
+	workqueue.RateLimitingInterface
+	delay time.Duration
+	key   interface{}
+}
+
+func (f *fakeQueue) AddAfter(key interface{}, delay time.Duration) {
+	f.delay = delay
+	f.key = key
+}
+
 // this test will take around 61 seconds to complete
-func TestController2_updateCronJob(t *testing.T) {
-	cjc := &fakeCJControl{}
-	jc := &fakeJobControl{}
-	type fields struct {
-		queue          workqueue.RateLimitingInterface
-		recorder       record.EventRecorder
-		jobControl     jobControlInterface
-		cronJobControl cjControlInterface
-	}
-	type args struct {
-		oldJobTemplate *batchv1beta1.JobTemplateSpec
-		newJobTemplate *batchv1beta1.JobTemplateSpec
-		oldJobSchedule string
-		newJobSchedule string
-	}
+func TestControllerV2UpdateCronJob(t *testing.T) {
 	tests := []struct {
-		name                 string
-		fields               fields
-		args                 args
-		deltaTimeForQueue    time.Duration
-		roundOffTimeDuration time.Duration
+		name          string
+		oldCronJob    *batchv1.CronJob
+		newCronJob    *batchv1.CronJob
+		expectedDelay time.Duration
 	}{
 		{
 			name: "spec.template changed",
-			fields: fields{
-				queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob"),
-				recorder:       record.NewFakeRecorder(10),
-				jobControl:     jc,
-				cronJobControl: cjc,
-			},
-			args: args{
-				oldJobTemplate: &batchv1beta1.JobTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"a": "b"},
-						Annotations: map[string]string{"x": "y"},
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
 					},
-					Spec: jobSpec(),
-				},
-				newJobTemplate: &batchv1beta1.JobTemplateSpec{
-					ObjectMeta: metav1.ObjectMeta{
-						Labels:      map[string]string{"a": "foo"},
-						Annotations: map[string]string{"x": "y"},
-					},
-					Spec: jobSpec(),
 				},
 			},
-			deltaTimeForQueue:    0 * time.Second,
-			roundOffTimeDuration: 500*time.Millisecond + nextScheduleDelta,
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
+			},
+			expectedDelay: 0 * time.Second,
 		},
 		{
 			name: "spec.schedule changed",
-			fields: fields{
-				queue:          workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob"),
-				recorder:       record.NewFakeRecorder(10),
-				jobControl:     jc,
-				cronJobControl: cjc,
+			oldCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					Schedule: "30 * * * *",
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "b"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
 			},
-			args: args{
-				oldJobSchedule: "30 * * * *",
-				newJobSchedule: "1 * * * *",
+			newCronJob: &batchv1.CronJob{
+				Spec: batchv1.CronJobSpec{
+					Schedule: "*/1 * * * *",
+					JobTemplate: batchv1.JobTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels:      map[string]string{"a": "foo"},
+							Annotations: map[string]string{"x": "y"},
+						},
+						Spec: jobSpec(),
+					},
+				},
 			},
-			deltaTimeForQueue:    61*time.Second + nextScheduleDelta,
-			roundOffTimeDuration: 750 * time.Millisecond,
+			expectedDelay: 1*time.Second + nextScheduleDelta,
 		},
 		// TODO: Add more test cases for updating scheduling.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cj := cronJob()
-			newCj := cronJob()
-			if tt.args.oldJobTemplate != nil {
-				cj.Spec.JobTemplate = *tt.args.oldJobTemplate
-			}
-			if tt.args.newJobTemplate != nil {
-				newCj.Spec.JobTemplate = *tt.args.newJobTemplate
-			}
-			if tt.args.oldJobSchedule != "" {
-				cj.Spec.Schedule = tt.args.oldJobSchedule
-			}
-			if tt.args.newJobSchedule != "" {
-				newCj.Spec.Schedule = tt.args.newJobSchedule
-			}
-			jm := &ControllerV2{
-				queue:          tt.fields.queue,
-				recorder:       tt.fields.recorder,
-				jobControl:     tt.fields.jobControl,
-				cronJobControl: tt.fields.cronJobControl,
+			kubeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
 			}
 			jm.now = justASecondBeforeTheHour
-			now := time.Now()
-			then := time.Now()
-			wg := sync.WaitGroup{}
-			wg.Add(1)
-			go func() {
-				now = time.Now()
-				jm.queue.Get()
-				then = time.Now()
-				wg.Done()
-				return
-			}()
-			jm.updateCronJob(&cj, &newCj)
-			wg.Wait()
-			d := then.Sub(now)
-			if d.Round(tt.roundOffTimeDuration).Seconds() != tt.deltaTimeForQueue.Round(tt.roundOffTimeDuration).Seconds() {
-				t.Errorf("Expected %#v got %#v", tt.deltaTimeForQueue.Round(tt.roundOffTimeDuration).String(), d.Round(tt.roundOffTimeDuration).String())
+			queue := &fakeQueue{RateLimitingInterface: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "test-update-cronjob")}
+			jm.queue = queue
+			jm.jobControl = &fakeJobControl{}
+			jm.cronJobControl = &fakeCJControl{}
+			jm.recorder = record.NewFakeRecorder(10)
+
+			jm.updateCronJob(tt.oldCronJob, tt.newCronJob)
+			if queue.delay.Seconds() != tt.expectedDelay.Seconds() {
+				t.Errorf("Expected delay %#v got %#v", tt.expectedDelay.Seconds(), queue.delay.Seconds())
 			}
 		})
 	}
 }
 
-type FakeNamespacedJobLister struct {
-	jobs      []*batchv1.Job
-	namespace string
-}
-
-func (f *FakeNamespacedJobLister) Get(name string) (*batchv1.Job, error) {
-	for _, j := range f.jobs {
-		if j.Namespace == f.namespace && j.Namespace == name {
-			return j, nil
-		}
-	}
-	return nil, fmt.Errorf("Not Found")
-}
-
-func (f *FakeNamespacedJobLister) List(selector labels.Selector) ([]*batchv1.Job, error) {
-	ret := []*batchv1.Job{}
-	for _, j := range f.jobs {
-		if f.namespace != "" && f.namespace != j.Namespace {
-			continue
-		}
-		if selector.Matches(labels.Set(j.GetLabels())) {
-			ret = append(ret, j)
-		}
-	}
-	return ret, nil
-}
-
-func (f *FakeNamespacedJobLister) Jobs(namespace string) batchv1listers.JobNamespaceLister {
-	f.namespace = namespace
-	return f
-}
-
-func (f *FakeNamespacedJobLister) GetPodJobs(pod *v1.Pod) (jobs []batchv1.Job, err error) {
-	panic("implement me")
-}
-
-func TestControllerV2_getJobList(t *testing.T) {
+func TestControllerV2GetJobsToBeReconciled(t *testing.T) {
 	trueRef := true
-	type fields struct {
-		jobLister batchv1listers.JobLister
-	}
-	type args struct {
-		cronJob *batchv1beta1.CronJob
-	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []*batchv1.Job
-		wantErr bool
+		name     string
+		cronJob  *batchv1.CronJob
+		jobs     []runtime.Object
+		expected []*batchv1.Job
 	}{
 		{
-			name: "test getting jobs in namespace without controller reference",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{},
+			name:    "test getting jobs in namespace without controller reference",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
+			},
+			expected: []*batchv1.Job{},
 		},
 		{
-			name: "test getting jobs in namespace with a controller reference",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-							OwnerReferences: []metav1.OwnerReference{
-								{
-									Name:       "fooer",
-									Controller: &trueRef,
-								},
-							}},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							Name:       "fooer",
-							Controller: &trueRef,
-						},
-					}},
-			}},
+			name:    "test getting jobs in namespace with a controller reference",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "foo-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "foo-ns"}},
+			},
+			expected: []*batchv1.Job{
+				{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "foo-ns",
+					OwnerReferences: []metav1.OwnerReference{{Name: "fooer", Controller: &trueRef}}}},
+			},
 		},
 		{
-			name: "test getting jobs in other namespaces ",
-			fields: fields{
-				&FakeNamespacedJobLister{jobs: []*batchv1.Job{
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "bar-ns"},
-					},
-					{
-						ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"},
-					},
-				}}},
-			args: args{cronJob: &batchv1beta1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}}},
-			want: []*batchv1.Job{},
+			name:    "test getting jobs in other namespaces",
+			cronJob: &batchv1.CronJob{ObjectMeta: metav1.ObjectMeta{Namespace: "foo-ns", Name: "fooer"}},
+			jobs: []runtime.Object{
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo1", Namespace: "bar-ns"}},
+				&batchv1.Job{ObjectMeta: metav1.ObjectMeta{Name: "foo2", Namespace: "bar-ns"}},
+			},
+			expected: []*batchv1.Job{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			jm := &ControllerV2{
-				jobLister: tt.fields.jobLister,
+			kubeClient := fake.NewSimpleClientset()
+			sharedInformers := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
+			for _, job := range tt.jobs {
+				sharedInformers.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 			}
-			got, err := jm.getJobsToBeReconciled(tt.args.cronJob)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getJobsToBeReconciled() error = %v, wantErr %v", err, tt.wantErr)
+			jm, err := NewControllerV2(sharedInformers.Batch().V1().Jobs(), sharedInformers.Batch().V1().CronJobs(), kubeClient)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getJobsToBeReconciled() got = %v, want %v", got, tt.want)
+
+			actual, err := jm.getJobsToBeReconciled(tt.cronJob)
+			if err != nil {
+				t.Errorf("unexpected error %v", err)
+				return
+			}
+			if !reflect.DeepEqual(actual, tt.expected) {
+				t.Errorf("\nExpected %#v,\nbut got %#v", tt.expected, actual)
 			}
 		})
 	}

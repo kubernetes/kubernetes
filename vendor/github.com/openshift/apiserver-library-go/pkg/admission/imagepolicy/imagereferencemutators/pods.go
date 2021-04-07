@@ -8,7 +8,6 @@ import (
 	kappsv1beta2 "k8s.io/api/apps/v1beta2"
 	batchv1 "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
-	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	corev1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -96,13 +95,9 @@ func GetPodSpecV1(obj runtime.Object) (*corev1.PodSpec, *field.Path, error) {
 	case *batchv1.Job:
 		return &r.Spec.Template.Spec, field.NewPath("spec", "template", "spec"), nil
 
-	case *batchv2alpha1.CronJob:
-		return &r.Spec.JobTemplate.Spec.Template.Spec, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), nil
 	case *batchv1beta1.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.Spec, field.NewPath("spec", "jobTemplate", "spec", "template", "spec"), nil
 
-	case *batchv2alpha1.JobTemplate:
-		return &r.Template.Spec.Template.Spec, field.NewPath("template", "spec", "template", "spec"), nil
 	case *batchv1beta1.JobTemplate:
 		return &r.Template.Spec.Template.Spec, field.NewPath("template", "spec", "template", "spec"), nil
 
@@ -155,13 +150,9 @@ func GetTemplateMetaObject(obj runtime.Object) (metav1.Object, bool) {
 	case *batchv1.Job:
 		return &r.Spec.Template.ObjectMeta, true
 
-	case *batchv2alpha1.CronJob:
-		return &r.Spec.JobTemplate.Spec.Template.ObjectMeta, true
 	case *batchv1beta1.CronJob:
 		return &r.Spec.JobTemplate.Spec.Template.ObjectMeta, true
 
-	case *batchv2alpha1.JobTemplate:
-		return &r.Template.Spec.Template.ObjectMeta, true
 	case *batchv1beta1.JobTemplate:
 		return &r.Template.Spec.Template.ObjectMeta, true
 

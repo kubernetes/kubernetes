@@ -24,6 +24,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -40,7 +41,7 @@ type containerManagerStub struct {
 var _ ContainerManager = &containerManagerStub{}
 
 func (cm *containerManagerStub) Start(_ *v1.Node, _ ActivePodsFunc, _ config.SourcesReady, _ status.PodStatusProvider, _ internalapi.RuntimeService) error {
-	klog.V(2).Infof("Starting stub container manager")
+	klog.V(2).InfoS("Starting stub container manager")
 	return nil
 }
 
@@ -102,7 +103,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulerframework.NodeIn
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {
@@ -110,6 +111,10 @@ func (cm *containerManagerStub) GetPodCgroupRoot() string {
 }
 
 func (cm *containerManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+	return nil
+}
+
+func (cm *containerManagerStub) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
 	return nil
 }
 
@@ -126,6 +131,10 @@ func (cm *containerManagerStub) UpdateAllocatedDevices() {
 }
 
 func (cm *containerManagerStub) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
+func (cm *containerManagerStub) GetAllocatableCPUs() []int64 {
 	return nil
 }
 

@@ -55,12 +55,10 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	}
 
 	// Secondary IP validation
-	// while api-server dualstack bits does not have dependency on EndPointSlice, its
-	// a good idea to have validation consistent across all components (ControllerManager
-	// needs EndPointSlice + DualStack feature flags).
+	// ControllerManager needs DualStack feature flags
 	secondaryServiceClusterIPRangeUsed := (options.SecondaryServiceClusterIPRange.IP != nil)
-	if secondaryServiceClusterIPRangeUsed && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
-		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v and %v feature is enabled", string(features.IPv6DualStack), string(features.EndpointSlice)))
+	if secondaryServiceClusterIPRangeUsed && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		errs = append(errs, fmt.Errorf("secondary service cluster-ip range(--service-cluster-ip-range[1]) can only be used if %v feature is enabled", string(features.IPv6DualStack)))
 	}
 
 	// note: While the cluster might be dualstack (i.e. pods with multiple IPs), the user may choose
@@ -139,7 +137,7 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 		testConfigs := []string{"flowcontrol.apiserver.k8s.io/v1beta1", "api/beta", "api/all"} // in the order of precedence
 		for _, testConfig := range testConfigs {
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=false", testConfig)) {
-				return []error{fmt.Errorf("%s=false conflicts with APIPriorityAndFairness feature gate", testConfig)}
+				return []error{fmt.Errorf("--runtime-config=%s=false conflicts with --enable-priority-and-fairness=true and --feature-gates=APIPriorityAndFairness=true", testConfig)}
 			}
 			if strings.Contains(enabledAPIString, fmt.Sprintf("%s=true", testConfig)) {
 				return nil
@@ -148,6 +146,17 @@ func validateAPIPriorityAndFairness(options *ServerRunOptions) []error {
 	}
 
 	return nil
+}
+
+func validateAPIServerIdentity(options *ServerRunOptions) []error {
+	var errs []error
+	if options.IdentityLeaseDurationSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", options.IdentityLeaseDurationSeconds))
+	}
+	if options.IdentityLeaseRenewIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", options.IdentityLeaseRenewIntervalSeconds))
+	}
+	return errs
 }
 
 // Validate checks ServerRunOptions and return a slice of found errs.
@@ -169,12 +178,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, validateTokenRequest(s)...)
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, s.Logs.Validate()...)
-	if s.IdentityLeaseDurationSeconds <= 0 {
-		errs = append(errs, fmt.Errorf("--identity-lease-duration-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseDurationSeconds))
-	}
-	if s.IdentityLeaseRenewIntervalSeconds <= 0 {
-		errs = append(errs, fmt.Errorf("--identity-lease-renew-interval-seconds should be a positive number, but value '%d' provided", s.IdentityLeaseRenewIntervalSeconds))
-	}
+	errs = append(errs, validateAPIServerIdentity(s)...)
 
 	return errs
 }

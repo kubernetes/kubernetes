@@ -26,54 +26,6 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// NewDeltaFIFO returns a Queue which can be used to process changes to items.
-//
-// keyFunc is used to figure out what key an object should have. (It is
-// exposed in the returned DeltaFIFO's KeyOf() method, with additional handling
-// around deleted objects and queue state).
-//
-// 'knownObjects' may be supplied to modify the behavior of Delete,
-// Replace, and Resync.  It may be nil if you do not need those
-// modifications.
-//
-// TODO: consider merging keyLister with this object, tracking a list of
-//       "known" keys when Pop() is called. Have to think about how that
-//       affects error retrying.
-// NOTE: It is possible to misuse this and cause a race when using an
-//       external known object source.
-//       Whether there is a potential race depends on how the consumer
-//       modifies knownObjects. In Pop(), process function is called under
-//       lock, so it is safe to update data structures in it that need to be
-//       in sync with the queue (e.g. knownObjects).
-//
-//       Example:
-//       In case of sharedIndexInformer being a consumer
-//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
-//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
-//       there is no race as knownObjects (s.indexer) is modified safely
-//       under DeltaFIFO's lock. The only exceptions are GetStore() and
-//       GetIndexer() methods, which expose ways to modify the underlying
-//       storage. Currently these two methods are used for creating Lister
-//       and internal tests.
-//
-// Also see the comment on DeltaFIFO.
-//
-// Warning: This constructs a DeltaFIFO that does not differentiate between
-// events caused by a call to Replace (e.g., from a relist, which may
-// contain object updates), and synthetic events caused by a periodic resync
-// (which just emit the existing object). See https://issue.k8s.io/86015 for details.
-//
-// Use `NewDeltaFIFOWithOptions(DeltaFIFOOptions{..., EmitDeltaTypeReplaced: true})`
-// instead to receive a `Replaced` event depending on the type.
-//
-// Deprecated: Equivalent to NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: keyFunc, KnownObjects: knownObjects})
-func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
-	return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
-		KeyFunction:  keyFunc,
-		KnownObjects: knownObjects,
-	})
-}
-
 // DeltaFIFOOptions is the configuration parameters for DeltaFIFO. All are
 // optional.
 type DeltaFIFOOptions struct {
@@ -99,25 +51,6 @@ type DeltaFIFOOptions struct {
 	EmitDeltaTypeReplaced bool
 }
 
-// NewDeltaFIFOWithOptions returns a Queue which can be used to process changes to
-// items. See also the comment on DeltaFIFO.
-func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
-	if opts.KeyFunction == nil {
-		opts.KeyFunction = MetaNamespaceKeyFunc
-	}
-
-	f := &DeltaFIFO{
-		items:        map[string]Deltas{},
-		queue:        []string{},
-		keyFunc:      opts.KeyFunction,
-		knownObjects: opts.KnownObjects,
-
-		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
-	}
-	f.cond.L = &f.lock
-	return f
-}
-
 // DeltaFIFO is like FIFO, but differs in two ways.  One is that the
 // accumulator associated with a given object's key is not that object
 // but rather a Deltas, which is a slice of Delta values for that
@@ -128,8 +61,11 @@ func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
 // Deleted if the older Deleted's object is a
 // DeletedFinalStateUnknown.
 //
-// The other difference is that DeltaFIFO has an additional way that
-// an object can be applied to an accumulator, called Sync.
+// The other difference is that DeltaFIFO has two additional ways that
+// an object can be applied to an accumulator: Replaced and Sync.
+// If EmitDeltaTypeReplaced is not set to true, Sync will be used in
+// replace events for backwards compatibility.  Sync is used for periodic
+// resync events.
 //
 // DeltaFIFO is a producer-consumer queue, where a Reflector is
 // intended to be the producer, and the consumer is whatever calls
@@ -191,6 +127,107 @@ type DeltaFIFO struct {
 	// emitDeltaTypeReplaced is whether to emit the Replaced or Sync
 	// DeltaType when Replace() is called (to preserve backwards compat).
 	emitDeltaTypeReplaced bool
+}
+
+// DeltaType is the type of a change (addition, deletion, etc)
+type DeltaType string
+
+// Change type definition
+const (
+	Added   DeltaType = "Added"
+	Updated DeltaType = "Updated"
+	Deleted DeltaType = "Deleted"
+	// Replaced is emitted when we encountered watch errors and had to do a
+	// relist. We don't know if the replaced object has changed.
+	//
+	// NOTE: Previous versions of DeltaFIFO would use Sync for Replace events
+	// as well. Hence, Replaced is only emitted when the option
+	// EmitDeltaTypeReplaced is true.
+	Replaced DeltaType = "Replaced"
+	// Sync is for synthetic events during a periodic resync.
+	Sync DeltaType = "Sync"
+)
+
+// Delta is a member of Deltas (a list of Delta objects) which
+// in its turn is the type stored by a DeltaFIFO. It tells you what
+// change happened, and the object's state after* that change.
+//
+// [*] Unless the change is a deletion, and then you'll get the final
+//     state of the object before it was deleted.
+type Delta struct {
+	Type   DeltaType
+	Object interface{}
+}
+
+// Deltas is a list of one or more 'Delta's to an individual object.
+// The oldest delta is at index 0, the newest delta is the last one.
+type Deltas []Delta
+
+// NewDeltaFIFO returns a Queue which can be used to process changes to items.
+//
+// keyFunc is used to figure out what key an object should have. (It is
+// exposed in the returned DeltaFIFO's KeyOf() method, with additional handling
+// around deleted objects and queue state).
+//
+// 'knownObjects' may be supplied to modify the behavior of Delete,
+// Replace, and Resync.  It may be nil if you do not need those
+// modifications.
+//
+// TODO: consider merging keyLister with this object, tracking a list of
+//       "known" keys when Pop() is called. Have to think about how that
+//       affects error retrying.
+// NOTE: It is possible to misuse this and cause a race when using an
+//       external known object source.
+//       Whether there is a potential race depends on how the consumer
+//       modifies knownObjects. In Pop(), process function is called under
+//       lock, so it is safe to update data structures in it that need to be
+//       in sync with the queue (e.g. knownObjects).
+//
+//       Example:
+//       In case of sharedIndexInformer being a consumer
+//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
+//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//       there is no race as knownObjects (s.indexer) is modified safely
+//       under DeltaFIFO's lock. The only exceptions are GetStore() and
+//       GetIndexer() methods, which expose ways to modify the underlying
+//       storage. Currently these two methods are used for creating Lister
+//       and internal tests.
+//
+// Also see the comment on DeltaFIFO.
+//
+// Warning: This constructs a DeltaFIFO that does not differentiate between
+// events caused by a call to Replace (e.g., from a relist, which may
+// contain object updates), and synthetic events caused by a periodic resync
+// (which just emit the existing object). See https://issue.k8s.io/86015 for details.
+//
+// Use `NewDeltaFIFOWithOptions(DeltaFIFOOptions{..., EmitDeltaTypeReplaced: true})`
+// instead to receive a `Replaced` event depending on the type.
+//
+// Deprecated: Equivalent to NewDeltaFIFOWithOptions(DeltaFIFOOptions{KeyFunction: keyFunc, KnownObjects: knownObjects})
+func NewDeltaFIFO(keyFunc KeyFunc, knownObjects KeyListerGetter) *DeltaFIFO {
+	return NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:  keyFunc,
+		KnownObjects: knownObjects,
+	})
+}
+
+// NewDeltaFIFOWithOptions returns a Queue which can be used to process changes to
+// items. See also the comment on DeltaFIFO.
+func NewDeltaFIFOWithOptions(opts DeltaFIFOOptions) *DeltaFIFO {
+	if opts.KeyFunction == nil {
+		opts.KeyFunction = MetaNamespaceKeyFunc
+	}
+
+	f := &DeltaFIFO{
+		items:        map[string]Deltas{},
+		queue:        []string{},
+		keyFunc:      opts.KeyFunction,
+		knownObjects: opts.KnownObjects,
+
+		emitDeltaTypeReplaced: opts.EmitDeltaTypeReplaced,
+	}
+	f.cond.L = &f.lock
+	return f
 }
 
 var (
@@ -572,7 +609,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 			f.populated = true
 			// While there shouldn't be any queued deletions in the initial
 			// population of the queue, it's better to be on the safe side.
-			f.initialPopulationCount = len(list) + queuedDeletions
+			f.initialPopulationCount = keys.Len() + queuedDeletions
 		}
 
 		return nil
@@ -602,7 +639,7 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 	if !f.populated {
 		f.populated = true
-		f.initialPopulationCount = len(list) + queuedDeletions
+		f.initialPopulationCount = keys.Len() + queuedDeletions
 	}
 
 	return nil
@@ -672,39 +709,6 @@ type KeyGetter interface {
 	// GetByKey returns the value associated with the key, or sets exists=false.
 	GetByKey(key string) (value interface{}, exists bool, err error)
 }
-
-// DeltaType is the type of a change (addition, deletion, etc)
-type DeltaType string
-
-// Change type definition
-const (
-	Added   DeltaType = "Added"
-	Updated DeltaType = "Updated"
-	Deleted DeltaType = "Deleted"
-	// Replaced is emitted when we encountered watch errors and had to do a
-	// relist. We don't know if the replaced object has changed.
-	//
-	// NOTE: Previous versions of DeltaFIFO would use Sync for Replace events
-	// as well. Hence, Replaced is only emitted when the option
-	// EmitDeltaTypeReplaced is true.
-	Replaced DeltaType = "Replaced"
-	// Sync is for synthetic events during a periodic resync.
-	Sync DeltaType = "Sync"
-)
-
-// Delta is the type stored by a DeltaFIFO. It tells you what change
-// happened, and the object's state after* that change.
-//
-// [*] Unless the change is a deletion, and then you'll get the final
-//     state of the object before it was deleted.
-type Delta struct {
-	Type   DeltaType
-	Object interface{}
-}
-
-// Deltas is a list of one or more 'Delta's to an individual object.
-// The oldest delta is at index 0, the newest delta is the last one.
-type Deltas []Delta
 
 // Oldest is a convenience function that returns the oldest delta, or
 // nil if there are no deltas.

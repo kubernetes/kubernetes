@@ -116,7 +116,7 @@ func (PodDisruptionBudgetList) SwaggerDoc() map[string]string {
 var map_PodDisruptionBudgetSpec = map[string]string{
 	"":               "PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.",
 	"minAvailable":   "An eviction is allowed if at least \"minAvailable\" pods selected by \"selector\" will still be available after the eviction, i.e. even in the absence of the evicted pod.  So for example you can prevent all voluntary evictions by specifying \"100%\".",
-	"selector":       "Label query over pods whose evictions are managed by the disruption budget.",
+	"selector":       "Label query over pods whose evictions are managed by the disruption budget. A null selector selects no pods. An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods. In policy/v1, an empty selector will select all pods in the namespace.",
 	"maxUnavailable": "An eviction is allowed if at most \"maxUnavailable\" pods selected by \"selector\" are unavailable after the eviction, i.e. even in absence of the evicted pod. For example, one can prevent all voluntary evictions by specifying 0. This is a mutually exclusive setting with \"minAvailable\".",
 }
 
@@ -132,6 +132,7 @@ var map_PodDisruptionBudgetStatus = map[string]string{
 	"currentHealthy":     "current number of healthy pods",
 	"desiredHealthy":     "minimum desired number of healthy pods",
 	"expectedPods":       "total number of pods counted by this disruption budget",
+	"conditions":         "Conditions contain conditions for PDB. The disruption controller sets the DisruptionAllowed condition. The following are known values for the reason field (additional reasons could be added in the future): - SyncFailed: The controller encountered an error and wasn't able to compute\n              the number of allowed disruptions. Therefore no disruptions are\n              allowed and the status of the condition will be False.\n- InsufficientPods: The number of pods are either at or below the number\n                    required by the PodDisruptionBudget. No disruptions are\n                    allowed and the status of the condition will be False.\n- SufficientPods: There are more pods than required by the PodDisruptionBudget.\n                  The condition will be True, and the number of allowed\n                  disruptions are provided by the disruptionsAllowed property.",
 }
 
 func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {
@@ -139,7 +140,7 @@ func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PodSecurityPolicy = map[string]string{
-	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
+	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container. Deprecated in 1.21.",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec defines the policy enforced.",
 }

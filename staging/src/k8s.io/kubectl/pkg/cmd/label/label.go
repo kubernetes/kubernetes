@@ -175,11 +175,7 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.dryRunStrategy)
 	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
@@ -213,17 +209,26 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 
 // Validate checks to the LabelOptions to see if there is sufficient information run the command.
 func (o *LabelOptions) Validate() error {
-	if o.local && o.dryRunStrategy == cmdutil.DryRunServer {
-		return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
-	}
 	if o.all && len(o.selector) > 0 {
 		return fmt.Errorf("cannot set --all and --selector at the same time")
 	}
 	if o.all && len(o.fieldSelector) > 0 {
 		return fmt.Errorf("cannot set --all and --field-selector at the same time")
 	}
-	if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
-		return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+	if o.local {
+		if o.dryRunStrategy == cmdutil.DryRunServer {
+			return fmt.Errorf("cannot specify --local and --dry-run=server - did you mean --dry-run=client?")
+		}
+		if len(o.resources) > 0 {
+			return fmt.Errorf("can only use local files by -f pod.yaml or --filename=pod.json when --local=true is set")
+		}
+		if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+			return fmt.Errorf("one or more files must be specified as -f pod.yaml or --filename=pod.json")
+		}
+	} else {
+		if len(o.resources) < 1 && cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+			return fmt.Errorf("one or more resources must be specified as <resource> <name> or <resource>/<name>")
+		}
 	}
 	if len(o.newLabels) < 1 && len(o.removeLabels) < 1 && !o.list {
 		return fmt.Errorf("at least one label update is required")

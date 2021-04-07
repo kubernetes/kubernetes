@@ -31,10 +31,10 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Kubelet Volume Manager", func() {
+var _ = SIGDescribe("Kubelet Volume Manager", func() {
 	f := framework.NewDefaultFramework("kubelet-volume-manager")
 	ginkgo.Describe("Volume Manager", func() {
-		ginkgo.Context("On terminatation of pod with memory backed volume", func() {
+		ginkgo.Context("On termination of pod with memory backed volume", func() {
 			ginkgo.It("should remove the volume from the node [NodeConformance]", func() {
 				var (
 					memoryBackedPod *v1.Pod

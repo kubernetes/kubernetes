@@ -46,7 +46,9 @@ func TestMatching(t *testing.T) {
 
 func checkFTR(t *testing.T, ftr *fsTestingRecord) {
 	for expectMatch, digests1 := range ftr.digests {
-		t.Logf("%s.digests[%v] = %#+v", ftr.fs.Name, expectMatch, digests1)
+		if testDebugLogs {
+			t.Logf("%s.digests[%v] = %#+v", ftr.fs.Name, expectMatch, digests1)
+		}
 		for _, digests2 := range digests1 {
 			for _, digest := range digests2 {
 				actualMatch := matchesFlowSchema(digest, ftr.fs)
@@ -66,7 +68,9 @@ func TestPolicyRules(t *testing.T) {
 			r := rng.Float32()
 			n := rng.Float32()
 			policyRule, matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests := genPolicyRuleWithSubjects(t, rng, fmt.Sprintf("t%d", i), rng.Float32() < 0.2, r < 0.10, n < 0.10, r < 0.05, n < 0.05)
-			t.Logf("policyRule=%s, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
+			if testDebugLogs {
+				t.Logf("policyRule=%s, mrd=%#+v, mnd=%#+v, srd=%#+v, snd=%#+v", fcfmt.Fmt(policyRule), matchingRDigests, matchingNDigests, skippingRDigests, skippingNDigests)
+			}
 			for _, digest := range append(matchingRDigests, matchingNDigests...) {
 				if !matchesPolicyRule(digest, &policyRule) {
 					t.Errorf("Fail: expected %s to match %#+v but it did not", fcfmt.Fmt(policyRule), digest)

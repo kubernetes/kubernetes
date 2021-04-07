@@ -58,13 +58,16 @@ var (
 		A successful message will be printed to stdout indicating when the specified
         condition has been met. One can use -o option to change to output destination.`))
 
-	waitExample = templates.Examples(`
+	waitExample = templates.Examples(i18n.T(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
 
+		# The default value of status condition is true, you can set false.
+		kubectl wait --for=condition=Ready=false pod/busybox1
+
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
 		kubectl delete pod/busybox1
-		kubectl wait --for=delete pod/busybox1 --timeout=60s`)
+		kubectl wait --for=delete pod/busybox1 --timeout=60s`))
 )
 
 // errNoMatchingResources is returned when there is no resources matching a query.
@@ -134,7 +137,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name]. The default status value of condition-name is true, you can set false with condition=condition-name=false")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -442,6 +445,13 @@ func (w ConditionalWait) checkCondition(obj *unstructured.Unstructured) (bool, e
 		if !found || err != nil {
 			continue
 		}
+		generation, found, _ := unstructured.NestedInt64(obj.Object, "metadata", "generation")
+		if found {
+			observedGeneration, found := getObservedGeneration(obj, condition)
+			if found && observedGeneration < generation {
+				return false, nil
+			}
+		}
 		return strings.EqualFold(status, w.conditionStatus), nil
 	}
 
@@ -466,4 +476,13 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
 	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
+}
+
+func getObservedGeneration(obj *unstructured.Unstructured, condition map[string]interface{}) (int64, bool) {
+	conditionObservedGeneration, found, _ := unstructured.NestedInt64(condition, "observedGeneration")
+	if found {
+		return conditionObservedGeneration, true
+	}
+	statusObservedGeneration, found, _ := unstructured.NestedInt64(obj.Object, "status", "observedGeneration")
+	return statusObservedGeneration, found
 }

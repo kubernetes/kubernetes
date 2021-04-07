@@ -99,12 +99,12 @@ func NewAutoscaleOptions(ioStreams genericclioptions.IOStreams) *AutoscaleOption
 func NewCmdAutoscale(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewAutoscaleOptions(ioStreams)
 
-	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "statefulset"}
 
 	cmd := &cobra.Command{
 		Use:                   "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU]",
 		DisableFlagsInUseLine: true,
-		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, or ReplicationController"),
+		Short:                 i18n.T("Auto-scale a Deployment, ReplicaSet, StatefulSet, or ReplicationController"),
 		Long:                  autoscaleLong,
 		Example:               autoscaleExample,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -147,7 +147,7 @@ func (o *AutoscaleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args 
 	if err != nil {
 		return err
 	}
-	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.dryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 	o.createAnnotation = cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag)
 	o.builder = f.NewBuilder()
 	o.scaleKindResolver = scale.NewDiscoveryScaleKindResolver(discoveryClient)

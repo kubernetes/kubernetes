@@ -76,7 +76,7 @@ func TestMultiIndexKeys(t *testing.T) {
 	expected["bert"] = sets.NewString("one", "two")
 	expected["elmo"] = sets.NewString("tre")
 	expected["oscar"] = sets.NewString("two")
-	expected["elmo"] = sets.NewString() // let's just make sure we don't get anything back in this case
+	expected["elmo1"] = sets.NewString()
 	{
 		for k, v := range expected {
 			found := sets.String{}
@@ -87,9 +87,8 @@ func TestMultiIndexKeys(t *testing.T) {
 			for _, item := range indexResults {
 				found.Insert(item.(*v1.Pod).Name)
 			}
-			items := v.List()
-			if !found.HasAll(items...) {
-				t.Errorf("missing items, index %s, expected %v but found %v", k, items, found.List())
+			if !found.Equal(v) {
+				t.Errorf("missing items, index %s, expected %v but found %v", k, v.List(), found.List())
 			}
 		}
 	}

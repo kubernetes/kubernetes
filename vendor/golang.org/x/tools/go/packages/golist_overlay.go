@@ -1,3 +1,7 @@
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 package packages
 
 import (
@@ -5,12 +9,14 @@ import (
 	"fmt"
 	"go/parser"
 	"go/token"
-	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"golang.org/x/tools/internal/gocommand"
 )
 
 // processGolistOverlay provides rudimentary support for adding
@@ -28,9 +34,12 @@ func (state *golistState) processGolistOverlay(response *responseDeduper) (modif
 		// This is an approximation of import path to id. This can be
 		// wrong for tests, vendored packages, and a number of other cases.
 		havePkgs[pkg.PkgPath] = pkg.ID
-		x := commonDir(pkg.GoFiles)
-		if x != "" {
-			pkgOfDir[x] = append(pkgOfDir[x], pkg)
+		dir, err := commonDir(pkg.GoFiles)
+		if err != nil {
+			return nil, nil, err
+		}
+		if dir != "" {
+			pkgOfDir[dir] = append(pkgOfDir[dir], pkg)
 		}
 	}
 
@@ -89,9 +98,19 @@ func (state *golistState) processGolistOverlay(response *responseDeduper) (modif
 					// because the file is generated in another directory.
 					testVariantOf = p
 					continue nextPackage
+				} else if !isTestFile && hasTestFiles(p) {
+					// We're examining a test variant, but the overlaid file is
+					// a non-test file. Because the overlay implementation
+					// (currently) only adds a file to one package, skip this
+					// package, so that we can add the file to the production
+					// variant of the package. (https://golang.org/issue/36857
+					// tracks handling overlays on both the production and test
+					// variant of a package).
+					continue nextPackage
 				}
-				// We must have already seen the package of which this is a test variant.
 				if pkg != nil && p != pkg && pkg.PkgPath == p.PkgPath {
+					// We have already seen the production version of the
+					// for which p is a test variant.
 					if hasTestFiles(p) {
 						testVariantOf = pkg
 					}
@@ -102,8 +121,11 @@ func (state *golistState) processGolistOverlay(response *responseDeduper) (modif
 				}
 			}
 		}
-		// The overlay could have included an entirely new package.
-		if pkg == nil {
+		// The overlay could have included an entirely new package or an
+		// ad-hoc package. An ad-hoc package is one that we have manually
+		// constructed from inadequate `go list` results for a file= query.
+		// It will have the ID command-line-arguments.
+		if pkg == nil || pkg.ID == "command-line-arguments" {
 			// Try to find the module or gopath dir the file is contained in.
 			// Then for modules, add the module opath to the beginning.
 			pkgPath, ok, err := state.getPkgPath(dir)
@@ -113,42 +135,55 @@ func (state *golistState) processGolistOverlay(response *responseDeduper) (modif
 			if !ok {
 				break
 			}
+			var forTest string // only set for x tests
 			isXTest := strings.HasSuffix(pkgName, "_test")
 			if isXTest {
+				forTest = pkgPath
 				pkgPath += "_test"
 			}
 			id := pkgPath
-			if isTestFile && !isXTest {
-				id = fmt.Sprintf("%s [%s.test]", pkgPath, pkgPath)
-			}
-			// Try to reclaim a package with the same ID, if it exists in the response.
-			for _, p := range response.dr.Packages {
-				if reclaimPackage(p, id, opath, contents) {
-					pkg = p
-					break
+			if isTestFile {
+				if isXTest {
+					id = fmt.Sprintf("%s [%s.test]", pkgPath, forTest)
+				} else {
+					id = fmt.Sprintf("%s [%s.test]", pkgPath, pkgPath)
 				}
 			}
-			// Otherwise, create a new package.
-			if pkg == nil {
-				pkg = &Package{
-					PkgPath: pkgPath,
-					ID:      id,
-					Name:    pkgName,
-					Imports: make(map[string]*Package),
-				}
-				response.addPackage(pkg)
-				havePkgs[pkg.PkgPath] = id
-				// Add the production package's sources for a test variant.
-				if isTestFile && !isXTest && testVariantOf != nil {
-					pkg.GoFiles = append(pkg.GoFiles, testVariantOf.GoFiles...)
-					pkg.CompiledGoFiles = append(pkg.CompiledGoFiles, testVariantOf.CompiledGoFiles...)
-					// Add the package under test and its imports to the test variant.
-					pkg.forTest = testVariantOf.PkgPath
-					for k, v := range testVariantOf.Imports {
-						pkg.Imports[k] = &Package{ID: v.ID}
+			if pkg != nil {
+				// TODO(rstambler): We should change the package's path and ID
+				// here. The only issue is that this messes with the roots.
+			} else {
+				// Try to reclaim a package with the same ID, if it exists in the response.
+				for _, p := range response.dr.Packages {
+					if reclaimPackage(p, id, opath, contents) {
+						pkg = p
+						break
 					}
 				}
-				// TODO(rstambler): Handle forTest for x_tests.
+				// Otherwise, create a new package.
+				if pkg == nil {
+					pkg = &Package{
+						PkgPath: pkgPath,
+						ID:      id,
+						Name:    pkgName,
+						Imports: make(map[string]*Package),
+					}
+					response.addPackage(pkg)
+					havePkgs[pkg.PkgPath] = id
+					// Add the production package's sources for a test variant.
+					if isTestFile && !isXTest && testVariantOf != nil {
+						pkg.GoFiles = append(pkg.GoFiles, testVariantOf.GoFiles...)
+						pkg.CompiledGoFiles = append(pkg.CompiledGoFiles, testVariantOf.CompiledGoFiles...)
+						// Add the package under test and its imports to the test variant.
+						pkg.forTest = testVariantOf.PkgPath
+						for k, v := range testVariantOf.Imports {
+							pkg.Imports[k] = &Package{ID: v.ID}
+						}
+					}
+					if isXTest {
+						pkg.forTest = forTest
+					}
+				}
 			}
 		}
 		if !fileExists {
@@ -224,7 +259,7 @@ func (state *golistState) processGolistOverlay(response *responseDeduper) (modif
 	return modifiedPkgs, needPkgs, err
 }
 
-// resolveImport finds the the ID of a package given its import path.
+// resolveImport finds the ID of a package given its import path.
 // In particular, it will find the right vendored copy when in GOPATH mode.
 func (state *golistState) resolveImport(sourceDir, importPath string) (string, error) {
 	env, err := state.getEnv()
@@ -299,24 +334,25 @@ func (state *golistState) determineRootDirs() (map[string]string, error) {
 }
 
 func (state *golistState) determineRootDirsModules() (map[string]string, error) {
-	// This will only return the root directory for the main module.
-	// For now we only support overlays in main modules.
+	// List all of the modules--the first will be the directory for the main
+	// module. Any replaced modules will also need to be treated as roots.
 	// Editing files in the module cache isn't a great idea, so we don't
-	// plan to ever support that, but editing files in replaced modules
-	// is something we may want to support. To do that, we'll want to
-	// do a go list -m to determine the replaced module's module path and
-	// directory, and then a go list -m {{with .Replace}}{{.Dir}}{{end}} <replaced module's path>
-	// from the main module to determine if that module is actually a replacement.
-	// See bcmills's comment here: https://github.com/golang/go/issues/37629#issuecomment-594179751
-	// for more information.
-	out, err := state.invokeGo("list", "-m", "-json")
+	// plan to ever support that.
+	out, err := state.invokeGo("list", "-m", "-json", "all")
 	if err != nil {
-		return nil, err
+		// 'go list all' will fail if we're outside of a module and
+		// GO111MODULE=on. Try falling back without 'all'.
+		var innerErr error
+		out, innerErr = state.invokeGo("list", "-m", "-json")
+		if innerErr != nil {
+			return nil, err
+		}
 	}
-	m := map[string]string{}
-	type jsonMod struct{ Path, Dir string }
+	roots := map[string]string{}
+	modules := map[string]string{}
+	var i int
 	for dec := json.NewDecoder(out); dec.More(); {
-		mod := new(jsonMod)
+		mod := new(gocommand.ModuleJSON)
 		if err := dec.Decode(mod); err != nil {
 			return nil, err
 		}
@@ -326,10 +362,15 @@ func (state *golistState) determineRootDirsModules() (map[string]string, error) 
 			if err != nil {
 				return nil, err
 			}
-			m[absDir] = mod.Path
+			modules[absDir] = mod.Path
+			// The first result is the main module.
+			if i == 0 || mod.Replace != nil && mod.Replace.Path != "" {
+				roots[absDir] = mod.Path
+			}
 		}
+		i++
 	}
-	return m, nil
+	return roots, nil
 }
 
 func (state *golistState) determineRootDirsGOPATH() (map[string]string, error) {
@@ -402,20 +443,21 @@ func extractPackageName(filename string, contents []byte) (string, bool) {
 	return f.Name.Name, true
 }
 
-func commonDir(a []string) string {
+// commonDir returns the directory that all files are in, "" if files is empty,
+// or an error if they aren't in the same directory.
+func commonDir(files []string) (string, error) {
 	seen := make(map[string]bool)
-	x := append([]string{}, a...)
-	for _, f := range x {
+	for _, f := range files {
 		seen[filepath.Dir(f)] = true
 	}
 	if len(seen) > 1 {
-		log.Fatalf("commonDir saw %v for %v", seen, x)
+		return "", fmt.Errorf("files (%v) are in more than one directory: %v", files, seen)
 	}
 	for k := range seen {
-		// len(seen) == 1
-		return k
+		// seen has only one element; return it.
+		return k, nil
 	}
-	return "" // no files
+	return "", nil // no files
 }
 
 // It is possible that the files in the disk directory dir have a different package
@@ -454,4 +496,80 @@ func maybeFixPackageName(newName string, isTestFile bool, pkgsOfDir []*Package) 
 	for _, p := range pkgsOfDir {
 		p.Name = newName
 	}
+}
+
+// This function is copy-pasted from
+// https://github.com/golang/go/blob/9706f510a5e2754595d716bd64be8375997311fb/src/cmd/go/internal/search/search.go#L360.
+// It should be deleted when we remove support for overlays from go/packages.
+//
+// NOTE: This does not handle any ./... or ./ style queries, as this function
+// doesn't know the working directory.
+//
+// matchPattern(pattern)(name) reports whether
+// name matches pattern. Pattern is a limited glob
+// pattern in which '...' means 'any string' and there
+// is no other special syntax.
+// Unfortunately, there are two special cases. Quoting "go help packages":
+//
+// First, /... at the end of the pattern can match an empty string,
+// so that net/... matches both net and packages in its subdirectories, like net/http.
+// Second, any slash-separated pattern element containing a wildcard never
+// participates in a match of the "vendor" element in the path of a vendored
+// package, so that ./... does not match packages in subdirectories of
+// ./vendor or ./mycode/vendor, but ./vendor/... and ./mycode/vendor/... do.
+// Note, however, that a directory named vendor that itself contains code
+// is not a vendored package: cmd/vendor would be a command named vendor,
+// and the pattern cmd/... matches it.
+func matchPattern(pattern string) func(name string) bool {
+	// Convert pattern to regular expression.
+	// The strategy for the trailing /... is to nest it in an explicit ? expression.
+	// The strategy for the vendor exclusion is to change the unmatchable
+	// vendor strings to a disallowed code point (vendorChar) and to use
+	// "(anything but that codepoint)*" as the implementation of the ... wildcard.
+	// This is a bit complicated but the obvious alternative,
+	// namely a hand-written search like in most shell glob matchers,
+	// is too easy to make accidentally exponential.
+	// Using package regexp guarantees linear-time matching.
+
+	const vendorChar = "\x00"
+
+	if strings.Contains(pattern, vendorChar) {
+		return func(name string) bool { return false }
+	}
+
+	re := regexp.QuoteMeta(pattern)
+	re = replaceVendor(re, vendorChar)
+	switch {
+	case strings.HasSuffix(re, `/`+vendorChar+`/\.\.\.`):
+		re = strings.TrimSuffix(re, `/`+vendorChar+`/\.\.\.`) + `(/vendor|/` + vendorChar + `/\.\.\.)`
+	case re == vendorChar+`/\.\.\.`:
+		re = `(/vendor|/` + vendorChar + `/\.\.\.)`
+	case strings.HasSuffix(re, `/\.\.\.`):
+		re = strings.TrimSuffix(re, `/\.\.\.`) + `(/\.\.\.)?`
+	}
+	re = strings.ReplaceAll(re, `\.\.\.`, `[^`+vendorChar+`]*`)
+
+	reg := regexp.MustCompile(`^` + re + `$`)
+
+	return func(name string) bool {
+		if strings.Contains(name, vendorChar) {
+			return false
+		}
+		return reg.MatchString(replaceVendor(name, vendorChar))
+	}
+}
+
+// replaceVendor returns the result of replacing
+// non-trailing vendor path elements in x with repl.
+func replaceVendor(x, repl string) string {
+	if !strings.Contains(x, "vendor") {
+		return x
+	}
+	elem := strings.Split(x, "/")
+	for i := 0; i < len(elem)-1; i++ {
+		if elem[i] == "vendor" {
+			elem[i] = repl
+		}
+	}
+	return strings.Join(elem, "/")
 }

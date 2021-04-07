@@ -63,6 +63,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		test := testsuites.StorageClassTest{
 			Name:      "default",
+			Timeouts:  f.Timeouts,
 			ClaimSize: "2Gi",
 		}
 
@@ -125,7 +126,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod %s", pod.Name)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -150,7 +151,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			e2eskipper.Skipf("Environment does not support getting controller-manager metrics - skipping")
 		}
 
-		ginkgo.By("Geting default storageclass")
+		ginkgo.By("Getting default storageclass")
 		defaultClass, err := c.StorageV1().StorageClasses().Get(context.TODO(), defaultScName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Error getting default storageclass: %v", err)
 		pluginName := defaultClass.Provisioner
@@ -185,7 +186,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
 
-		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, framework.PodStartShortTimeout)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectError(err)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -211,7 +212,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -222,7 +223,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			kubeletmetrics.VolumeStatsUsedBytesKey,
 			kubeletmetrics.VolumeStatsCapacityBytesKey,
 			kubeletmetrics.VolumeStatsAvailableBytesKey,
-			kubeletmetrics.VolumeStatsUsedBytesKey,
+			kubeletmetrics.VolumeStatsInodesKey,
 			kubeletmetrics.VolumeStatsInodesFreeKey,
 			kubeletmetrics.VolumeStatsInodesUsedKey,
 		}
@@ -268,7 +269,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -299,7 +300,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 
-		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 
 		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -336,7 +337,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Create pod
 		pod, err = c.CoreV1().Pods(ns).Create(context.TODO(), pod, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
-		err = e2epod.WaitForPodRunningInNamespace(c, pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "Error starting pod ", pod.Name)
 		pod, err = c.CoreV1().Pods(ns).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)

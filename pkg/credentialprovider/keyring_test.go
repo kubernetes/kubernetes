@@ -203,7 +203,7 @@ func TestDockerKeyringForGlob(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -271,7 +271,7 @@ func TestKeyringMiss(t *testing.T) {
 }`, test.globURL, email, auth)
 
 		keyring := &BasicDockerKeyring{}
-		if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+		if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 			t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 		} else {
 			keyring.Add(cfg)
@@ -299,7 +299,7 @@ func TestKeyringMissWithDockerHubCredentials(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -325,7 +325,7 @@ func TestKeyringHitWithUnqualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -366,7 +366,7 @@ func TestKeyringHitWithUnqualifiedLibraryDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -407,7 +407,7 @@ func TestKeyringHitWithQualifiedDockerHub(t *testing.T) {
 }`, url, email, auth)
 
 	keyring := &BasicDockerKeyring{}
-	if cfg, err := readDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
+	if cfg, err := ReadDockerConfigFileFromBytes([]byte(sampleDockerConfig)); err != nil {
 		t.Errorf("Error processing json blob %q, %v", sampleDockerConfig, err)
 	} else {
 		keyring.Add(cfg)
@@ -452,21 +452,6 @@ func TestIsDefaultRegistryMatch(t *testing.T) {
 			}
 		}
 	}
-}
-
-type testProvider struct {
-	Count int
-}
-
-// Enabled implements dockerConfigProvider
-func (d *testProvider) Enabled() bool {
-	return true
-}
-
-// Provide implements dockerConfigProvider
-func (d *testProvider) Provide(image string) DockerConfig {
-	d.Count++
-	return DockerConfig{}
 }
 
 func TestProvidersDockerKeyring(t *testing.T) {

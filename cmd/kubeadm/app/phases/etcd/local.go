@@ -162,9 +162,13 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	// only add the new member if it doesn't already exists
 	var exists bool
 	klog.V(1).Infof("[etcd] Checking if the etcd member already exists: %s", etcdPeerAddress)
-	for _, member := range initialCluster {
-		if member.PeerURL == etcdPeerAddress {
+	for i := range initialCluster {
+		if initialCluster[i].PeerURL == etcdPeerAddress {
 			exists = true
+			if len(initialCluster[i].Name) == 0 {
+				klog.V(1).Infof("[etcd] etcd member name is empty. Setting it to the node name: %s", nodeName)
+				initialCluster[i].Name = nodeName
+			}
 			break
 		}
 	}

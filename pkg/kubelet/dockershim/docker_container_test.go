@@ -182,9 +182,6 @@ func TestContainerStatus(t *testing.T) {
 	imageName := "iamimage"
 	config := makeContainerConfig(sConfig, "pause", imageName, 0, labels, annotations)
 
-	var defaultTime time.Time
-	dt := defaultTime.UnixNano()
-	ct, st, ft := dt, dt, dt
 	state := runtimeapi.ContainerState_CONTAINER_CREATED
 	imageRef := DockerImageIDPrefix + imageName
 	// The following variables are not set in FakeDockerClient.
@@ -193,9 +190,6 @@ func TestContainerStatus(t *testing.T) {
 
 	expected := &runtimeapi.ContainerStatus{
 		State:       state,
-		CreatedAt:   ct,
-		StartedAt:   st,
-		FinishedAt:  ft,
 		Metadata:    config.Metadata,
 		Image:       config.Image,
 		ImageRef:    imageRef,

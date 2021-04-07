@@ -34,7 +34,7 @@ const (
 	Name = "NodeName"
 
 	// ErrReason returned when node name doesn't match.
-	ErrReason = "node(s) didn't match the requested hostname"
+	ErrReason = "node(s) didn't match the requested node name"
 )
 
 // Name returns name of the plugin. It is used in logs, etc.

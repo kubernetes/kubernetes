@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -28,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	policy "k8s.io/api/policy/v1beta1"
+	policy "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,6 +42,7 @@ import (
 	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -100,6 +100,7 @@ func getDefaultDefaultPreemptionArgs() *config.DefaultPreemptionArgs {
 
 func TestPostFilter(t *testing.T) {
 	onePodRes := map[v1.ResourceName]string{v1.ResourcePods: "1"}
+	nodeRes := map[v1.ResourceName]string{v1.ResourceCPU: "200m", v1.ResourceMemory: "400"}
 	tests := []struct {
 		name                  string
 		pod                   *v1.Pod
@@ -138,7 +139,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable),
 			},
 			wantResult: nil,
-			wantStatus: framework.NewStatus(framework.Unschedulable),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/1 nodes are available: 1 No victims found on node node1 for preemptor pod p."),
 		},
 		{
 			name: "preemption should respect filteredNodesStatuses",
@@ -153,7 +154,7 @@ func TestPostFilter(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable),
 			},
 			wantResult: nil,
-			wantStatus: framework.NewStatus(framework.Unschedulable),
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/1 nodes are available: 1 Preemption is not helpful for scheduling."),
 		},
 		{
 			name: "pod can be made schedulable on one node",
@@ -194,6 +195,62 @@ func TestPostFilter(t *testing.T) {
 			},
 			wantStatus: framework.NewStatus(framework.Success),
 		},
+		{
+			name: "no candidate nodes found, no enough resource after removing low priority pods",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(nodeRes).Obj(), // no enough CPU resource
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(), // no enough CPU resource
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/2 nodes are available: 2 Insufficient cpu."),
+		},
+		{
+			name: "no candidate nodes found with mixed reasons, no lower priority pod and no enough CPU resource",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Priority(highPriority).Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(onePodRes).Obj(), // no pod will be preempted
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),   // no enough CPU resource
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node1": framework.NewStatus(framework.Unschedulable),
+				"node2": framework.NewStatus(framework.Unschedulable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/2 nodes are available: 1 Insufficient cpu, 1 No victims found on node node1 for preemptor pod p."),
+		},
+		{
+			name: "no candidate nodes found with mixed reason, 2 UnschedulableAndUnresolvable nodes and 2 nodes don't have enough CPU resource",
+			pod:  st.MakePod().Name("p").UID("p").Namespace(v1.NamespaceDefault).Priority(highPriority).Req(largeRes).Obj(),
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").UID("p1").Namespace(v1.NamespaceDefault).Node("node1").Obj(),
+				st.MakePod().Name("p2").UID("p2").Namespace(v1.NamespaceDefault).Node("node2").Obj(),
+			},
+			nodes: []*v1.Node{
+				st.MakeNode().Name("node1").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node2").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node3").Capacity(nodeRes).Obj(),
+				st.MakeNode().Name("node4").Capacity(nodeRes).Obj(),
+			},
+			filteredNodesStatuses: framework.NodeToStatusMap{
+				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable),
+			},
+			wantResult: nil,
+			wantStatus: framework.NewStatus(framework.Unschedulable, "0/4 nodes are available: 2 Insufficient cpu, 2 Preemption is not helpful for scheduling."),
+		},
 	}
 
 	for _, tt := range tests {
@@ -220,7 +277,7 @@ func TestPostFilter(t *testing.T) {
 			if tt.extender != nil {
 				extenders = append(extenders, tt.extender)
 			}
-			f, err := st.NewFramework(registeredPlugins,
+			f, err := st.NewFramework(registeredPlugins, "",
 				frameworkruntime.WithClientSet(cs),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithInformerFactory(informerFactory),
@@ -245,11 +302,11 @@ func TestPostFilter(t *testing.T) {
 			}
 
 			gotResult, gotStatus := p.PostFilter(context.TODO(), state, tt.pod, tt.filteredNodesStatuses)
-			if !reflect.DeepEqual(gotStatus, tt.wantStatus) {
-				t.Errorf("Status does not match: %v, want: %v", gotStatus, tt.wantStatus)
+			if diff := cmp.Diff(tt.wantStatus, gotStatus); diff != "" {
+				t.Errorf("Unexpected status (-want, +got):\n%s", diff)
 			}
-			if diff := cmp.Diff(gotResult, tt.wantResult); diff != "" {
-				t.Errorf("Unexpected postFilterResult (-want, +got): %s", diff)
+			if diff := cmp.Diff(tt.wantResult, gotResult); diff != "" {
+				t.Errorf("Unexpected postFilterResult (-want, +got):\n%s", diff)
 			}
 		})
 	}
@@ -474,7 +531,9 @@ func TestDryRunPreemption(t *testing.T) {
 			name: "pod with anti-affinity is preempted",
 			registerPlugins: []st.RegisterPluginFunc{
 				st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-				st.RegisterPluginAsExtensions(interpodaffinity.Name, interpodaffinity.New, "Filter", "PreFilter"),
+				st.RegisterPluginAsExtensions(interpodaffinity.Name, func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
+					return interpodaffinity.New(plArgs, fh, feature.Features{})
+				}, "Filter", "PreFilter"),
 			},
 			nodeNames: []string{"node1", "node2"},
 			testPods: []*v1.Pod{
@@ -935,16 +994,30 @@ func TestDryRunPreemption(t *testing.T) {
 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 			)
 			registeredPlugins = append(registeredPlugins, tt.registerPlugins...)
-			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(), 0)
+			objs := []runtime.Object{&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ""}}}
+			informerFactory := informers.NewSharedInformerFactory(clientsetfake.NewSimpleClientset(objs...), 0)
+			parallelism := parallelize.DefaultParallelism
+			if tt.disableParallelism {
+				// We need disableParallelism because of the non-deterministic nature
+				// of the results of tests that set custom minCandidateNodesPercentage
+				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
+				parallelism = 1
+			}
 			fwk, err := st.NewFramework(
-				registeredPlugins,
+				registeredPlugins, "",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 				frameworkruntime.WithInformerFactory(informerFactory),
+				frameworkruntime.WithParallelism(parallelism),
 			)
 			if err != nil {
 				t.Fatal(err)
 			}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			informerFactory.Start(ctx.Done())
+			informerFactory.WaitForCacheSync(ctx.Done())
 
 			nodeInfos, err := snapshot.NodeInfos().List()
 			if err != nil {
@@ -953,17 +1026,6 @@ func TestDryRunPreemption(t *testing.T) {
 			sort.Slice(nodeInfos, func(i, j int) bool {
 				return nodeInfos[i].Node().Name < nodeInfos[j].Node().Name
 			})
-
-			if tt.disableParallelism {
-				// We need disableParallelism because of the non-deterministic nature
-				// of the results of tests that set custom minCandidateNodesPercentage
-				// or minCandidateNodesAbsolute. This is only done in a handful of tests.
-				oldParallelism := parallelize.GetParallelism()
-				parallelize.SetParallelism(1)
-				t.Cleanup(func() {
-					parallelize.SetParallelism(oldParallelism)
-				})
-			}
 
 			if tt.args == nil {
 				tt.args = getDefaultDefaultPreemptionArgs()
@@ -978,10 +1040,7 @@ func TestDryRunPreemption(t *testing.T) {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
 				offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
-				if err != nil {
-					t.Fatal(err)
-				}
+				got, _ := dryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1182,6 +1241,7 @@ func TestSelectBestCandidate(t *testing.T) {
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
 			)
@@ -1201,7 +1261,7 @@ func TestSelectBestCandidate(t *testing.T) {
 
 			pl := &DefaultPreemption{args: *getDefaultDefaultPreemptionArgs()}
 			offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates := dryRunPreemption(context.Background(), fwk.PreemptHandle(), state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			candidates, _ := dryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := SelectCandidate(candidates)
 			found := false
 			for _, nodeName := range tt.expected {
@@ -1261,25 +1321,26 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		var nodes []*v1.Node
-		for _, n := range test.nodes {
-			nodes = append(nodes, st.MakeNode().Name(n).Obj())
-		}
-		snapshot := internalcache.NewSnapshot(test.pods, nodes)
-		if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
-			t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			var nodes []*v1.Node
+			for _, n := range test.nodes {
+				nodes = append(nodes, st.MakeNode().Name(n).Obj())
+			}
+			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
+				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
+			}
+		})
 	}
 }
 
 func TestNodesWherePreemptionMightHelp(t *testing.T) {
 	// Prepare 4 nodes names.
 	nodeNames := []string{"node1", "node2", "node3", "node4"}
-
 	tests := []struct {
 		name          string
 		nodesStatuses framework.NodeToStatusMap
-		expected      map[string]bool // set of expected node names. Value is ignored.
+		expected      sets.String // set of expected node names.
 	}{
 		{
 			name: "No node should be attempted",
@@ -1289,7 +1350,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
 			},
-			expected: map[string]bool{},
+			expected: sets.NewString(),
 		},
 		{
 			name: "ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
@@ -1298,7 +1359,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
 			},
-			expected: map[string]bool{"node1": true, "node4": true},
+			expected: sets.NewString("node1", "node4"),
 		},
 		{
 			name: "pod with both pod affinity and anti-affinity should be tried",
@@ -1306,7 +1367,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: sets.NewString("node1", "node3", "node4"),
 		},
 		{
 			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAffinityNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod affinity or anti-affinity",
@@ -1314,7 +1375,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
 				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAffinityNotMatch),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "Mix of failed predicates works fine",
@@ -1322,14 +1383,14 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
 				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "Node condition errors should be considered unresolvable",
 			nodesStatuses: framework.NodeToStatusMap{
 				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
 			},
-			expected: map[string]bool{"node2": true, "node3": true, "node4": true},
+			expected: sets.NewString("node2", "node3", "node4"),
 		},
 		{
 			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
@@ -1338,7 +1399,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
 				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
 			},
-			expected: map[string]bool{"node4": true},
+			expected: sets.NewString("node4"),
 		},
 		{
 			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
@@ -1347,7 +1408,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
 				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
 			},
-			expected: map[string]bool{"node1": true, "node3": true, "node4": true},
+			expected: sets.NewString("node1", "node3", "node4"),
 		},
 		{
 			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
@@ -1356,7 +1417,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: sets.NewString("node1", "node3"),
 		},
 		{
 			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
@@ -1365,7 +1426,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				"node3": framework.NewStatus(framework.Unschedulable, ""),
 				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
 			},
-			expected: map[string]bool{"node1": true, "node3": true},
+			expected: sets.NewString("node1", "node3"),
 		},
 	}
 
@@ -1377,7 +1438,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				ni.SetNode(st.MakeNode().Name(name).Obj())
 				nodeInfos = append(nodeInfos, ni)
 			}
-			nodes := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
+			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
 			if len(tt.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
 			}
@@ -1581,13 +1642,13 @@ func TestPreempt(t *testing.T) {
 				extender.CachedNodeNameToInfo = cachedNodeInfoMap
 				extenders = append(extenders, extender)
 			}
-
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					test.registerPlugin,
 					st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
 					st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
 				},
+				"",
 				frameworkruntime.WithClientSet(client),
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
@@ -1612,9 +1673,9 @@ func TestPreempt(t *testing.T) {
 				pdbLister: getPDBLister(informerFactory),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
-			node, err := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
-			if err != nil {
-				t.Errorf("unexpected error in preemption: %v", err)
+			node, status := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
 			if len(node) != 0 && node != test.expectedNode {
 				t.Errorf("expected node: %v, got: %v", test.expectedNode, node)
@@ -1649,9 +1710,9 @@ func TestPreempt(t *testing.T) {
 			}
 
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, err = pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
-			if err != nil {
-				t.Errorf("unexpected error in preemption: %v", err)
+			node, status = pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error in preemption: %v", status.AsError())
 			}
 			if len(node) != 0 && len(deletedPodNames) > 0 {
 				t.Errorf("didn't expect any more preemption. Node %v is selected for preemption.", node)

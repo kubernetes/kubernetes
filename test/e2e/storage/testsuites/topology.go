@@ -34,85 +34,85 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
-	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type topologyTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 type topologyTest struct {
-	config        *PerTestConfig
+	config        *storageframework.PerTestConfig
 	driverCleanup func()
 
 	migrationCheck *migrationOpCheck
 
-	resource      VolumeResource
+	resource      storageframework.VolumeResource
 	pod           *v1.Pod
 	allTopologies []topology
 }
 
 type topology map[string]string
 
-var _ TestSuite = &topologyTestSuite{}
-
-// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
-func InitTopologyTestSuite() TestSuite {
+// InitCustomTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomTopologyTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &topologyTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "topology",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.TopologyImmediate,
-				testpatterns.TopologyDelayed,
-			},
+		tsInfo: storageframework.TestSuiteInfo{
+			Name:         "topology",
+			TestPatterns: patterns,
 		},
 	}
 }
 
-func (t *topologyTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitTopologyTestSuite returns topologyTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitTopologyTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.TopologyImmediate,
+		storageframework.TopologyDelayed,
+	}
+	return InitCustomTopologyTestSuite(patterns)
+}
+
+func (t *topologyTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *topologyTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	dInfo := driver.GetDriverInfo()
+	var ok bool
+	_, ok = driver.(storageframework.DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
+	}
+
+	if !dInfo.Capabilities[storageframework.CapTopology] {
+		e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
+	}
 }
 
-func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *topologyTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
 		dInfo   = driver.GetDriverInfo()
-		dDriver DynamicPVTestDriver
+		dDriver storageframework.DynamicPVTestDriver
 		cs      clientset.Interface
 		err     error
 	)
 
-	ginkgo.BeforeEach(func() {
-		// Check preconditions.
-		ok := false
-		dDriver, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
-		}
-
-		if !dInfo.Capabilities[CapTopology] {
-			e2eskipper.Skipf("Driver %q does not support topology - skipping", dInfo.Name)
-		}
-
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("topology")
+	f := framework.NewFrameworkWithCustomTimeouts("topology", storageframework.GetDriverTimeouts(driver))
 
 	init := func() topologyTest {
-
+		dDriver, _ = driver.(storageframework.DynamicPVTestDriver)
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 
-		l.resource = VolumeResource{
+		l.resource = storageframework.VolumeResource{
 			Config:  l.config,
 			Pattern: pattern,
 		}
@@ -141,7 +141,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 		testVolumeSizeRange := t.GetTestSuiteInfo().SupportedSizeRange
 		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
-		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		claimSize, err := storageutils.GetSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		l.resource.Pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
@@ -154,7 +154,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 	cleanup := func(l topologyTest) {
 		t.CleanupResources(cs, &l)
-		err := tryFunc(l.driverCleanup)
+		err := storageutils.TryFunc(l.driverCleanup)
 		l.driverCleanup = nil
 		framework.ExpectNoError(err, "while cleaning up driver")
 
@@ -176,7 +176,7 @@ func (t *topologyTestSuite) DefineTests(driver TestDriver, pattern testpatterns.
 
 		t.createResources(cs, &l, nil)
 
-		err = e2epod.WaitForPodRunningInNamespace(cs, l.pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verifying pod scheduled to correct node")
@@ -337,8 +337,8 @@ func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyT
 		NS:            l.config.Framework.Namespace.Name,
 		PVCs:          []*v1.PersistentVolumeClaim{l.resource.Pvc},
 		NodeSelection: e2epod.NodeSelection{Affinity: affinity},
-		SeLinuxLabel:  e2evolume.GetLinuxLabel(),
-		ImageID:       e2evolume.GetDefaultTestImageID(),
+		SeLinuxLabel:  e2epod.GetLinuxLabel(),
+		ImageID:       e2epod.GetDefaultTestImageID(),
 	}
 	l.pod, err = e2epod.MakeSecPod(&podConfig)
 	framework.ExpectNoError(err)

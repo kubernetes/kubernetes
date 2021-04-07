@@ -136,6 +136,10 @@ message PodDisruptionBudgetSpec {
 
   // Label query over pods whose evictions are managed by the disruption
   // budget.
+  // A null selector selects no pods.
+  // An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+  // In policy/v1, an empty selector will select all pods in the namespace.
+  // +patchStrategy=replace
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector selector = 2;
 
@@ -180,10 +184,31 @@ message PodDisruptionBudgetStatus {
 
   // total number of pods counted by this disruption budget
   optional int32 expectedPods = 6;
+
+  // Conditions contain conditions for PDB. The disruption controller sets the
+  // DisruptionAllowed condition. The following are known values for the reason field
+  // (additional reasons could be added in the future):
+  // - SyncFailed: The controller encountered an error and wasn't able to compute
+  //               the number of allowed disruptions. Therefore no disruptions are
+  //               allowed and the status of the condition will be False.
+  // - InsufficientPods: The number of pods are either at or below the number
+  //                     required by the PodDisruptionBudget. No disruptions are
+  //                     allowed and the status of the condition will be False.
+  // - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+  //                   The condition will be True, and the number of allowed
+  //                   disruptions are provided by the disruptionsAllowed property.
+  //
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=type
+  repeated k8s.io.apimachinery.pkg.apis.meta.v1.Condition conditions = 7;
 }
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// Deprecated in 1.21.
 message PodSecurityPolicy {
   // Standard object's metadata.
   // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata

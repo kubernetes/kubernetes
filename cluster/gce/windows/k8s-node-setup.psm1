@@ -57,8 +57,8 @@ $GCE_METADATA_SERVER = "169.254.169.254"
 # exist until an initial HNS network has been created on the Windows node - see
 # Add_InitialHnsNetwork().
 $MGMT_ADAPTER_NAME = "vEthernet (Ethernet*"
-$CRICTL_VERSION = 'v1.19.0'
-$CRICTL_SHA256 = 'df60ff65ab71c5cf1d8c38f51db6f05e3d60a45d3a3293c3248c925c25375921'
+$CRICTL_VERSION = 'v1.20.0'
+$CRICTL_SHA256 = 'cc909108ee84d39b2e9d7ac0cb9599b6fa7fc51f5a7da7014052684cd3e3f65e'
 
 Import-Module -Force C:\common.psm1
 
@@ -159,6 +159,20 @@ function Dump-DebugInfoToConsole {
     Log-Output "Installed hotfixes:`n$hotfixes"
     Log-Output "GCE Windows image:`n$image"
   } Catch { }
+}
+
+# Configures Window Defender preferences
+function Configure-WindowsDefender {
+  if ((Get-WindowsFeature -Name 'Windows-Defender').Installed) {
+    Log-Output "Configuring Windows Defender preferences"
+    Set-MpPreference -SubmitSamplesConsent NeverSend
+    Log-Output "Disabling Windows Defender sample submission"
+    Set-MpPreference -MAPSReporting Disabled
+    Log-Output "Disabling Windows Defender Microsoft Active Protection Service Reporting"
+
+    Log-Output "Defender Preferences"
+    Get-MpPreference
+  }
 }
 
 # Converts the kube-env string in Yaml
@@ -273,6 +287,7 @@ function Set-EnvironmentVars {
     "LOGS_DIR" = ${kube_env}['LOGS_DIR']
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
+    "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
@@ -302,10 +317,13 @@ function Set-PrerequisiteOptions {
   Log-Output "Disabling Windows Update service"
   & sc.exe config wuauserv start=disabled
   & sc.exe stop wuauserv
+  Write-VerboseServiceInfoToConsole -Service 'wuauserv' -Delay 1
 
   # Use TLS 1.2: needed for Invoke-WebRequest downloads from github.com.
   [Net.ServicePointManager]::SecurityProtocol = `
       [Net.SecurityProtocolType]::Tls12
+
+  Configure-WindowsDefender
 }
 
 # Creates directories where other functions in this module will read and write
@@ -426,6 +444,7 @@ function Start-CSIProxy {
     & sc.exe failure csiproxy reset= 0 actions= restart/10000
     Log-Output "Starting CSI Proxy Service"
     & sc.exe start csiproxy
+    Write-VerboseServiceInfoToConsole -Service 'csiproxy' -Delay 1
   }
 }
 
@@ -1215,6 +1234,7 @@ function Start-WorkerServices {
 
   Log-Output "Waiting 10 seconds for kubelet to stabilize"
   Start-Sleep 10
+  Write-VerboseServiceInfoToConsole -Service 'kubelet'
 
   if (Get-Process | Where-Object Name -eq "kube-proxy") {
     Log-Output -Fatal `
@@ -1225,6 +1245,7 @@ function Start-WorkerServices {
   & sc.exe failure kube-proxy reset= 0 actions= restart/10000
   Log-Output "Starting kube-proxy service"
   & sc.exe start kube-proxy
+  Write-VerboseServiceInfoToConsole -Service 'kube-proxy' -Delay 1
 
   # F1020 23:08:52.000083    9136 server.go:361] unable to load in-cluster
   # configuration, KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT must be
@@ -1309,6 +1330,7 @@ function Pull-InfraContainer {
 # Setup the container runtime on the node. It supports both
 # Docker and containerd.
 function Setup-ContainerRuntime {
+  Install-Pigz
   if (${env:CONTAINER_RUNTIME} -eq "containerd") {
     Install_Containerd
     Configure_Containerd
@@ -1317,6 +1339,46 @@ function Setup-ContainerRuntime {
     Create_DockerRegistryKey
     Configure_Dockerd
   }
+}
+
+function Test-ContainersFeatureInstalled {
+  return (Get-WindowsFeature Containers).Installed
+}
+
+# After this function returns, the computer must be restarted to complete
+# the installation!
+function Install-ContainersFeature {
+  Log-Output "Installing Windows 'Containers' feature"
+  Install-WindowsFeature Containers
+}
+
+function Test-DockerIsInstalled {
+  return ((Get-Package `
+               -ProviderName DockerMsftProvider `
+               -ErrorAction SilentlyContinue |
+           Where-Object Name -eq 'docker') -ne $null)
+}
+
+function Test-DockerIsRunning {
+  return ((Get-Service docker).Status -eq 'Running')
+}
+
+# Installs Docker EE via the DockerMsftProvider. Ensure that the Windows
+# Containers feature is installed before calling this function; otherwise,
+# a restart may be needed after this function returns.
+function Install-Docker {
+  Log-Output 'Installing NuGet module'
+  Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+
+  Log-Output 'Installing DockerMsftProvider module'
+  Install-Module -Name DockerMsftProvider -Repository PSGallery -Force
+
+  Log-Output "Installing latest Docker EE version"
+  Install-Package `
+      -Name docker `
+      -ProviderName DockerMsftProvider `
+      -Force `
+      -Verbose
 }
 
 # Add a registry key for docker in EventLog so that log messages are mapped
@@ -1507,13 +1569,34 @@ function Install_Containerd {
   Remove-Item -Force -Recurse $tmp_dir
 }
 
+# Lookup the path of containerd config if exists, else returns a default.
+function Get_Containerd_ConfigPath {
+  $service = Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'"
+  if (!($service -eq $null) -and
+      $service.PathName -match ".*\s--config\s*(\S+).*" -and
+      $matches.Length -eq 2) {
+    return $matches[1]
+  } else {
+    return 'C:\Program Files\containerd\config.toml'
+  }
+}
+
 # Generates the containerd config.toml file.
 function Configure_Containerd {
-  $config_dir = 'C:\Program Files\containerd'
+  $config_path = Get_Containerd_ConfigPath
+  $config_dir = [System.IO.Path]::GetDirectoryName($config_path)
   New-Item $config_dir -ItemType 'directory' -Force | Out-Null
-  Set-Content "$config_dir\config.toml" @"
+  Set-Content ${config_path} @"
+[plugins.scheduler]
+  schedule_delay = '0s'
+  startup_delay = '0s'
 [plugins.cri]
   sandbox_image = 'INFRA_CONTAINER_IMAGE'
+[plugins.cri.containerd]
+  snapshotter = 'windows'
+  default_runtime_name = 'runhcs-wcow-process'
+  disable_snapshot_annotations = true
+  discard_unpacked_layers = true
 [plugins.cri.cni]
   bin_dir = 'CNI_BIN_DIR'
   conf_dir = 'CNI_CONF_DIR'
@@ -1522,13 +1605,53 @@ function Configure_Containerd {
     replace('CNI_CONF_DIR', ${env:CNI_CONFIG_DIR})
 }
 
-# Register and start containerd service.
+# Register if needed and start containerd service.
 function Start_Containerd {
-  Log-Output "Creating containerd service"
-  & containerd.exe --register-service --log-file ${env:LOGS_DIR}/containerd.log
+  # Do the registration only if the containerd service does not exist.
+  if ((Get-WMIObject -Class Win32_Service -Filter  "Name='containerd'") -eq $null) {
+    Log-Output "Creating containerd service"
+    & containerd.exe --register-service --log-file "${env:LOGS_DIR}/containerd.log"
+  }
+
   Log-Output "Starting containerd service"
-  Start-Service containerd
+  Restart-Service containerd
 }
+
+# Pigz Resources
+$PIGZ_ROOT = 'C:\pigz'
+$PIGZ_VERSION = '2.3.1'
+$PIGZ_TAR_URL = "https://storage.googleapis.com/gke-release/winnode/pigz/prod/gke_windows/pigz/release/5/20201104-134221/pigz-$PIGZ_VERSION.zip"
+$PIGZ_TAR_HASH = '5a6f8f5530acc85ea51797f58c1409e5af6b69e55da243ffc608784cf14fec0cd16f74cc61c564d69e1a267750aecfc1e4c53b5219ff5f893b42a7576306f34c'
+
+# Install Pigz (https://github.com/madler/pigz) into Windows for improved image
+# extraction performance.
+function Install-Pigz {
+  if ("${env:WINDOWS_ENABLE_PIGZ}" -eq "true") {
+    if (-not (Test-Path $PIGZ_ROOT)) {
+      Log-Output "Installing Pigz $PIGZ_VERSION"
+      New-Item -Path $PIGZ_ROOT -ItemType Directory
+      MustDownload-File `
+        -Url $PIGZ_TAR_URL `
+        -OutFile "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
+        -Hash $PIGZ_TAR_HASH `
+        -Algorithm SHA512
+      Expand-Archive -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip" `
+        -DestinationPath $PIGZ_ROOT
+      Remove-Item -Path "$PIGZ_ROOT\pigz-$PIGZ_VERSION.zip"
+      # Docker and Containerd search for unpigz.exe on the first container image
+      # pull request after the service is started. If unpigz.exe is in the
+      # Windows path it'll use it instead of the default unzipper.
+      # See: https://github.com/containerd/containerd/issues/1896
+      Add-MachineEnvironmentPath -Path $PIGZ_ROOT
+      # Add process exclusion for Windows Defender to boost performance. 
+      Add-MpPreference -ExclusionProcess "$PIGZ_ROOT\unpigz.exe"
+      Log-Output "Installed Pigz $PIGZ_VERSION"
+    } else {
+      Log-Output "Pigz already installed."
+    }
+  }
+}
+
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
@@ -1662,15 +1785,15 @@ function DownloadAndInstall-LoggingAgents {
 function Create-LoggingAgentServices {
   cd $LOGGINGAGENT_ROOT
 
-  Log-Output 'Creating service: ${LOGGINGAGENT_SERVICE}'
+  Log-Output "Creating service: ${LOGGINGAGENT_SERVICE}"
   sc.exe create $LOGGINGAGENT_SERVICE binpath= "${LOGGINGAGENT_ROOT}\bin\fluent-bit.exe -c \fluent-bit\conf\fluent-bit.conf"
   sc.exe failure $LOGGINGAGENT_SERVICE reset= 30 actions= restart/5000
-  sc.exe query $LOGGINGAGENT_SERVICE
+  Write-VerboseServiceInfoToConsole -Service $LOGGINGAGENT_SERVICE
 
-  Log-Output 'Creating service: ${LOGGINGEXPORTER_SERVICE}'
+  Log-Output "Creating service: ${LOGGINGEXPORTER_SERVICE}"
   sc.exe create  $LOGGINGEXPORTER_SERVICE  binpath= "${LOGGINGEXPORTER_ROOT}\flb-exporter.exe --kubernetes-separator=_ --stackdriver-resource-model=k8s --enable-pod-label-discovery --logtostderr --winsvc  --pod-label-dot-replacement=_"
   sc.exe failure $LOGGINGEXPORTER_SERVICE reset= 30 actions= restart/5000
-  sc.exe query $LOGGINGEXPORTER_SERVICE
+  Write-VerboseServiceInfoToConsole -Service $LOGGINGEXPORTER_SERVICE
 }
 
 # Writes the logging configuration file for Logging agent. Restart-LoggingAgent
@@ -2042,6 +2165,7 @@ function Configure-StackdriverAgent {
   # seconds. The logging agent may die die to various disruptions but can be
   # resumed.
   sc.exe failure StackdriverLogging reset= 0 actions= restart/1000/restart/10000
+  Write-VerboseServiceInfoToConsole -Service 'StackdriverLogging'
 }
 
 # The NODE_NAME placeholder must be replaced with the node's name (hostname).

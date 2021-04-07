@@ -242,8 +242,9 @@ func TestDecodeBrokenJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error with json: prefix, got no error")
 	}
-	if !strings.HasPrefix(err.Error(), "json: line 3:") {
-		t.Fatalf("expected %q to have 'json: line 3:' prefix", err.Error())
+	const msg = `json: offset 28: invalid character '"' after object key:value pair`
+	if msg != err.Error() {
+		t.Fatalf("expected %q, got %q", msg, err.Error())
 	}
 }
 

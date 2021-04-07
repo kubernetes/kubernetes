@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/quota/v1/generic"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	storagev1informer "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -111,8 +110,8 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		return nil, false, err
 	}
 
-	// failure: more than one cidr and dual stack is not enabled and/or endpoint slice is not enabled
-	if len(clusterCIDRs) > 1 && (!utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) || !utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice)) {
+	// failure: more than one cidr and dual stack is not enabled
+	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack or EndpointSlice feature is not enabled", len(clusterCIDRs))
 	}
 
@@ -320,12 +319,7 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 
-	var (
-		csiNodeInformer storagev1informer.CSINodeInformer
-	)
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInformer = ctx.InformerFactory.Storage().V1().CSINodes()
-	}
+	csiNodeInformer := ctx.InformerFactory.Storage().V1().CSINodes()
 	csiDriverInformer := ctx.InformerFactory.Storage().V1().CSIDrivers()
 
 	plugins, err := ProbeAttachableVolumePlugins()
@@ -385,7 +379,7 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.Cloud,
 			plugins,
 			csiTranslator,
-			csimigration.NewPluginManager(csiTranslator),
+			csimigration.NewPluginManager(csiTranslator, utilfeature.DefaultFeatureGate),
 			filteredDialOptions,
 		)
 
@@ -447,7 +441,8 @@ func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
 
 func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, error) {
 	resourceQuotaControllerClient := ctx.ClientBuilder.ClientOrDie("resourcequota-controller")
-	discoveryFunc := resourceQuotaControllerClient.Discovery().ServerPreferredNamespacedResources
+	resourceQuotaControllerDiscoveryClient := ctx.ClientBuilder.DiscoveryClientOrDie("resourcequota-controller")
+	discoveryFunc := resourceQuotaControllerDiscoveryClient.ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(ctx.InformerFactory.ForResource)
 	quotaConfiguration := quotainstall.NewQuotaConfigurationForControllers(listerFuncForResource)
 
@@ -541,6 +536,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	}
 
 	gcClientset := ctx.ClientBuilder.ClientOrDie("generic-garbage-collector")
+	discoveryClient := ctx.ClientBuilder.DiscoveryClientOrDie("generic-garbage-collector")
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
 	metadataClient, err := metadata.NewForConfig(config)
@@ -570,7 +566,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 
 	// Periodically refresh the RESTMapper with new discovery information and sync
 	// the garbage collector.
-	go garbageCollector.Sync(gcClientset.Discovery(), 30*time.Second, ctx.Stop)
+	go garbageCollector.Sync(discoveryClient, 30*time.Second, ctx.Stop)
 
 	return garbagecollector.NewDebugHandler(garbageCollector), true, nil
 }

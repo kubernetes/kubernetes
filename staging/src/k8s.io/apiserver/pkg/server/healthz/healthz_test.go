@@ -252,11 +252,11 @@ func TestMetrics(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
-        # HELP apiserver_request_total [ALPHA] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
         # TYPE apiserver_request_total counter
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
-        apiserver_request_total{code="200",component="",contentType="text/plain;charset=utf-8",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
 `)
 	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
 		t.Error(err)

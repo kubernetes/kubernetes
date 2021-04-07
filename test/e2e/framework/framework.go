@@ -119,6 +119,9 @@ type Framework struct {
 
 	// Place to keep ClusterAutoscaler metrics from before test in order to compute delta.
 	clusterAutoscalerMetricsBeforeTest e2emetrics.Collection
+
+	// Timeouts contains the custom timeouts used during the test execution.
+	Timeouts *TimeoutContext
 }
 
 // AfterEachActionFunc is a function that can be called after each test
@@ -138,6 +141,13 @@ type Options struct {
 	GroupVersion *schema.GroupVersion
 }
 
+// NewFrameworkWithCustomTimeouts makes a framework with with custom timeouts.
+func NewFrameworkWithCustomTimeouts(baseName string, timeouts *TimeoutContext) *Framework {
+	f := NewDefaultFramework(baseName)
+	f.Timeouts = timeouts
+	return f
+}
+
 // NewDefaultFramework makes a new framework and sets up a BeforeEach/AfterEach for
 // you (you can write additional before/after each functions).
 func NewDefaultFramework(baseName string) *Framework {
@@ -155,6 +165,7 @@ func NewFramework(baseName string, options Options, client clientset.Interface) 
 		AddonResourceConstraints: make(map[string]ResourceConstraint),
 		Options:                  options,
 		ClientSet:                client,
+		Timeouts:                 NewTimeoutContextWithDefaults(),
 	}
 
 	f.AddAfterEach("dumpNamespaceInfo", func(f *Framework, failed bool) {
@@ -201,10 +212,6 @@ func (f *Framework) BeforeEach() {
 		f.ClientSet, err = clientset.NewForConfig(config)
 		ExpectNoError(err)
 		f.DynamicClient, err = dynamic.NewForConfig(config)
-		ExpectNoError(err)
-		// node.k8s.io is based on CRD, which is served only as JSON
-		jsonConfig := config
-		jsonConfig.ContentType = "application/json"
 		ExpectNoError(err)
 
 		// create scales getter, set GroupVersion and NegotiatedSerializer to default values
@@ -616,12 +623,6 @@ func (kc *KubeConfig) FindCluster(name string) *KubeCluster {
 		}
 	}
 	return nil
-}
-
-// KubeDescribe is wrapper function for ginkgo describe.  Adds namespacing.
-// TODO: Support type safe tagging as well https://github.com/kubernetes/kubernetes/pull/22401.
-func KubeDescribe(text string, body func()) bool {
-	return ginkgo.Describe("[k8s.io] "+text, body)
 }
 
 // ConformanceIt is wrapper function for ginkgo It.  Adds "[Conformance]" tag and makes static analysis easier.

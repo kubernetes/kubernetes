@@ -30,7 +30,9 @@ import (
 	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -92,6 +94,7 @@ type csiDriverName string
 type csiDriverClient struct {
 	driverName          csiDriverName
 	addr                csiAddr
+	metricsManager      *MetricsManager
 	nodeV1ClientCreator nodeV1ClientCreator
 }
 
@@ -111,7 +114,7 @@ type csiResizeOptions struct {
 
 var _ csiClient = &csiDriverClient{}
 
-type nodeV1ClientCreator func(addr csiAddr) (
+type nodeV1ClientCreator func(addr csiAddr, metricsManager *MetricsManager) (
 	nodeClient csipbv1.NodeClient,
 	closer io.Closer,
 	err error,
@@ -122,9 +125,9 @@ type nodeV1ClientCreator func(addr csiAddr) (
 // the gRPC connection when the NodeClient is not used anymore.
 // This is the default implementation for the nodeV1ClientCreator, used in
 // newCsiDriverClient.
-func newV1NodeClient(addr csiAddr) (nodeClient csipbv1.NodeClient, closer io.Closer, err error) {
+func newV1NodeClient(addr csiAddr, metricsManager *MetricsManager) (nodeClient csipbv1.NodeClient, closer io.Closer, err error) {
 	var conn *grpc.ClientConn
-	conn, err = newGrpcConn(addr)
+	conn, err = newGrpcConn(addr, metricsManager)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -148,6 +151,7 @@ func newCsiDriverClient(driverName csiDriverName) (*csiDriverClient, error) {
 		driverName:          driverName,
 		addr:                csiAddr(existingDriver.endpoint),
 		nodeV1ClientCreator: nodeV1ClientCreator,
+		metricsManager:      NewCSIMetricsManager(string(driverName)),
 	}, nil
 }
 
@@ -172,7 +176,7 @@ func (c *csiDriverClient) nodeGetInfoV1(ctx context.Context) (
 	accessibleTopology map[string]string,
 	err error) {
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return "", 0, nil, err
 	}
@@ -216,7 +220,7 @@ func (c *csiDriverClient) NodePublishVolume(
 
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return err
 	}
@@ -275,7 +279,7 @@ func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, opts csiResizeOp
 		return opts.newSize, errors.New("size can not be less than 0")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return opts.newSize, err
 	}
@@ -331,7 +335,7 @@ func (c *csiDriverClient) NodeUnpublishVolume(ctx context.Context, volID string,
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return err
 	}
@@ -367,7 +371,7 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return err
 	}
@@ -418,7 +422,7 @@ func (c *csiDriverClient) NodeUnstageVolume(ctx context.Context, volID, stagingT
 		return errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return err
 	}
@@ -438,7 +442,7 @@ func (c *csiDriverClient) NodeSupportsNodeExpand(ctx context.Context) (bool, err
 		return false, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return false, err
 	}
@@ -469,7 +473,7 @@ func (c *csiDriverClient) NodeSupportsStageUnstage(ctx context.Context) (bool, e
 		return false, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return false, err
 	}
@@ -508,7 +512,7 @@ func asCSIAccessModeV1(am api.PersistentVolumeAccessMode) csipbv1.VolumeCapabili
 	return csipbv1.VolumeCapability_AccessMode_UNKNOWN
 }
 
-func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
+func newGrpcConn(addr csiAddr, metricsManager *MetricsManager) (*grpc.ClientConn, error) {
 	network := "unix"
 	klog.V(4).Infof(log("creating new gRPC connection for [%s://%s]", network, addr))
 
@@ -518,6 +522,7 @@ func newGrpcConn(addr csiAddr) (*grpc.ClientConn, error) {
 		grpc.WithContextDialer(func(ctx context.Context, target string) (net.Conn, error) {
 			return (&net.Dialer{}).DialContext(ctx, network, target)
 		}),
+		grpc.WithChainUnaryInterceptor(metricsManager.RecordMetricsInterceptor),
 	)
 }
 
@@ -560,7 +565,7 @@ func (c *csiDriverClient) NodeSupportsVolumeStats(ctx context.Context) (bool, er
 		return false, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return false, err
 	}
@@ -594,7 +599,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		return nil, errors.New("nodeV1ClientCreate is nil")
 	}
 
-	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr)
+	nodeClient, closer, err := c.nodeV1ClientCreator(c.addr, c.metricsManager)
 	if err != nil {
 		return nil, err
 	}
@@ -621,6 +626,19 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 		Inodes:     resource.NewQuantity(int64(0), resource.BinarySI),
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIVolumeHealth) {
+		isSupportNodeVolumeCondition, err := supportNodeGetVolumeCondition(ctx, nodeClient)
+		if err != nil {
+			return nil, err
+		}
+
+		if isSupportNodeVolumeCondition {
+			abnormal, message := resp.VolumeCondition.GetAbnormal(), resp.VolumeCondition.GetMessage()
+			metrics.Abnormal, metrics.Message = &abnormal, &message
+		}
+	}
+
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -641,6 +659,30 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 	}
 	return metrics, nil
+}
+
+func supportNodeGetVolumeCondition(ctx context.Context, nodeClient csipbv1.NodeClient) (supportNodeGetVolumeCondition bool, err error) {
+	req := csipbv1.NodeGetCapabilitiesRequest{}
+	rsp, err := nodeClient.NodeGetCapabilities(ctx, &req)
+	if err != nil {
+		return false, err
+	}
+
+	for _, cap := range rsp.GetCapabilities() {
+		if cap == nil {
+			continue
+		}
+		rpc := cap.GetRpc()
+		if rpc == nil {
+			continue
+		}
+		t := rpc.GetType()
+		if t == csipbv1.NodeServiceCapability_RPC_VOLUME_CONDITION {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
 
 func isFinalError(err error) bool {

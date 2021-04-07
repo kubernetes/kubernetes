@@ -187,6 +187,7 @@ func NewCmdDrain(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	}
 	cmd.Flags().BoolVar(&o.drainer.Force, "force", o.drainer.Force, "Continue even if there are pods not managed by a ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet.")
 	cmd.Flags().BoolVar(&o.drainer.IgnoreAllDaemonSets, "ignore-daemonsets", o.drainer.IgnoreAllDaemonSets, "Ignore DaemonSet-managed pods.")
+	cmd.Flags().BoolVar(&o.drainer.IgnoreErrors, "ignore-errors", o.drainer.IgnoreErrors, "Ignore errors occurred between drain nodes in group.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-local-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
 	cmd.Flags().MarkDeprecated("delete-local-data", "This option is deprecated and will be deleted. Use --delete-emptydir-data.")
 	cmd.Flags().BoolVar(&o.drainer.DeleteEmptyDirData, "delete-emptydir-data", o.drainer.DeleteEmptyDirData, "Continue even if there are pods using emptyDir (local data that will be deleted when the node is drained).")
@@ -221,11 +222,7 @@ func (o *DrainCmdOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	if err != nil {
 		return err
 	}
-	discoveryClient, err := f.ToDiscoveryClient()
-	if err != nil {
-		return err
-	}
-	o.drainer.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, discoveryClient)
+	o.drainer.DryRunVerifier = resource.NewDryRunVerifier(dynamicClient, f.OpenAPIGetter())
 
 	if o.drainer.Client, err = f.KubernetesClientSet(); err != nil {
 		return err
@@ -306,6 +303,10 @@ func (o *DrainCmdOptions) RunDrain() error {
 			drainedNodes.Insert(info.Name)
 			printObj(info.Object, o.Out)
 		} else {
+			if o.drainer.IgnoreErrors && len(o.nodeInfos) > 1 {
+				fmt.Fprintf(o.ErrOut, "error: unable to drain node %q due to error:%s, continuing command...\n", info.Name, err)
+				continue
+			}
 			fmt.Fprintf(o.ErrOut, "error: unable to drain node %q, aborting command...\n\n", info.Name)
 			remainingNodes := []string{}
 			fatal = err

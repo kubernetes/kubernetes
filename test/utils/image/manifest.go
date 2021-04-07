@@ -31,18 +31,17 @@ import (
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
-	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
-	DockerGluster           string `yaml:"dockerGluster"`
 	E2eRegistry             string `yaml:"e2eRegistry"`
-	E2eVolumeRegistry       string `yaml:"e2eVolumeRegistry"`
 	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
 	BuildImageRegistry      string `yaml:"buildImageRegistry"`
 	InvalidRegistry         string `yaml:"invalidRegistry"`
+	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
 	GcRegistry              string `yaml:"gcRegistry"`
 	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
 	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
+	MicrosoftRegistry       string `yaml:"microsoftRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -70,18 +69,17 @@ func (i *Config) SetVersion(version string) {
 func initReg() RegistryList {
 	registry := RegistryList{
 		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		DockerLibraryRegistry:   "docker.io/library",
-		DockerGluster:           "docker.io/gluster",
 		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		E2eVolumeRegistry:       "gcr.io/kubernetes-e2e-test-images/volume",
 		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
 		BuildImageRegistry:      "k8s.gcr.io/build-image",
 		InvalidRegistry:         "invalid.com/invalid",
+		GcEtcdRegistry:          "k8s.gcr.io",
 		GcRegistry:              "k8s.gcr.io",
 		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
 		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
 		SampleRegistry:          "gcr.io/google-samples",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
+		MicrosoftRegistry:       "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -101,23 +99,25 @@ func initReg() RegistryList {
 }
 
 var (
-	registry                = initReg()
-	dockerLibraryRegistry   = registry.DockerLibraryRegistry
-	dockerGluster           = registry.DockerGluster
+	registry = initReg()
+
+	// PrivateRegistry is an image repository that requires authentication
+	PrivateRegistry = registry.PrivateRegistry
+
+	// Preconfigured image configs
+	dockerLibraryRegistry   = "docker.io/library"
 	e2eRegistry             = registry.E2eRegistry
-	e2eVolumeRegistry       = registry.E2eVolumeRegistry
 	promoterE2eRegistry     = registry.PromoterE2eRegistry
 	buildImageRegistry      = registry.BuildImageRegistry
 	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
+	gcEtcdRegistry          = registry.GcEtcdRegistry
 	gcRegistry              = registry.GcRegistry
 	sigStorageRegistry      = registry.SigStorageRegistry
 	gcrReleaseRegistry      = registry.GcrReleaseRegistry
 	invalidRegistry         = registry.InvalidRegistry
-	// PrivateRegistry is an image repository that requires authentication
-	PrivateRegistry = registry.PrivateRegistry
-	sampleRegistry  = registry.SampleRegistry
+	sampleRegistry          = registry.SampleRegistry
+	microsoftRegistry       = registry.MicrosoftRegistry
 
-	// Preconfigured image configs
 	imageConfigs, originalImageConfigs = initImageConfigs()
 )
 
@@ -172,6 +172,12 @@ const (
 	Nginx
 	// NginxNew image
 	NginxNew
+	// NodePerfNpbEp image
+	NodePerfNpbEp
+	// NodePerfNpbIs image
+	NodePerfNpbIs
+	// NodePerfTfWideDeep image
+	NodePerfTfWideDeep
 	// Nonewprivs image
 	Nonewprivs
 	// NonRoot runs with a default user of 1234
@@ -201,49 +207,55 @@ const (
 	VolumeGlusterServer
 	// VolumeRBDServer image
 	VolumeRBDServer
+	// WindowsServer image
+	WindowsServer
 )
 
 func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.21"}
+	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.30"}
 	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
 	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
 	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
-	configs[APIServer] = Config{e2eRegistry, "sample-apiserver", "1.17"}
-	configs[AppArmorLoader] = Config{e2eRegistry, "apparmor-loader", "1.0"}
-	configs[BusyBox] = Config{dockerLibraryRegistry, "busybox", "1.29"}
-	configs[CheckMetadataConcealment] = Config{e2eRegistry, "metadata-concealment", "1.2"}
+	configs[APIServer] = Config{promoterE2eRegistry, "sample-apiserver", "1.17.4"}
+	configs[AppArmorLoader] = Config{promoterE2eRegistry, "apparmor-loader", "1.3"}
+	configs[BusyBox] = Config{promoterE2eRegistry, "busybox", "1.29-1"}
+	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
-	configs[CudaVectorAdd2] = Config{e2eRegistry, "cuda-vector-add", "2.0"}
-	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.3.0"}
-	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.4.13-0"}
-	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
-	configs[HttpdNew] = Config{dockerLibraryRegistry, "httpd", "2.4.39-alpine"}
+	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.5.0"}
+	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
+	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
+	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
+	configs[Httpd] = Config{promoterE2eRegistry, "httpd", "2.4.38-1"}
+	configs[HttpdNew] = Config{promoterE2eRegistry, "httpd", "2.4.39-1"}
 	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
-	configs[IpcUtils] = Config{e2eRegistry, "ipc-utils", "1.0"}
-	configs[JessieDnsutils] = Config{e2eRegistry, "jessie-dnsutils", "1.0"}
-	configs[Kitten] = Config{e2eRegistry, "kitten", "1.0"}
-	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
+	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
+	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
+	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
+	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
 	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
-	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
-	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
-	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
-	configs[NonRoot] = Config{e2eRegistry, "nonroot", "1.0"}
+	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-1"}
+	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-1"}
+	configs[NodePerfNpbEp] = Config{promoterE2eRegistry, "node-perf/npb-ep", "1.1"}
+	configs[NodePerfNpbIs] = Config{promoterE2eRegistry, "node-perf/npb-is", "1.1"}
+	configs[NodePerfTfWideDeep] = Config{promoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
+	configs[Nonewprivs] = Config{promoterE2eRegistry, "nonewprivs", "1.3"}
+	configs[NonRoot] = Config{promoterE2eRegistry, "nonroot", "1.1"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{gcRegistry, "pause", "3.2"}
-	configs[Perl] = Config{dockerLibraryRegistry, "perl", "5.26"}
+	configs[Pause] = Config{gcRegistry, "pause", "3.4.1"}
+	configs[Perl] = Config{promoterE2eRegistry, "perl", "5.26"}
 	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
 	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
-	configs[Redis] = Config{dockerLibraryRegistry, "redis", "5.0.5-alpine"}
-	configs[RegressionIssue74839] = Config{e2eRegistry, "regression-issue-74839-amd64", "1.0"}
-	configs[ResourceConsumer] = Config{e2eRegistry, "resource-consumer", "1.5"}
+	configs[Redis] = Config{promoterE2eRegistry, "redis", "5.0.5-alpine"}
+	configs[RegressionIssue74839] = Config{promoterE2eRegistry, "regression-issue-74839", "1.2"}
+	configs[ResourceConsumer] = Config{promoterE2eRegistry, "resource-consumer", "1.9"}
 	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
-	configs[VolumeNFSServer] = Config{e2eVolumeRegistry, "nfs", "1.0"}
-	configs[VolumeISCSIServer] = Config{e2eVolumeRegistry, "iscsi", "2.0"}
-	configs[VolumeGlusterServer] = Config{e2eVolumeRegistry, "gluster", "1.0"}
-	configs[VolumeRBDServer] = Config{e2eVolumeRegistry, "rbd", "1.0.1"}
+	configs[VolumeNFSServer] = Config{promoterE2eRegistry, "volume/nfs", "1.2"}
+	configs[VolumeISCSIServer] = Config{promoterE2eRegistry, "volume/iscsi", "2.2"}
+	configs[VolumeGlusterServer] = Config{promoterE2eRegistry, "volume/gluster", "1.2"}
+	configs[VolumeRBDServer] = Config{promoterE2eRegistry, "volume/rbd", "1.0.3"}
+	configs[WindowsServer] = Config{microsoftRegistry, "windows", "1809"}
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs
@@ -255,8 +267,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 }
 
 // GetMappedImageConfigs returns the images if they were mapped to the provided
-// image repository. This method is public to allow tooling to convert these configs
-// to an arbitrary repo.
+// image repository.
 func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map[int]Config {
 	configs := make(map[int]Config)
 	for i, config := range originalImageConfigs {
@@ -272,7 +283,7 @@ func GetMappedImageConfigs(originalImageConfigs map[int]Config, repo string) map
 
 		// Build a new tag with a the index, a hash of the image spec (to be unique) and
 		// shorten and make the pull spec "safe" so it will fit in the tag
-		configs[i] = mapConfigToRepos(i, config, repo)
+		configs[i] = getRepositoryMappedConfig(i, config, repo)
 	}
 	return configs
 }
@@ -282,35 +293,24 @@ var (
 	reDashes   = regexp.MustCompile(`-+`)
 )
 
-// mapConfigToRepos maps an existing image to the provided repo, generating a
+// getRepositoryMappedConfig maps an existing image to the provided repo, generating a
 // tag that is unique with the input config. The tag will contain the index, a hash of
 // the image spec (to be unique) and shorten and make the pull spec "safe" so it will
 // fit in the tag to allow a human to recognize the value. If index is -1, then no
 // index will be added to the tag.
-func mapConfigToRepos(index int, config Config, repo string) Config {
+func getRepositoryMappedConfig(index int, config Config, repo string) Config {
 	parts := strings.SplitN(repo, "/", 2)
 	registry, name := parts[0], parts[1]
 
 	pullSpec := config.GetE2EImage()
 
-	const (
-		// length of hash in base64-url chosen to minimize possible collisions (64^16 possible)
-		hashLength = 16
-		// maximum length of a Docker spec image tag
-		maxTagLength = 127
-		// when building a tag, there are at most 6 characters in the format (e2e and 3 dashes),
-		// and we should allow up to 10 digits for the index and additional qualifiers we may add
-		// in the future
-		tagFormatCharacters = 6 + 10
-	)
-
 	h := sha256.New()
 	h.Write([]byte(pullSpec))
-	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))[:hashLength]
+	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:16])
 
 	shortName := reCharSafe.ReplaceAllLiteralString(pullSpec, "-")
 	shortName = reDashes.ReplaceAllLiteralString(shortName, "-")
-	maxLength := maxTagLength - hashLength - tagFormatCharacters
+	maxLength := 127 - 16 - 6 - 10
 	if len(shortName) > maxLength {
 		shortName = shortName[len(shortName)-maxLength:]
 	}
@@ -328,9 +328,7 @@ func mapConfigToRepos(index int, config Config, repo string) Config {
 	}
 }
 
-// GetOriginalImageConfigs returns the configuration before any mapping rules.  This
-// method is public to allow tooling gain access to the default values for images regardless
-// of environment variable being set.
+// GetOriginalImageConfigs returns the configuration before any mapping rules.
 func GetOriginalImageConfigs() map[int]Config {
 	return originalImageConfigs
 }
@@ -375,7 +373,7 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 			}
 		}
 		last := strings.SplitN(parts[countParts-1], ":", 2)
-		config := mapConfigToRepos(index, Config{
+		config := getRepositoryMappedConfig(index, Config{
 			registry: parts[0],
 			name:     strings.Join([]string{strings.Join(parts[1:countParts-1], "/"), last[0]}, "/"),
 			version:  last[1],
@@ -386,8 +384,6 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	switch registryAndUser {
 	case "gcr.io/kubernetes-e2e-test-images":
 		registryAndUser = e2eRegistry
-	case "gcr.io/kubernetes-e2e-test-images/volume":
-		registryAndUser = e2eVolumeRegistry
 	case "k8s.gcr.io":
 		registryAndUser = gcRegistry
 	case "k8s.gcr.io/sig-storage":

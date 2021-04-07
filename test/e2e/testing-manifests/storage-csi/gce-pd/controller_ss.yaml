@@ -30,7 +30,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-provisioner
-          image: gcr.io/gke-release/csi-provisioner:v1.6.0-gke.0
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -39,7 +39,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: gcr.io/gke-release/csi-attacher:v2.2.0-gke.0
+          image: k8s.gcr.io/sig-storage/csi-attacher:v2.2.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -47,10 +47,11 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-resizer
-          image: gcr.io/gke-release/csi-resizer:v0.5.0-gke.0
+          image: k8s.gcr.io/sig-storage/csi-resizer:v1.1.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
+            - "--handle-volume-inuse-error=false"
           volumeMounts:
             - name: socket-dir
               mountPath: /csi

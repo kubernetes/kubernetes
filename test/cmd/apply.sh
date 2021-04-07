@@ -35,7 +35,7 @@ run_kubectl_apply_tests() {
   # Post-Condition: pod "test-pod" has configuration annotation
   grep -q kubectl.kubernetes.io/last-applied-configuration <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]:?}")"
   # pod has field manager for kubectl client-side apply
-  output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-client-side-apply'
   # Clean up
   kubectl delete pods test-pod "${kube_flags[@]:?}"
@@ -367,7 +367,7 @@ run_kubectl_server_side_apply_tests() {
   # Post-Condition: pod "test-pod" is created
   kube::test::get_object_assert 'pods test-pod' "{{${labels_field:?}.name}}" 'test-pod-label'
   # pod has field manager for kubectl server-side apply
-  output_message=$(kubectl get -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
+  output_message=$(kubectl get --show-managed-fields -f hack/testdata/pod.yaml -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl'
   # pod has custom field manager
   kubectl apply --server-side --field-manager=my-field-manager --force-conflicts -f hack/testdata/pod.yaml "${kube_flags[@]:?}"

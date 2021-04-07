@@ -13,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This script checks whether updating of the bazel compilation files is needed
-# or not. We should run `hack/update-bazel.sh` if actually updates them.
+# This script checks whether removal of bazel related files is still needed.
+# If so: run `hack/update-bazel.sh` to actually remove them.
+#
 # Usage: `hack/verify-bazel.sh`.
 
 set -o errexit
@@ -24,17 +25,6 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 export KUBE_ROOT
 source "${KUBE_ROOT}/hack/lib/init.sh"
-
-if [[ ! -f "${KUBE_ROOT}/vendor/BUILD" ]]; then
-  echo "${KUBE_ROOT}/vendor/BUILD does not exist." >&2
-  echo >&2
-  echo "Run ./hack/update-bazel.sh" >&2
-  exit 1
-fi
-
-# Remove generated files prior to running kazel.
-# TODO(spxtr): Remove this line once Bazel is the only way to build.
-rm -f "${KUBE_ROOT}/{pkg/generated,staging/src/k8s.io/apiextensions-apiserver/pkg/client,staging/src/k8s.io/kube-aggregator/pkg/client}/openapi/zz_generated.openapi.go"
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t verify-bazel.XXXXXX)")"
 kube::util::trap_add "chmod -R u+rw ${_tmpdir} && rm -rf ${_tmpdir}" EXIT

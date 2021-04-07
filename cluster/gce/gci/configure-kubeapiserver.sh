@@ -14,34 +14,25 @@
 # limitations under the License.
 
 
-# Configures etcd related parameters of kube-apiserver.
+# Configures etcd related flags of kube-apiserver.
 function configure-etcd-params {
   local -n params_ref=$1
 
-  local host_ip="127.0.0.1"
-  # If etcd is configured to listen on host IP,
-  # host_ip is set to the primary internal IP of host VM.
-  if [[ ${ETCD_LISTEN_ON_HOST_IP:-} == "true" ]] ; then
-      host_ip="${HOST_PRIMARY_IP:-$(hostname -i)}"
-  fi
-
-  # Configure the main etcd.
   if [[ -n "${ETCD_APISERVER_CA_KEY:-}" && -n "${ETCD_APISERVER_CA_CERT:-}" && -n "${ETCD_APISERVER_SERVER_KEY:-}" && -n "${ETCD_APISERVER_SERVER_CERT:-}" && -n "${ETCD_APISERVER_CLIENT_KEY:-}" && -n "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params_ref+=" --etcd-servers=${ETCD_SERVERS:-https://${host_ip}:2379}"
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-https://127.0.0.1:2379}"
       params_ref+=" --etcd-cafile=${ETCD_APISERVER_CA_CERT_PATH}"
       params_ref+=" --etcd-certfile=${ETCD_APISERVER_CLIENT_CERT_PATH}"
       params_ref+=" --etcd-keyfile=${ETCD_APISERVER_CLIENT_KEY_PATH}"
   elif [[ -z "${ETCD_APISERVER_CA_KEY:-}" && -z "${ETCD_APISERVER_CA_CERT:-}" && -z "${ETCD_APISERVER_SERVER_KEY:-}" && -z "${ETCD_APISERVER_SERVER_CERT:-}" && -z "${ETCD_APISERVER_CLIENT_KEY:-}" && -z "${ETCD_APISERVER_CLIENT_CERT:-}" ]]; then
-      params_ref+=" --etcd-servers=${ETCD_SERVERS:-http://${host_ip}:2379}"
+      params_ref+=" --etcd-servers=${ETCD_SERVERS:-http://127.0.0.1:2379}"
       echo "WARNING: ALL of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver is not enabled."
   else
       echo "ERROR: Some of ETCD_APISERVER_CA_KEY, ETCD_APISERVER_CA_CERT, ETCD_APISERVER_SERVER_KEY, ETCD_APISERVER_SERVER_CERT, ETCD_APISERVER_CLIENT_KEY and ETCD_APISERVER_CLIENT_CERT are missing, mTLS between etcd server and kube-apiserver cannot be enabled. Please provide all mTLS credential."
       exit 1
   fi
 
-  # Configure the event log etcd.
   if [[ -z "${ETCD_SERVERS:-}" ]]; then
-    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://${host_ip}:4002}"
+    params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-/events#http://127.0.0.1:4002}"
   elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
     params_ref+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
   fi
@@ -71,8 +62,8 @@ function configure-etcd-params {
 #   INSECURE_PORT_MAPPING
 function start-kube-apiserver {
   echo "Start kubernetes api-server"
-  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}"
-  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}"
+  prepare-log-file "${KUBE_API_SERVER_LOG_PATH:-/var/log/kube-apiserver.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
+  prepare-log-file "${KUBE_API_SERVER_AUDIT_LOG_PATH:-/var/log/kube-apiserver-audit.log}" "${KUBE_API_SERVER_RUNASUSER:-0}"
 
   # Calculate variables and assemble the command line.
   local params="${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${APISERVER_TEST_ARGS:-} ${CLOUD_CONFIG_OPT}"
@@ -101,6 +92,9 @@ function start-kube-apiserver {
     fi
     params+=" --tls-sni-cert-key=${OLD_MASTER_CERT_PATH},${OLD_MASTER_KEY_PATH}:${old_ips}"
   fi
+  if [[ -n "${TLS_CIPHER_SUITES:-}" ]]; then
+    params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
+  fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
     params+=" --requestheader-client-ca-file=${REQUESTHEADER_CA_CERT_PATH}"
@@ -119,7 +113,11 @@ function start-kube-apiserver {
   if [[ -n "${SERVICEACCOUNT_CERT_PATH:-}" ]]; then
     params+=" --service-account-key-file=${SERVICEACCOUNT_CERT_PATH}"
   fi
-  params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  local known_tokens_file='/etc/srv/kubernetes/known_tokens.csv'
+  if [[ -f "${known_tokens_file}" ]]; then
+    chown "${KUBE_API_SERVER_RUNASUSER:-0}":"${KUBE_API_SERVER_RUNASGROUP:-0}" "${known_tokens_file}"
+  fi
+  params+=" --token-auth-file=${known_tokens_file}"
 
   if [[ -n "${KUBE_APISERVER_REQUEST_TIMEOUT_SEC:-}" ]]; then
     params+=" --request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT_SEC}s"
@@ -410,6 +408,27 @@ function start-kube-apiserver {
   sed -i -e "s@{{konnectivity_socket_mount}}@${default_konnectivity_socket_mnt}@g" "${src_file}"
   sed -i -e "s@{{konnectivity_socket_volume}}@${default_konnectivity_socket_vol}@g" "${src_file}"
   sed -i -e "s@{{healthcheck_ip}}@${healthcheck_ip}@g" "${src_file}"
+
+  if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" && -n "${KUBE_PKI_READERS_GROUP:-}" ]]; then
+    sed -i -e "s@{{runAsUser}}@\"runAsUser\": ${KUBE_API_SERVER_RUNASUSER},@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@\"runAsGroup\": ${KUBE_API_SERVER_RUNASGROUP},@g" "${src_file}"
+    sed -i -e "s@{{capabilities}}@\"capabilities\": { \"drop\": [\"all\"], \"add\": [\"NET_BIND_SERVICE\"]},@g" "${src_file}"
+    sed -i -e "s@{{allowPrivilegeEscalation}}@\"allowPrivilegeEscalation\": false,@g" "${src_file}"
+    local supplementalGroups="${KUBE_PKI_READERS_GROUP}"
+    if [[ -n "${KMS_PLUGIN_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KMS_PLUGIN_SOCKET_WRITER_GROUP}"
+    fi
+    if [[ -n "${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP:-}" ]]; then
+      supplementalGroups+=",${KONNECTIVITY_SERVER_SOCKET_WRITER_GROUP}"
+    fi
+    sed -i -e "s@{{supplementalGroups}}@\"supplementalGroups\": [ ${supplementalGroups} ],@g" "${src_file}"
+  else
+    sed -i -e "s@{{runAsUser}}@@g" "${src_file}"
+    sed -i -e "s@{{runAsGroup}}@@g" "${src_file}"
+    sed -i -e "s@{{capabilities}}@@g" "${src_file}"
+    sed -i -e "s@{{allowPrivilegeEscalation}}@@g" "${src_file}"
+    sed -i -e "s@{{supplementalGroups}}@@g" "${src_file}"
+  fi
 
   cp "${src_file}" "${ETC_MANIFESTS:-/etc/kubernetes/manifests}"
 }

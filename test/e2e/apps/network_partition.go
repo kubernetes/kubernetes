@@ -33,7 +33,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	nodepkg "k8s.io/kubernetes/pkg/controller/nodelifecycle"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -128,7 +127,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		}
 	})
 
-	framework.KubeDescribe("Pods", func() {
+	ginkgo.Describe("Pods", func() {
 		ginkgo.Context("should return to running and ready state after network partition is healed", func() {
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
@@ -152,7 +151,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
-					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", node.Name).String()}
 					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
@@ -163,7 +162,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", node.Name).String()}
 				if err = e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReady); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}
@@ -238,7 +237,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[ReplicationController]", func() {
+	ginkgo.Describe("[ReplicationController]", func() {
 		ginkgo.It("should recreate pods scheduled on the unreachable node "+
 			"AND allow scheduling of pods on a node after it rejoins the cluster", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
@@ -356,7 +355,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[StatefulSet]", func() {
+	ginkgo.Describe("[StatefulSet]", func() {
 		psName := "ss"
 		labels := map[string]string{
 			"foo": "bar",
@@ -431,7 +430,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("[Job]", func() {
+	ginkgo.Describe("[Job]", func() {
 		ginkgo.It("should create new pods when node is partitioned", func() {
 			e2eskipper.SkipUnlessSSHKeyPresent()
 
@@ -478,7 +477,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pods", func() {
+	ginkgo.Describe("Pods", func() {
 		ginkgo.Context("should be evicted from unready Node", func() {
 			ginkgo.BeforeEach(func() {
 				e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
@@ -501,7 +500,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
-					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", node.Name).String()}
 					pods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), podOpts)
 					if err != nil || len(pods.Items) <= 0 {
 						return false
@@ -512,7 +511,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 					framework.Failf("No eligible node were found: %d", len(nodes.Items))
 				}
 				node := nodes.Items[0]
-				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
+				podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector("spec.nodeName", node.Name).String()}
 				if err := e2epod.WaitForMatchPodsCondition(c, podOpts, "Running and Ready", podReadyTimeout, testutils.PodRunningReadyOrSucceeded); err != nil {
 					framework.Failf("Pods on node %s are not ready and running within %v: %v", node.Name, podReadyTimeout, err)
 				}

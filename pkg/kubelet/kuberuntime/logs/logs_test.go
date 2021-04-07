@@ -18,6 +18,11 @@ package logs
 
 import (
 	"bytes"
+	"context"
+	"io/ioutil"
+	apitesting "k8s.io/cri-api/pkg/apis/testing"
+	"k8s.io/utils/pointer"
+	"os"
 	"testing"
 	"time"
 
@@ -63,6 +68,141 @@ func TestLogOptions(t *testing.T) {
 		t.Logf("TestCase #%d: %+v", c, test)
 		opts := NewLogOptions(test.apiOpts, timestamp.Time)
 		assert.Equal(t, test.expect, opts)
+	}
+}
+
+func TestReadLogs(t *testing.T) {
+	file, err := ioutil.TempFile("", "TestFollowLogs")
+	if err != nil {
+		t.Fatalf("unable to create temp file")
+	}
+	defer os.Remove(file.Name())
+	file.WriteString(`{"log":"line1\n","stream":"stdout","time":"2020-09-27T11:18:01.00000000Z"}` + "\n")
+	file.WriteString(`{"log":"line2\n","stream":"stdout","time":"2020-09-27T11:18:02.00000000Z"}` + "\n")
+	file.WriteString(`{"log":"line3\n","stream":"stdout","time":"2020-09-27T11:18:03.00000000Z"}` + "\n")
+
+	testCases := []struct {
+		name          string
+		podLogOptions v1.PodLogOptions
+		expected      string
+	}{
+		{
+			name:          "default pod log options should output all lines",
+			podLogOptions: v1.PodLogOptions{},
+			expected:      "line1\nline2\nline3\n",
+		},
+		{
+			name: "using TailLines 2 should output last 2 lines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: pointer.Int64Ptr(2),
+			},
+			expected: "line2\nline3\n",
+		},
+		{
+			name: "using TailLines 4 should output all lines when the log has less than 4 lines",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: pointer.Int64Ptr(4),
+			},
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name: "using TailLines 0 should output nothing",
+			podLogOptions: v1.PodLogOptions{
+				TailLines: pointer.Int64Ptr(0),
+			},
+			expected: "",
+		},
+		{
+			name: "using LimitBytes 9 should output first 9 bytes",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: pointer.Int64Ptr(9),
+			},
+			expected: "line1\nlin",
+		},
+		{
+			name: "using LimitBytes 100 should output all bytes when the log has less than 100 bytes",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: pointer.Int64Ptr(100),
+			},
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name: "using LimitBytes 0 should output nothing",
+			podLogOptions: v1.PodLogOptions{
+				LimitBytes: pointer.Int64Ptr(0),
+			},
+			expected: "",
+		},
+		{
+			name: "using SinceTime should output lines with a time on or after the specified time",
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
+			},
+			expected: "line2\nline3\n",
+		},
+		{
+			name: "using SinceTime now should output nothing",
+			podLogOptions: v1.PodLogOptions{
+				SinceTime: &metav1.Time{Time: time.Now()},
+			},
+			expected: "",
+		},
+		{
+			name: "using follow should output all log lines",
+			podLogOptions: v1.PodLogOptions{
+				Follow: true,
+			},
+			expected: "line1\nline2\nline3\n",
+		},
+		{
+			name: "using follow combined with TailLines 2 should output the last 2 lines",
+			podLogOptions: v1.PodLogOptions{
+				Follow:    true,
+				TailLines: pointer.Int64Ptr(2),
+			},
+			expected: "line2\nline3\n",
+		},
+		{
+			name: "using follow combined with SinceTime should output lines with a time on or after the specified time",
+			podLogOptions: v1.PodLogOptions{
+				Follow:    true,
+				SinceTime: &metav1.Time{Time: time.Date(2020, time.Month(9), 27, 11, 18, 02, 0, time.UTC)},
+			},
+			expected: "line2\nline3\n",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			containerID := "fake-container-id"
+			fakeRuntimeService := &apitesting.FakeRuntimeService{
+				Containers: map[string]*apitesting.FakeContainer{
+					containerID: {
+						ContainerStatus: runtimeapi.ContainerStatus{
+							State: runtimeapi.ContainerState_CONTAINER_RUNNING,
+						},
+					},
+				},
+			}
+			// If follow is specified, mark the container as exited or else ReadLogs will run indefinitely
+			if tc.podLogOptions.Follow {
+				fakeRuntimeService.Containers[containerID].State = runtimeapi.ContainerState_CONTAINER_EXITED
+			}
+
+			opts := NewLogOptions(&tc.podLogOptions, time.Now())
+			stdoutBuf := bytes.NewBuffer(nil)
+			stderrBuf := bytes.NewBuffer(nil)
+			err = ReadLogs(context.TODO(), file.Name(), containerID, opts, fakeRuntimeService, stdoutBuf, stderrBuf)
+
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			if stderrBuf.Len() > 0 {
+				t.Fatalf("Stderr: %v", stderrBuf.String())
+			}
+			if actual := stdoutBuf.String(); tc.expected != actual {
+				t.Fatalf("Actual output does not match expected.\nActual:  %v\nExpected: %v\n", actual, tc.expected)
+			}
+		})
 	}
 }
 

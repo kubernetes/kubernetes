@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"syscall"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -62,11 +63,11 @@ func (kl *Kubelet) podVolumesExist(podUID types.UID) bool {
 	// There are some volume plugins such as flexvolume might not have mounts. See issue #61229
 	volumePaths, err := kl.getMountedVolumePathListFromDisk(podUID)
 	if err != nil {
-		klog.Errorf("pod %q found, but error %v occurred during checking mounted volumes from disk", podUID, err)
+		klog.ErrorS(err, "Pod found, but error occurred during checking mounted volumes from disk", "podUID", podUID)
 		return true
 	}
 	if len(volumePaths) > 0 {
-		klog.V(4).Infof("pod %q found, but volumes are still mounted on disk %v", podUID, volumePaths)
+		klog.V(4).InfoS("Pod found, but volumes are still mounted on disk", "podUID", podUID, "paths", volumePaths)
 		return true
 	}
 
@@ -85,7 +86,7 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate mounter for volume: %s using plugin: %s with a root cause: %v", spec.Name(), plugin.GetPluginName(), err)
 	}
-	klog.V(10).Infof("Using volume plugin %q to mount %s", plugin.GetPluginName(), spec.Name())
+	klog.V(10).InfoS("Using volume plugin for mount", "volumePluginName", plugin.GetPluginName(), "volumeName", spec.Name())
 	return physicalMounter, nil
 }
 
@@ -117,43 +118,67 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		// TODO: getMountedVolumePathListFromDisk() call may be redundant with
 		// kl.getPodVolumePathListFromDisk(). Can this be cleaned up?
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			klog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up", uid)
+			klog.V(3).InfoS("Orphaned pod found, but volumes are not cleaned up", "podUID", uid)
 			continue
 		}
-		// If there are still volume directories, do not delete directory
+
+		allVolumesCleanedUp := true
+
+		// If there are still volume directories, attempt to rmdir them
 		volumePaths, err := kl.getPodVolumePathListFromDisk(uid)
 		if err != nil {
 			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but error %v occurred during reading volume dir from disk", uid, err))
 			continue
 		}
 		if len(volumePaths) > 0 {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but volume paths are still present on disk", uid))
-			continue
+			for _, volumePath := range volumePaths {
+				if err := syscall.Rmdir(volumePath); err != nil {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() volume at path %v: %v", uid, volumePath, err))
+					allVolumesCleanedUp = false
+				} else {
+					klog.InfoS("Cleaned up orphaned volume from pod", "podUID", uid, "path", volumePath)
+				}
+			}
 		}
 
-		// If there are any volume-subpaths, do not cleanup directories
-		volumeSubpathExists, err := kl.podVolumeSubpathsDirExists(uid)
+		// If there are any volume-subpaths, attempt to rmdir them
+		subpathVolumePaths, err := kl.getPodVolumeSubpathListFromDisk(uid)
 		if err != nil {
 			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but error %v occurred during reading of volume-subpaths dir from disk", uid, err))
 			continue
 		}
-		if volumeSubpathExists {
-			orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but volume subpaths are still present on disk", uid))
+		if len(subpathVolumePaths) > 0 {
+			for _, subpathVolumePath := range subpathVolumePaths {
+				if err := syscall.Rmdir(subpathVolumePath); err != nil {
+					orphanVolumeErrors = append(orphanVolumeErrors, fmt.Errorf("orphaned pod %q found, but failed to rmdir() subpath at path %v: %v", uid, subpathVolumePath, err))
+					allVolumesCleanedUp = false
+				} else {
+					klog.InfoS("Cleaned up orphaned volume subpath from pod", "podUID", uid, "path", subpathVolumePath)
+				}
+			}
+		}
+
+		if !allVolumesCleanedUp {
+			// Not all volumes were removed, so don't clean up the pod directory yet. It is likely
+			// that there are still mountpoints left which could stall RemoveAllOneFilesystem which
+			// would otherwise be called below.
+			// Errors for all removal operations have already been recorded, so don't add another
+			// one here.
 			continue
 		}
 
-		klog.V(3).Infof("Orphaned pod %q found, removing", uid)
+		klog.V(3).InfoS("Orphaned pod found, removing", "podUID", uid)
 		if err := removeall.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
-			klog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
+			klog.ErrorS(err, "Failed to remove orphaned pod dir", "podUID", uid)
 			orphanRemovalErrors = append(orphanRemovalErrors, err)
 		}
 	}
 
 	logSpew := func(errs []error) {
 		if len(errs) > 0 {
-			klog.Errorf("%v : There were a total of %v errors similar to this. Turn up verbosity to see them.", errs[0], len(errs))
+			klog.ErrorS(errs[0], "There were many similar errors. Turn up verbosity to see them.", "numErrs", len(errs))
 			for _, err := range errs {
-				klog.V(5).Infof("Orphan pod: %v", err)
+				klog.V(5).InfoS("Orphan pod", "err", err)
 			}
 		}
 	}

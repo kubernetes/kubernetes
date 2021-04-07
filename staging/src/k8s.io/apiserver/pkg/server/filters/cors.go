@@ -25,8 +25,8 @@ import (
 )
 
 // TODO: use restful.CrossOriginResourceSharing
-// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
-// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
+// See github.com/emicklei/go-restful/blob/master/examples/cors/restful-CORS-filter.go, and
+// github.com/emicklei/go-restful/blob/master/examples/basicauth/restful-basic-authentication.go
 // Or, for a more detailed implementation use https://github.com/martini-contrib/cors
 // or implement CORS at your proxy layer.
 

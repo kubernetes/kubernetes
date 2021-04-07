@@ -48,7 +48,6 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 	}
 	if ephemeralSource := podVolume.VolumeSource.Ephemeral; ephemeralSource != nil && utilfeature.DefaultFeatureGate.Enabled(features.GenericEphemeralVolume) {
 		claimName = pod.Name + "-" + podVolume.Name
-		readOnly = ephemeralSource.ReadOnly
 	}
 	if claimName != "" {
 		klog.V(10).Infof(
@@ -310,12 +309,8 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 }
 
 func isCSIMigrationSupportedOnNode(nodeName types.NodeName, spec *volume.Spec, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager) (bool, error) {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		// If CSIMigration is disabled, CSI migration paths will not be taken for
-		// the node. If CSINodeInfo is disabled, checking of installation status
-		// of a migrated CSI plugin cannot be performed. Therefore stick to
-		// in-tree plugins.
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		// If CSIMigration is disabled, CSI migration paths will not be taken for the node.
 		return false, nil
 	}
 

@@ -30,7 +30,7 @@ import (
 const (
 	// CrioSocket is the path to the CRI-O socket.
 	// Please keep this in sync with the one in:
-	// github.com/google/cadvisor/container/crio/client.go
+	// github.com/google/cadvisor/tree/master/container/crio/client.go
 	CrioSocket = "/var/run/crio/crio.sock"
 )
 

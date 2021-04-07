@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -58,7 +59,7 @@ var (
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
-var _ = SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
+var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet

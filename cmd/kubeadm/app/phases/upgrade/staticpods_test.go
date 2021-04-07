@@ -45,6 +45,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -442,7 +443,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 	for i := range tests {
 		rt := tests[i]
 		t.Run(rt.description, func(t *testing.T) {
-			t.Parallel()
+			pkiutiltesting.Reset()
 			waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
 			pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
 			if err != nil {
@@ -762,7 +763,7 @@ func TestRenewCertsByComponent(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
+			pkiutiltesting.Reset()
 
 			// Setup up basic requities
 			tmpDir := testutil.SetupTempDir(t)

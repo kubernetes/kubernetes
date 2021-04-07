@@ -47,6 +47,13 @@ type AuthProviderConfigPersister interface {
 	Persist(map[string]string) error
 }
 
+type noopPersister struct{}
+
+func (n *noopPersister) Persist(_ map[string]string) error {
+	// no operation persister
+	return nil
+}
+
 // All registered auth provider plugins.
 var pluginsLock sync.Mutex
 var plugins = make(map[string]Factory)
@@ -68,6 +75,9 @@ func GetAuthProvider(clusterAddress string, apc *clientcmdapi.AuthProviderConfig
 	p, ok := plugins[apc.Name]
 	if !ok {
 		return nil, fmt.Errorf("no Auth Provider found for name %q", apc.Name)
+	}
+	if persister == nil {
+		persister = &noopPersister{}
 	}
 	return p(clusterAddress, apc.Config, persister)
 }

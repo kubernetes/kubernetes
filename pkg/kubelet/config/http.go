@@ -54,7 +54,7 @@ func NewSourceURL(url string, header http.Header, nodeName types.NodeName, perio
 		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
-	klog.V(1).Infof("Watching URL %s", url)
+	klog.V(1).InfoS("Watching URL", "URL", url)
 	go wait.Until(config.run, period, wait.NeverStop)
 }
 
@@ -63,16 +63,16 @@ func (s *sourceURL) run() {
 		// Don't log this multiple times per minute. The first few entries should be
 		// enough to get the point across.
 		if s.failureLogs < 3 {
-			klog.Warningf("Failed to read pods from URL: %v", err)
+			klog.InfoS("Failed to read pods from URL", "err", err)
 		} else if s.failureLogs == 3 {
-			klog.Warningf("Failed to read pods from URL. Dropping verbosity of this message to V(4): %v", err)
+			klog.InfoS("Failed to read pods from URL. Dropping verbosity of this message to V(4)", "err", err)
 		} else {
-			klog.V(4).Infof("Failed to read pods from URL: %v", err)
+			klog.V(4).InfoS("Failed to read pods from URL", "err", err)
 		}
 		s.failureLogs++
 	} else {
 		if s.failureLogs > 0 {
-			klog.Info("Successfully read pods from URL.")
+			klog.InfoS("Successfully read pods from URL")
 			s.failureLogs = 0
 		}
 	}

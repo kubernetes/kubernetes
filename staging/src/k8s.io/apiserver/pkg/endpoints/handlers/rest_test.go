@@ -123,7 +123,7 @@ func TestStrategicMergePatchInvalid(t *testing.T) {
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
 	}
 }
@@ -171,7 +171,7 @@ func TestJSONPatch(t *testing.T) {
 				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
 				continue
 			}
-			if err.Error() != test.expectedError {
+			if !strings.Contains(err.Error(), test.expectedError) {
 				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
 			}
 			if test.expectedErrorType != apierrors.ReasonForError(err) {

@@ -5,6 +5,7 @@ The container image described here runs the EP benchmark from the
 This image is used as a workload in node performance testing.
 
 ## How to release:
+
 ```
 # Build
 $ cd $K8S_ROOT/test/images

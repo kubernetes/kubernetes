@@ -72,10 +72,3 @@ func (limitrangeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
-
-func (limitrangeStrategy) Export(context.Context, runtime.Object, bool) error {
-	// Copied from OpenShift exporter
-	// TODO: this needs to be fixed
-	//  limitrange.Strategy.PrepareForCreate(ctx, obj)
-	return nil
-}

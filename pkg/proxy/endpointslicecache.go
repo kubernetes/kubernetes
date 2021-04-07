@@ -23,9 +23,10 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -80,6 +81,11 @@ type endpointInfo struct {
 	Addresses []string
 	NodeName  *string
 	Topology  map[string]string
+	ZoneHints sets.String
+
+	Ready       bool
+	Serving     bool
+	Terminating bool
 }
 
 // spToEndpointMap stores groups Endpoint objects by ServicePortName and
@@ -122,16 +128,28 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
-			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
-				eInfo := endpointInfo{
-					Addresses: endpoint.Addresses,
-					Topology:  endpoint.Topology,
-				}
-				if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceNodeName) {
-					eInfo.NodeName = endpoint.NodeName
-				}
-				esInfo.Endpoints = append(esInfo.Endpoints, &eInfo)
+			epInfo := &endpointInfo{
+				Addresses: endpoint.Addresses,
+				Topology:  endpoint.Topology,
+
+				// conditions
+				Ready:       endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready,
+				Serving:     endpoint.Conditions.Serving == nil || *endpoint.Conditions.Serving,
+				Terminating: endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating,
 			}
+
+			epInfo.NodeName = endpoint.NodeName
+
+			if utilfeature.DefaultFeatureGate.Enabled(features.TopologyAwareHints) {
+				if endpoint.Hints != nil && len(endpoint.Hints.ForZones) > 0 {
+					epInfo.ZoneHints = sets.String{}
+					for _, zone := range endpoint.Hints.ForZones {
+						epInfo.ZoneHints.Insert(zone.Name)
+					}
+				}
+			}
+
+			esInfo.Endpoints = append(esInfo.Endpoints, epInfo)
 		}
 
 		sort.Sort(byAddress(esInfo.Endpoints))
@@ -269,7 +287,8 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 			isLocal = cache.isLocal(endpoint.Topology[v1.LabelHostname])
 		}
 
-		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology)
+		endpointInfo := newBaseEndpointInfo(endpoint.Addresses[0], portNum, isLocal, endpoint.Topology,
+			endpoint.Ready, endpoint.Serving, endpoint.Terminating, endpoint.ZoneHints)
 
 		// This logic ensures we're deduping potential overlapping endpoints
 		// isLocal should not vary between matching IPs, but if it does, we

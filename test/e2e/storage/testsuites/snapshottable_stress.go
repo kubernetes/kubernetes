@@ -33,21 +33,22 @@ import (
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 type snapshottableStressTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
 type snapshottableStressTest struct {
-	config        *PerTestConfig
-	testOptions   VolumeSnapshotStressTestOptions
+	config        *storageframework.PerTestConfig
+	testOptions   storageframework.VolumeSnapshotStressTestOptions
 	driverCleanup func()
 
 	pods      []*v1.Pod
-	volumes   []*VolumeResource
-	snapshots []*SnapshotResource
+	volumes   []*storageframework.VolumeResource
+	snapshots []*storageframework.SnapshotResource
 	// Because we are appending snapshot resources in parallel goroutines.
 	snapshotsMutex sync.Mutex
 
@@ -57,17 +58,13 @@ type snapshottableStressTest struct {
 	cancel context.CancelFunc
 }
 
-var _ TestSuite = &snapshottableStressTestSuite{}
-
-// InitSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
-func InitSnapshottableStressTestSuite() TestSuite {
+// InitCustomSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSnapshottableStressTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &snapshottableStressTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "snapshottable-stress",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DynamicSnapshotDelete,
-				testpatterns.DynamicSnapshotRetain,
-			},
+		tsInfo: storageframework.TestSuiteInfo{
+			Name:         "snapshottable-stress",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -76,55 +73,58 @@ func InitSnapshottableStressTestSuite() TestSuite {
 	}
 }
 
-func (t *snapshottableStressTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSnapshottableStressTestSuite returns snapshottableStressTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSnapshottableStressTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DynamicSnapshotDelete,
+		storageframework.DynamicSnapshotRetain,
+	}
+	return InitCustomSnapshottableStressTestSuite(patterns)
+}
+
+func (t *snapshottableStressTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *snapshottableStressTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *snapshottableStressTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	driverInfo := driver.GetDriverInfo()
+	var ok bool
+	if driverInfo.VolumeSnapshotStressTestOptions == nil {
+		e2eskipper.Skipf("Driver %s doesn't specify snapshot stress test options -- skipping", driverInfo.Name)
+	}
+	if driverInfo.VolumeSnapshotStressTestOptions.NumPods <= 0 {
+		framework.Failf("NumPods in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumPods)
+	}
+	if driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots <= 0 {
+		framework.Failf("NumSnapshots in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots)
+	}
+	_, ok = driver.(storageframework.SnapshottableTestDriver)
+	if !driverInfo.Capabilities[storageframework.CapSnapshotDataSource] || !ok {
+		e2eskipper.Skipf("Driver %q doesn't implement SnapshottableTestDriver - skipping", driverInfo.Name)
+	}
+
+	_, ok = driver.(storageframework.DynamicPVTestDriver)
+	if !ok {
+		e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
+	}
 }
 
-func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (t *snapshottableStressTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	var (
-		driverInfo          *DriverInfo
-		snapshottableDriver SnapshottableTestDriver
+		driverInfo          *storageframework.DriverInfo
+		snapshottableDriver storageframework.SnapshottableTestDriver
 		cs                  clientset.Interface
 		stressTest          *snapshottableStressTest
 	)
 
-	// Check preconditions before setting up namespace via framework below.
-	ginkgo.BeforeEach(func() {
-		driverInfo = driver.GetDriverInfo()
-		if driverInfo.VolumeSnapshotStressTestOptions == nil {
-			e2eskipper.Skipf("Driver %s doesn't specify snapshot stress test options -- skipping", driverInfo.Name)
-		}
-		if driverInfo.VolumeSnapshotStressTestOptions.NumPods <= 0 {
-			framework.Failf("NumPods in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumPods)
-		}
-		if driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots <= 0 {
-			framework.Failf("NumSnapshots in snapshot stress test options must be a positive integer, received: %d", driverInfo.VolumeSnapshotStressTestOptions.NumSnapshots)
-		}
-
-		// Because we're initializing snapshottableDriver, both vars must exist.
-		ok := false
-
-		snapshottableDriver, ok = driver.(SnapshottableTestDriver)
-		if !driverInfo.Capabilities[CapSnapshotDataSource] || !ok {
-			e2eskipper.Skipf("Driver %q doesn't implement SnapshottableTestDriver - skipping", driverInfo.Name)
-		}
-
-		_, ok = driver.(DynamicPVTestDriver)
-		if !ok {
-			e2eskipper.Skipf("Driver %s doesn't implement DynamicPVTestDriver -- skipping", driverInfo.Name)
-		}
-	})
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
 	f := framework.NewDefaultFramework("snapshottable-stress")
 
 	init := func() {
+		driverInfo = driver.GetDriverInfo()
+		snapshottableDriver, _ = driver.(storageframework.SnapshottableTestDriver)
 		cs = f.ClientSet
 		config, driverCleanup := driver.PrepareTest(f)
 		ctx, cancel := context.WithCancel(context.Background())
@@ -132,8 +132,8 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 		stressTest = &snapshottableStressTest{
 			config:        config,
 			driverCleanup: driverCleanup,
-			volumes:       []*VolumeResource{},
-			snapshots:     []*SnapshotResource{},
+			volumes:       []*storageframework.VolumeResource{},
+			snapshots:     []*storageframework.SnapshotResource{},
 			pods:          []*v1.Pod{},
 			testOptions:   *driverInfo.VolumeSnapshotStressTestOptions,
 			ctx:           ctx,
@@ -145,7 +145,7 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 		for i := 0; i < stressTest.testOptions.NumPods; i++ {
 			framework.Logf("Creating resources for pod %d/%d", i, stressTest.testOptions.NumPods-1)
 
-			volume := CreateVolumeResource(driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
+			volume := storageframework.CreateVolumeResource(driver, stressTest.config, pattern, t.GetTestSuiteInfo().SupportedSizeRange)
 			stressTest.volumes = append(stressTest.volumes, volume)
 
 			podConfig := e2epod.Config{
@@ -194,26 +194,24 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 			wg   sync.WaitGroup
 		)
 
-		for i, snapshot := range stressTest.snapshots {
-			wg.Add(1)
-
-			go func(i int, snapshot *SnapshotResource) {
+		wg.Add(len(stressTest.snapshots))
+		for _, snapshot := range stressTest.snapshots {
+			go func(snapshot *storageframework.SnapshotResource) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
 				framework.Logf("Deleting snapshot %s/%s", snapshot.Vs.GetNamespace(), snapshot.Vs.GetName())
-				err := snapshot.CleanupResource()
+				err := snapshot.CleanupResource(f.Timeouts)
 				mu.Lock()
 				defer mu.Unlock()
 				errs = append(errs, err)
-			}(i, snapshot)
+			}(snapshot)
 		}
 		wg.Wait()
 
-		for i, pod := range stressTest.pods {
-			wg.Add(1)
-
-			go func(i int, pod *v1.Pod) {
+		wg.Add(len(stressTest.pods))
+		for _, pod := range stressTest.pods {
+			go func(pod *v1.Pod) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
@@ -222,14 +220,13 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 				mu.Lock()
 				defer mu.Unlock()
 				errs = append(errs, err)
-			}(i, pod)
+			}(pod)
 		}
 		wg.Wait()
 
-		for i, volume := range stressTest.volumes {
-			wg.Add(1)
-
-			go func(i int, volume *VolumeResource) {
+		wg.Add(len(stressTest.volumes))
+		for _, volume := range stressTest.volumes {
+			go func(volume *storageframework.VolumeResource) {
 				defer ginkgo.GinkgoRecover()
 				defer wg.Done()
 
@@ -238,11 +235,11 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 				mu.Lock()
 				defer mu.Unlock()
 				errs = append(errs, err)
-			}(i, volume)
+			}(volume)
 		}
 		wg.Wait()
 
-		errs = append(errs, tryFunc(stressTest.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(stressTest.driverCleanup))
 
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resources")
 	}
@@ -275,7 +272,8 @@ func (t *snapshottableStressTestSuite) DefineTests(driver TestDriver, pattern te
 						return
 					default:
 						framework.Logf("Pod-%d [%s], Iteration %d/%d", podIndex, pod.Name, snapshotIndex, stressTest.testOptions.NumSnapshots-1)
-						snapshot := CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace())
+						parameters := map[string]string{}
+						snapshot := storageframework.CreateSnapshotResource(snapshottableDriver, stressTest.config, pattern, volume.Pvc.GetName(), volume.Pvc.GetNamespace(), f.Timeouts, parameters)
 						stressTest.snapshotsMutex.Lock()
 						defer stressTest.snapshotsMutex.Unlock()
 						stressTest.snapshots = append(stressTest.snapshots, snapshot)

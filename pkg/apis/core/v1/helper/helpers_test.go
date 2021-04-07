@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -306,222 +305,6 @@ func TestTopologySelectorRequirementsAsSelector(t *testing.T) {
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
-		}
-	}
-}
-
-func TestTolerationsTolerateTaintsWithFilter(t *testing.T) {
-	testCases := []struct {
-		description     string
-		tolerations     []v1.Toleration
-		taints          []v1.Taint
-		applyFilter     taintsFilterFunc
-		expectTolerated bool
-	}{
-		{
-			description:     "empty tolerations tolerate empty taints",
-			tolerations:     []v1.Toleration{},
-			taints:          []v1.Taint{},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
-		},
-		{
-			description: "non-empty tolerations tolerate empty taints",
-			tolerations: []v1.Toleration{
-				{
-					Key:      "foo",
-					Operator: "Exists",
-					Effect:   v1.TaintEffectNoSchedule,
-				},
-			},
-			taints:          []v1.Taint{},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
-		},
-		{
-			description: "tolerations match all taints, expect tolerated",
-			tolerations: []v1.Toleration{
-				{
-					Key:      "foo",
-					Operator: "Exists",
-					Effect:   v1.TaintEffectNoSchedule,
-				},
-			},
-			taints: []v1.Taint{
-				{
-					Key:    "foo",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			applyFilter:     func(t *v1.Taint) bool { return true },
-			expectTolerated: true,
-		},
-		{
-			description: "tolerations don't match taints, but no taints apply to the filter, expect tolerated",
-			tolerations: []v1.Toleration{
-				{
-					Key:      "foo",
-					Operator: "Exists",
-					Effect:   v1.TaintEffectNoSchedule,
-				},
-			},
-			taints: []v1.Taint{
-				{
-					Key:    "bar",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			applyFilter:     func(t *v1.Taint) bool { return false },
-			expectTolerated: true,
-		},
-		{
-			description: "no filterFunc indicated, means all taints apply to the filter, tolerations don't match taints, expect untolerated",
-			tolerations: []v1.Toleration{
-				{
-					Key:      "foo",
-					Operator: "Exists",
-					Effect:   v1.TaintEffectNoSchedule,
-				},
-			},
-			taints: []v1.Taint{
-				{
-					Key:    "bar",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			applyFilter:     nil,
-			expectTolerated: false,
-		},
-		{
-			description: "tolerations match taints, expect tolerated",
-			tolerations: []v1.Toleration{
-				{
-					Key:      "foo",
-					Operator: "Exists",
-					Effect:   v1.TaintEffectNoExecute,
-				},
-			},
-			taints: []v1.Taint{
-				{
-					Key:    "foo",
-					Effect: v1.TaintEffectNoExecute,
-				},
-				{
-					Key:    "bar",
-					Effect: v1.TaintEffectNoSchedule,
-				},
-			},
-			applyFilter:     func(t *v1.Taint) bool { return t.Effect == v1.TaintEffectNoExecute },
-			expectTolerated: true,
-		},
-	}
-
-	for _, tc := range testCases {
-		if tc.expectTolerated != TolerationsTolerateTaintsWithFilter(tc.tolerations, tc.taints, tc.applyFilter) {
-			filteredTaints := []v1.Taint{}
-			for _, taint := range tc.taints {
-				if tc.applyFilter != nil && !tc.applyFilter(&taint) {
-					continue
-				}
-				filteredTaints = append(filteredTaints, taint)
-			}
-			t.Errorf("[%s] expect tolerations %+v tolerate filtered taints %+v in taints %+v", tc.description, tc.tolerations, filteredTaints, tc.taints)
-		}
-	}
-}
-
-func TestGetAvoidPodsFromNode(t *testing.T) {
-	controllerFlag := true
-	testCases := []struct {
-		node        *v1.Node
-		expectValue v1.AvoidPods
-		expectErr   bool
-	}{
-		{
-			node:        &v1.Node{},
-			expectValue: v1.AvoidPods{},
-			expectErr:   false,
-		},
-		{
-			node: &v1.Node{
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-						                            "apiVersion": "v1",
-						                            "kind": "ReplicationController",
-						                            "name": "foo",
-						                            "uid": "abcdef123456",
-						                            "controller": true
-							                }
-							            },
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: v1.AvoidPods{
-				PreferAvoidPods: []v1.PreferAvoidPodsEntry{
-					{
-						PodSignature: v1.PodSignature{
-							PodController: &metav1.OwnerReference{
-								APIVersion: "v1",
-								Kind:       "ReplicationController",
-								Name:       "foo",
-								UID:        "abcdef123456",
-								Controller: &controllerFlag,
-							},
-						},
-						Reason:  "some reason",
-						Message: "some message",
-					},
-				},
-			},
-			expectErr: false,
-		},
-		{
-			node: &v1.Node{
-				// Missing end symbol of "podController" and "podSignature"
-				ObjectMeta: metav1.ObjectMeta{
-					Annotations: map[string]string{
-						v1.PreferAvoidPodsAnnotationKey: `
-							{
-							    "preferAvoidPods": [
-							        {
-							            "podSignature": {
-							                "podController": {
-							                    "kind": "ReplicationController",
-							                    "apiVersion": "v1"
-							            "reason": "some reason",
-							            "message": "some message"
-							        }
-							    ]
-							}`,
-					},
-				},
-			},
-			expectValue: v1.AvoidPods{},
-			expectErr:   true,
-		},
-	}
-
-	for i, tc := range testCases {
-		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
-		if err == nil && tc.expectErr {
-			t.Errorf("[%v]expected error but got none.", i)
-		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("[%v]did not expect error but got: %v", i, err)
-		}
-		if !reflect.DeepEqual(tc.expectValue, v) {
-			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
 		}
 	}
 }
@@ -915,5 +698,88 @@ func TestHugePageUnitSizeFromByteSize(t *testing.T) {
 		if test.expected != result {
 			t.Errorf("HugePageUnitSizeFromByteSize() expected %v but got %v", test.expected, result)
 		}
+	}
+}
+
+func TestLoadBalancerStatusEqual(t *testing.T) {
+
+	testCases := []struct {
+		left      *v1.LoadBalancerStatus
+		right     *v1.LoadBalancerStatus
+		name      string
+		expectVal bool
+	}{{
+		name: "left equals right",
+		left: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}},
+		},
+		right: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}},
+		},
+		expectVal: true,
+	}, {
+		name: "length of LoadBalancerIngress slice is not equal",
+		left: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}, {
+				IP:       "1.1.1.2",
+				Hostname: "host1",
+			}},
+		},
+		right: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}},
+		},
+		expectVal: false,
+	}, {
+		name: "LoadBalancerIngress ip is not equal",
+		left: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.2",
+				Hostname: "host1",
+			}},
+		},
+		right: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}},
+		},
+		expectVal: false,
+	}, {
+		name: "LoadBalancerIngress hostname is not equal",
+		left: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host2",
+			}},
+		},
+		right: &v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{{
+				IP:       "1.1.1.1",
+				Hostname: "host1",
+			}},
+		},
+		expectVal: false,
+	}}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			v := LoadBalancerStatusEqual(tc.left, tc.right)
+			if v != tc.expectVal {
+				t.Errorf("test %s failed. left input=%v, right input=%v, Got %v but expected %v",
+					tc.name, tc.left, tc.right, v, tc.expectVal)
+			}
+		})
 	}
 }

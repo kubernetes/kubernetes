@@ -35,9 +35,8 @@ import (
 var (
 	v1GroupVersion = schema.GroupVersion{Group: "", Version: "v1"}
 
-	scheme         = runtime.NewScheme()
-	codecs         = serializer.NewCodecFactory(scheme)
-	parameterCodec = runtime.NewParameterCodec(scheme)
+	scheme = runtime.NewScheme()
+	codecs = serializer.NewCodecFactory(scheme)
 )
 
 func init() {

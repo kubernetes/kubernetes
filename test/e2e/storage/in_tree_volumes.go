@@ -19,12 +19,13 @@ package storage
 import (
 	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() testsuites.TestDriver{
+var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -54,8 +55,8 @@ var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
-		ginkgo.Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, testsuites.BaseSuites)
+		ginkgo.Context(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
+			storageframework.DefineTestSuites(curDriver, testsuites.BaseSuites)
 		})
 	}
 })

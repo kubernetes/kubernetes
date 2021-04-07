@@ -87,8 +87,3 @@ func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
-
-func (podTemplateStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	// Do nothing
-	return nil
-}

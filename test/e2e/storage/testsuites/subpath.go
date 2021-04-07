@@ -39,8 +39,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	e2evolume "k8s.io/kubernetes/test/e2e/framework/volume"
-	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
+	storageutils "k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -55,22 +56,16 @@ var (
 )
 
 type subPathTestSuite struct {
-	tsInfo TestSuiteInfo
+	tsInfo storageframework.TestSuiteInfo
 }
 
-var _ TestSuite = &subPathTestSuite{}
-
-// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
-func InitSubPathTestSuite() TestSuite {
+// InitCustomSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using custom test patterns
+func InitCustomSubPathTestSuite(patterns []storageframework.TestPattern) storageframework.TestSuite {
 	return &subPathTestSuite{
-		tsInfo: TestSuiteInfo{
-			Name: "subPath",
-			TestPatterns: []testpatterns.TestPattern{
-				testpatterns.DefaultFsInlineVolume,
-				testpatterns.DefaultFsPreprovisionedPV,
-				testpatterns.DefaultFsDynamicPV,
-				testpatterns.NtfsDynamicPV,
-			},
+		tsInfo: storageframework.TestSuiteInfo{
+			Name:         "subPath",
+			TestPatterns: patterns,
 			SupportedSizeRange: e2evolume.SizeRange{
 				Min: "1Mi",
 			},
@@ -78,23 +73,35 @@ func InitSubPathTestSuite() TestSuite {
 	}
 }
 
-func (s *subPathTestSuite) GetTestSuiteInfo() TestSuiteInfo {
+// InitSubPathTestSuite returns subPathTestSuite that implements TestSuite interface
+// using testsuite default patterns
+func InitSubPathTestSuite() storageframework.TestSuite {
+	patterns := []storageframework.TestPattern{
+		storageframework.DefaultFsInlineVolume,
+		storageframework.DefaultFsPreprovisionedPV,
+		storageframework.DefaultFsDynamicPV,
+		storageframework.NtfsDynamicPV,
+	}
+	return InitCustomSubPathTestSuite(patterns)
+}
+
+func (s *subPathTestSuite) GetTestSuiteInfo() storageframework.TestSuiteInfo {
 	return s.tsInfo
 }
 
-func (s *subPathTestSuite) SkipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
-	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
-		testpatterns.PreprovisionedPV,
-		testpatterns.InlineVolume))
+func (s *subPathTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
+	skipVolTypePatterns(pattern, driver, storageframework.NewVolTypeMap(
+		storageframework.PreprovisionedPV,
+		storageframework.InlineVolume))
 }
 
-func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.TestPattern) {
+func (s *subPathTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
-		config        *PerTestConfig
+		config        *storageframework.PerTestConfig
 		driverCleanup func()
 
 		hostExec          utils.HostExec
-		resource          *VolumeResource
+		resource          *storageframework.VolumeResource
 		roVolSource       *v1.VolumeSource
 		pod               *v1.Pod
 		formatPod         *v1.Pod
@@ -106,13 +113,9 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 	}
 	var l local
 
-	// No preconditions to test. Normally they would be in a BeforeEach here.
-
-	// This intentionally comes after checking the preconditions because it
-	// registers its own BeforeEach which creates the namespace. Beware that it
-	// also registers an AfterEach which renders f unusable. Any code using
+	// Beware that it also registers an AfterEach which renders f unusable. Any code using
 	// f must run inside an It or Context callback.
-	f := framework.NewDefaultFramework("provisioning")
+	f := framework.NewFrameworkWithCustomTimeouts("provisioning", storageframework.GetDriverTimeouts(driver))
 
 	init := func() {
 		l = local{}
@@ -121,24 +124,24 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.migrationCheck = newMigrationOpCheck(f.ClientSet, driver.GetDriverInfo().InTreePluginName)
 		testVolumeSizeRange := s.GetTestSuiteInfo().SupportedSizeRange
-		l.resource = CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
+		l.resource = storageframework.CreateVolumeResource(driver, l.config, pattern, testVolumeSizeRange)
 		l.hostExec = utils.NewHostExec(f)
 
 		// Setup subPath test dependent resource
 		volType := pattern.VolType
 		switch volType {
-		case testpatterns.InlineVolume:
-			if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
+		case storageframework.InlineVolume:
+			if iDriver, ok := driver.(storageframework.InlineVolumeTestDriver); ok {
 				l.roVolSource = iDriver.GetVolumeSource(true, pattern.FsType, l.resource.Volume)
 			}
-		case testpatterns.PreprovisionedPV:
+		case storageframework.PreprovisionedPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
 					ReadOnly:  true,
 				},
 			}
-		case testpatterns.DynamicPV:
+		case storageframework.DynamicPV:
 			l.roVolSource = &v1.VolumeSource{
 				PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 					ClaimName: l.resource.Pvc.Name,
@@ -175,7 +178,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 			l.resource = nil
 		}
 
-		errs = append(errs, tryFunc(l.driverCleanup))
+		errs = append(errs, storageutils.TryFunc(l.driverCleanup))
 		l.driverCleanup = nil
 		framework.ExpectNoError(errors.NewAggregate(errs), "while cleaning up resource")
 
@@ -443,8 +446,8 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		defer cleanup()
 
 		// Change volume container to busybox so we can exec later
-		l.pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
-		l.pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+		l.pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
+		l.pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd("sleep 100000")
 		l.pod.Spec.Containers[1].Args = nil
 
 		ginkgo.By(fmt.Sprintf("Creating pod %s", l.pod.Name))
@@ -457,7 +460,7 @@ func (s *subPathTestSuite) DefineTests(driver TestDriver, pattern testpatterns.T
 		}()
 
 		// Wait for pod to be running
-		err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, l.pod)
+		err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, l.pod.Name, l.pod.Namespace, f.Timeouts.PodStart)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		// Exec into container that mounted the volume, delete subpath directory
@@ -518,19 +521,19 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 	initSubpathContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-init-subpath-%s", suffix),
 		[]v1.VolumeMount{volumeSubpathMount, probeMount}, nil, "mounttest")
-	initSubpathContainer.SecurityContext = e2evolume.GenerateSecurityContext(privilegedSecurityContext)
+	initSubpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
 	initVolumeContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-init-volume-%s", suffix),
 		[]v1.VolumeMount{volumeMount, probeMount}, nil, "mounttest")
-	initVolumeContainer.SecurityContext = e2evolume.GenerateSecurityContext(privilegedSecurityContext)
+	initVolumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
 	subpathContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-container-subpath-%s", suffix),
 		[]v1.VolumeMount{volumeSubpathMount, probeMount}, nil, "mounttest")
-	subpathContainer.SecurityContext = e2evolume.GenerateSecurityContext(privilegedSecurityContext)
+	subpathContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
 	volumeContainer := e2epod.NewAgnhostContainer(
 		fmt.Sprintf("test-container-volume-%s", suffix),
 		[]v1.VolumeMount{volumeMount, probeMount}, nil, "mounttest")
-	volumeContainer.SecurityContext = e2evolume.GenerateSecurityContext(privilegedSecurityContext)
+	volumeContainer.SecurityContext = e2epod.GenerateContainerSecurityContext(privilegedSecurityContext)
 
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -541,9 +544,9 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 			InitContainers: []v1.Container{
 				{
 					Name:            fmt.Sprintf("init-volume-%s", suffix),
-					Image:           e2evolume.GetDefaultTestImage(),
+					Image:           e2epod.GetDefaultTestImage(),
 					VolumeMounts:    []v1.VolumeMount{volumeMount, probeMount},
-					SecurityContext: e2evolume.GenerateSecurityContext(privilegedSecurityContext),
+					SecurityContext: e2epod.GenerateContainerSecurityContext(privilegedSecurityContext),
 				},
 				initSubpathContainer,
 				initVolumeContainer,
@@ -566,7 +569,7 @@ func SubpathTestPod(f *framework.Framework, subpath, volumeType string, source *
 					},
 				},
 			},
-			SecurityContext: e2evolume.GeneratePodSecurityContext(nil, seLinuxOptions),
+			SecurityContext: e2epod.GeneratePodSecurityContext(nil, seLinuxOptions),
 		},
 	}
 }
@@ -610,8 +613,8 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 			Containers: []v1.Container{
 				{
 					Name:    fmt.Sprintf("init-volume-%s", f.Namespace.Name),
-					Image:   e2evolume.GetDefaultTestImage(),
-					Command: e2evolume.GenerateScriptCmd("echo nothing"),
+					Image:   e2epod.GetDefaultTestImage(),
+					Command: e2epod.GenerateScriptCmd("echo nothing"),
 					VolumeMounts: []v1.VolumeMount{
 						{
 							Name:      volumeName,
@@ -632,7 +635,7 @@ func volumeFormatPod(f *framework.Framework, volumeSource *v1.VolumeSource) *v1.
 }
 
 func setInitCommand(pod *v1.Pod, command string) {
-	pod.Spec.InitContainers[0].Command = e2evolume.GenerateScriptCmd(command)
+	pod.Spec.InitContainers[0].Command = e2epod.GenerateScriptCmd(command)
 }
 
 func setWriteCommand(file string, container *v1.Container) {
@@ -727,7 +730,7 @@ func waitForPodSubpathError(f *framework.Framework, pod *v1.Pod, allowContainerT
 		return fmt.Errorf("failed to find container that uses subpath")
 	}
 
-	waitErr := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+	waitErr := wait.PollImmediate(framework.Poll, f.Timeouts.PodStart, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(pod.Namespace).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -789,11 +792,11 @@ func (h *podContainerRestartHooks) FixLivenessProbe(pod *v1.Pod, probeFilePath s
 func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks *podContainerRestartHooks) {
 	pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
 
-	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
-	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[0].Command = e2epod.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
-	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	hooks.AddLivenessProbe(pod, probeFilePath)
 
@@ -805,7 +808,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	defer func() {
 		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	ginkgo.By("Failing liveness probe")
@@ -920,7 +923,7 @@ func TestPodContainerRestartWithConfigmapModified(f *framework.Framework, origin
 		break
 	}
 	pod := SubpathTestPod(f, subpath, "configmap", &v1.VolumeSource{ConfigMap: &v1.ConfigMapVolumeSource{LocalObjectReference: v1.LocalObjectReference{Name: original.Name}}}, false)
-	pod.Spec.InitContainers[0].Command = e2evolume.GenerateScriptCmd(fmt.Sprintf("touch %v", probeFilePath))
+	pod.Spec.InitContainers[0].Command = e2epod.GenerateScriptCmd(fmt.Sprintf("touch %v", probeFilePath))
 
 	modifiedValue := modified.Data[subpath]
 	testPodContainerRestartWithHooks(f, pod, &podContainerRestartHooks{
@@ -956,18 +959,18 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	// Disruptive test run serially, we can cache all voluem global mount
 	// points and verify after the test that we do not leak any global mount point.
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
-	framework.ExpectNoError(err, "while listing scheduable nodes")
+	framework.ExpectNoError(err, "while listing schedulable nodes")
 	globalMountPointsByNode := make(map[string]sets.String, len(nodeList.Items))
 	for _, node := range nodeList.Items {
 		globalMountPointsByNode[node.Name] = utils.FindVolumeGlobalMountPoints(hostExec, &node)
 	}
 
 	// Change to busybox
-	pod.Spec.Containers[0].Image = e2evolume.GetDefaultTestImage()
-	pod.Spec.Containers[0].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[0].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[0].Command = e2epod.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[0].Args = nil
-	pod.Spec.Containers[1].Image = e2evolume.GetDefaultTestImage()
-	pod.Spec.Containers[1].Command = e2evolume.GenerateScriptCmd("sleep 100000")
+	pod.Spec.Containers[1].Image = e2epod.GetDefaultTestImage()
+	pod.Spec.Containers[1].Command = e2epod.GenerateScriptCmd("sleep 100000")
 	pod.Spec.Containers[1].Args = nil
 	// If grace period is too short, then there is not enough time for the volume
 	// manager to cleanup the volumes
@@ -978,8 +981,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 	removeUnusedContainers(pod)
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating pod")
-
-	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
@@ -991,7 +993,7 @@ func testSubpathReconstruction(f *framework.Framework, hostExec utils.HostExec, 
 			podNode = &nodeList.Items[i]
 		}
 	}
-	framework.ExpectNotEqual(podNode, nil, "pod node should exist in scheduable nodes")
+	framework.ExpectNotEqual(podNode, nil, "pod node should exist in schedulable nodes")
 
 	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
 
@@ -1010,7 +1012,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "while creating volume init pod")
 
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
+	err = e2epod.WaitForPodSuccessInNamespaceTimeout(f.ClientSet, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
 	err = e2epod.DeletePodWithWait(f.ClientSet, pod)

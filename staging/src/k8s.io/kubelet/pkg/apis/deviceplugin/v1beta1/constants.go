@@ -30,7 +30,17 @@ const (
 	DevicePluginPath = "/var/lib/kubelet/device-plugins/"
 	// KubeletSocket is the path of the Kubelet registry socket
 	KubeletSocket = DevicePluginPath + "kubelet.sock"
+
+	// DevicePluginPathWindows Avoid failed to run Kubelet: bad socketPath,
+	// must be an absolute path: /var/lib/kubelet/device-plugins/kubelet.sock
+	// https://github.com/kubernetes/kubernetes/issues/93262
+	// https://github.com/kubernetes/kubernetes/pull/93285#discussion_r458140701
+	DevicePluginPathWindows = "\\var\\lib\\kubelet\\device-plugins\\"
+	// KubeletSocketWindows is the path of the Kubelet registry socket on windows
+	KubeletSocketWindows = DevicePluginPathWindows + "kubelet.sock"
+
 	// KubeletPreStartContainerRPCTimeoutInSecs is the timeout duration in secs for PreStartContainer RPC
+	// Timeout duration in secs for PreStartContainer RPC
 	KubeletPreStartContainerRPCTimeoutInSecs = 30
 )
 

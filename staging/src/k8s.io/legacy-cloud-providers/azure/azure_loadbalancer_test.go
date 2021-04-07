@@ -1592,6 +1592,28 @@ func TestReconcileLoadBalancerRule(t *testing.T) {
 			expectedProbes:  getDefaultTestProbes("http", "/healthy"),
 			expectedRules:   getDefaultTestRules(true),
 		},
+		{
+			desc: "reconcileLoadBalancerRule shall return corresponding probe and lbRule (slb with HA enabled)",
+			service: getTestService("test1", v1.ProtocolTCP, map[string]string{
+				"service.beta.kubernetes.io/azure-load-balancer-enable-high-availability-ports": "true",
+				"service.beta.kubernetes.io/azure-load-balancer-internal":                       "true",
+			}, false, 80),
+			loadBalancerSku: "standard",
+			wantLb:          true,
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getHATestRules(true),
+		},
+		{
+			desc: "reconcileLoadBalancerRule shall return corresponding probe and lbRule (slb with HA enabled multi-ports services)",
+			service: getTestService("test1", v1.ProtocolTCP, map[string]string{
+				"service.beta.kubernetes.io/azure-load-balancer-enable-high-availability-ports": "true",
+				"service.beta.kubernetes.io/azure-load-balancer-internal":                       "true",
+			}, false, 80, 8080),
+			loadBalancerSku: "standard",
+			wantLb:          true,
+			expectedProbes:  getDefaultTestProbes("Tcp", ""),
+			expectedRules:   getHATestRules(true),
+		},
 	}
 	for i, test := range testCases {
 		az := GetTestCloud(ctrl)
@@ -1649,6 +1671,37 @@ func getDefaultTestRules(enableTCPReset bool) []network.LoadBalancingRule {
 				LoadDistribution:     "Default",
 				FrontendPort:         to.Int32Ptr(80),
 				BackendPort:          to.Int32Ptr(80),
+				EnableFloatingIP:     to.BoolPtr(true),
+				DisableOutboundSnat:  to.BoolPtr(false),
+				IdleTimeoutInMinutes: to.Int32Ptr(0),
+				Probe: &network.SubResource{
+					ID: to.StringPtr("/subscriptions/subscription/resourceGroups/rg/providers/" +
+						"Microsoft.Network/loadBalancers/lbname/probes/atest1-TCP-80"),
+				},
+			},
+		},
+	}
+	if enableTCPReset {
+		expectedRules[0].EnableTCPReset = to.BoolPtr(true)
+	}
+	return expectedRules
+}
+
+func getHATestRules(enableTCPReset bool) []network.LoadBalancingRule {
+	expectedRules := []network.LoadBalancingRule{
+		{
+			Name: to.StringPtr("atest1-TCP-80"),
+			LoadBalancingRulePropertiesFormat: &network.LoadBalancingRulePropertiesFormat{
+				Protocol: network.TransportProtocol("All"),
+				FrontendIPConfiguration: &network.SubResource{
+					ID: to.StringPtr("frontendIPConfigID"),
+				},
+				BackendAddressPool: &network.SubResource{
+					ID: to.StringPtr("backendPoolID"),
+				},
+				LoadDistribution:     "Default",
+				FrontendPort:         to.Int32Ptr(0),
+				BackendPort:          to.Int32Ptr(0),
 				EnableFloatingIP:     to.BoolPtr(true),
 				DisableOutboundSnat:  to.BoolPtr(false),
 				IdleTimeoutInMinutes: to.Int32Ptr(0),

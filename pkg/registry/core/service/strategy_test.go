@@ -47,115 +47,6 @@ func newStrategy(cidr string, hasSecondary bool) (testStrategy Strategy, testSta
 	return
 }
 
-func TestExportService(t *testing.T) {
-	testStrategy, _ := newStrategy("10.0.0.0/16", false)
-	tests := []struct {
-		objIn     runtime.Object
-		objOut    runtime.Object
-		exact     bool
-		expectErr bool
-	}{
-		{
-			objIn: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
-							{IP: "1.2.3.4"},
-						},
-					},
-				},
-			},
-			objOut: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-			},
-			exact: true,
-		},
-		{
-			objIn: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Spec: api.ServiceSpec{
-					ClusterIPs: []string{"10.0.0.1"},
-				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
-							{IP: "1.2.3.4"},
-						},
-					},
-				},
-			},
-			objOut: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Spec: api.ServiceSpec{
-					ClusterIPs: nil,
-				},
-			},
-		},
-		{
-			objIn: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Spec: api.ServiceSpec{
-					ClusterIPs: []string{"10.0.0.1", "2001::1"},
-				},
-				Status: api.ServiceStatus{
-					LoadBalancer: api.LoadBalancerStatus{
-						Ingress: []api.LoadBalancerIngress{
-							{IP: "1.2.3.4"},
-						},
-					},
-				},
-			},
-			objOut: &api.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "foo",
-					Namespace: "bar",
-				},
-				Spec: api.ServiceSpec{
-					ClusterIPs: nil,
-				},
-			},
-		},
-
-		{
-			objIn:     &api.Pod{},
-			expectErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		err := testStrategy.Export(genericapirequest.NewContext(), test.objIn, test.exact)
-		if err != nil {
-			if !test.expectErr {
-				t.Errorf("unexpected error: %v", err)
-			}
-			continue
-		}
-		if test.expectErr {
-			t.Error("unexpected non-error")
-			continue
-		}
-		if !reflect.DeepEqual(test.objIn, test.objOut) {
-			t.Errorf("expected:\n%v\nsaw:\n%v\n", test.objOut, test.objIn)
-		}
-	}
-}
-
 func TestCheckGeneratedNameError(t *testing.T) {
 	testStrategy, _ := newStrategy("10.0.0.0/16", false)
 	expect := errors.NewNotFound(api.Resource("foos"), "bar")
@@ -216,6 +107,15 @@ func makeValidServiceCustom(tweaks ...func(svc *api.Service)) *api.Service {
 		fn(svc)
 	}
 	return svc
+}
+
+func makeServiceWithClusterIp(clusterIP string, clusterIPs []string) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			ClusterIP:  clusterIP,
+			ClusterIPs: clusterIPs,
+		},
+	}
 }
 
 // TODO: This should be done on types that are not part of our API
@@ -349,18 +249,38 @@ func makeServiceWithPorts(ports []api.PortStatus) *api.Service {
 	}
 }
 
+func makeServiceWithLoadBalancerClass(loadBalancerClass *string) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			LoadBalancerClass: loadBalancerClass,
+		},
+	}
+}
+
+func makeServiceWithInternalTrafficPolicy(policy *api.ServiceInternalTrafficPolicyType) *api.Service {
+	return &api.Service{
+		Spec: api.ServiceSpec{
+			InternalTrafficPolicy: policy,
+		},
+	}
+}
+
 func TestDropDisabledField(t *testing.T) {
 	requireDualStack := api.IPFamilyPolicyRequireDualStack
 	preferDualStack := api.IPFamilyPolicyPreferDualStack
 	singleStack := api.IPFamilyPolicySingleStack
 
+	localInternalTrafficPolicy := api.ServiceInternalTrafficPolicyLocal
+
 	testCases := []struct {
-		name                string
-		enableDualStack     bool
-		enableMixedProtocol bool
-		svc                 *api.Service
-		oldSvc              *api.Service
-		compareSvc          *api.Service
+		name                        string
+		enableDualStack             bool
+		enableMixedProtocol         bool
+		enableLoadBalancerClass     bool
+		enableInternalTrafficPolicy bool
+		svc                         *api.Service
+		oldSvc                      *api.Service
+		compareSvc                  *api.Service
 	}{
 		{
 			name:            "not dual stack, field not used",
@@ -534,18 +454,99 @@ func TestDropDisabledField(t *testing.T) {
 			oldSvc:              makeServiceWithPorts([]api.PortStatus{}),
 			compareSvc:          makeServiceWithPorts(nil),
 		},
+		/* svc.Spec.LoadBalancerClass */
+		{
+			name:                    "loadBalancerClass not enabled, field not used in old, not used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field used in old and in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field not used in old, used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass not enabled, field used in old, not used in new",
+			enableLoadBalancerClass: false,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field not used in old, not used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field used in old and in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field not used in old, used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			oldSvc:                  makeServiceWithLoadBalancerClass(nil),
+			compareSvc:              makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+		},
+		{
+			name:                    "loadBalancerClass enabled, field used in old, not used in new",
+			enableLoadBalancerClass: true,
+			svc:                     makeServiceWithLoadBalancerClass(nil),
+			oldSvc:                  makeServiceWithLoadBalancerClass(utilpointer.StringPtr("test.com/test")),
+			compareSvc:              makeServiceWithLoadBalancerClass(nil),
+		},
+		/* svc.spec.internalTrafficPolicy */
+		{
+			name:                        "internal traffic policy not enabled, field used in old, not used in new",
+			enableInternalTrafficPolicy: false,
+			svc:                         makeServiceWithInternalTrafficPolicy(nil),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
+		},
+		{
+			name:                        "internal traffic policy not enabled, field not used in old, used in new",
+			enableInternalTrafficPolicy: false,
+			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(nil),
+		},
+		{
+			name:                        "internal traffic policy enabled, field not used in old, used in new",
+			enableInternalTrafficPolicy: true,
+			svc:                         makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+			oldSvc:                      makeServiceWithInternalTrafficPolicy(nil),
+			compareSvc:                  makeServiceWithInternalTrafficPolicy(&localInternalTrafficPolicy),
+		},
 		/* add more tests for other dropped fields as needed */
 	}
 	for _, tc := range testCases {
 		func() {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.MixedProtocolLBService, tc.enableMixedProtocol)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerClass, tc.enableLoadBalancerClass)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceInternalTrafficPolicy, tc.enableInternalTrafficPolicy)()
 			old := tc.oldSvc.DeepCopy()
 
 			// to test against user using IPFamily not set on cluster
 			dropServiceDisabledFields(tc.svc, tc.oldSvc)
 
-			// old node  should never be changed
+			// old node should never be changed
 			if !reflect.DeepEqual(tc.oldSvc, old) {
 				t.Errorf("%v: old svc changed: %v", tc.name, diff.ObjectReflectDiff(tc.oldSvc, old))
 			}
@@ -566,275 +567,115 @@ func TestNormalizeClusterIPs(t *testing.T) {
 		expectedClusterIP  string
 		expectedClusterIPs []string
 	}{
-
 		{
-			name:       "new - only clusterip used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "new - only clusterip used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name:       "new - only clusterips used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "new - only clusterips used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
 			expectedClusterIP:  "", // this is a validation issue, and validation will catch it
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name:       "new - both used",
-			oldService: nil,
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "new - both used",
+			oldService:         nil,
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - no change",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - no change",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - malformed change",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: []string{"10.0.0.11"},
-				},
-			},
+			name:               "update - malformed change",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11"}),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: []string{"10.0.0.11"},
 		},
-
 		{
-			name: "update - malformed change on secondary ip",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: []string{"10.0.0.11", "3000::1"},
-				},
-			},
+			name:               "update - malformed change on secondary ip",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", []string{"10.0.0.11", "3000::1"}),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: []string{"10.0.0.11", "3000::1"},
 		},
-
 		{
-			name: "update - upgrade",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
+			name:               "update - upgrade",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10", "2000::1"},
 		},
 		{
-			name: "update - downgrade",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - downgrade",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user cleared cluster IP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - user cleared cluster IP",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.10"}),
 			expectedClusterIP:  "",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared clusterIPs", // *MUST* REMAIN FOR OLD CLIENTS
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", nil),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user cleared both",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared both",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", nil),
 			expectedClusterIP:  "",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user cleared ClusterIP but changed clusterIPs",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "",
-					ClusterIPs: []string{"10.0.0.11"},
-				},
-			},
+			name:               "update - user cleared ClusterIP but changed clusterIPs",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("", []string{"10.0.0.11"}),
 			expectedClusterIP:  "", /* validation catches this */
 			expectedClusterIPs: []string{"10.0.0.11"},
 		},
-
 		{
-			name: "update - user cleared ClusterIPs but changed ClusterIP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.11",
-					ClusterIPs: nil,
-				},
-			},
+			name:               "update - user cleared ClusterIPs but changed ClusterIP",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("10.0.0.11", nil),
 			expectedClusterIP:  "10.0.0.11",
 			expectedClusterIPs: nil,
 		},
-
 		{
-			name: "update - user changed from None to ClusterIP",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"None"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"None"},
-				},
-			},
+			name:               "update - user changed from None to ClusterIP",
+			oldService:         makeServiceWithClusterIp("None", []string{"None"}),
+			newService:         makeServiceWithClusterIp("10.0.0.10", []string{"None"}),
 			expectedClusterIP:  "10.0.0.10",
 			expectedClusterIPs: []string{"10.0.0.10"},
 		},
-
 		{
-			name: "update - user changed from ClusterIP to None",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"10.0.0.10"},
-				},
-			},
+			name:               "update - user changed from ClusterIP to None",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10"}),
+			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.10"}),
 			expectedClusterIP:  "None",
 			expectedClusterIPs: []string{"None"},
 		},
-
 		{
-			name: "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
-			oldService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "10.0.0.10",
-					ClusterIPs: []string{"10.0.0.10", "2000::1"},
-				},
-			},
-			newService: &api.Service{
-				Spec: api.ServiceSpec{
-					ClusterIP:  "None",
-					ClusterIPs: []string{"10.0.0.11", "2000::1"},
-				},
-			},
+			name:               "update - user changed from ClusterIP to None and changed ClusterIPs in a dual stack (new client making a mistake)",
+			oldService:         makeServiceWithClusterIp("10.0.0.10", []string{"10.0.0.10", "2000::1"}),
+			newService:         makeServiceWithClusterIp("None", []string{"10.0.0.11", "2000::1"}),
 			expectedClusterIP:  "None",
 			expectedClusterIPs: []string{"10.0.0.11", "2000::1"},
 		},
@@ -944,6 +785,15 @@ func TestDropTypeDependentFields(t *testing.T) {
 	}
 	clearAllocateLoadBalancerNodePorts := func(svc *api.Service) {
 		svc.Spec.AllocateLoadBalancerNodePorts = nil
+	}
+	setLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class")
+	}
+	clearLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = nil
+	}
+	changeLoadBalancerClass := func(svc *api.Service) {
+		svc.Spec.LoadBalancerClass = utilpointer.StringPtr("test-load-balancer-class-changed")
 	}
 
 	testCases := []struct {
@@ -1072,6 +922,36 @@ func TestDropTypeDependentFields(t *testing.T) {
 			svc:    makeValidServiceCustom(setTypeLoadBalancer, setAllocateLoadBalancerNodePortsFalse),
 			patch:  patches(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
 			expect: makeValidServiceCustom(setTypeNodePort, setAllocateLoadBalancerNodePortsTrue),
+		}, { // loadBalancerClass cases
+			name:   "clear loadBalancerClass when set Service type LoadBalancer -> non LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  setTypeClusterIP,
+			expect: makeValidServiceCustom(setTypeClusterIP, clearLoadBalancerClass),
+		}, {
+			name:   "update loadBalancerClass load balancer class name",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  changeLoadBalancerClass,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, changeLoadBalancerClass),
+		}, {
+			name:   "clear load balancer class name",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  clearLoadBalancerClass,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, clearLoadBalancerClass),
+		}, {
+			name:   "change service type and load balancer class",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  patches(setTypeClusterIP, changeLoadBalancerClass),
+			expect: makeValidServiceCustom(setTypeClusterIP, changeLoadBalancerClass),
+		}, {
+			name:   "change service type to load balancer and set load balancer class",
+			svc:    makeValidServiceCustom(setTypeClusterIP),
+			patch:  patches(setTypeLoadBalancer, setLoadBalancerClass),
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+		}, {
+			name:   "don't clear load balancer class for Type=LoadBalancer",
+			svc:    makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
+			patch:  nil,
+			expect: makeValidServiceCustom(setTypeLoadBalancer, setLoadBalancerClass),
 		}}
 
 	for _, tc := range testCases {
@@ -1105,6 +985,9 @@ func TestDropTypeDependentFields(t *testing.T) {
 			}
 			if !reflect.DeepEqual(result.Spec.AllocateLoadBalancerNodePorts, tc.expect.Spec.AllocateLoadBalancerNodePorts) {
 				t.Errorf("failed %q: expected AllocateLoadBalancerNodePorts %v, got %v", tc.name, tc.expect.Spec.AllocateLoadBalancerNodePorts, result.Spec.AllocateLoadBalancerNodePorts)
+			}
+			if !reflect.DeepEqual(result.Spec.LoadBalancerClass, tc.expect.Spec.LoadBalancerClass) {
+				t.Errorf("failed %q: expected LoadBalancerClass %v, got %v", tc.name, tc.expect.Spec.LoadBalancerClass, result.Spec.LoadBalancerClass)
 			}
 		})
 	}

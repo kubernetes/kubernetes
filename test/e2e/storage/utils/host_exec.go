@@ -106,7 +106,7 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	}
 	pod, err := cs.CoreV1().Pods(ns.Name).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
 	framework.ExpectNoError(err)
-	err = e2epod.WaitForPodRunningInNamespace(cs, pod)
+	err = e2epod.WaitTimeoutForPodRunningInNamespace(cs, pod.Name, pod.Namespace, f.Timeouts.PodStart)
 	framework.ExpectNoError(err)
 	return pod
 }

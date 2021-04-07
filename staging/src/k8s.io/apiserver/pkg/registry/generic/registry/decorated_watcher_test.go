@@ -17,7 +17,6 @@ limitations under the License.
 package registry
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -30,10 +29,9 @@ import (
 
 func TestDecoratedWatcher(t *testing.T) {
 	w := watch.NewFake()
-	decorator := func(obj runtime.Object) error {
+	decorator := func(obj runtime.Object) {
 		pod := obj.(*example.Pod)
 		pod.Annotations = map[string]string{"decorated": "true"}
-		return nil
 	}
 	dw := newDecoratedWatcher(w, decorator)
 	defer dw.Stop()
@@ -48,26 +46,6 @@ func TestDecoratedWatcher(t *testing.T) {
 		}
 		if pod.Annotations["decorated"] != "true" {
 			t.Errorf("pod.Annotations[\"decorated\"], want=%s, get=%s", "true", pod.Labels["decorated"])
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timeout after %v", wait.ForeverTestTimeout)
-	}
-}
-
-func TestDecoratedWatcherError(t *testing.T) {
-	w := watch.NewFake()
-	expErr := fmt.Errorf("expected error")
-	decorator := func(obj runtime.Object) error {
-		return expErr
-	}
-	dw := newDecoratedWatcher(w, decorator)
-	defer dw.Stop()
-
-	go w.Add(&example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
-	select {
-	case e := <-dw.ResultChan():
-		if e.Type != watch.Error {
-			t.Errorf("event type want=%v, get=%v", watch.Error, e.Type)
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("timeout after %v", wait.ForeverTestTimeout)

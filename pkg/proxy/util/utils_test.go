@@ -17,16 +17,20 @@ limitations under the License.
 package util
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	fake "k8s.io/kubernetes/pkg/proxy/util/testing"
+	utilnet "k8s.io/utils/net"
 )
 
 func TestValidateWorks(t *testing.T) {
@@ -273,6 +277,125 @@ func TestShouldSkipService(t *testing.T) {
 			t.Errorf("case %d: expect %v, got %v", i, testCases[i].shouldSkip, skip)
 		}
 	}
+}
+
+func TestNewFilteredDialContext(t *testing.T) {
+
+	_, cidr, _ := net.ParseCIDR("1.1.1.1/28")
+
+	testCases := []struct {
+		name string
+
+		// opts passed to NewFilteredDialContext
+		opts *FilteredDialOptions
+
+		// value passed to dial
+		dial string
+
+		// value expected to be passed to resolve
+		expectResolve string
+		// result from resolver
+		resolveTo  []net.IPAddr
+		resolveErr error
+
+		// expect the wrapped dialer to be called
+		expectWrappedDial bool
+		// expect an error result
+		expectErr string
+	}{
+		{
+			name:              "allow with nil opts",
+			opts:              nil,
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "", // resolver not called, no-op opts
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+		{
+			name:              "allow localhost",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: true},
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "", // resolver not called, no-op opts
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+		{
+			name:              "disallow localhost",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false},
+			dial:              "127.0.0.1:8080",
+			expectResolve:     "127.0.0.1",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("127.0.0.1")}},
+			expectWrappedDial: false,
+			expectErr:         "address not allowed",
+		},
+		{
+			name:              "disallow IP",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
+			dial:              "foo.com:8080",
+			expectResolve:     "foo.com",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("1.1.1.1")}},
+			expectWrappedDial: false,
+			expectErr:         "address not allowed",
+		},
+		{
+			name:              "allow IP",
+			opts:              &FilteredDialOptions{AllowLocalLoopback: false, DialHostCIDRDenylist: []*net.IPNet{cidr}},
+			dial:              "foo.com:8080",
+			expectResolve:     "foo.com",
+			resolveTo:         []net.IPAddr{{IP: net.ParseIP("2.2.2.2")}},
+			expectWrappedDial: true,
+			expectErr:         "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			wrappedDialer := &testDialer{}
+			testResolver := &testResolver{addrs: tc.resolveTo, err: tc.resolveErr}
+			dialer := NewFilteredDialContext(wrappedDialer.DialContext, testResolver, tc.opts)
+			_, err := dialer(context.TODO(), "tcp", tc.dial)
+
+			if tc.expectResolve != testResolver.resolveAddress {
+				t.Fatalf("expected to resolve %s, got %s", tc.expectResolve, testResolver.resolveAddress)
+			}
+			if tc.expectWrappedDial != wrappedDialer.called {
+				t.Fatalf("expected wrapped dialer called %v, got %v", tc.expectWrappedDial, wrappedDialer.called)
+			}
+
+			if err != nil {
+				if len(tc.expectErr) == 0 {
+					t.Fatalf("unexpected error: %v", err)
+				} else if !strings.Contains(err.Error(), tc.expectErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.expectErr, err)
+				}
+			} else {
+				if len(tc.expectErr) > 0 {
+					t.Fatalf("expected error, got none")
+				}
+			}
+		})
+	}
+}
+
+type testDialer struct {
+	called bool
+}
+
+func (t *testDialer) DialContext(_ context.Context, network, address string) (net.Conn, error) {
+	t.called = true
+	return nil, nil
+}
+
+type testResolver struct {
+	addrs []net.IPAddr
+	err   error
+
+	resolveAddress string
+}
+
+func (t *testResolver) LookupIPAddr(_ context.Context, address string) ([]net.IPAddr, error) {
+	t.resolveAddress = address
+	return t.addrs, t.err
 }
 
 type InterfaceAddrsPair struct {
@@ -567,7 +690,7 @@ func TestShuffleStrings(t *testing.T) {
 	}
 }
 
-func TestFilterIncorrectIPVersion(t *testing.T) {
+func TestMapIPsByIPFamily(t *testing.T) {
 	testCases := []struct {
 		desc            string
 		ipString        []string
@@ -650,15 +773,122 @@ func TestFilterIncorrectIPVersion(t *testing.T) {
 	for _, testcase := range testCases {
 		t.Run(testcase.desc, func(t *testing.T) {
 			ipFamily := v1.IPv4Protocol
+			otherIPFamily := v1.IPv6Protocol
+
 			if testcase.wantIPv6 {
 				ipFamily = v1.IPv6Protocol
+				otherIPFamily = v1.IPv4Protocol
 			}
-			correct, incorrect := FilterIncorrectIPVersion(testcase.ipString, ipFamily)
-			if !reflect.DeepEqual(testcase.expectCorrect, correct) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, correct)
+
+			ipMap := MapIPsByIPFamily(testcase.ipString)
+
+			if !reflect.DeepEqual(testcase.expectCorrect, ipMap[ipFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, ipMap[ipFamily])
 			}
-			if !reflect.DeepEqual(testcase.expectIncorrect, incorrect) {
-				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, incorrect)
+			if !reflect.DeepEqual(testcase.expectIncorrect, ipMap[otherIPFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, ipMap[otherIPFamily])
+			}
+		})
+	}
+}
+
+func TestMapCIDRsByIPFamily(t *testing.T) {
+	testCases := []struct {
+		desc            string
+		ipString        []string
+		wantIPv6        bool
+		expectCorrect   []string
+		expectIncorrect []string
+	}{
+		{
+			desc:            "empty input IPv4",
+			ipString:        []string{},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "empty input IPv6",
+			ipString:        []string{},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv4 and receive IPv6",
+			ipString:        []string{"fd00:20::1/64"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1/64"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4",
+			ipString:        []string{"192.168.200.2/24"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2/24"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 and IPv6",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24", "fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			wantIPv6:        false,
+			expectCorrect:   []string{"192.168.200.2/24", "192.1.34.23/24"},
+			expectIncorrect: nil,
+		},
+		{
+			desc:            "want IPv6 and receive IPv4 only",
+			ipString:        []string{"192.168.200.2/24", "192.1.34.23/24"},
+			wantIPv6:        true,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"192.168.200.2/24", "192.1.34.23/24"},
+		},
+		{
+			desc:            "want IPv4 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        false,
+			expectCorrect:   nil,
+			expectIncorrect: []string{"fd00:20::1/64", "2001:db9::3/64"},
+		},
+		{
+			desc:            "want IPv6 and receive IPv6 only",
+			ipString:        []string{"fd00:20::1/64", "2001:db9::3/64"},
+			wantIPv6:        true,
+			expectCorrect:   []string{"fd00:20::1/64", "2001:db9::3/64"},
+			expectIncorrect: nil,
+		},
+	}
+
+	for _, testcase := range testCases {
+		t.Run(testcase.desc, func(t *testing.T) {
+			ipFamily := v1.IPv4Protocol
+			otherIPFamily := v1.IPv6Protocol
+
+			if testcase.wantIPv6 {
+				ipFamily = v1.IPv6Protocol
+				otherIPFamily = v1.IPv4Protocol
+			}
+
+			cidrMap := MapCIDRsByIPFamily(testcase.ipString)
+
+			if !reflect.DeepEqual(testcase.expectCorrect, cidrMap[ipFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectCorrect, cidrMap[ipFamily])
+			}
+			if !reflect.DeepEqual(testcase.expectIncorrect, cidrMap[otherIPFamily]) {
+				t.Errorf("Test %v failed: expected %v, got %v", testcase.desc, testcase.expectIncorrect, cidrMap[otherIPFamily])
 			}
 		})
 	}
@@ -820,5 +1050,222 @@ func TestGetClusterIPByFamily(t *testing.T) {
 			}
 		})
 	}
+}
 
+type fakeClosable struct {
+	closed bool
+}
+
+func (c *fakeClosable) Close() error {
+	c.closed = true
+	return nil
+}
+
+func TestRevertPorts(t *testing.T) {
+	testCases := []struct {
+		replacementPorts []utilnet.LocalPort
+		existingPorts    []utilnet.LocalPort
+		expectToBeClose  []bool
+	}{
+		{
+			replacementPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			existingPorts:   []utilnet.LocalPort{},
+			expectToBeClose: []bool{true, true, true},
+		},
+		{
+			replacementPorts: []utilnet.LocalPort{},
+			existingPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			expectToBeClose: []bool{},
+		},
+		{
+			replacementPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			existingPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			expectToBeClose: []bool{false, false, false},
+		},
+		{
+			replacementPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			existingPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5003},
+			},
+			expectToBeClose: []bool{false, true, false},
+		},
+		{
+			replacementPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+			},
+			existingPorts: []utilnet.LocalPort{
+				{Port: 5001},
+				{Port: 5002},
+				{Port: 5003},
+				{Port: 5004},
+			},
+			expectToBeClose: []bool{false, false, false},
+		},
+	}
+
+	for i, tc := range testCases {
+		replacementPortsMap := make(map[utilnet.LocalPort]utilnet.Closeable)
+		for _, lp := range tc.replacementPorts {
+			replacementPortsMap[lp] = &fakeClosable{}
+		}
+		existingPortsMap := make(map[utilnet.LocalPort]utilnet.Closeable)
+		for _, lp := range tc.existingPorts {
+			existingPortsMap[lp] = &fakeClosable{}
+		}
+		RevertPorts(replacementPortsMap, existingPortsMap)
+		for j, expectation := range tc.expectToBeClose {
+			if replacementPortsMap[tc.replacementPorts[j]].(*fakeClosable).closed != expectation {
+				t.Errorf("Expect replacement localport %v to be %v in test case %v", tc.replacementPorts[j], expectation, i)
+			}
+		}
+		for _, lp := range tc.existingPorts {
+			if existingPortsMap[lp].(*fakeClosable).closed == true {
+				t.Errorf("Expect existing localport %v to be false in test case %v", lp, i)
+			}
+		}
+	}
+}
+
+func TestWriteLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		words    []string
+		expected string
+	}{
+		{
+			name:     "write no word",
+			words:    []string{},
+			expected: "",
+		},
+		{
+			name:     "write one word",
+			words:    []string{"test1"},
+			expected: "test1\n",
+		},
+		{
+			name:     "write multi word",
+			words:    []string{"test1", "test2", "test3"},
+			expected: "test1 test2 test3\n",
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteLine(testBuffer, testCase.words...)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.words, testCase.expected, testBuffer.String())
+			}
+		})
+	}
+}
+
+func TestWriteBytesLine(t *testing.T) {
+	testCases := []struct {
+		name     string
+		bytes    []byte
+		expected string
+	}{
+		{
+			name:     "empty bytes",
+			bytes:    []byte{},
+			expected: "\n",
+		},
+		{
+			name:     "test bytes",
+			bytes:    []byte("test write bytes line"),
+			expected: "test write bytes line\n",
+		},
+	}
+
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			WriteBytesLine(testBuffer, testCase.bytes)
+			if !strings.EqualFold(testBuffer.String(), testCase.expected) {
+				t.Fatalf("write word is %v\n expected: %s, got: %s", testCase.bytes, testCase.expected, testBuffer.String())
+			}
+		})
+	}
+}
+
+func TestWriteCountLines(t *testing.T) {
+
+	testCases := []struct {
+		name     string
+		expected int
+	}{
+		{
+			name:     "write no line",
+			expected: 0,
+		},
+		{
+			name:     "write one line",
+			expected: 1,
+		},
+		{
+			name:     "write 100 lines",
+			expected: 100,
+		},
+		{
+			name:     "write 1000 lines",
+			expected: 1000,
+		},
+		{
+			name:     "write 10000 lines",
+			expected: 10000,
+		},
+		{
+			name:     "write 100000 lines",
+			expected: 100000,
+		},
+	}
+	testBuffer := bytes.NewBuffer(nil)
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			testBuffer.Reset()
+			for i := 0; i < testCase.expected; i++ {
+				WriteLine(testBuffer, randSeq())
+			}
+			n := CountBytesLines(testBuffer.Bytes())
+			if n != testCase.expected {
+				t.Fatalf("lines expected: %d, got: %d", testCase.expected, n)
+			}
+		})
+	}
+}
+
+// obtained from https://stackoverflow.com/a/22892986
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func randSeq() string {
+	b := make([]rune, 30)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
 }

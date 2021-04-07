@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
@@ -85,21 +86,29 @@ func (p *setnsProcess) signal(sig os.Signal) error {
 	return unix.Kill(p.pid(), s)
 }
 
-func (p *setnsProcess) start() (err error) {
+func (p *setnsProcess) start() (retErr error) {
 	defer p.messageSockPair.parent.Close()
-	err = p.cmd.Start()
+	err := p.cmd.Start()
 	// close the write-side of the pipes (controlled by child)
 	p.messageSockPair.child.Close()
 	p.logFilePair.child.Close()
 	if err != nil {
 		return newSystemErrorWithCause(err, "starting setns process")
 	}
+	defer func() {
+		if retErr != nil {
+			err := ignoreTerminateErrors(p.terminate())
+			if err != nil {
+				logrus.WithError(err).Warn("unable to terminate setnsProcess")
+			}
+		}
+	}()
 	if p.bootstrapData != nil {
 		if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 			return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 		}
 	}
-	if err = p.execSetns(); err != nil {
+	if err := p.execSetns(); err != nil {
 		return newSystemErrorWithCause(err, "executing setns process")
 	}
 	if len(p.cgroupPaths) > 0 {
@@ -312,6 +321,11 @@ func (p *initProcess) start() (retErr error) {
 	}
 	defer func() {
 		if retErr != nil {
+			// terminate the process to ensure we can remove cgroups
+			if err := ignoreTerminateErrors(p.terminate()); err != nil {
+				logrus.WithError(err).Warn("unable to terminate initProcess")
+			}
+
 			p.manager.Destroy()
 			if p.intelRdtManager != nil {
 				p.intelRdtManager.Destroy()
@@ -411,6 +425,28 @@ func (p *initProcess) start() (retErr error) {
 					}
 				}
 			}
+
+			// generate a timestamp indicating when the container was started
+			p.container.created = time.Now().UTC()
+			p.container.state = &createdState{
+				c: p.container,
+			}
+
+			// NOTE: If the procRun state has been synced and the
+			// runc-create process has been killed for some reason,
+			// the runc-init[2:stage] process will be leaky. And
+			// the runc command also fails to parse root directory
+			// because the container doesn't have state.json.
+			//
+			// In order to cleanup the runc-init[2:stage] by
+			// runc-delete/stop, we should store the status before
+			// procRun sync.
+			state, uerr := p.container.updateState(p)
+			if uerr != nil {
+				return newSystemErrorWithCause(err, "store init state")
+			}
+			p.container.initProcessStartTime = state.InitProcessStartTime
+
 			// Sync with child.
 			if err := writeSync(p.messageSockPair.parent, procRun); err != nil {
 				return newSystemErrorWithCause(err, "writing syncT 'run'")
@@ -475,14 +511,11 @@ func (p *initProcess) start() (retErr error) {
 
 func (p *initProcess) wait() (*os.ProcessState, error) {
 	err := p.cmd.Wait()
-	if err != nil {
-		return p.cmd.ProcessState, err
-	}
 	// we should kill all processes in cgroup when init is died if we use host PID namespace
 	if p.sharePidns {
 		signalAllProcesses(p.manager, unix.SIGKILL)
 	}
-	return p.cmd.ProcessState, nil
+	return p.cmd.ProcessState, err
 }
 
 func (p *initProcess) terminate() error {

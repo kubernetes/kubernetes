@@ -252,7 +252,7 @@ func (p *pluginProvider) Provide(image string) credentialprovider.DockerConfig {
 }
 
 // Enabled always returns true since registration of the plugin via kubelet implies it should be enabled.
-func (e *pluginProvider) Enabled() bool {
+func (p *pluginProvider) Enabled() bool {
 	return true
 }
 

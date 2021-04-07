@@ -30,6 +30,7 @@ import (
 	"github.com/karrick/godirwalk"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 
 	"k8s.io/klog/v2"
 )
@@ -68,6 +69,16 @@ func findFileInAncestorDir(current, file, limit string) (string, error) {
 	}
 }
 
+var bootTime = func() time.Time {
+	now := time.Now()
+	var sysinfo unix.Sysinfo_t
+	if err := unix.Sysinfo(&sysinfo); err != nil {
+		return now
+	}
+	sinceBoot := time.Duration(sysinfo.Uptime) * time.Second
+	return now.Add(-1 * sinceBoot).Truncate(time.Minute)
+}()
+
 func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem bool) (info.ContainerSpec, error) {
 	var spec info.ContainerSpec
 
@@ -75,17 +86,28 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	// Get the lowest creation time from all hierarchies as the container creation time.
 	now := time.Now()
 	lowestTime := now
-	for _, cgroupPath := range cgroupPaths {
-		// The modified time of the cgroup directory changes whenever a subcontainer is created.
+	for _, cgroupPathDir := range cgroupPaths {
+		dir, err := os.Stat(cgroupPathDir)
+		if err == nil && dir.ModTime().Before(lowestTime) {
+			lowestTime = dir.ModTime()
+		}
+		// The modified time of the cgroup directory sometimes changes whenever a subcontainer is created.
 		// eg. /docker will have creation time matching the creation of latest docker container.
-		// Use clone_children as a workaround as it isn't usually modified. It is only likely changed
-		// immediately after creating a container.
-		cgroupPath = path.Join(cgroupPath, "cgroup.clone_children")
-		fi, err := os.Stat(cgroupPath)
+		// Use clone_children/events as a workaround as it isn't usually modified. It is only likely changed
+		// immediately after creating a container. If the directory modified time is lower, we use that.
+		cgroupPathFile := path.Join(cgroupPathDir, "cgroup.clone_children")
+		if cgroups.IsCgroup2UnifiedMode() {
+			cgroupPathFile = path.Join(cgroupPathDir, "cgroup.events")
+		}
+		fi, err := os.Stat(cgroupPathFile)
 		if err == nil && fi.ModTime().Before(lowestTime) {
 			lowestTime = fi.ModTime()
 		}
 	}
+	if lowestTime.Before(bootTime) {
+		lowestTime = bootTime
+	}
+
 	if lowestTime != now {
 		spec.CreationTime = lowestTime
 	}

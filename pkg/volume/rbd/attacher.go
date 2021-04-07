@@ -226,7 +226,7 @@ func (detacher *rbdDetacher) UnmountDevice(deviceMountPath string) error {
 		if err = detacher.mounter.Unmount(deviceMountPath); err != nil {
 			return err
 		}
-		klog.V(3).Infof("rbd: successfully umount device mountpath %s", deviceMountPath)
+		klog.V(3).Infof("rbd: successfully unmount device mountpath %s", deviceMountPath)
 	}
 
 	// Get devicePath from deviceMountPath if devicePath is empty

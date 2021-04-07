@@ -2,13 +2,18 @@ apiVersion: v1
 kind: Pod
 metadata:
   generateName: spreading-pod-
+  labels:
+    color: blue
 spec:
   topologySpreadConstraints:
     - maxSkew: 5
       topologyKey: topology.kubernetes.io/zone
       whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          color: blue
   containers:
-  - image: k8s.gcr.io/pause:3.2
+  - image: k8s.gcr.io/pause:3.4.1
     name: pause
     ports:
     - containerPort: 80

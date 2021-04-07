@@ -38,12 +38,12 @@ import (
 	autoscalingapiv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	batchapiv1 "k8s.io/api/batch/v1"
 	batchapiv1beta1 "k8s.io/api/batch/v1beta1"
-	batchapiv2alpha1 "k8s.io/api/batch/v2alpha1"
 	certificatesapiv1 "k8s.io/api/certificates/v1"
 	certificatesapiv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	eventsv1 "k8s.io/api/events/v1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
@@ -54,6 +54,7 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -81,7 +82,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1"
 	"k8s.io/component-base/version"
 	"k8s.io/component-helpers/apimachinery/lease"
 	"k8s.io/klog/v2"
@@ -91,7 +92,6 @@ import (
 	"k8s.io/kubernetes/pkg/controlplane/controller/clusterauthenticationtrust"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
 	"k8s.io/kubernetes/pkg/controlplane/tunneler"
-	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/routes"
@@ -250,10 +250,7 @@ type Instance struct {
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	}
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
@@ -265,10 +262,7 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	var endpointSliceClient discoveryclient.EndpointSlicesGetter
-	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	}
+	endpointSliceClient := discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
 
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
@@ -366,37 +360,35 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		routes.Logs{}.Install(s.Handler.GoRestfulContainer)
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceAccountIssuerDiscovery) {
-		// Metadata and keys are expected to only change across restarts at present,
-		// so we just marshal immediately and serve the cached JSON bytes.
-		md, err := serviceaccount.NewOpenIDMetadata(
-			c.ExtraConfig.ServiceAccountIssuerURL,
-			c.ExtraConfig.ServiceAccountJWKSURI,
-			c.GenericConfig.ExternalAddress,
-			c.ExtraConfig.ServiceAccountPublicKeys,
-		)
-		if err != nil {
-			// If there was an error, skip installing the endpoints and log the
-			// error, but continue on. We don't return the error because the
-			// metadata responses require additional, backwards incompatible
-			// validation of command-line options.
-			msg := fmt.Sprintf("Could not construct pre-rendered responses for"+
-				" ServiceAccountIssuerDiscovery endpoints. Endpoints will not be"+
-				" enabled. Error: %v", err)
-			if c.ExtraConfig.ServiceAccountIssuerURL != "" {
-				// The user likely expects this feature to be enabled if issuer URL is
-				// set and the feature gate is enabled. In the future, if there is no
-				// longer a feature gate and issuer URL is not set, the user may not
-				// expect this feature to be enabled. We log the former case as an Error
-				// and the latter case as an Info.
-				klog.Error(msg)
-			} else {
-				klog.Info(msg)
-			}
+	// Metadata and keys are expected to only change across restarts at present,
+	// so we just marshal immediately and serve the cached JSON bytes.
+	md, err := serviceaccount.NewOpenIDMetadata(
+		c.ExtraConfig.ServiceAccountIssuerURL,
+		c.ExtraConfig.ServiceAccountJWKSURI,
+		c.GenericConfig.ExternalAddress,
+		c.ExtraConfig.ServiceAccountPublicKeys,
+	)
+	if err != nil {
+		// If there was an error, skip installing the endpoints and log the
+		// error, but continue on. We don't return the error because the
+		// metadata responses require additional, backwards incompatible
+		// validation of command-line options.
+		msg := fmt.Sprintf("Could not construct pre-rendered responses for"+
+			" ServiceAccountIssuerDiscovery endpoints. Endpoints will not be"+
+			" enabled. Error: %v", err)
+		if c.ExtraConfig.ServiceAccountIssuerURL != "" {
+			// The user likely expects this feature to be enabled if issuer URL is
+			// set and the feature gate is enabled. In the future, if there is no
+			// longer a feature gate and issuer URL is not set, the user may not
+			// expect this feature to be enabled. We log the former case as an Error
+			// and the latter case as an Info.
+			klog.Error(msg)
 		} else {
-			routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
-				Install(s.Handler.GoRestfulContainer)
+			klog.Info(msg)
 		}
+	} else {
+		routes.NewOpenIDMetadataServer(md.ConfigJSON, md.PublicKeysetJSON).
+			Install(s.Handler.GoRestfulContainer)
 	}
 
 	m := &Instance{
@@ -583,7 +575,7 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
 
 	// used later in the loop to filter the served resource by those that have expired.
-	resourceExpirationEvaluator, err := newResourceExpirationEvaluator(version.Get())
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(version.Get())
 	if err != nil {
 		return err
 	}
@@ -606,7 +598,7 @@ func (m *Instance) InstallAPIs(apiResourceConfigSource serverstorage.APIResource
 		// Remove resources that serving kinds that are removed.
 		// We do this here so that we don't accidentally serve versions without resources or openapi information that for kinds we don't serve.
 		// This is a spot above the construction of individual storage handlers so that no sig accidentally forgets to check.
-		resourceExpirationEvaluator.removeDeletedKinds(groupName, apiGroupInfo.VersionedResourcesStorageMap)
+		resourceExpirationEvaluator.RemoveDeletedKinds(groupName, apiGroupInfo.Scheme, apiGroupInfo.VersionedResourcesStorageMap)
 		if len(apiGroupInfo.VersionedResourcesStorageMap) == 0 {
 			klog.V(1).Infof("Removing API group %v because it is time to stop serving it because it has no versions per APILifecycle.", groupName)
 			continue
@@ -688,6 +680,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		certificatesapiv1beta1.SchemeGroupVersion,
 		coordinationapiv1.SchemeGroupVersion,
 		coordinationapiv1beta1.SchemeGroupVersion,
+		discoveryv1.SchemeGroupVersion,
 		discoveryv1beta1.SchemeGroupVersion,
 		eventsv1.SchemeGroupVersion,
 		eventsv1beta1.SchemeGroupVersion,
@@ -696,6 +689,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		networkingapiv1beta1.SchemeGroupVersion,
 		nodev1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion,
+		policyapiv1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,
@@ -712,7 +706,6 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	// disable alpha versions explicitly so we have a full list of what's possible to serve
 	ret.DisableVersions(
 		apiserverinternalv1alpha1.SchemeGroupVersion,
-		batchapiv2alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

@@ -18,6 +18,7 @@ package apps
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -28,8 +29,8 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/tools/cache"
 
-	"encoding/json"
 	appsv1 "k8s.io/api/apps/v1"
+	autoscalingv1 "k8s.io/api/autoscaling/v1" //Added new
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,6 +133,18 @@ var _ = SIGDescribe("Deployment", func() {
 	ginkgo.It("test Deployment ReplicaSet orphaning and adoption regarding controllerRef", func() {
 		testDeploymentsControllerRef(f)
 	})
+
+	/*
+	   Release: v1.21
+	   Testname: Deployment, completes the scaling of a Deployment subresource
+	   Description: Create a Deployment with a single Pod. The Pod MUST be verified
+	   that it is running. The Deployment MUST get and verify the scale subresource count.
+	   The Deployment MUST update and verify the scale subresource. The Deployment MUST patch and verify
+	   a scale subresource.
+	*/
+	framework.ConformanceIt("Deployment should have a working scale subresource", func() {
+		testDeploymentSubresources(f)
+	})
 	/*
 	  Release: v1.12
 	  Testname: Deployment Proportional Scaling
@@ -151,6 +164,9 @@ var _ = SIGDescribe("Deployment", func() {
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 	// See https://github.com/kubernetes/kubernetes/issues/29229
+	// Add UnavailableReplicas check because ReadyReplicas or UpdatedReplicas might not represent
+	// the actual number of pods running successfully if some pods failed to start after update or patch.
+	// See issue ##100192
 
 	/*
 		Release: v1.20
@@ -258,9 +274,8 @@ var _ = SIGDescribe("Deployment", func() {
 					"spec": map[string]interface{}{
 						"TerminationGracePeriodSeconds": &zero,
 						"containers": [1]map[string]interface{}{{
-							"name":    testDeploymentName,
-							"image":   testDeploymentPatchImage,
-							"command": []string{"/bin/sleep", "100000"},
+							"name":  testDeploymentName,
+							"image": testDeploymentPatchImage,
 						}},
 					},
 				},
@@ -297,6 +312,8 @@ var _ = SIGDescribe("Deployment", func() {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
 					deployment.Status.ReadyReplicas == testDeploymentMinimumReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentMinimumReplicas &&
+					deployment.Status.UnavailableReplicas == 0 &&
 					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentPatchImage
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
@@ -373,7 +390,9 @@ var _ = SIGDescribe("Deployment", func() {
 			if deployment, ok := event.Object.(*appsv1.Deployment); ok {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
-					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas
+					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UnavailableReplicas == 0
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v and labels %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas, deployment.ObjectMeta.Labels)
 				}
@@ -426,6 +445,8 @@ var _ = SIGDescribe("Deployment", func() {
 				found := deployment.ObjectMeta.Name == testDeployment.Name &&
 					deployment.ObjectMeta.Labels["test-deployment-static"] == "true" &&
 					deployment.Status.ReadyReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UpdatedReplicas == testDeploymentDefaultReplicas &&
+					deployment.Status.UnavailableReplicas == 0 &&
 					deployment.Spec.Template.Spec.Containers[0].Image == testDeploymentUpdateImage
 				if !found {
 					framework.Logf("observed Deployment %v in namespace %v with ReadyReplicas %v", deployment.ObjectMeta.Name, deployment.ObjectMeta.Namespace, deployment.Status.ReadyReplicas)
@@ -1475,4 +1496,67 @@ func waitForDeploymentCompleteAndCheckRolling(c clientset.Interface, d *appsv1.D
 // waitForDeploymentUpdatedReplicasGTE waits for given deployment to be observed by the controller and has at least a number of updatedReplicas
 func waitForDeploymentUpdatedReplicasGTE(c clientset.Interface, ns, deploymentName string, minUpdatedReplicas int32, desiredGeneration int64) error {
 	return testutil.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, minUpdatedReplicas, desiredGeneration, poll, pollLongTimeout)
+}
+
+// Deployment should have a working scale subresource
+func testDeploymentSubresources(f *framework.Framework) {
+	ns := f.Namespace.Name
+	c := f.ClientSet
+
+	deploymentName := "test-new-deployment"
+	framework.Logf("Creating simple deployment %s", deploymentName)
+	d := e2edeployment.NewDeployment("test-new-deployment", int32(1), map[string]string{"name": WebserverImageName}, WebserverImageName, WebserverImage, appsv1.RollingUpdateDeploymentStrategyType)
+	deploy, err := c.AppsV1().Deployments(ns).Create(context.TODO(), d, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+
+	// Wait for it to be updated to revision 1
+	err = e2edeployment.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", WebserverImage)
+	framework.ExpectNoError(err)
+
+	err = e2edeployment.WaitForDeploymentComplete(c, deploy)
+	framework.ExpectNoError(err)
+
+	_, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	framework.ExpectNoError(err)
+
+	ginkgo.By("getting scale subresource")
+	scale, err := c.AppsV1().Deployments(ns).GetScale(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get scale subresource: %v", err)
+	}
+	framework.ExpectEqual(scale.Spec.Replicas, int32(1))
+	framework.ExpectEqual(scale.Status.Replicas, int32(1))
+
+	ginkgo.By("updating a scale subresource")
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
+	scale.Spec.Replicas = 2
+	scaleResult, err := c.AppsV1().Deployments(ns).UpdateScale(context.TODO(), deploymentName, scale, metav1.UpdateOptions{})
+	if err != nil {
+		framework.Failf("Failed to put scale subresource: %v", err)
+	}
+	framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
+
+	ginkgo.By("verifying the deployment Spec.Replicas was modified")
+	deployment, err := c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	if err != nil {
+		framework.Failf("Failed to get deployment resource: %v", err)
+	}
+	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(2))
+
+	ginkgo.By("Patch a scale subresource")
+	scale.ResourceVersion = "" // indicate the scale update should be unconditional
+	scale.Spec.Replicas = 4    // should be 2 after "UpdateScale" operation, now Patch to 4
+	deploymentScalePatchPayload, err := json.Marshal(autoscalingv1.Scale{
+		Spec: autoscalingv1.ScaleSpec{
+			Replicas: scale.Spec.Replicas,
+		},
+	})
+	framework.ExpectNoError(err, "Could not Marshal JSON for patch payload")
+
+	_, err = c.AppsV1().Deployments(ns).Patch(context.TODO(), deploymentName, types.StrategicMergePatchType, []byte(deploymentScalePatchPayload), metav1.PatchOptions{}, "scale")
+	framework.ExpectNoError(err, "Failed to patch deployment: %v", err)
+
+	deployment, err = c.AppsV1().Deployments(ns).Get(context.TODO(), deploymentName, metav1.GetOptions{})
+	framework.ExpectNoError(err, "Failed to get deployment resource: %v", err)
+	framework.ExpectEqual(*(deployment.Spec.Replicas), int32(4), "deployment should have 4 replicas")
 }

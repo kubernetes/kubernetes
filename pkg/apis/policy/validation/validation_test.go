@@ -19,10 +19,13 @@ package validation
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -98,26 +101,150 @@ func TestValidateMinAvailablePodAndMaxUnavailableDisruptionBudgetSpec(t *testing
 }
 
 func TestValidatePodDisruptionBudgetStatus(t *testing.T) {
-	successCases := []policy.PodDisruptionBudgetStatus{
-		{DisruptionsAllowed: 10},
-		{CurrentHealthy: 5},
-		{DesiredHealthy: 3},
-		{ExpectedPods: 2}}
-	for _, c := range successCases {
-		errors := ValidatePodDisruptionBudgetStatus(c, field.NewPath("status"))
-		if len(errors) > 0 {
-			t.Errorf("unexpected failure %v for %v", errors, c)
-		}
+	const expectNoErrors = false
+	const expectErrors = true
+	testCases := []struct {
+		name                string
+		pdbStatus           policy.PodDisruptionBudgetStatus
+		expectErrForVersion map[schema.GroupVersion]bool
+	}{
+		{
+			name: "DisruptionsAllowed: 10",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DisruptionsAllowed: 10,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "CurrentHealthy: 5",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				CurrentHealthy: 5,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DesiredHealthy: 3",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DesiredHealthy: 3,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "ExpectedPods: 2",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				ExpectedPods: 2,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DisruptionsAllowed: -10",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DisruptionsAllowed: -10,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "CurrentHealthy: -5",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				CurrentHealthy: -5,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "DesiredHealthy: -3",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				DesiredHealthy: -3,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "ExpectedPods: -2",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				ExpectedPods: -2,
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "Conditions valid",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionTrue,
+						LastTransitionTime: metav1.Time{
+							Time: time.Now().Add(-5 * time.Minute),
+						},
+						Reason:             policyv1beta1.SufficientPodsReason,
+						Message:            "message",
+						ObservedGeneration: 3,
+					},
+				},
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectNoErrors,
+				policyv1beta1.SchemeGroupVersion: expectNoErrors,
+			},
+		},
+		{
+			name: "Conditions not valid",
+			pdbStatus: policy.PodDisruptionBudgetStatus{
+				Conditions: []metav1.Condition{
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionTrue,
+					},
+					{
+						Type:   policyv1beta1.DisruptionAllowedCondition,
+						Status: metav1.ConditionFalse,
+					},
+				},
+			},
+			expectErrForVersion: map[schema.GroupVersion]bool{
+				policy.SchemeGroupVersion:        expectErrors,
+				policyv1beta1.SchemeGroupVersion: expectErrors,
+			},
+		},
 	}
-	failureCases := []policy.PodDisruptionBudgetStatus{
-		{DisruptionsAllowed: -10},
-		{CurrentHealthy: -5},
-		{DesiredHealthy: -3},
-		{ExpectedPods: -2}}
-	for _, c := range failureCases {
-		errors := ValidatePodDisruptionBudgetStatus(c, field.NewPath("status"))
-		if len(errors) == 0 {
-			t.Errorf("unexpected success for %v", c)
+
+	for _, tc := range testCases {
+		for apiVersion, expectErrors := range tc.expectErrForVersion {
+			t.Run(fmt.Sprintf("apiVersion: %s, %s", apiVersion.String(), tc.name), func(t *testing.T) {
+				errors := ValidatePodDisruptionBudgetStatusUpdate(tc.pdbStatus, policy.PodDisruptionBudgetStatus{},
+					field.NewPath("status"), apiVersion)
+				errCount := len(errors)
+
+				if errCount > 0 && !expectErrors {
+					t.Errorf("unexpected failure %v for %v", errors, tc.pdbStatus)
+				}
+
+				if errCount == 0 && expectErrors {
+					t.Errorf("expected errors but didn't one for %v", tc.pdbStatus)
+				}
+			})
 		}
 	}
 }
@@ -463,7 +590,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range errorCases {
-		errs := ValidatePodSecurityPolicy(v.psp)
+		errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("%s expected errors but got none", k)
 			continue
@@ -486,7 +613,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	// Should not be able to update to an invalid policy.
 	for k, v := range errorCases {
 		v.psp.ResourceVersion = "444" // Required for updates.
-		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp)
+		errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{})
 		if len(errs) == 0 {
 			t.Errorf("[%s] expected update errors but got none", k)
 			continue
@@ -616,13 +743,13 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	for k, v := range successCases {
-		if errs := ValidatePodSecurityPolicy(v.psp); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicy(v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
 			t.Errorf("Expected success for %s, got %v", k, errs)
 		}
 
 		// Should be able to update to a valid PSP.
 		v.psp.ResourceVersion = "444" // Required for updates.
-		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp); len(errs) != 0 {
+		if errs := ValidatePodSecurityPolicyUpdate(validPSP(), v.psp, PodSecurityPolicyValidationOptions{}); len(errs) != 0 {
 			t.Errorf("Expected success for %s update, got %v", k, errs)
 		}
 	}
@@ -659,7 +786,7 @@ func TestValidatePSPVolumes(t *testing.T) {
 	for _, strVolume := range volumes.List() {
 		psp := validPSP()
 		psp.Spec.Volumes = []policy.FSType{policy.FSType(strVolume)}
-		errs := ValidatePodSecurityPolicy(psp)
+		errs := ValidatePodSecurityPolicy(psp, PodSecurityPolicyValidationOptions{AllowEphemeralVolumeType: true})
 		if len(errs) != 0 {
 			t.Errorf("%s validation expected no errors but received %v", strVolume, errs)
 		}
@@ -934,5 +1061,91 @@ func TestValidateRuntimeClassStrategy(t *testing.T) {
 				assert.Empty(t, errs)
 			}
 		})
+	}
+}
+
+func TestAllowEphemeralVolumeType(t *testing.T) {
+	pspWithoutGenericVolume := func() *policy.PodSecurityPolicy {
+		return &policy.PodSecurityPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "psp",
+				ResourceVersion: "1",
+			},
+			Spec: policy.PodSecurityPolicySpec{
+				RunAsUser: policy.RunAsUserStrategyOptions{
+					Rule: policy.RunAsUserStrategyMustRunAs,
+				},
+				SupplementalGroups: policy.SupplementalGroupsStrategyOptions{
+					Rule: policy.SupplementalGroupsStrategyMustRunAs,
+				},
+				SELinux: policy.SELinuxStrategyOptions{
+					Rule: policy.SELinuxStrategyMustRunAs,
+				},
+				FSGroup: policy.FSGroupStrategyOptions{
+					Rule: policy.FSGroupStrategyMustRunAs,
+				},
+			},
+		}
+	}
+	pspWithGenericVolume := func() *policy.PodSecurityPolicy {
+		psp := pspWithoutGenericVolume()
+		psp.Spec.Volumes = append(psp.Spec.Volumes, policy.Ephemeral)
+		return psp
+	}
+	pspNil := func() *policy.PodSecurityPolicy {
+		return nil
+	}
+
+	pspInfo := []struct {
+		description      string
+		hasGenericVolume bool
+		psp              func() *policy.PodSecurityPolicy
+	}{
+		{
+			description:      "PodSecurityPolicySpec Without GenericVolume",
+			hasGenericVolume: false,
+			psp:              pspWithoutGenericVolume,
+		},
+		{
+			description:      "PodSecurityPolicySpec With GenericVolume",
+			hasGenericVolume: true,
+			psp:              pspWithGenericVolume,
+		},
+		{
+			description:      "is nil",
+			hasGenericVolume: false,
+			psp:              pspNil,
+		},
+	}
+
+	for _, allowed := range []bool{true, false} {
+		for _, oldPSPInfo := range pspInfo {
+			for _, newPSPInfo := range pspInfo {
+				oldPSP := oldPSPInfo.psp()
+				newPSP := newPSPInfo.psp()
+				if newPSP == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old PodSecurityPolicySpec %v, new PodSecurityPolicySpec %v", allowed, oldPSPInfo.description, newPSPInfo.description), func(t *testing.T) {
+					opts := PodSecurityPolicyValidationOptions{
+						AllowEphemeralVolumeType: allowed,
+					}
+					var errs field.ErrorList
+					expectErrors := newPSPInfo.hasGenericVolume && !allowed
+					if oldPSP == nil {
+						errs = ValidatePodSecurityPolicy(newPSP, opts)
+					} else {
+						errs = ValidatePodSecurityPolicyUpdate(oldPSP, newPSP, opts)
+					}
+					if expectErrors && len(errs) == 0 {
+						t.Error("expected errors, got none")
+					}
+					if !expectErrors && len(errs) > 0 {
+						t.Errorf("expected no errors, got: %v", errs)
+					}
+				})
+			}
+		}
 	}
 }

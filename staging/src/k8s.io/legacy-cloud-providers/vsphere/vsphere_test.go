@@ -32,6 +32,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vmware/govmomi/find"
@@ -53,7 +54,6 @@ import (
 
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/legacy-cloud-providers/vsphere/vclib"
-	"k8s.io/legacy-cloud-providers/vsphere/vclib/fixtures"
 )
 
 // localhostCert was generated from crypto/tls/generate_cert.go with the following command:
@@ -318,12 +318,12 @@ func TestVSphereLoginByToken(t *testing.T) {
 }
 
 func TestVSphereLoginWithCaCert(t *testing.T) {
-	caCertPEM, err := ioutil.ReadFile(fixtures.CaCertPath)
+	caCertPEM, err := ioutil.ReadFile("./vclib/testdata/ca.pem")
 	if err != nil {
 		t.Fatalf("Could not read ca cert from file")
 	}
 
-	serverCert, err := tls.LoadX509KeyPair(fixtures.ServerCertPath, fixtures.ServerKeyPath)
+	serverCert, err := tls.LoadX509KeyPair("./vclib/testdata/server.pem", "./vclib/testdata/server.key")
 	if err != nil {
 		t.Fatalf("Could not load server cert and server key from files: %#v", err)
 	}
@@ -341,7 +341,7 @@ func TestVSphereLoginWithCaCert(t *testing.T) {
 	cfg, cleanup := configFromSimWithTLS(&tlsConfig, false)
 	defer cleanup()
 
-	cfg.Global.CAFile = fixtures.CaCertPath
+	cfg.Global.CAFile = "./vclib/testdata/ca.pem"
 
 	// Create vSphere configuration object
 	vs, err := newControllerNode(cfg)
@@ -1166,6 +1166,23 @@ func fakeSecret(name, namespace, datacenter, user, password string) *v1.Secret {
 	}
 }
 
+type buffer struct {
+	b  bytes.Buffer
+	rw sync.RWMutex
+}
+
+func (b *buffer) String() string {
+	b.rw.RLock()
+	defer b.rw.RUnlock()
+	return b.b.String()
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.rw.Lock()
+	defer b.rw.Unlock()
+	return b.b.Write(p)
+}
+
 func TestSecretUpdated(t *testing.T) {
 	datacenter := "0.0.0.0"
 	secretName := "vccreds"
@@ -1231,8 +1248,8 @@ func TestSecretUpdated(t *testing.T) {
 
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			buf := new(bytes.Buffer)
-			errBuf := new(bytes.Buffer)
+			buf := new(buffer)
+			errBuf := new(buffer)
 
 			klog.SetOutputBySeverity("INFO", buf)
 			klog.SetOutputBySeverity("WARNING", errBuf)

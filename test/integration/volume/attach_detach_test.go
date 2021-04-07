@@ -211,8 +211,7 @@ func TestPodDeletionWithDswp(t *testing.T) {
 }
 
 func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) &&
-		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
 	}
 	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)

@@ -32,13 +32,13 @@ import (
 type fakeOGCounter struct {
 	// calledFuncs stores name and count of functions
 	calledFuncs map[string]int
-	opFunc      func() (error, error)
+	opFunc      func() volumetypes.OperationContext
 }
 
 var _ OperationGenerator = &fakeOGCounter{}
 
 // NewFakeOGCounter returns a OperationGenerator
-func NewFakeOGCounter(opFunc func() (error, error)) OperationGenerator {
+func NewFakeOGCounter(opFunc func() volumetypes.OperationContext) OperationGenerator {
 	return &fakeOGCounter{
 		calledFuncs: map[string]int{},
 		opFunc:      opFunc,

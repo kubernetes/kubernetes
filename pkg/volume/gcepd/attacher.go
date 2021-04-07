@@ -269,6 +269,8 @@ func (attacher *gcePersistentDiskAttacher) WaitForAttach(spec *volume.Spec, devi
 				// A device path has successfully been created for the PD
 				klog.Infof("Successfully found attached GCE PD %q.", pdName)
 				return path, nil
+			} else {
+				klog.V(4).Infof("could not verify GCE PD (%q) is attached, device path does not exist", pdName)
 			}
 		case <-timer.C:
 			return "", fmt.Errorf("could not find attached GCE PD %q. Timeout waiting for mount paths to be created", pdName)

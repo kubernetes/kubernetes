@@ -69,7 +69,7 @@ func withRequestDeadline(handler http.Handler, sink audit.Sink, policy policy.Ch
 
 		userSpecifiedTimeout, ok, err := parseTimeout(req)
 		if err != nil {
-			statusErr := apierrors.NewBadRequest(fmt.Sprintf("%s", err.Error()))
+			statusErr := apierrors.NewBadRequest(err.Error())
 
 			klog.Errorf("Error - %s: %#v", err.Error(), req.RequestURI)
 
@@ -126,7 +126,7 @@ func withFailedRequestAudit(failedHandler http.Handler, statusErr *apierrors.Sta
 			ev.ResponseStatus.Message = statusErr.Error()
 		}
 
-		rw := decorateResponseWriter(w, ev, sink, omitStages)
+		rw := decorateResponseWriter(req.Context(), w, ev, sink, omitStages)
 		failedHandler.ServeHTTP(rw, req)
 	})
 }

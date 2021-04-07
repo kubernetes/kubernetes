@@ -62,14 +62,15 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 
 	dc := disruption.NewDisruptionController(
 		informers.Core().V1().Pods(),
-		informers.Policy().V1beta1().PodDisruptionBudgets(),
+		informers.Policy().V1().PodDisruptionBudgets(),
 		informers.Core().V1().ReplicationControllers(),
 		informers.Apps().V1().ReplicaSets(),
 		informers.Apps().V1().Deployments(),
 		informers.Apps().V1().StatefulSets(),
 		testCtx.ClientSet,
 		mapper,
-		scaleClient)
+		scaleClient,
+		testCtx.ClientSet.Discovery())
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
@@ -92,7 +93,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testutils.TestCon
 	prof := schedulerconfig.KubeSchedulerProfile{
 		SchedulerName: v1.DefaultSchedulerName,
 		Plugins: &schedulerconfig.Plugins{
-			PostFilter: &schedulerconfig.PluginSet{
+			PostFilter: schedulerconfig.PluginSet{
 				Disabled: []schedulerconfig.Plugin{
 					{Name: defaultpreemption.Name},
 				},

@@ -129,12 +129,6 @@ func (s *Scheme) nameFunc(t reflect.Type) string {
 	return gvks[0].Kind
 }
 
-// fromScope gets the input version, desired output version, and desired Scheme
-// from a conversion.Scope.
-func (s *Scheme) fromScope(scope conversion.Scope) *Scheme {
-	return s
-}
-
 // Converter allows access to the converter for the scheme
 func (s *Scheme) Converter() *conversion.Converter {
 	return s.converter
@@ -233,6 +227,32 @@ func (s *Scheme) KnownTypes(gv schema.GroupVersion) map[string]reflect.Type {
 		types[gvk.Kind] = t
 	}
 	return types
+}
+
+// VersionsForGroupKind returns the versions that a particular GroupKind can be converted to within the given group.
+// A GroupKind might be converted to a different group. That information is available in EquivalentResourceMapper.
+func (s *Scheme) VersionsForGroupKind(gk schema.GroupKind) []schema.GroupVersion {
+	availableVersions := []schema.GroupVersion{}
+	for gvk := range s.gvkToType {
+		if gk != gvk.GroupKind() {
+			continue
+		}
+
+		availableVersions = append(availableVersions, gvk.GroupVersion())
+	}
+
+	// order the return for stability
+	ret := []schema.GroupVersion{}
+	for _, version := range s.PrioritizedVersionsForGroup(gk.Group) {
+		for _, availableVersion := range availableVersions {
+			if version != availableVersion {
+				continue
+			}
+			ret = append(ret, availableVersion)
+		}
+	}
+
+	return ret
 }
 
 // AllKnownTypes returns the all known types.

@@ -122,8 +122,8 @@ func WithPriorityAndFairness(
 			served = true
 			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
 			innerReq := r.Clone(innerCtx)
-			w.Header().Set(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
-			w.Header().Set(flowcontrol.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
+			setResponseHeaders(classification, w)
+
 			handler.ServeHTTP(w, innerReq)
 		}
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
@@ -135,10 +135,12 @@ func WithPriorityAndFairness(
 			}
 		}, execute)
 		if !served {
+			setResponseHeaders(classification, w)
+
 			if isMutatingRequest {
-				epmetrics.DroppedRequests.WithLabelValues(epmetrics.MutatingKind).Inc()
+				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.MutatingKind).Inc()
 			} else {
-				epmetrics.DroppedRequests.WithLabelValues(epmetrics.ReadOnlyKind).Inc()
+				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			tooManyRequests(r, w)
@@ -152,4 +154,16 @@ func WithPriorityAndFairness(
 func StartPriorityAndFairnessWatermarkMaintenance(stopCh <-chan struct{}) {
 	startWatermarkMaintenance(watermark, stopCh)
 	startWatermarkMaintenance(waitingMark, stopCh)
+}
+
+func setResponseHeaders(classification *PriorityAndFairnessClassification, w http.ResponseWriter) {
+	if classification == nil {
+		return
+	}
+
+	// We intentionally set the UID of the flow-schema and priority-level instead of name. This is so that
+	// the names that cluster-admins choose for categorization and priority levels are not exposed, also
+	// the names might make it obvious to the users that they are rejected due to classification with low priority.
+	w.Header().Set(flowcontrol.ResponseHeaderMatchedPriorityLevelConfigurationUID, string(classification.PriorityLevelUID))
+	w.Header().Set(flowcontrol.ResponseHeaderMatchedFlowSchemaUID, string(classification.FlowSchemaUID))
 }

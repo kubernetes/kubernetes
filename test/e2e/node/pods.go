@@ -48,7 +48,7 @@ import (
 var _ = SIGDescribe("Pods Extended", func() {
 	f := framework.NewDefaultFramework("pods")
 
-	framework.KubeDescribe("Delete Grace Period", func() {
+	ginkgo.Describe("Delete Grace Period", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -145,7 +145,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pods Set QOS Class", func() {
+	ginkgo.Describe("Pods Set QOS Class", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -197,7 +197,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		})
 	})
 
-	framework.KubeDescribe("Pod Container Status", func() {
+	ginkgo.Describe("Pod Container Status", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()
@@ -206,7 +206,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 		ginkgo.It("should never report success for a pending container", func() {
 			ginkgo.By("creating pods that should always exit 1 and terminating the pod after a random delay")
 
-			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~secret.*no such file or directory`)
+			var reBug88766 = regexp.MustCompile(`rootfs_linux.*kubernetes\.io~(secret|projected).*no such file or directory`)
 
 			var (
 				lock sync.Mutex
@@ -441,7 +441,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 
 	})
 
-	framework.KubeDescribe("Pod Container lifecycle", func() {
+	ginkgo.Describe("Pod Container lifecycle", func() {
 		var podClient *framework.PodClient
 		ginkgo.BeforeEach(func() {
 			podClient = f.PodClient()

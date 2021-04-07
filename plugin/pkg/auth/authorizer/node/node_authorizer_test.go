@@ -20,13 +20,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"runtime"
 	"runtime/pprof"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -37,23 +36,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
-
-var (
-	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
-	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
-)
-
-func init() {
-	if err := csiNodeInfoEnabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: true}}); err != nil {
-		panic(err)
-	}
-	if err := csiNodeInfoDisabledFeature.Add(map[featuregate.Feature]featuregate.FeatureSpec{features.CSINodeInfo: {Default: false}}); err != nil {
-		panic(err)
-	}
-}
 
 func TestAuthorizer(t *testing.T) {
 	g := NewGraph()
@@ -282,82 +266,64 @@ func TestAuthorizer(t *testing.T) {
 		},
 		// CSINode
 		{
-			name:     "disallowed CSINode - feature disabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoDisabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed CSINode with subresource - feature enabled",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "csiDrivers", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed CSINode with subresource - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", Subresource: "csiDrivers", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed get another node's CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed get another node's CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed update another node's CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed update another node's CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed patch another node's CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed patch another node's CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed delete another node's CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed delete another node's CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node1"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed list CSINodes",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "csinodes", APIGroup: "storage.k8s.io"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed list CSINodes - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "list", Resource: "csinodes", APIGroup: "storage.k8s.io"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "disallowed watch CSINodes",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "csinodes", APIGroup: "storage.k8s.io"},
+			expect: authorizer.DecisionNoOpinion,
 		},
 		{
-			name:     "disallowed watch CSINodes - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "watch", Resource: "csinodes", APIGroup: "storage.k8s.io"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionNoOpinion,
+			name:   "allowed get CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed get CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "get", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed create CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed create CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "create", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed update CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed update CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "update", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed patch CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionAllow,
 		},
 		{
-			name:     "allowed patch CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "patch", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionAllow,
-		},
-		{
-			name:     "allowed delete CSINode - feature enabled",
-			attrs:    authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
-			features: csiNodeInfoEnabledFeature,
-			expect:   authorizer.DecisionAllow,
+			name:   "allowed delete CSINode",
+			attrs:  authorizer.AttributesRecord{User: node0, ResourceRequest: true, Verb: "delete", Resource: "csinodes", APIGroup: "storage.k8s.io", Name: "node0"},
+			expect: authorizer.DecisionAllow,
 		},
 	}
 

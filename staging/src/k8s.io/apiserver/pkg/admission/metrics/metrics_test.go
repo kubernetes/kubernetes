@@ -79,7 +79,7 @@ func TestObserveAdmissionController(t *testing.T) {
 
 func TestObserveWebhook(t *testing.T) {
 	Metrics.reset()
-	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x")
+	Metrics.ObserveWebhook(context.TODO(), 2*time.Second, false, attr, stepAdmit, "x")
 	wantLabels := map[string]string{
 		"name":      "x",
 		"operation": string(admission.Create),
@@ -91,9 +91,9 @@ func TestObserveWebhook(t *testing.T) {
 
 func TestObserveWebhookRejection(t *testing.T) {
 	Metrics.reset()
-	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
-	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
-	Metrics.ObserveWebhookRejection("x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
 	wantLabels := map[string]string{
 		"name":           "x",
 		"operation":      string(admission.Create),

@@ -19,7 +19,7 @@ func setFreezer(dirPath string, state configs.FreezerState) error {
 		// freeze the container (since without the freezer cgroup, that's a
 		// no-op).
 		if state == configs.Undefined || state == configs.Thawed {
-			err = nil
+			return nil
 		}
 		return errors.Wrap(err, "freezer not supported")
 	}

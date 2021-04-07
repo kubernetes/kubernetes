@@ -88,12 +88,6 @@ type ProgramABI struct {
 	Type ProgramType
 }
 
-func newProgramABIFromSpec(spec *ProgramSpec) *ProgramABI {
-	return &ProgramABI{
-		spec.Type,
-	}
-}
-
 func newProgramABIFromFd(fd *internal.FD) (string, *ProgramABI, error) {
 	info, err := bpfGetProgInfoByFD(fd)
 	if err != nil {

@@ -38,7 +38,7 @@ func init() {
 
 func newProvider() (framework.ProviderInterface, error) {
 	if framework.TestContext.CloudConfig.Zone == "" {
-		return nil, fmt.Errorf("gce-zone must be specified for AWS")
+		framework.Logf("Warning: gce-zone not specified! Some tests that use the AWS SDK may select the wrong region and fail.")
 	}
 	return &Provider{}, nil
 }

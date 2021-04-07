@@ -68,8 +68,12 @@ func init() {
 	)
 }
 
-// legacyAPIServiceName is the fixed name of the only non-groupified API version
-const legacyAPIServiceName = "v1."
+const (
+	// legacyAPIServiceName is the fixed name of the only non-groupified API version
+	legacyAPIServiceName = "v1."
+	// StorageVersionPostStartHookName is the name of the storage version updater post start hook.
+	StorageVersionPostStartHookName = "built-in-resources-storage-version-updater"
+)
 
 // ExtraConfig represents APIServices-specific configuration
 type ExtraConfig struct {
@@ -170,11 +174,6 @@ func (cfg *Config) Complete() CompletedConfig {
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
-	// Prevent generic API server to install OpenAPI handler. Aggregator server
-	// has its own customized OpenAPI handler.
-	openAPIConfig := c.GenericConfig.OpenAPIConfig
-	c.GenericConfig.OpenAPIConfig = nil
-
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -199,12 +198,18 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		lister:                          informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers:        informerFactory,
 		serviceResolver:                 c.ExtraConfig.ServiceResolver,
-		openAPIConfig:                   openAPIConfig,
+		openAPIConfig:                   c.GenericConfig.OpenAPIConfig,
 		egressSelector:                  c.GenericConfig.EgressSelector,
 		proxyCurrentCertKeyContent:      func() (bytes []byte, bytes2 []byte) { return nil, nil },
 	}
 
-	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter)
+	// used later  to filter the served resource by those that have expired.
+	resourceExpirationEvaluator, err := genericapiserver.NewResourceExpirationEvaluator(*c.GenericConfig.Version)
+	if err != nil {
+		return nil, err
+	}
+
+	apiGroupInfo := apiservicerest.NewRESTStorage(c.GenericConfig.MergedResourceConfig, c.GenericConfig.RESTOptionsGetter, resourceExpirationEvaluator.ShouldServeForVersion(1, 22))
 	if err := s.GenericAPIServer.InstallAPIGroup(&apiGroupInfo); err != nil {
 		return nil, err
 	}
@@ -309,7 +314,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) {
 		// Spawn a goroutine in aggregator apiserver to update storage version for
 		// all built-in resources
-		s.GenericAPIServer.AddPostStartHookOrDie("built-in-resources-storage-version-updater", func(hookContext genericapiserver.PostStartHookContext) error {
+		s.GenericAPIServer.AddPostStartHookOrDie(StorageVersionPostStartHookName, func(hookContext genericapiserver.PostStartHookContext) error {
 			// Wait for apiserver-identity to exist first before updating storage
 			// versions, to avoid storage version GC accidentally garbage-collecting
 			// storage versions.

@@ -112,13 +112,13 @@ func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtim
 
 		pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
 		if err != nil {
-			klog.Warningf("Failed to get hugepage size from resource name: %v", err)
+			klog.InfoS("Failed to get hugepage size from resource", "object", resourceObj, "err", err)
 			continue
 		}
 
 		sizeString, err := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
 		if err != nil {
-			klog.Warningf("pageSize is invalid: %v", err)
+			klog.InfoS("Size is invalid", "object", resourceObj, "err", err)
 			continue
 		}
 		requiredHugepageLimits[sizeString] = uint64(amountObj.Value())

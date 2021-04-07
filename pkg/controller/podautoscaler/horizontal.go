@@ -288,8 +288,10 @@ func (a *HorizontalController) computeReplicasForMetrics(hpa *autoscalingv2.Hori
 		}
 	}
 
-	// If all metrics are invalid return error and set condition on hpa based on first invalid metric.
-	if invalidMetricsCount >= len(metricSpecs) {
+	// If all metrics are invalid or some are invalid and we would scale down,
+	// return an error and set the condition of the hpa based on the first invalid metric.
+	// Otherwise set the condition as scaling active as we're going to scale
+	if invalidMetricsCount >= len(metricSpecs) || (invalidMetricsCount > 0 && replicas < specReplicas) {
 		setCondition(hpa, invalidMetricCondition.Type, invalidMetricCondition.Status, invalidMetricCondition.Reason, invalidMetricCondition.Message)
 		return 0, "", statuses, time.Time{}, fmt.Errorf("invalid metrics (%v invalid out of %v), first error is: %v", invalidMetricsCount, len(metricSpecs), invalidMetricError)
 	}
@@ -874,43 +876,57 @@ func (a *HorizontalController) storeScaleEvent(behavior *autoscalingv2.Horizonta
 // - replaces old recommendation with the newest recommendation,
 // - returns {max,min} of recommendations that are not older than constraints.Scale{Up,Down}.DelaySeconds
 func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args NormalizationArg) (int32, string, string) {
-	recommendation := args.DesiredReplicas
+	now := time.Now()
+
 	foundOldSample := false
 	oldSampleIndex := 0
-	var scaleDelaySeconds int32
-	var reason, message string
 
-	var betterRecommendation func(int32, int32) int32
+	upRecommendation := args.DesiredReplicas
+	upDelaySeconds := *args.ScaleUpBehavior.StabilizationWindowSeconds
+	upCutoff := now.Add(-time.Second * time.Duration(upDelaySeconds))
 
-	if args.DesiredReplicas >= args.CurrentReplicas {
-		scaleDelaySeconds = *args.ScaleUpBehavior.StabilizationWindowSeconds
-		betterRecommendation = min
-		reason = "ScaleUpStabilized"
-		message = "recent recommendations were lower than current one, applying the lowest recent recommendation"
-	} else {
-		scaleDelaySeconds = *args.ScaleDownBehavior.StabilizationWindowSeconds
-		betterRecommendation = max
-		reason = "ScaleDownStabilized"
-		message = "recent recommendations were higher than current one, applying the highest recent recommendation"
-	}
+	downRecommendation := args.DesiredReplicas
+	downDelaySeconds := *args.ScaleDownBehavior.StabilizationWindowSeconds
+	downCutoff := now.Add(-time.Second * time.Duration(downDelaySeconds))
 
-	maxDelaySeconds := max(*args.ScaleUpBehavior.StabilizationWindowSeconds, *args.ScaleDownBehavior.StabilizationWindowSeconds)
-	obsoleteCutoff := time.Now().Add(-time.Second * time.Duration(maxDelaySeconds))
-
-	cutoff := time.Now().Add(-time.Second * time.Duration(scaleDelaySeconds))
+	// Calculate the upper and lower stabilization limits.
 	for i, rec := range a.recommendations[args.Key] {
-		if rec.timestamp.After(cutoff) {
-			recommendation = betterRecommendation(rec.recommendation, recommendation)
+		if rec.timestamp.After(upCutoff) {
+			upRecommendation = min(rec.recommendation, upRecommendation)
 		}
-		if rec.timestamp.Before(obsoleteCutoff) {
+		if rec.timestamp.After(downCutoff) {
+			downRecommendation = max(rec.recommendation, downRecommendation)
+		}
+		if rec.timestamp.Before(upCutoff) && rec.timestamp.Before(downCutoff) {
 			foundOldSample = true
 			oldSampleIndex = i
 		}
 	}
+
+	// Bring the recommendation to within the upper and lower limits (stabilize).
+	recommendation := args.CurrentReplicas
+	if recommendation < upRecommendation {
+		recommendation = upRecommendation
+	}
+	if recommendation > downRecommendation {
+		recommendation = downRecommendation
+	}
+
+	// Record the unstabilized recommendation.
 	if foundOldSample {
 		a.recommendations[args.Key][oldSampleIndex] = timestampedRecommendation{args.DesiredReplicas, time.Now()}
 	} else {
 		a.recommendations[args.Key] = append(a.recommendations[args.Key], timestampedRecommendation{args.DesiredReplicas, time.Now()})
+	}
+
+	// Determine a human-friendly message.
+	var reason, message string
+	if args.DesiredReplicas >= args.CurrentReplicas {
+		reason = "ScaleUpStabilized"
+		message = "recent recommendations were lower than current one, applying the lowest recent recommendation"
+	} else {
+		reason = "ScaleDownStabilized"
+		message = "recent recommendations were higher than current one, applying the highest recent recommendation"
 	}
 	return recommendation, reason, message
 }

@@ -779,6 +779,24 @@ func (BareMetalPlatformStatus) SwaggerDoc() map[string]string {
 	return map_BareMetalPlatformStatus
 }
 
+var map_EquinixMetalPlatformSpec = map[string]string{
+	"": "EquinixMetalPlatformSpec holds the desired state of the Equinix Metal infrastructure provider. This only includes fields that can be modified in the cluster.",
+}
+
+func (EquinixMetalPlatformSpec) SwaggerDoc() map[string]string {
+	return map_EquinixMetalPlatformSpec
+}
+
+var map_EquinixMetalPlatformStatus = map[string]string{
+	"":                    "EquinixMetalPlatformStatus holds the current status of the Equinix Metal infrastructure provider.",
+	"apiServerInternalIP": "apiServerInternalIP is an IP address to contact the Kubernetes API server that can be used by components inside the cluster, like kubelets using the infrastructure rather than Kubernetes networking. It is the IP that the Infrastructure.status.apiServerInternalURI points to. It is the IP for a self-hosted load balancer in front of the API servers.",
+	"ingressIP":           "ingressIP is an external IP which routes to the default ingress controller. The IP is a suitable target of a wildcard DNS record used to resolve default route host names.",
+}
+
+func (EquinixMetalPlatformStatus) SwaggerDoc() map[string]string {
+	return map_EquinixMetalPlatformStatus
+}
+
 var map_GCPPlatformSpec = map[string]string{
 	"": "GCPPlatformSpec holds the desired state of the Google Cloud Platform infrastructure provider. This only includes fields that can be modified in the cluster.",
 }
@@ -845,13 +863,15 @@ func (InfrastructureSpec) SwaggerDoc() map[string]string {
 }
 
 var map_InfrastructureStatus = map[string]string{
-	"":                     "InfrastructureStatus describes the infrastructure the cluster is leveraging.",
-	"infrastructureName":   "infrastructureName uniquely identifies a cluster with a human friendly name. Once set it should not be changed. Must be of max length 27 and must have only alphanumeric or hyphen characters.",
-	"platform":             "platform is the underlying infrastructure provider for the cluster.\n\nDeprecated: Use platformStatus.type instead.",
-	"platformStatus":       "platformStatus holds status information specific to the underlying infrastructure provider.",
-	"etcdDiscoveryDomain":  "etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery deprecated: as of 4.7, this field is no longer set or honored.  It will be removed in a future release.",
-	"apiServerURL":         "apiServerURL is a valid URI with scheme 'https', address and optionally a port (defaulting to 443).  apiServerURL can be used by components like the web console to tell users where to find the Kubernetes API.",
-	"apiServerInternalURI": "apiServerInternalURL is a valid URI with scheme 'https', address and optionally a port (defaulting to 443).  apiServerInternalURL can be used by components like kubelets, to contact the Kubernetes API server using the infrastructure provider rather than Kubernetes networking.",
+	"":                       "InfrastructureStatus describes the infrastructure the cluster is leveraging.",
+	"infrastructureName":     "infrastructureName uniquely identifies a cluster with a human friendly name. Once set it should not be changed. Must be of max length 27 and must have only alphanumeric or hyphen characters.",
+	"platform":               "platform is the underlying infrastructure provider for the cluster.\n\nDeprecated: Use platformStatus.type instead.",
+	"platformStatus":         "platformStatus holds status information specific to the underlying infrastructure provider.",
+	"etcdDiscoveryDomain":    "etcdDiscoveryDomain is the domain used to fetch the SRV records for discovering etcd servers and clients. For more info: https://github.com/etcd-io/etcd/blob/329be66e8b3f9e2e6af83c123ff89297e49ebd15/Documentation/op-guide/clustering.md#dns-discovery deprecated: as of 4.7, this field is no longer set or honored.  It will be removed in a future release.",
+	"apiServerURL":           "apiServerURL is a valid URI with scheme 'https', address and optionally a port (defaulting to 443).  apiServerURL can be used by components like the web console to tell users where to find the Kubernetes API.",
+	"apiServerInternalURI":   "apiServerInternalURL is a valid URI with scheme 'https', address and optionally a port (defaulting to 443).  apiServerInternalURL can be used by components like kubelets, to contact the Kubernetes API server using the infrastructure provider rather than Kubernetes networking.",
+	"controlPlaneTopology":   "controlPlaneTopology expresses the expectations for operands that normally run on control nodes. The default is 'HighlyAvailable', which represents the behavior operators have in a \"normal\" cluster. The 'SingleReplica' mode will be used in single-node deployments and the operators should not configure the operand for highly-available operation",
+	"infrastructureTopology": "infrastructureTopology expresses the expectations for infrastructure services that do not run on control plane nodes, usually indicated by a node selector for a `role` value other than `master`. The default is 'HighlyAvailable', which represents the behavior operators have in a \"normal\" cluster. The 'SingleReplica' mode will be used in single-node deployments and the operators should not configure the operand for highly-available operation",
 }
 
 func (InfrastructureStatus) SwaggerDoc() map[string]string {
@@ -916,17 +936,18 @@ func (OvirtPlatformStatus) SwaggerDoc() map[string]string {
 }
 
 var map_PlatformSpec = map[string]string{
-	"":          "PlatformSpec holds the desired state specific to the underlying infrastructure provider of the current cluster. Since these are used at spec-level for the underlying cluster, it is supposed that only one of the spec structs is set.",
-	"type":      "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"KubeVirt\" and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
-	"aws":       "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
-	"azure":     "Azure contains settings specific to the Azure infrastructure provider.",
-	"gcp":       "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
-	"baremetal": "BareMetal contains settings specific to the BareMetal platform.",
-	"openstack": "OpenStack contains settings specific to the OpenStack infrastructure provider.",
-	"ovirt":     "Ovirt contains settings specific to the oVirt infrastructure provider.",
-	"vsphere":   "VSphere contains settings specific to the VSphere infrastructure provider.",
-	"ibmcloud":  "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
-	"kubevirt":  "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
+	"":             "PlatformSpec holds the desired state specific to the underlying infrastructure provider of the current cluster. Since these are used at spec-level for the underlying cluster, it is supposed that only one of the spec structs is set.",
+	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"KubeVirt\", \"EquinixMetal\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.",
+	"aws":          "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
+	"azure":        "Azure contains settings specific to the Azure infrastructure provider.",
+	"gcp":          "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
+	"baremetal":    "BareMetal contains settings specific to the BareMetal platform.",
+	"openstack":    "OpenStack contains settings specific to the OpenStack infrastructure provider.",
+	"ovirt":        "Ovirt contains settings specific to the oVirt infrastructure provider.",
+	"vsphere":      "VSphere contains settings specific to the VSphere infrastructure provider.",
+	"ibmcloud":     "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
+	"kubevirt":     "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
+	"equinixMetal": "EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.",
 }
 
 func (PlatformSpec) SwaggerDoc() map[string]string {
@@ -934,17 +955,18 @@ func (PlatformSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PlatformStatus = map[string]string{
-	"":          "PlatformStatus holds the current status specific to the underlying infrastructure provider of the current cluster. Since these are used at status-level for the underlying cluster, it is supposed that only one of the status structs is set.",
-	"type":      "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.\n\nThis value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set.",
-	"aws":       "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
-	"azure":     "Azure contains settings specific to the Azure infrastructure provider.",
-	"gcp":       "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
-	"baremetal": "BareMetal contains settings specific to the BareMetal platform.",
-	"openstack": "OpenStack contains settings specific to the OpenStack infrastructure provider.",
-	"ovirt":     "Ovirt contains settings specific to the oVirt infrastructure provider.",
-	"vsphere":   "VSphere contains settings specific to the VSphere infrastructure provider.",
-	"ibmcloud":  "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
-	"kubevirt":  "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
+	"":             "PlatformStatus holds the current status specific to the underlying infrastructure provider of the current cluster. Since these are used at status-level for the underlying cluster, it is supposed that only one of the status structs is set.",
+	"type":         "type is the underlying infrastructure provider for the cluster. This value controls whether infrastructure automation such as service load balancers, dynamic volume provisioning, machine creation and deletion, and other integrations are enabled. If None, no infrastructure automation is enabled. Allowed values are \"AWS\", \"Azure\", \"BareMetal\", \"GCP\", \"Libvirt\", \"OpenStack\", \"VSphere\", \"oVirt\", \"EquinixMetal\", and \"None\". Individual components may not support all platforms, and must handle unrecognized platforms as None if they do not support that platform.\n\nThis value will be synced with to the `status.platform` and `status.platformStatus.type`. Currently this value cannot be changed once set.",
+	"aws":          "AWS contains settings specific to the Amazon Web Services infrastructure provider.",
+	"azure":        "Azure contains settings specific to the Azure infrastructure provider.",
+	"gcp":          "GCP contains settings specific to the Google Cloud Platform infrastructure provider.",
+	"baremetal":    "BareMetal contains settings specific to the BareMetal platform.",
+	"openstack":    "OpenStack contains settings specific to the OpenStack infrastructure provider.",
+	"ovirt":        "Ovirt contains settings specific to the oVirt infrastructure provider.",
+	"vsphere":      "VSphere contains settings specific to the VSphere infrastructure provider.",
+	"ibmcloud":     "IBMCloud contains settings specific to the IBMCloud infrastructure provider.",
+	"kubevirt":     "Kubevirt contains settings specific to the kubevirt infrastructure provider.",
+	"equinixMetal": "EquinixMetal contains settings specific to the Equinix Metal infrastructure provider.",
 }
 
 func (PlatformStatus) SwaggerDoc() map[string]string {
@@ -970,6 +992,33 @@ func (VSpherePlatformStatus) SwaggerDoc() map[string]string {
 	return map_VSpherePlatformStatus
 }
 
+var map_ComponentRouteSpec = map[string]string{
+	"":                         "ComponentRouteSpec allows for configuration of a route's hostname and serving certificate.",
+	"namespace":                "namespace is the namespace of the route to customize.\n\nThe namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized.",
+	"name":                     "name is the logical name of the route to customize.\n\nThe namespace and name of this componentRoute must match a corresponding entry in the list of status.componentRoutes if the route is to be customized.",
+	"hostname":                 "hostname is the hostname that should be used by the route.",
+	"servingCertKeyPairSecret": "servingCertKeyPairSecret is a reference to a secret of type `kubernetes.io/tls` in the openshift-config namespace. The serving cert/key pair must match and will be used by the operator to fulfill the intent of serving with this name. If the custom hostname uses the default routing suffix of the cluster, the Secret specification for a serving certificate will not be needed.",
+}
+
+func (ComponentRouteSpec) SwaggerDoc() map[string]string {
+	return map_ComponentRouteSpec
+}
+
+var map_ComponentRouteStatus = map[string]string{
+	"":                 "ComponentRouteStatus contains information allowing configuration of a route's hostname and serving certificate.",
+	"namespace":        "namespace is the namespace of the route to customize. It must be a real namespace. Using an actual namespace ensures that no two components will conflict and the same component can be installed multiple times.\n\nThe namespace and name of this componentRoute must match a corresponding entry in the list of spec.componentRoutes if the route is to be customized.",
+	"name":             "name is the logical name of the route to customize. It does not have to be the actual name of a route resource but it cannot be renamed.\n\nThe namespace and name of this componentRoute must match a corresponding entry in the list of spec.componentRoutes if the route is to be customized.",
+	"defaultHostname":  "defaultHostname is the hostname of this route prior to customization.",
+	"consumingUsers":   "consumingUsers is a slice of ServiceAccounts that need to have read permission on the servingCertKeyPairSecret secret.",
+	"currentHostnames": "currentHostnames is the list of current names used by the route. Typically, this list should consist of a single hostname, but if multiple hostnames are supported by the route the operator may write multiple entries to this list.",
+	"conditions":       "conditions are used to communicate the state of the componentRoutes entry.\n\nSupported conditions include Available, Degraded and Progressing.\n\nIf available is true, the content served by the route can be accessed by users. This includes cases where a default may continue to serve content while the customized route specified by the cluster-admin is being configured.\n\nIf Degraded is true, that means something has gone wrong trying to handle the componentRoutes entry. The currentHostnames field may or may not be in effect.\n\nIf Progressing is true, that means the component is taking some action related to the componentRoutes entry.",
+	"relatedObjects":   "relatedObjects is a list of resources which are useful when debugging or inspecting how spec.componentRoutes is applied.",
+}
+
+func (ComponentRouteStatus) SwaggerDoc() map[string]string {
+	return map_ComponentRouteStatus
+}
+
 var map_Ingress = map[string]string{
 	"":       "Ingress holds cluster-wide information about ingress, including the default ingress domain used for routes. The canonical name is `cluster`.",
 	"spec":   "spec holds user settable values for configuration",
@@ -981,12 +1030,21 @@ func (Ingress) SwaggerDoc() map[string]string {
 }
 
 var map_IngressSpec = map[string]string{
-	"domain":     "domain is used to generate a default host name for a route when the route's host name is empty. The generated host name will follow this pattern: \"<route-name>.<route-namespace>.<domain>\".\n\nIt is also used as the default wildcard domain suffix for ingress. The default ingresscontroller domain will follow this pattern: \"*.<domain>\".\n\nOnce set, changing domain is not currently supported.",
-	"appsDomain": "appsDomain is an optional domain to use instead of the one specified in the domain field when a Route is created without specifying an explicit host. If appsDomain is nonempty, this value is used to generate default host values for Route. Unlike domain, appsDomain may be modified after installation. This assumes a new ingresscontroller has been setup with a wildcard certificate.",
+	"domain":          "domain is used to generate a default host name for a route when the route's host name is empty. The generated host name will follow this pattern: \"<route-name>.<route-namespace>.<domain>\".\n\nIt is also used as the default wildcard domain suffix for ingress. The default ingresscontroller domain will follow this pattern: \"*.<domain>\".\n\nOnce set, changing domain is not currently supported.",
+	"appsDomain":      "appsDomain is an optional domain to use instead of the one specified in the domain field when a Route is created without specifying an explicit host. If appsDomain is nonempty, this value is used to generate default host values for Route. Unlike domain, appsDomain may be modified after installation. This assumes a new ingresscontroller has been setup with a wildcard certificate.",
+	"componentRoutes": "componentRoutes is an optional list of routes that are managed by OpenShift components that a cluster-admin is able to configure the hostname and serving certificate for. The namespace and name of each route in this list should match an existing entry in the status.componentRoutes list.\n\nTo determine the set of configurable Routes, look at namespace and name of entries in the .status.componentRoutes list, where participating operators write the status of configurable routes.",
 }
 
 func (IngressSpec) SwaggerDoc() map[string]string {
 	return map_IngressSpec
+}
+
+var map_IngressStatus = map[string]string{
+	"componentRoutes": "componentRoutes is where participating operators place the current route status for routes whose hostnames and serving certificates can be customized by the cluster-admin.",
+}
+
+func (IngressStatus) SwaggerDoc() map[string]string {
+	return map_IngressStatus
 }
 
 var map_ClusterNetworkEntry = map[string]string{

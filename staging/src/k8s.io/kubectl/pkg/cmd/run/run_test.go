@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubectl/pkg/cmd/delete"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	generateversioned "k8s.io/kubectl/pkg/generate/versioned"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
 )
@@ -210,8 +209,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 				IOStreams: genericclioptions.NewTestIOStreamsDiscard(),
 
-				Image:     "nginx",
-				Generator: generateversioned.RunPodV1GeneratorName,
+				Image: "nginx",
 
 				PrintObj: func(obj runtime.Object) error {
 					return printer.PrintObj(obj, os.Stdout)
@@ -234,20 +232,18 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 
 func TestGenerateService(t *testing.T) {
 	tests := []struct {
-		name             string
-		port             string
-		args             []string
-		serviceGenerator string
-		params           map[string]interface{}
-		expectErr        bool
-		service          corev1.Service
-		expectPOST       bool
+		name       string
+		port       string
+		args       []string
+		params     map[string]interface{}
+		expectErr  bool
+		service    corev1.Service
+		expectPOST bool
 	}{
 		{
-			name:             "basic",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "basic",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -276,10 +272,9 @@ func TestGenerateService(t *testing.T) {
 			expectPOST: true,
 		},
 		{
-			name:             "custom labels",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "custom labels",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name":   "foo",
 				"labels": "app=bar",
@@ -315,10 +310,9 @@ func TestGenerateService(t *testing.T) {
 			expectPOST: false,
 		},
 		{
-			name:             "dry-run",
-			port:             "80",
-			args:             []string{"foo"},
-			serviceGenerator: "service/v2",
+			name: "dry-run",
+			port: "80",
+			args: []string{"foo"},
 			params: map[string]interface{}{
 				"name": "foo",
 			},
@@ -411,7 +405,7 @@ func TestGenerateService(t *testing.T) {
 				test.params["port"] = test.port
 			}
 
-			_, err = opts.generateService(tf, cmd, test.serviceGenerator, test.params)
+			_, err = opts.generateService(tf, cmd, test.params)
 			if test.expectErr {
 				if err == nil {
 					t.Error("unexpected non-error")
@@ -560,7 +554,7 @@ func TestExpose(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			tf := cmdtesting.NewTestFactory()
+			tf := cmdtesting.NewTestFactory().WithNamespace("test")
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
@@ -570,11 +564,11 @@ func TestExpose(t *testing.T) {
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					t.Logf("path: %v, method: %v", req.URL.Path, req.Method)
 					switch p, m := req.URL.Path, req.Method; {
-					case m == "POST" && p == "/namespaces/default/pods":
+					case m == "POST" && p == "/namespaces/test/pods":
 						pod := &corev1.Pod{}
 						body := cmdtesting.ObjBody(codec, pod)
 						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: body}, nil
-					case m == "POST" && p == "/namespaces/default/services":
+					case m == "POST" && p == "/namespaces/test/services":
 						data, err := ioutil.ReadAll(req.Body)
 						if err != nil {
 							t.Fatalf("unexpected error: %v", err)

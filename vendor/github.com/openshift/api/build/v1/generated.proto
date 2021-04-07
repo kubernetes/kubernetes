@@ -144,6 +144,10 @@ message BuildConfigSpec {
 message BuildConfigStatus {
   // lastVersion is used to inform about number of last triggered build.
   optional int64 lastVersion = 1;
+
+  // ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+  // including reconciled values of the lastTriggeredImageID and paused fields.
+  repeated ImageChangeTriggerStatus imageChangeTriggers = 2;
 }
 
 // BuildList is a collection of Builds.
@@ -545,7 +549,31 @@ message BuildTriggerCause {
 
 // BuildTriggerPolicy describes a policy for a single trigger that results in a new Build.
 message BuildTriggerPolicy {
-  // type is the type of build trigger
+  // type is the type of build trigger. Valid values:
+  //
+  // - GitHub
+  // GitHubWebHookBuildTriggerType represents a trigger that launches builds on
+  // GitHub webhook invocations
+  //
+  // - Generic
+  // GenericWebHookBuildTriggerType represents a trigger that launches builds on
+  // generic webhook invocations
+  //
+  // - GitLab
+  // GitLabWebHookBuildTriggerType represents a trigger that launches builds on
+  // GitLab webhook invocations
+  //
+  // - Bitbucket
+  // BitbucketWebHookBuildTriggerType represents a trigger that launches builds on
+  // Bitbucket webhook invocations
+  //
+  // - ImageChange
+  // ImageChangeBuildTriggerType represents a trigger that launches builds on
+  // availability of a new version of an image
+  //
+  // - ConfigChange
+  // ConfigChangeBuildTriggerType will trigger a build on an initial build config creation
+  // WARNING: In the future the behavior will change to trigger a build on any config change
   optional string type = 1;
 
   // github contains the parameters for a GitHub webhook type of trigger
@@ -604,6 +632,16 @@ message CommonSpec {
   // are ignored.
   // +optional
   optional OptionalNodeSelector nodeSelector = 9;
+
+  // mountTrustedCA bind mounts the cluster's trusted certificate authorities, as defined in
+  // the cluster's proxy configuration, into the build. This lets processes within a build trust
+  // components signed by custom PKI certificate authorities, such as private artifact
+  // repositories and HTTPS proxies.
+  //
+  // When this field is set to true, the contents of `/etc/pki/ca-trust` within the build are
+  // managed by the build container, and any changes to this directory or its subdirectories (for
+  // example - within a Dockerfile `RUN` instruction) are not persisted in the build's output image.
+  optional bool mountTrustedCA = 10;
 }
 
 // CommonWebHookCause factors out the identical format of these webhook
@@ -823,6 +861,8 @@ message ImageChangeCause {
 message ImageChangeTrigger {
   // lastTriggeredImageID is used internally by the ImageChangeController to save last
   // used image ID for build
+  // This field is deprecated and will be removed in a future release.
+  // Deprecated
   optional string lastTriggeredImageID = 1;
 
   // from is a reference to an ImageStreamTag that will trigger a build when updated
@@ -833,6 +873,25 @@ message ImageChangeTrigger {
 
   // paused is true if this trigger is temporarily disabled. Optional.
   optional bool paused = 3;
+}
+
+// ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy
+// specified in the BuildConfigSpec.Triggers struct.
+message ImageChangeTriggerStatus {
+  // lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered.
+  // It is not necessarily the sha/id of the image change that triggered a build.
+  // This field is updated for all image change triggers when any of them triggers a build.
+  optional string lastTriggeredImageID = 1;
+
+  // from is the ImageStreamTag that is used as the source of the trigger.
+  // This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.
+  optional k8s.io.api.core.v1.ObjectReference from = 2;
+
+  // paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.
+  optional bool paused = 3;
+
+  // lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTriggerTime = 4;
 }
 
 // ImageLabel represents a label applied to the resulting image.

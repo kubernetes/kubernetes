@@ -31,7 +31,7 @@ import (
 )
 
 // FitPredicate is a function type which is used in fake extender.
-type FitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
+type FitPredicate func(pod *v1.Pod, node *v1.Node) *framework.Status
 
 // PriorityFunc is a function type which is used in fake extender.
 type PriorityFunc func(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error)
@@ -42,37 +42,42 @@ type PriorityConfig struct {
 	Weight   int64
 }
 
-// ErrorPredicateExtender implements FitPredicate function to always return error.
-func ErrorPredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	return false, fmt.Errorf("some error")
+// ErrorPredicateExtender implements FitPredicate function to always return error status.
+func ErrorPredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
+	return framework.NewStatus(framework.Error, "some error")
 }
 
-// FalsePredicateExtender implements FitPredicate function to always return false.
-func FalsePredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	return false, nil
+// FalsePredicateExtender implements FitPredicate function to always return unschedulable status.
+func FalsePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("pod is unschedulable on the node %q", node.Name))
 }
 
-// TruePredicateExtender implements FitPredicate function to always return true.
-func TruePredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
-	return true, nil
+// FalseAndUnresolvePredicateExtender implements fitPredicate to always return unschedulable and unresolvable status.
+func FalseAndUnresolvePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
+	return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("pod is unschedulable and unresolvable on the node %q", node.Name))
+}
+
+// TruePredicateExtender implements FitPredicate function to always return success status.
+func TruePredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
+	return framework.NewStatus(framework.Success)
 }
 
 // Node1PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node1"; otherwise return false.
-func Node1PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
+func Node1PredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
 	if node.Name == "node1" {
-		return true, nil
+		return framework.NewStatus(framework.Success)
 	}
-	return false, nil
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
 }
 
 // Node2PredicateExtender implements FitPredicate function to return true
 // when the given node's name is "node2"; otherwise return false.
-func Node2PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
+func Node2PredicateExtender(pod *v1.Pod, node *v1.Node) *framework.Status {
 	if node.Name == "node2" {
-		return true, nil
+		return framework.NewStatus(framework.Success)
 	}
-	return false, nil
+	return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("node %q is not allowed", node.Name))
 }
 
 // ErrorPrioritizerExtender implements PriorityFunc function to always return error.
@@ -211,14 +216,14 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 	// If a extender support preemption but have no cached node info, let's run filter to make sure
 	// default scheduler's decision still stand with given pod and node.
 	if !f.NodeCacheCapable {
-		fits, err := f.runPredicate(pod, node)
-		if err != nil {
-			return nil, 0, false, err
-		}
-		if !fits {
+		err := f.runPredicate(pod, node)
+		if err.IsSuccess() {
+			return []*v1.Pod{}, 0, true, nil
+		} else if err.IsUnschedulable() {
 			return nil, 0, false, nil
+		} else {
+			return nil, 0, false, err.AsError()
 		}
-		return []*v1.Pod{}, 0, true, nil
 	}
 
 	// Otherwise, as a extender support preemption and have cached node info, we will assume cachedNodeNameToInfo is available
@@ -246,12 +251,15 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.
-	fits, err := f.runPredicate(pod, nodeInfoCopy.Node())
-	if err != nil {
-		return nil, 0, false, err
-	}
-	if !fits {
+	status := f.runPredicate(pod, nodeInfoCopy.Node())
+	if status.IsSuccess() {
+		// pass
+	} else if status.IsUnschedulable() {
+		// does not fit
 		return nil, 0, false, nil
+	} else {
+		// internal errors
+		return nil, 0, false, status.AsError()
 	}
 
 	var victims []*v1.Pod
@@ -261,12 +269,12 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 
 	reprievePod := func(p *v1.Pod) bool {
 		addPod(p)
-		fits, _ := f.runPredicate(pod, nodeInfoCopy.Node())
-		if !fits {
+		status := f.runPredicate(pod, nodeInfoCopy.Node())
+		if !status.IsSuccess() {
 			removePod(p)
 			victims = append(victims, p)
 		}
-		return fits
+		return status.IsSuccess()
 	}
 
 	// For now, assume all potential victims to be non-violating.
@@ -280,42 +288,39 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(pod *v1.Pod, node *v1.Node)
 
 // runPredicate run predicates of extender one by one for given pod and node.
 // Returns: fits or not.
-func (f *FakeExtender) runPredicate(pod *v1.Pod, node *v1.Node) (bool, error) {
-	fits := true
-	var err error
+func (f *FakeExtender) runPredicate(pod *v1.Pod, node *v1.Node) *framework.Status {
 	for _, predicate := range f.Predicates {
-		fits, err = predicate(pod, node)
-		if err != nil {
-			return false, err
-		}
-		if !fits {
-			break
+		status := predicate(pod, node)
+		if !status.IsSuccess() {
+			return status
 		}
 	}
-	return fits, nil
+	return framework.NewStatus(framework.Success)
 }
 
 // Filter implements the extender Filter function.
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, extenderv1.FailedNodesMap, error) {
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node) ([]*v1.Node, extenderv1.FailedNodesMap, extenderv1.FailedNodesMap, error) {
 	var filtered []*v1.Node
 	failedNodesMap := extenderv1.FailedNodesMap{}
+	failedAndUnresolvableMap := extenderv1.FailedNodesMap{}
 	for _, node := range nodes {
-		fits, err := f.runPredicate(pod, node)
-		if err != nil {
-			return []*v1.Node{}, extenderv1.FailedNodesMap{}, err
-		}
-		if fits {
+		status := f.runPredicate(pod, node)
+		if status.IsSuccess() {
 			filtered = append(filtered, node)
+		} else if status.Code() == framework.Unschedulable {
+			failedNodesMap[node.Name] = fmt.Sprintf("FakeExtender: node %q failed", node.Name)
+		} else if status.Code() == framework.UnschedulableAndUnresolvable {
+			failedAndUnresolvableMap[node.Name] = fmt.Sprintf("FakeExtender: node %q failed and unresolvable", node.Name)
 		} else {
-			failedNodesMap[node.Name] = "FakeExtender failed"
+			return nil, nil, nil, status.AsError()
 		}
 	}
 
 	f.FilteredNodes = filtered
 	if f.NodeCacheCapable {
-		return filtered, failedNodesMap, nil
+		return filtered, failedNodesMap, failedAndUnresolvableMap, nil
 	}
-	return filtered, failedNodesMap, nil
+	return filtered, failedNodesMap, failedAndUnresolvableMap, nil
 }
 
 // Prioritize implements the extender Prioritize function.

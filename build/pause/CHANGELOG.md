@@ -1,3 +1,15 @@
+# 3.4.1
+
+* Support for Windows container images (OS Versions: 20H2) was added.([#97322](https://prs.k8s.io/97322), [@claudiubelu](https://github.com/claudiubelu))
+
+# 3.4
+
+* Support for Windows container images (OS Versions: 1809, 1903, 1909, 2004) was added. ([#91452](https://prs.k8s.io/91452), [@claudiubelu](https://github.com/claudiubelu))
+
+# 3.3
+
+* update debian-base version to v2.1.0 ([#90665](https://prs.k8s.io/90665), [@justaugustus]
+
 # 3.2
 
 * The pause container is built with the correct "Architecture" metadata. ([#87954](https://prs.k8s.io/87954), [@BenTheElder](https://github.com/BenTheElder))

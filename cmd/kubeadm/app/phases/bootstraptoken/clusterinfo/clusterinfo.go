@@ -47,6 +47,9 @@ func CreateBootstrapConfigMapIfNotExists(client clientset.Interface, file string
 	if err != nil {
 		return errors.Wrap(err, "failed to load admin kubeconfig")
 	}
+	if err = clientcmdapi.FlattenConfig(adminConfig); err != nil {
+		return err
+	}
 
 	adminCluster := adminConfig.Contexts[adminConfig.CurrentContext].Cluster
 	// Copy the cluster from admin.conf to the bootstrap kubeconfig, contains the CA cert and the server URL

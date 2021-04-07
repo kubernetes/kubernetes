@@ -86,6 +86,16 @@ type CommonSpec struct {
 	// are ignored.
 	// +optional
 	NodeSelector OptionalNodeSelector `json:"nodeSelector" protobuf:"bytes,9,name=nodeSelector"`
+
+	// mountTrustedCA bind mounts the cluster's trusted certificate authorities, as defined in
+	// the cluster's proxy configuration, into the build. This lets processes within a build trust
+	// components signed by custom PKI certificate authorities, such as private artifact
+	// repositories and HTTPS proxies.
+	//
+	// When this field is set to true, the contents of `/etc/pki/ca-trust` within the build are
+	// managed by the build container, and any changes to this directory or its subdirectories (for
+	// example - within a Dockerfile `RUN` instruction) are not persisted in the build's output image.
+	MountTrustedCA *bool `json:"mountTrustedCA,omitempty" protobuf:"varint,10,opt,name=mountTrustedCA"`
 }
 
 // BuildTriggerCause holds information about a triggered build. It is used for
@@ -965,6 +975,10 @@ const (
 type BuildConfigStatus struct {
 	// lastVersion is used to inform about number of last triggered build.
 	LastVersion int64 `json:"lastVersion" protobuf:"varint,1,opt,name=lastVersion"`
+
+	// ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec,
+	// including reconciled values of the lastTriggeredImageID and paused fields.
+	ImageChangeTriggers []ImageChangeTriggerStatus `json:"imageChangeTriggers,omitempty" protobuf:"bytes,2,rep,name=imageChangeTriggers"`
 }
 
 // SecretLocalReference contains information that points to the local secret being used
@@ -994,6 +1008,8 @@ type WebHookTrigger struct {
 type ImageChangeTrigger struct {
 	// lastTriggeredImageID is used internally by the ImageChangeController to save last
 	// used image ID for build
+	// This field is deprecated and will be removed in a future release.
+	// Deprecated
 	LastTriggeredImageID string `json:"lastTriggeredImageID,omitempty" protobuf:"bytes,1,opt,name=lastTriggeredImageID"`
 
 	// from is a reference to an ImageStreamTag that will trigger a build when updated
@@ -1006,9 +1022,52 @@ type ImageChangeTrigger struct {
 	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
 }
 
+// ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy
+// specified in the BuildConfigSpec.Triggers struct.
+type ImageChangeTriggerStatus struct {
+	// lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered.
+	// It is not necessarily the sha/id of the image change that triggered a build.
+	// This field is updated for all image change triggers when any of them triggers a build.
+	LastTriggeredImageID string `json:"lastTriggeredImageID,omitempty" protobuf:"bytes,1,opt,name=lastTriggeredImageID"`
+
+	// from is the ImageStreamTag that is used as the source of the trigger.
+	// This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.
+	From *corev1.ObjectReference `json:"from,omitempty" protobuf:"bytes,2,opt,name=from"`
+
+	// paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.
+	Paused bool `json:"paused,omitempty" protobuf:"varint,3,opt,name=paused"`
+
+	// lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.
+	LastTriggerTime metav1.Time `json:"lastTriggerTime,omitempty" protobuf:"bytes,4,opt,name=lastTriggerTime"`
+}
+
 // BuildTriggerPolicy describes a policy for a single trigger that results in a new Build.
 type BuildTriggerPolicy struct {
-	// type is the type of build trigger
+	// type is the type of build trigger. Valid values:
+	//
+	// - GitHub
+	// GitHubWebHookBuildTriggerType represents a trigger that launches builds on
+	// GitHub webhook invocations
+	//
+	// - Generic
+	// GenericWebHookBuildTriggerType represents a trigger that launches builds on
+	// generic webhook invocations
+	//
+	// - GitLab
+	// GitLabWebHookBuildTriggerType represents a trigger that launches builds on
+	// GitLab webhook invocations
+	//
+	// - Bitbucket
+	// BitbucketWebHookBuildTriggerType represents a trigger that launches builds on
+	// Bitbucket webhook invocations
+	//
+	// - ImageChange
+	// ImageChangeBuildTriggerType represents a trigger that launches builds on
+	// availability of a new version of an image
+	//
+	// - ConfigChange
+	// ConfigChangeBuildTriggerType will trigger a build on an initial build config creation
+	// WARNING: In the future the behavior will change to trigger a build on any config change
 	Type BuildTriggerType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=BuildTriggerType"`
 
 	// github contains the parameters for a GitHub webhook type of trigger

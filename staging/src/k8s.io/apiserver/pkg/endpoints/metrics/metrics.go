@@ -18,10 +18,10 @@ package metrics
 
 import (
 	"bufio"
+	"context"
 	"net"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,13 +49,12 @@ type resettableCollector interface {
 
 const (
 	APIServerComponent string = "apiserver"
-	OtherContentType   string = "other"
 	OtherRequestMethod string = "other"
 )
 
 /*
  * By default, all the following metrics are defined as falling under
- * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/1209-metrics-stability/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
  *
  * Promoting the stability level of the metric is a responsibility of the component owner, since it
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
@@ -76,14 +75,10 @@ var (
 	requestCounter = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
 			Name:           "apiserver_request_total",
-			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response contentType and code.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			Help:           "Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.",
+			StabilityLevel: compbasemetrics.STABLE,
 		},
-		// The label_name contentType doesn't follow the label_name convention defined here:
-		// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-instrumentation/instrumentation.md
-		// But changing it would break backwards compatibility. Future label_names
-		// should be all lowercase and separated by underscores.
-		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "contentType", "code"},
+		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
 	longRunningRequestGauge = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -102,7 +97,7 @@ var (
 			// Thus we customize buckets significantly, to empower both usecases.
 			Buckets: []float64{0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
 				1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60},
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
 	)
@@ -216,8 +211,6 @@ var (
 		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 
-	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
-
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -237,19 +230,6 @@ var (
 		requestAbortsTotal,
 	}
 
-	// these are the known (e.g. whitelisted/known) content types which we will report for
-	// request metrics. Any other RFC compliant content types will be aggregated under 'unknown'
-	knownMetricContentTypes = utilsets.NewString(
-		"application/apply-patch+yaml",
-		"application/json",
-		"application/json-patch+json",
-		"application/merge-patch+json",
-		"application/strategic-merge-patch+json",
-		"application/vnd.kubernetes.protobuf",
-		"application/vnd.kubernetes.protobuf;stream=watch",
-		"application/yaml",
-		"text/plain",
-		"text/plain;charset=utf-8")
 	// these are the valid request methods which we report in our metrics. Any other request methods
 	// will be aggregated under 'unknown'
 	validRequestMethods = utilsets.NewString(
@@ -324,8 +304,8 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 	}
 }
 
-func RecordFilterLatency(name string, elapsed time.Duration) {
-	requestFilterDuration.WithLabelValues(name).Observe(elapsed.Seconds())
+func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration) {
+	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
 }
 
 // RecordRequestAbort records that the request was aborted possibly due to a timeout.
@@ -341,7 +321,7 @@ func RecordRequestAbort(req *http.Request, requestInfo *request.RequestInfo) {
 	group := requestInfo.APIGroup
 	version := requestInfo.APIVersion
 
-	requestAbortsTotal.WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
+	requestAbortsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope).Inc()
 }
 
 // RecordRequestTermination records that the request was terminated early as part of a resource
@@ -361,9 +341,9 @@ func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInf
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
-		requestTerminationsTotal.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestTerminationsTotal.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
@@ -383,9 +363,9 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 	reportedVerb := cleanVerb(canonicalVerb(strings.ToUpper(req.Method), scope), req)
 
 	if requestInfo.IsResourceRequest {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
+		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component)
 	} else {
-		g = longRunningRequestGauge.WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
+		g = longRunningRequestGauge.WithContext(req.Context()).WithLabelValues(reportedVerb, "", "", "", requestInfo.Path, scope, component)
 	}
 	g.Inc()
 	defer g.Dec()
@@ -394,7 +374,7 @@ func RecordLongRunning(req *http.Request, requestInfo *request.RequestInfo, comp
 
 // MonitorRequest handles standard transformations for client and the reported verb and then invokes Monitor to record
 // a request. verb must be uppercase to be backwards compatible with existing monitoring tooling.
-func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, contentType string, httpCode, respSize int, elapsed time.Duration) {
+func MonitorRequest(req *http.Request, verb, group, version, resource, subresource, scope, component string, deprecated bool, removedRelease string, httpCode, respSize int, elapsed time.Duration) {
 	// We don't use verb from <requestInfo>, as this may be propagated from
 	// InstrumentRouteFunc which is registered in installer.go with predefined
 	// list of verbs (different than those translated to RequestInfo).
@@ -403,24 +383,23 @@ func MonitorRequest(req *http.Request, verb, group, version, resource, subresour
 
 	dryRun := cleanDryRun(req.URL)
 	elapsedSeconds := elapsed.Seconds()
-	cleanContentType := cleanContentType(contentType)
-	requestCounter.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, cleanContentType, codeToString(httpCode)).Inc()
+	requestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component, codeToString(httpCode)).Inc()
 	// MonitorRequest happens after authentication, so we can trust the username given by the request
 	info, ok := request.UserFrom(req.Context())
 	if ok && info.GetName() == user.APIServerUser {
-		apiSelfRequestCounter.WithLabelValues(reportedVerb, resource, subresource).Inc()
+		apiSelfRequestCounter.WithContext(req.Context()).WithLabelValues(reportedVerb, resource, subresource).Inc()
 	}
 	if deprecated {
-		deprecatedRequestGauge.WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
+		deprecatedRequestGauge.WithContext(req.Context()).WithLabelValues(group, version, resource, subresource, removedRelease).Set(1)
 		audit.AddAuditAnnotation(req.Context(), deprecatedAnnotationKey, "true")
 		if len(removedRelease) > 0 {
 			audit.AddAuditAnnotation(req.Context(), removedReleaseAnnotationKey, removedRelease)
 		}
 	}
-	requestLatencies.WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
+	requestLatencies.WithContext(req.Context()).WithLabelValues(reportedVerb, dryRun, group, version, resource, subresource, scope, component).Observe(elapsedSeconds)
 	// We are only interested in response sizes of read requests.
 	if verb == "GET" || verb == "LIST" {
-		responseSizes.WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
+		responseSizes.WithContext(req.Context()).WithLabelValues(reportedVerb, group, version, resource, subresource, scope, component).Observe(float64(respSize))
 	}
 }
 
@@ -448,7 +427,7 @@ func InstrumentRouteFunc(verb, group, version, resource, subresource, scope, com
 
 		routeFunc(req, response)
 
-		MonitorRequest(req.Request, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		MonitorRequest(req.Request, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
 	})
 }
 
@@ -473,21 +452,8 @@ func InstrumentHandlerFunc(verb, group, version, resource, subresource, scope, c
 
 		handler(w, req)
 
-		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Header().Get("Content-Type"), delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
+		MonitorRequest(req, verb, group, version, resource, subresource, scope, component, deprecated, removedRelease, delegate.Status(), delegate.ContentLength(), time.Since(requestReceivedTimestamp))
 	}
-}
-
-// cleanContentType binds the contentType (for metrics related purposes) to a
-// bounded set of known/expected content-types.
-func cleanContentType(contentType string) string {
-	normalizedContentType := strings.ToLower(contentType)
-	if strings.HasSuffix(contentType, " stream=watch") || strings.HasSuffix(contentType, " charset=utf-8") {
-		normalizedContentType = strings.ReplaceAll(contentType, " ", "")
-	}
-	if knownMetricContentTypes.Has(normalizedContentType) {
-		return normalizedContentType
-	}
-	return OtherContentType
 }
 
 // CleanScope returns the scope of the request.

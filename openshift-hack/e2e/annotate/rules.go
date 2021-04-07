@@ -11,14 +11,24 @@ var (
 		"[Disabled:Alpha]": {
 			// ALPHA features in 1.20, disabled by default.
 			// !!! Review their status as part of the 1.21 rebase.
-			`\[Feature:CSIStorageCapacity\]`,
 			`\[Feature:CSIServiceAccountToken\]`,
-			`\[Feature:IPv6DualStack.*\]`,
-			`\[Feature:TTLAfterFinished\]`,
 
 			// BETA features in 1.20, enabled by default
-			// Their enablement is tracked via bz's targeted at 4.6.
+			// Their enablement is tracked via bz's targeted at 4.8.
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
+
+			`\[Feature:NetworkPolicy\]`,
+
+			`\[Feature:CrossNamespacePodAffinity\]`,
+
+			`\[Feature:GenericEphemeralVolume\]`,
+
+			`\[Feature:DaemonSetUpdateSurge\]`,
+
+			`\[Feature:StorageVersionAPI\]`,
+
+			`\[Feature:IndexedJob\]`,
+			`\[Feature:SuspendJob\]`,
 		},
 		// tests for features that are not implemented in openshift
 		"[Disabled:Unimplemented]": {
@@ -77,9 +87,8 @@ var (
 			"should reject a Pod requesting a RuntimeClass with conflicting node selector",
 			"should run a Pod requesting a RuntimeClass with scheduling",
 
-			// NFS umount is broken in kernels 5.7+
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
-			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
+			// A fix is in progress: https://github.com/openshift/origin/pull/24709
+			`Multi-AZ Clusters should spread the pods of a replication controller across zones`,
 
 			// Upstream assumes all control plane pods are in kube-system namespace and we should revert the change
 			// https://github.com/kubernetes/kubernetes/commit/176c8e219f4c7b4c15d34b92c50bfa5ba02b3aba#diff-28a3131f96324063dd53e17270d435a3b0b3bd8f806ee0e33295929570eab209R78
@@ -90,6 +99,19 @@ var (
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1906808
 			`ServiceAccounts should support OIDC discovery of service account issuer`,
+
+			// NFS umount is broken in kernels 5.7+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
+			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945104
+			`\[sig-storage\].*\[Driver: csi-hostpath\] \[Testpattern: Generic Ephemeral-volume`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945091
+			`\[Feature:IPv6DualStack\]`,
+
+			// https://bugzilla.redhat.com/show_bug.cgi?id=1945329
+			`should drop INVALID conntrack entries`,
 		},
 		// tests that may work, but we don't support them
 		"[Disabled:Unsupported]": {

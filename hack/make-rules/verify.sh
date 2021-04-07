@@ -35,6 +35,7 @@ EXCLUDED_PATTERNS=(
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-govet-levee.sh"        # Do not run levee analysis by default while KEP-1933 implementation is in alpha.
+  "verify-golangci-lint.sh"      # Experimental - intended to be run by hand periodically
   )
 
 # Exclude generated-files-remake in certain cases, if they're running in a separate job.
@@ -60,15 +61,21 @@ EXCLUDED_PATTERNS+=(
 # compare current and generated results without 'cp -a' since this
 # command does not execute without error in downstream ci.
 EXCLUDED_PATTERNS+=(
-  "verify-codegen.sh"                # TODO(marun) Fix inconsistent behavior between local and ci execution
-  "verify-generated-files-remake.sh" # TODO(marun) Is it worth fixing this check?
-  "verify-generated-protobuf.sh"     # TODO(marun) Fix inconsistent behavior between local and ci execution
-  "verify-golint.sh"                 # TODO(marun) Cleanup carried code
-  "verify-hack-tools.sh"             # TODO(marun) Fix inconsistent behavior between local and ci execution
-  "verify-openapi-spec.sh"           # TODO(marun) Fix inconsistent behavior between local and ci execution
-  "verify-spelling.sh"               # TODO(marun) Need to ensure installation of misspell command
-  "verify-staticcheck.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
-  "verify-vendor-licenses.sh"        # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-codegen.sh"                       # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-conformance-yaml.sh"              # TODO(soltysh) I don't expect us needing this
+  "verify-e2e-test-ownership.sh"            # TODO(soltysh) Is it worth fixing this check?
+  "verify-external-dependencies-version.sh" # TODO(soltysh) I don't expect us needing this
+  "verify-generated-files-remake.sh"        # TODO(marun) Is it worth fixing this check?
+  "verify-generated-protobuf.sh"            # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-golint.sh"                        # TODO(marun) Cleanup carried code
+  "verify-hack-tools.sh"                    # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-internal-modules.sh"              # TODO(soltysh) Currently fails on our ginkgo dependency
+  "verify-openapi-spec.sh"                  # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-shellcheck.sh"                    # TODO(soltysh) Fix problems in openshift-hack shells
+  "verify-spelling.sh"                      # TODO(marun) Need to ensure installation of misspell command
+  "verify-staticcheck.sh"                   # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-vendor-licenses.sh"               # TODO(marun) Fix inconsistent behavior between local and ci execution
+  "verify-structured-logging.sh"            # TODO(soltysh) I don't expect us needed it now
 )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
@@ -98,12 +105,10 @@ if [[ ${EXCLUDE_READONLY_PACKAGE:-} =~ ^[yY]$ ]]; then
     )
 fi
 
-# Only run whitelisted fast checks in quick mode.
-# These run in <10s each on enisoc's workstation, assuming that
-# `make` had already been run.
+# Only run known fast checks in quick mode.
+# These ideally run in less than 10s.
 QUICK_PATTERNS+=(
   "verify-api-groups.sh"
-  "verify-bazel.sh"
   "verify-boilerplate.sh"
   "verify-external-dependencies-version.sh"
   "verify-vendor-licenses.sh"

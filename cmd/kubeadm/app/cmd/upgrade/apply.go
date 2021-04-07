@@ -104,7 +104,7 @@ func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
-//   - Applying new kube-dns and kube-proxy manifests
+//   - Applying new CorDNS and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
 func runApply(flags *applyFlags, args []string) error {
 
@@ -168,6 +168,13 @@ func runApply(flags *applyFlags, args []string) error {
 	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
 		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
 	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+		return err
+	}
+
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2375
+	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to control plane Nodes\n",
+		kubeadmconstants.LabelExcludeFromExternalLB)
+	if err := upgrade.LabelControlPlaneNodesWithExcludeFromLB(client); err != nil {
 		return err
 	}
 

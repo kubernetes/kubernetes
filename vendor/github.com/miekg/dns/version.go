@@ -3,13 +3,13 @@ package dns
 import "fmt"
 
 // Version is current version of this library.
-var Version = V{1, 1, 4}
+var Version = v{1, 1, 35}
 
-// V holds the version of this library.
-type V struct {
+// v holds the version of this library.
+type v struct {
 	Major, Minor, Patch int
 }
 
-func (v V) String() string {
+func (v v) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }

@@ -29,6 +29,9 @@ func APIEndpointFromString(apiEndpoint string) (APIEndpoint, error) {
 	if err != nil {
 		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint: %s", apiEndpoint)
 	}
+	if net.ParseIP(apiEndpointHost) == nil {
+		return APIEndpoint{}, errors.Errorf("invalid API endpoint IP: %s", apiEndpointHost)
+	}
 	apiEndpointPort, err := net.LookupPort("tcp", apiEndpointPortStr)
 	if err != nil {
 		return APIEndpoint{}, errors.Wrapf(err, "invalid advertise address endpoint port: %s", apiEndpointPortStr)

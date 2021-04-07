@@ -242,7 +242,7 @@ func (r *Request) SubResource(subresources ...string) *Request {
 	}
 	subresource := path.Join(subresources...)
 	if len(r.subresource) != 0 {
-		r.err = fmt.Errorf("subresource already set to %q, cannot change to %q", r.resource, subresource)
+		r.err = fmt.Errorf("subresource already set to %q, cannot change to %q", r.subresource, subresource)
 		return r
 	}
 	for _, s := range subresources {
@@ -577,7 +577,7 @@ func (r Request) finalURLTemplate() url.URL {
 	return *url
 }
 
-func (r *Request) tryThrottle(ctx context.Context) error {
+func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) error {
 	if r.rateLimiter == nil {
 		return nil
 	}
@@ -587,17 +587,30 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 	err := r.rateLimiter.Wait(ctx)
 
 	latency := time.Since(now)
+
+	var message string
+	switch {
+	case len(retryInfo) > 0:
+		message = fmt.Sprintf("Waited for %v, %s - request: %s:%s", latency, retryInfo, r.verb, r.URL().String())
+	default:
+		message = fmt.Sprintf("Waited for %v due to client-side throttling, not priority and fairness, request: %s:%s", latency, r.verb, r.URL().String())
+	}
+
 	if latency > longThrottleLatency {
-		klog.V(3).Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		klog.V(3).Info(message)
 	}
 	if latency > extraLongThrottleLatency {
 		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
 		// but we use a throttled logger to prevent spamming.
-		globalThrottledLogger.Infof("Throttling request took %v, request: %s:%s", latency, r.verb, r.URL().String())
+		globalThrottledLogger.Infof(message)
 	}
-	metrics.RateLimiterLatency.Observe(r.verb, r.finalURLTemplate(), latency)
+	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
 	return err
+}
+
+func (r *Request) tryThrottle(ctx context.Context) error {
+	return r.tryThrottleWithInfo(ctx, "")
 }
 
 type throttleSettings struct {
@@ -678,7 +691,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	}
 	r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
-	updateURLMetrics(r, resp, err)
+	updateURLMetrics(ctx, r, resp, err)
 	if r.c.base != nil {
 		if err != nil {
 			r.backoff.UpdateBackoff(r.c.base, err, 0)
@@ -727,7 +740,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 
 // updateURLMetrics is a convenience function for pushing metrics.
 // It also handles corner cases for incomplete/invalid request data.
-func updateURLMetrics(req *Request, resp *http.Response, err error) {
+func updateURLMetrics(ctx context.Context, req *Request, resp *http.Response, err error) {
 	url := "none"
 	if req.c.base != nil {
 		url = req.c.base.Host
@@ -736,10 +749,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	// Errors can be arbitrary strings. Unbound label cardinality is not suitable for a metric
 	// system so we just report them as `<error>`.
 	if err != nil {
-		metrics.RequestResult.Increment("<error>", req.verb, url)
+		metrics.RequestResult.Increment(ctx, "<error>", req.verb, url)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
+		metrics.RequestResult.Increment(ctx, strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
 
@@ -772,7 +785,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 	}
 	r.backoff.Sleep(r.backoff.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
-	updateURLMetrics(r, resp, err)
+	updateURLMetrics(ctx, r, resp, err)
 	if r.c.base != nil {
 		if err != nil {
 			r.backoff.UpdateBackoff(r.URL(), err, 0)
@@ -837,7 +850,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.Observe(r.verb, r.finalURLTemplate(), time.Since(start))
+		metrics.RequestLatency.Observe(ctx, r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
@@ -869,6 +882,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 
 	// Right now we make about ten retry attempts if we get a Retry-After response.
 	retries := 0
+	var retryInfo string
 	for {
 
 		url := r.URL().String()
@@ -884,12 +898,13 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			// We are retrying the request that we already send to apiserver
 			// at least once before.
 			// This request should also be throttled with the client-internal rate limiter.
-			if err := r.tryThrottle(ctx); err != nil {
+			if err := r.tryThrottleWithInfo(ctx, retryInfo); err != nil {
 				return err
 			}
+			retryInfo = ""
 		}
 		resp, err := client.Do(req)
-		updateURLMetrics(r, resp, err)
+		updateURLMetrics(ctx, r, resp, err)
 		if err != nil {
 			r.backoff.UpdateBackoff(r.URL(), err, 0)
 		} else {
@@ -931,6 +946,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries <= r.maxRetries {
+				retryInfo = getRetryReason(retries, seconds, resp, err)
 				if seeker, ok := r.body.(io.Seeker); ok && r.body != nil {
 					_, err := seeker.Seek(0, 0)
 					if err != nil {
@@ -1202,6 +1218,26 @@ func retryAfterSeconds(resp *http.Response) (int, bool) {
 		}
 	}
 	return 0, false
+}
+
+func getRetryReason(retries, seconds int, resp *http.Response, err error) string {
+	// priority and fairness sets the UID of the FlowSchema associated with a request
+	// in the following response Header.
+	const responseHeaderMatchedFlowSchemaUID = "X-Kubernetes-PF-FlowSchema-UID"
+
+	message := fmt.Sprintf("retries: %d, retry-after: %ds", retries, seconds)
+
+	switch {
+	case resp.StatusCode == http.StatusTooManyRequests:
+		// it is server-side throttling from priority and fairness
+		flowSchemaUID := resp.Header.Get(responseHeaderMatchedFlowSchemaUID)
+		return fmt.Sprintf("%s - retry-reason: due to server-side throttling, FlowSchema UID: %q", message, flowSchemaUID)
+	case err != nil:
+		// it's a retriable error
+		return fmt.Sprintf("%s - retry-reason: due to retriable error, error: %v", message, err)
+	default:
+		return fmt.Sprintf("%s - retry-reason: %d", message, resp.StatusCode)
+	}
 }
 
 // Result contains the result of calling Request.Do().

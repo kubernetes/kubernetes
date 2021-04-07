@@ -108,14 +108,14 @@ func (pl *ServiceAffinity) createPreFilterState(pod *v1.Pod) (*preFilterState, e
 	// Store services which match the pod.
 	matchingPodServices, err := helper.GetPodServices(pl.serviceLister, pod)
 	if err != nil {
-		return nil, fmt.Errorf("listing pod services: %v", err.Error())
+		return nil, fmt.Errorf("listing pod services: %w", err)
 	}
 	selector := createSelectorFromLabels(pod.Labels)
 
 	// consider only the pods that belong to the same namespace
 	nodeInfos, err := pl.sharedLister.NodeInfos().List()
 	if err != nil {
-		return nil, fmt.Errorf("listing nodeInfos: %v", err.Error())
+		return nil, fmt.Errorf("listing nodeInfos: %w", err)
 	}
 	matchingPodList := filterPods(nodeInfos, selector, pod.Namespace)
 
@@ -148,7 +148,7 @@ func (pl *ServiceAffinity) PreFilterExtensions() framework.PreFilterExtensions {
 }
 
 // AddPod from pre-computed data in cycleState.
-func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToAdd *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
@@ -156,32 +156,32 @@ func (pl *ServiceAffinity) AddPod(ctx context.Context, cycleState *framework.Cyc
 
 	// If addedPod is in the same namespace as the pod, update the list
 	// of matching pods if applicable.
-	if podToAdd.Namespace != podToSchedule.Namespace {
+	if podInfoToAdd.Pod.Namespace != podToSchedule.Namespace {
 		return nil
 	}
 
 	selector := createSelectorFromLabels(podToSchedule.Labels)
-	if selector.Matches(labels.Set(podToAdd.Labels)) {
-		s.matchingPodList = append(s.matchingPodList, podToAdd)
+	if selector.Matches(labels.Set(podInfoToAdd.Pod.Labels)) {
+		s.matchingPodList = append(s.matchingPodList, podInfoToAdd.Pod)
 	}
 
 	return nil
 }
 
 // RemovePod from pre-computed data in cycleState.
-func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+func (pl *ServiceAffinity) RemovePod(ctx context.Context, cycleState *framework.CycleState, podToSchedule *v1.Pod, podInfoToRemove *framework.PodInfo, nodeInfo *framework.NodeInfo) *framework.Status {
 	s, err := getPreFilterState(cycleState)
 	if err != nil {
 		return framework.AsStatus(err)
 	}
 
 	if len(s.matchingPodList) == 0 ||
-		podToRemove.Namespace != s.matchingPodList[0].Namespace {
+		podInfoToRemove.Pod.Namespace != s.matchingPodList[0].Namespace {
 		return nil
 	}
 
 	for i, pod := range s.matchingPodList {
-		if pod.Name == podToRemove.Name && pod.Namespace == podToRemove.Namespace {
+		if pod.Name == podInfoToRemove.Pod.Name && pod.Namespace == podInfoToRemove.Pod.Namespace {
 			s.matchingPodList = append(s.matchingPodList[:i], s.matchingPodList[i+1:]...)
 			break
 		}
@@ -194,7 +194,7 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 	c, err := cycleState.Read(preFilterStateKey)
 	if err != nil {
 		// preFilterState doesn't exist, likely PreFilter wasn't invoked.
-		return nil, fmt.Errorf("error reading %q from cycleState: %v", preFilterStateKey, err)
+		return nil, fmt.Errorf("error reading %q from cycleState: %w", preFilterStateKey, err)
 	}
 
 	if c == nil {

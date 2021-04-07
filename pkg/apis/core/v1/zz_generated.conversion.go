@@ -3546,7 +3546,6 @@ func Convert_core_EphemeralContainers_To_v1_EphemeralContainers(in *core.Ephemer
 
 func autoConvert_v1_EphemeralVolumeSource_To_core_EphemeralVolumeSource(in *v1.EphemeralVolumeSource, out *core.EphemeralVolumeSource, s conversion.Scope) error {
 	out.VolumeClaimTemplate = (*core.PersistentVolumeClaimTemplate)(unsafe.Pointer(in.VolumeClaimTemplate))
-	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -3557,7 +3556,6 @@ func Convert_v1_EphemeralVolumeSource_To_core_EphemeralVolumeSource(in *v1.Ephem
 
 func autoConvert_core_EphemeralVolumeSource_To_v1_EphemeralVolumeSource(in *core.EphemeralVolumeSource, out *v1.EphemeralVolumeSource, s conversion.Scope) error {
 	out.VolumeClaimTemplate = (*v1.PersistentVolumeClaimTemplate)(unsafe.Pointer(in.VolumeClaimTemplate))
-	out.ReadOnly = in.ReadOnly
 	return nil
 }
 
@@ -5479,6 +5477,7 @@ func autoConvert_v1_PodAffinityTerm_To_core_PodAffinityTerm(in *v1.PodAffinityTe
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -5491,6 +5490,7 @@ func autoConvert_core_PodAffinityTerm_To_v1_PodAffinityTerm(in *core.PodAffinity
 	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
 	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	out.TopologyKey = in.TopologyKey
+	out.NamespaceSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.NamespaceSelector))
 	return nil
 }
 
@@ -6467,6 +6467,7 @@ func autoConvert_v1_Probe_To_core_Probe(in *v1.Probe, out *core.Probe, s convers
 	out.PeriodSeconds = in.PeriodSeconds
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
+	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	return nil
 }
 
@@ -6484,6 +6485,7 @@ func autoConvert_core_Probe_To_v1_Probe(in *core.Probe, out *v1.Probe, s convers
 	out.PeriodSeconds = in.PeriodSeconds
 	out.SuccessThreshold = in.SuccessThreshold
 	out.FailureThreshold = in.FailureThreshold
+	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	return nil
 }
 
@@ -7633,6 +7635,8 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.IPFamilies = *(*[]core.IPFamily)(unsafe.Pointer(&in.IPFamilies))
 	out.IPFamilyPolicy = (*core.IPFamilyPolicyType)(unsafe.Pointer(in.IPFamilyPolicy))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
+	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
+	out.InternalTrafficPolicy = (*core.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
 	return nil
 }
 
@@ -7660,6 +7664,8 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	out.AllocateLoadBalancerNodePorts = (*bool)(unsafe.Pointer(in.AllocateLoadBalancerNodePorts))
+	out.LoadBalancerClass = (*string)(unsafe.Pointer(in.LoadBalancerClass))
+	out.InternalTrafficPolicy = (*v1.ServiceInternalTrafficPolicyType)(unsafe.Pointer(in.InternalTrafficPolicy))
 	return nil
 }
 

@@ -20,6 +20,8 @@ package fake
 
 import (
 	"context"
+	json "encoding/json"
+	"fmt"
 
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,6 +29,7 @@ import (
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	appsv1beta2 "k8s.io/client-go/applyconfigurations/apps/v1beta2"
 	testing "k8s.io/client-go/testing"
 )
 
@@ -134,6 +137,51 @@ func (c *FakeStatefulSets) DeleteCollection(ctx context.Context, opts v1.DeleteO
 func (c *FakeStatefulSets) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta2.StatefulSet, err error) {
 	obj, err := c.Fake.
 		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, name, pt, data, subresources...), &v1beta2.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.StatefulSet), err
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied statefulSet.
+func (c *FakeStatefulSets) Apply(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data), &v1beta2.StatefulSet{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1beta2.StatefulSet), err
+}
+
+// ApplyStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating ApplyStatus().
+func (c *FakeStatefulSets) ApplyStatus(ctx context.Context, statefulSet *appsv1beta2.StatefulSetApplyConfiguration, opts v1.ApplyOptions) (result *v1beta2.StatefulSet, err error) {
+	if statefulSet == nil {
+		return nil, fmt.Errorf("statefulSet provided to Apply must not be nil")
+	}
+	data, err := json.Marshal(statefulSet)
+	if err != nil {
+		return nil, err
+	}
+	name := statefulSet.Name
+	if name == nil {
+		return nil, fmt.Errorf("statefulSet.Name must be provided to Apply")
+	}
+	obj, err := c.Fake.
+		Invokes(testing.NewPatchSubresourceAction(statefulsetsResource, c.ns, *name, types.ApplyPatchType, data, "status"), &v1beta2.StatefulSet{})
 
 	if obj == nil {
 		return nil, err

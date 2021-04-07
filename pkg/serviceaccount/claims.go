@@ -192,9 +192,9 @@ func (v *validator) Validate(ctx context.Context, _ string, public *jwt.Claims, 
 			secondsAfterWarn := nowTime.Unix() - warnafter.Time().Unix()
 			auditInfo := fmt.Sprintf("subject: %s, seconds after warning threshold: %d", public.Subject, secondsAfterWarn)
 			audit.AddAuditAnnotation(ctx, "authentication.k8s.io/stale-token", auditInfo)
-			staleTokensTotal.Inc()
+			staleTokensTotal.WithContext(ctx).Inc()
 		} else {
-			validTokensTotal.Inc()
+			validTokensTotal.WithContext(ctx).Inc()
 		}
 	}
 

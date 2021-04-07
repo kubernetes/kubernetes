@@ -432,7 +432,7 @@ func setObjectSelfLink(ctx context.Context, obj runtime.Object, req *http.Reques
 		return err
 	}
 	if err := namer.SetSelfLink(obj, uri); err != nil {
-		klog.V(4).Infof("Unable to set self link on object: %v", err)
+		klog.V(4).InfoS("Unable to set self link on object", "error", err)
 	}
 	requestInfo, ok := request.RequestInfoFrom(ctx)
 	if !ok {

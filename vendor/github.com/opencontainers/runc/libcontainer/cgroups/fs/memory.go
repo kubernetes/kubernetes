@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,16 +17,8 @@ import (
 )
 
 const (
-	numaNodeSymbol            = "N"
-	numaStatColumnSeparator   = " "
-	numaStatKeyValueSeparator = "="
-	numaStatMaxColumns        = math.MaxUint8 + 1
-	numaStatValueIndex        = 1
-	numaStatTypeIndex         = 0
-	numaStatColumnSliceLength = 2
-	cgroupMemorySwapLimit     = "memory.memsw.limit_in_bytes"
-	cgroupMemoryLimit         = "memory.limit_in_bytes"
-	cgroupMemoryPagesByNuma   = "memory.numa_stat"
+	cgroupMemorySwapLimit = "memory.memsw.limit_in_bytes"
+	cgroupMemoryLimit     = "memory.limit_in_bytes"
 )
 
 type MemoryGroup struct {
@@ -160,7 +151,7 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 
 func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	// Set stats from memory.stat.
-	statsFile, err := os.Open(filepath.Join(path, "memory.stat"))
+	statsFile, err := fscommon.OpenFile(path, "memory.stat", os.O_RDONLY)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -200,8 +191,7 @@ func (s *MemoryGroup) GetStats(path string, stats *cgroups.Stats) error {
 	}
 	stats.MemoryStats.KernelTCPUsage = kernelTCPUsage
 
-	useHierarchy := strings.Join([]string{"memory", "use_hierarchy"}, ".")
-	value, err := fscommon.GetCgroupParamUint(path, useHierarchy)
+	value, err := fscommon.GetCgroupParamUint(path, "memory.use_hierarchy")
 	if err != nil {
 		return err
 	}
@@ -233,12 +223,14 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 
 	moduleName := "memory"
 	if name != "" {
-		moduleName = strings.Join([]string{"memory", name}, ".")
+		moduleName = "memory." + name
 	}
-	usage := strings.Join([]string{moduleName, "usage_in_bytes"}, ".")
-	maxUsage := strings.Join([]string{moduleName, "max_usage_in_bytes"}, ".")
-	failcnt := strings.Join([]string{moduleName, "failcnt"}, ".")
-	limit := strings.Join([]string{moduleName, "limit_in_bytes"}, ".")
+	var (
+		usage    = moduleName + ".usage_in_bytes"
+		maxUsage = moduleName + ".max_usage_in_bytes"
+		failcnt  = moduleName + ".failcnt"
+		limit    = moduleName + ".limit_in_bytes"
+	)
 
 	value, err := fscommon.GetCgroupParamUint(path, usage)
 	if err != nil {
@@ -277,47 +269,81 @@ func getMemoryData(path, name string) (cgroups.MemoryData, error) {
 }
 
 func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
+	const (
+		maxColumns = math.MaxUint8 + 1
+		filename   = "memory.numa_stat"
+	)
 	stats := cgroups.PageUsageByNUMA{}
 
-	file, err := os.Open(path.Join(cgroupPath, cgroupMemoryPagesByNuma))
+	file, err := fscommon.OpenFile(cgroupPath, filename, os.O_RDONLY)
 	if os.IsNotExist(err) {
 		return stats, nil
 	} else if err != nil {
 		return stats, err
 	}
 
+	// File format is documented in linux/Documentation/cgroup-v1/memory.txt
+	// and it looks like this:
+	//
+	// total=<total pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// file=<total file pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// anon=<total anon pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// unevictable=<total anon pages> N0=<node 0 pages> N1=<node 1 pages> ...
+	// hierarchical_<counter>=<counter pages> N0=<node 0 pages> N1=<node 1 pages> ...
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		var statsType string
-		statsByType := cgroups.PageStats{Nodes: map[uint8]uint64{}}
-		columns := strings.SplitN(scanner.Text(), numaStatColumnSeparator, numaStatMaxColumns)
+		var field *cgroups.PageStats
 
-		for _, column := range columns {
-			pagesByNode := strings.SplitN(column, numaStatKeyValueSeparator, numaStatColumnSliceLength)
+		line := scanner.Text()
+		columns := strings.SplitN(line, " ", maxColumns)
+		for i, column := range columns {
+			byNode := strings.SplitN(column, "=", 2)
+			// Some custom kernels have non-standard fields, like
+			//   numa_locality 0 0 0 0 0 0 0 0 0 0
+			//   numa_exectime 0
+			if len(byNode) < 2 {
+				if i == 0 {
+					// Ignore/skip those.
+					break
+				} else {
+					// The first column was already validated,
+					// so be strict to the rest.
+					return stats, fmt.Errorf("malformed line %q in %s",
+						line, filename)
+				}
+			}
+			key, val := byNode[0], byNode[1]
+			if i == 0 { // First column: key is name, val is total.
+				field = getNUMAField(&stats, key)
+				if field == nil { // unknown field (new kernel?)
+					break
+				}
+				field.Total, err = strconv.ParseUint(val, 0, 64)
+				if err != nil {
+					return stats, err
+				}
+				field.Nodes = map[uint8]uint64{}
+			} else { // Subsequent columns: key is N<id>, val is usage.
+				if len(key) < 2 || key[0] != 'N' {
+					// This is definitely an error.
+					return stats, fmt.Errorf("malformed line %q in %s",
+						line, filename)
+				}
 
-			if strings.HasPrefix(pagesByNode[numaStatTypeIndex], numaNodeSymbol) {
-				nodeID, err := strconv.ParseUint(pagesByNode[numaStatTypeIndex][1:], 10, 8)
+				n, err := strconv.ParseUint(key[1:], 10, 8)
 				if err != nil {
 					return cgroups.PageUsageByNUMA{}, err
 				}
 
-				statsByType.Nodes[uint8(nodeID)], err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
-				if err != nil {
-					return cgroups.PageUsageByNUMA{}, err
-				}
-			} else {
-				statsByType.Total, err = strconv.ParseUint(pagesByNode[numaStatValueIndex], 0, 64)
+				usage, err := strconv.ParseUint(val, 10, 64)
 				if err != nil {
 					return cgroups.PageUsageByNUMA{}, err
 				}
 
-				statsType = pagesByNode[numaStatTypeIndex]
+				field.Nodes[uint8(n)] = usage
 			}
 
-			err := addNUMAStatsByType(&stats, statsByType, statsType)
-			if err != nil {
-				return cgroups.PageUsageByNUMA{}, err
-			}
 		}
 	}
 	err = scanner.Err()
@@ -328,26 +354,24 @@ func getPageUsageByNUMA(cgroupPath string) (cgroups.PageUsageByNUMA, error) {
 	return stats, nil
 }
 
-func addNUMAStatsByType(stats *cgroups.PageUsageByNUMA, byTypeStats cgroups.PageStats, statsType string) error {
-	switch statsType {
+func getNUMAField(stats *cgroups.PageUsageByNUMA, name string) *cgroups.PageStats {
+	switch name {
 	case "total":
-		stats.Total = byTypeStats
+		return &stats.Total
 	case "file":
-		stats.File = byTypeStats
+		return &stats.File
 	case "anon":
-		stats.Anon = byTypeStats
+		return &stats.Anon
 	case "unevictable":
-		stats.Unevictable = byTypeStats
+		return &stats.Unevictable
 	case "hierarchical_total":
-		stats.Hierarchical.Total = byTypeStats
+		return &stats.Hierarchical.Total
 	case "hierarchical_file":
-		stats.Hierarchical.File = byTypeStats
+		return &stats.Hierarchical.File
 	case "hierarchical_anon":
-		stats.Hierarchical.Anon = byTypeStats
+		return &stats.Hierarchical.Anon
 	case "hierarchical_unevictable":
-		stats.Hierarchical.Unevictable = byTypeStats
-	default:
-		return fmt.Errorf("unsupported NUMA page type found: %s", statsType)
+		return &stats.Hierarchical.Unevictable
 	}
 	return nil
 }

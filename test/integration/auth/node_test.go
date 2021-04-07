@@ -55,9 +55,6 @@ func TestNodeAuthorizer(t *testing.T) {
 	// Enable DynamicKubeletConfig feature so that Node.Spec.ConfigSource can be set
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DynamicKubeletConfig, true)()
 
-	// Enable CSINodeInfo feature so that nodes can create CSINode objects.
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, true)()
-
 	tokenFile, err := ioutil.TempFile("", "kubeconfig")
 	if err != nil {
 		t.Fatal(err)

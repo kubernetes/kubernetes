@@ -36,6 +36,7 @@ import (
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	structurallisttype "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/listtype"
 	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // customResourceStrategy implements behavior for CustomResources.
@@ -48,6 +49,7 @@ type customResourceStrategy struct {
 	structuralSchemas map[string]*structuralschema.Structural
 	status            *apiextensions.CustomResourceSubresourceStatus
 	scale             *apiextensions.CustomResourceSubresourceScale
+	kind              schema.GroupVersionKind
 }
 
 func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.GroupVersionKind, schemaValidator, statusSchemaValidator *validate.SchemaValidator, structuralSchemas map[string]*structuralschema.Structural, status *apiextensions.CustomResourceSubresourceStatus, scale *apiextensions.CustomResourceSubresourceScale) customResourceStrategy {
@@ -64,11 +66,26 @@ func NewStrategy(typer runtime.ObjectTyper, namespaceScoped bool, kind schema.Gr
 			statusSchemaValidator: statusSchemaValidator,
 		},
 		structuralSchemas: structuralSchemas,
+		kind:              kind,
 	}
 }
 
 func (a customResourceStrategy) NamespaceScoped() bool {
 	return a.namespaceScoped
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (a customResourceStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{}
+
+	if a.status != nil {
+		fields[fieldpath.APIVersion(a.kind.GroupVersion().String())] = fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		)
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a CustomResource before creation.

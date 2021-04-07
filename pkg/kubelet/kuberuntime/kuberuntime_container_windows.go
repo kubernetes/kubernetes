@@ -22,10 +22,7 @@ import (
 	"runtime"
 
 	"k8s.io/api/core/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
 
@@ -52,7 +49,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	}
 
 	cpuLimit := container.Resources.Limits.Cpu()
-	isolatedByHyperv := kubeletapis.ShouldIsolatedByHyperV(pod.Annotations)
 	if !cpuLimit.IsZero() {
 		// Note that sysinfo.NumCPU() is limited to 64 CPUs on Windows due to Processor Groups,
 		// as only 64 processors are available for execution by a given process. This causes
@@ -85,16 +81,6 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 
 		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(runtime.NumCPU()) / 1000
 
-		// TODO: This should be reviewed or removed once Hyper-V support is implemented with CRI-ContainerD
-		//       in a future release. cpuCount may or may not be required if cpuMaximum is set.
-		if isolatedByHyperv {
-			cpuCount := int64(cpuLimit.MilliValue()+999) / 1000
-			wc.Resources.CpuCount = cpuCount
-
-			if cpuCount != 0 {
-				cpuMaximum = cpuLimit.MilliValue() / cpuCount * 10000 / 1000
-			}
-		}
 		// ensure cpuMaximum is in range [1, 10000].
 		if cpuMaximum < 1 {
 			cpuMaximum = 1
@@ -105,15 +91,13 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		wc.Resources.CpuMaximum = cpuMaximum
 	}
 
-	if !isolatedByHyperv {
-		// The processor resource controls are mutually exclusive on
-		// Windows Server Containers, the order of precedence is
-		// CPUCount first, then CPUMaximum.
-		if wc.Resources.CpuCount > 0 {
-			if wc.Resources.CpuMaximum > 0 {
-				wc.Resources.CpuMaximum = 0
-				klog.Warningf("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
-			}
+	// The processor resource controls are mutually exclusive on
+	// Windows Server Containers, the order of precedence is
+	// CPUCount first, then CPUMaximum.
+	if wc.Resources.CpuCount > 0 {
+		if wc.Resources.CpuMaximum > 0 {
+			wc.Resources.CpuMaximum = 0
+			klog.InfoS("Mutually exclusive options: CPUCount priority > CPUMaximum priority on Windows Server Containers. CPUMaximum should be ignored")
 		}
 	}
 
@@ -128,8 +112,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 	if username != "" {
 		wc.SecurityContext.RunAsUsername = username
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WindowsGMSA) &&
-		effectiveSc.WindowsOptions != nil &&
+	if effectiveSc.WindowsOptions != nil &&
 		effectiveSc.WindowsOptions.GMSACredentialSpec != nil {
 		wc.SecurityContext.CredentialSpec = *effectiveSc.WindowsOptions.GMSACredentialSpec
 	}

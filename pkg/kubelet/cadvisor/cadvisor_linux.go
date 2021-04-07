@@ -31,12 +31,6 @@ import (
 	_ "github.com/google/cadvisor/container/crio/install"
 	_ "github.com/google/cadvisor/container/systemd/install"
 
-	// Register cloud info providers.
-	// TODO(#68522): Remove this in 1.20+ once the cAdvisor endpoints are removed.
-	_ "github.com/google/cadvisor/utils/cloudinfo/aws"
-	_ "github.com/google/cadvisor/utils/cloudinfo/azure"
-	_ "github.com/google/cadvisor/utils/cloudinfo/gce"
-
 	"github.com/google/cadvisor/cache/memory"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/events"
@@ -79,7 +73,7 @@ func init() {
 			f.DefValue = defaultValue
 			f.Value.Set(defaultValue)
 		} else {
-			klog.Errorf("Expected cAdvisor flag %q not found", name)
+			klog.ErrorS(nil, "Expected cAdvisor flag not found", "flag", name)
 		}
 	}
 }
@@ -186,7 +180,7 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 	}
 	// TODO(vmarmol): Handle this better when a label has more than one image filesystem.
 	if len(res) > 1 {
-		klog.Warningf("More than one filesystem labeled %q: %#v. Only using the first one", label, res)
+		klog.InfoS("More than one filesystem labeled. Only using the first one", "label", label, "fileSystem", res)
 	}
 
 	return res[0], nil

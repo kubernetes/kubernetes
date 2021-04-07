@@ -21,8 +21,6 @@ limitations under the License.
 package v1beta2
 
 import (
-	"reflect"
-
 	v1beta2 "k8s.io/api/apps/v1beta2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -109,7 +107,7 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -159,7 +157,7 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -209,7 +207,7 @@ func SetObjectDefaults_DaemonSet(in *v1beta2.DaemonSet) {
 		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -330,7 +328,7 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -380,7 +378,7 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -430,7 +428,7 @@ func SetObjectDefaults_Deployment(in *v1beta2.Deployment) {
 		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -551,7 +549,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -601,7 +599,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -651,7 +649,7 @@ func SetObjectDefaults_ReplicaSet(in *v1beta2.ReplicaSet) {
 		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -772,7 +770,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -822,7 +820,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 		v1.SetDefaults_Container(a)
 		for j := range a.Ports {
 			b := &a.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}
@@ -872,7 +870,7 @@ func SetObjectDefaults_StatefulSet(in *v1beta2.StatefulSet) {
 		v1.SetDefaults_EphemeralContainer(a)
 		for j := range a.EphemeralContainerCommon.Ports {
 			b := &a.EphemeralContainerCommon.Ports[j]
-			if reflect.ValueOf(b.Protocol).IsZero() {
+			if b.Protocol == "" {
 				b.Protocol = "TCP"
 			}
 		}

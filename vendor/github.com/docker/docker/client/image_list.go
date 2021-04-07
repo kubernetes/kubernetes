@@ -24,6 +24,7 @@ func (cli *Client) ImageList(ctx context.Context, options types.ImageListOptions
 		}
 	}
 	if optionFilters.Len() > 0 {
+		//nolint:staticcheck // ignore SA1019 for old code
 		filterJSON, err := filters.ToParamWithVersion(cli.version, optionFilters)
 		if err != nil {
 			return images, err

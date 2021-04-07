@@ -2,7 +2,7 @@
 
 module k8s.io/kubectl
 
-go 1.15
+go 1.16
 
 require (
 	github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
@@ -14,33 +14,34 @@ require (
 	github.com/exponent-io/jsonpath v0.0.0-20151013193312-d6023ce2651d
 	github.com/fatih/camelcase v1.0.0
 	github.com/fvbommel/sortorder v1.0.1
-	github.com/go-openapi/spec v0.19.3
+	github.com/go-openapi/spec v0.19.5
 	github.com/google/go-cmp v0.5.2
 	github.com/googleapis/gnostic v0.4.1
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/mitchellh/go-wordwrap v1.0.0
-	github.com/moby/term v0.0.0-20200312100748-672ec06f55cd
-	github.com/onsi/ginkgo v4.5.0-origin.1+incompatible
+	github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
+	github.com/onsi/ginkgo v4.7.0-origin.0+incompatible
 	github.com/onsi/gomega v1.7.0
 	github.com/russross/blackfriday v1.5.2
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/sys v0.0.0-20201112073958-5cba982894dd
-	gopkg.in/yaml.v2 v2.3.0
-	k8s.io/api v0.20.0
-	k8s.io/apimachinery v0.20.0
+	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
+	gopkg.in/yaml.v2 v2.4.0
+	k8s.io/api v0.21.0-rc.0
+	k8s.io/apimachinery v0.21.0-rc.0
 	k8s.io/cli-runtime v0.0.0
-	k8s.io/client-go v0.20.0
-	k8s.io/component-base v0.20.0
+	k8s.io/client-go v0.21.0-rc.0
+	k8s.io/component-base v0.21.0-rc.0
 	k8s.io/component-helpers v0.0.0
-	k8s.io/klog/v2 v2.4.0
+	k8s.io/klog/v2 v2.8.0
 	k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	sigs.k8s.io/kustomize v2.0.3+incompatible
+	sigs.k8s.io/kustomize/api v0.8.5
+	sigs.k8s.io/kustomize/kustomize/v4 v4.0.5
 	sigs.k8s.io/yaml v1.2.0
 )
 
@@ -48,10 +49,9 @@ replace (
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
-	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.5.0-origin.1+incompatible
+	github.com/onsi/ginkgo => github.com/openshift/ginkgo v4.7.0-origin.0+incompatible
 	github.com/robfig/cron => github.com/robfig/cron v1.1.0
 	go.uber.org/multierr => go.uber.org/multierr v1.1.0
-	gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.8
 	k8s.io/api => ../api
 	k8s.io/apiextensions-apiserver => ../apiextensions-apiserver
 	k8s.io/apimachinery => ../apimachinery

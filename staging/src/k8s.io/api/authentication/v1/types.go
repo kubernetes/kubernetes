@@ -178,7 +178,7 @@ type BoundObjectReference struct {
 	Kind string `json:"kind,omitempty" protobuf:"bytes,1,opt,name=kind"`
 	// API version of the referent.
 	// +optional
-	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=aPIVersion"`
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt,name=apiVersion"`
 
 	// Name of the referent.
 	// +optional

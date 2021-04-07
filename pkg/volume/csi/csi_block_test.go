@@ -30,10 +30,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -54,8 +51,6 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 }
 
 func TestBlockMapperGetGlobalMapPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -95,8 +90,6 @@ func TestBlockMapperGetGlobalMapPath(t *testing.T) {
 }
 
 func TestBlockMapperGetStagingPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -132,8 +125,6 @@ func TestBlockMapperGetStagingPath(t *testing.T) {
 }
 
 func TestBlockMapperGetPublishPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -169,8 +160,6 @@ func TestBlockMapperGetPublishPath(t *testing.T) {
 }
 
 func TestBlockMapperGetDeviceMapPath(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -210,8 +199,6 @@ func TestBlockMapperGetDeviceMapPath(t *testing.T) {
 }
 
 func TestBlockMapperSetupDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -251,8 +238,6 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 }
 
 func TestBlockMapperSetupDeviceError(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -299,8 +284,6 @@ func TestBlockMapperSetupDeviceError(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -346,8 +329,6 @@ func TestBlockMapperMapPodDevice(t *testing.T) {
 }
 
 func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	fakeClient := fakeclient.NewSimpleClientset()
 	attachRequired := false
 	fakeDriver := &storagev1.CSIDriver{
@@ -387,8 +368,6 @@ func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 }
 
 func TestBlockMapperTearDownDevice(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	plug, tmpDir := newTestPlugin(t, nil)
 	defer os.RemoveAll(tmpDir)
 
@@ -447,8 +426,6 @@ func TestBlockMapperTearDownDevice(t *testing.T) {
 }
 
 func TestVolumeSetupTeardown(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
-
 	// Follow volume setup + teardown sequences at top of cs_block.go and set up / clean up one CSI block device.
 	// Focus on testing that there were no leftover files present after the cleanup.
 

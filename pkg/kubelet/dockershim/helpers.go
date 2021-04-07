@@ -147,7 +147,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) []string {
 		case runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
 			attrs = append(attrs, "rslave")
 		default:
-			klog.Warningf("unknown propagation mode for hostPath %q", m.HostPath)
+			klog.InfoS("Unknown propagation mode for hostPath", "path", m.HostPath)
 			// Falls back to "private"
 		}
 
@@ -180,7 +180,7 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[
 		case runtimeapi.Protocol_SCTP:
 			protocol = "/sctp"
 		default:
-			klog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
+			klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", port.Protocol)
 			protocol = "/tcp"
 		}
 
@@ -288,13 +288,13 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 	}
 
 	id := matches[1]
-	klog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
+	klog.InfoS("Unable to create pod sandbox due to conflict. Attempting to remove sandbox", "containerID", id)
 	rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 	if rmErr == nil {
-		klog.V(2).Infof("Successfully removed conflicting container %q", id)
+		klog.V(2).InfoS("Successfully removed conflicting container", "containerID", id)
 		return nil, err
 	}
-	klog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
+	klog.ErrorS(rmErr, "Failed to remove the conflicting container", "containerID", id)
 	// Return if the error is not container not found error.
 	if !libdocker.IsContainerNotFoundError(rmErr) {
 		return nil, err
@@ -302,7 +302,7 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 
 	// randomize the name to avoid conflict.
 	createConfig.Name = randomizeName(createConfig.Name)
-	klog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
+	klog.V(2).InfoS("Create the container with the randomized name", "containerName", createConfig.Name)
 	return client.CreateContainer(createConfig)
 }
 
@@ -337,7 +337,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 	keyring := credentialprovider.NewDockerKeyring()
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
-		klog.V(3).Infof("Pulling image %q without credentials", image)
+		klog.V(3).InfoS("Pulling the image without credentials", "image", image)
 
 		err := client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
 		if err != nil {

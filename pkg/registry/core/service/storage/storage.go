@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
 	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	netutil "k8s.io/utils/net"
 )
@@ -54,10 +55,10 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 		DefaultQualifiedResource: api.Resource("services"),
 		ReturnDeletedObject:      true,
 
-		CreateStrategy: strategy,
-		UpdateStrategy: strategy,
-		DeleteStrategy: strategy,
-		ExportStrategy: strategy,
+		CreateStrategy:      strategy,
+		UpdateStrategy:      strategy,
+		DeleteStrategy:      strategy,
+		ResetFieldsStrategy: strategy,
 
 		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
@@ -67,12 +68,14 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = service.NewServiceStatusStrategy(strategy)
+	statusStrategy := service.NewServiceStatusStrategy(strategy)
+	statusStore.UpdateStrategy = statusStrategy
+	statusStore.ResetFieldsStrategy = statusStrategy
 
 	ipv4 := api.IPv4Protocol
 	ipv6 := api.IPv6Protocol
-	var primaryIPFamily *api.IPFamily = nil
-	var secondaryFamily *api.IPFamily = nil
+	var primaryIPFamily *api.IPFamily
+	var secondaryFamily *api.IPFamily
 	if netutil.IsIPv6CIDR(&serviceCIDR) {
 		primaryIPFamily = &ipv6
 		if hasSecondary {
@@ -126,47 +129,43 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
 }
 
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
 // defaultOnRead sets interlinked fields that were not previously set on read.
 // We can't do this in the normal defaulting path because that same logic
 // applies on Get, Create, and Update, but we need to distinguish between them.
 //
 // This will be called on both Service and ServiceList types.
-func (r *GenericREST) defaultOnRead(obj runtime.Object) error {
-	service, ok := obj.(*api.Service)
-	if ok {
-		return r.defaultOnReadService(service)
+func (r *GenericREST) defaultOnRead(obj runtime.Object) {
+	switch s := obj.(type) {
+	case *api.Service:
+		r.defaultOnReadService(s)
+	case *api.ServiceList:
+		r.defaultOnReadServiceList(s)
+	default:
+		// This was not an object we can default.  This is not an error, as the
+		// caching layer can pass through here, too.
 	}
-
-	serviceList, ok := obj.(*api.ServiceList)
-	if ok {
-		return r.defaultOnReadServiceList(serviceList)
-	}
-
-	// This was not an object we can default.  This is not an error, as the
-	// caching layer can pass through here, too.
-	return nil
 }
 
 // defaultOnReadServiceList defaults a ServiceList.
-func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) error {
+func (r *GenericREST) defaultOnReadServiceList(serviceList *api.ServiceList) {
 	if serviceList == nil {
-		return nil
+		return
 	}
 
 	for i := range serviceList.Items {
-		err := r.defaultOnReadService(&serviceList.Items[i])
-		if err != nil {
-			return err
-		}
+		r.defaultOnReadService(&serviceList.Items[i])
 	}
-
-	return nil
 }
 
 // defaultOnReadService defaults a single Service.
-func (r *GenericREST) defaultOnReadService(service *api.Service) error {
+func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	if service == nil {
-		return nil
+		return
 	}
 
 	// We might find Services that were written before ClusterIP became plural.
@@ -176,11 +175,11 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 
 	// The rest of this does not apply unless dual-stack is enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
-		return nil
+		return
 	}
 
 	if len(service.Spec.IPFamilies) > 0 {
-		return nil // already defaulted
+		return // already defaulted
 	}
 
 	// set clusterIPs based on ClusterIP
@@ -222,7 +221,6 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 				service.Spec.IPFamilyPolicy = &singleStack
 			}
 		}
-
 	} else {
 		// headful
 		// make sure a slice exists to receive the families
@@ -241,6 +239,4 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) error {
 			}
 		}
 	}
-
-	return nil
 }
