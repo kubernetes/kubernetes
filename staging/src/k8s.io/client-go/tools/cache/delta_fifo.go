@@ -433,7 +433,6 @@ func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) err
 			return nil
 		}
 		klog.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; breaking invariant by storing empty Deltas", id, oldDeltas, obj)
-		f.items[id] = newDeltas
 		return fmt.Errorf("Impossible dedupDeltas for id=%q: oldDeltas=%#+v, obj=%#+v; broke DeltaFIFO invariant by storing empty Deltas", id, oldDeltas, obj)
 	}
 	return nil
