@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/groupcache/lru"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -175,7 +175,7 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 // EventAggregatorMessageFunc is responsible for producing an aggregation message
 type EventAggregatorMessageFunc func(event *v1.Event) string
 
-// EventAggregratorByReasonMessageFunc returns an aggregate message by prefixing the incoming message
+// EventAggregatorByReasonMessageFunc returns an aggregate message by prefixing the incoming message
 func EventAggregatorByReasonMessageFunc(event *v1.Event) string {
 	return "(combined from similar events): " + event.Message
 }
