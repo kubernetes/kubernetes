@@ -362,7 +362,7 @@ func (o *Options) writeConfigFile() (err error) {
 		return err
 	}
 
-	klog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
+	klog.InfoS("Wrote configuration", "WriteConfigTo", o.WriteConfigTo)
 
 	return nil
 }
@@ -545,7 +545,7 @@ func createClients(config componentbaseconfig.ClientConnectionConfiguration, mas
 	var err error
 
 	if len(config.Kubeconfig) == 0 && len(masterOverride) == 0 {
-		klog.Info("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
+		klog.InfoS("Neither kubeconfig file nor master URL was specified. Falling back to in-cluster config.")
 		kubeConfig, err = rest.InClusterConfig()
 	} else {
 		// This creates a client, first loading any specified kubeconfig
@@ -584,7 +584,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	fn := func() {
 		err := hz.Run()
 		if err != nil {
-			klog.Errorf("healthz server failed: %v", err)
+			klog.ErrorS(err, "healthz server failed")
 			if errCh != nil {
 				errCh <- fmt.Errorf("healthz server failed: %v", err)
 				// if in hardfail mode, never retry again
@@ -592,7 +592,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 				<-blockCh
 			}
 		} else {
-			klog.Errorf("healthz server returned without error")
+			klog.ErrorS(nil, "healthz server returned without error")
 		}
 	}
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
@@ -640,7 +640,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
+	klog.InfoS("Version", "Version", version.Get())
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
@@ -785,10 +785,10 @@ func getConntrackMax(config kubeproxyconfig.KubeProxyConntrackConfiguration) (in
 		}
 		scaled := int(*config.MaxPerCore) * detectNumCPU()
 		if scaled > floor {
-			klog.V(3).Infof("getConntrackMax: using scaled conntrack-max-per-core")
+			klog.V(3).InfoS("getConntrackMax: using scaled conntrack-max-per-core")
 			return scaled, nil
 		}
-		klog.V(3).Infof("getConntrackMax: using conntrack-min")
+		klog.V(3).InfoS("getConntrackMax: using conntrack-min")
 		return floor, nil
 	}
 	return 0, nil
