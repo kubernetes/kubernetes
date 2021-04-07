@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 const (
@@ -214,7 +215,10 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 			azureSource.Kind = &diskKind
 		}
 	}
-
+	
+	if err := translateTopologyFromCSIToInTree(pv, AzureDiskTopologyKey, getAzureRegionFromZones); err != nil {
+		return nil, fmt.Errorf("Failed to translate topology. PV:%v. Error: %v", *pv, err)
+	}
 	pv.Spec.CSI = nil
 	pv.Spec.AzureDisk = azureSource
 
@@ -267,4 +271,28 @@ func getDiskName(diskURI string) (string, error) {
 		return "", fmt.Errorf("could not get disk name from %s, correct format: %s", diskURI, diskPathRE)
 	}
 	return matches[1], nil
+}
+
+func getAzureRegionFromZones(zones [] string) (string, error) {
+	regions := sets.String{} 
+	if len(zones) < 1 {
+		return "", fmt.Errorf("no zones specified")
+	}
+
+	//Azuredisk zones are formatted such that the region is first and the zone specifier is after a dash
+	for _, zone := range zones {
+		splitZone := strings.Split(zone, "-")
+		if len(splitZone) != 2 {
+			return "", fmt.Errorf("Zone in unexpected format, expected: {region}-{zone}, got: %v", zone)
+		}
+
+		regions.Insert(strings.Join(splitZone[0:1], "-"))
+
+	}
+
+	if regions.Len() != 1 {
+		return "", fmt.Errorf("multiple or no regions gotten from zones, got: %v", regions)
+	}
+	return regions.UnsortedList()[0], nil
+
 }
