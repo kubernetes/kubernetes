@@ -7,13 +7,11 @@ reviewers:
 - wojtek-t
 - deads2k
 - caesarxuchao
-- erictune
 - sttts
 - saad-ali
 - ncdc
 - soltysh
 - dims
 - errordeveloper
-- mml
 labels:
 - sig/apps
