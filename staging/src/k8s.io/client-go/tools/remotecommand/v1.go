@@ -50,7 +50,7 @@ func newStreamProtocolV1(options StreamOptions) streamProtocolHandler {
 
 func (p *streamProtocolV1) stream(conn streamCreator) error {
 	doneChan := make(chan struct{}, 2)
-	errorChan := make(chan error)
+	errorChan := make(chan error, 1)
 
 	cp := func(s string, dst io.Writer, src io.Reader) {
 		klog.V(6).Infof("Copying %s", s)
