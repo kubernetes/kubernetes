@@ -303,3 +303,11 @@ const (
 	// needs to use routes with invalid hosts.
 	AllowNonDNSCompliantHostAnnotation = "route.openshift.io/allow-non-dns-compliant-host"
 )
+
+// Ingress-to-route controller
+const (
+	// IngressToRouteIngressClassControllerName is the name of the
+	// controller that translates ingresses into routes.  This value is
+	// intended to be used for the spec.controller field of ingressclasses.
+	IngressToRouteIngressClassControllerName = "openshift.io/ingress-to-route"
+)

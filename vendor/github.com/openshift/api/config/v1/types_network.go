@@ -76,6 +76,9 @@ type NetworkStatus struct {
 
 	// ClusterNetworkMTU is the MTU for inter-pod networking.
 	ClusterNetworkMTU int `json:"clusterNetworkMTU,omitempty"`
+
+	// Migration contains the cluster network migration configuration.
+	Migration *NetworkMigration `json:"migration,omitempty"`
 }
 
 // ClusterNetworkEntry is a contiguous block of IP addresses from which pod IPs
@@ -130,4 +133,12 @@ type NetworkList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []Network `json:"items"`
+}
+
+// NetworkMigration represents the cluster network configuration.
+type NetworkMigration struct {
+	// NetworkType is the target plugin that is to be deployed.
+	// Currently supported values are: OpenShiftSDN, OVNKubernetes
+	// +kubebuilder:validation:Enum={"OpenShiftSDN","OVNKubernetes"}
+	NetworkType string `json:"networkType"`
 }

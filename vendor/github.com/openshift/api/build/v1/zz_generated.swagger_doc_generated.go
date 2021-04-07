@@ -101,7 +101,7 @@ func (BuildConfigSpec) SwaggerDoc() map[string]string {
 var map_BuildConfigStatus = map[string]string{
 	"":                    "BuildConfigStatus contains current state of the build config object.",
 	"lastVersion":         "lastVersion is used to inform about number of last triggered build.",
-	"imageChangeTriggers": "ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including reconciled values of the lastTriggeredImageID and paused fields.",
+	"imageChangeTriggers": "ImageChangeTriggers is used to capture the runtime state of any ImageChangeTrigger specified in the BuildConfigSpec, including the value reconciled by the OpenShift APIServer for the lastTriggeredImageID.  There will be a single entry in this array for each entry in the BuildConfigSpec.Triggers array where the BuildTriggerPolicy.ImageChange pointer is set to a non-nil value.  The logical key for each entry in this array is expressed by the ImageStreamTagReference type.  That type captures the required elements for identifying the ImageStreamTag referenced by the more generic ObjectReference BuildTriggerPolicy.ImageChange.From.",
 }
 
 func (BuildConfigStatus) SwaggerDoc() map[string]string {
@@ -470,10 +470,9 @@ func (ImageChangeTrigger) SwaggerDoc() map[string]string {
 
 var map_ImageChangeTriggerStatus = map[string]string{
 	"":                     "ImageChangeTriggerStatus tracks the latest resolved status of the associated ImageChangeTrigger policy specified in the BuildConfigSpec.Triggers struct.",
-	"lastTriggeredImageID": "lastTriggeredImageID is the sha/id of the imageref cited in the 'from' field the last time this BuildConfig was triggered. It is not necessarily the sha/id of the image change that triggered a build. This field is updated for all image change triggers when any of them triggers a build.",
-	"from":                 "from is the ImageStreamTag that is used as the source of the trigger. This can come from an ImageStream tag referenced in this BuildConfig's triggers, or the From image in this BuildConfig's build strategy.",
-	"paused":               "paused is true if this trigger is temporarily disabled, and the setting on the spec has been reconciled. Optional.",
-	"lastTriggerTime":      "lastTriggerTime is the last time the BuildConfig was triggered by a change in the ImageStreamTag associated with this trigger.",
+	"lastTriggeredImageID": "lastTriggeredImageID represents, at the last time a Build for this BuildConfig was instantiated, the sha/id of the image referenced by the the ImageStreamTag cited in the 'from' of this struct. The lastTriggeredImageID field will be updated by the OpenShift APIServer on all instantiations of a Build from the BuildConfig it processes, regardless of what is considered the cause of instantiation. Specifically, an instantiation of a Build could have been manually requested, or could have resulted from changes with any of the Triggers defined in BuildConfigSpec.Triggers. The reason for always updating this field across all ImageChangeTriggerStatus instances is to prevent multiple builds being instantiated concurrently when multiple ImageChangeTriggers fire concurrently.  The system compares the the sha/id stored here with the associated ImageStreamTag's sha/id for the image.  If they match, then this trigger is not a valid reason for instantiating a Build.  So when ImageChangeTriggers fire concurrently, only one of them can \"win\", meaning selected as the cause for a Build instantiation request. Lastly, to clarify exactly what is meant by \"Build instantiation\", from a REST perspective, it is a HTTP POST of a BuildRequest object as the HTTP Body that is made to the OpenShift APIServer, where that HTTP POST also specifies the \"buildconfigs\" resource,  \"instantiate\" subresource, as well as the namespace and name of the BuildConfig.",
+	"from":                 "from is the ImageStreamTag that is used as the source of the trigger. This can come from an ImageStream tag referenced in this BuildConfig's Spec ImageChange Triggers, or the \"from\"\n this BuildConfig's build strategy if it happens to be an ImageStreamTag (where the user has specified an\nImageChange Trigger in the spec with a 'nil' for its 'from'.",
+	"lastTriggerTime":      "lastTriggerTime is the last time this particular ImageChangeTrigger fired, and that trigger firing was chosen as the cause for the Build being instantiated from this BuildConfig.  So on each Build instantiation, while lastTriggeredImageID will be updated regardless of whether this ImageChangeTrigger fired and deemed the cause for the Build Instantiation, this field is only updated when this trigger was in fact deemed the cause.  As such, it is valid that this field may not be set across all the ImageChangeTriggers, as they may have not yet been deemed to be the cause of a Build instantiation.  It is also valid that the times stored in lastTriggerTime will vary across all the ImageChangeTriggers, as the system explicitly picks only one trigger cause for a given Build.",
 }
 
 func (ImageChangeTriggerStatus) SwaggerDoc() map[string]string {
@@ -510,6 +509,16 @@ var map_ImageSourcePath = map[string]string{
 
 func (ImageSourcePath) SwaggerDoc() map[string]string {
 	return map_ImageSourcePath
+}
+
+var map_ImageStreamTagReference = map[string]string{
+	"":          "ImageStreamTagReference captures the required elements for identifying the ImageStreamTag referenced by the more generic ObjectReference BuildTriggerPolicy.ImageChange.From.  It is used by ImageChangeTriggerStatus, where a specific instance of ImageChangeTriggerStatus in maintained in BuildConfigStatus.ImageChangeTriggers for each entry in the BuildConfigSpec.Triggers array where the BuildTriggerPolicy.ImageChange pointer is set to a non-nil value",
+	"namespace": "namespace is the namespace where the ImageStreamTag used for an ImageChangeTrigger is located",
+	"name":      "name is the name of the ImageStreamTag used for an ImageChangeTrigger",
+}
+
+func (ImageStreamTagReference) SwaggerDoc() map[string]string {
+	return map_ImageStreamTagReference
 }
 
 var map_JenkinsPipelineBuildStrategy = map[string]string{
