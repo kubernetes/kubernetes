@@ -35,11 +35,9 @@ aliases:
     - deads2k
     - dims
     - enj
-    - erictune
     - lavalamp
     - liggitt
     - mikedanese
-    - mml
     - ncdc
     - smarterclayton
     - sttts
@@ -51,7 +49,6 @@ aliases:
     - mikedanese
     - smarterclayton
   sig-auth-certificates-reviewers:
-    - awly
     - caesarxuchao
     - deads2k
     - dims
@@ -67,11 +64,9 @@ aliases:
     - wojtek-t
 
   sig-auth-encryption-at-rest-approvers:
-    - immutableT
     - smarterclayton
   sig-auth-encryption-at-rest-reviewers:
     - enj
-    - immutableT
     - lavalamp
     - liggitt
     - smarterclayton
@@ -103,7 +98,6 @@ aliases:
     - liggitt
     - mikedanese
   sig-auth-serviceaccounts-reviewers:
-    - awly
     - deads2k
     - enj
     - liggitt
