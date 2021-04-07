@@ -1641,9 +1641,9 @@
     hook should execute poststart http hook properly [NodeConformance] [Conformance]'
   description: When a post start handler is specified in the container lifecycle using
     a HttpGet action, then the handler MUST be invoked after the start of the container.
-    A server pod is created that will serve http requests, create a second pod with
-    a container lifecycle specifying a post start that invokes the server pod to validate
-    that the post start is executed.
+    A server pod is created that will serve http requests, create a second pod on
+    the same node with a container lifecycle specifying a post start that invokes
+    the server pod to validate that the post start is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Pod Lifecycle, prestop exec hook
@@ -1661,9 +1661,9 @@
     hook should execute prestop http hook properly [NodeConformance] [Conformance]'
   description: When a pre-stop handler is specified in the container lifecycle using
     a 'HttpGet' action, then the handler MUST be invoked before the container is terminated.
-    A server pod is created that will serve http requests, create a second pod with
-    a container lifecycle specifying a pre-stop that invokes the server pod to validate
-    that the pre-stop is executed.
+    A server pod is created that will serve http requests, create a second pod on
+    the same node with a container lifecycle specifying a pre-stop that invokes the
+    server pod to validate that the pre-stop is executed.
   release: v1.9
   file: test/e2e/common/node/lifecycle_hook.go
 - testname: Container Runtime, TerminationMessage, from log output of succeeding container
