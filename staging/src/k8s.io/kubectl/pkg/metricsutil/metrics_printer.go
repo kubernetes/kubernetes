@@ -37,7 +37,7 @@ var (
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
 	HostColumn      = "NODE"
-	IpColumn        = "IP"
+	IpColumn        = "NODE_IP"
 )
 
 type ResourceMetricsInfo struct {
