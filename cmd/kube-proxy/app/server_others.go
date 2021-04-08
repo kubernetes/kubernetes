@@ -359,6 +359,12 @@ func newProxyServer(
 		}
 	}
 
+	useEndpointSlices := utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying)
+	if proxyMode == proxyModeUserspace {
+		// userspace mode doesn't support endpointslice.
+		useEndpointSlices = false
+	}
+
 	return &ProxyServer{
 		Client:                 client,
 		EventClient:            eventClient,
@@ -379,7 +385,7 @@ func newProxyServer(
 		OOMScoreAdj:            config.OOMScoreAdj,
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
-		UseEndpointSlices:      utilfeature.DefaultFeatureGate.Enabled(features.EndpointSliceProxying),
+		UseEndpointSlices:      useEndpointSlices,
 	}, nil
 }
 
