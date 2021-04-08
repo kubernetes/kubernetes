@@ -44,7 +44,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
 	github.com/go-openapi/spec v0.19.5
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
-	github.com/godbus/dbus/v5 v5.0.3
+	github.com/godbus/dbus/v5 v5.0.4
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/golang/mock v1.4.4
@@ -267,7 +267,7 @@ replace (
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/gobuffalo/here => github.com/gobuffalo/here v0.6.0
-	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
+	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
