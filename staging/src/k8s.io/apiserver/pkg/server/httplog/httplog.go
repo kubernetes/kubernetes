@@ -25,6 +25,7 @@ import (
 	"runtime"
 	"time"
 
+	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/klog/v2"
 )
 
@@ -82,7 +83,13 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 		if old := respLoggerFromContext(req); old != nil {
 			panic("multiple WithLogging calls!")
 		}
-		rl := newLogged(req, w).StacktraceWhen(pred)
+
+		startTime := time.Now()
+		if receivedTimestamp, ok := request.ReceivedTimestampFrom(ctx); ok {
+			startTime = receivedTimestamp
+		}
+
+		rl := newLoggedWithStartTime(req, w, startTime).StacktraceWhen(pred)
 		req = req.WithContext(context.WithValue(ctx, respLoggerContextKey, rl))
 
 		if klog.V(3).Enabled() {
@@ -102,14 +109,18 @@ func respLoggerFromContext(req *http.Request) *respLogger {
 	return nil
 }
 
-// newLogged turns a normal response writer into a logged response writer.
-func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
+func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
 	return &respLogger{
-		startTime:         time.Now(),
+		startTime:         startTime,
 		req:               req,
 		w:                 w,
 		logStacktracePred: DefaultStacktracePred,
 	}
+}
+
+// newLogged turns a normal response writer into a logged response writer.
+func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
+	return newLoggedWithStartTime(req, w, time.Now())
 }
 
 // LogOf returns the logger hiding in w. If there is not an existing logger
