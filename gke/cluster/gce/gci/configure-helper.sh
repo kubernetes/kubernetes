@@ -2777,11 +2777,24 @@ EOF
     local -r metadata_proxy_yaml="${dst_dir}/metadata-proxy/gce/metadata-proxy.yaml"
     update-daemon-set-prometheus-to-sd-parameters ${metadata_proxy_yaml}
   fi
+
   if [[ "${ENABLE_ISTIO:-}" == "true" ]]; then
-    if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
-      setup-addon-manifests "addons" "istio/auth"
+    if [[ "${ISTIO_OPERATOR:-}" == "true" ]]; then
+      setup-addon-manifests "addons" "istio/operator"
     else
-      setup-addon-manifests "addons" "istio/noauth"
+      if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "stackdriver" || "${MONITORING_FLAG_SET}" == "true" ]]; then
+        if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+          setup-addon-manifests "addons" "istio/auth-sd"
+        else
+          setup-addon-manifests "addons" "istio/noauth-sd"
+        fi
+      else
+        if [[ "${ISTIO_AUTH_TYPE:-}" == "MUTUAL_TLS" ]]; then
+          setup-addon-manifests "addons" "istio/auth"
+        else
+          setup-addon-manifests "addons" "istio/noauth"
+        fi
+      fi
     fi
   fi
   if [[ -n "${EXTRA_ADDONS_URL:-}" ]]; then
