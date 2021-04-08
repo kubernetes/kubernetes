@@ -25,17 +25,21 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/cert"
 
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
@@ -43,6 +47,11 @@ import (
 )
 
 // This file tests the client-go credential plugin feature.
+
+// These constants are used to communicate behavior to the testdata/exec-plugin.sh test fixture.
+const (
+	outputEnvVar = "EXEC_PLUGIN_OUTPUT"
+)
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
@@ -67,35 +76,8 @@ func (s *syncedHeaderValues) get() [][]string {
 	return s.data
 }
 
-func TestExecPlugin(t *testing.T) {
-	// These constants are used to communicate behavior to the testdata/exec-plugin.sh test fixture.
-	const (
-		outputEnvVar = "EXEC_PLUGIN_OUTPUT"
-	)
-
-	const (
-		clientAuthorizedToken   = "authorized-token"
-		clientUnauthorizedToken = "unauthorized-token"
-	)
-
-	certDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-cert-dir-*")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	tokenFileName := writeTokenFile(t, clientAuthorizedToken)
-	clientCAFileName, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
-	clientCertFileName, clientKeyFileName := writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
-	result := kubeapiservertesting.StartTestServerOrDie(
-		t,
-		nil,
-		[]string{
-			"--token-auth-file", tokenFileName,
-			"--client-ca-file=" + clientCAFileName,
-		},
-		framework.SharedEtcd(),
-	)
-	t.Cleanup(result.TearDownFn)
+func TestExecPluginViaClient(t *testing.T) {
+	result, clientAuthorizedToken, clientCertFileName, clientKeyFileName := startTestServer(t)
 
 	unauthorizedCert, unauthorizedKey, err := cert.GenerateSelfSignedCertKey("some-host", nil, nil)
 	if err != nil {
@@ -224,11 +206,11 @@ func TestExecPlugin(t *testing.T) {
 								"clientCertificateData": %s,
 								"clientKeyData": %s
 							}
-						}`, clientUnauthorizedToken, read(t, clientCertFileName), read(t, clientKeyFileName)),
+						}`, "client-unauthorized-token", read(t, clientCertFileName), read(t, clientKeyFileName)),
 					},
 				}
 			},
-			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientUnauthorizedToken}},
+			wantAuthorizationHeaderValues: [][]string{{"Bearer client-unauthorized-token"}},
 			wantCertificate:               loadX509KeyPair(clientCertFileName, clientKeyFileName),
 		},
 		{
@@ -266,12 +248,12 @@ func TestExecPlugin(t *testing.T) {
 								"clientCertificateData": %q,
 								"clientKeyData": %q
 							}
-						}`, clientUnauthorizedToken, string(unauthorizedCert), string(unauthorizedKey)),
+						}`, "client-unauthorized-token", string(unauthorizedCert), string(unauthorizedKey)),
 					},
 				}
 			},
-			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientUnauthorizedToken}},
-			wantCertificate:               x509KeyPair([]byte(unauthorizedCert), []byte(unauthorizedKey), true),
+			wantAuthorizationHeaderValues: [][]string{{"Bearer client-unauthorized-token"}},
+			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, true),
 			wantClientErrorPrefix:         "Unauthorized",
 		},
 		{
@@ -337,17 +319,11 @@ func TestExecPlugin(t *testing.T) {
 				c.KeyData = unauthorizedKey
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Bearer " + clientAuthorizedToken}},
-			wantCertificate:               x509KeyPair([]byte(unauthorizedCert), []byte(unauthorizedKey), false),
+			wantCertificate:               x509KeyPair(unauthorizedCert, unauthorizedKey, false),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			tmpDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-plugin-dir-*")
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer os.RemoveAll(tmpDir)
-
 			var authorizationHeaderValues syncedHeaderValues
 			clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
 			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
@@ -355,12 +331,12 @@ func TestExecPlugin(t *testing.T) {
 				// TODO(ankeesler): move to v1 once exec plugins go GA.
 				APIVersion: "client.authentication.k8s.io/v1beta1",
 			}
-			clientConfig.Wrap(transport.WrapperFunc(func(rt http.RoundTripper) http.RoundTripper {
+			clientConfig.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 				return roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 					authorizationHeaderValues.append(req.Header.Values("Authorization"))
 					return rt.RoundTrip(req)
 				})
-			}))
+			})
 
 			if test.clientConfigFunc != nil {
 				test.clientConfigFunc(clientConfig)
@@ -405,6 +381,176 @@ func TestExecPlugin(t *testing.T) {
 			}
 		})
 	}
+}
+
+// objectMetaSansResourceVersionComparer compares two metav1.ObjectMeta's except for their resource
+// versions. Since the underlying integration test etcd is shared, these resource versions may jump
+// past the next sequential number for sequential API calls in the test.
+var objectMetaSansResourceVersionComparer = cmp.Comparer(func(a, b metav1.ObjectMeta) bool {
+	aa := a.DeepCopy()
+	bb := b.DeepCopy()
+
+	aa.ResourceVersion = ""
+	bb.ResourceVersion = ""
+
+	return cmp.Equal(aa, bb)
+})
+
+type oldNew struct {
+	old, new interface{}
+}
+
+var oldNewComparer = cmp.Comparer(func(a, b oldNew) bool {
+	return cmp.Equal(a.old, b.old, objectMetaSansResourceVersionComparer) &&
+		cmp.Equal(a.new, a.new, objectMetaSansResourceVersionComparer)
+})
+
+type informerSpy struct {
+	mu      sync.Mutex
+	adds    []interface{}
+	updates []oldNew
+	deletes []interface{}
+}
+
+func (es *informerSpy) OnAdd(obj interface{}) {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	es.adds = append(es.adds, obj)
+}
+
+func (es *informerSpy) OnUpdate(old, new interface{}) {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	es.updates = append(es.updates, oldNew{old: old, new: new})
+}
+
+func (es *informerSpy) OnDelete(obj interface{}) {
+	es.mu.Lock()
+	defer es.mu.Unlock()
+	es.deletes = append(es.deletes, obj)
+}
+
+// waitForEvents waits for adds, updates, and deletes to be filled with at least one event.
+func (es *informerSpy) waitForEvents(t *testing.T) {
+	if err := wait.PollImmediate(time.Millisecond*250, time.Second*20, func() (bool, error) {
+		es.mu.Lock()
+		defer es.mu.Unlock()
+		return len(es.adds) > 0 && len(es.updates) > 0 && len(es.deletes) > 0, nil
+	}); err != nil {
+		t.Fatalf("failed to wait for events: %v", err)
+	}
+}
+
+func TestExecPluginViaInformer(t *testing.T) {
+	result, clientAuthorizedToken, clientCertFileName, clientKeyFileName := startTestServer(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*60)
+	defer cancel()
+
+	adminClient := clientset.NewForConfigOrDie(result.ClientConfig)
+	ns := createNamespace(ctx, t, adminClient)
+
+	tests := []struct {
+		name                          string
+		clientConfigFunc              func(*rest.Config)
+		wantAuthorizationHeaderValues [][]string
+		wantCertificate               *tls.Certificate
+	}{
+		{
+			name: "authorized token",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+							"kind": "ExecCredential",
+							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"status": {
+								"token": %q
+							}
+						}`, clientAuthorizedToken),
+					},
+				}
+			},
+		},
+		{
+			name: "authorized certificate",
+			clientConfigFunc: func(c *rest.Config) {
+				c.ExecProvider.Env = []clientcmdapi.ExecEnvVar{
+					{
+						Name: outputEnvVar,
+						Value: fmt.Sprintf(`{
+							"kind": "ExecCredential",
+							"apiVersion": "client.authentication.k8s.io/v1beta1",
+							"status": {
+								"clientCertificateData": %s,
+								"clientKeyData": %s
+							}
+						}`, read(t, clientCertFileName), read(t, clientKeyFileName)),
+					},
+				}
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clientConfig := rest.AnonymousClientConfig(result.ClientConfig)
+			clientConfig.ExecProvider = &clientcmdapi.ExecConfig{
+				Command: "testdata/exec-plugin.sh",
+				// TODO(ankeesler): move to v1 once exec plugins go GA.
+				APIVersion: "client.authentication.k8s.io/v1beta1",
+			}
+
+			if test.clientConfigFunc != nil {
+				test.clientConfigFunc(clientConfig)
+			}
+			client := clientset.NewForConfigOrDie(clientConfig)
+
+			informerSpy := startConfigMapInformer(ctx, t, client, ns.Name)
+			createdCM, updatedCM, deletedCM := createUpdateDeleteConfigMap(ctx, t, client.CoreV1().ConfigMaps(ns.Name))
+			informerSpy.waitForEvents(t)
+
+			// Validate that the informer was called correctly.
+			if diff := cmp.Diff([]interface{}{createdCM}, informerSpy.adds, objectMetaSansResourceVersionComparer); diff != "" {
+				t.Errorf("unexpected add event(s), -want, +got:\n%s", diff)
+			}
+			if diff := cmp.Diff([]oldNew{{createdCM, updatedCM}}, informerSpy.updates, oldNewComparer); diff != "" {
+				t.Errorf("unexpected update event(s), -want, +got:\n%s", diff)
+			}
+			if diff := cmp.Diff([]interface{}{deletedCM}, informerSpy.deletes, objectMetaSansResourceVersionComparer); diff != "" {
+				t.Errorf("unexpected deleted event(s), -want, +got:\n%s", diff)
+			}
+		})
+	}
+}
+
+func startTestServer(t *testing.T) (result *kubeapiservertesting.TestServer, clientAuthorizedToken string, clientCertFileName string, clientKeyFileName string) {
+	certDir, err := ioutil.TempDir("", "kubernetes-client-exec-test-cert-dir-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(certDir); err != nil {
+			t.Error(err)
+		}
+	})
+
+	clientAuthorizedToken = "client-authorized-token"
+	tokenFileName := writeTokenFile(t, clientAuthorizedToken)
+	clientCAFileName, clientSigningCert, clientSigningKey := writeCACertFiles(t, certDir)
+	clientCertFileName, clientKeyFileName = writeCerts(t, clientSigningCert, clientSigningKey, certDir, 30*time.Second)
+	result = kubeapiservertesting.StartTestServerOrDie(
+		t,
+		nil,
+		[]string{
+			"--token-auth-file", tokenFileName,
+			"--client-ca-file=" + clientCAFileName,
+		},
+		framework.SharedEtcd(),
+	)
+	t.Cleanup(result.TearDownFn)
+
+	return
 }
 
 func writeTokenFile(t *testing.T, goodToken string) string {
@@ -463,4 +609,70 @@ func loadX509KeyPair(certFile, keyFile string) *tls.Certificate {
 		panic(err)
 	}
 	return &cert
+}
+
+func createNamespace(ctx context.Context, t *testing.T, client clientset.Interface) *corev1.Namespace {
+	t.Helper()
+
+	ns, err := client.CoreV1().Namespaces().Create(
+		ctx,
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "test-exec-plugin-with-informer-ns"}},
+		metav1.CreateOptions{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		// Use a new context since the one passed to this function would have timed out.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		if err := client.CoreV1().Namespaces().Delete(ctx, ns.Name, metav1.DeleteOptions{}); err != nil {
+			t.Error(err)
+		}
+	})
+
+	return ns
+}
+
+func startConfigMapInformer(ctx context.Context, t *testing.T, client clientset.Interface, namespace string) *informerSpy {
+	t.Helper()
+
+	var informerSpy informerSpy
+	informerFactory := informers.NewSharedInformerFactoryWithOptions(client, 0, informers.WithNamespace(namespace))
+	informerFactory.Core().V1().ConfigMaps().Informer().AddEventHandler(&informerSpy)
+	informerFactory.Start(ctx.Done())
+	synced := informerFactory.WaitForCacheSync(ctx.Done())
+	if len(synced) != 1 {
+		t.Fatalf("expected only 1 synced type, got %v", synced)
+	}
+	if cmSynced, ok := synced[reflect.TypeOf(&corev1.ConfigMap{})]; !(cmSynced && ok) {
+		t.Fatalf("expected ConfigMaps to be synced, got %v", synced)
+	}
+
+	return &informerSpy
+}
+
+func createUpdateDeleteConfigMap(ctx context.Context, t *testing.T, cms v1.ConfigMapInterface) (created, updated, deleted *corev1.ConfigMap) {
+	t.Helper()
+
+	var err error
+	created, err = cms.Create(ctx, &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "cm"}}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	updated = created.DeepCopy()
+	updated.Annotations = map[string]string{"tuna": "fish"}
+	updated, err = cms.Update(ctx, updated, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cms.Delete(ctx, updated.Name, metav1.DeleteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	deleted = updated.DeepCopy()
+
+	return created, updated, deleted
 }
