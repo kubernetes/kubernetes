@@ -136,7 +136,7 @@ type apiGroupHandler struct {
 
 func (r *apiGroupHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	apiServices, err := r.lister.List(labels.Everything())
-	if statusErr, ok := err.(*apierrors.StatusError); ok && err != nil {
+	if statusErr, ok := err.(*apierrors.StatusError); ok {
 		responsewriters.WriteRawJSON(int(statusErr.Status().Code), statusErr.Status(), w)
 		return
 	}
