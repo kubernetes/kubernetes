@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NewStorageClass(params map[string]string, allowedTopologies []v1.TopologySelectorTerm) *storage.StorageClass {
@@ -292,5 +293,51 @@ func TestInlineReadOnly(t *testing.T) {
 
 	if ams[0] != v1.ReadOnlyMany {
 		t.Errorf("got am %v, expected access mode of ReadOnlyMany", ams[0])
+	}
+}
+
+func TestTranslateInTreePVToCSIVolIDFmt(t *testing.T) {
+	g := NewGCEPersistentDiskCSITranslator()
+	pdName := "pd-name"
+	tests := []struct {
+		desc               string
+		topologyLabelKey   string
+		topologyLabelValue string
+		wantVolID          string
+	}{
+		{
+			desc:               "beta topology key zonal",
+			topologyLabelKey:   v1.LabelZoneFailureDomain,
+			topologyLabelValue: "us-east1-a",
+			wantVolID:          "projects/UNSPECIFIED/zones/us-east1-a/disks/pd-name",
+		},
+		{
+			desc:               "beta topology key regional",
+			topologyLabelKey:   v1.LabelZoneFailureDomain,
+			topologyLabelValue: "us-central1-a__us-central1-c",
+			wantVolID:          "projects/UNSPECIFIED/regions/us-central1/disks/pd-name",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.desc, func(t *testing.T) {
+			translatedPV, err := g.TranslateInTreePVToCSI(&v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{tc.topologyLabelKey: tc.topologyLabelValue},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName: pdName,
+						},
+					},
+				},
+			})
+			if err != nil {
+				t.Errorf("got error translating in-tree PV to CSI: %v", err)
+			}
+			if got := translatedPV.Spec.PersistentVolumeSource.CSI.VolumeHandle; got != tc.wantVolID {
+				t.Errorf("got translated volume handle: %q, want %q", got, tc.wantVolID)
+			}
+		})
 	}
 }
