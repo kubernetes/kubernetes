@@ -59,15 +59,7 @@ var statusData = map[schema.GroupVersionResource]string{
 	gvr("certificates.k8s.io", "v1", "certificatesigningrequests"):      `{"status": {"conditions": [{"type": "MyStatus", "status": "True"}]}}`,
 }
 
-const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"true"}]}}`
-
-// DO NOT ADD TO THIS LIST.
-// This list is used to ignore known bugs. We shouldn't introduce new bugs.
-var ignoreList = map[schema.GroupVersionResource]struct{}{
-	// TODO(#89264): apiservices doesn't work because the openapi is not routed properly.
-	gvr("apiregistration.k8s.io", "v1beta1", "apiservices"): {},
-	gvr("apiregistration.k8s.io", "v1", "apiservices"):      {},
-}
+const statusDefault = `{"status": {"conditions": [{"type": "MyStatus", "status":"True"}]}}`
 
 func gvr(g, v, r string) schema.GroupVersionResource {
 	return schema.GroupVersionResource{Group: g, Version: v, Resource: r}
@@ -139,9 +131,6 @@ func TestApplyStatus(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Run(mapping.Resource.String(), func(t *testing.T) {
-				if _, ok := ignoreList[mapping.Resource]; ok {
-					t.Skip()
-				}
 				status, ok := statusData[mapping.Resource]
 				if !ok {
 					status = statusDefault
@@ -160,8 +149,17 @@ func TestApplyStatus(t *testing.T) {
 					namespace = ""
 				}
 				name := newObj.GetName()
+
+				// etcd test stub data doesn't contain apiVersion/kind (!), but apply requires it
+				newObj.SetGroupVersionKind(mapping.GroupVersionKind)
+				createData, err := json.Marshal(newObj.Object)
+				if err != nil {
+					t.Fatal(err)
+				}
+
 				rsc := dynamicClient.Resource(mapping.Resource).Namespace(namespace)
-				_, err := rsc.Create(context.TODO(), &newObj, metav1.CreateOptions{FieldManager: "create_test"})
+				// apply to create
+				_, err = rsc.Patch(context.TODO(), name, types.ApplyPatchType, []byte(createData), metav1.PatchOptions{FieldManager: "create_test"})
 				if err != nil {
 					t.Fatal(err)
 				}
