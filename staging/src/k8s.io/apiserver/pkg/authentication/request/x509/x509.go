@@ -26,11 +26,12 @@ import (
 	"time"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"sigs.k8s.io/kustomize/kyaml/sets"
 )
 
 /*
@@ -113,8 +114,8 @@ type VerifyOptionFunc func() (x509.VerifyOptions, bool)
 
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
-	verifyOptionsFn VerifyOptionFunc
-	user            UserConversion
+	caProvider dynamiccertificates.CAContentProvider
+	user       UserConversion
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
@@ -125,8 +126,8 @@ func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
 
 // NewDynamic returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
-func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenticator {
-	return &Authenticator{verifyOptionsFn, user}
+func NewDynamic(caProvider dynamiccertificates.CAContentProvider, user UserConversion) *Authenticator {
+	return &Authenticator{caProvider, user}
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
@@ -136,7 +137,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	}
 
 	// Use intermediates, if provided
-	optsCopy, ok := a.verifyOptionsFn()
+	optsCopy, ok := a.caProvider.VerifyOptions()
 	// if there are intentionally no verify options, then we cannot authenticate this request
 	if !ok {
 		return nil, false, nil
@@ -176,8 +177,8 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 // Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 type Verifier struct {
-	verifyOptionsFn VerifyOptionFunc
-	auth            authenticator.Request
+	caProvider dynamiccertificates.CAContentProvider
+	auth       authenticator.Request
 
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
@@ -190,8 +191,8 @@ func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCom
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
-func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
-	return &Verifier{verifyOptionsFn, auth, allowedCommonNames}
+func NewDynamicCAVerifier(caProvider dynamiccertificates.CAContentProvider, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
+	return &Verifier{caProvider, auth, allowedCommonNames}
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
@@ -201,7 +202,7 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 	}
 
 	// Use intermediates, if provided
-	optsCopy, ok := a.verifyOptionsFn()
+	optsCopy, ok := a.caProvider.VerifyOptions()
 	// if there are intentionally no verify options, then we cannot authenticate this request
 	if !ok {
 		return nil, false, nil

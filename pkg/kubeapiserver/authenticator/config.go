@@ -100,7 +100,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// Add the front proxy authenticator if requested
 	if config.RequestHeaderConfig != nil {
 		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
-			config.RequestHeaderConfig.CAContentProvider.VerifyOptions,
+			config.RequestHeaderConfig.CAContentProvider,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
@@ -111,7 +111,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
-		certAuth := x509.NewDynamic(config.ClientCAContentProvider.VerifyOptions, x509.CommonNameUserConversion)
+		certAuth := x509.NewDynamic(config.ClientCAContentProvider, x509.CommonNameUserConversion)
 		authenticators = append(authenticators, certAuth)
 	}
 

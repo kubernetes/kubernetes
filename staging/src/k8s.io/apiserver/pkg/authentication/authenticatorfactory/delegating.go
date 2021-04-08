@@ -73,7 +73,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 	// Add the front proxy authenticator if requested
 	if c.RequestHeaderConfig != nil {
 		requestHeaderAuthenticator := headerrequest.NewDynamicVerifyOptionsSecure(
-			c.RequestHeaderConfig.CAContentProvider.VerifyOptions,
+			c.RequestHeaderConfig.CAContentProvider,
 			c.RequestHeaderConfig.AllowedClientNames,
 			c.RequestHeaderConfig.UsernameHeaders,
 			c.RequestHeaderConfig.GroupHeaders,
@@ -84,7 +84,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 
 	// x509 client cert auth
 	if c.ClientCertificateCAContentProvider != nil {
-		authenticators = append(authenticators, x509.NewDynamic(c.ClientCertificateCAContentProvider.VerifyOptions, x509.CommonNameUserConversion))
+		authenticators = append(authenticators, x509.NewDynamic(c.ClientCertificateCAContentProvider, x509.CommonNameUserConversion))
 	}
 
 	if c.TokenAccessReviewClient != nil {

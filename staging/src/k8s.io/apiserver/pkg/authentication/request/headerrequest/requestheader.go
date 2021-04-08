@@ -27,6 +27,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	x509request "k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	utilcert "k8s.io/client-go/util/cert"
 )
 
@@ -148,10 +149,10 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	), nil
 }
 
-func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+func NewDynamicVerifyOptionsSecure(caProvider dynamiccertificates.CAContentProvider, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
 	headerAuthenticator := NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes)
 
-	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
+	return x509request.NewDynamicCAVerifier(caProvider, headerAuthenticator, proxyClientNames)
 }
 
 func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
