@@ -26,6 +26,7 @@ import (
 
 	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	storage "k8s.io/api/storage/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,6 +163,58 @@ func TestPluginGetPluginName(t *testing.T) {
 	if plug.GetPluginName() != "kubernetes.io/csi" {
 		t.Errorf("unexpected plugin name %v", plug.GetPluginName())
 	}
+}
+
+func TestPluginGetFSGroupPolicy(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIVolumeFSGroupPolicy, true)()
+	defaultPolicy := storage.ReadWriteOnceWithFSTypeFSGroupPolicy
+	testCases := []struct {
+		name                  string
+		defined               bool
+		expectedFSGroupPolicy storage.FSGroupPolicy
+	}{
+		{
+			name:                  "no FSGroupPolicy defined, expect default",
+			defined:               false,
+			expectedFSGroupPolicy: storage.ReadWriteOnceWithFSTypeFSGroupPolicy,
+		},
+		{
+			name:                  "File FSGroupPolicy defined, expect File",
+			defined:               true,
+			expectedFSGroupPolicy: storage.FileFSGroupPolicy,
+		},
+		{
+			name:                  "None FSGroupPolicy defined, expected None",
+			defined:               true,
+			expectedFSGroupPolicy: storage.NoneFSGroupPolicy,
+		},
+	}
+	for _, tc := range testCases {
+		t.Logf("testing: %s", tc.name)
+		// Define the driver and set the FSGroupPolicy
+		driver := getTestCSIDriver(testDriver, nil, nil, nil)
+		if tc.defined {
+			driver.Spec.FSGroupPolicy = &tc.expectedFSGroupPolicy
+		} else {
+			driver.Spec.FSGroupPolicy = &defaultPolicy
+		}
+
+		// Create the client and register the resources
+		fakeClient := fakeclient.NewSimpleClientset(driver)
+		plug, tmpDir := newTestPlugin(t, fakeClient)
+		defer os.RemoveAll(tmpDir)
+		registerFakePlugin(testDriver, "endpoint", []string{"1.3.0"}, t)
+
+		// Check to see if we can obtain the CSIDriver, along with examining its FSGroupPolicy
+		fsGroup, err := plug.getFSGroupPolicy(testDriver)
+		if err != nil {
+			t.Fatalf("Error attempting to obtain FSGroupPolicy: %v", err)
+		}
+		if fsGroup != *driver.Spec.FSGroupPolicy {
+			t.Fatalf("FSGroupPolicy doesn't match expected value: %v, %v", fsGroup, tc.expectedFSGroupPolicy)
+		}
+	}
+
 }
 
 func TestPluginGetVolumeName(t *testing.T) {

@@ -154,11 +154,15 @@ message CSIDriverSpec {
   // Defines if the underlying volume supports changing ownership and
   // permission of the volume before being mounted.
   // Refer to the specific FSGroupPolicy values for additional details.
-  // This field is alpha-level, and is only honored by servers
+  // This field is beta, and is only honored by servers
   // that enable the CSIVolumeFSGroupPolicy feature gate.
   //
   // This field is immutable.
   //
+  // Defaults to ReadWriteOnceWithFSType, which will examine each volume
+  // to determine if Kubernetes should modify ownership and permissions of the volume.
+  // With the default policy the defined fsGroup will only be applied
+  // if a fstype is defined and the volume's access mode contains ReadWriteOnce.
   // +optional
   optional string fsGroupPolicy = 5;
 

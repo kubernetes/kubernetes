@@ -373,11 +373,15 @@ type CSIDriverSpec struct {
 	// Defines if the underlying volume supports changing ownership and
 	// permission of the volume before being mounted.
 	// Refer to the specific FSGroupPolicy values for additional details.
-	// This field is alpha-level, and is only honored by servers
+	// This field is beta, and is only honored by servers
 	// that enable the CSIVolumeFSGroupPolicy feature gate.
 	//
 	// This field is immutable.
 	//
+	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
+	// to determine if Kubernetes should modify ownership and permissions of the volume.
+	// With the default policy the defined fsGroup will only be applied
+	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
 	// +optional
 	FSGroupPolicy *FSGroupPolicy `json:"fsGroupPolicy,omitempty" protobuf:"bytes,5,opt,name=fsGroupPolicy"`
 
@@ -433,9 +437,11 @@ const (
 	ReadWriteOnceWithFSTypeFSGroupPolicy FSGroupPolicy = "ReadWriteOnceWithFSType"
 
 	// FileFSGroupPolicy indicates that CSI driver supports volume ownership
-	// and permission change via fsGroup, and Kubernetes may use fsGroup
-	// to change permissions and ownership of the volume to match user requested fsGroup in
+	// and permission change via fsGroup, and Kubernetes will change the permissions
+	// and ownership of every file in the volume to match the user requested fsGroup in
 	// the pod's SecurityPolicy regardless of fstype or access mode.
+	// Use this mode if Kubernetes should modify the permissions and ownership
+	// of the volume.
 	FileFSGroupPolicy FSGroupPolicy = "File"
 
 	// None indicates that volumes will be mounted without performing
