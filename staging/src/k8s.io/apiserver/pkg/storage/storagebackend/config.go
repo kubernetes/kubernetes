@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/server/egressselector"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/value"
 )
 
@@ -71,6 +72,8 @@ type Config struct {
 	CompactionInterval time.Duration
 	// CountMetricPollPeriod specifies how often should count metric be updated
 	CountMetricPollPeriod time.Duration
+
+	LeaseManagerConfig etcd3.LeaseManagerConfig
 }
 
 func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
@@ -79,5 +82,6 @@ func NewDefaultConfig(prefix string, codec runtime.Codec) *Config {
 		Prefix:             prefix,
 		Codec:              codec,
 		CompactionInterval: DefaultCompactInterval,
+		LeaseManagerConfig: etcd3.NewDefaultLeaseManagerConfig(),
 	}
 }
