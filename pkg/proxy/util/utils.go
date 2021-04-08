@@ -162,7 +162,7 @@ func GetLocalAddrs() ([]net.IP, error) {
 func GetLocalAddrSet() utilnet.IPSet {
 	localAddrs, err := GetLocalAddrs()
 	if err != nil {
-		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs", err)
+		klog.ErrorS(err, "Failed to get local addresses assuming no local IPs")
 	} else if len(localAddrs) == 0 {
 		klog.InfoS("No local addresses were found")
 	}
