@@ -801,7 +801,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
 	CSIMigrationvSphereComplete:                    {Default: false, PreRelease: featuregate.Beta}, // remove in 1.22
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationOpenStack:                          {Default: false, PreRelease: featuregate.Beta}, // OCP(storage team): force off by default, requires explicit opt-in via FeatureGate CR. Please <carry> until it's GA. https://github.com/openshift/enhancements/pull/549
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSubpath:                                  {Default: true, PreRelease: featuregate.GA},
 	ConfigurableFSGroupPolicy:                      {Default: true, PreRelease: featuregate.Beta},
