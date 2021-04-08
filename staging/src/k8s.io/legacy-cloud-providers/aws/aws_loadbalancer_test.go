@@ -168,6 +168,43 @@ func TestIsNLB(t *testing.T) {
 	}
 }
 
+func TestIsLBExternal(t *testing.T) {
+	tests := []struct {
+		name        string
+		annotations map[string]string
+		want        bool
+	}{
+		{
+			name:        "No annotation",
+			annotations: map[string]string{},
+			want:        false,
+		},
+		{
+			name:        "Type NLB",
+			annotations: map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "nlb"},
+			want:        false,
+		},
+		{
+			name:        "Type NLB-IP",
+			annotations: map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "nlb-ip"},
+			want:        true,
+		},
+		{
+			name:        "Type External",
+			annotations: map[string]string{"service.beta.kubernetes.io/aws-load-balancer-type": "external"},
+			want:        true,
+		},
+	}
+	for _, test := range tests {
+		t.Logf("Running test case %s", test.name)
+		got := isLBExternal(test.annotations)
+
+		if got != test.want {
+			t.Errorf("Incorrect value for isLBExternal() case %s. Got %t, expected %t.", test.name, got, test.want)
+		}
+	}
+}
+
 func TestSyncElbListeners(t *testing.T) {
 	tests := []struct {
 		name                 string
