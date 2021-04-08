@@ -795,6 +795,77 @@ func TestSetContainerStartup(t *testing.T) {
 	verifyStartup("ignore non-existent", &status, true, true, true)
 }
 
+func TestSetContainerTerminated(t *testing.T) {
+	cID1 := kubecontainer.ContainerID{Type: "test", ID: "1"}
+	cID2 := kubecontainer.ContainerID{Type: "test", ID: "2"}
+	containerStatuses := []v1.ContainerStatus{
+		{
+			Name:        "c1",
+			ContainerID: cID1.String(),
+			Ready:       false,
+		}, {
+			Name:        "c2",
+			ContainerID: cID2.String(),
+			Ready:       false,
+		},
+	}
+	status := v1.PodStatus{
+		ContainerStatuses: containerStatuses,
+		Conditions: []v1.PodCondition{{
+			Type:   v1.PodReady,
+			Status: v1.ConditionFalse,
+		}},
+	}
+	pod := getTestPod()
+	pod.Spec.Containers = []v1.Container{{Name: "c1"}, {Name: "c2"}}
+
+	// Verify expected readiness of containers & pod.
+	verifyReadiness := func(step string, status *v1.PodStatus, c1Ready, c2Ready, podReady bool) {
+		for _, c := range status.ContainerStatuses {
+			switch c.ContainerID {
+			case cID1.String():
+				if c.Ready != c1Ready {
+					t.Errorf("[%s] Expected readiness of c1 to be %v but was %v", step, c1Ready, c.Ready)
+				}
+			case cID2.String():
+				if c.Ready != c2Ready {
+					t.Errorf("[%s] Expected readiness of c2 to be %v but was %v", step, c2Ready, c.Ready)
+				}
+			default:
+				t.Fatalf("[%s] Unexpected container: %+v", step, c)
+			}
+		}
+		if status.Conditions[0].Type != v1.PodReady {
+			t.Fatalf("[%s] Unexpected condition: %+v", step, status.Conditions[0])
+		} else if ready := (status.Conditions[0].Status == v1.ConditionTrue); ready != podReady {
+			t.Errorf("[%s] Expected readiness of pod to be %v but was %v", step, podReady, ready)
+		}
+	}
+
+	m := newTestManager(&fake.Clientset{})
+	// Add test pod because the container spec has been changed.
+	m.podManager.AddPod(pod)
+
+	t.Log("Setting readiness before status should fail.")
+	m.SetContainerReadiness(pod.UID, cID1, true)
+	verifyUpdates(t, m, 0)
+	if status, ok := m.GetPodStatus(pod.UID); ok {
+		t.Errorf("Unexpected PodStatus: %+v", status)
+	}
+
+	t.Log("Setting initial status.")
+	m.SetPodStatus(pod, status)
+	verifyUpdates(t, m, 1)
+	status = expectPodStatus(t, m, pod)
+	verifyReadiness("initial", &status, false, false, false)
+
+	t.Log("Setting unchanged terminate should do nothing.")
+	m.SetContainerTerminated(pod.UID, cID1)
+	verifyUpdates(t, m, 0)
+	status = expectPodStatus(t, m, pod)
+	verifyReadiness("unchanged", &status, false, false, false)
+}
+
 func TestSyncBatchCleanupVersions(t *testing.T) {
 	m := newTestManager(&fake.Clientset{})
 	testPod := getTestPod()
