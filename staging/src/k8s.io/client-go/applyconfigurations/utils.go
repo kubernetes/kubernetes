@@ -259,6 +259,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &appsv1beta2.RollingUpdateDeploymentApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("RollingUpdateStatefulSetStrategy"):
 		return &appsv1beta2.RollingUpdateStatefulSetStrategyApplyConfiguration{}
+	case v1beta2.SchemeGroupVersion.WithKind("Scale"):
+		return &appsv1beta2.ScaleApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSet"):
 		return &appsv1beta2.StatefulSetApplyConfiguration{}
 	case v1beta2.SchemeGroupVersion.WithKind("StatefulSetCondition"):
@@ -279,6 +281,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerSpecApplyConfiguration{}
 	case autoscalingv1.SchemeGroupVersion.WithKind("HorizontalPodAutoscalerStatus"):
 		return &applyconfigurationsautoscalingv1.HorizontalPodAutoscalerStatusApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("Scale"):
+		return &applyconfigurationsautoscalingv1.ScaleApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleSpec"):
+		return &applyconfigurationsautoscalingv1.ScaleSpecApplyConfiguration{}
+	case autoscalingv1.SchemeGroupVersion.WithKind("ScaleStatus"):
+		return &applyconfigurationsautoscalingv1.ScaleStatusApplyConfiguration{}
 
 		// Group=autoscaling, Version=v2beta1
 	case v2beta1.SchemeGroupVersion.WithKind("ContainerResourceMetricSource"):
@@ -903,6 +911,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsextensionsv1beta1.RunAsUserStrategyOptionsApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("RuntimeClassStrategyOptions"):
 		return &applyconfigurationsextensionsv1beta1.RuntimeClassStrategyOptionsApplyConfiguration{}
+	case extensionsv1beta1.SchemeGroupVersion.WithKind("Scale"):
+		return &applyconfigurationsextensionsv1beta1.ScaleApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("SELinuxStrategyOptions"):
 		return &applyconfigurationsextensionsv1beta1.SELinuxStrategyOptionsApplyConfiguration{}
 	case extensionsv1beta1.SchemeGroupVersion.WithKind("SupplementalGroupsStrategyOptions"):
