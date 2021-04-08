@@ -1032,6 +1032,244 @@ func TestErrorPropagation(t *testing.T) {
 	}
 }
 
+func TestServeHTTPBehindReverseProxy(t *testing.T) {
+	reverseProxyPath := "/proxy-server"
+	tests := []struct {
+		name                  string
+		method                string
+		requestPath           string
+		expectedPath          string
+		requestBody           string
+		requestParams         map[string]string
+		requestHeader         map[string]string
+		responseHeader        map[string]string
+		expectedRespHeader    map[string]string
+		notExpectedRespHeader []string
+		upgradeRequired       bool
+		expectError           func(err error) bool
+	}{
+		{
+			name:         "root path, simple get",
+			method:       "GET",
+			requestPath:  "/",
+			expectedPath: "/",
+		},
+		{
+			name:            "no upgrade header sent",
+			method:          "GET",
+			requestPath:     "/",
+			upgradeRequired: true,
+			expectError: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "Upgrade request required")
+			},
+		},
+		{
+			name:         "simple path, get",
+			method:       "GET",
+			requestPath:  "/path/to/test",
+			expectedPath: "/path/to/test",
+		},
+		{
+			name:          "request params",
+			method:        "POST",
+			requestPath:   "/some/path/",
+			expectedPath:  "/some/path/",
+			requestParams: map[string]string{"param1": "value/1", "param2": "value%2"},
+			requestBody:   "test request body",
+		},
+		{
+			name:          "request headers",
+			method:        "PUT",
+			requestPath:   "/some/path",
+			expectedPath:  "/some/path",
+			requestHeader: map[string]string{"Header1": "value1", "Header2": "value2"},
+		},
+		{
+			name:         "empty path - slash should be added",
+			method:       "GET",
+			requestPath:  "",
+			expectedPath: "/",
+		},
+		{
+			name:         "remove CORS headers",
+			method:       "GET",
+			requestPath:  "/some/path",
+			expectedPath: "/some/path",
+			responseHeader: map[string]string{
+				"Header1":                      "value1",
+				"Access-Control-Allow-Origin":  "some.server",
+				"Access-Control-Allow-Methods": "GET"},
+			expectedRespHeader: map[string]string{
+				"Header1": "value1",
+			},
+			notExpectedRespHeader: []string{
+				"Access-Control-Allow-Origin",
+				"Access-Control-Allow-Methods",
+			},
+		},
+		{
+			name:         "use location host",
+			method:       "GET",
+			requestPath:  "/some/path",
+			expectedPath: "/some/path",
+		},
+		{
+			name:            "use location host - invalid upgrade",
+			method:          "GET",
+			upgradeRequired: true,
+			requestHeader: map[string]string{
+				httpstream.HeaderConnection: httpstream.HeaderUpgrade,
+			},
+			expectError: func(err error) bool {
+				return err != nil && strings.Contains(err.Error(), "invalid upgrade response: status code 200")
+			},
+			requestPath:  "/some/path",
+			expectedPath: "/some/path",
+		},
+	}
+
+	for i, test := range tests {
+		func() {
+			backendResponse := "<html><head></head><body><a href=\"/test/path\">Hello</a></body></html>"
+			backendResponseHeader := test.responseHeader
+			// Test a simple header if not specified in the test
+			if backendResponseHeader == nil && test.expectedRespHeader == nil {
+				backendResponseHeader = map[string]string{"Content-Type": "text/html"}
+				test.expectedRespHeader = map[string]string{"Content-Type": "text/html"}
+			}
+			backendHandler := &SimpleBackendHandler{
+				responseBody:   backendResponse,
+				responseHeader: backendResponseHeader,
+			}
+			backendServer := httptest.NewServer(backendHandler)
+			defer backendServer.Close()
+
+			responder := &fakeResponder{t: t}
+			serverURL, _ := url.Parse(backendServer.URL)
+
+			reverseProxy := httputil.NewSingleHostReverseProxy(serverURL)
+			reverseProxy.Director = func(req *http.Request) {
+				req.Header.Add("X-Forwarded-For", req.Host)
+				req.Header.Add("X-Origin-Host", serverURL.Host)
+				req.URL.Scheme = serverURL.Scheme
+				req.URL.Host = serverURL.Host
+
+				proxyPath := singleJoiningSlash(serverURL.Path, strings.TrimPrefix(req.URL.Path, reverseProxyPath))
+				req.URL.Path = proxyPath
+			}
+			reverseProxyServer := httptest.NewServer(reverseProxy)
+			defer reverseProxyServer.Close()
+			reverseProxyURL, _ := url.Parse(reverseProxyServer.URL)
+			reverseProxyURL.Path = reverseProxyPath
+			proxyHandler := NewUpgradeAwareHandler(reverseProxyURL, nil, false, test.upgradeRequired, responder)
+			proxyHandler.UseFullLocation = true
+			proxyHandler.UseLocationHost = true
+			proxyHandler.UseRequestLocation = true
+			proxyServer := httptest.NewServer(proxyHandler)
+			defer proxyServer.Close()
+			proxyURL, _ := url.Parse(proxyServer.URL)
+			proxyURL.Path = test.requestPath
+			paramValues := url.Values{}
+			for k, v := range test.requestParams {
+				paramValues[k] = []string{v}
+			}
+			proxyURL.RawQuery = paramValues.Encode()
+			var requestBody io.Reader
+			if test.requestBody != "" {
+				requestBody = bytes.NewBufferString(test.requestBody)
+			}
+			req, err := http.NewRequest(test.method, proxyURL.String(), requestBody)
+			if test.requestHeader != nil {
+				header := http.Header{}
+				for k, v := range test.requestHeader {
+					header.Add(k, v)
+				}
+				req.Header = header
+			}
+			if err != nil {
+				t.Errorf("Error creating client request: %v", err)
+			}
+			client := &http.Client{}
+			res, err := client.Do(req)
+			if err != nil {
+				t.Errorf("Error from proxy request: %v", err)
+			}
+
+			if test.expectError != nil {
+				if !responder.called {
+					t.Errorf("%d: responder was not invoked", i)
+					return
+				}
+				if !test.expectError(responder.err) {
+					t.Errorf("%d: unexpected error: %v", i, responder.err)
+				}
+				return
+			}
+
+			// Host
+			if backendHandler.requestHost != reverseProxyURL.Host {
+				t.Errorf("Unexpected request host: %s Expected: %s", backendHandler.requestHost, reverseProxyURL.Host)
+			}
+
+			// Validate backend request
+			// Method
+			if backendHandler.requestMethod != test.method {
+				t.Errorf("Unexpected request method: %s. Expected: %s",
+					backendHandler.requestMethod, test.method)
+			}
+
+			// Body
+			if string(backendHandler.requestBody) != test.requestBody {
+				t.Errorf("Unexpected request body: %s. Expected: %s",
+					string(backendHandler.requestBody), test.requestBody)
+			}
+
+			// Path
+			if backendHandler.requestURL.Path != test.expectedPath {
+				t.Errorf("Unexpected request path: %s", backendHandler.requestURL.Path)
+			}
+			// Parameters
+			validateParameters(t, test.name, backendHandler.requestURL.Query(), test.requestParams)
+
+			// Headers
+			validateHeaders(t, test.name+" backend request", backendHandler.requestHeader,
+				test.requestHeader, nil)
+
+			// Validate proxy response
+
+			// Response Headers
+			validateHeaders(t, test.name+" backend headers", res.Header, test.expectedRespHeader, test.notExpectedRespHeader)
+
+			// Validate Body
+			responseBody, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				t.Errorf("Unexpected error reading response body: %v", err)
+			}
+			expectedResponse := strings.ReplaceAll(backendResponse, "/test/path", singleJoiningSlash(test.requestPath, "/test/path"))
+			if rb := string(responseBody); rb != expectedResponse {
+				t.Errorf("Did not get expected response body: %s. Expected: %s", rb, backendResponse)
+			}
+
+			// Error
+			if responder.called {
+				t.Errorf("Unexpected proxy handler error: %v", responder.err)
+			}
+		}()
+	}
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
+}
+
 // exampleCert was generated from crypto/tls/generate_cert.go with the following command:
 //    go run generate_cert.go  --rsa-bits 1024 --host example.com --ca --start-date "Jan 1 00:00:00 1970" --duration=1000000h
 var exampleCert = []byte(`-----BEGIN CERTIFICATE-----

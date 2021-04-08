@@ -215,6 +215,7 @@ func NewProxyHandler(apiProxyPrefix string, filter *FilterServer, cfg *rest.Conf
 	proxy.UpgradeTransport = upgradeTransport
 	proxy.UseRequestLocation = true
 	proxy.UseLocationHost = true
+	proxy.UseFullLocation = true
 
 	proxyServer := http.Handler(proxy)
 	if filter != nil {
