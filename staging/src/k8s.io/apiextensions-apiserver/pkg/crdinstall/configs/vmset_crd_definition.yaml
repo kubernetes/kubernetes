@@ -1,0 +1,56 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vmsets.example.com
+spec:
+  group: example.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                vmtemplate:
+                  type: string
+                vmcount:
+                  type: integer
+            status:
+              type: object
+              properties:
+                available:
+                  type: integer
+                labelSelector:
+                  type: string
+      additionalPrinterColumns:
+      - name: Available
+        type: integer
+        description: The available number of VMs
+        jsonPath: .status.available
+      - name: VMCount
+        type: integer
+        description: The desired number of VMs
+        jsonPath: .spec.vmcount
+      # subresources describes the subresources for custom resources.
+      subresources:
+        # status enables the status subresource.
+        status: {}
+        # scale enables the scale subresource.
+        scale:
+          # specReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Spec.Replicas.
+          specReplicasPath: .spec.vmcount
+          # statusReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Replicas.
+          statusReplicasPath: .status.available
+          # labelSelectorPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Selector.
+          labelSelectorPath: .status.labelSelector
+  scope: Namespaced
+  names:
+    plural: vmsets
+    singular: vmset
+    kind: VMSet
+    shortNames:
+    - vmset
