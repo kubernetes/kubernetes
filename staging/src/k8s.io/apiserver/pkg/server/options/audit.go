@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/sets"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	auditv1alpha1 "k8s.io/apiserver/pkg/apis/audit/v1alpha1"
@@ -478,14 +479,7 @@ func (o *AuditLogOptions) Validate() []error {
 	}
 
 	// Check log format
-	validFormat := false
-	for _, f := range pluginlog.AllowedFormats {
-		if f == o.Format {
-			validFormat = true
-			break
-		}
-	}
-	if !validFormat {
+	if !sets.NewString(pluginlog.AllowedFormats...).Has(o.Format) {
 		allErrors = append(allErrors, fmt.Errorf("invalid audit log format %s, allowed formats are %q", o.Format, strings.Join(pluginlog.AllowedFormats, ",")))
 	}
 
