@@ -21,8 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apiserver/pkg/server/dynamiccertificates"
-
 	"github.com/spf13/pflag"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,9 +28,11 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
 	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/transport"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
@@ -198,6 +198,9 @@ type DelegatingAuthenticationOptions struct {
 	// ClientTimeout specifies a time limit for requests made by the authorization webhook client.
 	// The default value is set to 10 seconds.
 	ClientTimeout time.Duration
+
+	// CustomRoundTripperFn allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
+	CustomRoundTripperFn transport.WrapperFunc
 }
 
 func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
@@ -223,6 +226,11 @@ func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Ba
 // WithClientTimeout sets the given timeout for the authentication webhook client.
 func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duration) {
 	s.ClientTimeout = timeout
+}
+
+// WithCustomRoundTripper allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
+func (s *DelegatingAuthenticationOptions) WithCustomRoundTripper(rt transport.WrapperFunc) {
+	s.CustomRoundTripperFn = rt
 }
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
@@ -420,6 +428,9 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
 	clientConfig.Timeout = s.ClientTimeout
+	if s.CustomRoundTripperFn != nil {
+		clientConfig.Wrap(s.CustomRoundTripperFn)
+	}
 
 	return kubernetes.NewForConfig(clientConfig)
 }
