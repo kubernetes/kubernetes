@@ -504,13 +504,6 @@ func TestPodControllerLookup(t *testing.T) {
 	}
 }
 
-// byName sorts pods by their names.
-type byName []*v1.Pod
-
-func (pods byName) Len() int           { return len(pods) }
-func (pods byName) Swap(i, j int)      { pods[i], pods[j] = pods[j], pods[i] }
-func (pods byName) Less(i, j int) bool { return pods[i].Name < pods[j].Name }
-
 func TestRelatedPodsLookup(t *testing.T) {
 	someRS := newReplicaSet(1, map[string]string{"foo": "bar"})
 	someRS.Name = "foo1"
@@ -1222,7 +1215,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 		t.Fatalf("Deleting RS didn't result in new item in the queue: %v", err)
 	}
 
-	rsExp, exists, err = manager.expectations.GetExpectations(oldRSKey)
+	_, exists, err = manager.expectations.GetExpectations(oldRSKey)
 	if err != nil {
 		t.Fatal(err)
 	}
