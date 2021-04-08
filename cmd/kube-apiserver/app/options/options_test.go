@@ -25,15 +25,15 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
-	"k8s.io/component-base/logs"
-
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
+	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	auditbuffered "k8s.io/apiserver/plugin/pkg/audit/buffered"
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
+	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controlplane/reconcilers"
@@ -116,6 +116,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
+		"--lease-reuse-duration-seconds=100",
 	}
 	fs.Parse(args)
 
@@ -161,6 +162,10 @@ func TestAddFlags(t *testing.T) {
 				CountMetricPollPeriod: time.Minute,
 				DBMetricPollInterval:  storagebackend.DefaultDBMetricPollInterval,
 				HealthcheckTimeout:    storagebackend.DefaultHealthcheckTimeout,
+				LeaseManagerConfig: etcd3.LeaseManagerConfig{
+					ReuseDurationSeconds: 100,
+					MaxObjectCount:       1000,
+				},
 			},
 			DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
 			DeleteCollectionWorkers: 1,
