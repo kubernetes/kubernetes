@@ -233,7 +233,7 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 		delete(ect.lastChangeTriggerTimes, namespacedName)
 	} else {
 		for spn, eps := range change.current {
-			klog.V(2).Infof("Service port %s updated: %d endpoints", spn, len(eps))
+			klog.V(2).InfoS("Service port updated endpoints", "serviceport", spn, "endpointscount", len(eps))
 		}
 	}
 
@@ -246,13 +246,13 @@ func (ect *EndpointChangeTracker) Update(previous, current *v1.Endpoints) bool {
 // If removeSlice is true, slice will be removed, otherwise it will be added or updated.
 func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.EndpointSlice, removeSlice bool) bool {
 	if !supportedEndpointSliceAddressTypes.Has(string(endpointSlice.AddressType)) {
-		klog.V(4).Infof("EndpointSlice address type not supported by kube-proxy: %s", endpointSlice.AddressType)
+		klog.V(4).InfoS("EndpointSlice address type not supported by kube-proxy", "AddressType", endpointSlice.AddressType)
 		return false
 	}
 
 	// This should never happen
 	if endpointSlice == nil {
-		klog.Error("Nil endpointSlice passed to EndpointSliceUpdate")
+		klog.ErrorS(nil, "Nil endpointSlice passed to EndpointSliceUpdate")
 		return false
 	}
 
@@ -447,7 +447,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				}
 			}
 
-			klog.V(3).Infof("Setting endpoints for %q to %+v", svcPortName, formatEndpointsList(endpointsMap[svcPortName]))
+			klog.V(3).InfoS("Setting endpoints", "serviceport", svcPortName, "endpoints", formatEndpointsList(endpointsMap[svcPortName]))
 		}
 	}
 	return endpointsMap
@@ -531,7 +531,7 @@ func detectStaleConnections(oldEndpointsMap, newEndpointsMap EndpointsMap, stale
 				}
 			}
 			if stale {
-				klog.V(4).Infof("Stale endpoint %v -> %v", svcPortName, ep.String())
+				klog.V(4).InfoS("Stale endpoint", "serviceport", svcPortName, "endpoint", ep.String())
 				*staleEndpoints = append(*staleEndpoints, ServiceEndpoint{Endpoint: ep.String(), ServicePortName: svcPortName})
 			}
 		}

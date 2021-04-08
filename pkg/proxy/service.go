@@ -188,14 +188,14 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 
 	// Log the IPs not matching the ipFamily
 	if ips, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ips) > 0 {
-		klog.V(4).Infof("service change tracker(%v) ignored the following external IPs(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ips, ","), service.Namespace, service.Name)
+		klog.V(4).InfoS("service change tracker ignored the following external IPs for service as they don't match IPFamily", "ipFamily", sct.ipFamily, "ips", strings.Join(ips, ","), "namespace", service.Namespace, "service", service.Name)
 	}
 
 	ipFamilyMap = utilproxy.MapCIDRsByIPFamily(loadBalancerSourceRanges)
 	info.loadBalancerSourceRanges = ipFamilyMap[sct.ipFamily]
 	// Log the CIDRs not matching the ipFamily
 	if cidrs, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(cidrs) > 0 {
-		klog.V(4).Infof("service change tracker(%v) ignored the following load balancer source ranges(%s) for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(cidrs, ","), service.Namespace, service.Name)
+		klog.V(4).InfoS("service change tracker ignored the following load balancer source ranges for service as they don't match IPFamily", "ipFamily", sct.ipFamily, "cidrs", strings.Join(cidrs, ","), "namespace", service.Namespace, "service", service.Name)
 	}
 
 	// Obtain Load Balancer Ingress IPs
@@ -208,7 +208,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		ipFamilyMap = utilproxy.MapIPsByIPFamily(ips)
 
 		if ipList, ok := ipFamilyMap[utilproxy.OtherIPFamily(sct.ipFamily)]; ok && len(ipList) > 0 {
-			klog.V(4).Infof("service change tracker(%v) ignored the following load balancer(%s) ingress ips for service %v/%v as they don't match IPFamily", sct.ipFamily, strings.Join(ipList, ","), service.Namespace, service.Name)
+			klog.V(4).InfoS("service change tracker ignored the following load balancer ingress ips for service as they don't match IPFamily", "ipFamily", sct.ipFamily, "ipList", strings.Join(ipList, ","), "namespace", service.Namespace, "service", service.Name)
 
 		}
 		// Create the LoadBalancerStatus with the filtered IPs
@@ -220,7 +220,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	if apiservice.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
-			klog.Errorf("Service %s/%s has no healthcheck nodeport", service.Namespace, service.Name)
+			klog.ErrorS(nil, "Service has no healthcheck nodeport", "namespace", service.Namespace, "service", service.Name)
 		} else {
 			info.healthCheckNodePort = int(p)
 		}
@@ -303,7 +303,7 @@ func (sct *ServiceChangeTracker) Update(previous, current *v1.Service) bool {
 	if reflect.DeepEqual(change.previous, change.current) {
 		delete(sct.items, namespacedName)
 	} else {
-		klog.V(2).Infof("Service %s updated: %d ports", namespacedName, len(change.current))
+		klog.V(2).InfoS("Service updated ports", "service", namespacedName, "change.current", len(change.current))
 	}
 	metrics.ServiceChangesPending.Set(float64(len(sct.items)))
 	return len(sct.items) > 0
@@ -418,9 +418,9 @@ func (sm *ServiceMap) merge(other ServiceMap) sets.String {
 		existingPorts.Insert(svcPortName.String())
 		_, exists := (*sm)[svcPortName]
 		if !exists {
-			klog.V(1).Infof("Adding new service port %q at %s", svcPortName, info.String())
+			klog.V(1).InfoS("Adding new service port ", "serviceport", svcPortName, "info", info.String())
 		} else {
-			klog.V(1).Infof("Updating existing service port %q at %s", svcPortName, info.String())
+			klog.V(1).InfoS("Updating existing service port", "serviceport", svcPortName, "info", info.String())
 		}
 		(*sm)[svcPortName] = info
 	}
@@ -443,13 +443,13 @@ func (sm *ServiceMap) unmerge(other ServiceMap, UDPStaleClusterIP sets.String) {
 	for svcPortName := range other {
 		info, exists := (*sm)[svcPortName]
 		if exists {
-			klog.V(1).Infof("Removing service port %q", svcPortName)
+			klog.V(1).InfoS("Removing service port", "serviceport", svcPortName)
 			if info.Protocol() == v1.ProtocolUDP {
 				UDPStaleClusterIP.Insert(info.ClusterIP().String())
 			}
 			delete(*sm, svcPortName)
 		} else {
-			klog.Errorf("Service port %q doesn't exists", svcPortName)
+			klog.ErrorS(nil, "Service port doesn't exists", "serviceport", svcPortName)
 		}
 	}
 }
