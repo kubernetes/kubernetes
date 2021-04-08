@@ -60,6 +60,9 @@ type UpgradeAwareHandler struct {
 	// Location is the location of the upstream proxy. It is used as the location to Dial on the upstream server
 	// for upgrade requests unless UseRequestLocationOnUpgrade is true.
 	Location *url.URL
+	// UseFullLocation enables using full location in reverse proxy.
+	// It is allowed to connect to the Kubernetes API through a reverse proxy with an additional path in the URL.
+	UseFullLocation bool
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper
 	// UpgradeTransport, if specified, will be used as the backend transport when upgrade requests are provided.
@@ -239,7 +242,11 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		newReq.Host = h.Location.Host
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
+	targetUrl := url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host}
+	if h.UseFullLocation {
+		targetUrl = *h.Location
+	}
+	proxy := httputil.NewSingleHostReverseProxy(&targetUrl)
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
 	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
