@@ -915,6 +915,12 @@ func SetObjectDefaults_SecretList(in *v1.SecretList) {
 
 func SetObjectDefaults_Service(in *v1.Service) {
 	SetDefaults_Service(in)
+	for i := range in.Spec.Ports {
+		a := &in.Spec.Ports[i]
+		if reflect.ValueOf(a.Protocol).IsZero() {
+			a.Protocol = "TCP"
+		}
+	}
 }
 
 func SetObjectDefaults_ServiceList(in *v1.ServiceList) {

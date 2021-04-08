@@ -165,6 +165,8 @@ type Config struct {
 	Serializer runtime.NegotiatedSerializer
 	// OpenAPIConfig will be used in generating OpenAPI spec. This is nil by default. Use DefaultOpenAPIConfig for "working" defaults.
 	OpenAPIConfig *openapicommon.Config
+	// SkipOpenAPIInstallation avoids installing the OpenAPI handler if set to true.
+	SkipOpenAPIInstallation bool
 
 	// RESTOptionsGetter is used to construct RESTStorage types via the generic registry.
 	RESTOptionsGetter genericregistry.RESTOptionsGetter
@@ -571,7 +573,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		listedPathProvider: apiServerHandler,
 
-		openAPIConfig: c.OpenAPIConfig,
+		openAPIConfig:           c.OpenAPIConfig,
+		skipOpenAPIInstallation: c.SkipOpenAPIInstallation,
 
 		postStartHooks:         map[string]postStartHookEntry{},
 		preShutdownHooks:       map[string]preShutdownHookEntry{},
