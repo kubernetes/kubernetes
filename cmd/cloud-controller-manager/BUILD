@@ -23,9 +23,11 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/cloud-controller-manager",
     deps = [
+        "//cmd/kube-controller-manager/app/options:go_default_library",
         "//pkg/controller/nodeipam:go_default_library",
         "//pkg/controller/nodeipam/config:go_default_library",
         "//pkg/controller/nodeipam/ipam:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/app:go_default_library",

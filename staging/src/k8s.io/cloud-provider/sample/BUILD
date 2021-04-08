@@ -1,17 +1,16 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = [
-        "advanced_main.go",
-        "basic_main.go",
-    ],
+    srcs = ["basic_main.go"],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/sample",
     importpath = "k8s.io/cloud-provider/sample",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/app:go_default_library",
+        "//staging/src/k8s.io/cloud-provider/app/config:go_default_library",
         "//staging/src/k8s.io/cloud-provider/options:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
@@ -33,5 +32,11 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)
+
+go_binary(
+    name = "sample",
+    embed = [":go_default_library"],
     visibility = ["//visibility:public"],
 )

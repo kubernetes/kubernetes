@@ -28,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider/app:go_default_library",
         "//staging/src/k8s.io/cloud-provider/app/config:go_default_library",
         "//staging/src/k8s.io/cloud-provider/options:go_default_library",
+        "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )
