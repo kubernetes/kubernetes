@@ -260,8 +260,7 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 
 	go func() {
 		defer writer.Close()
-		err := makeTar(src.File, dest.File, writer)
-		cmdutil.CheckErr(err)
+		cmdutil.CheckErr(makeTar(src.File, dest.File, writer))
 	}()
 	var cmdArr []string
 
@@ -318,8 +317,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 
 	go func() {
 		defer outStream.Close()
-		err := o.execute(options)
-		cmdutil.CheckErr(err)
+		cmdutil.CheckErr(o.execute(options))
 	}()
 	prefix := getPrefix(src.File)
 	prefix = path.Clean(prefix)
