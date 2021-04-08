@@ -35,6 +35,8 @@ const (
 	ContainersNotInitialized = "ContainersNotInitialized"
 	// ReadinessGatesNotReady says that one or more pod readiness gates are not ready.
 	ReadinessGatesNotReady = "ReadinessGatesNotReady"
+	// ContainersTerminated says that one or more containers are terminated.
+	ContainersTerminated = "ContainersTerminated"
 )
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.

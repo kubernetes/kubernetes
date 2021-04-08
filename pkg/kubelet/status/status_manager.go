@@ -97,6 +97,10 @@ type Manager interface {
 	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
 	SetPodStatus(pod *v1.Pod, status v1.PodStatus)
 
+	// SetContainerTerminated updates the cached container status with the given terminated, and
+	// triggers a status update.
+	SetContainerTerminated(podUID types.UID, containerID kubecontainer.ContainerID)
+
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
 	SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool)
@@ -197,6 +201,74 @@ func (m *manager) SetPodStatus(pod *v1.Pod, status v1.PodStatus) {
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
+	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
+}
+
+func (m *manager) SetContainerTerminated(podUID types.UID, containerID kubecontainer.ContainerID) {
+	m.podStatusesLock.Lock()
+	defer m.podStatusesLock.Unlock()
+
+	pod, ok := m.podManager.GetPodByUID(podUID)
+	if !ok {
+		klog.V(4).InfoS("Pod has been deleted, no need to update terminated",
+			"podUID", string(podUID))
+		return
+	}
+
+	oldStatus, found := m.podStatuses[pod.UID]
+	if !found {
+		klog.InfoS("Container terminated changed before pod has synced",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	// Find the container to update.
+	containerStatus, _, ok := findContainerStatus(&oldStatus.status, containerID.String())
+	if !ok {
+		klog.InfoS("Container terminated changed for unknown container",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	if containerStatus.Ready == false {
+		klog.V(4).InfoS("Container terminated unchanged",
+			"pod", klog.KObj(pod),
+			"containerID", containerID.String())
+		return
+	}
+
+	status := *oldStatus.status.DeepCopy()
+	containerStatus, _, _ = findContainerStatus(&status, containerID.String())
+	containerStatus.Ready = false
+
+	// updateConditionFunc updates the corresponding type of condition
+	updateConditionFunc := func(conditionType v1.PodConditionType, condition v1.PodCondition) {
+		conditionIndex := -1
+		for i, condition := range status.Conditions {
+			if condition.Type == conditionType {
+				conditionIndex = i
+				break
+			}
+		}
+		if conditionIndex != -1 {
+			status.Conditions[conditionIndex] = condition
+		} else {
+			klog.InfoS("PodStatus missing condition type", "conditionType", conditionType, "status", status)
+			status.Conditions = append(status.Conditions, condition)
+		}
+	}
+	updateConditionFunc(v1.PodReady, v1.PodCondition{
+		Type:   v1.PodReady,
+		Status: v1.ConditionFalse,
+		Reason: ContainersNotReady,
+	})
+	updateConditionFunc(v1.ContainersReady, v1.PodCondition{
+		Type:   v1.ContainersReady,
+		Status: v1.ConditionFalse,
+		Reason: ContainersTerminated,
+	})
 	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
 }
 

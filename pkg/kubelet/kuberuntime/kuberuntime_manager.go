@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -147,6 +148,9 @@ type kubeGenericRuntimeManager struct {
 	// Use RuntimeDefault as the default seccomp profile for all workloads.
 	seccompDefault bool
 
+	// Syncs pods statuses with apiserver
+	statusManager status.Manager
+
 	// MemorySwapBehavior defines how swap is used
 	memorySwapBehavior string
 
@@ -197,6 +201,7 @@ func NewKubeGenericRuntimeManager(
 	logManager logs.ContainerLogManager,
 	runtimeClassManager *runtimeclass.Manager,
 	seccompDefault bool,
+	statusManager status.Manager,
 	memorySwapBehavior string,
 	getNodeAllocatable func() v1.ResourceList,
 	memoryThrottlingFactor float64,
@@ -220,6 +225,7 @@ func NewKubeGenericRuntimeManager(
 		runtimeClassManager:    runtimeClassManager,
 		logReduction:           logreduction.NewLogReduction(identicalErrorDelay),
 		seccompDefault:         seccompDefault,
+		statusManager:          statusManager,
 		memorySwapBehavior:     memorySwapBehavior,
 		getNodeAllocatable:     getNodeAllocatable,
 		memoryThrottlingFactor: memoryThrottlingFactor,

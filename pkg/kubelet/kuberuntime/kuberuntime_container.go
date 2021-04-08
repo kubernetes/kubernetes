@@ -746,6 +746,9 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 				klog.ErrorS(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
 					"containerName", container.Name, "containerID", container.ID)
 			}
+			if m.statusManager != nil {
+				m.statusManager.SetContainerTerminated(pod.UID, container.ID)
+			}
 			containerResults <- killContainerResult
 		}(container)
 	}
