@@ -25,8 +25,6 @@ import (
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 
-	"k8s.io/kubernetes/pkg/cluster/ports"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/utils/pointer"
 )
@@ -44,18 +42,18 @@ func SetDefaults_KubeProxyConfiguration(obj *kubeproxyconfigv1alpha1.KubeProxyCo
 	defaultHealthzAddress, defaultMetricsAddress := getDefaultAddresses(obj.BindAddress)
 
 	if obj.HealthzBindAddress == "" {
-		obj.HealthzBindAddress = fmt.Sprintf("%s:%v", defaultHealthzAddress, ports.ProxyHealthzPort)
+		obj.HealthzBindAddress = fmt.Sprintf("%s:%v", defaultHealthzAddress, kubeproxyconfigv1alpha1.ProxyHealthzPort)
 	} else {
-		obj.HealthzBindAddress = proxyutil.AppendPortIfNeeded(obj.HealthzBindAddress, ports.ProxyHealthzPort)
+		obj.HealthzBindAddress = proxyutil.AppendPortIfNeeded(obj.HealthzBindAddress, kubeproxyconfigv1alpha1.ProxyHealthzPort)
 	}
 	if obj.MetricsBindAddress == "" {
-		obj.MetricsBindAddress = fmt.Sprintf("%s:%v", defaultMetricsAddress, ports.ProxyStatusPort)
+		obj.MetricsBindAddress = fmt.Sprintf("%s:%v", defaultMetricsAddress, kubeproxyconfigv1alpha1.ProxyStatusPort)
 	} else {
-		obj.MetricsBindAddress = proxyutil.AppendPortIfNeeded(obj.MetricsBindAddress, ports.ProxyStatusPort)
+		obj.MetricsBindAddress = proxyutil.AppendPortIfNeeded(obj.MetricsBindAddress, kubeproxyconfigv1alpha1.ProxyStatusPort)
 	}
 
 	if obj.OOMScoreAdj == nil {
-		temp := int32(qos.KubeProxyOOMScoreAdj)
+		temp := int32(kubeproxyconfigv1alpha1.KubeProxyOOMScoreAdj)
 		obj.OOMScoreAdj = &temp
 	}
 	if obj.IPTables.SyncPeriod.Duration == 0 {

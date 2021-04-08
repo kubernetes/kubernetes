@@ -26,10 +26,9 @@ import (
 	"github.com/lithammer/dedent"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ServiceHealthServer serves HTTP endpoints for each service name, with results
@@ -111,7 +110,7 @@ func (hcs *server) SyncServices(newServices map[types.NamespacedName]uint16) err
 						Namespace: nsn.Namespace,
 						Name:      nsn.Name,
 						UID:       types.UID(nsn.String()),
-					}, api.EventTypeWarning, "FailedToStartServiceHealthcheck", msg)
+					}, v1.EventTypeWarning, "FailedToStartServiceHealthcheck", msg)
 			}
 			klog.Error(msg)
 			continue

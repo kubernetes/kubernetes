@@ -282,15 +282,6 @@ func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str) || IsExtendedResourceName(core.ResourceName(str))
 }
 
-// IsServiceIPSet aims to check if the service's ClusterIP is set or not
-// the objective is not to perform validation here
-func IsServiceIPSet(service *core.Service) bool {
-	// This function assumes that the service is semantically validated
-	// it does not test if the IP is valid, just makes sure that it is set.
-	return len(service.Spec.ClusterIP) > 0 &&
-		service.Spec.ClusterIP != core.ClusterIPNone
-}
-
 var standardFinalizers = sets.NewString(
 	string(core.FinalizerKubernetes),
 	metav1.FinalizerOrphanDependents,

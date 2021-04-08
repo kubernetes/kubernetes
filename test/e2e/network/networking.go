@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilwait "k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/cluster/ports"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -141,11 +141,11 @@ var _ = common.SIGDescribe("Networking", func() {
 		config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.UseHostNetwork)
 
 		ginkgo.By("checking kube-proxy URLs")
-		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "200 OK")
+		config.GetSelfURL(kubeproxyconfig.ProxyHealthzPort, "/healthz", "200 OK")
 		// Verify /healthz returns the proper content.
-		config.GetSelfURL(ports.ProxyHealthzPort, "/healthz", "lastUpdated")
+		config.GetSelfURL(kubeproxyconfig.ProxyHealthzPort, "/healthz", "lastUpdated")
 		// Verify /proxyMode returns http status code 200.
-		config.GetSelfURLStatusCode(ports.ProxyStatusPort, "/proxyMode", "200")
+		config.GetSelfURLStatusCode(kubeproxyconfig.ProxyStatusPort, "/proxyMode", "200")
 	})
 
 	ginkgo.Describe("Granular Checks: Services", func() {

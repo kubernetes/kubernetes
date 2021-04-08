@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/component-helpers/networking/corev1"
 )
 
 // FromServices builds environment variables that a container is started with,

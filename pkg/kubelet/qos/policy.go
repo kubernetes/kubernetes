@@ -24,9 +24,7 @@ import (
 
 const (
 	// KubeletOOMScoreAdj is the OOM score adjustment for Kubelet
-	KubeletOOMScoreAdj int = -999
-	// KubeProxyOOMScoreAdj is the OOM score adjustment for kube-proxy
-	KubeProxyOOMScoreAdj  int = -999
+	KubeletOOMScoreAdj    int = -999
 	guaranteedOOMScoreAdj int = -997
 	besteffortOOMScoreAdj int = 1000
 )

@@ -134,12 +134,6 @@ func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// IsServiceIPSet aims to check if the service's ClusterIP is set or not
-// the objective is not to perform validation here
-func IsServiceIPSet(service *v1.Service) bool {
-	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
-}
-
 // LoadBalancerStatusEqual evaluates the given load balancers' ingress IP addresses
 // and hostnames and returns true if equal or false if otherwise
 // TODO: make method on LoadBalancerStatus?

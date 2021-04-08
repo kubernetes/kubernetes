@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -228,7 +229,7 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 		}
 		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
 		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
+		assertNotReachableHTTPTimeout(nodeAddr, "/", kubeproxyconfig.ProxyStatusPort, firewallTestTCPTimeout, false)
 	})
 })
 

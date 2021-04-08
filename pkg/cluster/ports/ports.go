@@ -19,9 +19,6 @@ package ports
 // In this file, we can see all default port of cluster.
 // It's also an important documentation for us. So don't remove them easily.
 const (
-	// ProxyStatusPort is the default port for the proxy metrics server.
-	// May be overridden by a flag at startup.
-	ProxyStatusPort = 10249
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
@@ -35,9 +32,6 @@ const (
 	// until heapster can transition to using the SSL endpoint.
 	// TODO(roberthbailey): Remove this once we have a better solution for heapster.
 	KubeletReadOnlyPort = 10255
-	// ProxyHealthzPort is the default port for the proxy healthz server.
-	// May be overridden by a flag at startup.
-	ProxyHealthzPort = 10256
 	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	KubeControllerManagerPort = 10257

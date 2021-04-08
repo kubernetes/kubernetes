@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	helpers "k8s.io/component-helpers/networking/corev1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
@@ -146,12 +146,12 @@ func (info *BaseServiceInfo) HintsAnnotation() string {
 
 func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, service *v1.Service) *BaseServiceInfo {
 	nodeLocalExternal := false
-	if apiservice.RequestsOnlyLocalTraffic(service) {
+	if helpers.RequestsOnlyLocalTraffic(service) {
 		nodeLocalExternal = true
 	}
 	nodeLocalInternal := false
 	if utilfeature.DefaultFeatureGate.Enabled(features.ServiceInternalTrafficPolicy) {
-		nodeLocalInternal = apiservice.RequestsOnlyLocalTrafficForInternal(service)
+		nodeLocalInternal = helpers.RequestsOnlyLocalTrafficForInternal(service)
 	}
 	var stickyMaxAgeSeconds int
 	if service.Spec.SessionAffinity == v1.ServiceAffinityClientIP {
@@ -217,7 +217,7 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 		}
 	}
 
-	if apiservice.NeedsHealthCheck(service) {
+	if helpers.NeedsHealthCheck(service) {
 		p := service.Spec.HealthCheckNodePort
 		if p == 0 {
 			klog.Errorf("Service %s/%s has no healthcheck nodeport", service.Namespace, service.Name)

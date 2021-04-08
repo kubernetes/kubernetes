@@ -22,11 +22,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
 // ProxierHealthUpdater allows callers to update healthz timestamp only.
@@ -99,7 +98,7 @@ func (hs *proxierHealthServer) Run() error {
 		msg := fmt.Sprintf("failed to start proxier healthz on %s: %v", hs.addr, err)
 		// TODO(thockin): move eventing back to caller
 		if hs.recorder != nil {
-			hs.recorder.Eventf(hs.nodeRef, api.EventTypeWarning, "FailedToStartProxierHealthcheck", msg)
+			hs.recorder.Eventf(hs.nodeRef, v1.EventTypeWarning, "FailedToStartProxierHealthcheck", msg)
 		}
 		return fmt.Errorf("%v", msg)
 	}

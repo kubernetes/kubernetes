@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	kubeproxyconfig "k8s.io/kube-proxy/config/v1alpha1"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -345,7 +346,7 @@ var _ = SIGDescribe("DaemonRestart [Disruptive]", func() {
 		}
 		for _, ip := range nodeIPs {
 			restarter := NewRestartConfig(
-				ip, "kube-proxy", ports.ProxyHealthzPort, restartPollInterval, restartTimeout, false)
+				ip, "kube-proxy", kubeproxyconfig.ProxyHealthzPort, restartPollInterval, restartTimeout, false)
 			// restart method will kill the kube-proxy process and wait for recovery,
 			// if not able to recover, will throw test failure.
 			restarter.restart()
