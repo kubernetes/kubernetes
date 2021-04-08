@@ -10957,6 +10957,21 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "valid type - loadbalancer with allocateLoadBalancerNodePorts=false",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+				s.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid type - missing AllocateLoadBalancerNodePorts for loadbalancer type",
+			tweakSvc: func(s *core.Service) {
+				s.Spec.Type = core.ServiceTypeLoadBalancer
+			},
+			numErrs: 1,
+		},
+		{
 			name: "valid type loadbalancer 2 ports",
 			tweakSvc: func(s *core.Service) {
 				s.Spec.Type = core.ServiceTypeLoadBalancer
@@ -13526,6 +13541,26 @@ func TestValidateServiceUpdate(t *testing.T) {
 
 				newSvc.Spec.ClusterIP = "1.2.3.5"
 				newSvc.Spec.ClusterIPs = []string{"1.2.3.5"}
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from true to false",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+			},
+			numErrs: 0,
+		},
+		{
+			name: "Service with LoadBalancer type can change its AllocateLoadBalancerNodePorts from false to true",
+			tweakSvc: func(oldSvc, newSvc *core.Service) {
+				oldSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				oldSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(false)
+				newSvc.Spec.Type = core.ServiceTypeLoadBalancer
+				newSvc.Spec.AllocateLoadBalancerNodePorts = utilpointer.BoolPtr(true)
 			},
 			numErrs: 0,
 		},
