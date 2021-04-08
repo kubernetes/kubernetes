@@ -305,8 +305,51 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 		// allocate hugepages
 		if *is2MiHugepagesSupported {
-			err := configureHugePages(hugepagesSize2M, 256)
-			framework.ExpectNoError(err)
+			hugepagesCount := 256
+			ginkgo.By("Configuring hugepages")
+			gomega.Eventually(func() error {
+				if err := configureHugePages(hugepagesSize2M, hugepagesCount); err != nil {
+					return err
+				}
+				return nil
+			}, 30*time.Second, framework.Poll).Should(gomega.BeNil())
+
+			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
+			// stop the kubelet and wait until the server will restart it automatically
+			stopKubelet()
+			// wait until the kubelet health check will fail
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, time.Minute, time.Second).Should(gomega.BeFalse())
+			// wait until the kubelet health check will pass
+			gomega.Eventually(func() bool {
+				return kubeletHealthCheck(kubeletHealthCheckURL)
+			}, 2*time.Minute, 10*time.Second).Should(gomega.BeTrue())
+
+			ginkgo.By("Waiting for hugepages resource to become available on the local node")
+			gomega.Eventually(func() error {
+				node, err := f.ClientSet.CoreV1().Nodes().Get(context.TODO(), framework.TestContext.NodeName, metav1.GetOptions{})
+				if err != nil {
+					return err
+				}
+
+				capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResourceName2Mi)]
+				if !ok {
+					return fmt.Errorf("the node does not have the resource %s", hugepagesResourceName2Mi)
+				}
+
+				size, succeed := capacity.AsInt64()
+				if !succeed {
+					return fmt.Errorf("failed to convert quantity to int64")
+				}
+
+				// 512 Mb, the expected size in bytes
+				expectedSize := int64(hugepagesCount * hugepagesSize2M * 1024)
+				if size != expectedSize {
+					return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
+				}
+				return nil
+			}, time.Minute, framework.Poll).Should(gomega.BeNil())
 		}
 
 		// get the old kubelet config
