@@ -17,7 +17,9 @@ limitations under the License.
 package authenticator
 
 import (
+	"context"
 	"errors"
+	"net"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -91,9 +93,10 @@ type Config struct {
 
 // New returns an authenticator.Request or an error that supports the standard
 // Kubernetes authentication mechanisms.
-func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (config Config) New() (authenticator.Request, []func(ctx context.Context, c net.Conn) context.Context, *spec.SecurityDefinitions, error) {
 	var authenticators []authenticator.Request
 	var tokenAuthenticators []authenticator.Token
+	var connContextInitializers []func(ctx context.Context, c net.Conn) context.Context
 	securityDefinitions := spec.SecurityDefinitions{}
 
 	// front-proxy, BasicAuth methods, local first, then remote
@@ -107,33 +110,35 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			config.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
 		authenticators = append(authenticators, authenticator.WrapAudienceAgnosticRequest(config.APIAudiences, requestHeaderAuthenticator))
+		connContextInitializers = append(connContextInitializers, requestHeaderAuthenticator.WithTLSVerificationCache)
 	}
 
 	// X509 methods
 	if config.ClientCAContentProvider != nil {
 		certAuth := x509.NewDynamic(config.ClientCAContentProvider, x509.CommonNameUserConversion)
 		authenticators = append(authenticators, certAuth)
+		connContextInitializers = append(connContextInitializers, certAuth.WithTLSVerificationCache)
 	}
 
 	// Bearer token methods, local first, then remote
 	if len(config.TokenAuthFile) > 0 {
 		tokenAuth, err := newAuthenticatorFromTokenFile(config.TokenAuthFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, tokenAuth))
 	}
 	if len(config.ServiceAccountKeyFiles) > 0 {
 		serviceAccountAuth, err := newLegacyServiceAccountAuthenticator(config.ServiceAccountKeyFiles, config.ServiceAccountLookup, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
 	if len(config.ServiceAccountIssuers) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountIssuers, config.ServiceAccountKeyFiles, config.APIAudiences, config.ServiceAccountTokenGetter)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, serviceAccountAuth)
 	}
@@ -172,14 +177,14 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 			RequiredClaims:       config.OIDCRequiredClaims,
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		tokenAuthenticators = append(tokenAuthenticators, authenticator.WrapAudienceAgnosticToken(config.APIAudiences, oidcAuth))
 	}
 	if len(config.WebhookTokenAuthnConfigFile) > 0 {
 		webhookTokenAuth, err := newWebhookTokenAuthenticator(config)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		tokenAuthenticators = append(tokenAuthenticators, webhookTokenAuth)
@@ -205,9 +210,9 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 
 	if len(authenticators) == 0 {
 		if config.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+			return anonymous.NewAuthenticator(), connContextInitializers, &securityDefinitions, nil
 		}
-		return nil, &securityDefinitions, nil
+		return nil, connContextInitializers, &securityDefinitions, nil
 	}
 
 	authenticator := union.New(authenticators...)
@@ -220,7 +225,7 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 		authenticator = union.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
 
-	return authenticator, &securityDefinitions, nil
+	return authenticator, connContextInitializers, &securityDefinitions, nil
 }
 
 // IsValidServiceAccountKeyFile returns true if a valid public RSA key can be read from the given file

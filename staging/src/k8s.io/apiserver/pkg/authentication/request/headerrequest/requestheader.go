@@ -151,7 +151,7 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	), nil
 }
 
-func NewDynamicVerifyOptionsSecure(caProvider dynamiccertificates.CAContentProvider, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) authenticator.Request {
+func NewDynamicVerifyOptionsSecure(caProvider dynamiccertificates.CAContentProvider, proxyClientNames, nameHeaders, groupHeaders, extraHeaderPrefixes StringSliceProvider) *x509request.Verifier {
 	headerAuthenticator := NewDynamic(nameHeaders, groupHeaders, extraHeaderPrefixes)
 
 	return x509request.NewDynamicCAVerifier(caProvider, headerAuthenticator, proxyClientNames)

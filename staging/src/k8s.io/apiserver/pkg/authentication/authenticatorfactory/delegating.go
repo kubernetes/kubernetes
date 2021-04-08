@@ -17,7 +17,9 @@ limitations under the License.
 package authenticatorfactory
 
 import (
+	"context"
 	"errors"
+	"net"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -65,9 +67,10 @@ type DelegatingAuthenticatorConfig struct {
 	RequestHeaderConfig *RequestHeaderConfig
 }
 
-func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.SecurityDefinitions, error) {
+func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, []func(ctx context.Context, c net.Conn) context.Context, *spec.SecurityDefinitions, error) {
 	authenticators := []authenticator.Request{}
 	securityDefinitions := spec.SecurityDefinitions{}
+	var connContextInitializers []func(ctx context.Context, c net.Conn) context.Context
 
 	// front-proxy first, then remote
 	// Add the front proxy authenticator if requested
@@ -80,6 +83,7 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 			c.RequestHeaderConfig.ExtraHeaderPrefixes,
 		)
 		authenticators = append(authenticators, requestHeaderAuthenticator)
+		connContextInitializers = append(connContextInitializers, requestHeaderAuthenticator.WithTLSVerificationCache)
 	}
 
 	// x509 client cert auth
@@ -89,11 +93,11 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 
 	if c.TokenAccessReviewClient != nil {
 		if c.WebhookRetryBackoff == nil {
-			return nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
+			return nil, nil, nil, errors.New("retry backoff parameters for delegating authentication webhook has not been specified")
 		}
 		tokenAuth, err := webhooktoken.NewFromInterface(c.TokenAccessReviewClient, c.APIAudiences, *c.WebhookRetryBackoff, c.TokenAccessReviewTimeout)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		cachingTokenAuth := cache.New(tokenAuth, false, c.CacheTTL, c.CacheTTL)
 		authenticators = append(authenticators, bearertoken.New(cachingTokenAuth), websocket.NewProtocolAuthenticator(cachingTokenAuth))
@@ -110,14 +114,14 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 
 	if len(authenticators) == 0 {
 		if c.Anonymous {
-			return anonymous.NewAuthenticator(), &securityDefinitions, nil
+			return anonymous.NewAuthenticator(), connContextInitializers, &securityDefinitions, nil
 		}
-		return nil, nil, errors.New("No authentication method configured")
+		return nil, nil, nil, errors.New("No authentication method configured")
 	}
 
 	authenticator := group.NewAuthenticatedGroupAdder(unionauth.New(authenticators...))
 	if c.Anonymous {
 		authenticator = unionauth.NewFailOnError(authenticator, anonymous.NewAuthenticator())
 	}
-	return authenticator, &securityDefinitions, nil
+	return authenticator, connContextInitializers, &securityDefinitions, nil
 }

@@ -17,8 +17,10 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -504,10 +506,12 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(authInfo *genericapiserver.Authen
 		authenticatorConfig.CustomDial = egressDialer
 	}
 
-	authInfo.Authenticator, openAPIConfig.SecurityDefinitions, err = authenticatorConfig.New()
+	var connContextInitializers []func(ctx context.Context, c net.Conn) context.Context
+	authInfo.Authenticator, connContextInitializers, openAPIConfig.SecurityDefinitions, err = authenticatorConfig.New()
 	if err != nil {
 		return err
 	}
+	secureServing.ConnContextInitializers = append(secureServing.ConnContextInitializers, connContextInitializers...)
 
 	return nil
 }

@@ -89,7 +89,7 @@ func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletc
 		authenticatorConfig.TokenAccessReviewClient = client
 	}
 
-	authenticator, _, err := authenticatorConfig.New()
+	authenticator, _, _, err := authenticatorConfig.New()
 	if err != nil {
 		return nil, nil, err
 	}

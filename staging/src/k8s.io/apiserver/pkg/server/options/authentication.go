@@ -359,7 +359,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	// create authenticator
-	authenticator, securityDefinitions, err := cfg.New()
+	authenticator, connContextInitializers, securityDefinitions, err := cfg.New()
 	if err != nil {
 		return err
 	}
@@ -367,6 +367,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	if openAPIConfig != nil {
 		openAPIConfig.SecurityDefinitions = securityDefinitions
 	}
+	servingInfo.ConnContextInitializers = append(servingInfo.ConnContextInitializers, connContextInitializers...)
 
 	return nil
 }
