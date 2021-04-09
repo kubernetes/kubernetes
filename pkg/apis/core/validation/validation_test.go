@@ -17379,9 +17379,9 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv6", "2000::1"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := validateNonSpecialIP(tc.ip, fp)
+			errs := ValidateNonSpecialIP(tc.ip, fp)
 			if len(errs) != 0 {
-				t.Errorf("validateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
+				t.Errorf("ValidateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
 			}
 		})
 	}
@@ -17399,9 +17399,9 @@ func TestValidateNonSpecialIP(t *testing.T) {
 		{"ipv6 local multicast", "ff02::"},
 	} {
 		t.Run(tc.desc, func(t *testing.T) {
-			errs := validateNonSpecialIP(tc.ip, fp)
+			errs := ValidateNonSpecialIP(tc.ip, fp)
 			if len(errs) == 0 {
-				t.Errorf("validateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+				t.Errorf("ValidateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
 			}
 		})
 	}
