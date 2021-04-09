@@ -52,6 +52,21 @@ func TestValidateEndpointSlice(t *testing.T) {
 				}},
 			},
 		},
+		"good-ipv6": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv6,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"a00:100::4"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
 		"good-fqdns": {
 			expectedErrors: 0,
 			endpointSlice: &discovery.EndpointSlice{
@@ -375,7 +390,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ip": {
-			expectedErrors: 1,
+			expectedErrors: 2,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -390,7 +405,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv4": {
-			expectedErrors: 2,
+			expectedErrors: 3,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv4,
@@ -405,7 +420,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 			},
 		},
 		"bad-ipv6": {
-			expectedErrors: 2,
+			expectedErrors: 4,
 			endpointSlice: &discovery.EndpointSlice{
 				ObjectMeta:  standardMeta,
 				AddressType: discovery.AddressTypeIPv6,
@@ -453,6 +468,36 @@ func TestValidateEndpointSlice(t *testing.T) {
 		"empty-everything": {
 			expectedErrors: 3,
 			endpointSlice:  &discovery.EndpointSlice{},
+		},
+		"special-ipv4": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv4,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"127.0.0.1"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"special-ipv6": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: discovery.AddressTypeIPv6,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"fe80::9656:d028:8652:66b6"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
 		},
 	}
 
