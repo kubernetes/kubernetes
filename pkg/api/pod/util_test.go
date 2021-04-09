@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -1446,19 +1445,19 @@ func TestValidatePodDeletionCostOption(t *testing.T) {
 		},
 		{
 			name:                            "UpdateFeatureDisabled",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  false,
 			wantAllowInvalidPodDeletionCost: true,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "100"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "100"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: false,
 		},
 		{
 			name:                            "UpdateFeatureEnabledValidOldValue",
-			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{core.PodDeletionCost: "invalid-value"}},
+			oldPodMeta:                      &metav1.ObjectMeta{Annotations: map[string]string{api.PodDeletionCost: "invalid-value"}},
 			featureEnabled:                  true,
 			wantAllowInvalidPodDeletionCost: true,
 		},
