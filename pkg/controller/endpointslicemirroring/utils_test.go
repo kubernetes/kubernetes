@@ -22,7 +22,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,19 +34,19 @@ import (
 
 func TestNewEndpointSlice(t *testing.T) {
 	portName := "foo"
-	protocol := v1.ProtocolTCP
+	protocol := corev1.ProtocolTCP
 
 	ports := []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}}
 	addrType := discovery.AddressTypeIPv4
 	gvk := schema.GroupVersionKind{Version: "v1", Kind: "Endpoints"}
 
-	endpoints := v1.Endpoints{
+	endpoints := corev1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: "test",
 		},
-		Subsets: []v1.EndpointSubset{{
-			Ports: []v1.EndpointPort{{Port: 80}},
+		Subsets: []corev1.EndpointSubset{{
+			Ports: []corev1.EndpointPort{{Port: 80}},
 		}},
 	}
 	ownerRef := metav1.NewControllerRef(&endpoints, gvk)
@@ -191,11 +190,11 @@ func TestNewEndpointSlice(t *testing.T) {
 
 func TestAddressToEndpoint(t *testing.T) {
 	//name: "simple + gate enabled",
-	epAddress := v1.EndpointAddress{
+	epAddress := corev1.EndpointAddress{
 		IP:       "10.1.2.3",
 		Hostname: "foo",
 		NodeName: utilpointer.StringPtr("node-abc"),
-		TargetRef: &v1.ObjectReference{
+		TargetRef: &corev1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
 			Namespace:  "default",
@@ -209,7 +208,7 @@ func TestAddressToEndpoint(t *testing.T) {
 		Conditions: discovery.EndpointConditions{
 			Ready: utilpointer.BoolPtr(true),
 		},
-		TargetRef: &v1.ObjectReference{
+		TargetRef: &corev1.ObjectReference{
 			APIVersion: "v1",
 			Kind:       "Pod",
 			Namespace:  "default",

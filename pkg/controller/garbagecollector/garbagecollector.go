@@ -45,9 +45,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	"k8s.io/kubernetes/pkg/controller/apis/config/scheme"
-
-	// import known versions
-	_ "k8s.io/client-go/kubernetes"
 )
 
 // ResourceResyncTime defines the resync period of the garbage collector's informers.

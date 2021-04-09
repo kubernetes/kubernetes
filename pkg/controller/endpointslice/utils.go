@@ -21,7 +21,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,9 +275,9 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *corev1.Se
 
 	// add or remove headless label depending on the service Type
 	if !helper.IsServiceIPSet(service) {
-		svcLabels[v1.IsHeadlessService] = ""
+		svcLabels[corev1.IsHeadlessService] = ""
 	} else {
-		delete(svcLabels, v1.IsHeadlessService)
+		delete(svcLabels, corev1.IsHeadlessService)
 	}
 
 	// override endpoint slices reserved labels
@@ -292,7 +291,7 @@ func setEndpointSliceLabels(epSlice *discovery.EndpointSlice, service *corev1.Se
 func IsReservedLabelKey(label string) bool {
 	if label == discovery.LabelServiceName ||
 		label == discovery.LabelManagedBy ||
-		label == v1.IsHeadlessService {
+		label == corev1.IsHeadlessService {
 		return true
 	}
 	return false

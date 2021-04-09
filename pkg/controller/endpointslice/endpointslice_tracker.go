@@ -186,7 +186,7 @@ func (est *endpointSliceTracker) generationsForSliceUnsafe(endpointSlice *discov
 // getServiceNN returns a namespaced name for the Service corresponding to the
 // provided EndpointSlice.
 func getServiceNN(endpointSlice *discovery.EndpointSlice) types.NamespacedName {
-	serviceName, _ := endpointSlice.Labels[discovery.LabelServiceName]
+	serviceName := endpointSlice.Labels[discovery.LabelServiceName]
 	return types.NamespacedName{Name: serviceName, Namespace: endpointSlice.Namespace}
 }
 
@@ -199,6 +199,6 @@ func managedByChanged(endpointSlice1, endpointSlice2 *discovery.EndpointSlice) b
 // managedByController returns true if the controller of the provided
 // EndpointSlices is the EndpointSlice controller.
 func managedByController(endpointSlice *discovery.EndpointSlice) bool {
-	managedBy, _ := endpointSlice.Labels[discovery.LabelManagedBy]
+	managedBy := endpointSlice.Labels[discovery.LabelManagedBy]
 	return managedBy == controllerName
 }
