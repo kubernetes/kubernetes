@@ -134,7 +134,7 @@ type RequestedToCapacityRatioArgs struct {
 	Shape []UtilizationShapePoint
 	// Resources to be considered when scoring.
 	// The default resource set includes "cpu" and "memory" with an equal weight.
-	// Allowed weights go from 1 to 100.
+	// Weights should be larger than 0.
 	Resources []ResourceSpec
 }
 
