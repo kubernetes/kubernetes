@@ -38,6 +38,8 @@ KUBELET_IMAGE=${KUBELET_IMAGE:-""}
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
+# Name of the dns addon, eg: "kube-dns" or "coredns"
+DNS_ADDON=${DNS_ADDON:-"coredns"}
 # Place the config files and binaries required by NET_PLUGIN in these directory,
 # eg: "/etc/cni/net.d" for config files, and "/opt/cni/bin" for binaries.
 CNI_CONF_DIR=${CNI_CONF_DIR:-""}
@@ -921,22 +923,22 @@ EOF
     SCHEDULER_PID=$!
 }
 
-function start_kubedns {
+function start_dns_addon {
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
-        cp "${KUBE_ROOT}/cluster/addons/dns/kube-dns/kube-dns.yaml.in" kube-dns.yaml
-        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" kube-dns.yaml
-        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" kube-dns.yaml
-        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" kube-dns.yaml
+        cp "${KUBE_ROOT}/cluster/addons/dns/${DNS_ADDON}/${DNS_ADDON}.yaml.in" dns.yaml
+        ${SED} -i -e "s/dns_domain/${DNS_DOMAIN}/g" dns.yaml
+        ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" dns.yaml
+        ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" dns.yaml
         # TODO update to dns role once we have one.
-        # use kubectl to create kubedns addon
-        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f kube-dns.yaml ; then
-       		echo "Kube-dns addon successfully deployed."
+        # use kubectl to create dns addon
+        if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f dns.yaml ; then
+            echo "${DNS_ADDON} addon successfully deployed."
         else
 		echo "Something is wrong with your DNS input"
-		cat kube-dns.yaml
+		cat dns.yaml
 		exit 1
         fi
-        rm kube-dns.yaml
+        rm dns.yaml
     fi
 }
 
@@ -1138,7 +1140,7 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
     start_cloud_controller_manager
   fi
   start_kubescheduler
-  start_kubedns
+  start_dns_addon
   if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
     start_nodelocaldns
   fi
