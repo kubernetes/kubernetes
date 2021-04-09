@@ -211,7 +211,7 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 			if err != nil {
 				return nil, err
 			}
-			klog.V(4).Infof("local: reconstructing volume %q (pod volume mount: %q) with device %q", volumeName, mountPath, path)
+			klog.V(4).InfoS("Local: reconstructing volume with mount path and device", "volumeName", volumeName, "mountPath", mountPath, "device", path)
 			break
 		}
 	}
@@ -308,7 +308,7 @@ func (plugin *localVolumePlugin) NewDeviceMounter() (volume.DeviceMounter, error
 }
 
 func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	klog.V(4).Infof("local: mounting device %s to %s", devicePath, deviceMountPath)
+	klog.V(4).InfoS("Local: mounting device", "devicePath", devicePath, "deviceMountPath", deviceMountPath)
 	notMnt, err := dm.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -340,11 +340,11 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	err = dm.mounter.FormatAndMount(devicePath, deviceMountPath, fstype, mountOptions)
 	if err != nil {
 		if rmErr := os.Remove(deviceMountPath); rmErr != nil {
-			klog.Warningf("local: failed to remove %s: %v", deviceMountPath, rmErr)
+			klog.InfoS("Local: failed to remove device", "mountPath", deviceMountPath, "err", rmErr)
 		}
 		return fmt.Errorf("local: failed to mount device %s at %s (fstype: %s), error %w", devicePath, deviceMountPath, fstype, err)
 	}
-	klog.V(3).Infof("local: successfully mount device %s at %s (fstype: %s)", devicePath, deviceMountPath, fstype)
+	klog.V(3).InfoS("Local: successfully mount device", "devicePath", devicePath, "deviceMountPath", deviceMountPath, "fstype", fstype)
 	return nil
 }
 
@@ -487,9 +487,9 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	}
 
 	notMnt, err := mount.IsNotMountPoint(m.mounter, dir)
-	klog.V(4).Infof("LocalVolume mount setup: PodDir(%s) VolDir(%s) Mounted(%t) Error(%v), ReadOnly(%t)", dir, m.globalPath, !notMnt, err, m.readOnly)
+	klog.V(4).InfoS("LocalVolume mount setup", "podDir", dir, "volDir", m.globalPath, "mounted", !notMnt, "error", err, "readOnly", m.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.ErrorS(err, "Cannot validate mount point", "path", dir)
 		return err
 	}
 
@@ -499,7 +499,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	refs, err := m.mounter.GetMountRefs(m.globalPath)
 	if mounterArgs.FsGroup != nil {
 		if err != nil {
-			klog.Errorf("cannot collect mounting information: %s %v", m.globalPath, err)
+			klog.ErrorS(err, "Cannot collect mounting information", "volDir", m.globalPath)
 			return err
 		}
 
@@ -521,7 +521,7 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	if runtime.GOOS != "windows" {
 		// skip below MkdirAll for windows since the "bind mount" logic is implemented differently in mount_wiondows.go
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+			klog.ErrorS(err, "Failed to mkdir on disk", "directory", dir)
 			return err
 		}
 	}
@@ -532,34 +532,34 @@ func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs)
 	}
 	mountOptions := util.JoinMountOptions(options, m.mountOptions)
 
-	klog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).InfoS("Attempting to mount volume", "volDir", dir)
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
 	err = m.mounter.MountSensitiveWithoutSystemd(globalPath, dir, "", mountOptions, nil)
 	if err != nil {
-		klog.Errorf("Mount of volume %s failed: %v", dir, err)
+		klog.ErrorS(err, "Failed to mount volume", "volDir", dir)
 		notMnt, mntErr := mount.IsNotMountPoint(m.mounter, dir)
 		if mntErr != nil {
-			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+			klog.ErrorS(mntErr, "IsNotMountPoint check failed")
 			return err
 		}
 		if !notMnt {
 			if mntErr = m.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
+				klog.ErrorS(mntErr, "Failed to unmount volume")
 				return err
 			}
 			notMnt, mntErr = mount.IsNotMountPoint(m.mounter, dir)
 			if mntErr != nil {
-				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+				klog.ErrorS(mntErr, "IsNotMountPoint check failed")
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.ErrorS(err, "Volume is still mounted, despite call to unmount().  Will try again next sync loop", "volDir", dir)
 				return err
 			}
 		}
 		if rmErr := os.Remove(dir); rmErr != nil {
-			klog.Warningf("failed to remove %s: %v", dir, rmErr)
+			klog.InfoS("Failed to remove device", "path", dir, "err", rmErr)
 		}
 		return err
 	}
@@ -596,7 +596,7 @@ func (u *localVolumeUnmounter) TearDown() error {
 
 // TearDownAt unmounts the bind mount
 func (u *localVolumeUnmounter) TearDownAt(dir string) error {
-	klog.V(4).Infof("Unmounting volume %q at path %q\n", u.volName, dir)
+	klog.V(4).InfoS("Unmounting volume", "volumeName", u.volName, "volDir", dir)
 	return mount.CleanupMountPoint(dir, u.mounter, true) /* extensiveMountPointCheck = true */
 }
 
@@ -617,7 +617,7 @@ func (m *localVolumeMapper) SetUpDevice() (string, error) {
 // MapPodDevice provides physical device path for the local PV.
 func (m *localVolumeMapper) MapPodDevice() (string, error) {
 	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
+	klog.V(4).InfoS("MapPodDevice returning path", "volDir", globalPath)
 	return globalPath, nil
 }
 
