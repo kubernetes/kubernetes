@@ -21,10 +21,14 @@ import (
 	"fmt"
 	"net/http"
 	goruntime "runtime"
+	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/klog/v2"
 )
 
 // ResultFunc is a function that returns a rest result and can be run in a goroutine
@@ -62,10 +66,27 @@ func (r *result) Return() (runtime.Object, error) {
 	}
 }
 
+// PostTimeoutLoggerFunc is a function that can be used to log the result returned
+// by a ResultFunc after the request had timed out.
+// timedOutAt is the time the request had been timed out.
+// r is the result returned by the child goroutine.
+type PostTimeoutLoggerFunc func(timedOutAt time.Time, r *result)
+
+const (
+	// how much time the post-timeout receiver goroutine will wait for the sender
+	// (child goroutine executing ResultFunc) to send a result after the request.
+	// had timed out.
+	postTimeoutLoggerWait = 5 * time.Minute
+)
+
 // FinishRequest makes a given ResultFunc asynchronous and handles errors returned by the response.
 func FinishRequest(ctx context.Context, fn ResultFunc) (runtime.Object, error) {
-	// the channel needs to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
+	return finishRequest(ctx, fn, postTimeoutLoggerWait, logPostTimeoutResult)
+}
+
+func finishRequest(ctx context.Context, fn ResultFunc, postTimeoutWait time.Duration, postTimeoutLogger PostTimeoutLoggerFunc) (runtime.Object, error) {
+	// the channel needs to be buffered since the post-timeout receiver goroutine
+	// waits up to 5 minutes for the child goroutine to return.
 	resultCh := make(chan *result, 1)
 
 	go func() {
@@ -104,6 +125,52 @@ func FinishRequest(ctx context.Context, fn ResultFunc) (runtime.Object, error) {
 	case result := <-resultCh:
 		return result.Return()
 	case <-ctx.Done():
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", ctx.Err()), 0)
+		// we are going to send a timeout response to the caller, but the asynchronous goroutine
+		// (sender) is still executing the ResultFunc function.
+		// kick off a goroutine (receiver) here to wait for the sender (goroutine executing ResultFunc)
+		// to send the result and then log details of the result.
+		defer func() {
+			go func() {
+				timedOutAt := time.Now()
+
+				var result *result
+				select {
+				case result = <-resultCh:
+				case <-time.After(postTimeoutWait):
+					// we will not wait forever, if we are here then we know that some sender
+					// goroutines are taking longer than postTimeoutWait.
+				}
+				postTimeoutLogger(timedOutAt, result)
+			}()
+		}()
+		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout - %s", ctx.Err()), 0)
 	}
+}
+
+// logPostTimeoutResult logs a panic or an error from the result that the sender (goroutine that is
+// executing the ResultFunc function) has sent to the receiver after the request had timed out.
+// timedOutAt is the time the request had been timed out
+func logPostTimeoutResult(timedOutAt time.Time, r *result) {
+	if r == nil {
+		// we are using r == nil to indicate that the child goroutine never returned a result.
+		metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceRestHandler, metrics.PostTimeoutHandlerPending)
+		klog.Errorf("FinishRequest: post-timeout activity, waited for %s, child goroutine has not returned yet", time.Since(timedOutAt))
+		return
+	}
+
+	var status string
+	switch {
+	case r.reason != nil:
+		// a non empty reason inside a result object indicates that there was a panic.
+		status = metrics.PostTimeoutHandlerPanic
+	case r.err != nil:
+		status = metrics.PostTimeoutHandlerError
+	default:
+		status = metrics.PostTimeoutHandlerOK
+	}
+
+	metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceRestHandler, status)
+	err := fmt.Errorf("FinishRequest: post-timeout activity - time-elapsed: %s, panicked: %t, err: %v, panic-reason: %v",
+		time.Since(timedOutAt), r.reason != nil, r.err, r.reason)
+	utilruntime.HandleError(err)
 }
