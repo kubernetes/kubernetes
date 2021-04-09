@@ -1404,7 +1404,7 @@ func getAvailabilitySetName(az *Cloud, vmIndex int, numAS int) string {
 }
 
 // test supporting on 1 nic per vm
-// we really dont care about the name of the nic
+// we really don't care about the name of the nic
 // just using the vm name for testing purposes
 func getNICName(vmIndex int) string {
 	return getVMName(vmIndex)

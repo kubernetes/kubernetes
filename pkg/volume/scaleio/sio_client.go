@@ -477,7 +477,7 @@ func (c *sioClient) WaitForDetachedDevice(token string) error {
 			go func() {
 				klog.V(4).Info(log("waiting for volume %s to be unmapped/detached", token))
 			}()
-			// cant find vol id, then ok.
+			// can't find vol id, then ok.
 			if _, ok := devMap[token]; !ok {
 				return nil
 			}

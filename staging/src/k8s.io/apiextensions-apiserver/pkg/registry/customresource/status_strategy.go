@@ -40,7 +40,7 @@ func (a statusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
 		fieldpath.APIVersion(a.customResourceStrategy.kind.GroupVersion().String()): fieldpath.NewSet(
 			// Note that if there are other top level fields unique to CRDs,
 			// those will also get removed by the apiserver prior to persisting,
-			// but wont be added to the resetFields set.
+			// but won't be added to the resetFields set.
 
 			// This isn't an issue now, but if it becomes an issue in the future
 			// we might need a mechanism that is the inverse of resetFields where

@@ -43,7 +43,7 @@ import (
 // Maximum number of forwarded connections. In practice we don't
 // need more than one per sidecar and kubelet. Keeping this reasonably
 // small ensures that we don't establish connections through the apiserver
-// and the remote kernel which then arent' needed.
+// and the remote kernel which then aren't needed.
 const maxConcurrentConnections = 10
 
 // Listen creates a listener which returns new connections whenever someone connects
