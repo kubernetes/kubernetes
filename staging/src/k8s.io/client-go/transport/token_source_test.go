@@ -140,7 +140,7 @@ func TestCachingTokenSourceRace(t *testing.T) {
 
 		var wg sync.WaitGroup
 		wg.Add(100)
-		errc := make(chan error)
+		errc := make(chan error, 100)
 
 		for i := 0; i < 100; i++ {
 			go func() {
