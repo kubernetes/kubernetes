@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -67,6 +68,8 @@ type hollowNodeConfig struct {
 	ProxierMinSyncPeriod time.Duration
 	NodeLabels           map[string]string
 	RegisterWithTaints   []core.Taint
+	MaxPods              int
+	ExtendedResources    map[string]string
 }
 
 const (
@@ -92,6 +95,9 @@ func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
 	bindableNodeLabels := cliflag.ConfigurationMap(c.NodeLabels)
 	fs.Var(&bindableNodeLabels, "node-labels", "Additional node labels")
 	fs.Var(utiltaints.NewTaintsVar(&c.RegisterWithTaints), "register-with-taints", "Register the node with the given list of taints (comma separated \"<key>=<value>:<effect>\"). No-op if register-node is false.")
+	fs.IntVar(&c.MaxPods, "max-pods", maxPods, "Number of pods that can run on this Kubelet.")
+	bindableExtendedResources := cliflag.ConfigurationMap(c.ExtendedResources)
+	fs.Var(&bindableExtendedResources, "extended-resources", "Register the node with extended resources (comma separated \"<name>=<quantity>\")")
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -114,7 +120,7 @@ func (c *hollowNodeConfig) createHollowKubeletOptions() *kubemark.HollowKubletOp
 		NodeName:            c.NodeName,
 		KubeletPort:         c.KubeletPort,
 		KubeletReadOnlyPort: c.KubeletReadOnlyPort,
-		MaxPods:             maxPods,
+		MaxPods:             c.MaxPods,
 		PodsPerCore:         podsPerCore,
 		NodeLabels:          c.NodeLabels,
 		RegisterWithTaints:  c.RegisterWithTaints,
@@ -143,7 +149,8 @@ func main() {
 // newControllerManagerCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
 	s := &hollowNodeConfig{
-		NodeLabels: make(map[string]string),
+		NodeLabels:        make(map[string]string),
+		ExtendedResources: make(map[string]string),
 	}
 
 	cmd := &cobra.Command{
@@ -206,7 +213,18 @@ func run(config *hollowNodeConfig) {
 		cadvisorInterface := &cadvisortest.Fake{
 			NodeName: config.NodeName,
 		}
-		containerManager := cm.NewStubContainerManager()
+
+		var containerManager cm.ContainerManager
+		if config.ExtendedResources != nil {
+			extendedResources := v1.ResourceList{}
+			for k, v := range config.ExtendedResources {
+				extendedResources[v1.ResourceName(k)] = resource.MustParse(v)
+			}
+
+			containerManager = cm.NewStubContainerManagerWithDevicePluginResource(extendedResources)
+		} else {
+			containerManager = cm.NewStubContainerManager()
+		}
 
 		endpoint, err := fakeremote.GenerateEndpoint()
 		if err != nil {
