@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestCreateJobValidation(t *testing.T) {
@@ -153,11 +154,13 @@ func TestCreateJobFromCronJob(t *testing.T) {
 		},
 	}
 	tests := map[string]struct {
-		from     *batchv1.CronJob
-		expected *batchv1.Job
+		from       *batchv1.CronJob
+		controller bool
+		expected   *batchv1.Job
 	}{
 		"from CronJob": {
-			from: cronJob,
+			from:       cronJob,
+			controller: false,
 			expected: &batchv1.Job{
 				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 				ObjectMeta: metav1.ObjectMeta{
@@ -184,12 +187,44 @@ func TestCreateJobFromCronJob(t *testing.T) {
 				},
 			},
 		},
+		"from CronJob With Controller": {
+			from:       cronJob,
+			controller: true,
+			expected: &batchv1.Job{
+				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        jobName,
+					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
+					OwnerReferences: []metav1.OwnerReference{
+						{
+							APIVersion:         batchv1.SchemeGroupVersion.String(),
+							Kind:               "CronJob",
+							Name:               cronJob.GetName(),
+							UID:                cronJob.GetUID(),
+							BlockOwnerDeletion: utilpointer.BoolPtr(true),
+							Controller:         utilpointer.BoolPtr(true),
+						},
+					},
+				},
+				Spec: batchv1.JobSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{Image: "test-image"},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			o := &CreateJobOptions{
-				Name: jobName,
+				Name:       jobName,
+				Controller: tc.controller,
 			}
 			job := o.createJobFromCronJob(tc.from)
 
