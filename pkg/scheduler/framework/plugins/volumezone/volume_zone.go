@@ -123,7 +123,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return framework.NewStatus(framework.Error, fmt.Sprint("PersistentVolumeClaim had no pv name and storageClass name"))
+				return framework.NewStatus(framework.Error, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
 			class, _ := pl.scLister.Get(scName)
@@ -139,7 +139,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 				continue
 			}
 
-			return framework.NewStatus(framework.Error, fmt.Sprint("PersistentVolume had no name"))
+			return framework.NewStatus(framework.Error, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
@@ -155,7 +155,7 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			if !volumeZoneLabels.Has(k) {
 				continue
 			}
-			nodeV, _ := nodeConstraints[k]
+			nodeV := nodeConstraints[k]
 			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
 				klog.InfoS("Failed to parse label, ignoring the label", "label", fmt.Sprintf("%s:%s", k, v), "err", err)
