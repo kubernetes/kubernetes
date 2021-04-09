@@ -797,8 +797,8 @@ COMMIT
 		t.Fatalf("%s: Expected success, got %v", protocol, err)
 	}
 
-	if string(buffer.Bytes()) != output {
-		t.Errorf("%s: Expected output '%s', got '%v'", protocol, output, string(buffer.Bytes()))
+	if buffer.String() != output {
+		t.Errorf("%s: Expected output '%s', got '%v'", protocol, output, buffer.String())
 	}
 
 	if fcmd.CombinedOutputCalls != 1 {
@@ -817,8 +817,8 @@ COMMIT
 	if err == nil {
 		t.Errorf("%s: Expected failure", protocol)
 	}
-	if string(buffer.Bytes()) != stderrOutput {
-		t.Errorf("%s: Expected output '%s', got '%v'", protocol, stderrOutput, string(buffer.Bytes()))
+	if buffer.String() != stderrOutput {
+		t.Errorf("%s: Expected output '%s', got '%v'", protocol, stderrOutput, buffer.String())
 	}
 }
 
