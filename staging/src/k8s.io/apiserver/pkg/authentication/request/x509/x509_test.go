@@ -816,3 +816,50 @@ func TestCertificateIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkX509Verifier(b *testing.B) {
+	multilevelOpts := defaultVerifyOptions()
+	multilevelOpts.Roots = x509.NewCertPool()
+	multilevelOpts.Roots.AddCert(getCertsFromFile(b, "root")[0])
+
+	testCases := map[string]struct {
+		Certs []*x509.Certificate
+		Opts  x509.VerifyOptions
+	}{
+		"valid client cert": {
+			Opts:  getDefaultVerifyOptions(b),
+			Certs: getCerts(b, clientCNCert),
+		},
+		"multi-level, valid": {
+			Opts:  multilevelOpts,
+			Certs: getCertsFromFile(b, "client-valid", "intermediate"),
+		},
+	}
+
+	for k, testCase := range testCases {
+		b.Run(k, func(b *testing.B) {
+			req, err := http.NewRequest("GET", "/", nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
+
+			resp := authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}
+
+			auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				return &resp, true, nil
+			})
+
+			a := NewVerifier(testCase.Opts, auth, nil)
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					_, ok, err := a.AuthenticateRequest(req)
+					if !ok || err != nil {
+						b.Fatalf("unexpected result: ok=%v, err=%v", ok, err)
+					}
+				}
+			})
+		})
+	}
+}
