@@ -95,6 +95,7 @@ type ServiceAffinity struct {
 var _ framework.PreFilterPlugin = &ServiceAffinity{}
 var _ framework.FilterPlugin = &ServiceAffinity{}
 var _ framework.ScorePlugin = &ServiceAffinity{}
+var _ framework.EnqueueExtensions = &ServiceAffinity{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *ServiceAffinity) Name() string {
@@ -206,6 +207,28 @@ func getPreFilterState(cycleState *framework.CycleState) (*preFilterState, error
 		return nil, fmt.Errorf("%+v  convert to interpodaffinity.state error", c)
 	}
 	return s, nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *ServiceAffinity) EventsToRegister() []framework.ClusterEvent {
+	if len(pl.args.AffinityLabels) == 0 {
+		return nil
+	}
+
+	return []framework.ClusterEvent{
+		// Suppose there is a running Pod backs a Service, and the unschedulable Pod subjects
+		// to the same Service, but failed because of mis-matched affinity labels.
+		// - if the running Pod's labels get updated, it may not back the Service anymore, and
+		//   hence make the unschedulable Pod schedulable.
+		// - if the running Pod gets deleted, the unschedulable Pod may also become schedulable.
+		{Resource: framework.Pod, ActionType: framework.Update | framework.Delete},
+		// A new Node or updating a Node's labels may make a Pod schedulable.
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+		// Update or delete of a Service may break the correlation of the Pods that previously
+		// backed it, and hence make a Pod schedulable.
+		{Resource: framework.Service, ActionType: framework.Update | framework.Delete},
+	}
 }
 
 // Filter matches nodes in such a way to force that

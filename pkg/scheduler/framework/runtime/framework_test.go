@@ -686,7 +686,7 @@ func (*fakePodPlugin) EventsToRegister() []framework.ClusterEvent {
 	return []framework.ClusterEvent{
 		{Resource: framework.Pod, ActionType: framework.All},
 		{Resource: framework.Node, ActionType: framework.Add | framework.Delete},
-		{Resource: framework.Service, ActionType: framework.Delete},
+		{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete},
 	}
 }
 
@@ -718,7 +718,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 				{Resource: framework.StorageClass, ActionType: framework.All}:          sets.NewString("fakeNoop", bindPlugin, queueSortPlugin),
 			},
 		},
@@ -733,7 +732,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.StorageClass, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
 			},
 		},
@@ -741,15 +739,14 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			name:    "pod plugin",
 			plugins: []framework.Plugin{&fakePodPlugin{}},
 			want: map[framework.ClusterEvent]sets.String{
-				{Resource: framework.Pod, ActionType: framework.All}:                     sets.NewString("fakePod", bindPlugin, queueSortPlugin),
-				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}: sets.NewString("fakePod"),
-				{Resource: framework.Node, ActionType: framework.All}:                    sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.Delete}:              sets.NewString("fakePod"),
-				{Resource: framework.Service, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.CSINode, ActionType: framework.All}:                 sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.PersistentVolume, ActionType: framework.All}:        sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:   sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.StorageClass, ActionType: framework.All}:            sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.Pod, ActionType: framework.All}:                      sets.NewString("fakePod", bindPlugin, queueSortPlugin),
+				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:  sets.NewString("fakePod"),
+				{Resource: framework.Node, ActionType: framework.All}:                     sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}: sets.NewString("fakePod"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:    sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.CSINode, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.PersistentVolume, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
+				{Resource: framework.StorageClass, ActionType: framework.All}:             sets.NewString(bindPlugin, queueSortPlugin),
 			},
 		},
 		{
@@ -760,9 +757,8 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 				{Resource: framework.Node, ActionType: framework.Add | framework.Delete}:       sets.NewString("fakePod"),
 				{Resource: framework.Pod, ActionType: framework.All}:                           sets.NewString("fakeNode", "fakePod", bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.Update | framework.Delete}: sets.NewString("fakeNode"),
-				{Resource: framework.Service, ActionType: framework.Delete}:                    sets.NewString("fakePod"),
+				{Resource: framework.PersistentVolumeClaim, ActionType: framework.Delete}:      sets.NewString("fakePod"),
 				{Resource: framework.Node, ActionType: framework.All}:                          sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:                       sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:              sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}:         sets.NewString(bindPlugin, queueSortPlugin),
@@ -775,7 +771,6 @@ func TestNewFrameworkFillEventToPluginMap(t *testing.T) {
 			want: map[framework.ClusterEvent]sets.String{
 				{Resource: framework.Pod, ActionType: framework.All}:                   sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.Node, ActionType: framework.All}:                  sets.NewString(bindPlugin, queueSortPlugin),
-				{Resource: framework.Service, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.CSINode, ActionType: framework.All}:               sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolume, ActionType: framework.All}:      sets.NewString(bindPlugin, queueSortPlugin),
 				{Resource: framework.PersistentVolumeClaim, ActionType: framework.All}: sets.NewString(bindPlugin, queueSortPlugin),

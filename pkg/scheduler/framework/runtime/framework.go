@@ -66,7 +66,6 @@ var allClusterEvents = []framework.ClusterEvent{
 	{Resource: framework.CSINode, ActionType: framework.All},
 	{Resource: framework.PersistentVolume, ActionType: framework.All},
 	{Resource: framework.PersistentVolumeClaim, ActionType: framework.All},
-	{Resource: framework.Service, ActionType: framework.All},
 	{Resource: framework.StorageClass, ActionType: framework.All},
 }
 
