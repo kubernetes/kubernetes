@@ -750,13 +750,18 @@ func TestVolumeHealthEnable(t *testing.T) {
 				assert.Nil(t, err)
 			}
 
-			if tc.volumeConditionSet {
-				assert.NotNil(t, metrics.Abnormal)
-				assert.NotNil(t, metrics.Message)
+			if metrics == nil {
+				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
 			} else {
-				assert.Nil(t, metrics.Abnormal)
-				assert.Nil(t, metrics.Message)
+				if tc.volumeConditionSet {
+					assert.NotNil(t, metrics.Abnormal)
+					assert.NotNil(t, metrics.Message)
+				} else {
+					assert.Nil(t, metrics.Abnormal)
+					assert.Nil(t, metrics.Message)
+				}
 			}
+
 		})
 	}
 }
@@ -792,8 +797,12 @@ func TestVolumeHealthDisable(t *testing.T) {
 				assert.Nil(t, err)
 			}
 
-			assert.Nil(t, metrics.Abnormal)
-			assert.Nil(t, metrics.Message)
+			if metrics == nil {
+				t.Errorf("csi.NodeGetVolumeStats returned nil metrics for volume %s", tc.volumeData.VolumeID)
+			} else {
+				assert.Nil(t, metrics.Abnormal)
+				assert.Nil(t, metrics.Message)
+			}
 		})
 	}
 }
