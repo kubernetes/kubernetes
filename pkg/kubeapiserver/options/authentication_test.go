@@ -48,10 +48,36 @@ func TestAuthenticationValidate(t *testing.T) {
 				UsernameClaim: "sub",
 				SigningAlgs:   []string{"RS256"},
 				IssuerURL:     "testIssuerURL",
+				ClientID:      "testClientID",
+			},
+			testSA: &ServiceAccountAuthenticationOptions{
+				Issuer:   "http://foo.bar.com",
+				KeyFiles: []string{"testkeyfile1", "testkeyfile2"},
+			},
+		},
+		{
+			name: "test when OIDC and ServiceAccounts are invalid",
+			testOIDC: &OIDCAuthenticationOptions{
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "testIssuerURL",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
 				Issuer: "http://foo.bar.com",
 			},
+			expectErr: "oidc-issuer-url and oidc-client-id should be specified together",
+		},
+		{
+			name: "test when OIDC and ServiceAccounts are invalid",
+			testOIDC: &OIDCAuthenticationOptions{
+				UsernameClaim: "sub",
+				SigningAlgs:   []string{"RS256"},
+				IssuerURL:     "testIssuerURL",
+			},
+			testSA: &ServiceAccountAuthenticationOptions{
+				Issuer: "http://foo.bar.com",
+			},
+			expectErr: "service-account-key-file is a required flag",
 		},
 		{
 			name: "test when OIDC is invalid",
@@ -61,7 +87,8 @@ func TestAuthenticationValidate(t *testing.T) {
 				IssuerURL:     "testIssuerURL",
 			},
 			testSA: &ServiceAccountAuthenticationOptions{
-				Issuer: "http://foo.bar.com",
+				Issuer:   "http://foo.bar.com",
+				KeyFiles: []string{"testkeyfile1", "testkeyfile2"},
 			},
 			expectErr: "oidc-issuer-url and oidc-client-id should be specified together",
 		},
@@ -87,10 +114,9 @@ func TestAuthenticationValidate(t *testing.T) {
 			options.ServiceAccounts = testcase.testSA
 
 			errs := options.Validate()
-			if len(errs) > 0 && !strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) {
+			if len(errs) > 0 && (!strings.Contains(utilerrors.NewAggregate(errs).Error(), testcase.expectErr) || testcase.expectErr == "") {
 				t.Errorf("Got err: %v, Expected err: %s", errs, testcase.expectErr)
 			}
-
 			if len(errs) == 0 && len(testcase.expectErr) != 0 {
 				t.Errorf("Got err nil, Expected err: %s", testcase.expectErr)
 			}
