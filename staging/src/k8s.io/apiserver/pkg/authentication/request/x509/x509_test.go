@@ -362,7 +362,7 @@ PKJQCs0CM0zkesktuLi/gFpuB0nEwyOgLg==
 )
 
 func TestX509(t *testing.T) {
-	multilevelOpts := DefaultVerifyOptions()
+	multilevelOpts := defaultVerifyOptions()
 	multilevelOpts.Roots = x509.NewCertPool()
 	multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
 
@@ -544,7 +544,7 @@ func TestX509(t *testing.T) {
 }
 
 func TestX509Verifier(t *testing.T) {
-	multilevelOpts := DefaultVerifyOptions()
+	multilevelOpts := defaultVerifyOptions()
 	multilevelOpts.Roots = x509.NewCertPool()
 	multilevelOpts.Roots.AddCert(getCertsFromFile(t, "root")[0])
 
@@ -701,17 +701,23 @@ func TestX509Verifier(t *testing.T) {
 	}
 }
 
-func getDefaultVerifyOptions(t *testing.T) x509.VerifyOptions {
-	options := DefaultVerifyOptions()
-	options.Roots = getRootCertPool(t)
-	return options
+func getDefaultVerifyOptions(t testing.TB) x509.VerifyOptions {
+	t.Helper()
+
+	opts := defaultVerifyOptions()
+	opts.Roots = getRootCertPool(t)
+	return opts
 }
 
-func getRootCertPool(t *testing.T) *x509.CertPool {
+func getRootCertPool(t testing.TB) *x509.CertPool {
+	t.Helper()
+
 	return getRootCertPoolFor(t, rootCACert)
 }
 
-func getRootCertPoolFor(t *testing.T, certs ...string) *x509.CertPool {
+func getRootCertPoolFor(t testing.TB, certs ...string) *x509.CertPool {
+	t.Helper()
+
 	pool := x509.NewCertPool()
 	for _, cert := range certs {
 		pool.AddCert(getCert(t, cert))
@@ -719,7 +725,9 @@ func getRootCertPoolFor(t *testing.T, certs ...string) *x509.CertPool {
 	return pool
 }
 
-func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
+func getCertsFromFile(t testing.TB, names ...string) []*x509.Certificate {
+	t.Helper()
+
 	certs := []*x509.Certificate{}
 	for _, name := range names {
 		filename := "testdata/" + name + ".pem"
@@ -732,7 +740,7 @@ func getCertsFromFile(t *testing.T, names ...string) []*x509.Certificate {
 	return certs
 }
 
-func getCert(t *testing.T, pemData string) *x509.Certificate {
+func getCert(t testing.TB, pemData string) *x509.Certificate {
 	t.Helper()
 
 	pemBlock, _ := pem.Decode([]byte(pemData))
@@ -744,7 +752,9 @@ func getCert(t *testing.T, pemData string) *x509.Certificate {
 	return cert
 }
 
-func getCerts(t *testing.T, pemData ...string) []*x509.Certificate {
+func getCerts(t testing.TB, pemData ...string) []*x509.Certificate {
+	t.Helper()
+
 	certs := []*x509.Certificate{}
 	for _, pemData := range pemData {
 		certs = append(certs, getCert(t, pemData))

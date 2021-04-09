@@ -49,7 +49,7 @@ func NewStaticVerifierFromFile(clientCA string) (dynamiccertificates.CAContentPr
 
 	// Wrap with an x509 verifier
 	var err error
-	opts := DefaultVerifyOptions()
+	opts := defaultVerifyOptions()
 	opts.Roots, err = cert.NewPool(clientCA)
 	if err != nil {
 		return nil, fmt.Errorf("error loading certs from  %s: %v", clientCA, err)
@@ -78,4 +78,12 @@ type StaticStringSlice []string
 // Value returns the current string slice.  Callers should never mutate the returned value.
 func (s StaticStringSlice) Value() []string {
 	return s
+}
+
+// defaultVerifyOptions returns VerifyOptions that use the system root certificates, current time,
+// and requires certificates to be valid for client auth (x509.ExtKeyUsageClientAuth)
+func defaultVerifyOptions() x509.VerifyOptions {
+	return x509.VerifyOptions{
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
 }

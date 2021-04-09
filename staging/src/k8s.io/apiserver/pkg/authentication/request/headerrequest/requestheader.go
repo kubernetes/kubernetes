@@ -117,7 +117,9 @@ func NewSecure(clientCA string, proxyClientNames []string, nameHeaders []string,
 	if err != nil {
 		return nil, fmt.Errorf("error reading %s: %v", clientCA, err)
 	}
-	opts := x509request.DefaultVerifyOptions()
+	opts := x509.VerifyOptions{
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
 	opts.Roots = x509.NewCertPool()
 	certs, err := utilcert.ParseCertsPEM(caData)
 	if err != nil {
