@@ -596,13 +596,16 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 		message = fmt.Sprintf("Waited for %v due to client-side throttling, not priority and fairness, request: %s:%s", latency, r.verb, r.URL().String())
 	}
 
-	if latency > longThrottleLatency {
-		klog.V(3).Info(message)
-	}
 	if latency > extraLongThrottleLatency {
-		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
-		// but we use a throttled logger to prevent spamming.
+		// If the rate limiter latency is very high, the log message should be printed at a high log level, we use a
+		// throttled logger to prevent spamming.
 		globalThrottledLogger.Infof(message)
+	} else {
+		// even if extraLongThrottleLatency wasn't exceeded it's still possible longThrottleLatency was, log this with a
+		// lower level
+		if latency > longThrottleLatency {
+			klog.V(3).Info(message)
+		}
 	}
 	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
