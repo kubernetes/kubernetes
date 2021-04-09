@@ -824,12 +824,11 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 }
 
 // SetNode sets the overall node information.
-func (n *NodeInfo) SetNode(node *v1.Node) error {
+func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
 	n.Allocatable = NewResource(node.Status.Allocatable)
 	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
-	return nil
 }
 
 // RemoveNode removes the node object, leaving all other tracking information.
