@@ -259,11 +259,14 @@ func TestCRIListPodStats(t *testing.T) {
 	c0 := containerStatsMap[cName0]
 	assert.Equal(container0.CreatedAt, c0.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c0, infos[container0.ContainerStatus.Id].Stats[0])
+	checkCRIAcceleratorStats(assert, c0, infos[container0.ContainerStatus.Id].Stats[0])
 	checkCRIRootfsStats(assert, c0, containerStats0, &imageFsInfo)
 	checkCRILogsStats(assert, c0, &rootFsInfo, containerLogStats0)
+
 	c1 := containerStatsMap[cName1]
 	assert.Equal(container1.CreatedAt, c1.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c1, infos[container1.ContainerStatus.Id].Stats[0])
+	checkCRIAcceleratorStats(assert, c1, infos[container1.ContainerStatus.Id].Stats[0])
 	checkCRIRootfsStats(assert, c1, containerStats1, nil)
 	checkCRILogsStats(assert, c1, &rootFsInfo, containerLogStats1)
 	checkCRINetworkStats(assert, p0.Network, infos[sandbox0.PodSandboxStatus.Id].Stats[0].Network)
@@ -279,6 +282,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(cName2, c2.Name)
 	assert.Equal(container2.CreatedAt, c2.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c2, infos[container2.ContainerStatus.Id].Stats[0])
+	checkCRIAcceleratorStats(assert, c2, infos[container2.ContainerStatus.Id].Stats[0])
 	checkCRIRootfsStats(assert, c2, containerStats2, &imageFsInfo)
 	checkCRILogsStats(assert, c2, &rootFsInfo, containerLogStats2)
 	checkCRINetworkStats(assert, p1.Network, infos[sandbox1.PodSandboxStatus.Id].Stats[0].Network)
@@ -295,6 +299,7 @@ func TestCRIListPodStats(t *testing.T) {
 	assert.Equal(cName3, c3.Name)
 	assert.Equal(container4.CreatedAt, c3.StartTime.UnixNano())
 	checkCRICPUAndMemoryStats(assert, c3, infos[container4.ContainerStatus.Id].Stats[0])
+	checkCRIAcceleratorStats(assert, c3, infos[container4.ContainerStatus.Id].Stats[0])
 	checkCRIRootfsStats(assert, c3, containerStats4, &imageFsInfo)
 
 	checkCRILogsStats(assert, c3, &rootFsInfo, containerLogStats4)
@@ -672,6 +677,18 @@ func checkCRICPUAndMemoryStats(assert *assert.Assertions, actual statsapi.Contai
 	assert.Equal(cs.Memory.RSS, *actual.Memory.RSSBytes)
 	assert.Equal(cs.Memory.ContainerData.Pgfault, *actual.Memory.PageFaults)
 	assert.Equal(cs.Memory.ContainerData.Pgmajfault, *actual.Memory.MajorPageFaults)
+}
+
+func checkCRIAcceleratorStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *cadvisorapiv2.ContainerStats) {
+	assert.Equal(len(cs.Accelerators), len(actual.Accelerators))
+	for i := range cs.Accelerators {
+		assert.Equal(cs.Accelerators[i].Make, actual.Accelerators[i].Make)
+		assert.Equal(cs.Accelerators[i].Model, actual.Accelerators[i].Model)
+		assert.Equal(cs.Accelerators[i].ID, actual.Accelerators[i].ID)
+		assert.Equal(cs.Accelerators[i].MemoryTotal, actual.Accelerators[i].MemoryTotal)
+		assert.Equal(cs.Accelerators[i].MemoryUsed, actual.Accelerators[i].MemoryUsed)
+		assert.Equal(cs.Accelerators[i].DutyCycle, actual.Accelerators[i].DutyCycle)
+	}
 }
 
 func checkCRIRootfsStats(assert *assert.Assertions, actual statsapi.ContainerStats, cs *runtimeapi.ContainerStats, imageFsInfo *cadvisorapiv2.FsInfo) {
