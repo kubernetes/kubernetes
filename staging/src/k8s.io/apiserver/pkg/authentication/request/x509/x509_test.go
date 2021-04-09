@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -836,30 +837,38 @@ func BenchmarkX509Verifier(b *testing.B) {
 		},
 	}
 
-	for k, testCase := range testCases {
-		b.Run(k, func(b *testing.B) {
-			req, err := http.NewRequest("GET", "/", nil)
-			if err != nil {
-				b.Fatal(err)
-			}
-			req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
-
-			resp := authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}
-
-			auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-				return &resp, true, nil
-			})
-
-			a := NewVerifier(testCase.Opts, auth, nil)
-			b.ResetTimer()
-			b.RunParallel(func(pb *testing.PB) {
-				for pb.Next() {
-					_, ok, err := a.AuthenticateRequest(req)
-					if !ok || err != nil {
-						b.Fatalf("unexpected result: ok=%v, err=%v", ok, err)
+	for _, enableCache := range []bool{false, true} {
+		b.Run(fmt.Sprintf("cache=%v", enableCache), func(b *testing.B) {
+			for k, testCase := range testCases {
+				b.Run(k, func(b *testing.B) {
+					req, err := http.NewRequest("GET", "/", nil)
+					if err != nil {
+						b.Fatal(err)
 					}
-				}
-			})
+					req.TLS = &tls.ConnectionState{PeerCertificates: testCase.Certs}
+
+					resp := authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}
+
+					auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+						return &resp, true, nil
+					})
+
+					a := NewVerifier(testCase.Opts, auth, nil)
+					if enableCache {
+						req = req.WithContext(a.WithTLSVerificationCache(req.Context(), nil))
+					}
+
+					b.ResetTimer()
+					b.RunParallel(func(pb *testing.PB) {
+						for pb.Next() {
+							_, ok, err := a.AuthenticateRequest(req)
+							if !ok || err != nil {
+								b.Fatalf("unexpected result: ok=%v, err=%v", ok, err)
+							}
+						}
+					})
+				})
+			}
 		})
 	}
 }

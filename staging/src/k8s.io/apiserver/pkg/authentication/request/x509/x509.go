@@ -22,9 +22,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
+	"unsafe"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -238,21 +242,136 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 })
 
 func newCertificateVerifier(caProvider dynamiccertificates.CAContentProvider) *certificateVerifier {
-	return &certificateVerifier{caProvider: caProvider}
+	out := &certificateVerifier{
+		caProvider: caProvider,
+		// We start at 1 since it's not the zero value
+		// cachedVerification.generation.
+		generation: 1,
+	}
+	caProvider.AddListener(out)
+	out.ctxCacheKey = cachedVerificationCtxKey(unsafe.Pointer(out))
+	return out
 }
 
 type certificateVerifier struct {
-	caProvider dynamiccertificates.CAContentProvider
+	caProvider  dynamiccertificates.CAContentProvider
+	generation  uint64
+	ctxCacheKey cachedVerificationCtxKey
 }
 
 func (cv *certificateVerifier) verifyClientCerts(ctx context.Context, opts x509.VerifyOptions, peerCertificates []*x509.Certificate) ([][]*x509.Certificate, error) {
-	// Use intermediates, if provided
-	if opts.Intermediates == nil && len(peerCertificates) > 1 {
-		opts.Intermediates = x509.NewCertPool()
-		for _, intermediate := range peerCertificates[1:] {
-			opts.Intermediates.AddCert(intermediate)
+	verify := func() ([][]*x509.Certificate, error) {
+		// Use intermediates, if provided
+		if opts.Intermediates == nil && len(peerCertificates) > 1 {
+			opts.Intermediates = x509.NewCertPool()
+			for _, intermediate := range peerCertificates[1:] {
+				opts.Intermediates.AddCert(intermediate)
+			}
 		}
+
+		return peerCertificates[0].Verify(opts)
 	}
 
-	return peerCertificates[0].Verify(opts)
+	entry, ok := ctx.Value(cv.ctxCacheKey).(*cachedVerification)
+	if !ok {
+		return verify()
+	}
+
+	if opts.CurrentTime.IsZero() {
+		opts.CurrentTime = time.Now()
+	}
+	currentGeneration := atomic.LoadUint64(&cv.generation)
+
+	entry.Lock()
+	defer entry.Unlock()
+
+	if !entry.stale(currentGeneration, opts.CurrentTime) {
+		return entry.chains, entry.err
+	}
+
+	entry.chains, entry.err = verify()
+	entry.generation = currentGeneration
+	entry.cacheUntil = calculateCacheUntil(opts.CurrentTime, entry.chains, peerCertificates)
+
+	return entry.chains, entry.err
+}
+
+func (cv *certificateVerifier) WithTLSVerificationCache(ctx context.Context, _ net.Conn) context.Context {
+	return context.WithValue(ctx, cv.ctxCacheKey, &cachedVerification{})
+}
+
+func (cv *certificateVerifier) Enqueue() {
+	atomic.AddUint64(&cv.generation, 1)
+}
+
+func calculateCacheUntil(now time.Time, chains [][]*x509.Certificate, peerCertificates []*x509.Certificate) time.Time {
+	if chains != nil {
+		// We found valid chains. Calculate the latest point that a valid chain
+		// will expire.
+		var validUntil time.Time
+
+		for _, chain := range chains {
+			// Initialize notAfter for the chain using the leaf, with the added
+			// benefit of panicking if we get handed a chain of length 0.
+			chainNotAfter := chain[0].NotAfter
+
+			// Find the earliest expiration.
+			for _, cert := range chain[1:] {
+				if chainNotAfter.After(cert.NotAfter) {
+					chainNotAfter = cert.NotAfter
+				}
+			}
+
+			// Swap if it's later then the current validUntil
+			if chainNotAfter.After(validUntil) {
+				validUntil = chainNotAfter
+			}
+		}
+
+		return validUntil
+	}
+
+	// We don't have a valid chain, so we are caching an error and all we have
+	// are the peer certs.
+
+	// Find the latest not before.
+	notBefore := peerCertificates[0].NotBefore
+	for _, cert := range peerCertificates[1:] {
+		if cert.NotBefore.After(notBefore) {
+			notBefore = cert.NotBefore
+		}
+	}
+	if notBefore.After(now) {
+		// There's one or more certs in here that are not valid yet. Let's reverify
+		// once all of the NotBefores have passed.
+		return notBefore
+	}
+
+	// All certs are passed their NotBefore and verification still failed. Maybe
+	// they are expired or maybe we don't have anchors for them. Either way,
+	// these aren't going to start working until our CA changes. Cache error for
+	// arbitrary amount of time. This could probably be "infinite future", but an
+	// hour seems reasonable.
+	return now.Add(1 * time.Hour)
+}
+
+type cachedVerificationCtxKey uintptr
+
+type cachedVerification struct {
+	sync.Mutex
+	generation uint64
+	cacheUntil time.Time
+
+	chains [][]*x509.Certificate
+	err    error
+}
+
+func (vc *cachedVerification) stale(generation uint64, now time.Time) bool {
+	if vc.generation != generation {
+		return true
+	}
+	if now.After(vc.cacheUntil) {
+		return true
+	}
+	return false
 }
