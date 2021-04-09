@@ -115,6 +115,7 @@ message EndpointHints {
 }
 
 // EndpointPort represents a Port used by an EndpointSlice
+// +structType=atomic
 message EndpointPort {
   // The name of this port. All ports in an EndpointSlice must have a unique
   // name. If the EndpointSlice is dervied from a Kubernetes service, this
