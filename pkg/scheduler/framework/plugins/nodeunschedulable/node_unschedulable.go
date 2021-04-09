@@ -31,6 +31,7 @@ type NodeUnschedulable struct {
 }
 
 var _ framework.FilterPlugin = &NodeUnschedulable{}
+var _ framework.EnqueueExtensions = &NodeUnschedulable{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "NodeUnschedulable"
@@ -41,6 +42,14 @@ const (
 	// ErrReasonUnschedulable is used for NodeUnschedulable predicate error.
 	ErrReasonUnschedulable = "node(s) were unschedulable"
 )
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *NodeUnschedulable) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeTaint},
+	}
+}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeUnschedulable) Name() string {
