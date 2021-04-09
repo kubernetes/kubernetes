@@ -87,11 +87,12 @@ type sshTunnel struct {
 	client  *ssh.Client
 }
 
-func makeSSHTunnel(user string, signer ssh.Signer, host string) (*sshTunnel, error) {
+func makeSSHTunnel(user string, signer ssh.Signer, host string, dialTimeout time.Duration) (*sshTunnel, error) {
 	config := ssh.ClientConfig{
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         dialTimeout,
 	}
 	return &sshTunnel{
 		Config:  &config,
@@ -102,6 +103,7 @@ func makeSSHTunnel(user string, signer ssh.Signer, host string) (*sshTunnel, err
 
 func (s *sshTunnel) Open() error {
 	var err error
+	realTimeoutDialer := &timeoutDialer{&realSSHDialer{}, s.Config.Timeout}
 	s.client, err = realTimeoutDialer.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
 	tunnelOpenCounter.Inc()
 	if err != nil {
@@ -177,6 +179,10 @@ func (d *timeoutDialer) Dial(network, addr string, config *ssh.ClientConfig) (*s
 // If user=="", it will default (like SSH) to os.Getenv("USER")
 func RunSSHCommand(cmd, user, host string, signer ssh.Signer) (string, string, int, error) {
 	return runSSHCommand(realTimeoutDialer, cmd, user, host, signer, true)
+}
+
+func RunSSHCommandWithTimeout(cmd, user, host string, signer ssh.Signer, dialTimeout time.Duration) (string, string, int, error) {
+	return runSSHCommand(&timeoutDialer{&realSSHDialer{}, dialTimeout}, cmd, user, host, signer, true)
 }
 
 // Internal implementation of runSSHCommand, for testing
@@ -284,14 +290,16 @@ type sshTunnelCreator interface {
 	newSSHTunnel(user, keyFile, host string) (tunnel, error)
 }
 
-type realTunnelCreator struct{}
+type realTunnelCreator struct {
+	dialTimeout time.Duration
+}
 
-func (*realTunnelCreator) newSSHTunnel(user, keyFile, host string) (tunnel, error) {
+func (r *realTunnelCreator) newSSHTunnel(user, keyFile, host string) (tunnel, error) {
 	signer, err := MakePrivateKeySignerFromFile(keyFile)
 	if err != nil {
 		return nil, err
 	}
-	return makeSSHTunnel(user, signer, host)
+	return makeSSHTunnel(user, signer, host, r.dialTimeout)
 }
 
 type SSHTunnelList struct {
@@ -306,9 +314,15 @@ type SSHTunnelList struct {
 }
 
 func NewSSHTunnelList(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}) *SSHTunnelList {
+	return NewSSHTunnelListWithTimeout(user, keyfile, healthCheckURL, stopChan, sshDialTimeout)
+}
+
+func NewSSHTunnelListWithTimeout(user, keyfile string, healthCheckURL *url.URL, stopChan chan struct{}, dialTimeout time.Duration) *SSHTunnelList {
 	l := &SSHTunnelList{
-		adding:         make(map[string]bool),
-		tunnelCreator:  &realTunnelCreator{},
+		adding: make(map[string]bool),
+		tunnelCreator: &realTunnelCreator{
+			dialTimeout: dialTimeout,
+		},
 		user:           user,
 		keyfile:        keyfile,
 		healthCheckURL: healthCheckURL,
