@@ -361,5 +361,5 @@ func newSSHTunnelFromBytes(user string, privateKey []byte, host string) (*sshTun
 	if err != nil {
 		return nil, err
 	}
-	return makeSSHTunnel(user, signer, host)
+	return makeSSHTunnel(user, signer, host, sshDialTimeout)
 }
