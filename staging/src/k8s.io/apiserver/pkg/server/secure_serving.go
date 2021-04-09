@@ -86,13 +86,14 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			s.SNICerts,
 			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
 		)
-		// register if possible
-		if notifier, ok := s.ClientCA.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+
+		if s.ClientCA != nil {
+			s.ClientCA.AddListener(dynamicCertificateController)
 		}
-		if notifier, ok := s.Cert.(dynamiccertificates.Notifier); ok {
-			notifier.AddListener(dynamicCertificateController)
+		if s.Cert != nil {
+			s.Cert.AddListener(dynamicCertificateController)
 		}
+
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
@@ -113,10 +114,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			go controller.Run(1, stopCh)
 		}
 		for _, sniCert := range s.SNICerts {
-			if notifier, ok := sniCert.(dynamiccertificates.Notifier); ok {
-				notifier.AddListener(dynamicCertificateController)
-			}
-
+			sniCert.AddListener(dynamicCertificateController)
 			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.

@@ -58,7 +58,6 @@ type ConfigMapCAController struct {
 	preRunCaches []cache.InformerSynced
 }
 
-var _ Notifier = &ConfigMapCAController{}
 var _ CAContentProvider = &ConfigMapCAController{}
 var _ ControllerRunner = &ConfigMapCAController{}
 

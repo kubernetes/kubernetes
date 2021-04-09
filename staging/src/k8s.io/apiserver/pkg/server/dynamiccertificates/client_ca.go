@@ -18,19 +18,7 @@ package dynamiccertificates
 
 import (
 	"bytes"
-	"crypto/x509"
 )
-
-// CAContentProvider provides ca bundle byte content
-type CAContentProvider interface {
-	// Name is just an identifier
-	Name() string
-	// CurrentCABundleContent provides ca bundle byte content.  Errors can be contained to the controllers initializing
-	// the value.  By the time you get here, you should always be returning a value that won't fail.
-	CurrentCABundleContent() []byte
-	// VerifyOptions provides VerifyOptions for authenticators
-	VerifyOptions() (x509.VerifyOptions, bool)
-}
 
 // dynamicCertificateContent holds the content that overrides the baseTLSConfig
 type dynamicCertificateContent struct {

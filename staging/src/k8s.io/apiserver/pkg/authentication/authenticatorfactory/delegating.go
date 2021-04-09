@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/request/websocket"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authentication/token/cache"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	webhooktoken "k8s.io/apiserver/plugin/pkg/authenticator/token/webhook"
 	authenticationclient "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
@@ -55,7 +56,7 @@ type DelegatingAuthenticatorConfig struct {
 	// CAContentProvider are the options for verifying incoming connections using mTLS and directly assigning to users.
 	// Generally this is the CA bundle file used to authenticate client certificates
 	// If this is nil, then mTLS will not be used.
-	ClientCertificateCAContentProvider CAContentProvider
+	ClientCertificateCAContentProvider dynamiccertificates.CAContentProvider
 
 	APIAudiences authenticator.Audiences
 
