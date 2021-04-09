@@ -1385,16 +1385,25 @@ func TestGetAgentPoolScaleSets(t *testing.T) {
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000000")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
 				},
 			},
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000001")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
 				},
 			},
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000002")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
 				},
 			},
 		}
@@ -1464,6 +1473,20 @@ func TestGetVMSetNames(t *testing.T) {
 			expectedErr: fmt.Errorf("scale set (vmss-1) - not found"),
 		},
 		{
+			description: "GetVMSetNames should report an error if vm's network profile is nil",
+			service: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ServiceAnnotationLoadBalancerMode: "vmss"}},
+			},
+			nodes: []*v1.Node{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "vmss-vm-000003",
+					},
+				},
+			},
+			expectedErr: fmt.Errorf("instance not found"),
+		},
+		{
 			description: "GetVMSetNames should return the correct vmss names",
 			service: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{ServiceAnnotationLoadBalancerMode: "vmss"}},
@@ -1496,16 +1519,30 @@ func TestGetVMSetNames(t *testing.T) {
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000000")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
 				},
 			},
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000001")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
 				},
 			},
 			{
 				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
 					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000002")},
+					NetworkProfile: &compute.NetworkProfile{
+						NetworkInterfaces: &[]compute.NetworkInterfaceReference{},
+					},
+				},
+			},
+			{
+				VirtualMachineScaleSetVMProperties: &compute.VirtualMachineScaleSetVMProperties{
+					OsProfile: &compute.OSProfile{ComputerName: to.StringPtr("vmss-vm-000003")},
 				},
 			},
 		}
