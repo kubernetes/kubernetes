@@ -366,7 +366,7 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedCondition:       &jobConditionComplete,
 			expectedConditionStatus: v1.ConditionTrue,
 		},
-		"more active pods than completions": {
+		"more active pods than parallelism": {
 			parallelism:       2,
 			completions:       5,
 			backoffLimit:      6,
@@ -374,6 +374,17 @@ func TestControllerSyncJob(t *testing.T) {
 			activePods:        10,
 			expectedDeletions: 8,
 			expectedActive:    2,
+		},
+		"more active pods than remaining completions": {
+			parallelism:       3,
+			completions:       4,
+			backoffLimit:      6,
+			jobKeyForget:      true,
+			activePods:        3,
+			succeededPods:     2,
+			expectedDeletions: 1,
+			expectedActive:    2,
+			expectedSucceeded: 2,
 		},
 		"status change": {
 			parallelism:       2,
