@@ -17,7 +17,7 @@ spec:
   terminationGracePeriodSeconds: 600
   hostNetwork: true
   containers:
-  - image: k8s.gcr.io/ingress-gce-glbc-amd64:v1.6.1
+  - image: gcr.io/k8s-ingress-image-push/ingress-gce-glbc-amd64:v1.11.0
     livenessProbe:
       httpGet:
         path: /healthz
@@ -51,6 +51,7 @@ spec:
     - --logtostderr=false
     - --log_file=/var/log/glbc.log
     - --enable-finalizer-remove
+    - --enable-finalizer-add
     - --default-backend-service=kube-system/default-http-backend
     - --kubeconfig=/etc/srv/kubernetes/l7-lb-controller/kubeconfig
     - --sync-period=600s
