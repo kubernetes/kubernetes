@@ -451,6 +451,9 @@ function kube::release::package_kube_manifests_tarball() {
   find "${src_dir}" -name 'internal-*' -exec cp {} "${dst_dir}" \;
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   cp "${KUBE_ROOT}/gke/cluster/gce/gci/configure-kubeapiserver.sh" "${dst_dir}/configure-kubeapiserver.sh"
+  if [[ -e "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure.sh" ]]; then
+    cp "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure.sh" "${dst_dir}/"
+  fi
   if [[ -e "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
     cp "${KUBE_ROOT}/gke/cluster/gce/gci/gke-internal-configure-helper.sh" "${dst_dir}/"
   fi
