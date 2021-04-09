@@ -3244,6 +3244,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	az.nodeZones = map[string]sets.String{zone: nodesInZone}
 	az.nodeResourceGroups = map[string]string{"prevNode": "rg"}
 	az.unmanagedNodes = sets.NewString("prevNode")
+	az.nodeNames = sets.NewString("prevNode")
 
 	prevNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3260,6 +3261,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 0, len(az.nodeZones[zone]))
 	assert.Equal(t, 0, len(az.nodeResourceGroups))
 	assert.Equal(t, 0, len(az.unmanagedNodes))
+	assert.Equal(t, 0, len(az.nodeNames))
 
 	newNode := v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
@@ -3276,6 +3278,7 @@ func TestUpdateNodeCaches(t *testing.T) {
 	assert.Equal(t, 1, len(az.nodeZones[zone]))
 	assert.Equal(t, 1, len(az.nodeResourceGroups))
 	assert.Equal(t, 1, len(az.unmanagedNodes))
+	assert.Equal(t, 1, len(az.nodeNames))
 }
 
 func TestGetActiveZones(t *testing.T) {
