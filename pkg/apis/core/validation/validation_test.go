@@ -6531,14 +6531,14 @@ func TestValidateRestartPolicy(t *testing.T) {
 }
 
 func TestValidateDNSPolicy(t *testing.T) {
-	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSPolicy(core.DNSClusterFirst), core.DNSNone}
+	successCases := []core.DNSPolicy{core.DNSClusterFirst, core.DNSDefault, core.DNSClusterFirstWithHostNet, core.DNSNone}
 	for _, policy := range successCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
 
-	errorCases := []core.DNSPolicy{core.DNSPolicy("invalid")}
+	errorCases := []core.DNSPolicy{core.DNSPolicy("invalid"), core.DNSPolicy("")}
 	for _, policy := range errorCases {
 		if errs := validateDNSPolicy(&policy, field.NewPath("field")); len(errs) == 0 {
 			t.Errorf("expected failure for %v", policy)
