@@ -1131,6 +1131,12 @@ type SecretVolumeSource struct {
 	// Specify whether the Secret or its keys must be defined
 	// +optional
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
+	// Specify whether we want to preserve the defaultMode set on the files
+	// at the time of file creation.
+	// If this is set to true, the file mode is not modified based
+	// on fsGroup after the file is created with the defaultMode.
+	// +optional
+	PreserveDefaultMode *bool `json:"preserveDefaultMode,omitempty" protobuf:"varint,5,opt,name=preserveDefaultMode"`
 }
 
 const (
@@ -1559,6 +1565,12 @@ type ConfigMapVolumeSource struct {
 	// Specify whether the ConfigMap or its keys must be defined
 	// +optional
 	Optional *bool `json:"optional,omitempty" protobuf:"varint,4,opt,name=optional"`
+	// Specify whether we want to preserve the defaultMode set on the files
+	// at the time of file creation.
+	// If this is set to true, the file mode is not modified based
+	// on fsGroup after the file is created with the defaultMode.
+	// +optional
+	PreserveDefaultMode *bool `json:"preserveDefaultMode,omitempty" protobuf:"varint,5,opt,name=preserveDefaultMode"`
 }
 
 const (
@@ -1625,6 +1637,12 @@ type ProjectedVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
+	// Specify whether we want to preserve the defaultMode set on the files
+	// at the time of file creation.
+	// If this is set to true, the file mode is not modified based
+	// on fsGroup after the file is created with the defaultMode.
+	// +optional
+	PreserveDefaultMode *bool `json:"preserveDefaultMode,omitempty" protobuf:"varint,3,opt,name=preserveDefaultMode"`
 }
 
 // Projection that may be projected along with other supported volume types
@@ -6078,6 +6096,12 @@ type DownwardAPIVolumeSource struct {
 	// mode, like fsGroup, and the result can be other mode bits set.
 	// +optional
 	DefaultMode *int32 `json:"defaultMode,omitempty" protobuf:"varint,2,opt,name=defaultMode"`
+	// Specify whether we want to preserve the defaultMode set on the files
+	// at the time of file creation.
+	// If this is set to true, the file mode is not modified based
+	// on fsGroup after the file is created with the defaultMode.
+	// +optional
+	PreserveDefaultMode *bool `json:"preserveDefaultMode,omitempty" protobuf:"varint,3,opt,name=preserveDefaultMode"`
 }
 
 const (

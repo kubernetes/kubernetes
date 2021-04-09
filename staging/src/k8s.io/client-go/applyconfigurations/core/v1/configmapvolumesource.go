@@ -25,6 +25,7 @@ type ConfigMapVolumeSourceApplyConfiguration struct {
 	Items                                  []KeyToPathApplyConfiguration `json:"items,omitempty"`
 	DefaultMode                            *int32                        `json:"defaultMode,omitempty"`
 	Optional                               *bool                         `json:"optional,omitempty"`
+	PreserveDefaultMode                    *bool                         `json:"preserveDefaultMode,omitempty"`
 }
 
 // ConfigMapVolumeSourceApplyConfiguration constructs an declarative configuration of the ConfigMapVolumeSource type for use with
@@ -67,5 +68,13 @@ func (b *ConfigMapVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *
 // If called multiple times, the Optional field is set to the value of the last call.
 func (b *ConfigMapVolumeSourceApplyConfiguration) WithOptional(value bool) *ConfigMapVolumeSourceApplyConfiguration {
 	b.Optional = &value
+	return b
+}
+
+// WithPreserveDefaultMode sets the PreserveDefaultMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreserveDefaultMode field is set to the value of the last call.
+func (b *ConfigMapVolumeSourceApplyConfiguration) WithPreserveDefaultMode(value bool) *ConfigMapVolumeSourceApplyConfiguration {
+	b.PreserveDefaultMode = &value
 	return b
 }

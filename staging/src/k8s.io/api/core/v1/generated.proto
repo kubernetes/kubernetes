@@ -603,6 +603,13 @@ message ConfigMapVolumeSource {
   // Specify whether the ConfigMap or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // Specify whether we want to preserve the defaultMode set on the files
+  // at the time of file creation.
+  // If this is set to true, the file mode is not modified based
+  // on fsGroup after the file is created with the defaultMode.
+  // +optional
+  optional bool preserveDefaultMode = 5;
 }
 
 // A single application container that you want to run within a pod.
@@ -988,6 +995,13 @@ message DownwardAPIVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // Specify whether we want to preserve the defaultMode set on the files
+  // at the time of file creation.
+  // If this is set to true, the file mode is not modified based
+  // on fsGroup after the file is created with the defaultMode.
+  // +optional
+  optional bool preserveDefaultMode = 3;
 }
 
 // Represents an empty directory for a pod.
@@ -3921,6 +3935,13 @@ message ProjectedVolumeSource {
   // mode, like fsGroup, and the result can be other mode bits set.
   // +optional
   optional int32 defaultMode = 2;
+
+  // Specify whether we want to preserve the defaultMode set on the files
+  // at the time of file creation.
+  // If this is set to true, the file mode is not modified based
+  // on fsGroup after the file is created with the defaultMode.
+  // +optional
+  optional bool preserveDefaultMode = 3;
 }
 
 // Represents a Quobyte mount that lasts the lifetime of a pod.
@@ -4583,6 +4604,13 @@ message SecretVolumeSource {
   // Specify whether the Secret or its keys must be defined
   // +optional
   optional bool optional = 4;
+
+  // Specify whether we want to preserve the defaultMode set on the files
+  // at the time of file creation.
+  // If this is set to true, the file mode is not modified based
+  // on fsGroup after the file is created with the defaultMode.
+  // +optional
+  optional bool preserveDefaultMode = 5;
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

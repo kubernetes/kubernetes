@@ -223,17 +223,32 @@ func SetDefaults_SecretVolumeSource(obj *v1.SecretVolumeSource) {
 		perm := int32(v1.SecretVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
+
+	if obj.PreserveDefaultMode == nil {
+		obj.PreserveDefaultMode = new(bool)
+		*obj.PreserveDefaultMode = false
+	}
 }
 func SetDefaults_ConfigMapVolumeSource(obj *v1.ConfigMapVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.ConfigMapVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
 	}
+
+	if obj.PreserveDefaultMode == nil {
+		obj.PreserveDefaultMode = new(bool)
+		*obj.PreserveDefaultMode = false
+	}
 }
 func SetDefaults_DownwardAPIVolumeSource(obj *v1.DownwardAPIVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.DownwardAPIVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
+	}
+
+	if obj.PreserveDefaultMode == nil {
+		obj.PreserveDefaultMode = new(bool)
+		*obj.PreserveDefaultMode = false
 	}
 }
 func SetDefaults_Secret(obj *v1.Secret) {
@@ -245,6 +260,11 @@ func SetDefaults_ProjectedVolumeSource(obj *v1.ProjectedVolumeSource) {
 	if obj.DefaultMode == nil {
 		perm := int32(v1.ProjectedVolumeSourceDefaultMode)
 		obj.DefaultMode = &perm
+	}
+
+	if obj.PreserveDefaultMode == nil {
+		obj.PreserveDefaultMode = new(bool)
+		*obj.PreserveDefaultMode = false
 	}
 }
 func SetDefaults_ServiceAccountTokenProjection(obj *v1.ServiceAccountTokenProjection) {

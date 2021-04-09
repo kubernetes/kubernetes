@@ -710,6 +710,11 @@ func (in *ConfigMapVolumeSource) DeepCopyInto(out *ConfigMapVolumeSource) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.PreserveDefaultMode != nil {
+		in, out := &in.PreserveDefaultMode, &out.PreserveDefaultMode
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -1031,6 +1036,11 @@ func (in *DownwardAPIVolumeSource) DeepCopyInto(out *DownwardAPIVolumeSource) {
 	if in.DefaultMode != nil {
 		in, out := &in.DefaultMode, &out.DefaultMode
 		*out = new(int32)
+		**out = **in
+	}
+	if in.PreserveDefaultMode != nil {
+		in, out := &in.PreserveDefaultMode, &out.PreserveDefaultMode
+		*out = new(bool)
 		**out = **in
 	}
 	return
@@ -4225,6 +4235,11 @@ func (in *ProjectedVolumeSource) DeepCopyInto(out *ProjectedVolumeSource) {
 		*out = new(int32)
 		**out = **in
 	}
+	if in.PreserveDefaultMode != nil {
+		in, out := &in.PreserveDefaultMode, &out.PreserveDefaultMode
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -4967,6 +4982,11 @@ func (in *SecretVolumeSource) DeepCopyInto(out *SecretVolumeSource) {
 	}
 	if in.Optional != nil {
 		in, out := &in.Optional, &out.Optional
+		*out = new(bool)
+		**out = **in
+	}
+	if in.PreserveDefaultMode != nil {
+		in, out := &in.PreserveDefaultMode, &out.PreserveDefaultMode
 		*out = new(bool)
 		**out = **in
 	}

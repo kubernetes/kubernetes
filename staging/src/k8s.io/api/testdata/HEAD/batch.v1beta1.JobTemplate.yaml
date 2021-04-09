@@ -832,11 +832,11 @@ template:
             readOnly: true
             volumeID: "63"
           azureDisk:
-            cachingMode: ʜǝ鿟ldg滠鼍ƭt
+            cachingMode: ldg滠鼍ƭt?
             diskName: "127"
             diskURI: "128"
             fsType: "129"
-            kind: ȫşŇɜa
+            kind: ""
             readOnly: true
           azureFile:
             secretName: "113"
@@ -851,38 +851,39 @@ template:
             user: "100"
           cinder:
             fsType: "96"
-            readOnly: true
             secretRef:
               name: "97"
             volumeID: "95"
           configMap:
-            defaultMode: -599608368
+            defaultMode: -1639726141
             items:
             - key: "116"
-              mode: -1194714697
+              mode: 1825122175
               path: "117"
             name: "115"
             optional: true
+            preserveDefaultMode: false
           csi:
             driver: "159"
             fsType: "160"
             nodePublishSecretRef:
               name: "163"
-            readOnly: true
+            readOnly: false
             volumeAttributes:
               "161": "162"
           downwardAPI:
-            defaultMode: 1801487647
+            defaultMode: 345648859
             items:
             - fieldRef:
                 apiVersion: "106"
                 fieldPath: "107"
-              mode: 1322858613
+              mode: -1249460160
               path: "105"
               resourceFieldRef:
                 containerName: "108"
-                divisor: "889"
+                divisor: "826"
                 resource: "109"
+            preserveDefaultMode: true
           emptyDir:
             medium: 踓Ǻǧ湬淊kŪ睴鸏:ɥ³ƞsɁ8^ʥ
             sizeLimit: "681"
@@ -940,7 +941,7 @@ template:
                 volumeName: "187"
           fc:
             fsType: "111"
-            lun: 1169718433
+            lun: -672510883
             targetWWNs:
             - "110"
             wwids:
@@ -977,10 +978,9 @@ template:
             initiatorName: "79"
             iqn: "74"
             iscsiInterface: "75"
-            lun: -663180249
+            lun: 1539635748
             portals:
             - "77"
-            readOnly: true
             secretRef:
               name: "78"
             targetPortal: "73"
@@ -998,40 +998,40 @@ template:
             readOnly: true
             volumeID: "145"
           projected:
-            defaultMode: -1980941277
+            defaultMode: 2020789772
+            preserveDefaultMode: true
             sources:
             - configMap:
                 items:
                 - key: "141"
-                  mode: 1730325900
+                  mode: 570501002
                   path: "142"
                 name: "140"
-                optional: true
+                optional: false
               downwardAPI:
                 items:
                 - fieldRef:
                     apiVersion: "136"
                     fieldPath: "137"
-                  mode: -555780268
+                  mode: -868808281
                   path: "135"
                   resourceFieldRef:
                     containerName: "138"
-                    divisor: "952"
+                    divisor: "681"
                     resource: "139"
               secret:
                 items:
                 - key: "133"
-                  mode: 782113097
+                  mode: -1558831136
                   path: "134"
                 name: "132"
                 optional: true
               serviceAccountToken:
                 audience: "143"
-                expirationSeconds: -2937394236764575757
+                expirationSeconds: 7918505734624420658
                 path: "144"
           quobyte:
             group: "125"
-            readOnly: true
             registry: "122"
             tenant: "126"
             user: "124"
@@ -1043,7 +1043,6 @@ template:
             monitors:
             - "83"
             pool: "86"
-            readOnly: true
             secretRef:
               name: "89"
             user: "87"
@@ -1065,6 +1064,7 @@ template:
               mode: 1648350164
               path: "70"
             optional: true
+            preserveDefaultMode: false
             secretName: "68"
           storageos:
             fsType: "157"

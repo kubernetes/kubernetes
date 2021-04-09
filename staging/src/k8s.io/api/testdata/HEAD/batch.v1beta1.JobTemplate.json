@@ -179,7 +179,8 @@
                   }
                 ],
                 "defaultMode": 1655406148,
-                "optional": true
+                "optional": true,
+                "preserveDefaultMode": false
               },
               "nfs": {
                 "server": "71",
@@ -188,10 +189,9 @@
               "iscsi": {
                 "targetPortal": "73",
                 "iqn": "74",
-                "lun": -663180249,
+                "lun": 1539635748,
                 "iscsiInterface": "75",
                 "fsType": "76",
-                "readOnly": true,
                 "portals": [
                   "77"
                 ],
@@ -219,8 +219,7 @@
                 "keyring": "88",
                 "secretRef": {
                   "name": "89"
-                },
-                "readOnly": true
+                }
               },
               "flexVolume": {
                 "driver": "90",
@@ -236,7 +235,6 @@
               "cinder": {
                 "volumeID": "95",
                 "fsType": "96",
-                "readOnly": true,
                 "secretRef": {
                   "name": "97"
                 }
@@ -267,18 +265,19 @@
                     "resourceFieldRef": {
                       "containerName": "108",
                       "resource": "109",
-                      "divisor": "889"
+                      "divisor": "826"
                     },
-                    "mode": 1322858613
+                    "mode": -1249460160
                   }
                 ],
-                "defaultMode": 1801487647
+                "defaultMode": 345648859,
+                "preserveDefaultMode": true
               },
               "fc": {
                 "targetWWNs": [
                   "110"
                 ],
-                "lun": 1169718433,
+                "lun": -672510883,
                 "fsType": "111",
                 "wwids": [
                   "112"
@@ -294,11 +293,12 @@
                   {
                     "key": "116",
                     "path": "117",
-                    "mode": -1194714697
+                    "mode": 1825122175
                   }
                 ],
-                "defaultMode": -599608368,
-                "optional": true
+                "defaultMode": -1639726141,
+                "optional": true,
+                "preserveDefaultMode": false
               },
               "vsphereVolume": {
                 "volumePath": "118",
@@ -309,7 +309,6 @@
               "quobyte": {
                 "registry": "122",
                 "volume": "123",
-                "readOnly": true,
                 "user": "124",
                 "group": "125",
                 "tenant": "126"
@@ -317,10 +316,10 @@
               "azureDisk": {
                 "diskName": "127",
                 "diskURI": "128",
-                "cachingMode": "ʜǝ鿟ldg滠鼍ƭt",
+                "cachingMode": "ldg滠鼍ƭt?",
                 "fsType": "129",
                 "readOnly": true,
-                "kind": "ȫşŇɜa"
+                "kind": ""
               },
               "photonPersistentDisk": {
                 "pdID": "130",
@@ -335,7 +334,7 @@
                         {
                           "key": "133",
                           "path": "134",
-                          "mode": 782113097
+                          "mode": -1558831136
                         }
                       ],
                       "optional": true
@@ -351,9 +350,9 @@
                           "resourceFieldRef": {
                             "containerName": "138",
                             "resource": "139",
-                            "divisor": "952"
+                            "divisor": "681"
                           },
-                          "mode": -555780268
+                          "mode": -868808281
                         }
                       ]
                     },
@@ -363,19 +362,20 @@
                         {
                           "key": "141",
                           "path": "142",
-                          "mode": 1730325900
+                          "mode": 570501002
                         }
                       ],
-                      "optional": true
+                      "optional": false
                     },
                     "serviceAccountToken": {
                       "audience": "143",
-                      "expirationSeconds": -2937394236764575757,
+                      "expirationSeconds": 7918505734624420658,
                       "path": "144"
                     }
                   }
                 ],
-                "defaultMode": -1980941277
+                "defaultMode": 2020789772,
+                "preserveDefaultMode": true
               },
               "portworxVolume": {
                 "volumeID": "145",
@@ -406,7 +406,7 @@
               },
               "csi": {
                 "driver": "159",
-                "readOnly": true,
+                "readOnly": false,
                 "fsType": "160",
                 "volumeAttributes": {
                   "161": "162"

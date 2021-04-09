@@ -237,11 +237,18 @@ func (s *projectedVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterA
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
-	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
-		return err
+	preserveDefaultMode := s.source.PreserveDefaultMode != nil && *s.source.PreserveDefaultMode
+	if preserveDefaultMode {
+		klog.V(3).Infof("PreserveDefaultMode is set for volume %s. Skip setting volume ownership based on FsGroup",
+			s.volName)
+	} else {
+		err = volume.SetVolumeOwnership(s, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(s.plugin, nil))
+		if err != nil {
+			klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
+			return err
+		}
 	}
+
 	setupSuccess = true
 	return nil
 }

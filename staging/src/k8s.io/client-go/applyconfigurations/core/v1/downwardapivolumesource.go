@@ -21,8 +21,9 @@ package v1
 // DownwardAPIVolumeSourceApplyConfiguration represents an declarative configuration of the DownwardAPIVolumeSource type for use
 // with apply.
 type DownwardAPIVolumeSourceApplyConfiguration struct {
-	Items       []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
-	DefaultMode *int32                                    `json:"defaultMode,omitempty"`
+	Items               []DownwardAPIVolumeFileApplyConfiguration `json:"items,omitempty"`
+	DefaultMode         *int32                                    `json:"defaultMode,omitempty"`
+	PreserveDefaultMode *bool                                     `json:"preserveDefaultMode,omitempty"`
 }
 
 // DownwardAPIVolumeSourceApplyConfiguration constructs an declarative configuration of the DownwardAPIVolumeSource type for use with
@@ -49,5 +50,13 @@ func (b *DownwardAPIVolumeSourceApplyConfiguration) WithItems(values ...*Downwar
 // If called multiple times, the DefaultMode field is set to the value of the last call.
 func (b *DownwardAPIVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *DownwardAPIVolumeSourceApplyConfiguration {
 	b.DefaultMode = &value
+	return b
+}
+
+// WithPreserveDefaultMode sets the PreserveDefaultMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreserveDefaultMode field is set to the value of the last call.
+func (b *DownwardAPIVolumeSourceApplyConfiguration) WithPreserveDefaultMode(value bool) *DownwardAPIVolumeSourceApplyConfiguration {
+	b.PreserveDefaultMode = &value
 	return b
 }

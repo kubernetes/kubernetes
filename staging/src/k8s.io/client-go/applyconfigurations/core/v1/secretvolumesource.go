@@ -21,10 +21,11 @@ package v1
 // SecretVolumeSourceApplyConfiguration represents an declarative configuration of the SecretVolumeSource type for use
 // with apply.
 type SecretVolumeSourceApplyConfiguration struct {
-	SecretName  *string                       `json:"secretName,omitempty"`
-	Items       []KeyToPathApplyConfiguration `json:"items,omitempty"`
-	DefaultMode *int32                        `json:"defaultMode,omitempty"`
-	Optional    *bool                         `json:"optional,omitempty"`
+	SecretName          *string                       `json:"secretName,omitempty"`
+	Items               []KeyToPathApplyConfiguration `json:"items,omitempty"`
+	DefaultMode         *int32                        `json:"defaultMode,omitempty"`
+	Optional            *bool                         `json:"optional,omitempty"`
+	PreserveDefaultMode *bool                         `json:"preserveDefaultMode,omitempty"`
 }
 
 // SecretVolumeSourceApplyConfiguration constructs an declarative configuration of the SecretVolumeSource type for use with
@@ -67,5 +68,13 @@ func (b *SecretVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *Sec
 // If called multiple times, the Optional field is set to the value of the last call.
 func (b *SecretVolumeSourceApplyConfiguration) WithOptional(value bool) *SecretVolumeSourceApplyConfiguration {
 	b.Optional = &value
+	return b
+}
+
+// WithPreserveDefaultMode sets the PreserveDefaultMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreserveDefaultMode field is set to the value of the last call.
+func (b *SecretVolumeSourceApplyConfiguration) WithPreserveDefaultMode(value bool) *SecretVolumeSourceApplyConfiguration {
+	b.PreserveDefaultMode = &value
 	return b
 }

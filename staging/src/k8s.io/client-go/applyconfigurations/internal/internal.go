@@ -3391,6 +3391,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: optional
       type:
         scalar: boolean
+    - name: preserveDefaultMode
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.Container
   map:
     fields:
@@ -3660,6 +3663,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.api.core.v1.DownwardAPIVolumeFile
           elementRelationship: atomic
+    - name: preserveDefaultMode
+      type:
+        scalar: boolean
 - name: io.k8s.api.core.v1.EmptyDirVolumeSource
   map:
     fields:
@@ -5536,6 +5542,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: defaultMode
       type:
         scalar: numeric
+    - name: preserveDefaultMode
+      type:
+        scalar: boolean
     - name: sources
       type:
         list:
@@ -6010,6 +6019,9 @@ var schemaYAML = typed.YAMLObject(`types:
             namedType: io.k8s.api.core.v1.KeyToPath
           elementRelationship: atomic
     - name: optional
+      type:
+        scalar: boolean
+    - name: preserveDefaultMode
       type:
         scalar: boolean
     - name: secretName

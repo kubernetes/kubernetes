@@ -21,8 +21,9 @@ package v1
 // ProjectedVolumeSourceApplyConfiguration represents an declarative configuration of the ProjectedVolumeSource type for use
 // with apply.
 type ProjectedVolumeSourceApplyConfiguration struct {
-	Sources     []VolumeProjectionApplyConfiguration `json:"sources,omitempty"`
-	DefaultMode *int32                               `json:"defaultMode,omitempty"`
+	Sources             []VolumeProjectionApplyConfiguration `json:"sources,omitempty"`
+	DefaultMode         *int32                               `json:"defaultMode,omitempty"`
+	PreserveDefaultMode *bool                                `json:"preserveDefaultMode,omitempty"`
 }
 
 // ProjectedVolumeSourceApplyConfiguration constructs an declarative configuration of the ProjectedVolumeSource type for use with
@@ -49,5 +50,13 @@ func (b *ProjectedVolumeSourceApplyConfiguration) WithSources(values ...*VolumeP
 // If called multiple times, the DefaultMode field is set to the value of the last call.
 func (b *ProjectedVolumeSourceApplyConfiguration) WithDefaultMode(value int32) *ProjectedVolumeSourceApplyConfiguration {
 	b.DefaultMode = &value
+	return b
+}
+
+// WithPreserveDefaultMode sets the PreserveDefaultMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PreserveDefaultMode field is set to the value of the last call.
+func (b *ProjectedVolumeSourceApplyConfiguration) WithPreserveDefaultMode(value bool) *ProjectedVolumeSourceApplyConfiguration {
+	b.PreserveDefaultMode = &value
 	return b
 }

@@ -2845,6 +2845,7 @@ func autoConvert_v1_ConfigMapVolumeSource_To_core_ConfigMapVolumeSource(in *v1.C
 	out.Items = *(*[]core.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -2860,6 +2861,7 @@ func autoConvert_core_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *core
 	out.Items = *(*[]v1.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -3195,6 +3197,7 @@ func Convert_core_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *core.Dow
 func autoConvert_v1_DownwardAPIVolumeSource_To_core_DownwardAPIVolumeSource(in *v1.DownwardAPIVolumeSource, out *core.DownwardAPIVolumeSource, s conversion.Scope) error {
 	out.Items = *(*[]core.DownwardAPIVolumeFile)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -3206,6 +3209,7 @@ func Convert_v1_DownwardAPIVolumeSource_To_core_DownwardAPIVolumeSource(in *v1.D
 func autoConvert_core_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *core.DownwardAPIVolumeSource, out *v1.DownwardAPIVolumeSource, s conversion.Scope) error {
 	out.Items = *(*[]v1.DownwardAPIVolumeFile)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -6507,6 +6511,7 @@ func autoConvert_v1_ProjectedVolumeSource_To_core_ProjectedVolumeSource(in *v1.P
 		out.Sources = nil
 	}
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -6528,6 +6533,7 @@ func autoConvert_core_ProjectedVolumeSource_To_v1_ProjectedVolumeSource(in *core
 		out.Sources = nil
 	}
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -7313,6 +7319,7 @@ func autoConvert_v1_SecretVolumeSource_To_core_SecretVolumeSource(in *v1.SecretV
 	out.Items = *(*[]core.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
@@ -7326,6 +7333,7 @@ func autoConvert_core_SecretVolumeSource_To_v1_SecretVolumeSource(in *core.Secre
 	out.Items = *(*[]v1.KeyToPath)(unsafe.Pointer(&in.Items))
 	out.DefaultMode = (*int32)(unsafe.Pointer(in.DefaultMode))
 	out.Optional = (*bool)(unsafe.Pointer(in.Optional))
+	out.PreserveDefaultMode = (*bool)(unsafe.Pointer(in.PreserveDefaultMode))
 	return nil
 }
 
