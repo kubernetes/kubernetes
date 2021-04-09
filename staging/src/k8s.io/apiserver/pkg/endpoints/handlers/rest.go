@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -223,60 +222,6 @@ func (r *responder) Object(statusCode int, obj runtime.Object) {
 
 func (r *responder) Error(err error) {
 	r.scope.err(err, r.w, r.req)
-}
-
-// resultFunc is a function that returns a rest result and can be run in a goroutine
-type resultFunc func() (runtime.Object, error)
-
-// finishRequest makes a given resultFunc asynchronous and handles errors returned by the response.
-// An api.Status object with status != success is considered an "error", which interrupts the normal response flow.
-func finishRequest(ctx context.Context, fn resultFunc) (result runtime.Object, err error) {
-	// these channels need to be buffered to prevent the goroutine below from hanging indefinitely
-	// when the select statement reads something other than the one the goroutine sends on.
-	ch := make(chan runtime.Object, 1)
-	errCh := make(chan error, 1)
-	panicCh := make(chan interface{}, 1)
-	go func() {
-		// panics don't cross goroutine boundaries, so we have to handle ourselves
-		defer func() {
-			panicReason := recover()
-			if panicReason != nil {
-				// do not wrap the sentinel ErrAbortHandler panic value
-				if panicReason != http.ErrAbortHandler {
-					// Same as stdlib http server code. Manually allocate stack
-					// trace buffer size to prevent excessively large logs
-					const size = 64 << 10
-					buf := make([]byte, size)
-					buf = buf[:goruntime.Stack(buf, false)]
-					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
-				}
-				// Propagate to parent goroutine
-				panicCh <- panicReason
-			}
-		}()
-
-		if result, err := fn(); err != nil {
-			errCh <- err
-		} else {
-			ch <- result
-		}
-	}()
-
-	select {
-	case result = <-ch:
-		if status, ok := result.(*metav1.Status); ok {
-			if status.Status != metav1.StatusSuccess {
-				return nil, errors.FromObject(status)
-			}
-		}
-		return result, nil
-	case err = <-errCh:
-		return nil, err
-	case p := <-panicCh:
-		panic(p)
-	case <-ctx.Done():
-		return nil, errors.NewTimeoutError(fmt.Sprintf("request did not complete within requested timeout %s", ctx.Err()), 0)
-	}
 }
 
 // transformDecodeError adds additional information into a bad-request api error when a decode fails.
