@@ -5,8 +5,7 @@
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-- [Release notes for v1.21.0](#release-notes-for-v1210)
-- [Changelog since v1.20.0](#changelog-since-v1200-1)
+  - [Changelog since v1.20.0](#changelog-since-v1200)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Deprecation of PodSecurityPolicy](#deprecation-of-podsecuritypolicy)
     - [Kubernetes API Reference Documentation](#kubernetes-api-reference-documentation)
@@ -139,7 +138,7 @@
     - [Client binaries](#client-binaries-6)
     - [Server binaries](#server-binaries-6)
     - [Node binaries](#node-binaries-6)
-  - [Changelog since v1.20.0](#changelog-since-v1200-2)
+  - [Changelog since v1.20.0](#changelog-since-v1200-1)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes-6)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade-6)
   - [Changes by Kind](#changes-by-kind-6)
@@ -203,11 +202,7 @@ filename | sha512 hash
 [kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.21.0/kubernetes-node-linux-s390x.tar.gz) | `8de2bc6f22f232ff534b45012986eac23893581ccb6c45bd637e40dbe808ce31d5a92375c00dc578bdbadec342b6e5b70c1b9f3d3a7bb26ccfde97d71f9bf84a`
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.21.0/kubernetes-node-windows-amd64.tar.gz) | `b82e94663d330cff7a117f99a7544f27d0bc92b36b5a283b3c23725d5b33e6f15e0ebf784627638f22f2d58c58c0c2b618ddfd226a64ae779693a0861475d355`
 
-# Release notes for v1.21.0
-
-[Documentation](https://docs.k8s.io/docs/home)
-
-# Changelog since v1.20.0
+## Changelog since v1.20.0
 
 ## What's New (Major Themes)
 
