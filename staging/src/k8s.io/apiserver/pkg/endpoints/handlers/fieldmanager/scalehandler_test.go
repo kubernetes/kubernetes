@@ -117,6 +117,19 @@ func TestTransformManagedFieldsToSubresource(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "drops fields if the api version is unknown",
+			input: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "manager-1",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "apps/v10",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+				},
+			},
+			expected: nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -561,6 +574,43 @@ func TestTransformingManagedFieldsToParent(t *testing.T) {
 					FieldsType:  "FieldsV1",
 					FieldsV1:    &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
 					Subresource: "scale",
+				},
+			},
+		},
+		{
+			desc: "drops other fields if the api version is unknown",
+			parent: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "test",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "apps/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+				},
+				{
+					Manager:    "another-manager",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "apps/v10",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:selector":{}}}`)},
+				},
+			},
+			subresource: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "scale",
+					Operation:  metav1.ManagedFieldsOperationUpdate,
+					APIVersion: "autoscaling/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+				},
+			},
+			expected: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "scale",
+					Operation:  metav1.ManagedFieldsOperationUpdate,
+					APIVersion: "apps/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
 				},
 			},
 		},

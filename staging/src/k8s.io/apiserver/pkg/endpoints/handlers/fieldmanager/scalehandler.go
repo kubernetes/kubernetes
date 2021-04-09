@@ -68,7 +68,12 @@ func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 	f := fieldpath.ManagedFields{}
 	t := map[string]*metav1.Time{}
 	for manager, versionedSet := range managed.Fields() {
-		path := h.mappings[string(versionedSet.APIVersion())]
+		path, ok := h.mappings[string(versionedSet.APIVersion())]
+		// Drop the field if the APIVersion of the managed field is unknown
+		if !ok {
+			continue
+		}
+
 		if versionedSet.Set().Has(path) {
 			newVersionedSet := fieldpath.NewVersionedSet(
 				fieldpath.NewSet(replicasPathInScale),
@@ -104,7 +109,11 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 
 	for manager, versionedSet := range parentFields {
 		// Get the main resource "replicas" path
-		path := h.mappings[string(versionedSet.APIVersion())]
+		path, ok := h.mappings[string(versionedSet.APIVersion())]
+		// Drop the field if the APIVersion of the managed field is unknown
+		if !ok {
+			continue
+		}
 
 		// If the parent entry does not have the replicas path, just keep it as it is
 		if !versionedSet.Set().Has(path) {
