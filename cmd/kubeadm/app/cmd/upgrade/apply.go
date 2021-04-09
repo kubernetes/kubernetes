@@ -171,13 +171,6 @@ func runApply(flags *applyFlags, args []string) error {
 		return err
 	}
 
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2375
-	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to control plane Nodes\n",
-		kubeadmconstants.LabelExcludeFromExternalLB)
-	if err := upgrade.LabelControlPlaneNodesWithExcludeFromLB(client); err != nil {
-		return err
-	}
-
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
 	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
