@@ -158,11 +158,6 @@ func (cfg *Config) Complete() CompletedConfig {
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
 func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
-	// Prevent generic API server to install OpenAPI handler. Aggregator server
-	// has its own customized OpenAPI handler.
-	openAPIConfig := c.GenericConfig.OpenAPIConfig
-	c.GenericConfig.OpenAPIConfig = nil
-
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -188,7 +183,7 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 		lister:                   informerFactory.Apiregistration().V1().APIServices().Lister(),
 		APIRegistrationInformers: informerFactory,
 		serviceResolver:          c.ExtraConfig.ServiceResolver,
-		openAPIConfig:            openAPIConfig,
+		openAPIConfig:            c.GenericConfig.OpenAPIConfig,
 		egressSelector:           c.GenericConfig.EgressSelector,
 	}
 
