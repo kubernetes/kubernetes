@@ -222,7 +222,7 @@ func (e *PredicateFailureError) GetReason() string {
 
 // GeneralPredicates checks a group of predicates that the kubelet cares about.
 func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]PredicateFailureReason, error) {
-	if nodeInfo.Node() == nil {
+	if nodeInfo.Node == nil {
 		return nil, fmt.Errorf("node not found")
 	}
 
@@ -236,7 +236,7 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 		})
 	}
 
-	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo.Node()) {
+	if !pluginhelper.PodMatchesNodeSelectorAndAffinityTerms(pod, nodeInfo.Node) {
 		reasons = append(reasons, &PredicateFailureError{nodeaffinity.Name, nodeaffinity.ErrReasonPod})
 	}
 	if !nodename.Fits(pod, nodeInfo) {
