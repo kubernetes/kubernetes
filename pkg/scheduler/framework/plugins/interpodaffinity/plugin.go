@@ -39,6 +39,7 @@ var _ framework.PreFilterPlugin = &InterPodAffinity{}
 var _ framework.FilterPlugin = &InterPodAffinity{}
 var _ framework.PreScorePlugin = &InterPodAffinity{}
 var _ framework.ScorePlugin = &InterPodAffinity{}
+var _ framework.EnqueueExtensions = &InterPodAffinity{}
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
@@ -52,6 +53,22 @@ type InterPodAffinity struct {
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *InterPodAffinity) Name() string {
 	return Name
+}
+
+// EventsToRegister returns the possible events that may make a failed Pod
+// schedulable
+func (pl *InterPodAffinity) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		// All ActionType includes the following events:
+		// - Delete. An unschedulable Pod may fail due to violating an existing Pod's anti-affinity constraints,
+		// deleting an existing Pod may make it schedulable.
+		// - Update. Updating on an existing Pod's labels (e.g., removal) may make
+		// an unschedulable Pod schedulable.
+		// - Add. An unschedulable Pod may fail due to violating pod-affinity constraints,
+		// adding an assigned Pod may make it schedulable.
+		{Resource: framework.Pod, ActionType: framework.All},
+		{Resource: framework.Node, ActionType: framework.Add | framework.UpdateNodeLabel},
+	}
 }
 
 // New initializes a new plugin and returns it.
