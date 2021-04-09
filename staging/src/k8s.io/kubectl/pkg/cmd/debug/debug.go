@@ -382,25 +382,22 @@ func (o *DebugOptions) visitPod(ctx context.Context, pod *corev1.Pod) (*corev1.P
 // debugByEphemeralContainer runs an EphemeralContainer in the target Pod for use as a debug container
 func (o *DebugOptions) debugByEphemeralContainer(ctx context.Context, pod *corev1.Pod) (*corev1.Pod, string, error) {
 	pods := o.podClient.Pods(pod.Namespace)
-	ec, err := pods.GetEphemeralContainers(ctx, pod.Name, metav1.GetOptions{})
+	klog.V(2).Infof("existing ephemeral containers: %v", pod.Spec.EphemeralContainers)
+
+	debugContainer := o.generateDebugContainer(pod)
+	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
+
+	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, *debugContainer)
+	result, err := pods.UpdateEphemeralContainers(ctx, pod.Name, pod, metav1.UpdateOptions{})
 	if err != nil {
 		// The pod has already been fetched at this point, so a NotFound error indicates the ephemeralcontainers subresource wasn't found.
 		if serr, ok := err.(*errors.StatusError); ok && serr.Status().Reason == metav1.StatusReasonNotFound {
 			return nil, "", fmt.Errorf("ephemeral containers are disabled for this cluster (error from server: %q).", err)
 		}
-		return nil, "", err
-	}
-	klog.V(2).Infof("existing ephemeral containers: %v", ec.EphemeralContainers)
-
-	debugContainer := o.generateDebugContainer(pod)
-	klog.V(2).Infof("new ephemeral container: %#v", debugContainer)
-	ec.EphemeralContainers = append(ec.EphemeralContainers, *debugContainer)
-	_, err = pods.UpdateEphemeralContainers(ctx, pod.Name, ec, metav1.UpdateOptions{})
-	if err != nil {
 		return nil, "", fmt.Errorf("error updating ephemeral containers: %v", err)
 	}
 
-	return pod, debugContainer.Name, nil
+	return result, debugContainer.Name, nil
 }
 
 // debugByCopy runs a copy of the target Pod with a debug container added or an original container modified

@@ -205,6 +205,18 @@ type podEphemeralContainersStrategy struct {
 // EphemeralContainersStrategy wraps and exports the used podStrategy for the storage package.
 var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
+func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	newPod := obj.(*api.Pod)
+	oldPod := old.(*api.Pod)
+
+	// Drop all changes except for pod.Spec.EphemeralContainers
+	ec := newPod.Spec.EphemeralContainers
+	*newPod = *oldPod
+	newPod.Spec.EphemeralContainers = ec
+
+	podutil.DropDisabledPodFields(newPod, oldPod)
+}
+
 func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
