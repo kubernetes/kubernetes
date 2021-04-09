@@ -214,9 +214,9 @@ func (util *portworxVolumeUtil) ResizeVolume(spec *volume.Spec, newSize resource
 	}
 
 	vol := vols[0]
-	tBytes, ok := newSize.AsInt64()
-	if !ok {
-		return fmt.Errorf("quantity %v is too great, overflows int64", newSize)
+	tBytes, err := volumehelpers.RoundUpToB(newSize)
+	if err != nil {
+		return err
 	}
 	newSizeInBytes := uint64(tBytes)
 	if vol.Spec.Size >= newSizeInBytes {
