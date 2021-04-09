@@ -5,8 +5,7 @@
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.20.0](#changelog-since-v1200)
-- [Release notes for v1.21.0-rc.0](#release-notes-for-v1210-rc0)
+- [Release notes for v1.21.0](#release-notes-for-v1210)
 - [Changelog since v1.20.0](#changelog-since-v1200-1)
   - [What's New (Major Themes)](#whats-new-major-themes)
     - [Deprecation of PodSecurityPolicy](#deprecation-of-podsecuritypolicy)
@@ -36,10 +35,6 @@
     - [Added](#added)
     - [Changed](#changed)
     - [Removed](#removed)
-  - [Dependencies](#dependencies-1)
-    - [Added](#added-1)
-    - [Changed](#changed-1)
-    - [Removed](#removed-1)
 - [v1.21.0-rc.0](#v1210-rc0)
   - [Downloads for v1.21.0-rc.0](#downloads-for-v1210-rc0)
     - [Source Code](#source-code)
@@ -208,9 +203,7 @@ filename | sha512 hash
 [kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.21.0/kubernetes-node-linux-s390x.tar.gz) | `8de2bc6f22f232ff534b45012986eac23893581ccb6c45bd637e40dbe808ce31d5a92375c00dc578bdbadec342b6e5b70c1b9f3d3a7bb26ccfde97d71f9bf84a`
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.21.0/kubernetes-node-windows-amd64.tar.gz) | `b82e94663d330cff7a117f99a7544f27d0bc92b36b5a283b3c23725d5b33e6f15e0ebf784627638f22f2d58c58c0c2b618ddfd226a64ae779693a0861475d355`
 
-## Changelog since v1.20.0
-
-# Release notes for v1.21.0-rc.0
+# Release notes for v1.21.0
 
 [Documentation](https://docs.k8s.io/docs/home)
 
@@ -616,91 +609,6 @@ The feature gate currently falls back to the default behavior in most cases. Ena
 
 - GCE L4 Loadbalancers now handle > 5 ports in service spec correctly. ([#99595](https://github.com/kubernetes/kubernetes/pull/99595), [@prameshj](https://github.com/prameshj)) [SIG Cloud Provider]
 - The DownwardAPIHugePages feature is beta.  Users may use the feature if all workers in their cluster are min 1.20 version.  The feature will be enabled by default in all installations in 1.22. ([#99610](https://github.com/kubernetes/kubernetes/pull/99610), [@derekwaynecarr](https://github.com/derekwaynecarr)) [SIG Node]
-
-## Dependencies
-
-### Added
-- github.com/go-errors/errors: [v1.0.1](https://github.com/go-errors/errors/tree/v1.0.1)
-- github.com/gobuffalo/here: [v0.6.0](https://github.com/gobuffalo/here/tree/v0.6.0)
-- github.com/google/shlex: [e7afc7f](https://github.com/google/shlex/tree/e7afc7f)
-- github.com/markbates/pkger: [v0.17.1](https://github.com/markbates/pkger/tree/v0.17.1)
-- github.com/moby/spdystream: [v0.2.0](https://github.com/moby/spdystream/tree/v0.2.0)
-- github.com/monochromegane/go-gitignore: [205db1a](https://github.com/monochromegane/go-gitignore/tree/205db1a)
-- github.com/niemeyer/pretty: [a10e7ca](https://github.com/niemeyer/pretty/tree/a10e7ca)
-- github.com/xlab/treeprint: [a009c39](https://github.com/xlab/treeprint/tree/a009c39)
-- go.starlark.net: 8dd3e2e
-- golang.org/x/term: 6a3ed07
-- sigs.k8s.io/kustomize/api: v0.8.5
-- sigs.k8s.io/kustomize/cmd/config: v0.9.7
-- sigs.k8s.io/kustomize/kustomize/v4: v4.0.5
-- sigs.k8s.io/kustomize/kyaml: v0.10.15
-
-### Changed
-- dmitri.shuralyov.com/gpu/mtl: 666a987 → 28db891
-- github.com/Azure/go-autorest/autorest: [v0.11.1 → v0.11.12](https://github.com/Azure/go-autorest/autorest/compare/v0.11.1...v0.11.12)
-- github.com/NYTimes/gziphandler: [56545f4 → v1.1.1](https://github.com/NYTimes/gziphandler/compare/56545f4...v1.1.1)
-- github.com/cilium/ebpf: [1c8d4c9 → v0.2.0](https://github.com/cilium/ebpf/compare/1c8d4c9...v0.2.0)
-- github.com/container-storage-interface/spec: [v1.2.0 → v1.3.0](https://github.com/container-storage-interface/spec/compare/v1.2.0...v1.3.0)
-- github.com/containerd/console: [v1.0.0 → v1.0.1](https://github.com/containerd/console/compare/v1.0.0...v1.0.1)
-- github.com/containerd/containerd: [v1.4.1 → v1.4.4](https://github.com/containerd/containerd/compare/v1.4.1...v1.4.4)
-- github.com/coredns/corefile-migration: [v1.0.10 → v1.0.11](https://github.com/coredns/corefile-migration/compare/v1.0.10...v1.0.11)
-- github.com/creack/pty: [v1.1.7 → v1.1.11](https://github.com/creack/pty/compare/v1.1.7...v1.1.11)
-- github.com/docker/docker: [bd33bbf → v20.10.2+incompatible](https://github.com/docker/docker/compare/bd33bbf...v20.10.2)
-- github.com/go-logr/logr: [v0.2.0 → v0.4.0](https://github.com/go-logr/logr/compare/v0.2.0...v0.4.0)
-- github.com/go-openapi/spec: [v0.19.3 → v0.19.5](https://github.com/go-openapi/spec/compare/v0.19.3...v0.19.5)
-- github.com/go-openapi/strfmt: [v0.19.3 → v0.19.5](https://github.com/go-openapi/strfmt/compare/v0.19.3...v0.19.5)
-- github.com/go-openapi/validate: [v0.19.5 → v0.19.8](https://github.com/go-openapi/validate/compare/v0.19.5...v0.19.8)
-- github.com/gogo/protobuf: [v1.3.1 → v1.3.2](https://github.com/gogo/protobuf/compare/v1.3.1...v1.3.2)
-- github.com/golang/mock: [v1.4.1 → v1.4.4](https://github.com/golang/mock/compare/v1.4.1...v1.4.4)
-- github.com/google/cadvisor: [v0.38.5 → v0.39.0](https://github.com/google/cadvisor/compare/v0.38.5...v0.39.0)
-- github.com/heketi/heketi: [c2e2a4a → v10.2.0+incompatible](https://github.com/heketi/heketi/compare/c2e2a4a...v10.2.0)
-- github.com/kisielk/errcheck: [v1.2.0 → v1.5.0](https://github.com/kisielk/errcheck/compare/v1.2.0...v1.5.0)
-- github.com/konsorten/go-windows-terminal-sequences: [v1.0.3 → v1.0.2](https://github.com/konsorten/go-windows-terminal-sequences/compare/v1.0.3...v1.0.2)
-- github.com/kr/text: [v0.1.0 → v0.2.0](https://github.com/kr/text/compare/v0.1.0...v0.2.0)
-- github.com/mattn/go-runewidth: [v0.0.2 → v0.0.7](https://github.com/mattn/go-runewidth/compare/v0.0.2...v0.0.7)
-- github.com/miekg/dns: [v1.1.4 → v1.1.35](https://github.com/miekg/dns/compare/v1.1.4...v1.1.35)
-- github.com/moby/sys/mountinfo: [v0.1.3 → v0.4.0](https://github.com/moby/sys/mountinfo/compare/v0.1.3...v0.4.0)
-- github.com/moby/term: [672ec06 → df9cb8a](https://github.com/moby/term/compare/672ec06...df9cb8a)
-- github.com/mrunalp/fileutils: [abd8a0e → v0.5.0](https://github.com/mrunalp/fileutils/compare/abd8a0e...v0.5.0)
-- github.com/olekukonko/tablewriter: [a0225b3 → v0.0.4](https://github.com/olekukonko/tablewriter/compare/a0225b3...v0.0.4)
-- github.com/opencontainers/runc: [v1.0.0-rc92 → v1.0.0-rc93](https://github.com/opencontainers/runc/compare/v1.0.0-rc92...v1.0.0-rc93)
-- github.com/opencontainers/runtime-spec: [4d89ac9 → e6143ca](https://github.com/opencontainers/runtime-spec/compare/4d89ac9...e6143ca)
-- github.com/opencontainers/selinux: [v1.6.0 → v1.8.0](https://github.com/opencontainers/selinux/compare/v1.6.0...v1.8.0)
-- github.com/sergi/go-diff: [v1.0.0 → v1.1.0](https://github.com/sergi/go-diff/compare/v1.0.0...v1.1.0)
-- github.com/sirupsen/logrus: [v1.6.0 → v1.7.0](https://github.com/sirupsen/logrus/compare/v1.6.0...v1.7.0)
-- github.com/syndtr/gocapability: [d983527 → 42c35b4](https://github.com/syndtr/gocapability/compare/d983527...42c35b4)
-- github.com/willf/bitset: [d5bec33 → v1.1.11](https://github.com/willf/bitset/compare/d5bec33...v1.1.11)
-- github.com/yuin/goldmark: [v1.1.27 → v1.2.1](https://github.com/yuin/goldmark/compare/v1.1.27...v1.2.1)
-- golang.org/x/crypto: 7f63de1 → 5ea612d
-- golang.org/x/exp: 6cc2880 → 85be41e
-- golang.org/x/mobile: d2bd2a2 → e6ae53a
-- golang.org/x/mod: v0.3.0 → ce943fd
-- golang.org/x/net: 69a7880 → 3d97a24
-- golang.org/x/sync: cd5d95a → 67f06af
-- golang.org/x/sys: 5cba982 → a50acf3
-- golang.org/x/time: 3af7569 → f8bda1e
-- golang.org/x/tools: c1934b7 → v0.1.0
-- gopkg.in/check.v1: 41f04d3 → 8fa4692
-- gopkg.in/yaml.v2: v2.2.8 → v2.4.0
-- gotest.tools/v3: v3.0.2 → v3.0.3
-- k8s.io/gengo: 83324d8 → b6c5ce2
-- k8s.io/klog/v2: v2.4.0 → v2.8.0
-- k8s.io/kube-openapi: d219536 → 591a79e
-- k8s.io/system-validators: v1.2.0 → v1.4.0
-- sigs.k8s.io/apiserver-network-proxy/konnectivity-client: v0.0.14 → v0.0.15
-- sigs.k8s.io/structured-merge-diff/v4: v4.0.2 → v4.1.0
-
-### Removed
-- github.com/codegangsta/negroni: [v1.0.0](https://github.com/codegangsta/negroni/tree/v1.0.0)
-- github.com/docker/spdystream: [449fdfc](https://github.com/docker/spdystream/tree/449fdfc)
-- github.com/golangplus/bytes: [45c989f](https://github.com/golangplus/bytes/tree/45c989f)
-- github.com/golangplus/fmt: [2a5d6d7](https://github.com/golangplus/fmt/tree/2a5d6d7)
-- github.com/gorilla/context: [v1.1.1](https://github.com/gorilla/context/tree/v1.1.1)
-- github.com/kr/pty: [v1.1.5](https://github.com/kr/pty/tree/v1.1.5)
-- rsc.io/quote/v3: v3.1.0
-- rsc.io/sampler: v1.3.0
-- sigs.k8s.io/kustomize: v2.0.3+incompatible
-
 
 ## Dependencies
 
