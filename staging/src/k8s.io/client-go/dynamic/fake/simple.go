@@ -83,7 +83,7 @@ func NewSimpleDynamicClientWithCustomListKinds(scheme *runtime.Scheme, gvrToList
 		}
 	}
 
-	cs := &FakeDynamicClient{scheme: scheme, gvrToListKind: completeGVRToListKind}
+	cs := &FakeDynamicClient{scheme: scheme, gvrToListKind: completeGVRToListKind, tracker: o}
 	cs.AddReactor("*", "*", testing.ObjectReaction(o))
 	cs.AddWatchReactor("*", func(action testing.Action) (handled bool, ret watch.Interface, err error) {
 		gvr := action.GetResource()
@@ -105,6 +105,7 @@ type FakeDynamicClient struct {
 	testing.Fake
 	scheme        *runtime.Scheme
 	gvrToListKind map[schema.GroupVersionResource]string
+	tracker       testing.ObjectTracker
 }
 
 type dynamicResourceClient struct {
@@ -112,6 +113,10 @@ type dynamicResourceClient struct {
 	namespace string
 	resource  schema.GroupVersionResource
 	listKind  string
+}
+
+func (c *FakeDynamicClient) Tracker() testing.ObjectTracker {
+	return c.tracker
 }
 
 var _ dynamic.Interface = &FakeDynamicClient{}
