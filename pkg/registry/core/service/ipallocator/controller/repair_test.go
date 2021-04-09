@@ -23,7 +23,6 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -151,7 +150,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
 				ClusterIPs: []string{"192.168.1.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{
@@ -159,7 +158,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.100",
 				ClusterIPs: []string{"192.168.1.100"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{ // outside CIDR, will be dropped
@@ -167,7 +166,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
 				ClusterIPs: []string{"192.168.0.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{ // empty, ignored
@@ -182,7 +181,7 @@ func TestRepairWithExisting(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
 				ClusterIPs: []string{"192.168.1.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{ // headless
@@ -253,31 +252,31 @@ func makeIPNet(cidr string) *net.IPNet {
 func TestShouldWorkOnSecondary(t *testing.T) {
 	testCases := []struct {
 		name             string
-		expectedFamilies []v1.IPFamily
+		expectedFamilies []corev1.IPFamily
 		primaryNet       *net.IPNet
 		secondaryNet     *net.IPNet
 	}{
 		{
 			name:             "primary only (v4)",
-			expectedFamilies: []v1.IPFamily{v1.IPv4Protocol},
+			expectedFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			primaryNet:       makeIPNet("10.0.0.0/16"),
 			secondaryNet:     nil,
 		},
 		{
 			name:             "primary only (v6)",
-			expectedFamilies: []v1.IPFamily{v1.IPv6Protocol},
+			expectedFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			primaryNet:       makeIPNet("2000::/120"),
 			secondaryNet:     nil,
 		},
 		{
 			name:             "primary and secondary provided (v4,v6)",
-			expectedFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+			expectedFamilies: []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
 			primaryNet:       makeIPNet("10.0.0.0/16"),
 			secondaryNet:     makeIPNet("2000::/120"),
 		},
 		{
 			name:             "primary and secondary provided (v6,v4)",
-			expectedFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+			expectedFamilies: []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol},
 			primaryNet:       makeIPNet("2000::/120"),
 			secondaryNet:     makeIPNet("10.0.0.0/16"),
 		},
@@ -298,7 +297,7 @@ func TestShouldWorkOnSecondary(t *testing.T) {
 				t.Fatalf("expected to have allocator by family count:%v got %v", len(tc.expectedFamilies), len(repair.allocatorByFamily))
 			}
 
-			seen := make(map[v1.IPFamily]bool)
+			seen := make(map[corev1.IPFamily]bool)
 			for _, family := range tc.expectedFamilies {
 				familySeen := true
 
@@ -496,7 +495,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
 				ClusterIPs: []string{"192.168.1.1", "2000::1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
 			},
 		},
 		&corev1.Service{
@@ -504,7 +503,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::1",
 				ClusterIPs: []string{"2000::1", "192.168.1.100"},
-				IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{
@@ -512,7 +511,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::2",
 				ClusterIPs: []string{"2000::2"},
-				IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			},
 		},
 		&corev1.Service{
@@ -520,7 +519,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.90",
 				ClusterIPs: []string{"192.168.1.90"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		// outside CIDR, will be dropped
@@ -529,7 +528,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
 				ClusterIPs: []string{"192.168.0.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{ // outside CIDR, will be dropped
@@ -537,7 +536,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "3000::1",
 				ClusterIPs: []string{"3000::1"},
-				IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			},
 		},
 		&corev1.Service{
@@ -545,7 +544,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.0.1",
 				ClusterIPs: []string{"192.168.0.1", "3000::1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol, v1.IPv6Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol},
 			},
 		},
 		&corev1.Service{
@@ -553,7 +552,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "3000::1",
 				ClusterIPs: []string{"3000::1", "192.168.0.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol},
 			},
 		},
 
@@ -566,7 +565,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "192.168.1.1",
 				ClusterIPs: []string{"192.168.1.1"},
-				IPFamilies: []v1.IPFamily{v1.IPv4Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv4Protocol},
 			},
 		},
 		&corev1.Service{ // duplicate, dropped
@@ -574,7 +573,7 @@ func TestRepairWithExistingDualStack(t *testing.T) {
 			Spec: corev1.ServiceSpec{
 				ClusterIP:  "2000::2",
 				ClusterIPs: []string{"2000::2"},
-				IPFamilies: []v1.IPFamily{v1.IPv6Protocol},
+				IPFamilies: []corev1.IPFamily{corev1.IPv6Protocol},
 			},
 		},
 

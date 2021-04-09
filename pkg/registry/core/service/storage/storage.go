@@ -31,9 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/core/service"
 	registry "k8s.io/kubernetes/pkg/registry/core/service"
-	svcreg "k8s.io/kubernetes/pkg/registry/core/service"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	netutil "k8s.io/utils/net"
@@ -68,7 +66,7 @@ func NewGenericREST(optsGetter generic.RESTOptionsGetter, serviceCIDR net.IPNet,
 	}
 
 	statusStore := *store
-	statusStrategy := service.NewServiceStatusStrategy(strategy)
+	statusStrategy := registry.NewServiceStatusStrategy(strategy)
 	statusStore.UpdateStrategy = statusStrategy
 	statusStore.ResetFieldsStrategy = statusStrategy
 
@@ -171,7 +169,7 @@ func (r *GenericREST) defaultOnReadService(service *api.Service) {
 	// We might find Services that were written before ClusterIP became plural.
 	// We still want to present a consistent view of them.
 	// NOTE: the args are (old, new)
-	svcreg.NormalizeClusterIPs(nil, service)
+	registry.NormalizeClusterIPs(nil, service)
 
 	// The rest of this does not apply unless dual-stack is enabled.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
