@@ -18,15 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-run_cluster_management_tests() {
-  set -o nounset
-  set -o errexit
-
-  create_and_use_new_namespace
-  kube::log::status "Testing cluster-management commands"
-
-  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
-
+create_test_pods(){
   # create test pods we can work with
   kubectl create -f - "${kube_flags[@]:?}" << __EOF__
 {
@@ -35,10 +27,12 @@ run_cluster_management_tests() {
   "metadata": {
     "name": "test-pod-1",
     "labels": {
-      "e": "f"
+      "e": "f",
+      "type": "test-pod"
     }
   },
   "spec": {
+    "nodeName": "127.0.0.1",
     "containers": [
       {
         "name": "container-1",
@@ -57,10 +51,12 @@ __EOF__
   "metadata": {
     "name": "test-pod-2",
     "labels": {
-      "c": "d"
+      "c": "d",
+      "type": "test-pod"
     }
   },
   "spec": {
+    "nodeName": "127.0.0.1",
     "containers": [
       {
         "name": "container-1",
@@ -71,6 +67,24 @@ __EOF__
   }
 }
 __EOF__
+}
+
+delete_test_pods() {
+  # need to use --force because node is unready
+  kubectl delete pod/test-pod-1 --force --ignore-not-found
+  kubectl delete pod/test-pod-2 --force --ignore-not-found
+}
+
+run_cluster_management_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing cluster-management commands"
+
+  kube::test::get_object_assert nodes "{{range.items}}{{${id_field:?}}}:{{end}}" '127.0.0.1:'
+
+  create_test_pods
 
   # taint/untaint
   # Pre-condition: node doesn't have dedicated=foo:PreferNoSchedule taint
@@ -109,8 +123,8 @@ __EOF__
   ### kubectl drain update with --dry-run does not mark node unschedulable
   # Pre-condition: node is schedulable
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
-  kubectl drain "127.0.0.1" --dry-run=client
-  kubectl drain "127.0.0.1" --dry-run=server
+  kubectl drain "127.0.0.1" --dry-run=client --force
+  kubectl drain "127.0.0.1" --dry-run=server --force
   # Post-condition: node still exists, node is still schedulable
   kube::test::get_object_assert nodes "{{range.items}}{{$id_field}}:{{end}}" '127.0.0.1:'
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -121,15 +135,17 @@ __EOF__
   # Pre-condition: test-pod-1 and test-pod-2 exist
   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
   # dry-run command
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=client
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=server
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=client --force
+  kubectl drain "127.0.0.1" --pod-selector 'e in (f)' --dry-run=server --force
   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
-  # command
-  kubectl drain "127.0.0.1" --pod-selector 'e in (f)'
-  # only "test-pod-1" should have been matched and deleted - test-pod-2 should still exist
-  kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.name}}" 'test-pod-2'
-  # delete pod no longer in use
-  kubectl delete pod/test-pod-2
+  # command - need --force because pod is unmanaged and --skip-wait-for-delete-timeout because node is unready
+  response=$(kubectl drain "127.0.0.1" --force --pod-selector 'e in (f)' --skip-wait-for-delete-timeout=1)
+  kube::test::if_has_string "${response}" "evicting pod .*/test-pod-1"
+  # only "test-pod-1" should have been matched and deleted - test-pod-2 should not have a deletion timestamp
+  kube::test::get_object_assert "pods/test-pod-2" "{{.metadata.deletionTimestamp}}" '<no value>'
+  # Post-condition: recreate test pods -- they have deletionTimestamp set but will not go away because node is unready
+  delete_test_pods
+  create_test_pods
   # Post-condition: node is schedulable
   kubectl uncordon "127.0.0.1"
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
@@ -169,6 +185,9 @@ __EOF__
   kube::test::if_has_not_string "${response}" 'cordoned'
   # Post-condition: node "127.0.0.1" is cordoned
   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" 'true'
+
+  # Clean up test pods
+  delete_test_pods
 
   set +o nounset
   set +o errexit

@@ -220,6 +220,8 @@ func filterPods(podList *corev1.PodList, filters []PodFilter) *PodDeleteList {
 		// Add the pod to PodDeleteList no matter what PodDeleteStatus is,
 		// those pods whose PodDeleteStatus is false like DaemonSet will
 		// be catched by list.errors()
+		pod.Kind = "Pod"
+		pod.APIVersion = "v1"
 		pods = append(pods, PodDelete{
 			Pod:    pod,
 			Status: status,
