@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -980,6 +982,77 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 			err := ValidateVolumeBindingArgs(&tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestValidateFitArgs(t *testing.T) {
+	argsTest := []struct {
+		name   string
+		args   config.NodeResourcesFitArgs
+		expect string
+	}{
+		{
+			name: "IgnoredResources: too long value",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
+			},
+			expect: "name part must be no more than 63 characters",
+		},
+		{
+			name: "IgnoredResources: name is empty",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com/"},
+			},
+			expect: "name part must be non-empty",
+		},
+		{
+			name: "IgnoredResources: name has too many slash",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com/aaa/bbb"},
+			},
+			expect: "a qualified name must consist of alphanumeric characters",
+		},
+		{
+			name: "IgnoredResources: valid args",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResources: []string{"example.com"},
+			},
+		},
+		{
+			name: "IgnoredResourceGroups: valid args ",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com"},
+			},
+		},
+		{
+			name: "IgnoredResourceGroups: illegal args",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com/"},
+			},
+			expect: "name part must be non-empty",
+		},
+		{
+			name: "IgnoredResourceGroups: name is too long",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
+			},
+			expect: "name part must be no more than 63 characters",
+		},
+		{
+			name: "IgnoredResourceGroups: name cannot be contain slash",
+			args: config.NodeResourcesFitArgs{
+				IgnoredResourceGroups: []string{"example.com/aa"},
+			},
+			expect: "resource group name can't contain '/'",
+		},
+	}
+
+	for _, test := range argsTest {
+		t.Run(test.name, func(t *testing.T) {
+			if err := ValidateNodeResourcesFitArgs(&test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+				t.Errorf("case[%v]: error details do not include %v", test.name, err)
 			}
 		})
 	}
