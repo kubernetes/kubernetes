@@ -212,7 +212,7 @@ filename | sha512 hash
 
 # Release notes for v1.21.0-rc.0
 
-[Documentation](https://docs.k8s.io/docs/home)
+[Documentation](https://docs.k8s.io)
 
 # Changelog since v1.20.0
 
