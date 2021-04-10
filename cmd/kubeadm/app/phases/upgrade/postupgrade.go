@@ -230,31 +230,3 @@ func LabelOldControlPlaneNodes(client clientset.Interface) error {
 	}
 	return nil
 }
-
-// LabelControlPlaneNodesWithExcludeFromLB finds all control plane nodes and applies the LabelExcludeFromExternalLB
-// label to them.
-// TODO: https://github.com/kubernetes/kubeadm/issues/2375
-func LabelControlPlaneNodesWithExcludeFromLB(client clientset.Interface) error {
-	selectorControlPlane := labels.SelectorFromSet(labels.Set(map[string]string{
-		kubeadmconstants.LabelNodeRoleControlPlane: "",
-	}))
-	nodesWithLabel, err := client.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: selectorControlPlane.String(),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "could not list nodes labeled with %q", kubeadmconstants.LabelNodeRoleControlPlane)
-	}
-
-	for _, n := range nodesWithLabel.Items {
-		if _, hasLabel := n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB]; hasLabel {
-			continue
-		}
-		err = apiclient.PatchNode(client, n.Name, func(n *v1.Node) {
-			n.ObjectMeta.Labels[kubeadmconstants.LabelExcludeFromExternalLB] = ""
-		})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
