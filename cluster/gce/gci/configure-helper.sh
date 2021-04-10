@@ -3019,30 +3019,34 @@ EOF
     fi
   fi
   cat > "${config_path}" <<EOF
+version = 2
 # Kubernetes doesn't use containerd restart manager.
-disabled_plugins = ["restart"]
+disabled_plugins = ["io.containerd.internal.v1.restart"]
 oom_score = -999
 
 [debug]
   level = "${CONTAINERD_LOG_LEVEL:-"info"}"
-
-[plugins.cri]
+[plugins."io.containerd.grpc.v1.cri"]
   stream_server_address = "127.0.0.1"
   max_container_log_line_size = ${CONTAINERD_MAX_CONTAINER_LOG_LINE:-262144}
-[plugins.cri.cni]
+[plugins."io.containerd.grpc.v1.cri".cni]
   bin_dir = "${KUBE_HOME}/bin"
   conf_dir = "/etc/cni/net.d"
   conf_template = "${cni_template_path}"
-[plugins.cri.registry.mirrors."docker.io"]
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
   endpoint = ["https://mirror.gcr.io","https://registry-1.docker.io"]
+[plugins."io.containerd.grpc.v1.cri".containerd]
+  default_runtime_name = "runc"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc]
+  runtime_type = "io.containerd.runc.v2"
 EOF
 
   if [[ "${CONTAINER_RUNTIME_TEST_HANDLER:-}" == "true" ]]; then
   cat >> "${config_path}" <<EOF
 # Setup a runtime with the magic name ("test-handler") used for Kubernetes
 # runtime class tests ...
-[plugins.cri.containerd.runtimes.test-handler]
-  runtime_type = "io.containerd.runtime.v1.linux"
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.test-handler]
+  runtime_type = "io.containerd.runc.v1"
 EOF
   fi
 
@@ -3056,6 +3060,10 @@ EOF
 EOF
   fi
   chmod 644 "${config_path}"
+
+  echo ">>>>>>>>>>> BEGIN config.toml <<<<<<<<<<<<<<"
+  cat -n "${config_path}"
+  echo ">>>>>>>>>>> END config.toml <<<<<<<<<<<<<<"
 
   echo "Restart containerd to load the config change"
   systemctl restart containerd
