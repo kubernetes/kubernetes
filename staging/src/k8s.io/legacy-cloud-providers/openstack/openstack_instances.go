@@ -48,6 +48,15 @@ const (
 func (os *OpenStack) Instances() (cloudprovider.Instances, bool) {
 	klog.V(4).Info("openstack.Instances() called")
 
+	// For kubelet we don't have to initialize cloud provider as it
+	// can read all required data from metadata service. Absence of
+	// secretLister means that we use kubelet.
+	if os.secretLister == nil {
+		return &Instances{
+			opts: os.metadataOpts,
+		}, true
+	}
+
 	compute, err := os.NewComputeV2()
 	if err != nil {
 		klog.Errorf("unable to access compute v2 API : %v", err)

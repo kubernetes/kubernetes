@@ -86,8 +86,8 @@ func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status 
 
 func TestReadConfig(t *testing.T) {
 	_, err := readConfig(nil)
-	if err == nil {
-		t.Errorf("Should fail when no config is provided: %s", err)
+	if err != nil {
+		t.Errorf("Should not fail when no config is provided: %s", err)
 	}
 
 	// Since we are setting env vars, we need to reset old
