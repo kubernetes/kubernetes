@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -128,7 +127,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 		c.t.Fatalf("Expected encryption provider config to be written to %s, but stat failed with error: %v", p, err)
 	}
 
-	got, err := ioutil.ReadFile(p)
+	got, err := os.ReadFile(p)
 	if err != nil {
 		c.t.Fatalf("Failed to read encryption provider config %s", p)
 	}

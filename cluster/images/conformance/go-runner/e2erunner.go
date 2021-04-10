@@ -18,7 +18,6 @@ package main
 
 import (
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -115,7 +114,7 @@ func saveResults(resultsDir string) error {
 	}
 
 	return errors.Wrap(
-		ioutil.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777)),
+		os.WriteFile(doneFile, []byte(resultsTarball), os.FileMode(0777)),
 		"writing donefile",
 	)
 }

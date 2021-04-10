@@ -17,7 +17,6 @@ limitations under the License.
 package clusterinfo
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 	"text/template"
@@ -80,7 +79,7 @@ func TestCreateBootstrapConfigMapIfNotExists(t *testing.T) {
 	}
 
 	for _, server := range servers {
-		file, err := ioutil.TempFile("", "")
+		file, err := os.CreateTemp("", "")
 		if err != nil {
 			t.Fatalf("could not create tempfile: %v", err)
 		}

@@ -18,7 +18,7 @@ package upgrade
 
 import (
 	"io"
-	"io/ioutil"
+	"os"
 
 	"github.com/pkg/errors"
 	"github.com/pmezard/go-difflib/difflib"
@@ -143,7 +143,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if path == "" {
 			return errors.New("empty manifest path")
 		}
-		existingManifest, err := ioutil.ReadFile(path)
+		existingManifest, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
