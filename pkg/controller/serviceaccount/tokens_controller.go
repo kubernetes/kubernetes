@@ -174,13 +174,13 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 		return
 	}
 
-	klog.V(5).Infof("Starting workers")
+	klog.V(5).InfoS("Starting workers")
 	for i := 0; i < workers; i++ {
 		go wait.Until(e.syncServiceAccount, 0, stopCh)
 		go wait.Until(e.syncSecret, 0, stopCh)
 	}
 	<-stopCh
-	klog.V(1).Infof("Shutting down")
+	klog.V(1).InfoS("Shutting down")
 }
 
 func (e *TokensController) queueServiceAccountSync(obj interface{}) {
@@ -208,7 +208,7 @@ func (e *TokensController) retryOrForget(queue workqueue.RateLimitingInterface, 
 		return
 	}
 
-	klog.V(4).Infof("retried %d times: %#v", requeueCount, key)
+	klog.V(4).InfoS("Retried times", "requeueCount", requeueCount, "serviceAccountKey", key)
 	queue.Forget(key)
 }
 
@@ -238,28 +238,28 @@ func (e *TokensController) syncServiceAccount() {
 
 	saInfo, err := parseServiceAccountKey(key)
 	if err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Error parsing serviceAccountQueueKey")
 		return
 	}
 
 	sa, err := e.getServiceAccount(saInfo.namespace, saInfo.name, saInfo.uid, false)
 	switch {
 	case err != nil:
-		klog.Error(err)
+		klog.ErrorS(err, "Error getting serviceaccount")
 		retry = true
 	case sa == nil:
 		// service account no longer exists, so delete related tokens
-		klog.V(4).Infof("syncServiceAccount(%s/%s), service account deleted, removing tokens", saInfo.namespace, saInfo.name)
+		klog.V(4).InfoS("SyncServiceAccount, serviceaccount deleted, removing tokens", "serviceaccount", klog.KRef(saInfo.namespace, saInfo.name))
 		sa = &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Namespace: saInfo.namespace, Name: saInfo.name, UID: saInfo.uid}}
 		retry, err = e.deleteTokens(sa)
 		if err != nil {
-			klog.Errorf("error deleting serviceaccount tokens for %s/%s: %v", saInfo.namespace, saInfo.name, err)
+			klog.ErrorS(err, "Error deleting serviceaccount tokens", "serviceaccount", klog.KRef(saInfo.namespace, saInfo.name))
 		}
 	default:
 		// ensure a token exists and is referenced by this service account
 		retry, err = e.ensureReferencedToken(sa)
 		if err != nil {
-			klog.Errorf("error synchronizing serviceaccount %s/%s: %v", saInfo.namespace, saInfo.name, err)
+			klog.ErrorS(err, "Error synchronizing serviceaccount", "serviceaccount", klog.KRef(saInfo.namespace, saInfo.name))
 		}
 	}
 }
@@ -279,14 +279,14 @@ func (e *TokensController) syncSecret() {
 
 	secretInfo, err := parseSecretQueueKey(key)
 	if err != nil {
-		klog.Error(err)
+		klog.ErrorS(err, "Error parsing secretQueueKey")
 		return
 	}
 
 	secret, err := e.getSecret(secretInfo.namespace, secretInfo.name, secretInfo.uid, false)
 	switch {
 	case err != nil:
-		klog.Error(err)
+		klog.ErrorS(err, "Error getting secret")
 		retry = true
 	case secret == nil:
 		// If the service account exists
@@ -295,7 +295,7 @@ func (e *TokensController) syncSecret() {
 			if err := clientretry.RetryOnConflict(RemoveTokenBackoff, func() error {
 				return e.removeSecretReference(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, secretInfo.name)
 			}); err != nil {
-				klog.Error(err)
+				klog.ErrorS(err, "Error removing secret", "serviceaccount", klog.KRef(secretInfo.namespace, secretInfo.saName), "secret", klog.KRef(secretInfo.namespace, secretInfo.name))
 			}
 		}
 	default:
@@ -303,19 +303,19 @@ func (e *TokensController) syncSecret() {
 		sa, saErr := e.getServiceAccount(secretInfo.namespace, secretInfo.saName, secretInfo.saUID, true)
 		switch {
 		case saErr != nil:
-			klog.Error(saErr)
+			klog.ErrorS(saErr, "Error getting serviceaccount")
 			retry = true
 		case sa == nil:
 			// Delete token
-			klog.V(4).Infof("syncSecret(%s/%s), service account does not exist, deleting token", secretInfo.namespace, secretInfo.name)
+			klog.V(4).InfoS("SyncSecret, serviceaccount does not exist, deleting token", "secret", klog.KRef(secretInfo.namespace, secretInfo.name))
 			if retriable, err := e.deleteToken(secretInfo.namespace, secretInfo.name, secretInfo.uid); err != nil {
-				klog.Errorf("error deleting serviceaccount token %s/%s for service account %s: %v", secretInfo.namespace, secretInfo.name, secretInfo.saName, err)
+				klog.ErrorS(err, "Error deleting serviceaccount token for serviceaccount", "secret", klog.KRef(secretInfo.namespace, secretInfo.name), "serviceaccount", secretInfo.saName)
 				retry = retriable
 			}
 		default:
 			// Update token if needed
 			if retriable, err := e.generateTokenIfNeeded(sa, secret); err != nil {
-				klog.Errorf("error populating serviceaccount token %s/%s for service account %s: %v", secretInfo.namespace, secretInfo.name, secretInfo.saName, err)
+				klog.ErrorS(err, "Error populating serviceaccount token for service accoun", "secret", klog.KRef(secretInfo.namespace, secretInfo.name), "serviceaccount", secretInfo.saName)
 				retry = retriable
 			}
 		}
@@ -377,7 +377,7 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	}
 	if liveServiceAccount.ResourceVersion != serviceAccount.ResourceVersion {
 		// Retry if our liveServiceAccount doesn't match our cache's resourceVersion (either the live lookup or our cache are stale)
-		klog.V(4).Infof("liveServiceAccount.ResourceVersion (%s) does not match cache (%s), retrying", liveServiceAccount.ResourceVersion, serviceAccount.ResourceVersion)
+		klog.V(4).InfoS("LiveServiceAccount.ResourceVersion (%s) does not match cache (%s), retrying", liveServiceAccount.ResourceVersion, serviceAccount.ResourceVersion)
 		return true, nil
 	}
 
@@ -460,10 +460,10 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 
 	if !addedReference {
 		// we weren't able to use the token, try to clean it up.
-		klog.V(2).Infof("deleting secret %s/%s because reference couldn't be added (%v)", secret.Namespace, secret.Name, err)
+		klog.V(2).InfoS("Deleting secret because reference couldn't be added", "secret", klog.KObj(secret), "err", err)
 		deleteOpts := metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &createdToken.UID}}
 		if err := e.client.CoreV1().Secrets(createdToken.Namespace).Delete(context.TODO(), createdToken.Name, deleteOpts); err != nil {
-			klog.Error(err) // if we fail, just log it
+			klog.ErrorS(err, "Error deleting secret", "secret", klog.KObj(createdToken)) // if we fail, just log it
 		}
 	}
 
@@ -529,7 +529,7 @@ func (e *TokensController) generateTokenIfNeeded(serviceAccount *v1.ServiceAccou
 	if liveSecret.ResourceVersion != cachedSecret.ResourceVersion {
 		// our view of the secret is not up to date
 		// we'll get notified of an update event later and get to try again
-		klog.V(2).Infof("secret %s/%s is not up to date, skipping token population", liveSecret.Namespace, liveSecret.Name)
+		klog.V(2).InfoS("Secret is not up to date, skipping token population", klog.KObj(liveSecret))
 		return false, nil
 	}
 

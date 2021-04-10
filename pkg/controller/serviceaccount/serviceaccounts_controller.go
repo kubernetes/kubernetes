@@ -114,8 +114,8 @@ func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting service account controller")
-	defer klog.Infof("Shutting down service account controller")
+	klog.InfoS("Starting service account controller")
+	defer klog.InfoS("Shutting down service account controller")
 
 	if !cache.WaitForNamedCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
 		return
@@ -185,7 +185,7 @@ func (c *ServiceAccountsController) processNextWorkItem() bool {
 func (c *ServiceAccountsController) syncNamespace(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing namespace", "namespace", key, "startDuration", time.Since(startTime))
 	}()
 
 	ns, err := c.nsLister.Get(key)

@@ -568,8 +568,7 @@ func TestTokenCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		klog.Infof(k)
-
+		klog.InfoS(k)
 		// Re-seed to reset name generation
 		utilrand.Seed(1)
 
@@ -589,37 +588,53 @@ func TestTokenCreation(t *testing.T) {
 		}
 
 		if tc.ExistingServiceAccount != nil {
-			serviceAccounts.Add(tc.ExistingServiceAccount)
+			if err = serviceAccounts.Add(tc.ExistingServiceAccount); err != nil {
+				t.Fatalf("serviceAccounts could not add %v,err %v", tc.ExistingServiceAccount, err)
+			}
 		}
 		for _, s := range tc.ExistingSecrets {
-			secrets.Add(s)
+			if err = secrets.Add(s); err != nil {
+				t.Fatalf("secrets could not add %v,err %v", s, err)
+			}
 		}
 
 		if tc.AddedServiceAccount != nil {
-			serviceAccounts.Add(tc.AddedServiceAccount)
+			if err = serviceAccounts.Add(tc.AddedServiceAccount); err != nil {
+				t.Fatalf("serviceAccounts could not add %v,err %v", tc.AddedServiceAccount, err)
+			}
 			controller.queueServiceAccountSync(tc.AddedServiceAccount)
 		}
 		if tc.UpdatedServiceAccount != nil {
-			serviceAccounts.Add(tc.UpdatedServiceAccount)
+			if err = serviceAccounts.Add(tc.UpdatedServiceAccount); err != nil {
+				t.Fatalf("serviceAccounts could not add %v,err %v", tc.UpdatedServiceAccount, err)
+			}
 			controller.queueServiceAccountUpdateSync(nil, tc.UpdatedServiceAccount)
 		}
 		if tc.DeletedServiceAccount != nil {
-			serviceAccounts.Delete(tc.DeletedServiceAccount)
+			if err = serviceAccounts.Delete(tc.DeletedServiceAccount); err != nil {
+				t.Fatalf("serviceAccounts could not delete %v,err %v", tc.DeletedServiceAccount, err)
+			}
 			controller.queueServiceAccountSync(tc.DeletedServiceAccount)
 		}
 		if tc.AddedSecret != nil {
-			secrets.Add(tc.AddedSecret)
+			if err = secrets.Add(tc.AddedSecret); err != nil {
+				t.Fatalf("secrets could not add %v,err %v", tc.AddedSecret, err)
+			}
 			controller.queueSecretSync(tc.AddedSecret)
 		}
 		if tc.AddedSecretLocal != nil {
 			controller.updatedSecrets.Mutation(tc.AddedSecretLocal)
 		}
 		if tc.UpdatedSecret != nil {
-			secrets.Add(tc.UpdatedSecret)
+			if err = secrets.Add(tc.UpdatedSecret); err != nil {
+				t.Fatalf("secrets could not add %v,err %v", tc.UpdatedSecret, err)
+			}
 			controller.queueSecretUpdateSync(nil, tc.UpdatedSecret)
 		}
 		if tc.DeletedSecret != nil {
-			secrets.Delete(tc.DeletedSecret)
+			if err = secrets.Delete(tc.DeletedSecret); err != nil {
+				t.Fatalf("secrets could not delete %v,err %v", tc.DeletedSecret, err)
+			}
 			controller.queueSecretSync(tc.DeletedSecret)
 		}
 
