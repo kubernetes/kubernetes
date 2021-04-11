@@ -72,6 +72,7 @@ type ServiceOptions struct {
 	FieldManager     string
 	CreateAnnotation bool
 	Namespace        string
+	EnforceNamespace bool
 
 	Client         corev1client.CoreV1Interface
 	DryRunStrategy cmdutil.DryRunStrategy
@@ -105,7 +106,7 @@ func (o *ServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []
 		return err
 	}
 
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -173,13 +174,19 @@ func (o *ServiceOptions) createService() (*corev1.Service, error) {
 	selector := map[string]string{}
 	selector["app"] = o.Name
 
+	namespace := ""
+	if o.EnforceNamespace {
+		namespace = o.Namespace
+	}
+
 	service := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   o.Name,
-			Labels: labels,
+			Name:      o.Name,
+			Labels:    labels,
+			Namespace: namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:         corev1.ServiceType(o.Type),
+			Type:         o.Type,
 			Selector:     selector,
 			Ports:        ports,
 			ExternalName: o.ExternalName,
