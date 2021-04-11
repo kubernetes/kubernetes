@@ -70,6 +70,9 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
 	IssuerURL string
 
+	// Optional KeySet to allow for synchronous initlization instead of fetching from the remote issuer.
+	KeySet oidc.KeySet
+
 	// ClientID the JWT must be issued for, the "sub" field. This plugin only trusts a single
 	// client to ensure the plugin can be used with public providers.
 	//
@@ -78,8 +81,8 @@ type Options struct {
 	// See: https://openid.net/specs/openid-connect-core-1_0.html#IDToken
 	ClientID string
 
-	// Path to a PEM encoded root certificate of the provider.
-	CAFile string
+	// PEM encoded root certificate contents of the provider.
+	CAContentProvider CAContentProvider
 
 	// UsernameClaim is the JWT field to use as the user's username.
 	UsernameClaim string
@@ -114,6 +117,11 @@ type Options struct {
 
 	// now is used for testing. It defaults to time.Now.
 	now func() time.Time
+}
+
+// Subset of dynamiccertificates.CAContentProvider that can be used to dynamically load root CAs.
+type CAContentProvider interface {
+	CurrentCABundleContent() []byte
 }
 
 // initVerifier creates a new ID token verifier for the given configuration and issuer URL.  On success, calls setVerifier with the
@@ -214,24 +222,6 @@ func (a *Authenticator) Close() {
 	a.cancel()
 }
 
-func New(opts Options) (*Authenticator, error) {
-	return newAuthenticator(opts, func(ctx context.Context, a *Authenticator, config *oidc.Config) {
-		// Asynchronously attempt to initialize the authenticator. This enables
-		// self-hosted providers, providers that run on top of Kubernetes itself.
-		go wait.PollImmediateUntil(time.Second*10, func() (done bool, err error) {
-			provider, err := oidc.NewProvider(ctx, a.issuerURL)
-			if err != nil {
-				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
-				return false, nil
-			}
-
-			verifier := provider.Verifier(config)
-			a.setVerifier(verifier)
-			return true, nil
-		}, ctx.Done())
-	})
-}
-
 // whitelist of signing algorithms to ensure users don't mistakenly pass something
 // goofy.
 var allowedSigningAlgs = map[string]bool{
@@ -246,7 +236,7 @@ var allowedSigningAlgs = map[string]bool{
 	oidc.PS512: true,
 }
 
-func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Authenticator, config *oidc.Config)) (*Authenticator, error) {
+func New(opts Options) (*Authenticator, error) {
 	url, err := url.Parse(opts.IssuerURL)
 	if err != nil {
 		return nil, err
@@ -273,10 +263,11 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 	}
 
 	var roots *x509.CertPool
-	if opts.CAFile != "" {
-		roots, err = certutil.NewPool(opts.CAFile)
+	if opts.CAContentProvider != nil {
+		// TODO(enj): make this reload CA data dynamically
+		roots, err = certutil.NewPoolFromBytes(opts.CAContentProvider.CurrentCABundleContent())
 		if err != nil {
-			return nil, fmt.Errorf("Failed to read the CA file: %v", err)
+			return nil, fmt.Errorf("Failed to read the CA contents: %v", err)
 		}
 	} else {
 		klog.Info("OIDC: No x509 certificates provided, will use host's root CA set")
@@ -321,7 +312,25 @@ func newAuthenticator(opts Options, initVerifier func(ctx context.Context, a *Au
 		resolver:       resolver,
 	}
 
-	initVerifier(ctx, authenticator, verifierConfig)
+	if opts.KeySet != nil {
+		// We already have a key set, synchronously initialize the verifier.
+		authenticator.setVerifier(oidc.NewVerifier(opts.IssuerURL, opts.KeySet, verifierConfig))
+	} else {
+		// Asynchronously attempt to initialize the authenticator. This enables
+		// self-hosted providers, providers that run on top of Kubernetes itself.
+		go wait.PollImmediateUntil(10*time.Second, func() (done bool, err error) {
+			provider, err := oidc.NewProvider(ctx, opts.IssuerURL)
+			if err != nil {
+				klog.Errorf("oidc authenticator: initializing plugin: %v", err)
+				return false, nil
+			}
+
+			verifier := provider.Verifier(verifierConfig)
+			authenticator.setVerifier(verifier)
+			return true, nil
+		}, ctx.Done())
+	}
+
 	return authenticator, nil
 }
 
