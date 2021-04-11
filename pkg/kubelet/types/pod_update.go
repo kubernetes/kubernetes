@@ -184,3 +184,8 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 func IsCriticalPodBasedOnPriority(priority int32) bool {
 	return priority >= scheduling.SystemCriticalPriority
 }
+
+// IsNodeCriticalPod checks if the given pod is a system-node-critical
+func IsNodeCriticalPod(pod *v1.Pod) bool {
+	return IsCriticalPod(pod) && (pod.Spec.PriorityClassName == scheduling.SystemNodeCritical)
+}
