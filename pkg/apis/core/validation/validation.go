@@ -35,7 +35,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
-	v1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -1624,7 +1623,7 @@ func ValidatePersistentVolumeClaimTemplate(claimTemplate *core.PersistentVolumeC
 
 func validatePersistentVolumeClaimTemplateObjectMeta(objMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	allErrs := apimachineryvalidation.ValidateAnnotations(objMeta.Annotations, fldPath.Child("annotations"))
-	allErrs = append(allErrs, v1validation.ValidateLabels(objMeta.Labels, fldPath.Child("labels"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(objMeta.Labels, fldPath.Child("labels"))...)
 	// All other fields are not supported and thus must not be set
 	// to avoid confusion.  We could reject individual fields,
 	// but then adding a new one to ObjectMeta wouldn't be checked
@@ -5408,7 +5407,7 @@ func ValidateResourceRequirements(requirements *core.ResourceRequirements, fldPa
 
 	}
 	if !limContainsCPUOrMemory && !reqContainsCPUOrMemory && (reqContainsHugePages || limContainsHugePages) {
-		allErrs = append(allErrs, field.Forbidden(fldPath, fmt.Sprintf("HugePages require cpu or memory")))
+		allErrs = append(allErrs, field.Forbidden(fldPath, "HugePages require cpu or memory"))
 	}
 
 	return allErrs
@@ -5927,10 +5926,10 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 		if l := len(*windowsOptions.RunAsUserName); l == 0 {
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, "runAsUserName cannot be an empty string"))
 		} else if ctrlRegex.MatchString(*windowsOptions.RunAsUserName) {
-			errMsg := fmt.Sprintf("runAsUserName cannot contain control characters")
+			errMsg := "runAsUserName cannot contain control characters"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 		} else if parts := strings.Split(*windowsOptions.RunAsUserName, "\\"); len(parts) > 2 {
-			errMsg := fmt.Sprintf("runAsUserName cannot contain more than one backslash")
+			errMsg := "runAsUserName cannot contain more than one backslash"
 			allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 		} else {
 			var (
@@ -5957,7 +5956,7 @@ func validateWindowsSecurityContextOptions(windowsOptions *core.WindowsSecurityC
 			}
 
 			if l := len(user); l == 0 {
-				errMsg := fmt.Sprintf("runAsUserName's User cannot be empty")
+				errMsg := "runAsUserName's User cannot be empty"
 				allErrs = append(allErrs, field.Invalid(fieldPath.Child("runAsUserName"), windowsOptions.RunAsUserName, errMsg))
 			} else if l > maxRunAsUserNameUserLength {
 				errMsg := fmt.Sprintf("runAsUserName's User length must not be longer than %d characters", maxRunAsUserNameUserLength)
