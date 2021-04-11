@@ -17366,3 +17366,43 @@ func TestValidateResourceRequirements(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNonSpecialIP(t *testing.T) {
+	fp := field.NewPath("ip")
+
+	// Valid values.
+	for _, tc := range []struct {
+		desc string
+		ip   string
+	}{
+		{"ipv4", "10.1.2.3"},
+		{"ipv6", "2000::1"},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			errs := validateNonSpecialIP(tc.ip, fp)
+			if len(errs) != 0 {
+				t.Errorf("validateNonSpecialIP(%q, ...) = %v; want nil", tc.ip, errs)
+			}
+		})
+	}
+	// Invalid cases
+	for _, tc := range []struct {
+		desc string
+		ip   string
+	}{
+		{"ipv4 unspecified", "0.0.0.0"},
+		{"ipv6 unspecified", "::0"},
+		{"ipv4 localhost", "127.0.0.0"},
+		{"ipv4 localhost", "127.255.255.255"},
+		{"ipv6 localhost", "::1"},
+		{"ipv6 link local", "fe80::"},
+		{"ipv6 local multicast", "ff02::"},
+	} {
+		t.Run(tc.desc, func(t *testing.T) {
+			errs := validateNonSpecialIP(tc.ip, fp)
+			if len(errs) == 0 {
+				t.Errorf("validateNonSpecialIP(%q, ...) = nil; want non-nil (errors)", tc.ip)
+			}
+		})
+	}
+}
