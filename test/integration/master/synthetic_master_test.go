@@ -143,13 +143,13 @@ func TestEmptyList(t *testing.T) {
 	}
 }
 
-func initStatusForbiddenMasterCongfig() *controlplane.Config {
+func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return masterConfig
 }
 
-func initUnauthorizedMasterCongfig() *controlplane.Config {
+func initUnauthorizedControlPlaneConfig() *controlplane.Config {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
@@ -178,7 +178,7 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:         "403",
-			masterConfig: initStatusForbiddenMasterCongfig(),
+			masterConfig: initStatusForbiddenControlPlaneConfig(),
 			statusCode:   http.StatusForbidden,
 			reqPath:      "/apis",
 			reason:       "Forbidden",
@@ -186,7 +186,7 @@ func TestStatus(t *testing.T) {
 		},
 		{
 			name:         "401",
-			masterConfig: initUnauthorizedMasterCongfig(),
+			masterConfig: initUnauthorizedControlPlaneConfig(),
 			statusCode:   http.StatusUnauthorized,
 			reqPath:      "/apis",
 			reason:       "Unauthorized",

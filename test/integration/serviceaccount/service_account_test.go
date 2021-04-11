@@ -446,7 +446,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	_, _, kubeAPIServerCloseFn := framework.RunAMasterUsingServer(masterConfig, apiServer, h)
+	_, _, kubeAPIServerCloseFn := framework.RunAnApiserverUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})

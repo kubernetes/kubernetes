@@ -77,7 +77,7 @@ func TestQuota(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAnApiserverUsingServer(masterConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quotaed", s, t)
@@ -277,7 +277,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	masterConfig.GenericConfig.AdmissionControl = admission
-	_, _, closeFn := framework.RunAMasterUsingServer(masterConfig, s, h)
+	_, _, closeFn := framework.RunAnApiserverUsingServer(masterConfig, s, h)
 	defer closeFn()
 
 	ns := framework.CreateTestingNamespace("quota", s, t)
