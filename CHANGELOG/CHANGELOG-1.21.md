@@ -12,7 +12,7 @@
     - [Deprecation of PodSecurityPolicy](#deprecation-of-podsecuritypolicy)
     - [Kubernetes API Reference Documentation](#kubernetes-api-reference-documentation)
     - [Kustomize Updates in Kubectl](#kustomize-updates-in-kubectl)
-    - [Default Container Labels](#default-container-labels)
+    - [Default Container Annotation](#default-container-annotation)
     - [Immutable Secrets and ConfigMaps](#immutable-secrets-and-configmaps)
     - [Structured Logging in Kubelet](#structured-logging-in-kubelet)
     - [Storage Capacity Tracking](#storage-capacity-tracking)
@@ -230,9 +230,9 @@ The API reference is now generated with [`gen-resourcesdocs`](https://github.com
 
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) version in kubectl had a jump from v2.0.3 to [v4.0.5](https://github.com/kubernetes/kubernetes/pull/98946). Kustomize is now treated as a library and future updates will be less sporadic.
 
-### Default Container Labels
+### Default Container Annotation
 
-Pod with multiple containers can use `kubectl.kubernetes.io/default-container` label to have a container preselected for kubectl commands. More can be read in [KEP-2227](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cli/2227-kubectl-default-container/README.md).
+Pod with multiple containers can use `kubectl.kubernetes.io/default-container` annotation to have a container preselected for kubectl commands. More can be read in [KEP-2227](https://github.com/kubernetes/enhancements/blob/master/keps/sig-cli/2227-kubectl-default-container/README.md).
 
 ### Immutable Secrets and ConfigMaps
 
