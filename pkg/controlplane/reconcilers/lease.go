@@ -37,6 +37,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
+	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
 	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
 )
 
@@ -130,14 +131,16 @@ type leaseEndpointReconciler struct {
 	masterLeases          Leases
 	stopReconcilingCalled bool
 	reconcilingLock       sync.Mutex
+	destroyFunc           factory.DestroyFunc
 }
 
 // NewLeaseEndpointReconciler creates a new LeaseEndpoint reconciler
-func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases) EndpointReconciler {
+func NewLeaseEndpointReconciler(epAdapter EndpointsAdapter, masterLeases Leases, destroyFunc factory.DestroyFunc) EndpointReconciler {
 	return &leaseEndpointReconciler{
 		epAdapter:             epAdapter,
 		masterLeases:          masterLeases,
 		stopReconcilingCalled: false,
+		destroyFunc:           destroyFunc,
 	}
 }
 
@@ -305,5 +308,6 @@ func (r *leaseEndpointReconciler) RemoveEndpoints(serviceName string, ip net.IP,
 func (r *leaseEndpointReconciler) StopReconciling() {
 	r.reconcilingLock.Lock()
 	defer r.reconcilingLock.Unlock()
+	r.destroyFunc()
 	r.stopReconcilingCalled = true
 }
