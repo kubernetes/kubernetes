@@ -487,7 +487,7 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	for k, v := range ingAnnotations {
 		j.Ingress.Annotations[k] = v
 	}
-	j.Logger.Infof(fmt.Sprintf("creating " + j.Ingress.Name + " ingress"))
+	j.Logger.Infof("creating %v ingress", j.Ingress.Name)
 	j.Ingress, err = j.runCreate(j.Ingress)
 	framework.ExpectNoError(err)
 }
