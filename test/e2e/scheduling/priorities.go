@@ -130,8 +130,9 @@ func removeAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 // We check for double because it needs to support at least the cri-o minimum
 // plus whatever delta between node usages (which could be up to or at least crioMinMemLimit)
 func nodesAreTooUtilized(cs clientset.Interface, nodeList *v1.NodeList) bool {
+	nodeNameToPodList := podListForEachNode(cs)
 	for _, node := range nodeList.Items {
-		_, memFraction, _, memAllocatable := computeCPUMemFraction(cs, node, podRequestedResource)
+		_, memFraction, _, memAllocatable := computeCPUMemFraction(node, podRequestedResource, nodeNameToPodList[node.Name])
 		if float64(memAllocatable)-(memFraction*float64(memAllocatable)) < float64(2*crioMinMemLimit) {
 			return true
 		}
@@ -508,8 +509,11 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 	var cpuFractionMap = make(map[string]float64)
 	var memFractionMap = make(map[string]float64)
 
+	// For each node, stores its pods info
+	nodeNameToPodList := podListForEachNode(cs)
+
 	for _, node := range nodes {
-		cpuFraction, memFraction, _, _ := computeCPUMemFraction(cs, node, requestedResource)
+		cpuFraction, memFraction, _, _ := computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 		cpuFractionMap[node.Name] = cpuFraction
 		memFractionMap[node.Name] = memFraction
 		if cpuFraction > maxCPUFraction {
@@ -569,33 +573,43 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		}
 	}
 
+	nodeNameToPodList = podListForEachNode(cs)
 	for _, node := range nodes {
 		ginkgo.By("Compute Cpu, Mem Fraction after create balanced pods.")
-		computeCPUMemFraction(cs, node, requestedResource)
+		computeCPUMemFraction(node, requestedResource, nodeNameToPodList[node.Name])
 	}
 
 	return cleanUp, nil
 }
 
-func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64, int64, int64) {
-	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
-	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
-	totalRequestedMemResource := resource.Requests.Memory().Value()
-	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+func podListForEachNode(cs clientset.Interface) map[string][]*v1.Pod {
+	nodeNameToPodList := make(map[string][]*v1.Pod)
+	allPods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		framework.Failf("Expect error of invalid, got : %v", err)
 	}
-	for _, pod := range allpods.Items {
-		if pod.Spec.NodeName == node.Name {
-			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
-			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
-			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
-				continue
-			}
-			totalRequestedCPUResource += getNonZeroRequests(&pod).MilliCPU
-			totalRequestedMemResource += getNonZeroRequests(&pod).Memory
-		}
+	for _, pod := range allPods.Items {
+		nodeName := pod.Spec.NodeName
+		nodeNameToPodList[nodeName] = append(nodeNameToPodList[nodeName], &pod)
 	}
+	return nodeNameToPodList
+}
+
+func computeCPUMemFraction(node v1.Node, resource *v1.ResourceRequirements, pods []*v1.Pod) (float64, float64, int64, int64) {
+	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
+	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
+	totalRequestedMemResource := resource.Requests.Memory().Value()
+
+	for _, pod := range pods {
+		framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(pod).MilliCPU, getNonZeroRequests(pod).Memory)
+		// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
+		if v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort {
+			continue
+		}
+		totalRequestedCPUResource += getNonZeroRequests(pod).MilliCPU
+		totalRequestedMemResource += getNonZeroRequests(pod).Memory
+	}
+
 	cpuAllocatable, found := node.Status.Allocatable[v1.ResourceCPU]
 	framework.ExpectEqual(found, true)
 	cpuAllocatableMil := cpuAllocatable.MilliValue()
