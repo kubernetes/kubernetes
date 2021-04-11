@@ -103,12 +103,12 @@ func TestZapLoggerV(t *testing.T) {
 		var buffer bytes.Buffer
 		writer := bufio.NewWriter(&buffer)
 		var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
-		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2)
+		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		writer.Flush()
 		logStr := buffer.String()
 		var v int
 		var expectFormat string
-		expectFormat = "{\"ts\":0.000123,\"msg\":\"test\",\"v\":%d,\"ns\":\"default\",\"podnum\":2}\n"
+		expectFormat = "{\"ts\":0.000123,\"msg\":\"test\",\"v\":%d,\"ns\":\"default\",\"podnum\":2,\"time\":\"1µs\"}\n"
 		n, err := fmt.Sscanf(logStr, expectFormat, &v)
 		if n != 1 || err != nil {
 			t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
@@ -132,11 +132,11 @@ func TestZapLoggerError(t *testing.T) {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
 	var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
-	sampleInfoLogger.Error(fmt.Errorf("ivailid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2)
+	sampleInfoLogger.Error(fmt.Errorf("ivailid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
 	writer.Flush()
 	logStr := buffer.String()
 	var ts float64
-	expectFormat := `{"ts":%f,"msg":"wrong namespace","v":0,"ns":"default","podnum":2,"err":"ivailid namespace:default"}`
+	expectFormat := `{"ts":%f,"msg":"wrong namespace","v":0,"ns":"default","podnum":2,"time":"1µs","err":"ivailid namespace:default"}`
 	n, err := fmt.Sscanf(logStr, expectFormat, &ts)
 	if n != 1 || err != nil {
 		t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
@@ -165,7 +165,7 @@ func TestKlogV(t *testing.T) {
 			t.Fatalf("Failed to set verbosity")
 		}
 		for j := 0; j < 11; j++ {
-			klog.V(klog.Level(j)).Info("test")
+			klog.V(klog.Level(j)).Info("test", "time", time.Microsecond)
 			logWritten := buffer.writeCount > 0
 			totalLogsWritten += buffer.writeCount
 			buffer.writeCount = 0

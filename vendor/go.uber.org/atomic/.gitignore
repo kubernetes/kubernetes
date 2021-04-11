@@ -1,6 +1,7 @@
+/bin
 .DS_Store
 /vendor
-/cover
+cover.html
 cover.out
 lint.log
 

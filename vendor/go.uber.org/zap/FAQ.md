@@ -149,6 +149,7 @@ We're aware of the following extensions, but haven't used them ourselves:
 | `github.com/tchap/zapext` | Sentry, syslog |
 | `github.com/fgrosse/zaptest` | Ginkgo |
 | `github.com/blendle/zapdriver` | Stackdriver |
+| `github.com/moul/zapgorm` | Gorm |
 
 [go-proverbs]: https://go-proverbs.github.io/
 [import-path]: https://golang.org/cmd/go/#hdr-Remote_import_paths

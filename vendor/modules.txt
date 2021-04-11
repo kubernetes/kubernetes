@@ -1230,15 +1230,16 @@ go.starlark.net/resolve
 go.starlark.net/starlark
 go.starlark.net/starlarkstruct
 go.starlark.net/syntax
-# go.uber.org/atomic v1.4.0 => go.uber.org/atomic v1.4.0
+# go.uber.org/atomic v1.6.0 => go.uber.org/atomic v1.6.0
 go.uber.org/atomic
-# go.uber.org/atomic => go.uber.org/atomic v1.4.0
-# go.uber.org/multierr v1.1.0 => go.uber.org/multierr v1.1.0
+# go.uber.org/atomic => go.uber.org/atomic v1.6.0
+# go.uber.org/multierr v1.5.0 => go.uber.org/multierr v1.5.0
 go.uber.org/multierr
-# go.uber.org/multierr => go.uber.org/multierr v1.1.0
-# go.uber.org/zap v1.10.0 => go.uber.org/zap v1.10.0
+# go.uber.org/multierr => go.uber.org/multierr v1.5.0
+# go.uber.org/tools => go.uber.org/tools v0.0.0-20190618225709-2cfd321de3ee
+# go.uber.org/zap v1.16.0 => go.uber.org/zap v1.16.0
 go.uber.org/zap
-# go.uber.org/zap => go.uber.org/zap v1.10.0
+# go.uber.org/zap => go.uber.org/zap v1.16.0
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
