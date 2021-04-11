@@ -8,3 +8,5 @@ reviewers:
  - mattfenwick
  - abhiraut
  - knabben
+labels:
+- area/network-policy
