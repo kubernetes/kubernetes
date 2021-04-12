@@ -4874,6 +4874,7 @@ Events:         <none>` + "\n",
 						Addresses:  []string{"1.2.3.6", "1.2.3.7"},
 						Conditions: discoveryv1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 						TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
+						NodeName:   utilpointer.StringPtr("node-2"),
 					},
 				},
 				Ports: []discoveryv1.EndpointPort{
@@ -4906,7 +4907,7 @@ Endpoints:
       Ready:    true
     Hostname:   <unset>
     TargetRef:  Pod/test-124
-    NodeName:   <unset>
+    NodeName:   node-2
     Zone:       <unset>
 Events:         <none>` + "\n",
 		},

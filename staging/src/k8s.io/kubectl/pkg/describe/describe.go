@@ -3055,7 +3055,7 @@ func describeEndpointSliceV1(eps *discoveryv1.EndpointSlice, events *corev1.Even
 				w.Write(LEVEL_2, "NodeName:\t%s\n", nodeNameText)
 
 				zoneText := "<unset>"
-				if endpoint.NodeName != nil {
+				if endpoint.Zone != nil {
 					zoneText = *endpoint.Zone
 				}
 				w.Write(LEVEL_2, "Zone:\t%s\n", zoneText)
