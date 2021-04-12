@@ -83,7 +83,7 @@ var (
 		# Show metrics for the pods defined by label name=myLabel
 		kubectl top pod -l name=myLabel
 		
-		# Show pod metrics with more information (such as node name)
+		# Show pod metrics with more information (such as node name). Requires GET /pods access.
 		kubectl top pod -o wide`))
 )
 
