@@ -26,7 +26,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -1272,7 +1271,7 @@ func TestCompleteAndValidate(t *testing.T) {
 			args: "--image=busybox --env=FOO=BAR mypod",
 			wantOpts: &DebugOptions{
 				Args:           []string{},
-				Env:            []v1.EnvVar{{Name: "FOO", Value: "BAR"}},
+				Env:            []corev1.EnvVar{{Name: "FOO", Value: "BAR"}},
 				Image:          "busybox",
 				Namespace:      "test",
 				ShareProcesses: true,
