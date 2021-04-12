@@ -41,7 +41,7 @@ func NameIsDNSSubdomain(name string, prefix bool) []string {
 	return validation.IsDNS1123Subdomain(name)
 }
 
-// NameIsDNSLabel is a ValidateNameFunc for names that must be a RFC 1123 label.
+// NameIsDNSLabel is a ValidateNameFunc for names that must be a DNS label (RFC 1123).
 func NameIsDNSLabel(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
@@ -49,7 +49,7 @@ func NameIsDNSLabel(name string, prefix bool) []string {
 	return validation.IsDNS1123Label(name)
 }
 
-// NameIsDNS1035Label is a ValidateNameFunc for names that must be a RFC 1035 label.
+// NameIsDNS1035Label is a ValidateNameFunc for names that must be a DNS label (RFC 1035).
 func NameIsDNS1035Label(name string, prefix bool) []string {
 	if prefix {
 		name = maskTrailingDash(name)
