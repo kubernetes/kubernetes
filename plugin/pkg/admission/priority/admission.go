@@ -32,7 +32,6 @@ import (
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -99,7 +98,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 }
 
 var (
-	podResource           = api.Resource("pods")
+	podResource           = core.Resource("pods")
 	priorityClassResource = scheduling.Resource("priorityclasses")
 )
 
@@ -146,13 +145,13 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 // admitPod makes sure a new pod does not set spec.Priority field. It also makes sure that the PriorityClassName exists if it is provided and resolves the pod priority from the PriorityClassName.
 func (p *Plugin) admitPod(a admission.Attributes) error {
 	operation := a.GetOperation()
-	pod, ok := a.GetObject().(*api.Pod)
+	pod, ok := a.GetObject().(*core.Pod)
 	if !ok {
 		return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 	}
 
 	if operation == admission.Update {
-		oldPod, ok := a.GetOldObject().(*api.Pod)
+		oldPod, ok := a.GetOldObject().(*core.Pod)
 		if !ok {
 			return errors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 		}
