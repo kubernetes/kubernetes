@@ -96,7 +96,7 @@ function start-kube-apiserver {
     params+=" --tls-cipher-suites=${TLS_CIPHER_SUITES}"
   fi
   if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
-    gke-kube-apiserver-internal-sni-param params
+    params+=" $(gke-kube-apiserver-internal-sni-param)"
   fi
   params+=" --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname"
   if [[ -s "${REQUESTHEADER_CA_CERT_PATH:-}" ]]; then
