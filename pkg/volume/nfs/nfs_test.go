@@ -181,6 +181,14 @@ func TestPluginVolume(t *testing.T) {
 	doTestPlugin(t, volume.NewSpecFromVolume(vol))
 }
 
+func TestIPV6VolumeSource(t *testing.T) {
+	vol := &v1.Volume{
+		Name:         "vol1",
+		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "0:0:0:0:0:0:0:1", Path: "/somepath", ReadOnly: false}},
+	}
+	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+}
+
 func TestPluginPersistentVolume(t *testing.T) {
 	vol := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{

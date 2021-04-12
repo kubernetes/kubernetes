@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"time"
@@ -121,7 +122,10 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 	if err != nil {
 		return nil, err
 	}
-
+	// wrap ipv6 into `[ ]`
+	if net.ParseIP(source.Server).To16() != nil {
+		source.Server = fmt.Sprintf("[%s]", source.Server)
+	}
 	return &nfsMounter{
 		nfs: &nfs{
 			volName:         spec.Name(),
