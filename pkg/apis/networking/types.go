@@ -387,7 +387,34 @@ type IngressTLS struct {
 type IngressStatus struct {
 	// LoadBalancer contains the current status of the load-balancer.
 	// +optional
-	LoadBalancer api.LoadBalancerStatus
+	LoadBalancer LoadBalancerStatus
+}
+
+// LoadBalancerStatus represents the status of a load-balancer
+type LoadBalancerStatus struct {
+	// Ingress is a list containing ingress points for the load-balancer;
+	// traffic intended for the service should be sent to these ingress points.
+	// +optional
+	Ingress []LoadBalancerIngress
+}
+
+// LoadBalancerIngress represents the status of a load-balancer ingress point:
+// traffic intended for the service should be sent to an ingress point.
+type LoadBalancerIngress struct {
+	// IP is set for load-balancer ingress points that are IP based
+	// (typically GCE or OpenStack load-balancers)
+	// +optional
+	IP string
+
+	// Hostname is set for load-balancer ingress points that are DNS based
+	// (typically AWS load-balancers)
+	// +optional
+	Hostname string
+
+	// Ports is a list of records of service ports
+	// If used, every port defined in the service should have an entry in it
+	// +optional
+	Ports []api.PortStatus
 }
 
 // IngressRule represents the rules mapping the paths under a specified host to

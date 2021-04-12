@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core"
 	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
 	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 	utilpointer "k8s.io/utils/pointer"
 
 	// ensure types are installed
@@ -700,6 +701,91 @@ func Test_v1_NodeSpec_to_core_NodeSpec(t *testing.T) {
 		for idx := range testInput.PodCIDRs {
 			if coreNodeSpec.PodCIDRs[idx] != testInput.PodCIDRs[idx] {
 				t.Errorf("%v:Convert v1.NodeSpec to core.NodeSpec failed core.PodCIDRs[%v]=%v expected %v", i, idx, coreNodeSpec.PodCIDRs[idx], testInput.PodCIDRs[idx])
+			}
+		}
+	}
+}
+
+func Test_v1_LoadBalancerStatus_to_networking_LoadBalancerStatus(t *testing.T) {
+	var stringErrOne = "First error"
+	var stringErrTwo = "Second error"
+
+	testInputs := []v1.LoadBalancerStatus{
+		// empty ingress
+		{
+			Ingress: []v1.LoadBalancerIngress{},
+		},
+		// simple
+		{
+			Ingress: []v1.LoadBalancerIngress{
+				{
+					Hostname: "my-host",
+					IP:       "1.2.3.4",
+				},
+			},
+		},
+		// complex
+		{
+			Ingress: []v1.LoadBalancerIngress{
+				{
+					Hostname: "my-host",
+					IP:       "1.2.3.4",
+					Ports: []v1.PortStatus{
+						{
+							Port:     1337,
+							Protocol: v1.ProtocolTCP,
+							Error:    &stringErrOne,
+						},
+						{
+							Port:     1338,
+							Protocol: v1.ProtocolUDP,
+							Error:    &stringErrTwo,
+						},
+					},
+				},
+				{
+					Hostname: "my-second-host",
+					IP:       "1.2.3.5",
+					Ports: []v1.PortStatus{
+						{
+							Port:     1337,
+							Protocol: v1.ProtocolSCTP,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, testInput := range testInputs {
+		networkingLoadBalancerStatus := networking.LoadBalancerStatus{}
+		if err := corev1.Convert_v1_LoadBalancerStatus_To_networking_LoadBalancerStatus(&testInput, &networkingLoadBalancerStatus, nil); err != nil {
+			t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed with error:%v", i, err.Error())
+		}
+		if len(testInput.Ingress) != len(networkingLoadBalancerStatus.Ingress) {
+			t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected %d ingresses found %d", i, len(testInput.Ingress), len(networkingLoadBalancerStatus.Ingress))
+		}
+
+		for idx := range testInput.Ingress {
+			if testInput.Ingress[idx].Hostname != networkingLoadBalancerStatus.Ingress[idx].Hostname {
+				t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].Hostname=%v found %v", i, idx, testInput.Ingress[idx].Hostname, networkingLoadBalancerStatus.Ingress[idx].Hostname)
+			}
+			if testInput.Ingress[idx].IP != networkingLoadBalancerStatus.Ingress[idx].IP {
+				t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].IP=%v found %v", i, idx, testInput.Ingress[idx].IP, networkingLoadBalancerStatus.Ingress[idx].IP)
+			}
+			for jdx := range testInput.Ingress[idx].Ports {
+				if testInput.Ingress[idx].Ports[jdx].Port != networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Port {
+					t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].Ports[%d].Port=%v found %v", i, idx, jdx, testInput.Ingress[idx].Ports[jdx].Port, networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Port)
+				}
+				if string(testInput.Ingress[idx].Ports[jdx].Protocol) != string(networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Protocol) {
+					t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].Ports[%d].Protocol=%v found %v", i, idx, jdx, testInput.Ingress[idx].Ports[jdx].Protocol, networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Protocol)
+				}
+				if testInput.Ingress[idx].Ports[jdx].Error == nil && testInput.Ingress[idx].Ports[jdx].Error != networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Error {
+					t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].Ports[%d].Error=%v found %v", i, idx, jdx, testInput.Ingress[idx].Ports[jdx].Error, networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Error)
+				}
+				if testInput.Ingress[idx].Ports[jdx].Error != nil && (networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Error == nil || *testInput.Ingress[idx].Ports[jdx].Error != *networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Error) {
+					t.Errorf("%v:Convert v1.LoadBalancerStatus to networking.LoadBalancerStatus failed. expected networkingLoadBalancerStatus.Ingress[%d].Ports[%d].Error=%v found %v", i, idx, jdx, testInput.Ingress[idx].Ports[jdx].Error, networkingLoadBalancerStatus.Ingress[idx].Ports[jdx].Error)
+				}
 			}
 		}
 	}

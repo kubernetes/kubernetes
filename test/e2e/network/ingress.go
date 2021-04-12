@@ -651,7 +651,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 					},
 				},
 			},
-			Status: networkingv1.IngressStatus{LoadBalancer: v1.LoadBalancerStatus{}},
+			Status: networkingv1.IngressStatus{LoadBalancer: networkingv1.LoadBalancerStatus{}},
 		}
 		// Discovery
 		ginkgo.By("getting /apis")
@@ -778,8 +778,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 
 		// /status subresource operations
 		ginkgo.By("patching /status")
-		lbStatus := v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.1"}},
+		lbStatus := networkingv1.LoadBalancerStatus{
+			Ingress: []networkingv1.LoadBalancerIngress{{IP: "169.1.1.1"}},
 		}
 		lbStatusJSON, err := json.Marshal(lbStatus)
 		framework.ExpectNoError(err)
@@ -797,8 +797,8 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			if err != nil {
 				return err
 			}
-			statusToUpdate.Status.LoadBalancer = v1.LoadBalancerStatus{
-				Ingress: []v1.LoadBalancerIngress{{IP: "169.1.1.2"}},
+			statusToUpdate.Status.LoadBalancer = networkingv1.LoadBalancerStatus{
+				Ingress: []networkingv1.LoadBalancerIngress{{IP: "169.1.1.2"}},
 			}
 			updatedStatus, err = ingClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
 			return err

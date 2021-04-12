@@ -2602,7 +2602,7 @@ func (i *IngressDescriber) describeIngressV1(ing *networkingv1.Ingress, events *
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%v\n", ing.Name)
 		w.Write(LEVEL_0, "Namespace:\t%v\n", ing.Namespace)
-		w.Write(LEVEL_0, "Address:\t%v\n", loadBalancerStatusStringer(ing.Status.LoadBalancer, true))
+		w.Write(LEVEL_0, "Address:\t%v\n", networkingLoadBalancerStatusStringer(ing.Status.LoadBalancer, true))
 		def := ing.Spec.DefaultBackend
 		ns := ing.Namespace
 		if def == nil {
@@ -5515,4 +5515,24 @@ func searchEvents(client corev1client.EventsGetter, objOrRef runtime.Object, lim
 			return newEvents, nil
 		})
 	return eventList, err
+}
+
+// networkingLoadBalancerStatusStringer behaves mostly like a string interface and converts the given status to a string.
+// `wide` indicates whether the returned value is meant for --o=wide output. If not, it's clipped to 16 bytes.
+func networkingLoadBalancerStatusStringer(s networkingv1.LoadBalancerStatus, wide bool) string {
+	ingress := s.Ingress
+	result := sets.NewString()
+	for i := range ingress {
+		if ingress[i].IP != "" {
+			result.Insert(ingress[i].IP)
+		} else if ingress[i].Hostname != "" {
+			result.Insert(ingress[i].Hostname)
+		}
+	}
+
+	r := strings.Join(result.List(), ",")
+	if !wide && len(r) > LoadBalancerWidth {
+		r = r[0:(LoadBalancerWidth-3)] + "..."
+	}
+	return r
 }

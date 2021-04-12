@@ -505,8 +505,8 @@ func TestValidateIngress(t *testing.T) {
 			},
 		},
 		Status: networking.IngressStatus{
-			LoadBalancer: api.LoadBalancerStatus{
-				Ingress: []api.LoadBalancerIngress{
+			LoadBalancer: networking.LoadBalancerStatus{
+				Ingress: []networking.LoadBalancerIngress{
 					{IP: "127.0.0.1"},
 				},
 			},
@@ -1954,8 +1954,8 @@ func TestValidateIngressTLS(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.LoadBalancerStatus{
+					Ingress: []networking.LoadBalancerIngress{
 						{IP: "127.0.0.1"},
 					},
 				},
@@ -2106,8 +2106,8 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 				},
 			},
 			Status: networking.IngressStatus{
-				LoadBalancer: api.LoadBalancerStatus{
-					Ingress: []api.LoadBalancerIngress{
+				LoadBalancer: networking.LoadBalancerStatus{
+					Ingress: []networking.LoadBalancerIngress{
 						{IP: "127.0.0.1", Hostname: "foo.bar.com"},
 					},
 				},
@@ -2117,24 +2117,24 @@ func TestValidateIngressStatusUpdate(t *testing.T) {
 	oldValue := newValid()
 	newValue := newValid()
 	newValue.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.LoadBalancerStatus{
+			Ingress: []networking.LoadBalancerIngress{
 				{IP: "127.0.0.2", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidIP := newValid()
 	invalidIP.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.LoadBalancerStatus{
+			Ingress: []networking.LoadBalancerIngress{
 				{IP: "abcd", Hostname: "foo.com"},
 			},
 		},
 	}
 	invalidHostname := newValid()
 	invalidHostname.Status = networking.IngressStatus{
-		LoadBalancer: api.LoadBalancerStatus{
-			Ingress: []api.LoadBalancerIngress{
+		LoadBalancer: networking.LoadBalancerStatus{
+			Ingress: []networking.LoadBalancerIngress{
 				{IP: "127.0.0.1", Hostname: "127.0.0.1"},
 			},
 		},
