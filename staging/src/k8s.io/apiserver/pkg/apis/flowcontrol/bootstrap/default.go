@@ -64,6 +64,7 @@ var (
 	}
 	SuggestedFlowSchemas = []*flowcontrol.FlowSchema{
 		SuggestedFlowSchemaSystemNodes,               // references "system" priority-level
+		SuggestedFlowSchemaProbes,                    // references "exempt" priority-level
 		SuggestedFlowSchemaSystemLeaderElection,      // references "leader-election" priority-level
 		SuggestedFlowSchemaWorkloadLeaderElection,    // references "leader-election" priority-level
 		SuggestedFlowSchemaKubeControllerManager,     // references "workload-high" priority-level
@@ -391,6 +392,19 @@ var (
 				nonResourceRule(
 					[]string{flowcontrol.VerbAll},
 					[]string{flowcontrol.NonResourceAll}),
+			},
+		},
+	)
+	// the following flow schema exempts probes
+	SuggestedFlowSchemaProbes = newFlowSchema(
+		"probes", "exempt", 2,
+		"", // distinguisherMethodType
+		flowcontrol.PolicyRulesWithSubjects{
+			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
+			NonResourceRules: []flowcontrol.NonResourcePolicyRule{
+				nonResourceRule(
+					[]string{"get"},
+					[]string{"/healthz", "/readyz", "/livez"}),
 			},
 		},
 	)
