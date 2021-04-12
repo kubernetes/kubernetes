@@ -233,7 +233,7 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	if err != nil {
 		return nil, err
 	}
-	tlsCertAuthority := []byte(nil)
+	var tlsCertAuthority []byte
 	if len(o.CertAuthority) != 0 {
 		tlsCertAuthority, err = readFile(o.CertAuthority)
 		if err != nil {
@@ -246,12 +246,14 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 
 	// validate that cert is a valid certificate
 	rest := tlsCert
+	var _tlsCert *x509.Certificate
+	var block *pem.Block
 	for {
-		block, rest := pem.Decode(rest)
+		block, rest = pem.Decode(rest)
 		if block == nil || block.Type != "CERTIFICATE" {
 			return nil, fmt.Errorf("failed to decode PEM block containing certificate.")
 		}
-		_, err := x509.ParseCertificate(block.Bytes)
+		_tlsCert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse PEM block in certificate: %s", err)
 		}
@@ -263,19 +265,19 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	// validate certAuthority is a valid certificate
 	rest = tlsKey
 	for {
-		block, rest := pem.Decode(rest)
+		block, rest = pem.Decode(rest)
 		if block == nil {
 			return nil, fmt.Errorf("failed to decode PEM block containing private key.")
 		}
 		if block.Type == "RSA PRIVATE KEY" {
 			_, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse PEM block in RSA private key.")
+				return nil, fmt.Errorf("failed to parse PEM block in RSA private key, %s", err)
 			}
 		} else if block.Type == "EC PRIVATE KEY" {
 			_, err := x509.ParseECPrivateKey(block.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse PEM block in EC private key.")
+				return nil, fmt.Errorf("failed to parse PEM block in EC private key: %s", err)
 			}
 		} else {
 			return nil, fmt.Errorf("unknown PEM block in private key: %s.", block.Type)
@@ -285,20 +287,35 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 		}
 	}
 
-	// validate certAuthority is a valid certificate
-	rest = tlsCertAuthority
-	for {
-		block, rest := pem.Decode(rest)
-		if block == nil && len(rest) == 0 {
-			// tlsCertAuthority is allowed to be empty
-			break
+	if len(tlsCertAuthority) > 0 {
+		// validate certAuthority is a valid certificate
+		rest = tlsCertAuthority
+		for {
+			block, rest = pem.Decode(rest)
+			if block == nil || block.Type != "CERTIFICATE" {
+				return nil, fmt.Errorf("failed to decode PEM block containing certificate authority.")
+			}
+			_, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse PEM block in certificate authority: %s.", err)
+			}
+			if len(rest) == 0 {
+				break
+			}
 		}
-		if block == nil || block.Type != "CERTIFICATE" {
-			return nil, fmt.Errorf("failed to decode PEM block containing certificate authority.")
+
+		// validate that the certificate is valid with certAuthority
+		roots := x509.NewCertPool()
+		if !roots.AppendCertsFromPEM([]byte(tlsCertAuthority)) {
+			return nil, fmt.Errorf("could not use certificate authority for validating.")
 		}
-		_, err := x509.ParsePKIXPublicKey(block.Bytes)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse PEM block in certificate.")
+		// validate only valid root and (impliticly) generation time
+		opts := x509.VerifyOptions{
+			Roots: roots,
+		}
+
+		if _, err := _tlsCert.Verify(opts); err != nil {
+			return nil, fmt.Errorf("failed to verify certificate: %s", err.Error())
 		}
 	}
 
