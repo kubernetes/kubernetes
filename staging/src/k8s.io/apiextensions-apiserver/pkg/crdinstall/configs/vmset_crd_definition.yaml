@@ -54,3 +54,60 @@ spec:
     kind: VMSet
     shortNames:
     - vmset
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: panipuris.chaat.com
+spec:
+  group: chaat.com
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                includeAloo:
+                  type: boolean
+                perPlate:
+                  type: integer
+            status:
+              type: object
+              properties:
+                served:
+                  type: integer
+                labelSelector:
+                  type: string
+      additionalPrinterColumns:
+        - name: Served
+          type: integer
+          description: The number of puris already served
+          jsonPath: .status.served
+        - name: Per Plate
+          type: integer
+          description: The number of puris served per plate
+          jsonPath: .spec.perPlate
+      # subresources describes the subresources for custom resources.
+      subresources:
+        # status enables the status subresource.
+        status: {}
+        # scale enables the scale subresource.
+        scale:
+          # specReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Spec.Replicas.
+          specReplicasPath: .spec.perPlate
+          # statusReplicasPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Replicas.
+          statusReplicasPath: .status.served
+          # labelSelectorPath defines the JSONPath inside of a custom resource that corresponds to Scale.Status.Selector.
+          labelSelectorPath: .status.labelSelector
+  scope: Namespaced
+  names:
+    plural: panipuris
+    singular: panipuri
+    kind: PaniPuri
+    shortNames:
+      - pp

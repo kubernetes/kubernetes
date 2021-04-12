@@ -20,10 +20,6 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/apiextensions-apiserver/pkg/crdinstall"
-	"k8s.io/apimachinery/pkg/api/meta"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/restmapper"
 	"net/http"
 	"time"
 
@@ -52,8 +48,6 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/webhook"
-	clientdiscovery "k8s.io/client-go/discovery"
-	clientmemory "k8s.io/client-go/discovery/cached/memory"
 )
 
 var (
@@ -276,9 +270,6 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// Add a post startup hook here that installs all the objects (generally CRDs) that need to be installed as the api-server comes-up
 	// We will use the LoopbackClientConfig of the api server to create a client and use that client to patch objects
 	s.GenericAPIServer.AddPostStartHook("crd-installer", func(postStartHookContext genericapiserver.PostStartHookContext) error {
-
-		starttime := time.Now()
-		fmt.Println("polling and waiting for crd informer to sync")
 		// wait for CRD type to become available
 		err := wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
@@ -286,70 +277,21 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		if err != nil {
 			return err
 		}
-		endtime := time.Now()
-		fmt.Printf("poll waited for : %v\n", endtime.Sub(starttime))
-		fmt.Println("finished waiting for pool")
 
 		ctx := context.Background()
-		// create a dynamic client
-		dyn, err := dynamic.NewForConfig(postStartHookContext.LoopbackClientConfig)
-		if err != nil {
-			fmt.Printf("failed to create dynamic client: %v\n", err)
+		if err := crdinstall.Install(ctx, postStartHookContext.LoopbackClientConfig); err != nil {
 			return err
 		}
 
-		// create a discovery client
-		dc, err := clientdiscovery.NewDiscoveryClientForConfig(postStartHookContext.LoopbackClientConfig)
+		// wait for the newly installed crds to be available
+		err = wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
+		}, postStartHookContext.StopCh)
 		if err != nil {
-			fmt.Printf("failed to create discovery client: %v\n", err)
 			return err
 		}
-
-		apiGroups, err := restmapper.GetAPIGroupResources(dc)
-		if err != nil {
-			fmt.Printf("failed to get apigroups the second time: %v\n", err)
-			return err
-		}
-		//print all the apiGroups available
-		fmt.Println("list of apiGroups Available:")
-		for _, group := range apiGroups {
-			fmt.Printf("Group: %v\n", group.Group)
-			fmt.Printf("VersionedResources: %+v\n", group.VersionedResources)
-		}
-
-		// Rest mapper
-		mapper := restmapper.NewDeferredDiscoveryRESTMapper(clientmemory.NewMemCacheClient(dc))
-
-		// loop through all the objects and patch them to the server
-		for _, obj := range crdinstall.Objects() {
-			gvk := obj.GroupVersionKind()
-			mapping, err := mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
-			if err != nil {
-				return err
-			}
-
-			var dynRes dynamic.ResourceInterface
-			if mapping.Scope.Name() == meta.RESTScopeNameNamespace {
-				dynRes = dyn.Resource(mapping.Resource).Namespace(obj.GetNamespace())
-			} else {
-				dynRes = dyn.Resource(mapping.Resource)
-			}
-
-			data, err := obj.MarshalJSON()
-			if err != nil {
-				return err
-			}
-
-			_, err = dynRes.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
-				FieldManager: "apiextesnions-poststarthook-crd-installed",
-			})
-			if err != nil {
-				fmt.Printf("failed to patch %v : %v\n", obj.GetName(), err)
-				return err
-			}
-		}
-
 		return nil
+
 	})
 
 	return s, nil
