@@ -28,29 +28,101 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 )
 
+var rsaSelfSignedCertPEM = `
+-----BEGIN CERTIFICATE-----
+MIIDZTCCAk2gAwIBAgIUEARJE682DlpLrwXr32hkJo2OHOowDQYJKoZIhvcNAQEL
+BQAwQjELMAkGA1UEBhMCVVMxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UE
+CgwTRGVmYXVsdCBDb21wYW55IEx0ZDAeFw0yMTA0MTIxMTEyMDlaFw0yMTA1MTIx
+MTEyMDlaMEIxCzAJBgNVBAYTAlVTMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAa
+BgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+DwAwggEKAoIBAQDQOIOlz+GhLxwigsBBj6ZXOB6DNK9DACmmw0pz3M+U0o4+PI85
+8ae3q2eizvjMwCHgvQmh82w9kaI2NehnXCygG4qi7MTRNj+UnsrP5haTc5FyucYl
+GUADD9MUuyR9qZwkAt+PY4QmRotWnBlKLD/I+rXBVVv1KveJUkxoBLGk42kpMdS7
+RT06vmpGVHjq9HikrRvicdFbUfm4YODvFMNNStnoInZJmmGxumnGxhNkO+n6mswk
+3/Je5QEuZ8S2yIGkMXVOCUzAeScbI+NGiursYx5OPjN0doR4xNEHYIC53ATDBaK3
+z3Hxhp2tYNPDbZvGnFPsjcFAiXspYjViQDVJAgMBAAGjUzBRMB0GA1UdDgQWBBTR
+a1tRtnbp9ZQruY5RSvmzP/duiTAfBgNVHSMEGDAWgBTRa1tRtnbp9ZQruY5RSvmz
+P/duiTAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCYtfHoz7Y8
+evmSGUqfOay7DCyL2tFLdWJdki4YG0NDquA9QKZ8jfl0epUnlX+UaaxT1fswAd0H
+YO0V48MCADlx2xC/pDmSzIS8chPbipqpGZuHMl+LseRaltZbnyMf7VSrK0EbW0xh
+bKbZDPR3lSkAQaCmYqlzauY0ZJa3bHZrhzem0wMUdwTFH03AJASqq3PzlGEOcuqa
+6Z0me1WVcR9oHwfbfOEF3DiQinFhRyG/DtCD2oYbbaO9e9VP0+1Hy05YkTN572Gw
+9jF5Z4wn5rFZJNglVoDiTEPwUyt+iXdGRPvQ7ftaTmK+jfbwxNbMMjehOi2y1nCW
+GIvEgkp0W7eG
+-----END CERTIFICATE-----
+`
+
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----
-MIIB0zCCAX2gAwIBAgIJAI/M7BYjwB+uMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
-BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
-aWRnaXRzIFB0eSBMdGQwHhcNMTIwOTEyMjE1MjAyWhcNMTUwOTEyMjE1MjAyWjBF
-MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
-ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBANLJ
-hPHhITqQbPklG3ibCVxwGMRfp/v4XqhfdQHdcVfHap6NQ5Wok/4xIA+ui35/MmNa
-rtNuC+BdZ1tMuVCPFZcCAwEAAaNQME4wHQYDVR0OBBYEFJvKs8RfJaXTH08W+SGv
-zQyKn0H8MB8GA1UdIwQYMBaAFJvKs8RfJaXTH08W+SGvzQyKn0H8MAwGA1UdEwQF
-MAMBAf8wDQYJKoZIhvcNAQEFBQADQQBJlffJHybjDGxRMqaRmDhX0+6v02TUKZsW
-r5QuVbpQhH6u+0UgcW0jp9QwpxoPTLTWGXEWBBBurxFwiCBhkQ+V
+MIIDCzCCAfMCFAIsO+psszOfir2J0i6dqWN6RnBQMA0GCSqGSIb3DQEBCwUAMEIx
+CzAJBgNVBAYTAlVTMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0Rl
+ZmF1bHQgQ29tcGFueSBMdGQwHhcNMjEwNDEyMTAzOTU5WhcNMjEwNTEyMTAzOTU5
+WjBCMQswCQYDVQQGEwJVUzEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQK
+DBNEZWZhdWx0IENvbXBhbnkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
+CgKCAQEA0DiDpc/hoS8cIoLAQY+mVzgegzSvQwAppsNKc9zPlNKOPjyPOfGnt6tn
+os74zMAh4L0JofNsPZGiNjXoZ1wsoBuKouzE0TY/lJ7Kz+YWk3ORcrnGJRlAAw/T
+FLskfamcJALfj2OEJkaLVpwZSiw/yPq1wVVb9Sr3iVJMaASxpONpKTHUu0U9Or5q
+RlR46vR4pK0b4nHRW1H5uGDg7xTDTUrZ6CJ2SZphsbppxsYTZDvp+prMJN/yXuUB
+LmfEtsiBpDF1TglMwHknGyPjRorq7GMeTj4zdHaEeMTRB2CAudwEwwWit89x8Yad
+rWDTw22bxpxT7I3BQIl7KWI1YkA1SQIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAc
++FBQUbp1RE2ysq7vZaLmZtEvwm0D55J7QQByjLh6opiPwS1hj+rYAOMpMhC97oQF
+8saheoYocMhS6jL100tuA8n7MFVa4oFQSKn/S5bP9gecyTTikSbu8sRenV/959Xd
+l4Eo75Qq9eNv8AKfHzcMEBM8rhrQEwRsVlDN3c0jVsq/J3kPy+JEs3tcsVPS3ra3
+5ZDs53CSKQ6RHr6eagr/uQeoYn+NGx7bf88puZQhpg/S85H2am3e0vmesZ4xIeeD
+uF+xcXBtg6i8/Gm+kBzYYycYhlo8u5W26KByIM/qMj/cFYNuq4aiQ6SiTWAmutqz
+aHa9ghdQ169u3ScCJw6M
 -----END CERTIFICATE-----
 `
 
 var rsaKeyPEM = `-----BEGIN RSA PRIVATE KEY-----
-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
+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
 -----END RSA PRIVATE KEY-----
+`
+
+var rsaCAPEM = `-----BEGIN CERTIFICATE-----
+MIIDZTCCAk2gAwIBAgIUA8ZO+ysA12hPno7jbTMKg6Kvog0wDQYJKoZIhvcNAQEL
+BQAwQjELMAkGA1UEBhMCVVMxFTATBgNVBAcMDERlZmF1bHQgQ2l0eTEcMBoGA1UE
+CgwTRGVmYXVsdCBDb21wYW55IEx0ZDAeFw0yMTA0MTIxMDM5NDdaFw0yMTA1MTIx
+MDM5NDdaMEIxCzAJBgNVBAYTAlVTMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAa
+BgNVBAoME0RlZmF1bHQgQ29tcGFueSBMdGQwggEiMA0GCSqGSIb3DQEBAQUAA4IB
+DwAwggEKAoIBAQDpAvbQ5YJ7Cy+WTS0+B6KKea1ENM7+1yDTSojMO/8KXqByQJMi
+BDIzHfCp2gxzM69A3xMy0p9dIAmk6xOFoh9jN/z/K8dsD8I4gDpa5QrAf3pgVaoL
+3YIdP3ZZmLlsl6MbYsGKBVm50JibY5hOE+kAeP72oSAiBP2nNEYshXlHqV3cicd9
+tHz+bY1jwwNIwHtAV+sNxb7Gyck4jQGijc/4aKZysojpeboTrXfFP0MP269Alzkq
+UfsK0ep7bwEN4Ym+bsQ9toQ9t7ADckveblWWQ1xLRwA5AWq63ro/ttkTVgn7Ppiw
+tx+hPHTb6tXQ0QVriri3VF8Q6si4/oNOLfzxAgMBAAGjUzBRMB0GA1UdDgQWBBQq
+SCV2WXyha5UmBTJJx0rOMtf3SzAfBgNVHSMEGDAWgBQqSCV2WXyha5UmBTJJx0rO
+Mtf3SzAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCk1R/VV62t
+a3sNFgKErNtTxxyi/VaWHP5mSf/ggKVFnVjQawK7RuLSD2jYygU9VFMqJ/BQRbZM
+eh0anTmY06RiDtdvLr/s56hXVwtuHIoo2mTaFgggBkL7HJo68i11riB9yXhlEyKg
+avPAfDRmAOmADVLzeNug8CcYTtEgXjhEKnBw7cBcFWxZFUtWIGCyHzRReD2yjzrj
+DF1KyI8emof6Cx/Tc4SSP1hrrkb8fVPRdFe4PWQqd/muzYZ4ol5PXFrIu3S8q9Sq
+aP+477RvbC9DU5XyFFD2kYmTHoJcy0wMaEX3cXDUr9EMLYlz0stYLNGD7g++Y38Y
+ikoCPiJSMDzz
+-----END CERTIFICATE-----
 `
 
 const mismatchRSAKeyPEM = `-----BEGIN PRIVATE KEY-----
@@ -85,15 +157,23 @@ rLTt0TTazzwBCgCD0Jkoqg==
 func TestCreateSecretTLS(t *testing.T) {
 
 	validCertTmpDir := utiltesting.MkTmpdirOrDie("tls-valid-cert-test")
-	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
+	validKeyPath, validCertPath, validCAPath := writeCertData(validCertTmpDir, rsaKeyPEM, rsaCertPEM, rsaCAPEM, t)
 	defer tearDown(validCertTmpDir)
 
+	wrongCertTmpDir := utiltesting.MkTmpdirOrDie("tls-wrong-cert-test")
+	wrongKeyPath, wrongCertPath, wrongCAPath := writeCertData(wrongCertTmpDir, rsaKeyPEM, rsaSelfSignedCertPEM, rsaCAPEM, t)
+	defer tearDown(wrongCertTmpDir)
+
+	selfSignedCertTmpDir := utiltesting.MkTmpdirOrDie("tls-selfSigned-cert-test")
+	selfSignedKeyPath, selfSignedCertPath, _ := writeCertData(selfSignedCertTmpDir, rsaKeyPEM, rsaSelfSignedCertPEM, "", t)
+	defer tearDown(selfSignedCertTmpDir)
+
 	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-invalid-cert-test")
-	invalidKeyPath, invalidCertPath := writeKeyPair(invalidCertTmpDir, "test", "test", t)
+	invalidKeyPath, invalidCertPath, invalidCAPath := writeCertData(invalidCertTmpDir, "test", "test", "test", t)
 	defer tearDown(invalidCertTmpDir)
 
 	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
-	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, rsaKeyPEM, mismatchRSAKeyPEM, t)
+	mismatchKeyPath, mismatchCertPath, mismatchCAPath := writeCertData(mismatchCertTmpDir, rsaKeyPEM, mismatchRSAKeyPEM, "", t)
 	defer tearDown(mismatchCertTmpDir)
 
 	tests := map[string]struct {
@@ -109,7 +189,7 @@ func TestCreateSecretTLS(t *testing.T) {
 			tlsSecretName:    "foo",
 			tlsKey:           validKeyPath,
 			tlsCert:          validCertPath,
-			tlsCertAuthority: "",
+			tlsCertAuthority: validCAPath,
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
 					APIVersion: corev1.SchemeGroupVersion.String(),
@@ -122,6 +202,7 @@ func TestCreateSecretTLS(t *testing.T) {
 				Data: map[string][]byte{
 					corev1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
 					corev1.TLSCertKey:       []byte(rsaCertPEM),
+					"ca.crt":                []byte(rsaCAPEM),
 				},
 			},
 			expectErr: false,
@@ -130,7 +211,7 @@ func TestCreateSecretTLS(t *testing.T) {
 			tlsSecretName:    "foo",
 			tlsKey:           validKeyPath,
 			tlsCert:          validCertPath,
-			tlsCertAuthority: "",
+			tlsCertAuthority: validCAPath,
 			appendHash:       true,
 			expected: &corev1.Secret{
 				TypeMeta: metav1.TypeMeta{
@@ -138,28 +219,57 @@ func TestCreateSecretTLS(t *testing.T) {
 					Kind:       "Secret",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-272h6tt825",
+					Name: "foo-th4dtb9f52",
 				},
 				Type: corev1.SecretTypeTLS,
 				Data: map[string][]byte{
 					corev1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
 					corev1.TLSCertKey:       []byte(rsaCertPEM),
+					"ca.crt":                []byte(rsaCAPEM),
 				},
 			},
 			expectErr: false,
+		},
+		"create_secret_selfsigned_tls": {
+			tlsSecretName:    "foo",
+			tlsKey:           selfSignedKeyPath,
+			tlsCert:          selfSignedCertPath,
+			tlsCertAuthority: "",
+			expected: &corev1.Secret{
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: corev1.SchemeGroupVersion.String(),
+					Kind:       "Secret",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "foo",
+				},
+				Type: corev1.SecretTypeTLS,
+				Data: map[string][]byte{
+					corev1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
+					corev1.TLSCertKey:       []byte(rsaSelfSignedCertPEM),
+				},
+			},
+			expectErr: false,
+		},
+		"create_secret_wrong_ca": {
+			tlsSecretName:    "foo",
+			tlsKey:           wrongKeyPath,
+			tlsCert:          wrongCertPath,
+			tlsCertAuthority: wrongCAPath,
+			expectErr:        true,
 		},
 		"create_secret_invalid_tls": {
 			tlsSecretName:    "foo",
 			tlsKey:           invalidKeyPath,
 			tlsCert:          invalidCertPath,
-			tlsCertAuthority: "",
+			tlsCertAuthority: invalidCAPath,
 			expectErr:        true,
 		},
 		"create_secret_mismatch_tls": {
 			tlsSecretName:    "foo",
 			tlsKey:           mismatchKeyPath,
 			tlsCert:          mismatchCertPath,
-			tlsCertAuthority: "",
+			tlsCertAuthority: mismatchCAPath,
 			expectErr:        true,
 		},
 		"create_invalid_filepath_and_certpath_secret_tls": {
@@ -215,10 +325,16 @@ func write(path, contents string, t *testing.T) {
 	}
 }
 
-func writeKeyPair(tmpDirPath, key, cert string, t *testing.T) (keyPath, certPath string) {
+func writeCertData(tmpDirPath, key, cert, ca string, t *testing.T) (keyPath, certPath, caPath string) {
 	keyPath = path.Join(tmpDirPath, "tls.key")
 	certPath = path.Join(tmpDirPath, "tls.cert")
 	write(keyPath, key, t)
 	write(certPath, cert, t)
+	if ca != "" {
+		caPath = path.Join(tmpDirPath, "ca.cert")
+		write(caPath, ca, t)
+	} else {
+		caPath = ""
+	}
 	return
 }
