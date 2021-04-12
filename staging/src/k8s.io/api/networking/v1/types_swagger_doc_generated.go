@@ -189,6 +189,26 @@ func (IngressTLS) SwaggerDoc() map[string]string {
 	return map_IngressTLS
 }
 
+var map_LoadBalancerIngress = map[string]string{
+	"":         "LoadBalancerIngress represents the status of a load-balancer ingress point: traffic intended for the service should be sent to an ingress point.",
+	"ip":       "IP is set for load-balancer ingress points that are IP based (typically GCE or OpenStack load-balancers)",
+	"hostname": "Hostname is set for load-balancer ingress points that are DNS based (typically AWS load-balancers)",
+	"ports":    "Ports is a list of records of service ports If used, every port defined in the service should have an entry in it",
+}
+
+func (LoadBalancerIngress) SwaggerDoc() map[string]string {
+	return map_LoadBalancerIngress
+}
+
+var map_LoadBalancerStatus = map[string]string{
+	"":        "LoadBalancerStatus represents the status of a load-balancer.",
+	"ingress": "Ingress is a list containing ingress points for the load-balancer. Traffic intended for the service should be sent to these ingress points.",
+}
+
+func (LoadBalancerStatus) SwaggerDoc() map[string]string {
+	return map_LoadBalancerStatus
+}
+
 var map_NetworkPolicy = map[string]string{
 	"":         "NetworkPolicy describes what network traffic is allowed for a set of Pods",
 	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",

@@ -1469,7 +1469,7 @@ func autoConvert_networking_IngressSpec_To_v1beta1_IngressSpec(in *networking.In
 }
 
 func autoConvert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.IngressStatus, out *networking.IngressStatus, s conversion.Scope) error {
-	if err := corev1.Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+	if err := corev1.Convert_v1_LoadBalancerStatus_To_networking_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
 	return nil
@@ -1481,7 +1481,7 @@ func Convert_v1beta1_IngressStatus_To_networking_IngressStatus(in *v1beta1.Ingre
 }
 
 func autoConvert_networking_IngressStatus_To_v1beta1_IngressStatus(in *networking.IngressStatus, out *v1beta1.IngressStatus, s conversion.Scope) error {
-	if err := corev1.Convert_core_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
+	if err := corev1.Convert_networking_LoadBalancerStatus_To_v1_LoadBalancerStatus(&in.LoadBalancer, &out.LoadBalancer, s); err != nil {
 		return err
 	}
 	return nil

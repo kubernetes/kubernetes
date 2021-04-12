@@ -1071,6 +1071,10 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &applyconfigurationsnetworkingv1.IngressTLSApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("IPBlock"):
 		return &applyconfigurationsnetworkingv1.IPBlockApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("LoadBalancerIngress"):
+		return &applyconfigurationsnetworkingv1.LoadBalancerIngressApplyConfiguration{}
+	case networkingv1.SchemeGroupVersion.WithKind("LoadBalancerStatus"):
+		return &applyconfigurationsnetworkingv1.LoadBalancerStatusApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicy"):
 		return &applyconfigurationsnetworkingv1.NetworkPolicyApplyConfiguration{}
 	case networkingv1.SchemeGroupVersion.WithKind("NetworkPolicyEgressRule"):

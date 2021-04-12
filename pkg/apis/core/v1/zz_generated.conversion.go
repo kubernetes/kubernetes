@@ -32,6 +32,7 @@ import (
 	types "k8s.io/apimachinery/pkg/types"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	core "k8s.io/kubernetes/pkg/apis/core"
+	networking "k8s.io/kubernetes/pkg/apis/networking"
 )
 
 func init() {
@@ -2111,8 +2112,18 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*networking.LoadBalancerStatus)(nil), (*v1.LoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_networking_LoadBalancerStatus_To_v1_LoadBalancerStatus(a.(*networking.LoadBalancerStatus), b.(*v1.LoadBalancerStatus), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*v1.LoadBalancerStatus)(nil), (*core.LoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_LoadBalancerStatus_To_core_LoadBalancerStatus(a.(*v1.LoadBalancerStatus), b.(*core.LoadBalancerStatus), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1.LoadBalancerStatus)(nil), (*networking.LoadBalancerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_LoadBalancerStatus_To_networking_LoadBalancerStatus(a.(*v1.LoadBalancerStatus), b.(*networking.LoadBalancerStatus), scope)
 	}); err != nil {
 		return err
 	}

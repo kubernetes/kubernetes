@@ -8572,7 +8572,7 @@ var schemaYAML = typed.YAMLObject(`types:
     fields:
     - name: loadBalancer
       type:
-        namedType: io.k8s.api.core.v1.LoadBalancerStatus
+        namedType: io.k8s.api.networking.v1.LoadBalancerStatus
       default: {}
 - name: io.k8s.api.networking.v1.IngressTLS
   map:
@@ -8586,6 +8586,30 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: secretName
       type:
         scalar: string
+- name: io.k8s.api.networking.v1.LoadBalancerIngress
+  map:
+    fields:
+    - name: hostname
+      type:
+        scalar: string
+    - name: ip
+      type:
+        scalar: string
+    - name: ports
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.core.v1.PortStatus
+          elementRelationship: atomic
+- name: io.k8s.api.networking.v1.LoadBalancerStatus
+  map:
+    fields:
+    - name: ingress
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.api.networking.v1.LoadBalancerIngress
+          elementRelationship: atomic
 - name: io.k8s.api.networking.v1.NetworkPolicy
   map:
     fields:
