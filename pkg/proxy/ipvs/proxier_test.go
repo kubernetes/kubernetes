@@ -393,12 +393,12 @@ func TestGetNodeIPs(t *testing.T) {
 		// case 0
 		{
 			devAddresses: map[string][]string{"eth0": {"1.2.3.4"}, "lo": {"127.0.0.1"}},
-			expectIPs:    []string{"1.2.3.4", "127.0.0.1"},
+			expectIPs:    []string{"1.2.3.4"},
 		},
 		// case 1
 		{
 			devAddresses: map[string][]string{"lo": {"127.0.0.1"}},
-			expectIPs:    []string{"127.0.0.1"},
+			expectIPs:    []string{},
 		},
 		// case 2
 		{
@@ -408,22 +408,22 @@ func TestGetNodeIPs(t *testing.T) {
 		// case 3
 		{
 			devAddresses: map[string][]string{"encap0": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "docker0": {"172.17.0.1"}},
-			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "172.17.0.1"},
+			expectIPs:    []string{"10.20.30.40", "172.17.0.1"},
 		},
 		// case 4
 		{
 			devAddresses: map[string][]string{"encaps9": {"10.20.30.40"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
-			expectIPs:    []string{"10.20.30.40", "127.0.0.1", "10.20.30.31"},
+			expectIPs:    []string{"10.20.30.40", "10.20.30.31"},
 		},
 		// case 5
 		{
 			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
-			expectIPs:    []string{"127.0.0.1", "10.20.30.31"},
+			expectIPs:    []string{"10.20.30.31"},
 		},
 		// case 6
 		{
 			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "lo": {"127.0.0.1"}},
-			expectIPs:    []string{"127.0.0.1"},
+			expectIPs:    []string{},
 		},
 		// case 7
 		{
@@ -433,12 +433,12 @@ func TestGetNodeIPs(t *testing.T) {
 		// case 8
 		{
 			devAddresses: map[string][]string{"kube-ipvs0": {"1.2.3.4", "2.3.4.5"}, "eth5": {"3.4.5.6"}, "lo": {"127.0.0.1"}},
-			expectIPs:    []string{"127.0.0.1", "3.4.5.6"},
+			expectIPs:    []string{"3.4.5.6"},
 		},
 		// case 9
 		{
 			devAddresses: map[string][]string{"ipvs0": {"1.2.3.4"}, "lo": {"127.0.0.1"}, "encap7": {"10.20.30.31"}},
-			expectIPs:    []string{"127.0.0.1", "10.20.30.31", "1.2.3.4"},
+			expectIPs:    []string{"10.20.30.31", "1.2.3.4"},
 		},
 	}
 
