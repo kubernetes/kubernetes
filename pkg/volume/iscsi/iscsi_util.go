@@ -791,7 +791,7 @@ func extractDeviceAndPrefix(mntPath string) (string, string, error) {
 
 func extractIface(mntPath string) (string, bool) {
 	reOutput := ifaceRe.FindStringSubmatch(mntPath)
-	if reOutput != nil && len(reOutput) > 1 {
+	if len(reOutput) > 1 {
 		return reOutput[1], true
 	}
 

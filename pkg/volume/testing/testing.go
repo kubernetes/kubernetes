@@ -380,9 +380,9 @@ func (plugin *FakeVolumePlugin) NewDetacher() (Detacher, error) {
 	plugin.NewDetacherCallCount = plugin.NewDetacherCallCount + 1
 	detacher := plugin.getFakeVolume(&plugin.Detachers)
 	attacherList := plugin.Attachers
-	if attacherList != nil && len(attacherList) > 0 {
+	if len(attacherList) > 0 {
 		detacherList := plugin.Detachers
-		if detacherList != nil && len(detacherList) > 0 {
+		if len(detacherList) > 0 {
 			detacherList[0].VolumesAttached = attacherList[0].VolumesAttached
 		}
 
