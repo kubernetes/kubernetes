@@ -179,7 +179,11 @@ func New(
 					return
 				}
 
-				s.triggerNodeSync()
+				if !equality.Semantic.DeepEqual(oldNode.Status.Addresses, curNode.Status.Addresses) {
+					s.forceNodeSync()
+				} else {
+					s.triggerNodeSync()
+				}
 			},
 			DeleteFunc: func(old interface{}) {
 				s.triggerNodeSync()
@@ -261,6 +265,30 @@ func (s *Controller) triggerNodeSync() {
 		// there are many loadbalancers in the clusters. nodeSyncInternal
 		// would be triggered until all loadbalancers are updated to the new state.
 		klog.V(2).Infof("Node changes detected, triggering a full node sync on all loadbalancer services")
+		s.needFullSync = true
+		s.knownHosts = newHosts
+	}
+
+	select {
+	case s.nodeSyncCh <- struct{}{}:
+		klog.V(4).Info("Triggering nodeSync")
+		return
+	default:
+		klog.V(4).Info("A pending nodeSync is already in queue")
+		return
+	}
+}
+
+// forceNodeSync triggers an unconditional nodeSync asynchronously
+func (s *Controller) forceNodeSync() {
+	s.nodeSyncLock.Lock()
+	defer s.nodeSyncLock.Unlock()
+	newHosts, err := listWithPredicate(s.nodeLister, s.getNodeConditionPredicate())
+	if err != nil {
+		runtime.HandleError(fmt.Errorf("Failed to retrieve current set of nodes from node lister: %v", err))
+		s.needFullSync = true
+	} else {
+		klog.V(2).Infof("Force triggering a full node sync on all loadbalancer services")
 		s.needFullSync = true
 		s.knownHosts = newHosts
 	}
