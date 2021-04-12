@@ -1269,9 +1269,14 @@ EOF
 function create-kubeconfig {
   local component=$1
   local token=$2
-  echo "Creating kubeconfig file for component ${component}"
+  local path="/etc/srv/kubernetes/${component}/kubeconfig"
   mkdir -p "/etc/srv/kubernetes/${component}"
-  cat <<EOF >"/etc/srv/kubernetes/${component}/kubeconfig"
+
+  if [[ -e "${KUBE_HOME}/bin/gke-internal-configure-helper.sh" ]]; then
+    gke-internal-create-kubeconfig "${component}" "${token}" "${path}"
+  else
+    echo "Creating kubeconfig file for component ${component}"
+    cat <<EOF >"${path}"
 apiVersion: v1
 kind: Config
 users:
@@ -1290,6 +1295,7 @@ contexts:
   name: ${component}
 current-context: ${component}
 EOF
+  fi
 }
 
 # Arg 1: the IP address of the API server
