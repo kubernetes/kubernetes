@@ -578,7 +578,7 @@ aliases:
     - xing-yang       # Storage
     - wojtek-t        # Scalability
 
-  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
+  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/960-conformance-behaviors/README.md
   conformance-behavior-approvers:
     - smarterclayton
     - johnbelamaric
