@@ -264,6 +264,7 @@ func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, wit
 		}
 		if podExists {
 			printValue(out, pod.Spec.NodeName)
+			printValue(out, pod.Status.HostIP)
 		}
 		printValue(out, m.Name)
 		printMetricsLine(out, &ResourceMetricsInfo{
