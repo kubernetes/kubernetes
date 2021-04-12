@@ -143,9 +143,9 @@ func TestExecInContainer(t *testing.T) {
 	var resize <-chan remotecommand.TerminalSize
 
 	for _, tc := range testcases {
+		// these tests cannot be run in parallel due to the fact that they are feature gate dependent
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
-			t.Parallel()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, tc.execProbeTimeout)()
 
 			mockClient := mockclient.NewMockInterface(ctrl)
