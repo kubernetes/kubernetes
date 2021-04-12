@@ -163,7 +163,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 
 	if kc.config.Authentication.Anonymous.Enabled == nil {
 		kc.config.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(kubeletAuthenticationAnonymousEnabled)
-	} else if *kc.config.Authentication.Anonymous.Enabled != kubeletAuthenticationAnonymousEnabled {
+	} else if *kc.config.Authentication.Anonymous.Enabled {
 		warnDefaultComponentConfigValue(kind, "authentication.anonymous.enabled", kubeletAuthenticationAnonymousEnabled, *kc.config.Authentication.Anonymous.Enabled)
 	}
 
@@ -178,7 +178,7 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
 	if kc.config.Authentication.Webhook.Enabled == nil {
 		kc.config.Authentication.Webhook.Enabled = utilpointer.BoolPtr(kubeletAuthenticationWebhookEnabled)
-	} else if *kc.config.Authentication.Webhook.Enabled != kubeletAuthenticationWebhookEnabled {
+	} else if !*kc.config.Authentication.Webhook.Enabled {
 		warnDefaultComponentConfigValue(kind, "authentication.webhook.enabled", kubeletAuthenticationWebhookEnabled, *kc.config.Authentication.Webhook.Enabled)
 	}
 

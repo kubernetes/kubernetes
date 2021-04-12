@@ -36,10 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
 )
@@ -496,7 +494,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 					return
 				}
 			}
-			apiEndpoint := kubeadm.APIEndpoint{}
+			apiEndpoint := kubeadmapi.APIEndpoint{}
 			err := getAPIEndpointWithBackoff(client, rt.nodeName, &apiEndpoint, wait.Backoff{Duration: 0, Jitter: 0, Steps: 1})
 			if err != nil && !rt.expectedErr {
 				t.Errorf("got error %q; was expecting no errors", err)
@@ -859,7 +857,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 			},
@@ -875,7 +873,7 @@ func TestGetAPIEndpointFromPodAnnotation(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 			},
@@ -937,7 +935,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 			},
@@ -948,11 +946,11 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 				{
-					Component: constants.KubeAPIServer,
+					Component: kubeadmconstants.KubeAPIServer,
 				},
 			},
 			expectedErr: true,
@@ -962,11 +960,11 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.5:1234"},
 				},
 			},
@@ -977,10 +975,10 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component: constants.KubeAPIServer,
+					Component: kubeadmconstants.KubeAPIServer,
 				},
 				{
-					Component: constants.KubeAPIServer,
+					Component: kubeadmconstants.KubeAPIServer,
 				},
 			},
 			expectedErr: true,
@@ -990,7 +988,7 @@ func TestGetRawAPIEndpointFromPodAnnotationWithoutRetry(t *testing.T) {
 			nodeName: nodeName,
 			pods: []testresources.FakeStaticPod{
 				{
-					Component:   constants.KubeAPIServer,
+					Component:   kubeadmconstants.KubeAPIServer,
 					Annotations: map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3.4:1234"},
 				},
 			},

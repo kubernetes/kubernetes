@@ -36,7 +36,6 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/config/strict"
@@ -186,12 +185,12 @@ func DefaultedStaticInitConfiguration() (*kubeadmapi.InitConfiguration, error) {
 		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
 		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{PlaceholderToken},
 		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
-			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
+			CRISocket: kubeadmconstants.DefaultDockerCRISocket, // avoid CRI detection
 			Name:      "node",
 		},
 	}
 	versionedClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
-		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
+		KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
 	}
 
 	internalcfg := &kubeadmapi.InitConfiguration{}

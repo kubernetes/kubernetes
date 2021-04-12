@@ -33,7 +33,6 @@ import (
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
@@ -100,7 +99,7 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdCertsRenewal(out))
-	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
+	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
 	cmd.AddCommand(newCmdCertificateKey())
 	cmd.AddCommand(newCmdGenCSR(out))
 	return cmd
@@ -207,7 +206,7 @@ func newCmdCertsRenewal(out io.Writer) *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
 
-	cmd.AddCommand(getRenewSubCommands(out, constants.KubernetesDir)...)
+	cmd.AddCommand(getRenewSubCommands(out, kubeadmconstants.KubernetesDir)...)
 
 	return cmd
 }
@@ -224,7 +223,7 @@ func getRenewSubCommands(out io.Writer, kdir string) []*cobra.Command {
 	flags := &renewFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
 		},
 		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
 	}
@@ -367,7 +366,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 	flags := &expirationFlags{
 		cfg: kubeadmapiv1beta2.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
-			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
+			KubernetesVersion: kubeadmconstants.CurrentKubernetesVersion.String(),
 		},
 		kubeconfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
 	}

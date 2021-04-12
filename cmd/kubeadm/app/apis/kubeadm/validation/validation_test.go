@@ -24,7 +24,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
@@ -111,7 +110,7 @@ func TestValidateNodeRegistrationOptions(t *testing.T) {
 		// test cases for criSocket are covered in TestValidateSocketPath
 	}
 	for _, rt := range tests {
-		nro := kubeadm.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "/some/path"}
+		nro := kubeadmapi.NodeRegistrationOptions{Name: rt.nodeName, CRISocket: "/some/path"}
 		actual := ValidateNodeRegistrationOptions(&nro, field.NewPath("nodeRegistration"))
 		actualErrors := len(actual) > 0
 		if actualErrors != rt.expectedErrors {
@@ -391,12 +390,12 @@ func TestValidateHostPort(t *testing.T) {
 func TestValidateAPIEndpoint(t *testing.T) {
 	var tests = []struct {
 		name     string
-		s        *kubeadm.APIEndpoint
+		s        *kubeadmapi.APIEndpoint
 		expected bool
 	}{
 		{
 			name: "Valid IPv4 address / port",
-			s: &kubeadm.APIEndpoint{
+			s: &kubeadmapi.APIEndpoint{
 				AdvertiseAddress: "4.5.6.7",
 				BindPort:         6443,
 			},
@@ -404,7 +403,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Valid IPv6 address / port",
-			s: &kubeadm.APIEndpoint{
+			s: &kubeadmapi.APIEndpoint{
 				AdvertiseAddress: "2001:db7::2",
 				BindPort:         6443,
 			},
@@ -412,7 +411,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv4 address",
-			s: &kubeadm.APIEndpoint{
+			s: &kubeadmapi.APIEndpoint{
 				AdvertiseAddress: "1.2.34",
 				BindPort:         6443,
 			},
@@ -420,7 +419,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid IPv6 address",
-			s: &kubeadm.APIEndpoint{
+			s: &kubeadmapi.APIEndpoint{
 				AdvertiseAddress: "2001:db7:1",
 				BindPort:         6443,
 			},
@@ -428,7 +427,7 @@ func TestValidateAPIEndpoint(t *testing.T) {
 		},
 		{
 			name: "Invalid BindPort",
-			s: &kubeadm.APIEndpoint{
+			s: &kubeadmapi.APIEndpoint{
 				AdvertiseAddress: "4.5.6.7",
 				BindPort:         0,
 			},
@@ -453,49 +452,49 @@ func TestValidateInitConfiguration(t *testing.T) {
 	nodename := "valid-nodename"
 	var tests = []struct {
 		name     string
-		s        *kubeadm.InitConfiguration
+		s        *kubeadmapi.InitConfiguration
 		expected bool
 	}{
 		{"invalid missing InitConfiguration",
-			&kubeadm.InitConfiguration{}, false},
+			&kubeadmapi.InitConfiguration{}, false},
 		{"invalid missing token with IPv4 service subnet",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Networking: kubeadm.Networking{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing token with IPv6 service subnet",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Networking: kubeadm.Networking{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "2001:db8::1/98",
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir: "/some/cert/dir",
 				},
-				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"invalid missing node name",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Networking: kubeadm.Networking{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
 					},
@@ -503,61 +502,61 @@ func TestValidateInitConfiguration(t *testing.T) {
 				},
 			}, false},
 		{"valid InitConfiguration with incorrect IPv4 pod subnet",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Networking: kubeadm.Networking{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
 						PodSubnet:     "10.0.1.15",
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, false},
 		{"valid InitConfiguration with IPv4 service subnet",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         6443,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Etcd: kubeadm.Etcd{
-						Local: &kubeadm.LocalEtcd{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
 						},
 					},
-					Networking: kubeadm.Networking{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "10.96.0.1/12",
 						DNSDomain:     "cluster.local",
 						PodSubnet:     "10.0.1.15/16",
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 		{"valid InitConfiguration using IPv6 service subnet",
-			&kubeadm.InitConfiguration{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			&kubeadmapi.InitConfiguration{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1:2:3::4",
 					BindPort:         3446,
 				},
-				ClusterConfiguration: kubeadm.ClusterConfiguration{
-					Etcd: kubeadm.Etcd{
-						Local: &kubeadm.LocalEtcd{
+				ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+					Etcd: kubeadmapi.Etcd{
+						Local: &kubeadmapi.LocalEtcd{
 							DataDir: "/some/path",
 						},
 					},
-					Networking: kubeadm.Networking{
+					Networking: kubeadmapi.Networking{
 						ServiceSubnet: "2001:db8::1/112",
 						DNSDomain:     "cluster.local",
 					},
 					CertificatesDir: "/some/other/cert/dir",
 				},
-				NodeRegistration: kubeadm.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
+				NodeRegistration: kubeadmapi.NodeRegistrationOptions{Name: nodename, CRISocket: "/some/path"},
 			}, true},
 	}
 	for _, rt := range tests {
@@ -575,94 +574,94 @@ func TestValidateInitConfiguration(t *testing.T) {
 
 func TestValidateJoinConfiguration(t *testing.T) {
 	var tests = []struct {
-		s        *kubeadm.JoinConfiguration
+		s        *kubeadmapi.JoinConfiguration
 		expected bool
 	}{
-		{&kubeadm.JoinConfiguration{}, false},
-		{&kubeadm.JoinConfiguration{
+		{&kubeadmapi.JoinConfiguration{}, false},
+		{&kubeadmapi.JoinConfiguration{
 			CACertPath: "/some/cert.crt",
-			Discovery: kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			Discovery: kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token: "abcdef.1234567890123456@foobar",
 				},
-				File: &kubeadm.FileDiscovery{
+				File: &kubeadmapi.FileDiscovery{
 					KubeConfigPath: "foo",
 				},
 			},
 		}, false},
-		{&kubeadm.JoinConfiguration{ // Pass without JoinControlPlane
+		{&kubeadmapi.JoinConfiguration{ // Pass without JoinControlPlane
 			CACertPath: "/some/cert.crt",
-			Discovery: kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			Discovery: kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token:             "abcdef.1234567890123456",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
 				TLSBootstrapToken: "abcdef.1234567890123456",
 			},
-			NodeRegistration: kubeadm.NodeRegistrationOptions{
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
 				CRISocket: "/var/run/dockershim.sock",
 			},
 		}, true},
-		{&kubeadm.JoinConfiguration{ // Pass with JoinControlPlane
+		{&kubeadmapi.JoinConfiguration{ // Pass with JoinControlPlane
 			CACertPath: "/some/cert.crt",
-			Discovery: kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			Discovery: kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token:             "abcdef.1234567890123456",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
 				TLSBootstrapToken: "abcdef.1234567890123456",
 			},
-			NodeRegistration: kubeadm.NodeRegistrationOptions{
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
 				CRISocket: "/var/run/dockershim.sock",
 			},
-			ControlPlane: &kubeadm.JoinControlPlane{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			ControlPlane: &kubeadmapi.JoinControlPlane{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         1234,
 				},
 			},
 		}, true},
-		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
+		{&kubeadmapi.JoinConfiguration{ // Fail JoinControlPlane.AdvertiseAddress validation
 			CACertPath: "/some/cert.crt",
-			Discovery: kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			Discovery: kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token:             "abcdef.1234567890123456",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
 				TLSBootstrapToken: "abcdef.1234567890123456",
 			},
-			NodeRegistration: kubeadm.NodeRegistrationOptions{
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
 				CRISocket: "/var/run/dockershim.sock",
 			},
-			ControlPlane: &kubeadm.JoinControlPlane{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			ControlPlane: &kubeadmapi.JoinControlPlane{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "aaa",
 					BindPort:         1234,
 				},
 			},
 		}, false},
-		{&kubeadm.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
+		{&kubeadmapi.JoinConfiguration{ // Fail JoinControlPlane.BindPort validation
 			CACertPath: "/some/cert.crt",
-			Discovery: kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			Discovery: kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token:             "abcdef.1234567890123456",
 					APIServerEndpoint: "1.2.3.4:6443",
 					CACertHashes:      []string{"aaaa"},
 				},
 				TLSBootstrapToken: "abcdef.1234567890123456",
 			},
-			NodeRegistration: kubeadm.NodeRegistrationOptions{
+			NodeRegistration: kubeadmapi.NodeRegistrationOptions{
 				Name:      "aaa",
 				CRISocket: "/var/run/dockershim.sock",
 			},
-			ControlPlane: &kubeadm.JoinControlPlane{
-				LocalAPIEndpoint: kubeadm.APIEndpoint{
+			ControlPlane: &kubeadmapi.JoinControlPlane{
+				LocalAPIEndpoint: kubeadmapi.APIEndpoint{
 					AdvertiseAddress: "1.2.3.4",
 					BindPort:         -1,
 				},
@@ -830,16 +829,16 @@ func TestValidateIgnorePreflightErrors(t *testing.T) {
 func TestValidateDiscovery(t *testing.T) {
 	var tests = []struct {
 		name     string
-		d        *kubeadm.Discovery
+		d        *kubeadmapi.Discovery
 		expected bool
 	}{
 		{
 			"invalid: .BootstrapToken and .File cannot both be set",
-			&kubeadm.Discovery{
-				BootstrapToken: &kubeadm.BootstrapTokenDiscovery{
+			&kubeadmapi.Discovery{
+				BootstrapToken: &kubeadmapi.BootstrapTokenDiscovery{
 					Token: "abcdef.1234567890123456",
 				},
-				File: &kubeadm.FileDiscovery{
+				File: &kubeadmapi.FileDiscovery{
 					KubeConfigPath: "https://url/file.conf",
 				},
 			},
@@ -847,7 +846,7 @@ func TestValidateDiscovery(t *testing.T) {
 		},
 		{
 			"invalid: .BootstrapToken or .File must be set",
-			&kubeadm.Discovery{},
+			&kubeadmapi.Discovery{},
 			false,
 		},
 	}
@@ -868,19 +867,19 @@ func TestValidateDiscovery(t *testing.T) {
 func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 	var tests = []struct {
 		name     string
-		btd      *kubeadm.BootstrapTokenDiscovery
+		btd      *kubeadmapi.BootstrapTokenDiscovery
 		expected bool
 	}{
 		{
 			"invalid: .APIServerEndpoint not set",
-			&kubeadm.BootstrapTokenDiscovery{
+			&kubeadmapi.BootstrapTokenDiscovery{
 				Token: "abcdef.1234567890123456",
 			},
 			false,
 		},
 		{
 			"invalid: using token-based discovery without .BootstrapToken.CACertHashes and .BootstrapToken.UnsafeSkipCAVerification",
-			&kubeadm.BootstrapTokenDiscovery{
+			&kubeadmapi.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
 				APIServerEndpoint:        "192.168.122.100:6443",
 				UnsafeSkipCAVerification: false,
@@ -889,7 +888,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		},
 		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashes",
-			&kubeadm.BootstrapTokenDiscovery{
+			&kubeadmapi.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
 				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
@@ -899,7 +898,7 @@ func TestValidateDiscoveryBootstrapToken(t *testing.T) {
 		},
 		{
 			"valid: using token-based discovery with .BootstrapToken.CACertHashe but skip ca verification",
-			&kubeadm.BootstrapTokenDiscovery{
+			&kubeadmapi.BootstrapTokenDiscovery{
 				Token:                    "abcdef.1234567890123456",
 				APIServerEndpoint:        "192.168.122.100:6443",
 				CACertHashes:             []string{"sha256:7173b809ca12ec5dee4506cd86be934c4596dd234ee82c0662eac04a8c2c71dc"},
@@ -1052,21 +1051,21 @@ func TestValidateURLs(t *testing.T) {
 func TestValidateEtcd(t *testing.T) {
 	var tests = []struct {
 		name           string
-		etcd           *kubeadm.Etcd
+		etcd           *kubeadmapi.Etcd
 		expectedErrors bool
 	}{
 		{
 			name:           "either .Etcd.Local or .Etcd.External is required",
-			etcd:           &kubeadm.Etcd{},
+			etcd:           &kubeadmapi.Etcd{},
 			expectedErrors: true,
 		},
 		{
 			name: ".Etcd.Local and .Etcd.External are mutually exclusive",
-			etcd: &kubeadm.Etcd{
-				Local: &kubeadm.LocalEtcd{
+			etcd: &kubeadmapi.Etcd{
+				Local: &kubeadmapi.LocalEtcd{
 					DataDir: "/some/path",
 				},
-				External: &kubeadm.ExternalEtcd{
+				External: &kubeadmapi.ExternalEtcd{
 					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379"},
 				},
 			},
@@ -1074,8 +1073,8 @@ func TestValidateEtcd(t *testing.T) {
 		},
 		{
 			name: "either both or none of .Etcd.External.CertFile and .Etcd.External.KeyFile must be set",
-			etcd: &kubeadm.Etcd{
-				External: &kubeadm.ExternalEtcd{
+			etcd: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
 					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
 					CertFile:  "/some/file.crt",
 				},
@@ -1084,8 +1083,8 @@ func TestValidateEtcd(t *testing.T) {
 		},
 		{
 			name: "setting .Etcd.External.CertFile and .Etcd.External.KeyFile requires .Etcd.External.CAFile",
-			etcd: &kubeadm.Etcd{
-				External: &kubeadm.ExternalEtcd{
+			etcd: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
 					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
 					CertFile:  "/some/file.crt",
 					KeyFile:   "/some/file.key",
@@ -1095,8 +1094,8 @@ func TestValidateEtcd(t *testing.T) {
 		},
 		{
 			name: "valid external etcd",
-			etcd: &kubeadm.Etcd{
-				External: &kubeadm.ExternalEtcd{
+			etcd: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
 					Endpoints: []string{"https://external.etcd1:2379", "https://external.etcd2:2379"},
 					CertFile:  "/etcd.crt",
 					KeyFile:   "/etcd.key",
@@ -1107,8 +1106,8 @@ func TestValidateEtcd(t *testing.T) {
 		},
 		{
 			name: "valid external etcd (no TLS)",
-			etcd: &kubeadm.Etcd{
-				External: &kubeadm.ExternalEtcd{
+			etcd: &kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
 					Endpoints: []string{"http://10.100.0.1:2379", "http://10.100.0.2:2379"},
 				},
 			},

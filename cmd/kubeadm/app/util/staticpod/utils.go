@@ -34,7 +34,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/patches"
@@ -246,7 +245,7 @@ func ReadinessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe 
 
 // StartupProbe creates a Probe object with a HTTPGet handler
 func StartupProbe(host, path string, port int, scheme v1.URIScheme, timeoutForControlPlane *metav1.Duration) *v1.Probe {
-	periodSeconds, timeoutForControlPlaneSeconds := int32(10), constants.DefaultControlPlaneTimeout.Seconds()
+	periodSeconds, timeoutForControlPlaneSeconds := int32(10), kubeadmconstants.DefaultControlPlaneTimeout.Seconds()
 	if timeoutForControlPlane != nil {
 		timeoutForControlPlaneSeconds = timeoutForControlPlane.Seconds()
 	}
