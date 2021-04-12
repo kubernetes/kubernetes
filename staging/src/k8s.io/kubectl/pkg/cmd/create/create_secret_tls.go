@@ -19,9 +19,11 @@ package create
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 
+	"encoding/pem"
 	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -241,9 +243,67 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	if _, err := tls.X509KeyPair(tlsCert, tlsKey); err != nil {
 		return nil, err
 	}
+
+	// validate that cert is a valid certificate
+	rest := tlsCert
+	for {
+		block, rest := pem.Decode(rest)
+		if block == nil || block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("failed to decode PEM block containing certificate.")
+		}
+		_, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PEM block in certificate: %s", err)
+		}
+		if len(rest) == 0 {
+			break
+		}
+	}
+
+	// validate certAuthority is a valid certificate
+	rest = tlsKey
+	for {
+		block, rest := pem.Decode(rest)
+		if block == nil {
+			return nil, fmt.Errorf("failed to decode PEM block containing private key.")
+		}
+		if block.Type == "RSA PRIVATE KEY" {
+			_, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse PEM block in RSA private key.")
+			}
+		} else if block.Type == "EC PRIVATE KEY" {
+			_, err := x509.ParseECPrivateKey(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse PEM block in EC private key.")
+			}
+		} else {
+			return nil, fmt.Errorf("unknown PEM block in private key: %s.", block.Type)
+		}
+		if len(rest) == 0 {
+			break
+		}
+	}
+
+	// validate certAuthority is a valid certificate
+	rest = tlsCertAuthority
+	for {
+		block, rest := pem.Decode(rest)
+		if block == nil && len(rest) == 0 {
+			// tlsCertAuthority is allowed to be empty
+			break
+		}
+		if block == nil || block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("failed to decode PEM block containing certificate authority.")
+		}
+		_, err := x509.ParsePKIXPublicKey(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PEM block in certificate.")
+		}
+	}
+
 	// TODO: Add more validation.
-	// 1. If the certificate contains intermediates, it is a valid chain.
-	// 2. Format etc.
+	// E.g., if the certificate contains intermediates, it is a valid chain.
 
 	secretTLS := newSecretObj(o.Name, namespace, corev1.SecretTypeTLS)
 	secretTLS.Data[corev1.TLSCertKey] = []byte(tlsCert)
