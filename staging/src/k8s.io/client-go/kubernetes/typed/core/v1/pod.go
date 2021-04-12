@@ -52,8 +52,7 @@ type PodInterface interface {
 	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Pod, err error)
 	Apply(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
 	ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Pod, err error)
-	GetEphemeralContainers(ctx context.Context, podName string, options metav1.GetOptions) (*v1.EphemeralContainers, error)
-	UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (*v1.EphemeralContainers, error)
+	UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (*v1.Pod, error)
 
 	PodExpansion
 }
@@ -258,60 +257,9 @@ func (c *pods) ApplyStatus(ctx context.Context, pod *corev1.PodApplyConfiguratio
 	return
 }
 
-func ephemeralContainersInPod(pod *v1.Pod) *v1.EphemeralContainers {
-	ephemeralContainers := pod.Spec.EphemeralContainers
-	if ephemeralContainers == nil {
-		ephemeralContainers = []v1.EphemeralContainer{}
-	}
-	return &v1.EphemeralContainers{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:              pod.Name,
-			Namespace:         pod.Namespace,
-			UID:               pod.UID,
-			ResourceVersion:   pod.ResourceVersion,
-			CreationTimestamp: pod.CreationTimestamp,
-		},
-		EphemeralContainers: ephemeralContainers,
-	}
-
-}
-
-// GetEphemeralContainers takes name of the pod, and returns the corresponding v1.EphemeralContainers object, and an error if there is any.
-func (c *pods) GetEphemeralContainers(ctx context.Context, podName string, options metav1.GetOptions) (*v1.EphemeralContainers, error) {
-	pod := &v1.Pod{}
-	err := c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		Name(podName).
-		SubResource("ephemeralcontainers").
-		VersionedParams(&options, scheme.ParameterCodec).
-		Do(ctx).
-		Into(pod)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return ephemeralContainersInPod(pod), nil
-}
-
-// UpdateEphemeralContainers takes the top resource name and the representation of a ephemeralContainers and updates it. Returns the server's representation of the ephemeralContainers, and an error, if there is any.
-func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, ephemeralContainers *v1.EphemeralContainers, opts metav1.UpdateOptions) (*v1.EphemeralContainers, error) {
-	pod := &v1.Pod{}
-	err := c.client.Get().
-		Namespace(c.ns).
-		Resource("pods").
-		Name(podName).
-		SubResource("ephemeralcontainers").
-		VersionedParams(&metav1.GetOptions{}, scheme.ParameterCodec).
-		Do(ctx).
-		Into(pod)
-	if err != nil {
-		return nil, err
-	}
-
-	result := &v1.Pod{}
-	pod.Spec.EphemeralContainers = ephemeralContainers.EphemeralContainers
+// UpdateEphemeralContainers takes the top resource name and the representation of a pod and updates it. Returns the server's representation of the pod, and an error, if there is any.
+func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, pod *v1.Pod, opts metav1.UpdateOptions) (result *v1.Pod, err error) {
+	result = &v1.Pod{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("pods").
@@ -321,9 +269,5 @@ func (c *pods) UpdateEphemeralContainers(ctx context.Context, podName string, ep
 		Body(pod).
 		Do(ctx).
 		Into(result)
-	if err != nil {
-		return nil, err
-	}
-
-	return ephemeralContainersInPod(pod), nil
+	return
 }
