@@ -2359,11 +2359,35 @@ func TestListPlugins(t *testing.T) {
 			},
 			pluginSetCount: 3,
 		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			plugins := f.ListPlugins()
+			if len(plugins) != tt.pluginSetCount {
+				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
+			}
+		})
+	}
+}
+
+func TestPluginWeights(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+		// pluginSetCount include queue sort plugin and bind plugin.
+		pluginSetCount int
+	}{
 		{
 			name: "Add multiple plugins with weights",
 			plugins: &config.Plugins{
 				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
-				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
 			},
 			pluginSetCount: 4,
 		},
@@ -2381,9 +2405,7 @@ func TestListPlugins(t *testing.T) {
 				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
 			}
 
-			if len(plugins["ScorePlugin"]) != 0 && len(tt.plugins.Score.Enabled) != 0 {
-				compareScoreWeight(t, plugins["ScorePlugin"], tt.plugins.Score.Enabled)
-			}
+			compareScoreWeight(t, plugins["ScorePlugin"], tt.plugins.Score.Enabled)
 		})
 	}
 }
@@ -2393,7 +2415,7 @@ func compareScoreWeight(t *testing.T, gotScores []config.Plugin, wantScores []co
 		if ws.Weight != 0 {
 			for _, gs := range gotScores {
 				if gs.Name == ws.Name && gs.Weight != ws.Weight {
-					t.Errorf("Expect %d sample, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
+					t.Errorf("Expect weight to be %d, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
 				}
 			}
 		}
