@@ -2318,6 +2318,20 @@ function setup-addon-manifests {
   fi
 }
 
+# A helper function for setting up addon manifests from outside of k/k
+#
+# $1: addon category under /etc/kubernetes
+# $2: manifest source dir
+# $3: remote manifest repository
+function setup-addon-manifests-remote {
+  local -r dst_dir="/etc/kubernetes/$1/$2"
+  local -r local_addon_dir="/tmp/$2"
+
+  git clone "$3" "${local_addon_dir}"
+
+  copy-manifests "${local_addon_dir}/$2" "${dst_dir}"
+}
+
 # A function that downloads extra addons from a URL and puts them in the GCI
 # manifests directory.
 function download-extra-addons {
@@ -2752,7 +2766,7 @@ EOF
   if [[ "${ENABLE_NODE_LOGGING:-}" == "true" ]] && \
      [[ "${LOGGING_DESTINATION:-}" == "elasticsearch" ]] && \
      [[ "${ENABLE_CLUSTER_LOGGING:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "fluentd-elasticsearch"
+    setup-addon-manifests-remote "addons" "fluentd-gcp" "https://github.com/kubernetes-sigs/instrumentation-addons/tree/master/fluentd-elasticsearch"
     local -r fluentd_es_configmap_yaml="${dst_dir}/fluentd-elasticsearch/fluentd-es-configmap.yaml"
     update-container-runtime ${fluentd_es_configmap_yaml}
   fi
