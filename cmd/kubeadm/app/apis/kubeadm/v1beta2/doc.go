@@ -173,7 +173,7 @@ limitations under the License.
 // 	    value: "master"
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
-// 	    cgroup-driver: "cgroupfs"
+// 	    v: 4
 //	  ignorePreflightErrors:
 //	  - IsPrivilegedUser
 // 	localAPIEndpoint:
