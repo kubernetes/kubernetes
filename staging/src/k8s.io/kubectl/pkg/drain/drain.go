@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -61,6 +62,7 @@ type Helper struct {
 	DeleteEmptyDirData  bool
 	Selector            string
 	PodSelector         string
+	ChunkSize           int64
 
 	// DisableEviction forces drain to use delete rather than evict
 	DisableEviction bool
@@ -189,9 +191,23 @@ func (d *Helper) GetPodsForDeletion(nodeName string) (*PodDeleteList, []error) {
 		return nil, []error{err}
 	}
 
-	podList, err := d.Client.CoreV1().Pods(metav1.NamespaceAll).List(d.getContext(), metav1.ListOptions{
+	podList := &corev1.PodList{}
+	initialOpts := &metav1.ListOptions{
 		LabelSelector: labelSelector.String(),
-		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String()})
+		FieldSelector: fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName}).String(),
+		Limit:         d.ChunkSize,
+	}
+
+	err = resource.FollowContinue(initialOpts, func(options metav1.ListOptions) (runtime.Object, error) {
+		newPods, err := d.Client.CoreV1().Pods(metav1.NamespaceAll).List(d.getContext(), options)
+		if err != nil {
+			podR := corev1.SchemeGroupVersion.WithResource(corev1.ResourcePods.String())
+			return nil, resource.EnhanceListError(err, options, podR.String())
+		}
+		podList.Items = append(podList.Items, newPods.Items...)
+		return newPods, nil
+	})
+
 	if err != nil {
 		return nil, []error{err}
 	}

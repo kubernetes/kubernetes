@@ -810,6 +810,7 @@ func TestDrain(t *testing.T) {
 							}
 							getParams := make(url.Values)
 							getParams["fieldSelector"] = []string{"spec.nodeName=node"}
+							getParams["limit"] = []string{"500"}
 							if !reflect.DeepEqual(getParams, values) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, getParams, values)
 							}

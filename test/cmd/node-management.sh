@@ -167,6 +167,32 @@ run_cluster_management_tests() {
   response=$(! kubectl drain "127.0.0.1" --selector test=label 2>&1)
   kube::test::if_has_string "${response}" 'cannot specify both a node name'
 
+   ### Test kubectl drain chunk size
+   # Pre-condition: node exists and contains label test=label
+   kube::test::get_object_assert "nodes 127.0.0.1" '{{.metadata.labels.test}}' 'label'
+   # Pre-condition: node is schedulable
+   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+   # Pre-condition: test-pod-1 and test-pod-2 exist
+   kube::test::get_object_assert "pods" "{{range .items}}{{.metadata.name}},{{end}}" 'test-pod-1,test-pod-2,'
+   # command - need to use force because pods are unmanaged, dry run (or skip-wait) because node is unready
+   output_message=$(kubectl --v=6 drain --force --pod-selector type=test-pod --selector test=label --chunk-size=1 --dry-run=client 2>&1 "${kube_flags[@]}")
+   # Post-condition: Check if we get a limit on node, and both limit and continue on pods
+   kube::test::if_has_string "${output_message}" "/v1/nodes?labelSelector=test%3Dlabel&limit=1 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&labelSelector=type%3Dtest-pod&limit=1 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?continue=.*&fieldSelector=spec.nodeName%3D127.0.0.1&labelSelector=type%3Dtest-pod&limit=1 200 OK"
+   # Post-condition: Check we evict multiple pages worth of pods
+   kube::test::if_has_string "${output_message}" "evicting pod .*/test-pod-1"
+   kube::test::if_has_string "${output_message}" "evicting pod .*/test-pod-2"
+   # Post-condition: node is schedulable
+   kubectl uncordon "127.0.0.1"
+   kube::test::get_object_assert "nodes 127.0.0.1" "{{.spec.unschedulable}}" '<no value>'
+
+   ### Test kubectl drain chunk size defaults to 500
+   output_message=$(kubectl --v=6 drain --force --selector test=label --dry-run=client 2>&1 "${kube_flags[@]}")
+   # Post-condition: Check if we get a limit
+   kube::test::if_has_string "${output_message}" "/v1/nodes?labelSelector=test%3Dlabel&limit=500 200 OK"
+   kube::test::if_has_string "${output_message}" "/v1/pods?fieldSelector=spec.nodeName%3D127.0.0.1&limit=500 200 OK"
+
   ### kubectl cordon command fails when no arguments are passed
   # Pre-condition: node exists
   response=$(! kubectl cordon 2>&1)

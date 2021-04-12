@@ -50,6 +50,7 @@ import (
 const (
 	ApplyAnnotationsFlag = "save-config"
 	DefaultErrorExitCode = 1
+	DefaultChunkSize     = 500
 )
 
 type debugError interface {
@@ -461,6 +462,11 @@ func AddGeneratorFlags(cmd *cobra.Command, defaultGenerator string) {
 	cmd.Flags().String("generator", defaultGenerator, "The name of the API generator to use.")
 	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future.")
 	AddDryRunFlag(cmd)
+}
+
+func AddChunkSizeFlag(cmd *cobra.Command, value *int64) {
+	cmd.Flags().Int64Var(value, "chunk-size", *value,
+		"Return large lists in chunks rather than all at once. Pass 0 to disable. This flag is beta and may change in the future.")
 }
 
 type ValidateOptions struct {
