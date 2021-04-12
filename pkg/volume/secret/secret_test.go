@@ -323,7 +323,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, "pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name") {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -397,7 +397,7 @@ func TestInvalidPathSecret(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, "pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name") {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -449,7 +449,7 @@ func TestPluginReboot(t *testing.T) {
 	podMetadataDir := fmt.Sprintf("%v/pods/test_pod_uid3/plugins/kubernetes.io~secret/test_volume_name", rootDir)
 	util.SetReady(podMetadataDir)
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid3/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, "pods/test_pod_uid3/volumes/kubernetes.io~secret/test_volume_name") {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -501,7 +501,7 @@ func TestPluginOptional(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, "pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name") {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
@@ -599,7 +599,7 @@ func TestPluginOptionalKeys(t *testing.T) {
 	}
 
 	volumePath := mounter.GetPath()
-	if !strings.HasSuffix(volumePath, fmt.Sprintf("pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name")) {
+	if !strings.HasSuffix(volumePath, "pods/test_pod_uid/volumes/kubernetes.io~secret/test_volume_name") {
 		t.Errorf("Got unexpected path: %s", volumePath)
 	}
 
