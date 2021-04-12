@@ -17,15 +17,15 @@ limitations under the License.
 package watch
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
 
-	"k8s.io/klog/v2"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/klog/v2"
 )
 
 // Decoder allows StreamWatcher to watch any stream for which a Decoder can be written.
@@ -52,14 +52,24 @@ type Reporter interface {
 // into a watch.Interface.
 type StreamWatcher struct {
 	sync.Mutex
-	source   Decoder
-	reporter Reporter
-	result   chan Event
-	done     chan struct{}
+	source    Decoder
+	reporter  Reporter
+	result    chan Event
+	done      chan struct{}
+	cleanUpFn context.CancelFunc
 }
 
 // NewStreamWatcher creates a StreamWatcher from the given decoder.
 func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
+	return newStreamWatcherInternal(d, r, func() { /* noop*/ })
+}
+
+// NewDisposableStreamWatcher it is like regular NewStreamWatcher except it accepts a function for releasing resources with requests on exit.
+func NewDisposableStreamWatcher(cleanUpFn context.CancelFunc, d Decoder, r Reporter) *StreamWatcher {
+	return newStreamWatcherInternal(d, r, cleanUpFn)
+}
+
+func newStreamWatcherInternal(d Decoder, r Reporter, cleanUpFn context.CancelFunc) *StreamWatcher {
 	sw := &StreamWatcher{
 		source:   d,
 		reporter: r,
@@ -72,6 +82,9 @@ func NewStreamWatcher(d Decoder, r Reporter) *StreamWatcher {
 		// error reporting might block forever.
 		// Therefore a dedicated stop channel is used to resolve this blocking.
 		done: make(chan struct{}),
+		// releases resources associated with the request
+		// it will be called when the stream exits
+		cleanUpFn: cleanUpFn,
 	}
 	go sw.receive()
 	return sw
@@ -101,6 +114,8 @@ func (sw *StreamWatcher) receive() {
 	defer utilruntime.HandleCrash()
 	defer close(sw.result)
 	defer sw.Stop()
+	defer sw.cleanUpFn()
+
 	for {
 		action, obj, err := sw.source.Decode()
 		if err != nil {

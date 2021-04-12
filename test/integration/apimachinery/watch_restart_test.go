@@ -275,3 +275,147 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 		}
 	})
 }
+
+// TestWatchRestartsWhenTimeoutSet makes sure that the global timeout is respected for watch requests.
+func TestWatchRestartsWhenTimeoutSet(t *testing.T) {
+	// set up test environment
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
+
+	testNamespace := framework.CreateTestingNamespace("watch-restart-timeout", s, t)
+	defer framework.DeleteTestingNamespace(testNamespace, s, t)
+
+	config := &restclient.Config{
+		Host:    s.URL,
+		Timeout: 12 * time.Second,
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	_, err = client.CoreV1().Secrets(testNamespace.Name).Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-01",
+			Namespace: testNamespace.Name,
+		},
+		Data: map[string][]byte{
+			"data": []byte("value1\n"),
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create secret %s/secret-01: %v", testNamespace.Name, err)
+	}
+
+	// act
+	probes := 3
+	clientGoTimeout := config.Timeout + time.Second
+	res := []time.Duration{}
+	for i := 0; i < probes; i++ {
+		// record current time to be able to asses if the timeout has been reached
+		startTime := time.Now()
+		w, err := client.CoreV1().Secrets(testNamespace.Namespace).Watch(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for {
+			_, ok := <-w.ResultChan()
+			if !ok {
+				// watch closed
+				break
+			}
+		}
+
+		// record watch requests than ended later than we expected
+		watchDuration := time.Since(startTime)
+		if watchDuration >= clientGoTimeout {
+			res = append(res, watchDuration)
+		}
+	}
+
+	// validate
+	if len(res) > 0 {
+		t.Fatalf("we expected exactly %d watch reqeusts to end within %v"+
+			" %d probes ended later than we expected %v", probes, clientGoTimeout, len(res), res)
+	}
+}
+
+// TestWatchTimeoutIsRespectedWhenOverwritten makes sure that setting a new timeout via ListOptions overwrites the global timeout set on the rest.Config.
+// It turned out that setting a timeout on HTTP client affected watch requests.
+// For example, with a 10 second timeout watch requests ere being re-established exactly after 10 seconds even though the default request timeout for them is ~5 minutes.
+//
+// This is because if multiple timeouts were set, the stdlib picks the smaller timeout to be applied, leaving other useless.
+// For more details see https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
+func TestWatchTimeoutIsRespectedWhenOverwritten(t *testing.T) {
+	// set up test environment
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	_, s, closeFn := framework.RunAMaster(masterConfig)
+	defer closeFn()
+
+	testNamespace := framework.CreateTestingNamespace("watch-restart-timeout", s, t)
+	defer framework.DeleteTestingNamespace(testNamespace, s, t)
+
+	config := &restclient.Config{
+		Host:    s.URL,
+		Timeout: 10 * time.Second,
+	}
+
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatalf("Failed to create clientset: %v", err)
+	}
+
+	_, err = client.CoreV1().Secrets(testNamespace.Name).Create(context.TODO(), &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret-01",
+			Namespace: testNamespace.Name,
+		},
+		Data: map[string][]byte{
+			"data": []byte("value1\n"),
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatalf("Failed to create secret %s/secret-01: %v", testNamespace.Name, err)
+	}
+
+	// act
+	probes := 6
+	failedProbesTreshold := 2 // accounts for 33% of watch requests
+	clientGoTimeout := config.Timeout + time.Second
+	res := []time.Duration{}
+	for i := 0; i < probes; i++ {
+		// contextTimeout sets the upper bound time limit for our watch requests it must be > than clientGoTimeout
+		watchTimeoutSeconds := int64(15)
+
+		// record current time to be able to asses if the timeout has been reached
+		startTime := time.Now()
+		w, err := client.CoreV1().Secrets(testNamespace.Namespace).Watch(context.TODO(), metav1.ListOptions{TimeoutSeconds: &watchTimeoutSeconds})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for {
+			_, ok := <-w.ResultChan()
+			if !ok {
+				// watch closed
+				break
+			}
+		}
+
+		// record watch requests than ended sooner than we expected
+		watchDuration := time.Since(startTime)
+		if watchDuration <= clientGoTimeout+time.Second {
+			res = append(res, watchDuration)
+		}
+	}
+
+	// validate
+	if len(res) > failedProbesTreshold {
+		t.Fatalf("%d%% of probes failed. That means some (all) watch requests ended sooner than we expected. The current treshold was set to %d%%"+
+			" We did %d probes in total. The upper-bound time limit for a single watch reqeust was set to %v."+
+			" %v probes ended before that time %v", len(res)*100/probes, failedProbesTreshold*100/probes, probes, clientGoTimeout, len(res), res)
+	}
+}

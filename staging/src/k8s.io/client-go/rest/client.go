@@ -100,11 +100,14 @@ type RESTClient struct {
 
 	// Set specific behavior of the client.  If not set http.DefaultClient will be used.
 	Client *http.Client
+
+	// RequestTimeout specifies a time limit for requests made by the HTTP Client
+	RequestTimeout time.Duration
 }
 
 // NewRESTClient creates a new RESTClient. This client performs generic REST functions
 // such as Get, Put, Post, and Delete on specified paths.
-func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientContentConfig, rateLimiter flowcontrol.RateLimiter, client *http.Client, requestTimeout time.Duration) (*RESTClient, error) {
 	if len(config.ContentType) == 0 {
 		config.ContentType = "application/json"
 	}
@@ -123,7 +126,8 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ClientConte
 		createBackoffMgr: readExpBackoffConfig,
 		rateLimiter:      rateLimiter,
 
-		Client: client,
+		Client:         client,
+		RequestTimeout: requestTimeout,
 	}, nil
 }
 

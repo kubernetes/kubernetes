@@ -210,7 +210,7 @@ func TestStream(t *testing.T) {
 				GroupVersion: schema.GroupVersion{Group: "x"},
 				Negotiator:   runtime.NewClientNegotiator(legacyscheme.Codecs.WithoutConversion(), schema.GroupVersion{Group: "x"}),
 			}
-			c, err := restclient.NewRESTClient(url, "", config, nil, nil)
+			c, err := restclient.NewRESTClient(url, "", config, nil, nil, time.Duration(0))
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}

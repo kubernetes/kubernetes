@@ -324,9 +324,12 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
+		// do not set a timeout on the http client, instead use context for cancellation
+		// if multiple timeouts were set, the request will pick the smaller timeout to be applied, leaving other useless.
+		//
+		// see:
+		//   https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
+		//   https://github.com/kubernetes/kubernetes/pull/100959
 	}
 
 	rateLimiter := config.RateLimiter
@@ -355,7 +358,7 @@ func RESTClientFor(config *Config) (*RESTClient, error) {
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient, config.Timeout)
 	if err == nil && config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}
@@ -382,9 +385,12 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 	var httpClient *http.Client
 	if transport != http.DefaultTransport {
 		httpClient = &http.Client{Transport: transport}
-		if config.Timeout > 0 {
-			httpClient.Timeout = config.Timeout
-		}
+		// do not set a timeout on the http client, instead use context for cancellation
+		// if multiple timeouts were set, the request will pick the smaller timeout to be applied, leaving other useless.
+		//
+		// see:
+		//   https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
+		//   https://github.com/kubernetes/kubernetes/pull/100959
 	}
 
 	rateLimiter := config.RateLimiter
@@ -413,7 +419,7 @@ func UnversionedRESTClientFor(config *Config) (*RESTClient, error) {
 		Negotiator:         runtime.NewClientNegotiator(config.NegotiatedSerializer, gv),
 	}
 
-	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient)
+	restClient, err := NewRESTClient(baseURL, versionedAPIPath, clientContent, rateLimiter, httpClient, config.Timeout)
 	if err == nil && config.WarningHandler != nil {
 		restClient.warningHandler = config.WarningHandler
 	}

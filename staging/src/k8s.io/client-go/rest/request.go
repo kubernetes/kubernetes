@@ -131,16 +131,11 @@ func NewRequest(c *RESTClient) *Request {
 		pathPrefix = path.Join("/", c.versionedAPIPath)
 	}
 
-	var timeout time.Duration
-	if c.Client != nil {
-		timeout = c.Client.Timeout
-	}
-
 	r := &Request{
 		c:              c,
 		rateLimiter:    c.rateLimiter,
 		backoff:        backoff,
-		timeout:        timeout,
+		timeout:        c.RequestTimeout,
 		pathPrefix:     pathPrefix,
 		maxRetries:     10,
 		warningHandler: c.warningHandler,
@@ -683,6 +678,12 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
+	requestCleanUpFn := func() { /* noop */ }
+	if r.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		requestCleanUpFn = cancel
+	}
 	req = req.WithContext(ctx)
 	req.Header = r.headers
 	client := r.c.Client
@@ -730,7 +731,8 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
-	return watch.NewStreamWatcher(
+	return watch.NewDisposableStreamWatcher(
+		requestCleanUpFn,
 		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
