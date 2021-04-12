@@ -62,7 +62,7 @@ dependencies:
 
   # CRI Tools
   - name: "crictl"
-    version: 1.20.0
+    version: 1.21.0
     refPaths:
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CRICTL_VERSION=
