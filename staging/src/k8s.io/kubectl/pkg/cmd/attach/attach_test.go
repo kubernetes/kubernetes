@@ -148,15 +148,6 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectedContainerName: "bar",
 			obj:                   attachPod(),
 		},
-		{
-			name:                  "invalid get pod timeout value",
-			options:               &AttachOptions{GetPodTimeout: 0},
-			args:                  []string{"pod/foo"},
-			expectedPodName:       "foo",
-			expectedContainerName: "bar",
-			obj:                   attachPod(),
-			expectError:           "must be higher than zero",
-		},
 	}
 
 	for _, test := range tests {
