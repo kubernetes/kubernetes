@@ -2380,30 +2380,26 @@ func TestPluginWeights(t *testing.T) {
 	tests := []struct {
 		name    string
 		plugins *config.Plugins
-		// pluginSetCount include queue sort plugin and bind plugin.
-		pluginSetCount int
 	}{
 		{
 			name: "Add multiple plugins with weights",
 			plugins: &config.Plugins{
-				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
-				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
+				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
+				Score:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
+				PostBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
+				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
 			},
-			pluginSetCount: 4,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
-			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			f, err := NewFramework(registry, &profile)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 			plugins := f.ListPlugins()
-			if len(plugins) != tt.pluginSetCount {
-				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
-			}
 
 			compareScoreWeight(t, plugins["ScorePlugin"], tt.plugins.Score.Enabled)
 		})
@@ -2412,15 +2408,12 @@ func TestPluginWeights(t *testing.T) {
 
 func compareScoreWeight(t *testing.T, gotScores []config.Plugin, wantScores []config.Plugin) {
 	for _, ws := range wantScores {
-		if ws.Weight != 0 {
-			for _, gs := range gotScores {
-				if gs.Name == ws.Name && gs.Weight != ws.Weight {
-					t.Errorf("Expect weight to be %d, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
-				}
+		for _, gs := range gotScores {
+			if gs.Name == ws.Name && gs.Weight != ws.Weight {
+				t.Errorf("Expect weight to be %d, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
 			}
 		}
 	}
-
 }
 
 func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {
