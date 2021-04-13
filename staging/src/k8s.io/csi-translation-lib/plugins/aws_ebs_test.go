@@ -102,6 +102,11 @@ func TestTranslateEBSInTreeStorageClassToCSI(t *testing.T) {
 			sc:    NewStorageClass(map[string]string{"fstype": "ext3"}, nil),
 			expSc: NewStorageClass(map[string]string{"csi.storage.k8s.io/fstype": "ext3"}, nil),
 		},
+		{
+			name:  "translate with iops",
+			sc:    NewStorageClass(map[string]string{"iopsPerGB": "100"}, nil),
+			expSc: NewStorageClass(map[string]string{"iopsPerGB": "100", "allowautoiopspergbincrease": "true"}, nil),
+		},
 	}
 
 	for _, tc := range cases {

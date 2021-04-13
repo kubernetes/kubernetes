@@ -36,6 +36,14 @@ const (
 	AWSEBSInTreePluginName = "kubernetes.io/aws-ebs"
 	// AWSEBSTopologyKey is the zonal topology key for AWS EBS CSI driver
 	AWSEBSTopologyKey = "topology." + AWSEBSDriverName + "/zone"
+	// iopsPerGBKey is StorageClass parameter name that specifies IOPS
+	// Per GB.
+	iopsPerGBKey = "iopspergb"
+	// allowIncreaseIOPSKey is parameter name that allows the CSI driver
+	// to increase IOPS to the minimum value supported by AWS when IOPS
+	// Per GB is too low for a given volume size. This preserves current
+	// in-tree volume plugin behavior.
+	allowIncreaseIOPSKey = "allowautoiopspergbincrease"
 )
 
 var _ InTreePlugin = &awsElasticBlockStoreCSITranslator{}
@@ -62,6 +70,12 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc 
 			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, []string{v})
 		case zonesKey:
 			generatedTopologies = generateToplogySelectors(AWSEBSTopologyKey, strings.Split(v, ","))
+		case iopsPerGBKey:
+			// Keep iopsPerGBKey
+			params[k] = v
+			// Preserve current in-tree volume plugin behavior and allow the CSI
+			// driver to bump volume IOPS when volume size * iopsPerGB is too low.
+			params[allowIncreaseIOPSKey] = "true"
 		default:
 			params[k] = v
 		}
