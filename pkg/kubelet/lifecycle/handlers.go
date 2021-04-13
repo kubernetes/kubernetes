@@ -22,7 +22,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
@@ -86,9 +86,9 @@ func (hr *handlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 // If portReference has an int value, it is treated as a literal, and simply returns that value.
 // If portReference is a string, an attempt is first made to parse it as an integer.  If that fails,
 // an attempt is made to find a port with the same name in the container spec.
-// If a port with the same name is found, it's ContainerPort value is returned.  If no matching
-// port is found, an error is returned.
-func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int, error) {
+// If a port with the same name is found and conforms to the protocol, it's ContainerPort value is returned.
+// If no matching port is found, an error is returned.
+func resolvePort(portReference intstr.IntOrString, container *v1.Container, protocol v1.Protocol) (int, error) {
 	if portReference.Type == intstr.Int {
 		return portReference.IntValue(), nil
 	}
@@ -99,6 +99,9 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 	}
 	for _, portSpec := range container.Ports {
 		if portSpec.Name == portName {
+			if protocol != "" && portSpec.Protocol != protocol {
+				return -1, fmt.Errorf("found the port %q but its protocol is %s instead of %s", portSpec.Name, portSpec.Protocol, protocol)
+			}
 			return int(portSpec.ContainerPort), nil
 		}
 	}
@@ -123,7 +126,7 @@ func (hr *handlerRunner) runHTTPHandler(pod *v1.Pod, container *v1.Container, ha
 		port = 80
 	} else {
 		var err error
-		port, err = resolvePort(handler.HTTPGet.Port, container)
+		port, err = resolvePort(handler.HTTPGet.Port, container, v1.ProtocolTCP)
 		if err != nil {
 			return "", err
 		}

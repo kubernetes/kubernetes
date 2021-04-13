@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -33,7 +33,7 @@ import (
 
 func TestResolvePortInt(t *testing.T) {
 	expected := 80
-	port, err := resolvePort(intstr.FromInt(expected), &v1.Container{})
+	port, err := resolvePort(intstr.FromInt(expected), &v1.Container{}, v1.ProtocolTCP)
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
@@ -47,15 +47,32 @@ func TestResolvePortString(t *testing.T) {
 	name := "foo"
 	container := &v1.Container{
 		Ports: []v1.ContainerPort{
-			{Name: name, ContainerPort: int32(expected)},
+			{Name: name, ContainerPort: int32(expected), Protocol: v1.ProtocolTCP},
 		},
 	}
-	port, err := resolvePort(intstr.FromString(name), container)
+	port, err := resolvePort(intstr.FromString(name), container, v1.ProtocolTCP)
 	if port != expected {
 		t.Errorf("expected: %d, saw: %d", expected, port)
 	}
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestResolvePortStringUDP(t *testing.T) {
+	expected := int32(80)
+	name := "foo"
+	container := &v1.Container{
+		Ports: []v1.ContainerPort{
+			{Name: name, ContainerPort: expected, Protocol: v1.ProtocolUDP},
+		},
+	}
+	port, err := resolvePort(intstr.FromString(name), container, v1.ProtocolTCP)
+	if port != -1 {
+		t.Errorf("expected: -1, saw: %d", port)
+	}
+	if err == nil {
+		t.Error("unexpected non-error")
 	}
 }
 
@@ -67,7 +84,7 @@ func TestResolvePortStringUnknown(t *testing.T) {
 			{Name: "bar", ContainerPort: expected},
 		},
 	}
-	port, err := resolvePort(intstr.FromString(name), container)
+	port, err := resolvePort(intstr.FromString(name), container, v1.ProtocolTCP)
 	if port != -1 {
 		t.Errorf("expected: -1, saw: %d", port)
 	}
