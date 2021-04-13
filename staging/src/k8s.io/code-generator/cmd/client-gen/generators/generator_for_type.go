@@ -641,17 +641,12 @@ func (c *$.type|privatePlural$) UpdateStatus(ctx context.Context, $.type|private
 var watchTemplate = `
 // Watch returns a $.watchInterface|raw$ that watches the requested $.type|privatePlural$.
 func (c *$.type|privatePlural$) Watch(ctx context.Context, opts $.ListOptions|raw$) ($.watchInterface|raw$, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil{
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		$if .namespaced$Namespace(c.ns).$end$
-		Resource("$.type|resource$").
-		VersionedParams(&opts, $.schemeParameterCodec|raw$).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().$if .namespaced$Namespace(c.ns).$end$Resource("$.type|resource$").VersionedParams(&opts, $.schemeParameterCodec|raw$)
+	if opts.TimeoutSeconds != nil{
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+    return client.Watch(ctx)
 }
 `
 
