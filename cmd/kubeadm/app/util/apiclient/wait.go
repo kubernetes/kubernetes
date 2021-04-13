@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/klog/v2"
 	"net/http"
 	"time"
 
@@ -247,7 +248,7 @@ func getStaticPodSingleHash(client clientset.Interface, nodeName string, compone
 	}
 
 	staticPodHash := staticPod.Annotations["kubernetes.io/config.hash"]
-	fmt.Printf("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
+	klog.V(1).Info("Static pod: %s hash: %s\n", staticPodName, staticPodHash)
 	return staticPodHash, nil
 }
 
