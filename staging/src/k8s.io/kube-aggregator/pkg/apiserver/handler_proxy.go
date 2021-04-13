@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -200,6 +201,12 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = location
 	newReq.Host = location.Host
+
+	// If the original request has an audit ID, let's make sure we propagate this
+	// to the aggregated server.
+	if auditID, found := genericapirequest.AuditIDFrom(req.Context()); found {
+		newReq.Header.Set(auditinternal.HeaderAuditID, string(auditID))
+	}
 
 	return newReq, cancelFn
 }

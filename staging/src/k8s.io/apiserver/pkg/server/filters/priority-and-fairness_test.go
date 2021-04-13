@@ -854,6 +854,7 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	handler = apifilters.WithRequestDeadline(handler, nil, nil, longRunningRequestCheck, nil, requestTimeout)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
 	handler = WithPanicRecovery(handler, requestInfoFactory)
+	handler = apifilters.WithAuditID(handler)
 	return handler
 }
 
