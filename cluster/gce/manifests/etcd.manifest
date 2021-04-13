@@ -7,8 +7,6 @@
 },
 "spec":{
 "securityContext": {
-    {{ run_as_user }}
-    {{ run_as_group }}
     "seccompProfile": {
         "type": "RuntimeDefault"
     }

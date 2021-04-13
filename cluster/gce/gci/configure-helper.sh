@@ -1859,16 +1859,10 @@ function prepare-etcd-manifest {
   # Replace the volume host path.
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${temp_file}"
   # Replace the run as user and run as group
-  pod_run_as_user=""
-  pod_run_as_group=""
   container_security_context=""
   if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
-    pod_run_as_user="\"runAsUser\": ${ETCD_RUNASUSER},"
-    pod_run_as_group="\"runAsGroup\": ${ETCD_RUNASGROUP},"
-    container_security_context="\"securityContext\": {\"allowPrivilegeEscalation\": false, \"capabilities\": {\"drop\": [\"all\"]}},"
+    container_security_context="\"securityContext\": {\"runAsUser\": ${ETCD_RUNASUSER}, \"runAsGroup\": ${ETCD_RUNASGROUP}, \"allowPrivilegeEscalation\": false, \"capabilities\": {\"drop\": [\"all\"]}},"
   fi
-  sed -i -e "s@{{ run_as_user }}@${pod_run_as_user}@g" "${temp_file}"
-  sed -i -e "s@{{ run_as_group }}@${pod_run_as_group}@g" "${temp_file}"
   sed -i -e "s@{{security_context}}@${container_security_context}@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
 }
@@ -1891,7 +1885,7 @@ function start-etcd-servers {
     rm -f /etc/init.d/etcd
   fi
   if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
-    chown -R "${ETCD_RUNASUSER}":"${ETCD_RUNASGROUP}" /var/etcd/
+    chown -R "${ETCD_RUNASUSER}":"${ETCD_RUNASGROUP}" /mnt/disks/master-pd/var/etcd
   fi
   prepare-log-file /var/log/etcd.log "${ETCD_RUNASUSER:-0}"
   prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
