@@ -245,7 +245,7 @@ func (nfsMounter *nfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
 
 func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	notMnt, err := mount.IsNotMountPoint(nfsMounter.mounter, dir)
-	klog.V(4).Infof("NFS mount set up: %s %v %v", dir, !notMnt, err)
+	klog.V(4).InfoS("NFS mount set up", "path", dir, "isMountPoint", !notMnt, "err", err)
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -265,22 +265,22 @@ func (nfsMounter *nfsMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	if err != nil {
 		notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 		if mntErr != nil {
-			klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+			klog.ErrorS(mntErr, "IsNotMountPoint check failed")
 			return err
 		}
 		if !notMnt {
 			if mntErr = nfsMounter.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
+				klog.ErrorS(mntErr, "Failed to unmount")
 				return err
 			}
 			notMnt, mntErr := mount.IsNotMountPoint(nfsMounter.mounter, dir)
 			if mntErr != nil {
-				klog.Errorf("IsNotMountPoint check failed: %v", mntErr)
+				klog.ErrorS(mntErr, "IsNotMountPoint check failed")
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.ErrorS(nil, "Path is still mounted, despite call to unmount().  Will try again next sync loop.", "path", dir)
 				return err
 			}
 		}
@@ -306,7 +306,7 @@ func (c *nfsUnmounter) TearDownAt(dir string) error {
 	// NFS server and kubelet may not be able to do lstat/stat() there.
 	forceUnmounter, ok := c.mounter.(mount.MounterForceUnmounter)
 	if ok {
-		klog.V(4).Infof("Using force unmounter interface")
+		klog.V(4).InfoS("Using force unmounter interface")
 		return mount.CleanupMountWithForce(dir, forceUnmounter, true /* extensiveMountPointCheck */, unMountTimeout)
 	}
 	return mount.CleanupMountPoint(dir, c.mounter, true /* extensiveMountPointCheck */)

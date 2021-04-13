@@ -60,13 +60,13 @@ func (util *AWSDiskUtil) DeleteVolume(d *awsElasticBlockStoreDeleter) error {
 	if err != nil {
 		// AWS cloud provider returns volume.deletedVolumeInUseError when
 		// necessary, no handling needed here.
-		klog.V(2).Infof("Error deleting EBS Disk volume %s: %v", d.volumeID, err)
+		klog.V(2).InfoS("Error deleting EBS Disk volume", "volumeID", d.volumeID, "err", err)
 		return err
 	}
 	if deleted {
-		klog.V(2).Infof("Successfully deleted EBS Disk volume %s", d.volumeID)
+		klog.V(2).InfoS("Successfully deleted EBS Disk volume", "volumeID", d.volumeID)
 	} else {
-		klog.V(2).Infof("Successfully deleted EBS Disk volume %s (actually already deleted)", d.volumeID)
+		klog.V(2).InfoS("Successfully deleted EBS Disk volume (actually already deleted)", "volumeID", d.volumeID)
 	}
 	return nil
 }
@@ -97,7 +97,7 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 
 	volumeOptions, err := populateVolumeOptions(c.plugin.GetPluginName(), c.options.PVC.Name, capacity, tags, c.options.Parameters, node, allowedTopologies, zonesWithNodes)
 	if err != nil {
-		klog.V(2).Infof("Error populating EBS options: %v", err)
+		klog.V(2).InfoS("Error populating EBS options", "err", err)
 		return "", 0, nil, "", err
 	}
 
@@ -108,15 +108,15 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner, node *
 
 	name, err := cloud.CreateDisk(volumeOptions)
 	if err != nil {
-		klog.V(2).Infof("Error creating EBS Disk volume: %v", err)
+		klog.V(2).InfoS("Error creating EBS Disk volume", "err", err)
 		return "", 0, nil, "", err
 	}
-	klog.V(2).Infof("Successfully created EBS Disk volume %s", name)
+	klog.V(2).InfoS("Successfully created EBS Disk volume", "volumeName", name)
 
 	labels, err := cloud.GetVolumeLabels(name)
 	if err != nil {
 		// We don't really want to leak the volume here...
-		klog.Errorf("Error building labels for new EBS volume %q: %v", name, err)
+		klog.ErrorS(err, "Error building labels for new EBS volume", "volumeName", name)
 	}
 
 	fstype := ""
@@ -232,14 +232,14 @@ func getDiskByIDPaths(volumeID aws.KubernetesVolumeID, partition string, deviceP
 	// and we have to get the volume id from the nvme interface
 	awsVolumeID, err := volumeID.MapToAWSVolumeID()
 	if err != nil {
-		klog.Warningf("Error mapping volume %q to AWS volume: %v", volumeID, err)
+		klog.InfoS("Error mapping volume to AWS volume", "volumeID", volumeID, "err", err)
 	} else {
 		// This is the magic name on which AWS presents NVME devices under /dev/disk/by-id/
 		// For example, vol-0fab1d5e3f72a5e23 creates a symlink at /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol0fab1d5e3f72a5e23
 		nvmeName := "nvme-Amazon_Elastic_Block_Store_" + strings.Replace(string(awsVolumeID), "-", "", -1)
 		nvmePath, err := findNvmeVolume(nvmeName)
 		if err != nil {
-			klog.Warningf("Error looking for nvme volume %q: %v", volumeID, err)
+			klog.InfoS("Error looking for nvme volume", "volumeID", volumeID, "err", err)
 		} else if nvmePath != "" {
 			if partition != "" {
 				nvmePath = nvmePath + nvmeDiskPartitionSuffix + partition
@@ -268,14 +268,14 @@ func findNvmeVolume(findName string) (device string, err error) {
 	stat, err := os.Lstat(p)
 	if err != nil {
 		if os.IsNotExist(err) {
-			klog.V(6).Infof("nvme path not found %q", p)
+			klog.V(6).InfoS("NVME path not found", "path", p)
 			return "", nil
 		}
 		return "", fmt.Errorf("error getting stat of %q: %v", p, err)
 	}
 
 	if stat.Mode()&os.ModeSymlink != os.ModeSymlink {
-		klog.Warningf("nvme file %q found, but was not a symlink", p)
+		klog.InfoS("NVME file found, but was not a symlink", "path", p)
 		return "", nil
 	}
 
@@ -318,7 +318,7 @@ func formatVolumeID(volumeID string) (string, error) {
 		if length == 3 {
 			sourceName = awsURLNamePrefix + names[1] + "/" + volName // names[1] is the zone label
 		}
-		klog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
+		klog.V(4).InfoS("Convert aws volume name from volumeID to sourceName", "volumeID", volumeID, "sourceName", sourceName)
 	}
 	return sourceName, nil
 }

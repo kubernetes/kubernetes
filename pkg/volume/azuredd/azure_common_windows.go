@@ -36,7 +36,7 @@ func scsiHostRescan(io ioHandler, exec utilexec.Interface) {
 	cmd := "Update-HostStorageCache"
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		klog.Errorf("Update-HostStorageCache failed in scsiHostRescan, error: %v, output: %q", err, string(output))
+		klog.ErrorS(err, "Update-HostStorageCache failed in scsiHostRescan", "output", string(output))
 	}
 }
 
@@ -45,7 +45,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 	cmd := `Get-Disk | select number, location | ConvertTo-Json`
 	output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 	if err != nil {
-		klog.Errorf("Get-Disk failed in findDiskByLun, error: %v, output: %q", err, string(output))
+		klog.ErrorS(err, "Get-Disk failed in findDiskByLun", "output", string(output))
 		return "", err
 	}
 
@@ -55,7 +55,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 
 	var data []map[string]interface{}
 	if err = json.Unmarshal(output, &data); err != nil {
-		klog.Errorf("Get-Disk output is not a json array, output: %q", string(output))
+		klog.ErrorS(nil, "Get-Disk output is not a json array", "output", string(output))
 		return "", err
 	}
 
@@ -69,27 +69,27 @@ func findDiskByLun(lun int, iohandler ioHandler, exec utilexec.Interface) (strin
 				arr := strings.Split(location, " ")
 				arrLen := len(arr)
 				if arrLen < 3 {
-					klog.Warningf("unexpected json structure from Get-Disk, location: %q", jsonLocation)
+					klog.InfoS("Unexpected json structure from Get-Disk", "location", jsonLocation)
 					continue
 				}
 
-				klog.V(4).Infof("found a disk, location: %q, lun: %q", location, arr[arrLen-1])
+				klog.V(4).InfoS("Found a disk", "location", location, "LUN", arr[arrLen-1])
 				//last element of location field is LUN number, e.g.
 				//		"location":  "Integrated : Adapter 3 : Port 0 : Target 0 : LUN 1"
 				l, err := strconv.Atoi(arr[arrLen-1])
 				if err != nil {
-					klog.Warningf("cannot parse element from data structure, location: %q, element: %q", location, arr[arrLen-1])
+					klog.InfoS("Cannot parse element from data structure", "location", location, "element", arr[arrLen-1])
 					continue
 				}
 
 				if l == lun {
-					klog.V(4).Infof("found a disk and lun, location: %q, lun: %d", location, lun)
+					klog.V(4).InfoS("Found a disk and Logical Unit Number", "location", location, "LUN", lun)
 					if d, ok := v["number"]; ok {
 						if diskNum, ok := d.(float64); ok {
-							klog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)
+							klog.V(2).InfoS("AzureDisk Mount: got disk number by Logical Unit Number", "diskNumber", int(diskNum), "LUN", lun)
 							return fmt.Sprintf(winDiskNumFormat, int(diskNum)), nil
 						}
-						klog.Warningf("LUN(%d) found, but could not get disk number(%q), location: %q", lun, d, location)
+						klog.InfoS("Logical Unit Number found, but could not get disk number in location", "LUN", lun, "diskNumber", d, "location", location)
 					}
 					return "", fmt.Errorf("LUN(%d) found, but could not get disk number, location: %q", lun, location)
 				}
