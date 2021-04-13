@@ -37,7 +37,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	apiutil "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
@@ -137,6 +139,101 @@ type remoteSubnetInfo struct {
 }
 
 const NETWORK_TYPE_OVERLAY = "overlay"
+
+func newHostNetworkService() (HostNetworkService, hcn.SupportedFeatures) {
+	var hns HostNetworkService
+	hns = hnsV1{}
+	supportedFeatures := hcn.GetSupportedFeatures()
+	if supportedFeatures.Api.V2 {
+		hns = hnsV2{}
+	}
+
+	return hns, supportedFeatures
+}
+
+func getNetworkName(hnsNetworkName string) (string, error) {
+	if len(hnsNetworkName) == 0 {
+		klog.V(3).InfoS("network-name flag not set. Checking environment variable")
+		hnsNetworkName = os.Getenv("KUBE_NETWORK")
+		if len(hnsNetworkName) == 0 {
+			return "", fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
+		}
+	}
+	return hnsNetworkName, nil
+}
+
+func getNetworkInfo(hns HostNetworkService, hnsNetworkName string) (*hnsNetworkInfo, error) {
+	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
+	for err != nil {
+		klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
+		time.Sleep(1 * time.Second)
+		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+	}
+	return hnsNetworkInfo, err
+}
+
+func isOverlay(hnsNetworkInfo *hnsNetworkInfo) bool {
+	return strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY)
+}
+
+// StackCompatTester tests whether the required kernel and network are dualstack capable
+type StackCompatTester interface {
+	DualStackCompatible(networkName string) bool
+}
+
+type DualStackCompatTester struct{}
+
+func (t DualStackCompatTester) DualStackCompatible(networkName string) bool {
+	dualStackFeatureEnabled := utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack)
+	if !dualStackFeatureEnabled {
+		return false
+	}
+
+	globals, err := hcn.GetGlobals()
+	if err != nil {
+		klog.ErrorS(err, "Unable to determine networking stack version. Falling back to single-stack")
+		return false
+	}
+
+	if !kernelSupportsDualstack(globals.Version) {
+		klog.InfoS("This version of Windows does not support dual-stack. Falling back to single-stack")
+		return false
+	}
+
+	// check if network is using overlay
+	hns, _ := newHostNetworkService()
+	networkName, err = getNetworkName(networkName)
+	if err != nil {
+		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		return false
+	}
+	networkInfo, err := getNetworkInfo(hns, networkName)
+	if err != nil {
+		klog.ErrorS(err, "unable to determine dual-stack status %v. Falling back to single-stack")
+		return false
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) && isOverlay(networkInfo) {
+		// Overlay (VXLAN) networks on Windows do not support dual-stack networking today
+		klog.InfoS("Winoverlay does not support dual-stack. Falling back to single-stack")
+		return false
+	}
+
+	return true
+}
+
+// The hcsshim version logic has a bug that did not calculate the versioning of DualStack correctly.
+// DualStack is supported in WS 2004+ (10.0.19041+) where HCN component version is 11.10+
+// https://github.com/microsoft/hcsshim/pull/1003#issuecomment-827930358
+func kernelSupportsDualstack(currentVersion hcn.Version) bool {
+	hnsVersion := fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor)
+	v, err := version.ParseSemantic(hnsVersion)
+	if err != nil {
+		return false
+	}
+
+	return v.AtLeast(version.MustParseSemantic("11.10.0"))
+}
 
 func Log(v interface{}, message string, level klog.Level) {
 	klog.V(level).InfoS("%s", message, "spewConfig", spewSdump(v))
@@ -543,36 +640,24 @@ func NewProxier(
 	}
 
 	serviceHealthServer := healthcheck.NewServiceHealthServer(hostname, recorder)
-	var hns HostNetworkService
-	hns = hnsV1{}
-	supportedFeatures := hcn.GetSupportedFeatures()
-	if supportedFeatures.Api.V2 {
-		hns = hnsV2{}
-	}
-
-	hnsNetworkName := config.NetworkName
-	if len(hnsNetworkName) == 0 {
-		klog.V(3).InfoS("network-name flag not set. Checking environment variable")
-		hnsNetworkName = os.Getenv("KUBE_NETWORK")
-		if len(hnsNetworkName) == 0 {
-			return nil, fmt.Errorf("Environment variable KUBE_NETWORK and network-flag not initialized")
-		}
+	hns, supportedFeatures := newHostNetworkService()
+	hnsNetworkName, err := getNetworkName(config.NetworkName)
+	if err != nil {
+		return nil, err
 	}
 
 	klog.V(3).InfoS("Cleaning up old HNS policy lists")
 	deleteAllHnsLoadBalancerPolicy()
 
 	// Get HNS network information
-	hnsNetworkInfo, err := hns.getNetworkByName(hnsNetworkName)
-	for err != nil {
-		klog.ErrorS(err, "Unable to find HNS Network specified. Please check network name and CNI deployment", "hnsNetworkName", hnsNetworkName)
-		time.Sleep(1 * time.Second)
-		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
+	hnsNetworkInfo, err := getNetworkInfo(hns, hnsNetworkName)
+	if err != nil {
+		return nil, err
 	}
 
 	// Network could have been detected before Remote Subnet Routes are applied or ManagementIP is updated
 	// Sleep and update the network to include new information
-	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
+	if isOverlay(hnsNetworkInfo) {
 		time.Sleep(10 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
@@ -592,7 +677,7 @@ func NewProxier(
 
 	var sourceVip string
 	var hostMac string
-	if strings.EqualFold(hnsNetworkInfo.networkType, NETWORK_TYPE_OVERLAY) {
+	if isOverlay(hnsNetworkInfo) {
 		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.WinOverlay) {
 			return nil, fmt.Errorf("WinOverlay feature gate not enabled")
 		}
@@ -603,6 +688,15 @@ func NewProxier(
 		sourceVip = config.SourceVip
 		if len(sourceVip) == 0 {
 			return nil, fmt.Errorf("source-vip flag not set")
+		}
+
+		if nodeIP.IsUnspecified() {
+			// attempt to get the correct ip address
+			klog.V(2).InfoS("node ip was unspecified.  Attempting to find node ip")
+			nodeIP, err = apiutil.ResolveBindAddress(nodeIP)
+			if err != nil {
+				klog.InfoS("failed to find an ip. You may need set the --bind-address flag", "err", err)
+			}
 		}
 
 		interfaces, _ := net.Interfaces() //TODO create interfaces
