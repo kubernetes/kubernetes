@@ -95,16 +95,12 @@ func (c *cSINodes) List(ctx context.Context, opts metav1.ListOptions) (result *v
 
 // Watch returns a watch.Interface that watches the requested cSINodes.
 func (c *cSINodes) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		Resource("csinodes").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().Resource("csinodes").VersionedParams(&opts, scheme.ParameterCodec)
+	if opts.TimeoutSeconds != nil {
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+	return client.Watch(ctx)
 }
 
 // Create takes the representation of a cSINode and creates it.  Returns the server's representation of the cSINode, and an error, if there is any.

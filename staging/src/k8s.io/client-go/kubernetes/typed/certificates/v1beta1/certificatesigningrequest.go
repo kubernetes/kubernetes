@@ -97,16 +97,12 @@ func (c *certificateSigningRequests) List(ctx context.Context, opts v1.ListOptio
 
 // Watch returns a watch.Interface that watches the requested certificateSigningRequests.
 func (c *certificateSigningRequests) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		Resource("certificatesigningrequests").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().Resource("certificatesigningrequests").VersionedParams(&opts, scheme.ParameterCodec)
+	if opts.TimeoutSeconds != nil {
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+	return client.Watch(ctx)
 }
 
 // Create takes the representation of a certificateSigningRequest and creates it.  Returns the server's representation of the certificateSigningRequest, and an error, if there is any.

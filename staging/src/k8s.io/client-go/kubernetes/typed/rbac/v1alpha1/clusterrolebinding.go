@@ -95,16 +95,12 @@ func (c *clusterRoleBindings) List(ctx context.Context, opts v1.ListOptions) (re
 
 // Watch returns a watch.Interface that watches the requested clusterRoleBindings.
 func (c *clusterRoleBindings) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		Resource("clusterrolebindings").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().Resource("clusterrolebindings").VersionedParams(&opts, scheme.ParameterCodec)
+	if opts.TimeoutSeconds != nil {
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+	return client.Watch(ctx)
 }
 
 // Create takes the representation of a clusterRoleBinding and creates it.  Returns the server's representation of the clusterRoleBinding, and an error, if there is any.

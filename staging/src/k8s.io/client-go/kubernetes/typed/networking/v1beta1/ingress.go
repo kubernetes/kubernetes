@@ -101,17 +101,12 @@ func (c *ingresses) List(ctx context.Context, opts v1.ListOptions) (result *v1be
 
 // Watch returns a watch.Interface that watches the requested ingresses.
 func (c *ingresses) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("ingresses").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().Namespace(c.ns).Resource("ingresses").VersionedParams(&opts, scheme.ParameterCodec)
+	if opts.TimeoutSeconds != nil {
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+	return client.Watch(ctx)
 }
 
 // Create takes the representation of a ingress and creates it.  Returns the server's representation of the ingress, and an error, if there is any.

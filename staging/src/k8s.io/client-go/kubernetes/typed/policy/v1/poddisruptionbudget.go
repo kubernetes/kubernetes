@@ -101,17 +101,12 @@ func (c *podDisruptionBudgets) List(ctx context.Context, opts metav1.ListOptions
 
 // Watch returns a watch.Interface that watches the requested podDisruptionBudgets.
 func (c *podDisruptionBudgets) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
-	var timeout time.Duration
-	if opts.TimeoutSeconds != nil {
-		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
-	}
 	opts.Watch = true
-	return c.client.Get().
-		Namespace(c.ns).
-		Resource("poddisruptionbudgets").
-		VersionedParams(&opts, scheme.ParameterCodec).
-		Timeout(timeout).
-		Watch(ctx)
+	client := c.client.Get().Namespace(c.ns).Resource("poddisruptionbudgets").VersionedParams(&opts, scheme.ParameterCodec)
+	if opts.TimeoutSeconds != nil {
+		client.Timeout(time.Duration(*opts.TimeoutSeconds) * time.Second)
+	}
+	return client.Watch(ctx)
 }
 
 // Create takes the representation of a podDisruptionBudget and creates it.  Returns the server's representation of the podDisruptionBudget, and an error, if there is any.
