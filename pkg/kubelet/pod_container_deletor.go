@@ -25,9 +25,12 @@ import (
 )
 
 const (
-	// The limit on the number of buffered container deletion requests
-	// This number is a bit arbitrary and may be adjusted in the future.
-	containerDeletorBufferLimit = 50
+	// The limit on the number of buffered container deletion requests,
+	// On bare metal, a node will run hundreds of containers,
+	// In the scenario where all the pods on the node are upgraded at the same time,
+	// some container's cleanup events will be discarded because of the BufferLimit is too small,
+	// so increase the BufferLimit to 500
+	containerDeletorBufferLimit = 500
 )
 
 type containerStatusbyCreatedList []*kubecontainer.Status
