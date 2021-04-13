@@ -252,7 +252,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 							"foo",
 							`["foo"]`,
 							`["bar","baz"]`,
-							`["foo"]`, // TODO: TableConverter should be changed so that the response is this: `["foo"] ["bar","baz"]`,
+							`[["foo"],["bar","baz"]]`,
 						},
 						Object: runtime.RawExtension{
 							Object: &unstructured.Unstructured{
@@ -325,7 +325,7 @@ func Test_convertor_ConvertToTable(t *testing.T) {
 							"1",
 							"[1]",
 							"[2,3]",
-							"[1]", // TODO: TableConverter should be changed so that the response is this: `[1] [2,3]`,
+							"[[1],[2,3]]",
 						},
 						Object: runtime.RawExtension{
 							Object: &unstructured.Unstructured{

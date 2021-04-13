@@ -74,6 +74,9 @@ func newTableCRD() *apiextensionsv1.CustomResourceDefinition {
 						{Name: "Gamma", Type: "integer", Description: "a column with wrongly typed values", JSONPath: ".spec.gamma"},
 						{Name: "Epsilon", Type: "string", Description: "an array of integers as string", JSONPath: ".spec.epsilon"},
 						{Name: "Zeta", Type: "integer", Description: "the zeta field", Format: "int64", Priority: 42, JSONPath: ".spec.zeta"},
+						{Name: "Eta", Type: "string", Description: "an array of structs", JSONPath: ".spec.eta[*].foo"},
+						{Name: "Eta truncated", Type: "string", Description: "a truncated array of structs", JSONPath: ".spec.eta[0:3].foo"},
+						{Name: "Theta", Type: "string", Description: "an array of strings", JSONPath: ".spec.theta[1:2]"},
 					},
 					Schema: fixtures.AllowAllSchema(),
 				},
@@ -97,6 +100,10 @@ func newTableInstance(name string) *unstructured.Unstructured {
 				"delta":   "hello",
 				"epsilon": []int64{1, 2, 3},
 				"zeta":    5,
+				"eta": []map[string]int{
+					{"foo": 1}, {"bar": 4}, nil, {}, {"foo": 3}, {"foo": 5}, {"foo": 7},
+				},
+				"theta": []string{},
 			},
 		},
 	}
@@ -211,10 +218,25 @@ func TestTableGet(t *testing.T) {
 					t.Errorf("expected column definition %#v, got %#v", expected, got)
 				}
 
-				// Validate extra column for v1
+				// Validate extra columns for v1
 				if i == 1 {
 					zeta := metav1beta1.TableColumnDefinition{Name: "Zeta", Type: "integer", Format: "int64", Description: "the zeta field", Priority: 42}
 					if got, expected := tbl.ColumnDefinitions[6], zeta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+
+					eta := metav1beta1.TableColumnDefinition{Name: "Eta", Type: "string", Description: "an array of structs"}
+					if got, expected := tbl.ColumnDefinitions[7], eta; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+
+					etaTruncated := metav1beta1.TableColumnDefinition{Name: "Eta truncated", Type: "string", Description: "a truncated array of structs"}
+					if got, expected := tbl.ColumnDefinitions[8], etaTruncated; got != expected {
+						t.Errorf("expected column definition %#v, got %#v", expected, got)
+					}
+
+					theta := metav1beta1.TableColumnDefinition{Name: "Theta", Type: "string", Description: "an array of strings"}
+					if got, expected := tbl.ColumnDefinitions[9], theta; got != expected {
 						t.Errorf("expected column definition %#v, got %#v", expected, got)
 					}
 				}
@@ -249,10 +271,22 @@ func TestTableGet(t *testing.T) {
 				if got, expected := tbl.Rows[0].Cells[5], "[1,2,3]"; got != expected {
 					t.Errorf("expected cell[5] to equal %q, got %q", expected, got)
 				}
-				// Validate extra column for v1
+				// Validate extra columns for v1
 				if i == 1 {
 					if got, expected := tbl.Rows[0].Cells[6], int64(5); got != expected {
 						t.Errorf("expected cell[6] to equal %q, got %q", expected, got)
+					}
+					if got, expected := tbl.Rows[0].Cells[7], "[1,3,5,7]"; got != expected {
+						t.Errorf("expected cell[7] to equal %q, got %q", expected, got)
+					}
+					// TODO: This should be outputting 3 values but the [0:3]
+					// range does not appear to be supported in our jsonpath
+					// implementation.
+					if got, expected := tbl.Rows[0].Cells[8], "1"; got != expected {
+						t.Errorf("expected cell[8] to equal %q, got %q", expected, got)
+					}
+					if got := tbl.Rows[0].Cells[9]; got != nil {
+						t.Errorf("expected cell[9] to be nil, got %q", got)
 					}
 				}
 			}

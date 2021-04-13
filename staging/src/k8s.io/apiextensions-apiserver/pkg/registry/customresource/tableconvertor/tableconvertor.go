@@ -107,17 +107,32 @@ func (c *convertor) ConvertToTable(ctx context.Context, obj runtime.Object, tabl
 				continue
 			}
 
-			// as we only support simple JSON path, we can assume to have only one result (or none, filtered out above)
-			value := results[0][0].Interface()
 			if customHeaders[i].Type == "string" {
-				if err := column.PrintResults(buf, []reflect.Value{reflect.ValueOf(value)}); err == nil {
+				values := []reflect.Value{}
+
+				// When there are multiple matches, this squashes them into a
+				// single slice so PrintResults will treat this in the same way
+				// as any other matching slice.
+				if len(results[0]) > 1 {
+					a := make([]interface{}, len(results[0]))
+					for i, v := range results[0] {
+						a[i] = v.Interface()
+					}
+					results[0] = []reflect.Value{reflect.ValueOf(a)}
+				}
+
+				values = append(values, reflect.ValueOf(results[0][0].Interface()))
+
+				if err := column.PrintResults(buf, values); err == nil {
 					cells = append(cells, buf.String())
 					buf.Reset()
 				} else {
 					cells = append(cells, nil)
 				}
 			} else {
-				cells = append(cells, cellForJSONValue(customHeaders[i].Type, value))
+				// For non-string formats, we only support a simple JSON path.
+				// That means that only one result will be returned.
+				cells = append(cells, cellForJSONValue(customHeaders[i].Type, results[0][0].Interface()))
 			}
 		}
 		return cells, nil
