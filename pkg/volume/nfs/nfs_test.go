@@ -18,7 +18,6 @@ package nfs
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"testing"
 
@@ -119,18 +118,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
 	}
-	if nfsm, ok := mounter.(*nfsMounter); ok {
-		srvr := nfsm.server
-		vol, _, _ := getVolumeSource(spec)
-		expectedSrvr := vol.Server
-		// check cluster IP version
-		if net.ParseIP(expectedSrvr).To16() != nil {
-			expectedSrvr = fmt.Sprintf("[%s]", expectedSrvr)
-		}
-		if srvr != expectedSrvr {
-			t.Errorf("Unexpected nfs server, expected %q, got: %q", expectedSrvr, srvr)
-		}
-	}
 	volumePath := mounter.GetPath()
 	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
 	if volumePath != expectedPath {
@@ -148,6 +135,23 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	if mounter.(*nfsMounter).readOnly {
 		t.Errorf("The volume source should not be read-only and it is.")
+	}
+	mntDevs, err := fake.List()
+	if err != nil {
+		t.Errorf("fakeMounter.List() failed: %v", err)
+	}
+	if len(mntDevs) != 1 {
+		t.Errorf("unexpected number of mounted devices. expected: %v, got %v", 1, len(mntDevs))
+	} else {
+		if mntDevs[0].Type != "nfs" {
+			t.Errorf("unexpected type of mounted devices. expected: %v, got %v", "nfs", mntDevs[0].Type)
+		}
+		src, _, _ := getVolumeSource(spec)
+		srvr := getServerFromSource(src)
+		expectedDevice := fmt.Sprintf("%s:%s", srvr, src.Path)
+		if mntDevs[0].Device != expectedDevice {
+			t.Errorf("unexpected nfs device, expected %q, got: %q", expectedDevice, mntDevs[0].Device)
+		}
 	}
 	log := fake.GetLog()
 	if len(log) != 1 {
