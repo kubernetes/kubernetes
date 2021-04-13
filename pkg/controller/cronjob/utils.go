@@ -154,9 +154,9 @@ func getRecentUnmetScheduleTimes(cj batchv1.CronJob, now time.Time) ([]time.Time
 // If there are too many (>100) unstarted times, it will raise a warning and but still return
 // the list of missed times.
 func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedule, recorder record.EventRecorder) (*time.Time, error) {
-	starts := []time.Time{}
-
-	var earliestTime time.Time
+	var (
+		earliestTime time.Time
+	)
 	if cj.Status.LastScheduleTime != nil {
 		earliestTime = cj.Status.LastScheduleTime.Time
 	} else {
@@ -200,8 +200,8 @@ func getNextScheduleTime(cj batchv1.CronJob, now time.Time, schedule cron.Schedu
 		//
 		// I've somewhat arbitrarily picked 100, as more than 80,
 		// but less than "lots".
-		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", len(starts))
-		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", len(starts))
+		recorder.Eventf(&cj, corev1.EventTypeWarning, "TooManyMissedTimes", "too many missed start times: %d. Set or decrease .spec.startingDeadlineSeconds or check clock skew", numberOfMissedSchedules)
+		klog.InfoS("too many missed times", "cronjob", klog.KRef(cj.GetNamespace(), cj.GetName()), "missed times", numberOfMissedSchedules)
 	}
 	return t, err
 }
