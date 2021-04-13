@@ -3,6 +3,8 @@ package filters
 import (
 	"net/http"
 
+	"k8s.io/apimachinery/pkg/runtime/schema"
+
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest"
 )
@@ -26,7 +28,16 @@ func WithDeprecatedApiRequestLogging(handler http.Handler, controller deprecated
 		if !ok {
 			return
 		}
-		controller.LogRequest(info.Resource, info.APIVersion, info.APIGroup, info.Verb, user.GetName(), timestamp)
+		controller.LogRequest(
+			schema.GroupVersionResource{
+				Group:    info.APIGroup,
+				Version:  info.APIVersion,
+				Resource: info.Resource,
+			},
+			timestamp,
+			user.GetName(),
+			info.Verb,
+		)
 	})
 	return handlerFunc
 }

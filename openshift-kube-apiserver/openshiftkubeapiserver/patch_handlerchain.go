@@ -25,17 +25,17 @@ import (
 )
 
 // TODO switch back to taking a kubeapiserver config.  For now make it obviously safe for 3.11
-func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string, genericConfig *genericapiserver.Config) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, map[string]genericapiserver.PostStartHookFunc, error) {
+func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string, deprecatedAPIRequestController deprecatedapirequest.APIRequestLogger) (func(apiHandler http.Handler, kc *genericapiserver.Config) http.Handler, error) {
 	// load the oauthmetadata when we can return an error
 	oAuthMetadata := []byte{}
 	if len(oauthMetadataFile) > 0 {
 		var err error
 		oAuthMetadata, err = loadOAuthMetadataFile(oauthMetadataFile)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
-	deprecatedAPIRequestController := deprecatedapirequest.NewController(genericConfig.LoopbackClientConfig)
+
 	return func(apiHandler http.Handler, genericConfig *genericapiserver.Config) http.Handler {
 			// well-known comes after the normal handling chain. This shows where to connect for oauth information
 			handler := withOAuthInfo(apiHandler, oAuthMetadata)
@@ -57,9 +57,7 @@ func BuildHandlerChain(consolePublicURL string, oauthMetadataFile string, generi
 
 			return handler
 		},
-		map[string]genericapiserver.PostStartHookFunc{
-			"openshift.io-deprecated-api-requests-filter": deprecatedapirequest.NewPostStartHookFunc(deprecatedAPIRequestController),
-		},
+
 		nil
 }
 

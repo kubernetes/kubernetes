@@ -15,3 +15,8 @@ var deprecatedApiRemovedRelease = map[schema.GroupVersionResource]string{
 	{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "rolebindings"}:                       "1.22",
 	{Group: "rbac.authorization.k8s.io", Version: "v1beta1", Resource: "roles"}:                              "1.22",
 }
+
+// removedRelease of a specified resource.version.group.
+func removedRelease(resource schema.GroupVersionResource) string {
+	return deprecatedApiRemovedRelease[resource]
+}

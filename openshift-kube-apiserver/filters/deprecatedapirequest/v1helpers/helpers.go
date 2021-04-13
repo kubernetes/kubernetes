@@ -3,31 +3,30 @@ package v1helpers
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/runtime"
+	apiclientv1 "github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1"
 
 	apiv1 "github.com/openshift/api/apiserver/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
-type DeprecatedAPIRequestClient interface {
-	Get(ctx context.Context, name string, opts metav1.GetOptions) (*apiv1.DeprecatedAPIRequest, error)
-	UpdateStatus(ctx context.Context, deprecatedAPIRequest *apiv1.DeprecatedAPIRequest, opts metav1.UpdateOptions) (*apiv1.DeprecatedAPIRequest, error)
-}
-
 type UpdateStatusFunc func(status *apiv1.DeprecatedAPIRequestStatus)
 
-func UpdateStatus(ctx context.Context, client DeprecatedAPIRequestClient, name string, updateFuncs ...UpdateStatusFunc) (*apiv1.DeprecatedAPIRequestStatus, bool, error) {
+func ApplyStatus(ctx context.Context, client apiclientv1.DeprecatedAPIRequestInterface, name string, updateFuncs ...UpdateStatusFunc) (*apiv1.DeprecatedAPIRequestStatus, bool, error) {
 	updated := false
 	var updatedStatus *apiv1.DeprecatedAPIRequestStatus
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		check, err := client.Get(ctx, name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			// do not retry on NotFound
-			runtime.HandleError(err)
-			return nil
+			// on a not found, let's create this thing.
+			requestCount := &apiv1.DeprecatedAPIRequest{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				// TODO fix spec here
+				Spec: apiv1.DeprecatedAPIRequestSpec{RemovedRelease: "1.1"},
+			}
+			check, err = client.Create(ctx, requestCount, metav1.CreateOptions{})
 		}
 		if err != nil {
 			return err

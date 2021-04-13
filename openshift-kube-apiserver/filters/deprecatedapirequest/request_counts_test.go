@@ -4,55 +4,70 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/diff"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func gvr(group, version, resource string) schema.GroupVersionResource {
+	return schema.GroupVersionResource{
+		Group:    group,
+		Version:  version,
+		Resource: resource,
+	}
+}
 
 func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 	testCases := []struct {
-		resource string
+		resource schema.GroupVersionResource
 		ts       time.Time
 		user     string
 		verb     string
 		count    int
 	}{
-		{"test.v1.group", testTime(0, 0), "bob", "get", 1},
-		{"test.v1.group", testTime(0, 1), "bob", "list", 2},
-		{"test.v1.group", testTime(1, 0), "bob", "get", 1},
-		{"test.v2.group", testTime(2, 0), "bob", "get", 1},
-		{"test.v2.group", testTime(2, 1), "sue", "list", 2},
-		{"test.v2.group", testTime(2, 2), "sue", "get", 1},
-		{"test.v2.group", testTime(2, 3), "sue", "get", 3},
+		{gvr("group", "v1", "test"), testTime(0, 0), "bob", "get", 1},
+		{gvr("group", "v1", "test"), testTime(0, 1), "bob", "list", 2},
+		{gvr("group", "v1", "test"), testTime(1, 0), "bob", "get", 1},
+		{gvr("group", "v2", "test"), testTime(2, 0), "bob", "get", 1},
+		{gvr("group", "v2", "test"), testTime(2, 1), "sue", "list", 2},
+		{gvr("group", "v2", "test"), testTime(2, 2), "sue", "get", 1},
+		{gvr("group", "v2", "test"), testTime(2, 3), "sue", "get", 3},
 	}
-	actual := &apiRequestCounts{resources: map[string]*resourceRequestCounts{}}
+	actual := newAPIRequestCounts("nodeName")
 	for _, tc := range testCases {
-		actual.IncrementRequestCount(tc.resource, tc.ts, tc.user, tc.verb, tc.count)
+		actual.IncrementRequestCount(tc.resource, tc.ts.Hour(), tc.user, tc.verb, tc.count)
 	}
 	expected := &apiRequestCounts{
-		resources: map[string]*resourceRequestCounts{
-			"test.v1.group": {hours: map[int]*hourlyRequestCounts{
-				0: {
-					lastUpdateTime: testTime(0, 1),
-					users: map[string]*userRequestCounts{
-						"bob": {verbs: map[string]*verbRequestCount{"get": {count: 1}, "list": {count: 2}}},
-					}},
-				1: {
-					lastUpdateTime: testTime(1, 0),
-					users: map[string]*userRequestCounts{
-						"bob": {verbs: map[string]*verbRequestCount{"get": {count: 1}}},
+		nodeName: "nodeName",
+		resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+			gvr("group", "v1", "test"): {
+				resource: gvr("group", "v1", "test"),
+				hourToRequestCount: map[int]*hourlyRequestCounts{
+					0: {
+						usersToRequestCounts: map[string]*userRequestCounts{
+							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}, "list": {count: 2}}},
+						}},
+					1: {
+						usersToRequestCounts: map[string]*userRequestCounts{
+							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
+						},
 					},
-				},
-			}},
-			"test.v2.group": {hours: map[int]*hourlyRequestCounts{
-				2: {
-					lastUpdateTime: testTime(2, 3),
-					users: map[string]*userRequestCounts{
-						"bob": {verbs: map[string]*verbRequestCount{"get": {count: 1}}},
-						"sue": {verbs: map[string]*verbRequestCount{"list": {count: 2}, "get": {count: 4}}},
-					}},
-			}},
+				}},
+			gvr("group", "v2", "test"): {
+				resource: gvr("group", "v2", "test"),
+				hourToRequestCount: map[int]*hourlyRequestCounts{
+					2: {
+						usersToRequestCounts: map[string]*userRequestCounts{
+							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
+							"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"list": {count: 2}, "get": {count: 4}}},
+						}},
+				}},
 		},
 	}
-	assert.Equal(t, actual.resources, expected.resources)
+
+	if !actual.Equals(expected) {
+		t.Error(diff.StringDiff(expected.String(), actual.String()))
+	}
 }
 
 func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
@@ -70,159 +85,186 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 		},
 		{
 			name:     "TargetEmpty",
-			existing: &apiRequestCounts{resources: map[string]*resourceRequestCounts{}},
+			existing: newAPIRequestCounts(""),
 			additional: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 			expected: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 		},
 		{
 			name: "SourceEmpty",
 			existing: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
-			additional: &apiRequestCounts{resources: map[string]*resourceRequestCounts{}},
+			additional: &apiRequestCounts{resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{}},
 			expected: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 		},
 		{
 			name: "MergeCount",
 			existing: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 			additional: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 45),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {2}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {2}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 			expected: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 45),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"verb": {3}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "", "resource"): {
+						resource: gvr("", "", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {3}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 		},
 		{
 			name: "Merge",
 			existing: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource.v1": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"bob": {verbs: map[string]*verbRequestCount{"get": {1}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "v1", "resource"): {
+						resource: gvr("", "v1", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 			additional: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource.v1": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"bob": {verbs: map[string]*verbRequestCount{"get": {2}, "post": {1}}},
-								"sue": {verbs: map[string]*verbRequestCount{"get": {5}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "v1", "resource"): {
+						resource: gvr("", "v1", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {2}, "post": {1}}},
+									"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
+								},
 							},
-						},
-						2: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"bob": {verbs: map[string]*verbRequestCount{"get": {1}}},
+							2: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								},
 							},
-						},
-					}},
-					"resource.v2": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"get": {1}}},
+						}},
+					gvr("", "v2", "resource"): {
+						resource: gvr("", "v2", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 			expected: &apiRequestCounts{
-				resources: map[string]*resourceRequestCounts{
-					"resource.v1": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"bob": {verbs: map[string]*verbRequestCount{"get": {3}, "post": {1}}},
-								"sue": {verbs: map[string]*verbRequestCount{"get": {5}}},
+				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
+					gvr("", "v1", "resource"): {
+						resource: gvr("", "v1", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {3}, "post": {1}}},
+									"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
+								},
 							},
-						},
-						2: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"bob": {verbs: map[string]*verbRequestCount{"get": {1}}},
+							2: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								},
 							},
-						},
-					}},
-					"resource.v2": {hours: map[int]*hourlyRequestCounts{
-						0: {lastUpdateTime: testTime(10, 28),
-							users: map[string]*userRequestCounts{
-								"user": {verbs: map[string]*verbRequestCount{"get": {1}}},
+						}},
+					gvr("", "v2", "resource"): {
+						resource: gvr("", "v2", "resource"),
+						hourToRequestCount: map[int]*hourlyRequestCounts{
+							0: {
+								usersToRequestCounts: map[string]*userRequestCounts{
+									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								},
 							},
-						},
-					}},
+						}},
 				},
 			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.existing.IncrementRequestCounts(tc.additional)
-			assert.Equal(t, tc.existing, tc.expected)
+			tc.existing.Add(tc.additional)
+
+			if !tc.existing.Equals(tc.expected) {
+				t.Error(diff.StringDiff(tc.expected.String(), tc.existing.String()))
+			}
 		})
 	}
 }
