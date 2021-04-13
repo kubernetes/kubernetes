@@ -30,7 +30,6 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-base/metrics/testutil"
@@ -1670,7 +1669,7 @@ func TestBackOffFlow(t *testing.T) {
 		},
 	}
 
-	podID := ktypes.NamespacedName{
+	podID := types.NamespacedName{
 		Namespace: pod.Namespace,
 		Name:      pod.Name,
 	}

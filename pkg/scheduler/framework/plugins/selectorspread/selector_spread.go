@@ -181,8 +181,7 @@ func (pl *SelectorSpread) PreScore(ctx context.Context, cycleState *framework.Cy
 	if skipSelectorSpread(pod) {
 		return nil
 	}
-	var selector labels.Selector
-	selector = helper.DefaultSelector(
+	selector := helper.DefaultSelector(
 		pod,
 		pl.services,
 		pl.replicationControllers,
