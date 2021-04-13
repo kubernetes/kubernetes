@@ -165,7 +165,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		if host == "" {
 			host = status.PodIP
 		}
-		port, err := extractPort(p.HTTPGet.Port, container)
+		port, err := extractPort(p.HTTPGet.Port, container, v1.ProtocolTCP)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
@@ -184,7 +184,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		}
 	}
 	if p.TCPSocket != nil {
-		port, err := extractPort(p.TCPSocket.Port, container)
+		port, err := extractPort(p.TCPSocket.Port, container, v1.ProtocolTCP)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
@@ -199,14 +199,14 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
-func extractPort(param intstr.IntOrString, container v1.Container) (int, error) {
+func extractPort(param intstr.IntOrString, container v1.Container, protocol v1.Protocol) (int, error) {
 	port := -1
 	var err error
 	switch param.Type {
 	case intstr.Int:
 		port = param.IntValue()
 	case intstr.String:
-		if port, err = findPortByName(container, param.StrVal); err != nil {
+		if port, err = findPort(container, param.StrVal, protocol); err != nil {
 			// Last ditch effort - maybe it was an int stored as string?
 			if port, err = strconv.Atoi(param.StrVal); err != nil {
 				return port, err
@@ -221,10 +221,13 @@ func extractPort(param intstr.IntOrString, container v1.Container) (int, error) 
 	return port, fmt.Errorf("invalid port number: %v", port)
 }
 
-// findPortByName is a helper function to look up a port in a container by name.
-func findPortByName(container v1.Container, portName string) (int, error) {
+// findPort is a helper function to look up a port in a container by name and protocol.
+func findPort(container v1.Container, portName string, protocol v1.Protocol) (int, error) {
 	for _, port := range container.Ports {
 		if port.Name == portName {
+			if protocol != "" && port.Protocol != protocol {
+				return 0, fmt.Errorf("found the port %q but its protocol is %s instead of %s", portName, port.Protocol, protocol)
+			}
 			return int(port.ContainerPort), nil
 		}
 	}

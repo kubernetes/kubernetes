@@ -57,23 +57,85 @@ func TestFormatURL(t *testing.T) {
 	}
 }
 
-func TestFindPortByName(t *testing.T) {
+func Test_findPort(t *testing.T) {
 	container := v1.Container{
 		Ports: []v1.ContainerPort{
 			{
 				Name:          "foo",
 				ContainerPort: 8080,
+				Protocol:      v1.ProtocolTCP,
 			},
 			{
 				Name:          "bar",
 				ContainerPort: 9000,
+				Protocol:      v1.ProtocolUDP,
 			},
 		},
 	}
-	want := 8080
-	got, err := findPortByName(container, "foo")
-	if got != want || err != nil {
-		t.Errorf("Expected %v, got %v, err: %v", want, got, err)
+
+	type args struct {
+		container v1.Container
+		portName  string
+		protocol  v1.Protocol
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{
+			args: args{
+				container: container,
+				portName:  "foo",
+				protocol:  v1.ProtocolTCP,
+			},
+			want: 8080,
+		},
+		{
+			args: args{
+				container: container,
+				portName:  "foo",
+				protocol:  v1.ProtocolUDP,
+			},
+			wantErr: true,
+		},
+		{
+			args: args{
+				container: container,
+				portName:  "bar",
+				protocol:  v1.ProtocolUDP,
+			},
+			want: 9000,
+		},
+		{
+			args: args{
+				container: container,
+				portName:  "bar",
+				protocol:  v1.ProtocolTCP,
+			},
+			wantErr: true,
+		},
+		{
+			args: args{
+				container: container,
+				portName:  "notfound",
+				protocol:  v1.ProtocolTCP,
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := findPort(tt.args.container, tt.args.portName, tt.args.protocol)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findPort() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("findPort() got = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -98,7 +160,7 @@ func TestGetURLParts(t *testing.T) {
 	for _, test := range testCases {
 		state := v1.PodStatus{PodIP: "127.0.0.1"}
 		container := v1.Container{
-			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
+			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93, Protocol: v1.ProtocolTCP}},
 			LivenessProbe: &v1.Probe{
 				Handler: v1.Handler{
 					HTTPGet: test.probe,
@@ -114,7 +176,7 @@ func TestGetURLParts(t *testing.T) {
 		if host == "" {
 			host = state.PodIP
 		}
-		port, err := extractPort(test.probe.Port, container)
+		port, err := extractPort(test.probe.Port, container, v1.ProtocolTCP)
 		if test.ok && err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
@@ -151,14 +213,14 @@ func TestGetTCPAddrParts(t *testing.T) {
 	for _, test := range testCases {
 		host := "1.2.3.4"
 		container := v1.Container{
-			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93}},
+			Ports: []v1.ContainerPort{{Name: "found", ContainerPort: 93, Protocol: v1.ProtocolTCP}},
 			LivenessProbe: &v1.Probe{
 				Handler: v1.Handler{
 					TCPSocket: test.probe,
 				},
 			},
 		}
-		port, err := extractPort(test.probe.Port, container)
+		port, err := extractPort(test.probe.Port, container, v1.ProtocolTCP)
 		if !test.ok && err == nil {
 			t.Errorf("Expected error for %+v, got %s:%d", test, host, port)
 		}
