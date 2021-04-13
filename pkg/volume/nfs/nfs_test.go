@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"testing"
 
@@ -117,6 +118,18 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 	}
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
+	}
+	if nfsm, ok := mounter.(*nfsMounter); ok {
+		srvr := nfsm.server
+		vol, _, _ := getVolumeSource(spec)
+		expectedSrvr := vol.Server
+		// check cluster IP version
+		if net.ParseIP(expectedSrvr).To16() != nil {
+			expectedSrvr = fmt.Sprintf("[%s]", expectedSrvr)
+		}
+		if srvr != expectedSrvr {
+			t.Errorf("Unexpected nfs server, expected %q, got: %q", expectedSrvr, srvr)
+		}
 	}
 	volumePath := mounter.GetPath()
 	expectedPath := fmt.Sprintf("%s/pods/poduid/volumes/kubernetes.io~nfs/vol1", tmpDir)
