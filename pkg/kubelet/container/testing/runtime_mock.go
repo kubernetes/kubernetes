@@ -147,7 +147,7 @@ func (r *Mock) DeleteContainer(containerID kubecontainer.ContainerID) error {
 	return args.Error(0)
 }
 
-func (r *Mock) DeleteSandbox(sandboxID string) error {
+func (r *Mock) RemoveSandbox(sandboxID string) error {
 	args := r.Called(sandboxID)
 	return args.Error(0)
 }

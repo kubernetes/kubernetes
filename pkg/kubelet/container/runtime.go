@@ -114,8 +114,8 @@ type Runtime interface {
 	GetContainerLogs(ctx context.Context, pod *v1.Pod, containerID ContainerID, logOptions *v1.PodLogOptions, stdout, stderr io.Writer) (err error)
 	// Delete a container. If the container is still running, an error is returned.
 	DeleteContainer(containerID ContainerID) error
-	// DeleteSandbox deletes a sandbox.
-	DeleteSandbox(sandboxID string) error
+	// RemoveSandbox removes a sandbox.
+	RemoveSandbox(sandboxID string) error
 	// ImageService provides methods to image-related methods.
 	ImageService
 	// UpdatePodCIDR sends a new podCIDR to the runtime.

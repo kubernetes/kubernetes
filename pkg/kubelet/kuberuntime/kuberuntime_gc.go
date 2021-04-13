@@ -161,7 +161,7 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
 		if !sandboxes[i].active {
-			if err := cgc.manager.DeleteSandbox(sandboxes[i].id); err != nil {
+			if err := cgc.manager.RemoveSandbox(sandboxes[i].id); err != nil {
 				klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxes[i].id)
 			}
 		}

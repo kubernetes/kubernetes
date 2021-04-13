@@ -366,11 +366,11 @@ func (f *FakeRuntime) DeleteContainer(containerID kubecontainer.ContainerID) err
 	return f.Err
 }
 
-func (f *FakeRuntime) DeleteSandbox(sandboxID string) error {
+func (f *FakeRuntime) RemoveSandbox(sandboxID string) error {
 	f.Lock()
 	defer f.Unlock()
 
-	f.CalledFunctions = append(f.CalledFunctions, "DeleteSandbox")
+	f.CalledFunctions = append(f.CalledFunctions, "RemoveSandbox")
 	return f.Err
 }
 

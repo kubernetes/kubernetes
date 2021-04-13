@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -47,8 +47,8 @@ func newPodSandboxDeleter(runtime kubecontainer.Runtime) *podSandboxDeleter {
 	buffer := make(chan string, sandboxDeletionBufferLimit)
 	go wait.Forever(func() {
 		for id := range buffer {
-			if err := runtime.DeleteSandbox(id); err != nil {
-				klog.InfoS("[pod_sandbox_deleter] DeleteSandbox returned error", "sandboxId", id, "err", err)
+			if err := runtime.RemoveSandbox(id); err != nil {
+				klog.InfoS("[pod_sandbox_deleter] RemoveSandbox returned error", "sandboxId", id, "err", err)
 			}
 		}
 	}, 0)

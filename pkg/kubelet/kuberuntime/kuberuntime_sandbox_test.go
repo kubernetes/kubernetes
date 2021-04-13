@@ -362,8 +362,8 @@ func TestGeneratePodSandboxWindowsConfig(t *testing.T) {
 	}
 }
 
-// TestDeleteSandbox tests removing the sandbox.
-func TestDeleteSandbox(t *testing.T) {
+// TestRemoveSandbox tests removing the sandbox.
+func TestRemoveSandbox(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 	pod := &v1.Pod{
@@ -390,7 +390,7 @@ func TestDeleteSandbox(t *testing.T) {
 	})
 	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{sandbox})
 
-	err = m.DeleteSandbox(sandbox.Id)
+	err = m.RemoveSandbox(sandbox.Id)
 	assert.NoError(t, err)
 	assert.Contains(t, fakeRuntime.Called, "StopPodSandbox")
 	assert.Contains(t, fakeRuntime.Called, "RemovePodSandbox")
