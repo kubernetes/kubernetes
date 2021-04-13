@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	klabels "k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -40,6 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -888,6 +890,132 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss, err = c.AppsV1().StatefulSets(ns).Get(context.TODO(), ssName, metav1.GetOptions{})
 			framework.ExpectNoError(err, "Failed to get statefulset resource: %v", err)
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(4), "statefulset should have 4 replicas")
+		})
+
+		ginkgo.It("should validate Statefulset Status endpoints", func() {
+			ssClient := c.AppsV1().StatefulSets(ns)
+			labelSelector := "e2e=testing"
+
+			w := &cache.ListWatch{
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					options.LabelSelector = labelSelector
+					return ssClient.Watch(context.TODO(), options)
+				},
+			}
+			ssList, err := c.AppsV1().StatefulSets("").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+			framework.ExpectNoError(err, "failed to list StatefulSets")
+
+			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
+			ss := e2estatefulset.NewStatefulSet(ssName, ns, headlessSvcName, 1, nil, nil, labels)
+			setHTTPProbe(ss)
+			ss, err = c.AppsV1().StatefulSets(ns).Create(context.TODO(), ss, metav1.CreateOptions{})
+			framework.ExpectNoError(err)
+			e2estatefulset.WaitForRunningAndReady(c, *ss.Spec.Replicas, ss)
+			waitForStatus(c, ss)
+
+			ginkgo.By("Patch Statefulset to include a label")
+			payload := []byte(`{"metadata":{"labels":{"e2e":"testing"}}}`)
+			ss, err = ssClient.Patch(context.TODO(), ssName, types.StrategicMergePatchType, payload, metav1.PatchOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Getting /status")
+			ssResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}
+			ssStatusUnstructured, err := f.DynamicClient.Resource(ssResource).Namespace(ns).Get(context.TODO(), ssName, metav1.GetOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to fetch the status of replica set %s in namespace %s", ssName, ns)
+			ssStatusBytes, err := json.Marshal(ssStatusUnstructured)
+			framework.ExpectNoError(err, "Failed to marshal unstructured response. %v", err)
+
+			var ssStatus appsv1.StatefulSet
+			err = json.Unmarshal(ssStatusBytes, &ssStatus)
+			framework.ExpectNoError(err, "Failed to unmarshal JSON bytes to a Statefulset object type")
+			framework.Logf("StatefulSet %s has Conditions: %#v", ssName, ssStatus.Status.Conditions)
+
+			ginkgo.By("updating the StatefulSet Status")
+			var statusToUpdate, updatedStatus *appsv1.StatefulSet
+
+			err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				statusToUpdate, err = ssClient.Get(context.TODO(), ssName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Unable to retrieve statefulset %s", ssName)
+
+				statusToUpdate.Status.Conditions = append(statusToUpdate.Status.Conditions, appsv1.StatefulSetCondition{
+					Type:    "StatusUpdate",
+					Status:  "True",
+					Reason:  "E2E",
+					Message: "Set from e2e test",
+				})
+
+				updatedStatus, err = ssClient.UpdateStatus(context.TODO(), statusToUpdate, metav1.UpdateOptions{})
+				return err
+			})
+			framework.ExpectNoError(err, "Failed to update status. %v", err)
+			framework.Logf("updatedStatus.Conditions: %#v", updatedStatus.Status.Conditions)
+
+			ginkgo.By("watching for the statefulset status to be updated")
+
+			ctx, cancel := context.WithTimeout(context.Background(), statefulSetTimeout)
+			defer cancel()
+
+			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+
+				if e, ok := event.Object.(*appsv1.StatefulSet); ok {
+					found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
+						e.ObjectMeta.Namespace == ss.ObjectMeta.Namespace &&
+						e.ObjectMeta.Labels["e2e"] == ss.ObjectMeta.Labels["e2e"]
+					if !found {
+						framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, ss.Status.Conditions)
+						return false, nil
+					}
+					for _, cond := range e.Status.Conditions {
+						if cond.Type == "StatusUpdate" &&
+							cond.Reason == "E2E" &&
+							cond.Message == "Set from e2e test" {
+							framework.Logf("Found Statefulset %v in namespace %v with labels: %v annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.ObjectMeta.Labels, ss.Annotations, cond)
+							return found, nil
+						}
+						framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, cond)
+					}
+				}
+				object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+				framework.Logf("Observed %v event: %+v", object, event.Type)
+				return false, nil
+			})
+			framework.ExpectNoError(err, "failed to locate Statefulset %v in namespace %v", ss.ObjectMeta.Name, ns)
+			framework.Logf("Statefulset %s has an updated status", ssName)
+
+			ginkgo.By("patching the Statefulset Status")
+			payload = []byte(`{"status":{"conditions":[{"type":"StatusPatched","status":"True"}]}}`)
+			framework.Logf("Patch payload: %v", string(payload))
+
+			patchedStatefulSet, err := ssClient.Patch(context.TODO(), ssName, types.MergePatchType, payload, metav1.PatchOptions{}, "status")
+			framework.ExpectNoError(err, "Failed to patch status. %v", err)
+			framework.Logf("Patched status conditions: %#v", patchedStatefulSet.Status.Conditions)
+
+			ginkgo.By("watching for the Statefulset status to be patched")
+			ctx, cancel = context.WithTimeout(context.Background(), statefulSetTimeout)
+
+			_, err = watchtools.Until(ctx, ssList.ResourceVersion, w, func(event watch.Event) (bool, error) {
+
+				defer cancel()
+				if e, ok := event.Object.(*appsv1.StatefulSet); ok {
+					found := e.ObjectMeta.Name == ss.ObjectMeta.Name &&
+						e.ObjectMeta.Namespace == ss.ObjectMeta.Namespace &&
+						e.ObjectMeta.Labels["e2e"] == ss.ObjectMeta.Labels["e2e"]
+					if !found {
+						framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, ss.Status.Conditions)
+						return false, nil
+					}
+					for _, cond := range e.Status.Conditions {
+						if cond.Type == "StatusPatched" {
+							framework.Logf("Found Statefulset %v in namespace %v with labels: %v annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.ObjectMeta.Labels, ss.Annotations, cond)
+							return found, nil
+						}
+						framework.Logf("Observed Statefulset %v in namespace %v with annotations: %v & Conditions: %v", ss.ObjectMeta.Name, ss.ObjectMeta.Namespace, ss.Annotations, cond)
+					}
+				}
+				object := strings.Split(fmt.Sprintf("%v", event.Object), "{")[0]
+				framework.Logf("Observed %v event: %+v", object, event.Type)
+				return false, nil
+			})
 		})
 	})
 
