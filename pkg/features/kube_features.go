@@ -686,6 +686,7 @@ const (
 
 	// owner: @ahg-g
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Enables controlling pod ranking on replicaset scale-down.
 	PodDeletionCost featuregate.Feature = "PodDeletionCost"
@@ -858,7 +859,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PreferNominatedNode:                            {Default: false, PreRelease: featuregate.Alpha},
 	ProbeTerminationGracePeriod:                    {Default: false, PreRelease: featuregate.Alpha},
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	PodDeletionCost:                                {Default: false, PreRelease: featuregate.Alpha},
+	PodDeletionCost:                                {Default: true, PreRelease: featuregate.Beta},
 	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
 	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
