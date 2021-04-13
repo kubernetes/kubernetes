@@ -99,15 +99,20 @@ func NewDefaultCRDFieldManager(typeConverter TypeConverter, objectConverter runt
 
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
 func newDefaultFieldManager(f Manager, typeConverter TypeConverter, objectConverter runtime.ObjectConvertor, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, ignoreManagedFieldsFromRequestObject bool) *FieldManager {
-	f = NewManagedFieldsUpdater(f)
-	f = NewStripMetaManager(f)
-	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
-	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
-	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
-	f = NewLastAppliedManager(f, typeConverter, objectConverter, kind.GroupVersion())
-	f = NewLastAppliedUpdater(f)
-
-	return NewFieldManager(f, ignoreManagedFieldsFromRequestObject)
+	return NewFieldManager(
+		NewLastAppliedUpdater(
+			NewLastAppliedManager(
+				NewProbabilisticSkipNonAppliedManager(
+					NewCapManagersManager(
+						NewBuildManagerInfoManager(
+							NewManagedFieldsUpdater(
+								NewStripMetaManager(f),
+							), kind.GroupVersion(),
+						), DefaultMaxUpdateManagers,
+					), objectCreater, kind, DefaultTrackOnCreateProbability,
+				), typeConverter, objectConverter, kind.GroupVersion()),
+		), ignoreManagedFieldsFromRequestObject,
+	)
 }
 
 // DecodeManagedFields converts ManagedFields from the wire format (api format)
