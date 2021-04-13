@@ -287,14 +287,14 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		WebhookRetryBackoff: s.WebhookRetryBackoff,
 	}
 
-	client, err := s.getClient()
+	shortClient, err := s.getClientForShortRequests()
 	if err != nil {
 		return fmt.Errorf("failed to get delegated authentication kubeconfig: %v", err)
 	}
 
 	// configure token review
-	if client != nil {
-		cfg.TokenAccessReviewClient = client.AuthenticationV1().TokenReviews()
+	if shortClient != nil {
+		cfg.TokenAccessReviewClient = shortClient.AuthenticationV1().TokenReviews()
 	}
 
 	// get the clientCA information
@@ -311,10 +311,15 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		}
 
 	} else if !s.SkipInClusterLookup {
-		if client == nil {
+		generalClient, err := s.getClient()
+		if err != nil {
+			return err
+		}
+
+		if generalClient == nil {
 			klog.Warningf("No authentication-kubeconfig provided in order to lookup client-ca-file in configmap/%s in %s, so client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		} else {
-			clientCAProvider, err = dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "client-ca-file", client)
+			clientCAProvider, err = dynamiccertificates.NewDynamicCAFromConfigMapController("client-ca", authenticationConfigMapNamespace, authenticationConfigMapName, "client-ca-file", generalClient)
 			if err != nil {
 				return fmt.Errorf("unable to load configmap based client CA file: %v", err)
 			}
@@ -335,10 +340,15 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		}
 
 	} else if !s.SkipInClusterLookup {
-		if client == nil {
+		generalClient, err := s.getClient()
+		if err != nil {
+			return err
+		}
+
+		if generalClient == nil {
 			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		} else {
-			requestHeaderConfig, err = s.createRequestHeaderConfig(client)
+			requestHeaderConfig, err = s.createRequestHeaderConfig(generalClient)
 			if err != nil {
 				if s.TolerateInClusterLookupFailure {
 					klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
@@ -402,6 +412,27 @@ func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kuber
 // getClient returns a Kubernetes clientset. If s.RemoteKubeConfigFileOptional is true, nil will be returned
 // if no kubeconfig is specified by the user and the in-cluster config is not found.
 func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, error) {
+	clientConfig, err := s.getClientConfig(0)
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(clientConfig)
+}
+
+// getClientForShortRequests returns a Kubernetes clientset. If s.RemoteKubeConfigFileOptional is true, nil will be returned
+// if no kubeconfig is specified by the user and the in-cluster config is not found.
+// This function sets a short timeout on all requests.  It is not suitable for watches.
+func (s *DelegatingAuthenticationOptions) getClientForShortRequests() (kubernetes.Interface, error) {
+	clientConfig, err := s.getClientConfig(s.ClientTimeout)
+	if err != nil {
+		return nil, err
+	}
+
+	return kubernetes.NewForConfig(clientConfig)
+}
+
+func (s *DelegatingAuthenticationOptions) getClientConfig(timeout time.Duration) (*rest.Config, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
@@ -427,10 +458,10 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
-	clientConfig.Timeout = s.ClientTimeout
+	clientConfig.Timeout = timeout
 	if s.CustomRoundTripperFn != nil {
 		clientConfig.Wrap(s.CustomRoundTripperFn)
 	}
 
-	return kubernetes.NewForConfig(clientConfig)
+	return clientConfig, nil
 }

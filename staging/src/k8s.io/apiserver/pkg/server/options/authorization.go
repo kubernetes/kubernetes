@@ -165,16 +165,16 @@ func (s *DelegatingAuthorizationOptions) ApplyTo(c *server.AuthorizationInfo) er
 		return nil
 	}
 
-	client, err := s.getClient()
+	shortClient, err := s.getClientForShortRequests()
 	if err != nil {
 		return err
 	}
 
-	c.Authorizer, err = s.toAuthorizer(client)
+	c.Authorizer, err = s.toAuthorizer(shortClient)
 	return err
 }
 
-func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interface) (authorizer.Authorizer, error) {
+func (s *DelegatingAuthorizationOptions) toAuthorizer(shortClient kubernetes.Interface) (authorizer.Authorizer, error) {
 	var authorizers []authorizer.Authorizer
 
 	if len(s.AlwaysAllowGroups) > 0 {
@@ -189,11 +189,11 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 		authorizers = append(authorizers, a)
 	}
 
-	if client == nil {
+	if shortClient == nil {
 		klog.Warning("No authorization-kubeconfig provided, so SubjectAccessReview of authorization tokens won't work.")
 	} else {
 		cfg := authorizerfactory.DelegatingAuthorizerConfig{
-			SubjectAccessReviewClient: client.AuthorizationV1().SubjectAccessReviews(),
+			SubjectAccessReviewClient: shortClient.AuthorizationV1().SubjectAccessReviews(),
 			AllowCacheTTL:             s.AllowCacheTTL,
 			DenyCacheTTL:              s.DenyCacheTTL,
 			WebhookRetryBackoff:       s.WebhookRetryBackoff,
@@ -208,7 +208,7 @@ func (s *DelegatingAuthorizationOptions) toAuthorizer(client kubernetes.Interfac
 	return union.New(authorizers...), nil
 }
 
-func (s *DelegatingAuthorizationOptions) getClient() (kubernetes.Interface, error) {
+func (s *DelegatingAuthorizationOptions) getClientForShortRequests() (kubernetes.Interface, error) {
 	var clientConfig *rest.Config
 	var err error
 	if len(s.RemoteKubeConfigFile) > 0 {
