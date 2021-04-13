@@ -18,12 +18,15 @@ package alpha
 
 import (
 	"io"
+	"time"
 
 	"github.com/spf13/cobra"
+	"k8s.io/klog/v2"
 
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
@@ -64,6 +67,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	var (
 		token, clientName, cfgPath string
 		organizations              []string
+		validityPeriod             time.Duration
 	)
 
 	// Creates the UX Command
@@ -79,13 +83,20 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 				return err
 			}
 
+			if validityPeriod > kubeadmconstants.CertificateValidity {
+				klog.Warningf("WARNING: the specified certificate validity period %v is longer than the default duration %v, this may increase security risks.",
+					validityPeriod, kubeadmconstants.CertificateValidity)
+			}
+
+			notAfter := time.Now().Add(validityPeriod).UTC()
+
 			// if the kubeconfig file for an additional user has to use a token, use it
 			if token != "" {
-				return kubeconfigphase.WriteKubeConfigWithToken(out, internalCfg, clientName, token)
+				return kubeconfigphase.WriteKubeConfigWithToken(out, internalCfg, clientName, token, &notAfter)
 			}
 
 			// Otherwise, write a kubeconfig file with a generate client cert
-			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalCfg, clientName, organizations)
+			return kubeconfigphase.WriteKubeConfigWithClientCert(out, internalCfg, clientName, organizations, &notAfter)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -96,6 +107,7 @@ func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&token, options.TokenStr, token, "The token that should be used as the authentication mechanism for this kubeconfig, instead of client certificates")
 	cmd.Flags().StringVar(&clientName, "client-name", clientName, "The name of user. It will be used as the CN if client certificates are created")
 	cmd.Flags().StringSliceVar(&organizations, "org", organizations, "The orgnizations of the client certificate. It will be used as the O if client certificates are created")
+	cmd.Flags().DurationVar(&validityPeriod, "validity-period", kubeadmconstants.CertificateValidity, "The validity period of the client certificate. It is an offset from the current time.")
 
 	cmd.MarkFlagRequired(options.CfgPath)
 	cmd.MarkFlagRequired("client-name")
