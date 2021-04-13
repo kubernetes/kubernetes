@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -57,7 +58,8 @@ type Binder interface {
 // Configurator defines I/O, caching, and other functionality needed to
 // construct a new scheduler.
 type Configurator struct {
-	client clientset.Interface
+	client     clientset.Interface
+	kubeConfig *restclient.Config
 
 	recorderFactory profile.RecorderFactory
 
@@ -137,6 +139,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithClientSet(c.client),
+		frameworkruntime.WithKubeConfig(c.kubeConfig),
 		frameworkruntime.WithInformerFactory(c.informerFactory),
 		frameworkruntime.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),

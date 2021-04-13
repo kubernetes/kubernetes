@@ -99,7 +99,7 @@ func mustSetupScheduler(config *config.KubeSchedulerConfiguration) (util.Shutdow
 
 	// Not all config options will be effective but only those mostly related with scheduler performance will
 	// be applied to start a scheduler, most of them are defined in `scheduler.schedulerOptions`.
-	_, podInformer, schedulerShutdown := util.StartScheduler(client, config)
+	_, podInformer, schedulerShutdown := util.StartScheduler(client, cfg, config)
 	fakePVControllerShutdown := util.StartFakePVController(client)
 
 	shutdownFunc := func() {

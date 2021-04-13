@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
@@ -91,6 +92,7 @@ type frameworkImpl struct {
 	permitPlugins         []framework.PermitPlugin
 
 	clientSet       clientset.Interface
+	kubeConfig      *restclient.Config
 	eventRecorder   events.EventRecorder
 	informerFactory informers.SharedInformerFactory
 
@@ -141,6 +143,7 @@ func (f *frameworkImpl) Extenders() []framework.Extender {
 
 type frameworkOptions struct {
 	clientSet            clientset.Interface
+	kubeConfig           *restclient.Config
 	eventRecorder        events.EventRecorder
 	informerFactory      informers.SharedInformerFactory
 	snapshotSharedLister framework.SharedLister
@@ -160,6 +163,13 @@ type Option func(*frameworkOptions)
 func WithClientSet(clientSet clientset.Interface) Option {
 	return func(o *frameworkOptions) {
 		o.clientSet = clientSet
+	}
+}
+
+// WithKubeConfig sets kubeConfig for the scheduling frameworkImpl.
+func WithKubeConfig(kubeConfig *restclient.Config) Option {
+	return func(o *frameworkOptions) {
+		o.kubeConfig = kubeConfig
 	}
 }
 
@@ -253,6 +263,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
+		kubeConfig:            options.kubeConfig,
 		eventRecorder:         options.eventRecorder,
 		informerFactory:       options.informerFactory,
 		metricsRecorder:       options.metricsRecorder,
@@ -1146,6 +1157,11 @@ func (f *frameworkImpl) ListPlugins() map[string][]config.Plugin {
 // ClientSet returns a kubernetes clientset.
 func (f *frameworkImpl) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+// KubeConfig returns a kubernetes config.
+func (f *frameworkImpl) KubeConfig() *restclient.Config {
+	return f.kubeConfig
 }
 
 // EventRecorder returns an event recorder.

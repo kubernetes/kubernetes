@@ -75,7 +75,7 @@ func StartApiserver() (string, ShutdownFunc) {
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler, podInformer and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config, cfg *kubeschedulerconfig.KubeSchedulerConfiguration) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	informerFactory := scheduler.NewInformerFactory(clientSet, 0)
@@ -89,6 +89,7 @@ func StartScheduler(clientSet clientset.Interface, cfg *kubeschedulerconfig.Kube
 		informerFactory,
 		profile.NewRecorderFactory(evtBroadcaster),
 		ctx.Done(),
+		scheduler.WithKubeConfig(kubeConfig),
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithAlgorithmSource(cfg.AlgorithmSource),
 		scheduler.WithPercentageOfNodesToScore(cfg.PercentageOfNodesToScore),
@@ -159,7 +160,8 @@ type TestContext struct {
 	CloseFn         framework.CloseFunc
 	HTTPServer      *httptest.Server
 	NS              *v1.Namespace
-	ClientSet       *clientset.Clientset
+	ClientSet       clientset.Interface
+	KubeConfig      *restclient.Config
 	InformerFactory informers.SharedInformerFactory
 	Scheduler       *scheduler.Scheduler
 	Ctx             context.Context
@@ -349,14 +351,14 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 	}
 
 	// 2. Create kubeclient
-	testCtx.ClientSet = clientset.NewForConfigOrDie(
-		&restclient.Config{
-			QPS: -1, Host: s.URL,
-			ContentConfig: restclient.ContentConfig{
-				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
-			},
+	kubeConfig := &restclient.Config{
+		QPS: -1, Host: s.URL,
+		ContentConfig: restclient.ContentConfig{
+			GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
 		},
-	)
+	}
+	testCtx.KubeConfig = kubeConfig
+	testCtx.ClientSet = clientset.NewForConfigOrDie(kubeConfig)
 	return &testCtx
 }
 
@@ -403,6 +405,7 @@ func InitTestSchedulerWithOptions(
 	if policy != nil {
 		opts = append(opts, scheduler.WithAlgorithmSource(CreateAlgorithmSourceFromPolicy(policy, testCtx.ClientSet)))
 	}
+	opts = append(opts, scheduler.WithKubeConfig(testCtx.KubeConfig))
 	testCtx.Scheduler, err = scheduler.New(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
