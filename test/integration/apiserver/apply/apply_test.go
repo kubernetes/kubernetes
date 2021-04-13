@@ -403,12 +403,8 @@ func TestApplyGroupsManySeparateUpdates(t *testing.T) {
 
 	for i := 0; i < 20; i++ {
 		unique := fmt.Sprintf("updater%v", i)
-		version := "v1"
-		if i%2 == 0 {
-			version = "v1beta1"
-		}
 		object, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
-			AbsPath("/apis/admissionregistration.k8s.io/"+version).
+			AbsPath("/apis/admissionregistration.k8s.io/v1").
 			Resource("validatingwebhookconfigurations").
 			Name("webhook").
 			Param("fieldManager", unique).
