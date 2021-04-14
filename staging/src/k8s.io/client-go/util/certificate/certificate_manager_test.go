@@ -279,6 +279,7 @@ func TestSetRotationDeadline(t *testing.T) {
 				getTemplate: func() *x509.CertificateRequest { return &x509.CertificateRequest{} },
 				usages:      []certificatesv1.KeyUsage{},
 				now:         func() time.Time { return now },
+				logf:        t.Logf,
 			}
 			jitteryDuration = func(float64) time.Duration { return time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7) }
 			lowerBound := tc.notBefore.Add(time.Duration(float64(tc.notAfter.Sub(tc.notBefore)) * 0.7))
@@ -451,6 +452,7 @@ func TestCertSatisfiesTemplate(t *testing.T) {
 				cert:        tlsCert,
 				getTemplate: func() *x509.CertificateRequest { return tc.template },
 				now:         time.Now,
+				logf:        t.Logf,
 			}
 
 			result := m.certSatisfiesTemplate()
@@ -475,7 +477,8 @@ func TestRotateCertCreateCSRError(t *testing.T) {
 		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
 			return newClientset(fakeClient{failureType: createError}), nil
 		},
-		now: func() time.Time { return now },
+		now:  func() time.Time { return now },
+		logf: t.Logf,
 	}
 
 	if success, err := m.rotateCerts(); success {
@@ -499,7 +502,8 @@ func TestRotateCertWaitingForResultError(t *testing.T) {
 		clientsetFn: func(_ *tls.Certificate) (clientset.Interface, error) {
 			return newClientset(fakeClient{failureType: watchError}), nil
 		},
-		now: func() time.Time { return now },
+		now:  func() time.Time { return now },
+		logf: t.Logf,
 	}
 
 	defer func(t time.Duration) { certificateWaitTimeout = t }(certificateWaitTimeout)
@@ -1058,6 +1062,7 @@ func TestRotationLogsDuration(t *testing.T) {
 		},
 		certificateRotation: &h,
 		now:                 func() time.Time { return now },
+		logf:                t.Logf,
 	}
 	ok, err := m.rotateCerts()
 	if err != nil || !ok {
