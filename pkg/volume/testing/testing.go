@@ -959,7 +959,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 		// even if volume was previously attached to time out, we need to keep returning error
 		// so as reconciler can not confirm this volume as attached.
 		if nodeName == TimeoutAttachNode {
-			return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+			return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 		}
 		if volumeNodes.Has(string(nodeName)) || volumeNodes.Has(MultiAttachNode) || nodeName == MultiAttachNode {
 			volumeNodes.Insert(string(nodeName))
@@ -970,7 +970,7 @@ func (fv *FakeVolume) Attach(spec *Spec, nodeName types.NodeName) (string, error
 
 	fv.VolumesAttached[volumeName] = sets.NewString(string(nodeName))
 	if nodeName == UncertainAttachNode || nodeName == TimeoutAttachNode {
-		return "", fmt.Errorf("Timed out to attach volume %q to node %q", volumeName, nodeName)
+		return "", fmt.Errorf("timed out to attach volume %q to node %q", volumeName, nodeName)
 	}
 	return "/dev/vdb-test", nil
 }
@@ -1070,7 +1070,7 @@ func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
 	node := string(nodeName)
 	volumeNodes, exist := fv.VolumesAttached[volumeName]
 	if !exist || !volumeNodes.Has(node) {
-		return fmt.Errorf("Trying to detach volume %q that is not attached to the node %q", volumeName, node)
+		return fmt.Errorf("trying to detach volume %q that is not attached to the node %q", volumeName, node)
 	}
 
 	volumeNodes.Delete(node)

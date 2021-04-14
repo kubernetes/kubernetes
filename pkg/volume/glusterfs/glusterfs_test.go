@@ -743,7 +743,7 @@ func TestParseClassParameters(t *testing.T) {
 			if test.secret != nil {
 				return true, test.secret, nil
 			}
-			return true, nil, fmt.Errorf("Test %s did not set a secret", test.name)
+			return true, nil, fmt.Errorf("test %s did not set a secret", test.name)
 		})
 
 		cfg, err := parseClassParameters(test.parameters, client)

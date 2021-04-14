@@ -271,7 +271,7 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 
 func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
-		return fmt.Errorf("Expected success, got: %v", err)
+		return fmt.Errorf("expected success, got: %w", err)
 	}
 	// Stat the directory and check the permission bits
 	if !volumeutil.IsReady(metadataDir) {
@@ -285,7 +285,7 @@ func testSetUp(mounter volume.Mounter, metadataDir, volPath string) error {
 		return fmt.Errorf("SetUp() failed: %v", err)
 	}
 	if e, a := perm, fileinfo.Mode().Perm(); e != a {
-		return fmt.Errorf("Unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
+		return fmt.Errorf("unexpected file mode for %v: expected: %v, got: %v", volPath, e, a)
 	}
 	return nil
 }

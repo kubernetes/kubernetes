@@ -44,7 +44,7 @@ func prepareBlockMapperTest(plug *csiPlugin, specVolumeName string, t *testing.T
 		volume.VolumeOptions{},
 	)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("Failed to make a new Mapper: %v", err)
+		return nil, nil, nil, fmt.Errorf("failed to make a new Mapper: %w", err)
 	}
 	csiMapper := mapper.(*csiBlockMapper)
 	return csiMapper, spec, pv, nil

@@ -452,7 +452,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 	volumeDir := filepath.Dir(host.GetPodVolumeDir(podUID, utilstrings.EscapeQualifiedName(storageosPluginName), pvName))
 	files, err := ioutil.ReadDir(volumeDir)
 	if err != nil {
-		return "", "", fmt.Errorf("Could not read mounts from pod volume dir: %s", err)
+		return "", "", fmt.Errorf("could not read mounts from pod volume dir: %s", err)
 	}
 	for _, f := range files {
 		if f.Mode().IsDir() && strings.HasPrefix(f.Name(), pvName+".") {
@@ -461,7 +461,7 @@ func getVolumeInfo(pvName string, podUID types.UID, host volume.VolumeHost) (str
 			}
 		}
 	}
-	return "", "", fmt.Errorf("Could not get info from unmounted pv %q at %q", pvName, volumeDir)
+	return "", "", fmt.Errorf("could not get info from unmounted pv %q at %q", pvName, volumeDir)
 }
 
 // Splits the volume ref on "." to return the volNamespace and pvName.  Neither
