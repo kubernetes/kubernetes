@@ -51,7 +51,7 @@ func init() {
 func ReadLeaderMigrationConfiguration(configFilePath string) (*internal.LeaderMigrationConfiguration, error) {
 	data, err := ioutil.ReadFile(configFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %v", configFilePath, err)
+		return nil, fmt.Errorf("unable to read leader migration configuration from %q: %w", configFilePath, err)
 	}
 	config, gvk, err := serializer.NewCodecFactory(cfgScheme).UniversalDecoder().Decode(data, nil, nil)
 	if err != nil {
