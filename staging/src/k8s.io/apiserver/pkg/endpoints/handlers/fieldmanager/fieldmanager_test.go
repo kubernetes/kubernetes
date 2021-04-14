@@ -112,12 +112,17 @@ func NewTestFieldManager(gvk schema.GroupVersionKind, ignoreManagedFieldsFromReq
 	live := &unstructured.Unstructured{}
 	live.SetKind(gvk.Kind)
 	live.SetAPIVersion(gvk.GroupVersion().String())
-	f = NewStripMetaManager(f)
-	f = NewManagedFieldsUpdater(f)
-	f = NewBuildManagerInfoManager(f, gvk.GroupVersion())
-	f = NewProbabilisticSkipNonAppliedManager(f, &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability)
-	f = NewLastAppliedManager(f, typeConverter, objectConverter, gvk.GroupVersion())
-	f = NewLastAppliedUpdater(f)
+	f = NewLastAppliedUpdater(
+		NewLastAppliedManager(
+			NewProbabilisticSkipNonAppliedManager(
+				NewBuildManagerInfoManager(
+					NewManagedFieldsUpdater(
+						NewStripMetaManager(f),
+					), gvk.GroupVersion(),
+				), &fakeObjectCreater{gvk: gvk}, gvk, DefaultTrackOnCreateProbability,
+			), typeConverter, objectConverter, gvk.GroupVersion(),
+		),
+	)
 	if chainFieldManager != nil {
 		f = chainFieldManager(f)
 	}
