@@ -108,7 +108,7 @@ func TestTimeout(t *testing.T) {
 		}), func(w http.ResponseWriter, req *http.Request, err interface{}) {
 			gotPanic <- err
 			http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-		}, nil),
+		}),
 	))
 	defer ts.Close()
 
@@ -250,7 +250,7 @@ func TestErrConnKilled(t *testing.T) {
 		GrouplessAPIPrefixes: sets.NewString("api"),
 	}
 
-	ts := httptest.NewServer(WithPanicRecovery(handler, resolver, nil))
+	ts := httptest.NewServer(WithPanicRecovery(handler, resolver))
 	defer ts.Close()
 
 	_, err = http.Get(ts.URL)
@@ -263,7 +263,7 @@ func TestErrConnKilled(t *testing.T) {
 	if strings.Count(capturedOutput, "\n") != 1 {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 }
@@ -308,7 +308,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	}
 
 	// test server
-	ts := httptest.NewUnstartedServer(WithPanicRecovery(handler, resolver, nil))
+	ts := httptest.NewUnstartedServer(WithPanicRecovery(handler, resolver))
 	tsCert, err := tls.X509KeyPair(tsCrt, tsKey)
 	if err != nil {
 		t.Fatalf("backend: invalid x509/key pair: %v", err)
@@ -353,7 +353,7 @@ func TestErrConnKilledHTTP2(t *testing.T) {
 	if strings.Count(capturedOutput, "\n") != 1 {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
-	if !strings.Contains(capturedOutput, `timeout or abort while handling: GET "/"`) {
+	if !strings.Contains(capturedOutput, `timeout or abort while handling: method=GET URI="/" audit-ID=""`) {
 		t.Errorf("unexpected output captured actual = %v", capturedOutput)
 	}
 
