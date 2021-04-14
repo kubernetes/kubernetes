@@ -851,8 +851,9 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericapifilters.WithWarningRecorder(handler)
 	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithHSTS(handler, c.HSTSDirectives)
+	handler = genericfilters.WithHTTPLogging(handler, c.IsTerminating)
 	handler = genericapifilters.WithRequestReceivedTimestamp(handler)
-	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver, c.IsTerminating)
+	handler = genericfilters.WithPanicRecovery(handler, c.RequestInfoResolver)
 	return handler
 }
 
