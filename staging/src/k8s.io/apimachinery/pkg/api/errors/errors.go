@@ -274,7 +274,7 @@ func NewBadRequest(reason string) *StatusError {
 
 // NewTooManyRequests creates an error that indicates that the client must try again later because
 // the specified endpoint is not accepting requests. More specific details should be provided
-// if client should know why the failure was limited4.
+// if client should know why the failure was limited.
 func NewTooManyRequests(message string, retryAfterSeconds int) *StatusError {
 	return &StatusError{metav1.Status{
 		Status:  metav1.StatusFailure,
