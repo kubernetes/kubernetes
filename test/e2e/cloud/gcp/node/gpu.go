@@ -32,6 +32,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 	f := framework.NewDefaultFramework("gpu-upgrade")
+	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should NOT disrupt gpu pod [Feature:GPUMasterUpgrade]", func() {
@@ -43,7 +44,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
@@ -56,7 +57,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuUpgradeTest)
 
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, gpuUpgradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
@@ -69,7 +70,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 			testSuite.TestCases = append(testSuite.TestCases, gpuDowngradeTest)
 
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, gpuDowngradeTest, nil, nil)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
