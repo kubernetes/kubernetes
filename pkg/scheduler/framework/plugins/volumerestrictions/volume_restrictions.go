@@ -29,6 +29,7 @@ import (
 type VolumeRestrictions struct{}
 
 var _ framework.FilterPlugin = &VolumeRestrictions{}
+var _ framework.EnqueueExtensions = &VolumeRestrictions{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "VolumeRestrictions"
@@ -128,6 +129,19 @@ func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleStat
 		}
 	}
 	return nil
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *VolumeRestrictions) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		// Pods may fail to schedule because of volumes conflicting with other pods on same node.
+		// Once running pods are deleted and volumes have been released, the unschedulable pod will be schedulable.
+		// Due to immutable fields `spec.volumes`, pod update events are ignored.
+		{Resource: framework.Pod, ActionType: framework.Delete},
+		// A new Node may make a pod schedulable.
+		{Resource: framework.Node, ActionType: framework.Add},
+	}
 }
 
 // New initializes a new plugin and returns it.
