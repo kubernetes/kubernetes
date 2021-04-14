@@ -398,7 +398,7 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 	var lastErr error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
 		if lastErr = nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); lastErr != nil {
-			klog.V(2).Infof("Failed to publish CSINode: %v", lastErr)
+			klog.V(2).InfoS("Failed to publish CSINode", "err", lastErr)
 			return false, nil
 		}
 		return true, nil
@@ -557,13 +557,13 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 
 	if maxAttachLimit > 0 {
 		if maxAttachLimit > math.MaxInt32 {
-			klog.Warningf("Exceeded max supported attach limit value, truncating it to %d", math.MaxInt32)
+			klog.InfoS("Exceeded max supported attach limit value, truncating it to MaxInt32", "MaxInt32", math.MaxInt32)
 			maxAttachLimit = math.MaxInt32
 		}
 		m := int32(maxAttachLimit)
 		driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &m}
 	} else {
-		klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
+		klog.ErrorS(nil, "Invalid attach limit value cannot be added to CSINode object for driver", "maxAttachLimit", maxAttachLimit, "driverName", driverName)
 	}
 
 	newDriverSpecs = append(newDriverSpecs, driverSpec)

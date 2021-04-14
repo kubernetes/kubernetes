@@ -165,7 +165,7 @@ func (c *csiDriverClient) NodeGetInfo(ctx context.Context) (
 	var getNodeInfoError error
 	nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError = c.nodeGetInfoV1(ctx)
 	if getNodeInfoError != nil {
-		klog.Warningf("Error calling CSI NodeGetInfo(): %v", getNodeInfoError.Error())
+		klog.InfoS("Error calling CSI NodeGetInfo()", "err", getNodeInfoError.Error())
 	}
 	return nodeID, maxVolumePerNode, accessibleTopology, getNodeInfoError
 }
@@ -654,7 +654,7 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 			metrics.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
 			metrics.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
 		default:
-			klog.Errorf("unknown key %s in usage", unit.String())
+			klog.ErrorS(nil, "Unknown key in usage", "key", unit.String())
 		}
 
 	}

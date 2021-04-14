@@ -53,7 +53,7 @@ func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, kubeC
 // same as above func comments, except 'recyclerClient' is a narrower pod API
 // interface to ease testing
 func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, recyclerClient recyclerClient) error {
-	klog.V(5).Infof("creating recycler pod for volume %s\n", pod.Name)
+	klog.V(5).InfoS("Creating recycler pod for volume", "podName", pod.Name)
 
 	// Generate unique name for the recycler pod - we need to get "already
 	// exists" error when a previous controller has already started recycling
@@ -65,7 +65,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	defer close(stopChannel)
 	podCh, err := recyclerClient.WatchPod(pod.Name, pod.Namespace, stopChannel)
 	if err != nil {
-		klog.V(4).Infof("cannot start watcher for pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.V(4).InfoS("Cannot start watcher for pod", "pod", klog.KObj(pod), "err", err)
 		return err
 	}
 
@@ -86,10 +86,10 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	err = waitForPod(pod, recyclerClient, podCh)
 
 	// In all cases delete the recycler pod and log its result.
-	klog.V(2).Infof("deleting recycler pod %s/%s", pod.Namespace, pod.Name)
+	klog.V(2).InfoS("Deleting recycler pod", "pod", klog.KObj(pod))
 	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
 	if deleteErr != nil {
-		klog.Errorf("failed to delete recycler pod %s/%s: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "Failed to delete recycler pod", "pod", klog.KObj(pod))
 	}
 
 	// Returning recycler error is preferred, the pod will be deleted again on
@@ -119,7 +119,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 		case *v1.Pod:
 			// POD changed
 			pod := event.Object.(*v1.Pod)
-			klog.V(4).Infof("recycler pod update received: %s %s/%s %s", event.Type, pod.Namespace, pod.Name, pod.Status.Phase)
+			klog.V(4).InfoS("Recycler pod update received", "eventType", event.Type, "pod", klog.KObj(pod), "podStatusPhase", pod.Status.Phase)
 			switch event.Type {
 			case watch.Added, watch.Modified:
 				if pod.Status.Phase == v1.PodSucceeded {
@@ -143,7 +143,7 @@ func waitForPod(pod *v1.Pod, recyclerClient recyclerClient, podCh <-chan watch.E
 		case *v1.Event:
 			// Event received
 			podEvent := event.Object.(*v1.Event)
-			klog.V(4).Infof("recycler event received: %s %s/%s %s/%s %s", event.Type, podEvent.Namespace, podEvent.Name, podEvent.InvolvedObject.Namespace, podEvent.InvolvedObject.Name, podEvent.Message)
+			klog.V(4).InfoS("Recycler pod event received", "eventType", event.Type, "namespace", podEvent.Namespace, "name", podEvent.Name, "involvedObjectNamespace", podEvent.InvolvedObject.Namespace, "involvedObjectName", podEvent.InvolvedObject.Name, "message", podEvent.Message)
 			if event.Type == watch.Added {
 				recyclerClient.Event(podEvent.Type, podEvent.Message)
 			}
