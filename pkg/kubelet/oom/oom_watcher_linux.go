@@ -88,7 +88,7 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference, getPodByUID GetPodByUIDFun
 			}
 
 			parsedContainer := containerRegexp.FindStringSubmatch(event.VictimContainerName)
-			if parsedContainer != nil && event.ContainerName != legacyRecordEventContainerName {
+			if parsedContainer != nil && len(parsedContainer) == 2 && event.ContainerName != legacyRecordEventContainerName {
 				klog.V(1).InfoS("Got cgroup oom event", "event", event)
 				if pod, ok := getPodByUID(types.UID(parsedContainer[1])); ok {
 					ow.recorder.Eventf(pod, v1.EventTypeWarning, cGroupOOMEvent, eventMsg)
