@@ -17,17 +17,21 @@ limitations under the License.
 package authorizer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	"k8s.io/apiserver/pkg/authorization/union"
 	"k8s.io/apiserver/plugin/pkg/authorizer/webhook"
 	versionedinformers "k8s.io/client-go/informers"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/nodeidentifier"
 	"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
@@ -91,7 +95,15 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.VersionedInformerFactory.Core().V1().PersistentVolumes(),
 				config.VersionedInformerFactory.Storage().V1().VolumeAttachments(),
 			)
-			nodeAuthorizer := node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules())
+			nodeAuthorizer := withNotSyncedReason{
+				node.NewAuthorizer(graph, nodeidentifier.NewDefaultNodeIdentifier(), bootstrappolicy.NodeRules()),
+				[]cache.SharedInformer{
+					config.VersionedInformerFactory.Core().V1().Nodes().Informer(),
+					config.VersionedInformerFactory.Core().V1().Pods().Informer(),
+					config.VersionedInformerFactory.Core().V1().PersistentVolumes().Informer(),
+					config.VersionedInformerFactory.Storage().V1().VolumeAttachments().Informer(),
+				},
+			}
 			authorizers = append(authorizers, nodeAuthorizer)
 			ruleResolvers = append(ruleResolvers, nodeAuthorizer)
 
@@ -126,12 +138,17 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 			authorizers = append(authorizers, webhookAuthorizer)
 			ruleResolvers = append(ruleResolvers, webhookAuthorizer)
 		case modes.ModeRBAC:
-			rbacAuthorizer := rbac.New(
+			rbacAuthorizer := withNotSyncedReason{rbac.New(
 				&rbac.RoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().Roles().Lister()},
 				&rbac.RoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().RoleBindings().Lister()},
 				&rbac.ClusterRoleGetter{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Lister()},
 				&rbac.ClusterRoleBindingLister{Lister: config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Lister()},
-			)
+			), []cache.SharedInformer{
+				config.VersionedInformerFactory.Rbac().V1().Roles().Informer(),
+				config.VersionedInformerFactory.Rbac().V1().RoleBindings().Informer(),
+				config.VersionedInformerFactory.Rbac().V1().ClusterRoles().Informer(),
+				config.VersionedInformerFactory.Rbac().V1().ClusterRoleBindings().Informer(),
+			}}
 			authorizers = append(authorizers, rbacAuthorizer)
 			ruleResolvers = append(ruleResolvers, rbacAuthorizer)
 		default:
@@ -140,4 +157,38 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 	}
 
 	return union.New(authorizers...), union.NewRuleResolvers(ruleResolvers...), nil
+}
+
+type ruleResolvedAUthorizer interface {
+	Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+	RulesFor(user user.Info, namespace string) ([]authorizer.ResourceRuleInfo, []authorizer.NonResourceRuleInfo, bool, error)
+}
+
+type withNotSyncedReason struct {
+	ruleResolvedAUthorizer
+	informers []cache.SharedInformer
+}
+
+func (az withNotSyncedReason) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+	d, reason, err := az.ruleResolvedAUthorizer.Authorize(ctx, a)
+	if err != nil {
+		return d, reason, err
+	}
+
+	if d == authorizer.DecisionNoOpinion && len(reason) == 0 && !az.hasSynced() {
+		reason = "informers not synced"
+		klog.Warningf("authorize before synced informers by %s for %s at %s", a.GetUser().GetName(), a.GetVerb(), a.GetPath())
+	}
+
+	return d, reason, err
+}
+
+func (az withNotSyncedReason) hasSynced() bool {
+	for _, i := range az.informers {
+		if !i.HasSynced() {
+			return false
+		}
+	}
+
+	return true
 }
