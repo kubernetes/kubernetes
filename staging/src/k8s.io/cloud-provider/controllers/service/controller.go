@@ -150,8 +150,9 @@ func New(
 					s.enqueueService(cur)
 				}
 			},
-			// No need to handle deletion event because the deletion would be handled by
-			// the update path when the deletion timestamp is added.
+			// When the finalizers are cleared for some reason, and then the service is deleted,
+			// the corresponding LB resources should also be cleared
+			DeleteFunc: s.enqueueService,
 		},
 		serviceSyncPeriod,
 	)
