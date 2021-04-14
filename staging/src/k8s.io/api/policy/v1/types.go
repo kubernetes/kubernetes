@@ -21,6 +21,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+// DisruptionBudgetCause is the status cause returned for eviction failures caused by PodDisruptionBudget violations.
+const DisruptionBudgetCause metav1.CauseType = "DisruptionBudget"
+
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" pods selected by

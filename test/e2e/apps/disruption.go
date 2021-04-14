@@ -23,7 +23,6 @@ import (
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -293,7 +292,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 
 			if c.shouldDeny {
 				err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
-				gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+				framework.ExpectError(err, "pod eviction should fail")
+				framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 			} else {
 				// Only wait for running pods in the "allow" case
 				// because one of shouldDeny cases relies on the
@@ -331,7 +331,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 			},
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Updating the pdb to allow a pod to be evicted")
 		updatePDBOrDie(cs, ns, defaultName, func(pdb *policyv1.PodDisruptionBudget) *policyv1.PodDisruptionBudget {
@@ -368,7 +369,8 @@ var _ = SIGDescribe("DisruptionController", func() {
 			},
 		}
 		err = cs.CoreV1().Pods(ns).EvictV1(context.TODO(), e)
-		gomega.Expect(err).Should(gomega.MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+		framework.ExpectError(err, "pod eviction should fail")
+		framework.ExpectEqual(apierrors.HasStatusCause(err, policyv1.DisruptionBudgetCause), true, "pod eviction should fail with DisruptionBudget cause")
 
 		ginkgo.By("Deleting the pdb to allow a pod to be evicted")
 		deletePDBOrDie(cs, ns, defaultName)
