@@ -33,12 +33,6 @@ DEFAULT_CRICTL_HASH='e4fb9822cb5f71ab8f85021c66170613aae972f4b32030e42868fb36a3b
 DEFAULT_MOUNTER_TAR_SHA='7956fd42523de6b3107ddc3ce0e75233d2fcb78436ff07a1389b6eaac91fb2b1b72a08f7a219eaf96ba1ca4da8d45271002e0d60e0644e796c665f99bb356516'
 ###
 
-# Use --retry-connrefused opt only if it's supported by curl.
-CURL_RETRY_CONNREFUSED=""
-if curl --help | grep -q -- '--retry-connrefused'; then
-  CURL_RETRY_CONNREFUSED='--retry-connrefused'
-fi
-
 function set-broken-motd {
   cat > /etc/motd <<EOF
 Broken (or in progress) Kubernetes node setup! Check the cluster initialization status
@@ -54,11 +48,43 @@ Node instance:
 EOF
 }
 
+# A function that fetches a GCE metadata value and echoes it out.
+# Args:
+#   $1 : URL path after /computeMetadata/v1/ (without heading slash).
+#   $2 : An optional default value to echo out if the fetch fails.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function get-metadata-value {
+  local default="${2:-}"
+
+  local status
+  # We do not want quotes for CURL_RETRY_CONNREFUSED
+  # shellcheck disable=SC2086
+  curl \
+      --retry 5 \
+      --retry-delay 3 \
+      ${CURL_RETRY_CONNREFUSED} \
+      --fail \
+      --silent \
+      -H 'Metadata-Flavor: Google' \
+      "http://metadata/computeMetadata/v1/${1}" \
+  || status="$?"
+  status="${status:-0}"
+
+  if [[ "${status}" -eq 0 || -z "${default}" ]]; then
+    return "${status}"
+  else
+    echo "${default}"
+  fi
+}
+
 function download-kube-env {
   # Fetch kube-env from GCE metadata server.
   (
     umask 077
     local -r tmp_kube_env="/tmp/kube-env.yaml"
+    # shellcheck disable=SC2086
     curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_env}" \
@@ -85,6 +111,7 @@ function download-kubelet-config {
   (
     umask 077
     local -r tmp_kubelet_config="/tmp/kubelet-config.yaml"
+    # shellcheck disable=SC2086
     if curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
         -H "X-Google-Metadata-Request: True" \
         -o "${tmp_kubelet_config}" \
@@ -103,6 +130,7 @@ function download-kube-master-certs {
   (
     umask 077
     local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
+    # shellcheck disable=SC2086
     curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_master_certs}" \
@@ -137,11 +165,13 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
+  # shellcheck disable=SC2086
   curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | ${PYTHON} -c \
     'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
 function valid-storage-scope {
+  # shellcheck disable=SC2086
   curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
@@ -162,6 +192,7 @@ function download-or-bust {
       if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
         curl_headers="Authorization: Bearer $(get-credentials)"
       fi
+      # shellcheck disable=SC2086
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
@@ -666,17 +697,188 @@ function detect_host_info() {
   esac
 }
 
+# Retries a command forever with a delay between retries.
+# Args:
+#  $1    : delay between retries, in seconds.
+#  $2... : the command to run.
+function retry-forever {
+  local -r delay="$1"
+  shift 1
+
+  until "$@"; do
+    echo "== $* failed, retrying after ${delay}s"
+    sleep "${delay}"
+  done
+}
+
+# Initializes variables used by the log-* functions.
+#
+# get-metadata-value must be defined before calling this function.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-init {
+  # CURL_RETRY_CONNREFUSED needs to be defined before calling get-metadata-value.
+  # Use --retry-connrefused opt only if it's supported by curl.
+  CURL_RETRY_CONNREFUSED=""
+  if curl --help | grep -q -- '--retry-connrefused'; then
+    CURL_RETRY_CONNREFUSED='--retry-connrefused'
+  fi
+
+  # Used by log-* functions.
+  LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
+  LOG_INSTANCE_NAME=$(hostname)
+  LOG_BOOT_ID=$(journalctl --list-boots | grep -E '^ *0' | awk '{print $2}')
+  declare -Ag LOG_START_TIMES
+  declare -ag LOG_TRAP_STACK
+
+  LOG_STATUS_STARTED='STARTED'
+  LOG_STATUS_COMPLETED='COMPLETED'
+  LOG_STATUS_ERROR='ERROR'
+}
+
+# Sets an EXIT trap.
+# Args:
+#   $1:... : the trap command.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-trap-push {
+  local t="${*:1}"
+  LOG_TRAP_STACK+=("${t}")
+  # shellcheck disable=2064
+  trap "${t}" EXIT
+}
+
+# Removes and restores an EXIT trap.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-trap-pop {
+  # Remove current trap.
+  unset 'LOG_TRAP_STACK[-1]'
+
+  # Restore previous trap.
+  if [ ${#LOG_TRAP_STACK[@]} -ne 0 ]; then
+    local t="${LOG_TRAP_STACK[-1]}"
+    # shellcheck disable=2064
+    trap "${t}" EXIT
+  else
+    # If no traps in stack, clear.
+    trap EXIT
+  fi
+}
+
+# Logs the end of a bootstrap step that errored.
+# Args:
+#  $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-error {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_ERROR}" "error calling '${BASH_COMMAND}'"
+}
+
+# Wraps a command with bootstrap logging.
+# Args:
+#   $1    : bootstrap step name.
+#   $2... : the command to run.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-wrap {
+  local bootstep="$1"
+  local command="${*:2}"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+  $command
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Logs a bootstrap step start. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-start {
+  local bootstep="$1"
+
+  log-trap-push "log-error ${bootstep}"
+  log-proto "${bootstep}" "${LOG_STATUS_STARTED}"
+}
+
+# Logs a bootstrap step end. Prefer log-wrap.
+# Args:
+#   $1 : bootstrap step name.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-end {
+  local bootstep="$1"
+
+  log-proto "${bootstep}" "${LOG_STATUS_COMPLETED}"
+  log-trap-pop
+}
+
+# Writes a log proto to stdout.
+# Args:
+#   $1: bootstrap step name.
+#   $2: status. Either 'STARTED', 'COMPLETED', or 'ERROR'.
+#   $3: optional status reason.
+#
+# NOTE: this function is duplicated in configure-helper.sh, any changes here
+# should be duplicated there as well.
+function log-proto {
+  local bootstep="$1"
+  local status="$2"
+  local status_reason="${3:-}"
+
+  # Get current time.
+  local current_time
+  current_time="$(date --utc '+%s.%N')"
+  # ...formatted as UTC RFC 3339.
+  local timestamp
+  timestamp="$(date --utc --date="@${current_time}" '+%FT%T.%NZ')"
+
+  # Calculate latency.
+  local latency='null'
+  if [ "${status}" == "${LOG_STATUS_STARTED}" ]; then
+    LOG_START_TIMES["${bootstep}"]="${current_time}"
+  else
+    local start_time="${LOG_START_TIMES["${bootstep}"]}"
+    unset 'LOG_START_TIMES['"${bootstep}"']'
+
+    # Bash cannot do non-integer math, shell out to awk.
+    latency="$(echo "${current_time} ${start_time}" | awk '{print $1 - $2}')s"
+
+    # The default latency is null which cannot be wrapped as a string so we must
+    # do it here instead of the printf.
+    latency="\"${latency}\""
+  fi
+
+  printf '[cloud.kubernetes.monitoring.proto.SerialportLog] {"cluster_hash":"%s","vm_instance_name":"%s","boot_id":"%s","timestamp":"%s","bootstrap_status":{"step_name":"%s","status":"%s","status_reason":"%s","latency":%s}}\n' \
+  "${LOG_CLUSTER_ID}" "${LOG_INSTANCE_NAME}" "${LOG_BOOT_ID}" "${timestamp}" "${bootstep}" "${status}" "${status_reason}" "${latency}"
+}
+
 ######### Main Function ##########
+log-init
+log-start 'ConfigureMain'
 echo "Start to install kubernetes files"
-detect_host_info
+log-wrap 'DetectHostInfo' detect_host_info
 
 # if install fails, message-of-the-day (motd) will warn at login shell
-set-broken-motd
+log-wrap 'SetBrokenMotd' set-broken-motd
 
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
 PYTHON="python"
 
+log-start 'SetPythonVersion'
 if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
   # found python2, just use that
   PYTHON="python"
@@ -692,22 +894,24 @@ else
   fi
 fi
 echo "Version :  $(${PYTHON} -V 2>&1)"
+log-end 'SetPythonVersion'
 
 # download and source kube-env
-download-kube-env
-source "${KUBE_HOME}/kube-env"
+log-wrap 'DownloadKubeEnv' retry-forever 30 download-kube-env
+log-wrap 'SourceKubeEnv' source "${KUBE_HOME}/kube-env"
 
-download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
+log-wrap 'DownloadKubeletConfig' retry-forever 10 download-kubelet-config "${KUBE_HOME}/kubelet-config.yaml"
 
 # master certs
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
-  download-kube-master-certs
+  log-wrap 'DownloadKubeMasterCerts' retry-forever 10 download-kube-master-certs
 fi
 
 # ensure chosen container runtime is present
-ensure-container-runtime
+log-wrap 'EnsureContainerRuntime' ensure-container-runtime
 
 # binaries and kube-system manifests
-install-kube-binary-config
+log-wrap 'InstallKubeBinaryConfig' install-kube-binary-config
 
 echo "Done for installing kubernetes files"
+log-end 'ConfigureMain'
