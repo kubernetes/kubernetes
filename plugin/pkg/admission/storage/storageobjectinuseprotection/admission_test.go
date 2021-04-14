@@ -50,11 +50,25 @@ func TestAdmit(t *testing.T) {
 			Name: "pv",
 		},
 	}
+
+	secret := &api.Secret{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "secret",
+			Namespace: "ns",
+		},
+	}
+
 	claimWithFinalizer := claim.DeepCopy()
 	claimWithFinalizer.Finalizers = []string{volumeutil.PVCProtectionFinalizer}
 
 	pvWithFinalizer := pv.DeepCopy()
 	pvWithFinalizer.Finalizers = []string{volumeutil.PVProtectionFinalizer}
+
+	secretWithFinalizer := secret.DeepCopy()
+	secretWithFinalizer.Finalizers = []string{volumeutil.SecretProtectionFinalizer}
 
 	tests := []struct {
 		name           string
@@ -111,6 +125,30 @@ func TestAdmit(t *testing.T) {
 			pv,
 			false,
 			pv.Namespace,
+		},
+		{
+			"create -> add finalizer",
+			api.SchemeGroupVersion.WithResource("secrets"),
+			secret,
+			secretWithFinalizer,
+			true,
+			secret.Namespace,
+		},
+		{
+			"finalizer already exists -> no new finalizer",
+			api.SchemeGroupVersion.WithResource("secrets"),
+			secretWithFinalizer,
+			secretWithFinalizer,
+			true,
+			secretWithFinalizer.Namespace,
+		},
+		{
+			"disabled feature -> no finalizer",
+			api.SchemeGroupVersion.WithResource("secrets"),
+			secret,
+			secret,
+			false,
+			secret.Namespace,
 		},
 	}
 

@@ -60,8 +60,9 @@ func newPlugin() *storageProtectionPlugin {
 }
 
 var (
-	pvResource  = api.Resource("persistentvolumes")
-	pvcResource = api.Resource("persistentvolumeclaims")
+	pvResource     = api.Resource("persistentvolumes")
+	pvcResource    = api.Resource("persistentvolumeclaims")
+	secretResource = api.Resource("secrets")
 )
 
 // Admit sets finalizer on all PVCs(PVs). The finalizer is removed by
@@ -79,6 +80,8 @@ func (c *storageProtectionPlugin) Admit(ctx context.Context, a admission.Attribu
 		return c.admitPV(a)
 	case pvcResource:
 		return c.admitPVC(a)
+	case secretResource:
+		return c.admitSecret(a)
 
 	default:
 		return nil
@@ -127,6 +130,29 @@ func (c *storageProtectionPlugin) admitPVC(a admission.Attributes) error {
 
 	klog.V(4).Infof("adding PVC protection finalizer to %s/%s", pvc.Namespace, pvc.Name)
 	pvc.Finalizers = append(pvc.Finalizers, volumeutil.PVCProtectionFinalizer)
+	return nil
+}
+
+func (c *storageProtectionPlugin) admitSecret(a admission.Attributes) error {
+	if len(a.GetSubresource()) != 0 {
+		return nil
+	}
+
+	secret, ok := a.GetObject().(*api.Secret)
+	// if we can't convert the obj to Secret, just return
+	if !ok {
+		return nil
+	}
+
+	for _, f := range secret.Finalizers {
+		if f == volumeutil.SecretProtectionFinalizer {
+			// Finalizer is already present, nothing to do
+			return nil
+		}
+	}
+
+	klog.V(4).Infof("adding Secret protection finalizer to %s/%s", secret.Namespace, secret.Name)
+	secret.Finalizers = append(secret.Finalizers, volumeutil.SecretProtectionFinalizer)
 	return nil
 }
 

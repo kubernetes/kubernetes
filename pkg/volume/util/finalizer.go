@@ -22,4 +22,7 @@ const (
 
 	// PVProtectionFinalizer is the name of finalizer on PVs that are bound by PVCs
 	PVProtectionFinalizer = "kubernetes.io/pv-protection"
+
+	// SecretProtectionFinalizer is the name of finalizer on secrets that are consumed by the other resources
+	SecretProtectionFinalizer = "kubernetes.io/secret-protection"
 )
