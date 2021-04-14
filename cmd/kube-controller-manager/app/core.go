@@ -64,6 +64,7 @@ import (
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/controller/volume/pvcprotection"
 	"k8s.io/kubernetes/pkg/controller/volume/pvprotection"
+	"k8s.io/kubernetes/pkg/controller/volume/secretprotection"
 	"k8s.io/kubernetes/pkg/features"
 	quotainstall "k8s.io/kubernetes/pkg/quota/v1/install"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
@@ -590,6 +591,17 @@ func startPVProtectionController(ctx ControllerContext) (http.Handler, bool, err
 	go pvprotection.NewPVProtectionController(
 		ctx.InformerFactory.Core().V1().PersistentVolumes(),
 		ctx.ClientBuilder.ClientOrDie("pv-protection-controller"),
+		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
+	).Run(1, ctx.Stop)
+	return nil, true, nil
+}
+
+func startSecretProtectionController(ctx ControllerContext) (http.Handler, bool, error) {
+	go secretprotection.NewSecretProtectionController(
+		ctx.InformerFactory.Core().V1().Secrets(),
+		ctx.InformerFactory.Core().V1().Pods(),
+		ctx.InformerFactory.Core().V1().PersistentVolumes(),
+		ctx.ClientBuilder.ClientOrDie("secret-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	).Run(1, ctx.Stop)
 	return nil, true, nil
