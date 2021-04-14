@@ -39,6 +39,8 @@ type WatchEvent struct {
 	Object runtime.RawExtension `json:"object" protobuf:"bytes,2,opt,name=object"`
 }
 
+func (e *WatchEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+
 func Convert_watch_Event_To_v1_WatchEvent(in *watch.Event, out *WatchEvent, s conversion.Scope) error {
 	out.Type = string(in.Type)
 	switch t := in.Object.(type) {
@@ -79,7 +81,7 @@ func Convert_v1_WatchEvent_To_v1_InternalEvent(in *WatchEvent, out *InternalEven
 type InternalEvent watch.Event
 
 func (e *InternalEvent) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (e *WatchEvent) GetObjectKind() schema.ObjectKind    { return schema.EmptyObjectKind }
+
 func (e *InternalEvent) DeepCopyObject() runtime.Object {
 	if c := e.DeepCopy(); c != nil {
 		return c

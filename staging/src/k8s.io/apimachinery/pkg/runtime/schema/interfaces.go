@@ -28,7 +28,8 @@ type ObjectKind interface {
 	GroupVersionKind() GroupVersionKind
 }
 
-// EmptyObjectKind implements the ObjectKind interface as a noop
+// EmptyObjectKind implements the ObjectKind interface as a noop. These types cannot be
+// directly converted but may be used in the serialization logic.
 var EmptyObjectKind = emptyObjectKind{}
 
 type emptyObjectKind struct{}
@@ -38,3 +39,7 @@ func (emptyObjectKind) SetGroupVersionKind(gvk GroupVersionKind) {}
 
 // GroupVersionKind implements the ObjectKind interface
 func (emptyObjectKind) GroupVersionKind() GroupVersionKind { return GroupVersionKind{} }
+
+// ObjectDoesNotSupportMutationOfGVK marks this object as not being fully capable of
+// GVK behavior, which is expected for objects without an object kind.
+func (emptyObjectKind) ObjectDoesNotSupportMutationOfGVK() {}

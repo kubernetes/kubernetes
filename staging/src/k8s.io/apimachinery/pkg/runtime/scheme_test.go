@@ -868,8 +868,8 @@ func TestConvertToVersion(t *testing.T) {
 				if !reflect.DeepEqual(unsafe, test.out) {
 					t.Fatalf("unexpected unsafe: %s", diff.ObjectReflectDiff(unsafe, test.out))
 				}
-				if unsafe != test.in {
-					t.Fatalf("UnsafeConvertToVersion should return same object: %#v", unsafe)
+				if unsafe == test.in {
+					t.Fatalf("UnsafeConvertToVersion should not return the same object since it may mutate GVK: %#v", unsafe)
 				}
 				return
 			}

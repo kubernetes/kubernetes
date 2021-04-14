@@ -171,6 +171,69 @@ func (s *Scheme) AddKnownTypes(gv schema.GroupVersion, types ...Object) {
 	}
 }
 
+// typeBypassesGVKRules is a marker interface that allows test types to violate
+// Scheme registration rules for types. This should be used sparingly and is for
+// special cases within the framework. Types that invoke Scheme methods related
+// to conversion will end up without a GVK set, which is acceptable in specific
+// scenarios (metav1.WatchEvent). Using this type should involve stronger review.
+type typeBypassesGVKRules interface {
+	// ObjectDoesNotSupportMutationOfGVK marks a type as not following normal rules
+	// for mutation.
+	ObjectDoesNotSupportMutationOfGVK()
+}
+
+// verifyRequiredTypeRules enforces invariants expected of types that go into
+// a scheme. This includes rules for conversion and serialization where the
+// ObjectKind interface is expected to behave a certain way.
+func verifyRequiredTypeRules(t reflect.Type) error {
+	p := reflect.New(t)
+	obj := p.Interface().(Object)
+
+	// objects explicitly declare they don't follow the rules for mutating GVK
+	_, explicitGVKRuleException := obj.GetObjectKind().(typeBypassesGVKRules)
+	// unstructured objects are always copied during conversion
+	_, isUnstructured := obj.(Unstructured)
+
+	// Expect: a new object has an empty gvk
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if !gvk.Empty() {
+		if !explicitGVKRuleException {
+			return fmt.Errorf("pointer to %s must return an empty GroupVersionKind via GetObjectKind() when newly created", t)
+		}
+	}
+
+	// Expect: setting a gvk is returned by the next call
+	expect := schema.GroupVersionKind{Group: "a", Version: "b", Kind: "c"}
+	obj.GetObjectKind().SetGroupVersionKind(expect)
+	gvk = obj.GetObjectKind().GroupVersionKind()
+	if gvk != expect {
+		if !explicitGVKRuleException {
+			return fmt.Errorf("pointer to %s must return the group version kind passed to SetGroupVersionKind on the next invocation", t)
+		}
+	}
+
+	// Expect: clearing a gvk is supported
+	obj.GetObjectKind().SetGroupVersionKind(schema.GroupVersionKind{})
+	if !obj.GetObjectKind().GroupVersionKind().Empty() {
+		if !explicitGVKRuleException {
+			return fmt.Errorf("pointer to %s must allow SetGroupVersionKind to clear the set value back to empty", t)
+		}
+	}
+
+	// Expect: a shallow copy of the struct is sufficient to copy the object safely for serialization conversion
+	// (setting the GVK when we output the object using ConvertToVersion)
+	shallowCopied := shallowCopyObjectForTargetKind(obj)
+	original := shallowCopied.GetObjectKind().GroupVersionKind()
+	obj.GetObjectKind().SetGroupVersionKind(expect)
+	if shallowCopied.GetObjectKind().GroupVersionKind() != original {
+		if !isUnstructured {
+			return fmt.Errorf("pointer to %s must ensure GroupVersionKind is not aliased if the object is shallow copied", t)
+		}
+	}
+
+	return nil
+}
+
 // AddKnownTypeWithName is like AddKnownTypes, but it lets you specify what this type should
 // be encoded as. Useful for testing when you don't want to make multiple packages to define
 // your structs. Version may not be empty - use the APIVersionInternal constant if you have a
@@ -187,6 +250,10 @@ func (s *Scheme) AddKnownTypeWithName(gvk schema.GroupVersionKind, obj Object) {
 	t = t.Elem()
 	if t.Kind() != reflect.Struct {
 		panic("All types must be pointers to structs.")
+	}
+
+	if err := verifyRequiredTypeRules(t); err != nil {
+		panic(fmt.Sprintf("invalid type added to scheme: %v", err))
 	}
 
 	if oldT, found := s.gvkToType[gvk]; found && oldT != t {
@@ -468,14 +535,19 @@ func (s *Scheme) UnsafeConvertToVersion(in Object, target GroupVersioner) (Objec
 }
 
 // convertToVersion handles conversion with an optional copy.
-func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (Object, error) {
-	var t reflect.Type
+func (s *Scheme) convertToVersion(needsDeepCopy bool, in Object, target GroupVersioner) (Object, error) {
+	var isNewObject bool
 
+	var t reflect.Type
 	if u, ok := in.(Unstructured); ok {
 		typed, err := s.unstructuredToTyped(u)
 		if err != nil {
 			return nil, err
 		}
+
+		// we are creating a new object and thus do not need to deep copy later
+		isNewObject = true
+		needsDeepCopy = false
 
 		in = typed
 		// unstructuredToTyped returns an Object, which must be a pointer to a struct.
@@ -504,9 +576,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		// TODO: when we move to server API versions, we should completely remove the unversioned concept
 		if unversionedKind, ok := s.unversionedTypes[t]; ok {
 			if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-				return copyAndSetTargetKind(copy, in, gvk)
+				return setTargetKindOnNewObject(in, gvk, needsDeepCopy, isNewObject)
 			}
-			return copyAndSetTargetKind(copy, in, unversionedKind)
+			return setTargetKindOnNewObject(in, unversionedKind, needsDeepCopy, isNewObject)
 		}
 		return nil, NewNotRegisteredErrForTarget(s.schemeName, t, target)
 	}
@@ -514,16 +586,16 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 	// target wants to use the existing type, set kind and return (no conversion necessary)
 	for _, kind := range kinds {
 		if gvk == kind {
-			return copyAndSetTargetKind(copy, in, gvk)
+			return setTargetKindOnNewObject(in, gvk, needsDeepCopy, isNewObject)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
 		if gvk, ok := target.KindForGroupVersionKinds([]schema.GroupVersionKind{unversionedKind}); ok {
-			return copyAndSetTargetKind(copy, in, gvk)
+			return setTargetKindOnNewObject(in, gvk, needsDeepCopy, isNewObject)
 		}
-		return copyAndSetTargetKind(copy, in, unversionedKind)
+		return setTargetKindOnNewObject(in, unversionedKind, needsDeepCopy, isNewObject)
 	}
 
 	out, err := s.New(gvk)
@@ -531,7 +603,9 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, err
 	}
 
-	if copy {
+	// since underlying conversion is allowed to reuse objects, we must deep copy if we haven't
+	// created a totally new object and the caller wants to ensure old and new have no link
+	if needsDeepCopy && !isNewObject {
 		in = in.DeepCopyObject()
 	}
 
@@ -569,10 +643,34 @@ func (s *Scheme) generateConvertMeta(in interface{}) *conversion.Meta {
 	return s.converter.DefaultMeta(reflect.TypeOf(in))
 }
 
-// copyAndSetTargetKind performs a conditional copy before returning the object, or an error if copy was not successful.
-func copyAndSetTargetKind(copy bool, obj Object, kind schema.GroupVersionKind) (Object, error) {
-	if copy {
+// shallowCopyObjectForTargetKind ensures obj is unique by performing a shallow copy
+// of the struct Object points to (all Object must be a pointer to a struct in a scheme).
+func shallowCopyObjectForTargetKind(obj Object) Object {
+	v := reflect.ValueOf(obj).Elem()
+	copied := reflect.New(v.Type())
+	copied.Elem().Set(v)
+	return copied.Interface().(Object)
+}
+
+// setTargetKindOnNewObject will invoke setTargetKind on the object by first copying
+// appropriately. If isNewObject is true, no copy will be performed. Otherwise, either
+// a deep (needsDeepCopy) or shallow (only the element in the pointer) is copied. It
+// returns an error if setTargetKind fails. This may only be invoked on Objects who are
+// part of the current scheme, because AddKnownType*() enforce that shallow copy of the
+// struct is sufficient to prevent aliasing of the ObjectKind implementation.
+func setTargetKindOnNewObject(obj Object, kind schema.GroupVersionKind, needsDeepCopy, isNewObject bool) (Object, error) {
+	if isNewObject {
+		setTargetKind(obj, kind)
+		return obj, nil
+	}
+	if needsDeepCopy {
+		// The conversion requires the object to be net new
 		obj = obj.DeepCopyObject()
+	} else {
+		// We are using an object that satisfies the constraint (verified at type
+		// registration) that shallow copying the top level of the object prevents any
+		// mutation of the original object
+		obj = shallowCopyObjectForTargetKind(obj)
 	}
 	setTargetKind(obj, kind)
 	return obj, nil

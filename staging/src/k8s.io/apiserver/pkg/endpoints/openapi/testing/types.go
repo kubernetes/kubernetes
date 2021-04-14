@@ -39,3 +39,5 @@ func (t TestType) GroupVersionKind() schema.GroupVersionKind {
 		Kind:    "TestType",
 	}
 }
+
+func (t TestType) ObjectDoesNotSupportMutationOfGVK() {}
