@@ -108,7 +108,7 @@
   link: https://github.com/kubernetes/enhancements/blob/f16c4c7f1c9e28a3cc4bb4d0e6503efea2ae7987/keps/sig-api-machinery/20190228-priority-and-fairness.md
 - endpoint: getInternalApiserverAPIGroup
   reason: Not eligible for conformance yet
-  link: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190802-dynamic-coordinated-storage-version.md
+  link: https://github.com/kubernetes/enhancements/blob/0e4d5df19d396511fe41ed0860b0ab9b96f46a2d/keps/sig-api-machinery/2339-storageversion-api-for-ha-api-servers/README.md
 - endpoint: getStorageAPIGroup
   reason: vendor specific feature
   link: https://github.com/kubernetes/community/blame/master/contributors/devel/sig-architecture/conformance-tests.md#L64
