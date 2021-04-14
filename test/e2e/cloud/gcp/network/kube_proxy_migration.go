@@ -45,6 +45,8 @@ func kubeProxyDaemonSetExtraEnvs(enableKubeProxyDaemonSet bool) []string {
 
 var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]", func() {
 	f := framework.NewDefaultFramework("kube-proxy-ds-migration")
+	upgradeTestFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
+	downgradeTestsFrameworks := upgrades.CreateUpgradeFrameworks(downgradeTests)
 
 	ginkgo.BeforeEach(func() {
 		e2eskipper.SkipUnlessProviderIs("gce")
@@ -64,7 +66,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(true)
 			upgradeFunc := common.ClusterUpgradeFunc(f, upgCtx, kubeProxyUpgradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, upgradeTestFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -82,7 +84,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 
 			extraEnvs := kubeProxyDaemonSetExtraEnvs(false)
 			upgradeFunc := common.ClusterDowngradeFunc(f, upgCtx, kubeProxyDowngradeTest, extraEnvs, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, downgradeTests, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, downgradeTests, downgradeTestsFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
