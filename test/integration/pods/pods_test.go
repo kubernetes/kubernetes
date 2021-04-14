@@ -709,8 +709,9 @@ func TestPodEphemeralContainersDisabled(t *testing.T) {
 	}
 	pod, err := setUpEphemeralContainers(client.CoreV1().Pods(ns.Name), pod, nil)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
+	defer integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
 
 	pod.Spec.EphemeralContainers = append(pod.Spec.EphemeralContainers, v1.EphemeralContainer{
 		EphemeralContainerCommon: v1.EphemeralContainerCommon{
@@ -721,11 +722,18 @@ func TestPodEphemeralContainersDisabled(t *testing.T) {
 		},
 	})
 
-	if _, err := client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); err == nil {
-		t.Errorf("got nil error when updating ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
-	} else if se := err.(*errors.StatusError); se.ErrStatus.Reason != metav1.StatusReasonNotFound {
-		t.Errorf("got error reason %q when updating ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
+	if _, err = client.CoreV1().Pods(ns.Name).UpdateEphemeralContainers(context.TODO(), pod.Name, pod, metav1.UpdateOptions{}); err == nil {
+		t.Fatalf("got nil error when updating ephemeral containers with feature disabled, wanted %q", metav1.StatusReasonNotFound)
 	}
 
-	integration.DeletePodOrErrorf(t, client, ns.Name, pod.Name)
+	se, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("got error %#v, expected StatusError", err)
+	}
+	if se.ErrStatus.Reason != metav1.StatusReasonNotFound {
+		t.Errorf("got error reason %q when updating ephemeral containers with feature disabled, want %q: %#v", se.ErrStatus.Reason, metav1.StatusReasonNotFound, se)
+	}
+	if se.ErrStatus.Details.Name != "" {
+		t.Errorf("got error details with name %q, want %q: %#v", se.ErrStatus.Details.Name, "", se)
+	}
 }

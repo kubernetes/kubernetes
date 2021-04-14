@@ -205,15 +205,22 @@ type podEphemeralContainersStrategy struct {
 // EphemeralContainersStrategy wraps and exports the used podStrategy for the storage package.
 var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
 
+// dropNonEphemeralContainerUpdates discards all changes except for pod.Spec.EphemeralContainers and certain metadata
+func dropNonEphemeralContainerUpdates(newPod, oldPod *api.Pod) *api.Pod {
+	pod := oldPod.DeepCopy()
+	pod.Name = newPod.Name
+	pod.Namespace = newPod.Namespace
+	pod.ResourceVersion = newPod.ResourceVersion
+	pod.UID = newPod.UID
+	pod.Spec.EphemeralContainers = newPod.Spec.EphemeralContainers
+	return pod
+}
+
 func (podEphemeralContainersStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 
-	// Drop all changes except for pod.Spec.EphemeralContainers
-	ec := newPod.Spec.EphemeralContainers
-	*newPod = *oldPod
-	newPod.Spec.EphemeralContainers = ec
-
+	*newPod = *dropNonEphemeralContainerUpdates(newPod, oldPod)
 	podutil.DropDisabledPodFields(newPod, oldPod)
 }
 
