@@ -1041,6 +1041,17 @@ func ensureSystemCgroups(rootCgroupPath string, manager cgroups.Manager) error {
 				}
 
 				finalErr = fmt.Errorf("failed to move PID %d into the system container %q: %v", pid, name, err)
+			} else {
+				err := manager.Set(nil)
+				if err != nil {
+					name := ""
+					cgroups, err := manager.GetCgroups()
+					if err == nil {
+						name = cgroups.Name
+					}
+
+					finalErr = fmt.Errorf("failed to set system container %q: %v", name, err)
+				}
 			}
 		}
 

@@ -334,7 +334,7 @@ type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *libcontainerconfigs.Cgroup) error
+	Set(path string, cgroup *libcontainerconfigs.Resources) error
 	// GetStats returns the statistics associated with the cgroup
 	GetStats(path string, stats *libcontainercgroups.Stats) error
 }
@@ -370,7 +370,7 @@ func setSupportedSubsystemsV1(cgroupConfig *libcontainerconfigs.Cgroup) error {
 			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
 			continue
 		}
-		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
+		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig.Resources); err != nil {
 			return fmt.Errorf("failed to set config for supported subsystems : %v", err)
 		}
 	}
@@ -492,10 +492,7 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
 	}
-	config := &libcontainerconfigs.Config{
-		Cgroups: cgroupConfig,
-	}
-	return manager.Set(config)
+	return manager.Set(cgroupConfig.Resources)
 }
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
@@ -642,6 +639,10 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	// in the tasks file. We use the function to create all the required
 	// cgroup files but not attach any "real" pid to the cgroup.
 	if err := manager.Apply(-1); err != nil {
+		return err
+	}
+
+	if err := manager.Set(libcontainerCgroupConfig.Resources); err != nil {
 		return err
 	}
 
