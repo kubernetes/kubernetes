@@ -59,12 +59,10 @@ function get-metadata-value {
   local default="${2:-}"
 
   local status
-  # We do not want quotes for CURL_RETRY_CONNREFUSED
-  # shellcheck disable=SC2086
   curl \
       --retry 5 \
       --retry-delay 3 \
-      ${CURL_RETRY_CONNREFUSED} \
+      --retry-connrefused \
       --fail \
       --silent \
       -H 'Metadata-Flavor: Google' \
@@ -84,8 +82,7 @@ function download-kube-env {
   (
     umask 077
     local -r tmp_kube_env="/tmp/kube-env.yaml"
-    # shellcheck disable=SC2086
-    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+    curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_env}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
@@ -111,8 +108,7 @@ function download-kubelet-config {
   (
     umask 077
     local -r tmp_kubelet_config="/tmp/kubelet-config.yaml"
-    # shellcheck disable=SC2086
-    if curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+    if curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error \
         -H "X-Google-Metadata-Request: True" \
         -o "${tmp_kubelet_config}" \
         http://metadata.google.internal/computeMetadata/v1/instance/attributes/kubelet-config; then
@@ -130,8 +126,7 @@ function download-kube-master-certs {
   (
     umask 077
     local -r tmp_kube_master_certs="/tmp/kube-master-certs.yaml"
-    # shellcheck disable=SC2086
-    curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error \
+    curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error \
       -H "X-Google-Metadata-Request: True" \
       -o "${tmp_kube_master_certs}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
@@ -165,14 +160,12 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  # shellcheck disable=SC2086
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | ${PYTHON} -c \
+  curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | ${PYTHON} -c \
     'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
 function valid-storage-scope {
-  # shellcheck disable=SC2086
-  curl --fail --retry 5 --retry-delay 3 ${CURL_RETRY_CONNREFUSED} --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
+  curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/scopes" -H "Metadata-Flavor: Google" -s | grep -E "auth/devstorage|auth/cloud-platform"
 }
 
 # Retry a download until we get it. Takes a hash and a set of URLs.
@@ -192,8 +185,7 @@ function download-or-bust {
       if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
         curl_headers="Authorization: Bearer $(get-credentials)"
       fi
-      # shellcheck disable=SC2086
-      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 ${CURL_RETRY_CONNREFUSED} "${url}"; then
+      if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -718,13 +710,6 @@ function retry-forever {
 # NOTE: this function is duplicated in configure-helper.sh, any changes here
 # should be duplicated there as well.
 function log-init {
-  # CURL_RETRY_CONNREFUSED needs to be defined before calling get-metadata-value.
-  # Use --retry-connrefused opt only if it's supported by curl.
-  CURL_RETRY_CONNREFUSED=""
-  if curl --help | grep -q -- '--retry-connrefused'; then
-    CURL_RETRY_CONNREFUSED='--retry-connrefused'
-  fi
-
   # Used by log-* functions.
   LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
   LOG_INSTANCE_NAME=$(hostname)

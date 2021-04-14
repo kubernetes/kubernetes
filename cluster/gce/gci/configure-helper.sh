@@ -2296,10 +2296,8 @@ function download-extra-addons {
     "--retry-delay" "3"
     "--silent"
     "--show-error"
+    "--retry-connrefused"
   )
-  if [[ -n "${CURL_RETRY_CONNREFUSED:-}" ]]; then
-    curl_cmd+=("${CURL_RETRY_CONNREFUSED}")
-  fi
   if [[ -n "${EXTRA_ADDONS_HEADER:-}" ]]; then
     curl_cmd+=("-H" "${EXTRA_ADDONS_HEADER}")
   fi
@@ -2320,12 +2318,10 @@ function get-metadata-value {
   local default="${2:-}"
 
   local status
-  # We do not want quotes for CURL_RETRY_CONNREFUSED
-  # shellcheck disable=SC2086
   curl \
       --retry 5 \
       --retry-delay 3 \
-      ${CURL_RETRY_CONNREFUSED} \
+      --retry-connrefused \
       --fail \
       --silent \
       -H 'Metadata-Flavor: Google' \
@@ -3120,13 +3116,6 @@ function detect_host_info() {
 # NOTE: this function is duplicated in configure.sh, any changes here should be
 # duplicated there as well.
 function log-init {
-  # CURL_RETRY_CONNREFUSED needs to be defined before calling get-metadata-value.
-  # Use --retry-connrefused opt only if it's supported by curl.
-  CURL_RETRY_CONNREFUSED=""
-  if curl --help | grep -q -- '--retry-connrefused'; then
-    CURL_RETRY_CONNREFUSED='--retry-connrefused'
-  fi
-
   # Used by log-* functions.
   LOG_CLUSTER_ID=$(get-metadata-value 'instance/attributes/cluster-uid' 'get-metadata-value-error')
   LOG_INSTANCE_NAME=$(hostname)
