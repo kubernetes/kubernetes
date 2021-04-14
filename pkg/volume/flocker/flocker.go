@@ -310,9 +310,9 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 
 	// TODO: handle failed mounts here.
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
-	klog.V(4).Infof("flockerVolume set up: %s %v %v, datasetUUID %v readOnly %v", dir, !notMnt, err, datasetUUID, b.readOnly)
+	klog.V(4).InfoS("Set up flockerVolume", "path", dir, "!notMnt", !notMnt, "err", err, "datasetUUID", datasetUUID, "readOnly", b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", dir, err)
+		klog.ErrorS(err, "Cannot validate mount point", "path", dir)
 		return err
 	}
 	if !notMnt {
@@ -320,7 +320,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	}
 
 	if err := os.MkdirAll(dir, 0750); err != nil {
-		klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
+		klog.ErrorS(err, "Failed to mkdir on disk", "path", dir)
 		return err
 	}
 
@@ -331,33 +331,33 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 	}
 
 	globalFlockerPath := makeGlobalFlockerPath(datasetUUID)
-	klog.V(4).Infof("attempting to mount %s", dir)
+	klog.V(4).InfoS("Attempting to mount", "path", dir)
 
 	err = b.mounter.MountSensitiveWithoutSystemd(globalFlockerPath, dir, "", options, nil)
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			klog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
+			klog.ErrorS(mntErr, "IsLikelyNotMountPoint check failed")
 			return err
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("failed to unmount: %v", mntErr)
+				klog.ErrorS(mntErr, "Failed to unmount")
 				return err
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				klog.Errorf("isLikelyNotMountPoint check failed: %v", mntErr)
+				klog.ErrorS(mntErr, "IsLikelyNotMountPoint check failed")
 				return err
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
+				klog.ErrorS(nil, "Path is still mounted, despite call to unmount().  Will try again next sync loop.", "path", dir)
 				return err
 			}
 		}
 		os.Remove(dir)
-		klog.Errorf("mount of disk %s failed: %v", dir, err)
+		klog.ErrorS(err, "Failed to mount disk", "path", dir)
 		return err
 	}
 
@@ -365,7 +365,7 @@ func (b *flockerVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArg
 		volume.SetVolumeOwnership(b, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
-	klog.V(4).Infof("successfully mounted %s", dir)
+	klog.V(4).InfoS("Successfully mounted", "path", dir)
 	return nil
 }
 

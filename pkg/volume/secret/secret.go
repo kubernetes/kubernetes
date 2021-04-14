@@ -180,7 +180,7 @@ func (b *secretVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 }
 
 func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
-	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
+	klog.V(3).InfoS("Setting up volume for pod at path", "volumeName", b.volName, "podUID", b.pod.UID, "path", dir)
 
 	// Wrap EmptyDir, let it do the setup.
 	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
@@ -192,7 +192,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	secret, err := b.getSecret(b.pod.Namespace, b.source.SecretName)
 	if err != nil {
 		if !(errors.IsNotFound(err) && optional) {
-			klog.Errorf("Couldn't get secret %v/%v: %v", b.pod.Namespace, b.source.SecretName, err)
+			klog.ErrorS(err, "Couldn't get secret", "namespace", b.pod.Namespace, "secretName", b.source.SecretName)
 			return err
 		}
 		secret = &v1.Secret{
@@ -204,11 +204,11 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	}
 
 	totalBytes := totalSecretBytes(secret)
-	klog.V(3).Infof("Received secret %v/%v containing (%v) pieces of data, %v total bytes",
-		b.pod.Namespace,
-		b.source.SecretName,
-		len(secret.Data),
-		totalBytes)
+	klog.V(3).InfoS("Received secret containing pieces of data",
+		"namespace", b.pod.Namespace,
+		"secretName", b.source.SecretName,
+		"lenData", len(secret.Data),
+		"totalBytes", totalBytes)
 
 	payload, err := MakePayload(b.source.Items, secret, b.source.DefaultMode, optional)
 	if err != nil {
@@ -228,12 +228,12 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 		if !setupSuccess {
 			unmounter, unmountCreateErr := b.plugin.NewUnmounter(b.volName, b.podUID)
 			if unmountCreateErr != nil {
-				klog.Errorf("error cleaning up mount %s after failure. Create unmounter failed with %v", b.volName, unmountCreateErr)
+				klog.ErrorS(unmountCreateErr, "Error cleaning up mount for volume after failure, failing creating unmounter", "volumeName", b.volName)
 				return
 			}
 			tearDownErr := unmounter.TearDown()
 			if tearDownErr != nil {
-				klog.Errorf("error tearing down volume %s with : %v", b.volName, tearDownErr)
+				klog.ErrorS(tearDownErr, "Error tearing down volume", "volumeName", b.volName)
 			}
 		}
 	}()
@@ -241,19 +241,19 @@ func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs
 	writerContext := fmt.Sprintf("pod %v/%v volume %v", b.pod.Namespace, b.pod.Name, b.volName)
 	writer, err := volumeutil.NewAtomicWriter(dir, writerContext)
 	if err != nil {
-		klog.Errorf("Error creating atomic writer: %v", err)
+		klog.ErrorS(err, "Error creating atomic writer")
 		return err
 	}
 
 	err = writer.Write(payload)
 	if err != nil {
-		klog.Errorf("Error writing payload to dir: %v", err)
+		klog.ErrorS(err, "Error writing payload to dir")
 		return err
 	}
 
 	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
+		klog.ErrorS(nil, "Error applying volume ownership settings for group", "group", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true

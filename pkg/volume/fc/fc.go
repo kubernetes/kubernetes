@@ -139,7 +139,7 @@ func (plugin *fcPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, 
 		return nil, err
 	}
 
-	klog.V(5).Infof("fc: newMounterInternal volumeMode %s", volumeMode)
+	klog.V(5).InfoS("fc: newMounterInternal", "volumeMode", volumeMode)
 	return &fcDiskMounter{
 		fcDisk:       fcDisk,
 		fsType:       fc.FSType,
@@ -277,8 +277,8 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 			FC: &v1.FCVolumeSource{WWIDs: wwids, Lun: &lun, TargetWWNs: wwns},
 		},
 	}
-	klog.V(5).Infof("ConstructVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
-		fcVolume.VolumeSource.FC.TargetWWNs, *fcVolume.VolumeSource.FC.Lun, fcVolume.VolumeSource.FC.WWIDs)
+	klog.V(5).InfoS("ConstructVolumeSpec",
+		"TargetWWNs", fcVolume.VolumeSource.FC.TargetWWNs, "Lun", *fcVolume.VolumeSource.FC.Lun, "WWIDs", fcVolume.VolumeSource.FC.WWIDs)
 	return volume.NewSpecFromVolume(fcVolume), nil
 }
 
@@ -296,7 +296,7 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	if err != nil {
 		return nil, err
 	}
-	klog.V(5).Infof("globalMapPathUUID: %v, err: %v", globalMapPathUUID, err)
+	klog.V(5).InfoS("FindGlobalMapPathUUIDFromPod", "globalMapPathUUID", globalMapPathUUID)
 
 	// Retrieve globalPDPath from globalMapPathUUID
 	// globalMapPathUUID examples:
@@ -310,10 +310,10 @@ func (plugin *fcPlugin) ConstructBlockVolumeSpec(podUID types.UID, volumeName, m
 	}
 	fcPV := createPersistentVolumeFromFCVolumeSource(volumeName,
 		v1.FCVolumeSource{TargetWWNs: wwns, Lun: &lun, WWIDs: wwids})
-	klog.V(5).Infof("ConstructBlockVolumeSpec: TargetWWNs: %v, Lun: %v, WWIDs: %v",
-		fcPV.Spec.PersistentVolumeSource.FC.TargetWWNs,
-		*fcPV.Spec.PersistentVolumeSource.FC.Lun,
-		fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
+	klog.V(5).InfoS("ConstructBlockVolumeSpec",
+		"TargetWWNs", fcPV.Spec.PersistentVolumeSource.FC.TargetWWNs,
+		"Lun", *fcPV.Spec.PersistentVolumeSource.FC.Lun,
+		"WWIDs", fcPV.Spec.PersistentVolumeSource.FC.WWIDs)
 
 	return volume.NewSpecFromPersistentVolume(fcPV, false), nil
 }
@@ -340,7 +340,7 @@ func (fc *fcDisk) GetPath() string {
 func (fc *fcDisk) fcGlobalMapPath(spec *volume.Spec) (string, error) {
 	mounter, err := volumeSpecToMounter(spec, fc.plugin.host)
 	if err != nil {
-		klog.Warningf("failed to get fc mounter: %v", err)
+		klog.InfoS("Failed to get fc mounter", "err", err)
 		return "", err
 	}
 	return fc.manager.MakeGlobalVDPDName(*mounter.fcDisk), nil
@@ -385,7 +385,7 @@ func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) erro
 	// diskSetUp checks mountpoints and prevent repeated calls
 	err := diskSetUp(b.manager, *b, dir, b.mounter, mounterArgs.FsGroup, mounterArgs.FSGroupChangePolicy)
 	if err != nil {
-		klog.Errorf("fc: failed to setup")
+		klog.ErrorS(nil, "fc: failed to setup")
 	}
 	return err
 }
@@ -434,11 +434,11 @@ func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	if err != nil {
 		return fmt.Errorf("fc: failed to detach disk: %s\nError: %v", mapPath, err)
 	}
-	klog.V(4).Infof("fc: %s is unmounted, deleting the directory", mapPath)
+	klog.V(4).InfoS("fc: mapPath is unmounted, deleting the directory", "path", mapPath)
 	if err = os.RemoveAll(mapPath); err != nil {
 		return fmt.Errorf("fc: failed to delete the directory: %s\nError: %v", mapPath, err)
 	}
-	klog.V(4).Infof("fc: successfully detached disk: %s", mapPath)
+	klog.V(4).InfoS("fc: successfully detached disk", "path", mapPath)
 	return nil
 }
 

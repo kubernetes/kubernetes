@@ -231,7 +231,7 @@ func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 	addWatch := func(path string, info os.FileInfo, err error) error {
 		if err == nil && info.IsDir() {
 			if err := prober.watcher.AddWatch(path); err != nil {
-				klog.Errorf("Error recursively adding watch: %v", err)
+				klog.ErrorS(err, "Error recursively adding watch")
 			}
 		}
 		return nil
@@ -244,10 +244,10 @@ func (prober *flexVolumeProber) addWatchRecursive(filename string) error {
 func (prober *flexVolumeProber) initWatcher() error {
 	err := prober.watcher.Init(func(event fsnotify.Event) {
 		if err := prober.handleWatchEvent(event); err != nil {
-			klog.Errorf("Flexvolume prober watch: %s", err)
+			klog.ErrorS(err, "Flexvolume prober watch")
 		}
 	}, func(err error) {
-		klog.Errorf("Received an error from watcher: %s", err)
+		klog.ErrorS(err, "Received an error from watcher")
 	})
 	if err != nil {
 		return fmt.Errorf("error initializing watcher: %s", err)
@@ -265,7 +265,7 @@ func (prober *flexVolumeProber) initWatcher() error {
 // Creates the plugin directory, if it doesn't already exist.
 func (prober *flexVolumeProber) createPluginDir() error {
 	if _, err := prober.fs.Stat(prober.pluginDir); os.IsNotExist(err) {
-		klog.Warningf("Flexvolume plugin directory at %s does not exist. Recreating.", prober.pluginDir)
+		klog.InfoS("Flexvolume plugin directory does not exist. Recreating.", "path", prober.pluginDir)
 		err := prober.fs.MkdirAll(prober.pluginDir, 0755)
 		if err != nil {
 			return fmt.Errorf("error (re-)creating driver directory: %s", err)
