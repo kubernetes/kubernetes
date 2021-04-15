@@ -121,48 +121,52 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	framework.ConformanceIt("validates basic preemption works", func() {
 		var podRes v1.ResourceList
 
-		// Create one pod per node that uses a lot of the node's resources.
-		ginkgo.By("Create pods that use 2/3 of node resources.")
-		pods := make([]*v1.Pod, 0, len(nodeList.Items))
-		// Now create victim pods on each of the node with lower priority
+		// Create two pods per node that uses a lot of the node's resources.
+		ginkgo.By("Create pods that use 4/5 of node resources.")
+		pods := make([]*v1.Pod, 0, 2*len(nodeList.Items))
+		// Create pods in the cluster.
+		// One of them has low priority, making it the victim for preemption.
 		for i, node := range nodeList.Items {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
-			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("3")
+			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
-			// Request 2 of the available resources for the victim pods
-			podRes = v1.ResourceList{}
-			podRes[testExtendedResource] = resource.MustParse("2")
+			for j := 0; j < 2; j++ {
+				// Request 2 of the available resources for the victim pods
+				podRes = v1.ResourceList{}
+				podRes[testExtendedResource] = resource.MustParse("2")
 
-			// make the first pod low priority and the rest medium priority.
-			priorityName := mediumPriorityClassName
-			if len(pods) == 0 {
-				priorityName = lowPriorityClassName
-			}
-			pods = append(pods, createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
-				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
-					Requests: podRes,
-					Limits:   podRes,
-				},
-				Affinity: &v1.Affinity{
-					NodeAffinity: &v1.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
-								{
-									MatchFields: []v1.NodeSelectorRequirement{
-										{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+				// make the first pod low priority and the rest medium priority.
+				priorityName := mediumPriorityClassName
+				if len(pods) == 0 {
+					priorityName = lowPriorityClassName
+				}
+				pausePod := createPausePod(f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, priorityName),
+					PriorityClassName: priorityName,
+					Resources: &v1.ResourceRequirements{
+						Requests: podRes,
+						Limits:   podRes,
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+										},
 									},
 								},
 							},
 						},
 					},
-				},
-			}))
-			framework.Logf("Created pod: %v", pods[i].Name)
+				})
+				pods = append(pods, pausePod)
+				framework.Logf("Created pod: %v", pausePod.Name)
+			}
 		}
 		if len(pods) < 2 {
 			framework.Failf("We need at least two pods to be created but " +
@@ -209,46 +213,49 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 	framework.ConformanceIt("validates lower priority pod preemption by critical pod", func() {
 		var podRes v1.ResourceList
 
-		ginkgo.By("Create pods that use 2/3 of node resources.")
+		ginkgo.By("Create pods that use 4/5 of node resources.")
 		pods := make([]*v1.Pod, 0, len(nodeList.Items))
 		for i, node := range nodeList.Items {
 			// Update each node to advertise 3 available extended resources
 			nodeCopy := node.DeepCopy()
-			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("3")
+			nodeCopy.Status.Capacity[testExtendedResource] = resource.MustParse("5")
 			err := patchNode(cs, &node, nodeCopy)
 			framework.ExpectNoError(err)
 
-			// Request 2 of the available resources for the victim pods
-			podRes = v1.ResourceList{}
-			podRes[testExtendedResource] = resource.MustParse("2")
+			for j := 0; j < 2; j++ {
+				// Request 2 of the available resources for the victim pods
+				podRes = v1.ResourceList{}
+				podRes[testExtendedResource] = resource.MustParse("2")
 
-			// make the first pod low priority and the rest medium priority.
-			priorityName := mediumPriorityClassName
-			if len(pods) == 0 {
-				priorityName = lowPriorityClassName
-			}
-			pods = append(pods, createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
-				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
-					Requests: podRes,
-					Limits:   podRes,
-				},
-				Affinity: &v1.Affinity{
-					NodeAffinity: &v1.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
-								{
-									MatchFields: []v1.NodeSelectorRequirement{
-										{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+				// make the first pod low priority and the rest medium priority.
+				priorityName := mediumPriorityClassName
+				if len(pods) == 0 {
+					priorityName = lowPriorityClassName
+				}
+				pausePod := createPausePod(f, pausePodConfig{
+					Name:              fmt.Sprintf("pod%d-%d-%v", i, j, priorityName),
+					PriorityClassName: priorityName,
+					Resources: &v1.ResourceRequirements{
+						Requests: podRes,
+						Limits:   podRes,
+					},
+					Affinity: &v1.Affinity{
+						NodeAffinity: &v1.NodeAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
+								NodeSelectorTerms: []v1.NodeSelectorTerm{
+									{
+										MatchFields: []v1.NodeSelectorRequirement{
+											{Key: "metadata.name", Operator: v1.NodeSelectorOpIn, Values: []string{node.Name}},
+										},
 									},
 								},
 							},
 						},
 					},
-				},
-			}))
-			framework.Logf("Created pod: %v", pods[i].Name)
+				})
+				pods = append(pods, pausePod)
+				framework.Logf("Created pod: %v", pausePod.Name)
+			}
 		}
 		if len(pods) < 2 {
 			framework.Failf("We need at least two pods to be created but " +
@@ -306,6 +313,9 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		var fakeRes v1.ResourceName = "example.com/fakePTSRes"
 
 		ginkgo.BeforeEach(func() {
+			if len(nodeList.Items) < 2 {
+				ginkgo.Skip("At least 2 nodes are required to run the test")
+			}
 			ginkgo.By("Trying to get 2 available nodes which can run pod")
 			nodeNames = Get2NodesThatCanRunPod(f)
 			ginkgo.By(fmt.Sprintf("Apply dedicated topologyKey %v for this test on the 2 nodes.", topologyKey))
