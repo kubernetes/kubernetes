@@ -70,8 +70,7 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plu
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesLeastAllocatedArgs, got %T", laArgs)
 	}
-
-	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(args); err != nil {
+	if err := validation.ValidateNodeResourcesLeastAllocatedArgs(nil, args); err != nil {
 		return nil, err
 	}
 

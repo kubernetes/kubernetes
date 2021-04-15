@@ -114,7 +114,7 @@ func TestValidateDefaultPreemptionArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateDefaultPreemptionArgs(tc.args)
+			err := ValidateDefaultPreemptionArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateDefaultPreemptionArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -154,7 +154,7 @@ func TestValidateInterPodAffinityArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateInterPodAffinityArgs(tc.args)
+			err := ValidateInterPodAffinityArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateInterPodAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -235,7 +235,7 @@ func TestValidateNodeLabelArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeLabelArgs(tc.args)
+			err := ValidateNodeLabelArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeLabelArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -426,7 +426,7 @@ func TestValidatePodTopologySpreadArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidatePodTopologySpreadArgs(tc.args)
+			err := ValidatePodTopologySpreadArgs(nil, tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidatePodTopologySpreadArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -668,7 +668,7 @@ func TestValidateRequestedToCapacityRatioArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateRequestedToCapacityRatioArgs(tc.args)
+			err := ValidateRequestedToCapacityRatioArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateRequestedToCapacityRatioArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -755,7 +755,7 @@ func TestValidateNodeResourcesLeastAllocatedArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeResourcesLeastAllocatedArgs(tc.args)
+			err := ValidateNodeResourcesLeastAllocatedArgs(nil, tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -842,7 +842,7 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			err := ValidateNodeResourcesMostAllocatedArgs(tc.args)
+			err := ValidateNodeResourcesMostAllocatedArgs(nil, tc.args)
 			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateNodeResourcesLeastAllocatedArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -940,7 +940,7 @@ func TestValidateNodeAffinityArgs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateNodeAffinityArgs(&tc.args)
+			err := ValidateNodeAffinityArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidatedNodeAffinityArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -979,7 +979,7 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := ValidateVolumeBindingArgs(&tc.args)
+			err := ValidateVolumeBindingArgs(nil, &tc.args)
 			if diff := cmp.Diff(tc.wantErr, err, ignoreBadValueDetail); diff != "" {
 				t.Errorf("ValidateVolumeBindingArgs returned err (-want,+got):\n%s", diff)
 			}
@@ -1051,7 +1051,7 @@ func TestValidateFitArgs(t *testing.T) {
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ValidateNodeResourcesFitArgs(&test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
 				t.Errorf("case[%v]: error details do not include %v", test.name, err)
 			}
 		})

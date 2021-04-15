@@ -225,7 +225,7 @@ func getArgs(obj runtime.Object) (config.NodeAffinityArgs, error) {
 	if !ok {
 		return config.NodeAffinityArgs{}, fmt.Errorf("args are not of type NodeAffinityArgs, got %T", obj)
 	}
-	return *ptr, validation.ValidateNodeAffinityArgs(ptr)
+	return *ptr, validation.ValidateNodeAffinityArgs(nil, ptr)
 }
 
 func getPodPreferredNodeAffinity(pod *v1.Pod) (*nodeaffinity.PreferredSchedulingTerms, error) {

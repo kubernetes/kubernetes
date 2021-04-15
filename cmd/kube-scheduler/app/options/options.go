@@ -184,7 +184,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err != nil {
 			return err
 		}
-		if err := validation.ValidateKubeSchedulerConfiguration(cfg).ToAggregate(); err != nil {
+		if err := validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
 			return err
 		}
 
@@ -234,7 +234,7 @@ func emptySchedulerProfileConfig(profiles []kubeschedulerconfig.KubeSchedulerPro
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig).ToAggregate(); err != nil {
+	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig); err != nil {
 		errs = append(errs, err.Errors()...)
 	}
 	errs = append(errs, o.SecureServing.Validate()...)

@@ -30,8 +30,7 @@ import (
 )
 
 // ValidateDefaultPreemptionArgs validates that DefaultPreemptionArgs are correct.
-func ValidateDefaultPreemptionArgs(args config.DefaultPreemptionArgs) error {
-	var path *field.Path
+func ValidateDefaultPreemptionArgs(path *field.Path, args *config.DefaultPreemptionArgs) error {
 	var allErrs field.ErrorList
 	percentagePath := path.Child("minCandidateNodesPercentage")
 	absolutePath := path.Child("minCandidateNodesAbsolute")
@@ -68,8 +67,7 @@ func validateMinCandidateNodesAbsolute(minCandidateNodesAbsolute int32, p *field
 }
 
 // ValidateInterPodAffinityArgs validates that InterPodAffinityArgs are correct.
-func ValidateInterPodAffinityArgs(args config.InterPodAffinityArgs) error {
-	var path *field.Path
+func ValidateInterPodAffinityArgs(path *field.Path, args *config.InterPodAffinityArgs) error {
 	return ValidateHardPodAffinityWeight(path.Child("hardPodAffinityWeight"), args.HardPodAffinityWeight)
 }
 
@@ -88,8 +86,7 @@ func ValidateHardPodAffinityWeight(path *field.Path, w int32) error {
 }
 
 // ValidateNodeLabelArgs validates that NodeLabelArgs are correct.
-func ValidateNodeLabelArgs(args config.NodeLabelArgs) error {
-	var path *field.Path
+func ValidateNodeLabelArgs(path *field.Path, args *config.NodeLabelArgs) error {
 	var allErrs field.ErrorList
 
 	allErrs = append(allErrs, validateNoConflict(args.PresentLabels, args.AbsentLabels,
@@ -120,8 +117,7 @@ func validateNoConflict(presentLabels, absentLabels []string, presentPath, absen
 // ValidatePodTopologySpreadArgs validates that PodTopologySpreadArgs are correct.
 // It replicates the validation from pkg/apis/core/validation.validateTopologySpreadConstraints
 // with an additional check for .labelSelector to be nil.
-func ValidatePodTopologySpreadArgs(args *config.PodTopologySpreadArgs) error {
-	var path *field.Path
+func ValidatePodTopologySpreadArgs(path *field.Path, args *config.PodTopologySpreadArgs) error {
 	var allErrs field.ErrorList
 	if err := validateDefaultingType(path.Child("defaultingType"), args.DefaultingType, args.DefaultConstraints); err != nil {
 		allErrs = append(allErrs, err)
@@ -196,8 +192,7 @@ func validateConstraintNotRepeat(path *field.Path, constraints []v1.TopologySpre
 }
 
 // ValidateRequestedToCapacityRatioArgs validates that RequestedToCapacityRatioArgs are correct.
-func ValidateRequestedToCapacityRatioArgs(args config.RequestedToCapacityRatioArgs) error {
-	var path *field.Path
+func ValidateRequestedToCapacityRatioArgs(path *field.Path, args *config.RequestedToCapacityRatioArgs) error {
 	var allErrs field.ErrorList
 	allErrs = append(allErrs, validateFunctionShape(args.Shape, path.Child("shape"))...)
 	allErrs = append(allErrs, validateResourcesNoMax(args.Resources, path.Child("resources"))...)
@@ -254,14 +249,12 @@ func validateResourcesNoMax(resources []config.ResourceSpec, p *field.Path) fiel
 }
 
 // ValidateNodeResourcesLeastAllocatedArgs validates that NodeResourcesLeastAllocatedArgs are correct.
-func ValidateNodeResourcesLeastAllocatedArgs(args *config.NodeResourcesLeastAllocatedArgs) error {
-	var path *field.Path
+func ValidateNodeResourcesLeastAllocatedArgs(path *field.Path, args *config.NodeResourcesLeastAllocatedArgs) error {
 	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
 }
 
 // ValidateNodeResourcesMostAllocatedArgs validates that NodeResourcesMostAllocatedArgs are correct.
-func ValidateNodeResourcesMostAllocatedArgs(args *config.NodeResourcesMostAllocatedArgs) error {
-	var path *field.Path
+func ValidateNodeResourcesMostAllocatedArgs(path *field.Path, args *config.NodeResourcesMostAllocatedArgs) error {
 	return validateResources(args.Resources, path.Child("resources")).ToAggregate()
 }
 
@@ -277,22 +270,21 @@ func validateResources(resources []config.ResourceSpec, p *field.Path) field.Err
 }
 
 // ValidateNodeAffinityArgs validates that NodeAffinityArgs are correct.
-func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
+func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) error {
 	if args.AddedAffinity == nil {
 		return nil
 	}
 	affinity := args.AddedAffinity
-	path := field.NewPath("addedAffinity")
 	var errs []error
 	if ns := affinity.RequiredDuringSchedulingIgnoredDuringExecution; ns != nil {
-		_, err := nodeaffinity.NewNodeSelector(ns, field.WithPath(path.Child("requiredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewNodeSelector(ns, field.WithPath(path.Child("addedAffinity", "requiredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
 	// TODO: Add validation for requiredDuringSchedulingRequiredDuringExecution when it gets added to the API.
 	if terms := affinity.PreferredDuringSchedulingIgnoredDuringExecution; len(terms) != 0 {
-		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, field.WithPath(path.Child("preferredDuringSchedulingIgnoredDuringExecution")))
+		_, err := nodeaffinity.NewPreferredSchedulingTerms(terms, field.WithPath(path.Child("addedAffinity", "preferredDuringSchedulingIgnoredDuringExecution")))
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -301,8 +293,7 @@ func ValidateNodeAffinityArgs(args *config.NodeAffinityArgs) error {
 }
 
 // ValidateVolumeBindingArgs validates that VolumeBindingArgs are set correctly.
-func ValidateVolumeBindingArgs(args *config.VolumeBindingArgs) error {
-	var path *field.Path
+func ValidateVolumeBindingArgs(path *field.Path, args *config.VolumeBindingArgs) error {
 	var err error
 
 	if args.BindTimeoutSeconds < 0 {
@@ -312,9 +303,9 @@ func ValidateVolumeBindingArgs(args *config.VolumeBindingArgs) error {
 	return err
 }
 
-func ValidateNodeResourcesFitArgs(args *config.NodeResourcesFitArgs) error {
+func ValidateNodeResourcesFitArgs(path *field.Path, args *config.NodeResourcesFitArgs) error {
 	var allErrs field.ErrorList
-	resPath := field.NewPath("ignoredResources")
+	resPath := path.Child("ignoredResources")
 	for i, res := range args.IgnoredResources {
 		path := resPath.Index(i)
 		if errs := metav1validation.ValidateLabelName(res, path); len(errs) != 0 {
@@ -322,7 +313,7 @@ func ValidateNodeResourcesFitArgs(args *config.NodeResourcesFitArgs) error {
 		}
 	}
 
-	groupPath := field.NewPath("ignoredResourceGroups")
+	groupPath := path.Child("ignoredResourceGroups")
 	for i, group := range args.IgnoredResourceGroups {
 		path := groupPath.Index(i)
 		if strings.Contains(group, "/") {

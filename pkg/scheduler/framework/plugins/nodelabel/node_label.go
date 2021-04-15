@@ -42,8 +42,7 @@ func New(plArgs runtime.Object, handle framework.Handle) (framework.Plugin, erro
 	if err != nil {
 		return nil, err
 	}
-
-	if err := validation.ValidateNodeLabelArgs(args); err != nil {
+	if err := validation.ValidateNodeLabelArgs(nil, &args); err != nil {
 		return nil, err
 	}
 

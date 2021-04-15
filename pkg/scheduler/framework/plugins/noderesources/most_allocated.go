@@ -68,8 +68,7 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plug
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesMostAllocatedArgs, got %T", args)
 	}
-
-	if err := validation.ValidateNodeResourcesMostAllocatedArgs(args); err != nil {
+	if err := validation.ValidateNodeResourcesMostAllocatedArgs(nil, args); err != nil {
 		return nil, err
 	}
 
