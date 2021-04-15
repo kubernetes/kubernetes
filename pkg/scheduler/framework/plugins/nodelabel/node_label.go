@@ -121,9 +121,6 @@ func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod
 	}
 
 	node := nodeInfo.Node()
-	if node == nil {
-		return 0, framework.NewStatus(framework.Error, "node not found")
-	}
 
 	size := int64(len(pl.args.PresentLabelsPreference) + len(pl.args.AbsentLabelsPreference))
 	if size == 0 {
