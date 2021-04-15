@@ -81,7 +81,7 @@ func OpenShiftKubeAPIServerConfigPatch(genericConfig *genericapiserver.Config, k
 	if err != nil {
 		return err
 	}
-	deprecatedAPIRequestController := deprecatedapirequest.NewController(deprecatedAPIClient.DeprecatedAPIRequests(), nodeFor())
+	deprecatedAPIRequestController := deprecatedapirequest.NewController(deprecatedAPIClient.APIRequestCounts(), nodeFor())
 	genericConfig.AddPostStartHook("openshift.io-deprecated-api-requests-filter", func(context genericapiserver.PostStartHookContext) error {
 		go deprecatedAPIRequestController.Start(context.StopCh)
 		return nil

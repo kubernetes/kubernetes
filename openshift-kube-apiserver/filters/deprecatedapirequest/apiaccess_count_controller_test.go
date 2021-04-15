@@ -51,76 +51,76 @@ func TestAPIStatusToRequestCount(t *testing.T) {
 	testCases := []struct {
 		name     string
 		resource schema.GroupVersionResource
-		status   *apiv1.DeprecatedAPIRequestStatus
+		status   *apiv1.APIRequestCountStatus
 		expected *clusterRequestCounts
 	}{
 		{
 			name:     "Empty",
 			resource: gvr("test.v1.group"),
-			status:   &apiv1.DeprecatedAPIRequestStatus{},
+			status:   &apiv1.APIRequestCountStatus{},
 			expected: cluster(),
 		},
 		{
 			name:     "NotEmpty",
 			resource: gvr("test.v1.group"),
-			status: &apiv1.DeprecatedAPIRequestStatus{
-				RequestsLast24h: []apiv1.RequestLog{
+			status: &apiv1.APIRequestCountStatus{
+				Last24h: []apiv1.PerResourceAPIRequestLog{
 					{},
 					{},
 					{},
-					{Nodes: []apiv1.NodeRequestLog{
-						{NodeName: "node1", Users: []apiv1.RequestUser{
-							{UserName: "eva", Requests: []apiv1.RequestCount{
-								{Verb: "get", Count: 625}, {Verb: "watch", Count: 540},
+					{ByNode: []apiv1.PerNodeAPIRequestLog{
+						{NodeName: "node1", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "eva", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "get", RequestCount: 625}, {Verb: "watch", RequestCount: 540},
 							}},
 						}},
-						{NodeName: "node3", Users: []apiv1.RequestUser{
-							{UserName: "mia", Requests: []apiv1.RequestCount{
-								{Verb: "list", Count: 1427}, {Verb: "create", Count: 1592}, {Verb: "watch", Count: 1143},
+						{NodeName: "node3", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "mia", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "list", RequestCount: 1427}, {Verb: "create", RequestCount: 1592}, {Verb: "watch", RequestCount: 1143},
 							}},
-							{UserName: "ava", Requests: []apiv1.RequestCount{
-								{Verb: "update", Count: 40}, {Verb: "patch", Count: 1047},
-							}},
-						}},
-						{NodeName: "node5", Users: []apiv1.RequestUser{
-							{UserName: "mia", Requests: []apiv1.RequestCount{
-								{Verb: "delete", Count: 360}, {Verb: "deletecollection", Count: 1810}, {Verb: "update", Count: 149},
-							}},
-							{UserName: "zoe", Requests: []apiv1.RequestCount{
-								{Verb: "get", Count: 1714}, {Verb: "watch", Count: 606}, {Verb: "list", Count: 703},
+							{UserName: "ava", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "update", RequestCount: 40}, {Verb: "patch", RequestCount: 1047},
 							}},
 						}},
-						{NodeName: "node2", Users: []apiv1.RequestUser{
-							{UserName: "mia", Requests: []apiv1.RequestCount{
-								{Verb: "get", Count: 305},
+						{NodeName: "node5", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "mia", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "delete", RequestCount: 360}, {Verb: "deletecollection", RequestCount: 1810}, {Verb: "update", RequestCount: 149},
 							}},
-							{UserName: "ivy", Requests: []apiv1.RequestCount{
-								{Verb: "create", Count: 1113},
-							}},
-							{UserName: "zoe", Requests: []apiv1.RequestCount{
-								{Verb: "patch", Count: 1217}, {Verb: "delete", Count: 1386},
+							{UserName: "zoe", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "get", RequestCount: 1714}, {Verb: "watch", RequestCount: 606}, {Verb: "list", RequestCount: 703},
 							}},
 						}},
-					}},
-					{Nodes: []apiv1.NodeRequestLog{
-						{NodeName: "node1", Users: []apiv1.RequestUser{
-							{UserName: "mia", Requests: []apiv1.RequestCount{
-								{Verb: "delete", Count: 1386},
+						{NodeName: "node2", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "mia", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "get", RequestCount: 305},
 							}},
-						}},
-						{NodeName: "node5", Users: []apiv1.RequestUser{
-							{UserName: "ava", Requests: []apiv1.RequestCount{
-								{Verb: "create", Count: 1091},
+							{UserName: "ivy", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "create", RequestCount: 1113},
+							}},
+							{UserName: "zoe", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "patch", RequestCount: 1217}, {Verb: "delete", RequestCount: 1386},
 							}},
 						}},
 					}},
+					{ByNode: []apiv1.PerNodeAPIRequestLog{
+						{NodeName: "node1", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "mia", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "delete", RequestCount: 1386},
+							}},
+						}},
+						{NodeName: "node5", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "ava", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "create", RequestCount: 1091},
+							}},
+						}},
+					}},
 					{},
 					{},
 					{},
-					{Nodes: []apiv1.NodeRequestLog{
-						{NodeName: "node3", Users: []apiv1.RequestUser{
-							{UserName: "eva", Requests: []apiv1.RequestCount{
-								{Verb: "list", Count: 20},
+					{ByNode: []apiv1.PerNodeAPIRequestLog{
+						{NodeName: "node3", ByUser: []apiv1.PerUserAPIRequestCount{
+							{UserName: "eva", ByVerb: []apiv1.PerVerbAPIRequestCount{
+								{Verb: "list", RequestCount: 20},
 							}},
 						}},
 					}},
@@ -207,40 +207,41 @@ func TestSetRequestCountsForNode(t *testing.T) {
 		nodeName        string
 		expiredHour     int
 		countsToPersist *resourceRequestCounts
-		status          *apiv1.DeprecatedAPIRequestStatus
-		expected        *apiv1.DeprecatedAPIRequestStatus
+		status          *apiv1.APIRequestCountStatus
+		expected        *apiv1.APIRequestCountStatus
 	}{
 		{
 			name:            "Empty",
 			nodeName:        "node1",
 			expiredHour:     5,
 			countsToPersist: resource("test.v1.group"),
-			status:          &apiv1.DeprecatedAPIRequestStatus{},
+			status:          &apiv1.APIRequestCountStatus{},
 			expected: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1")),
-				withRequestLast24h(0, withNodeRequestLog("node1")),
-				withRequestLast24h(1, withNodeRequestLog("node1")),
-				withRequestLast24h(2, withNodeRequestLog("node1")),
-				withRequestLast24h(3, withNodeRequestLog("node1")),
-				withRequestLast24h(4, withNodeRequestLog("node1")),
-				withRequestLast24h(6, withNodeRequestLog("node1")),
-				withRequestLast24h(7, withNodeRequestLog("node1")),
-				withRequestLast24h(8, withNodeRequestLog("node1")),
-				withRequestLast24h(9, withNodeRequestLog("node1")),
-				withRequestLast24h(10, withNodeRequestLog("node1")),
-				withRequestLast24h(11, withNodeRequestLog("node1")),
-				withRequestLast24h(12, withNodeRequestLog("node1")),
-				withRequestLast24h(13, withNodeRequestLog("node1")),
-				withRequestLast24h(14, withNodeRequestLog("node1")),
-				withRequestLast24h(15, withNodeRequestLog("node1")),
-				withRequestLast24h(16, withNodeRequestLog("node1")),
-				withRequestLast24h(17, withNodeRequestLog("node1")),
-				withRequestLast24h(18, withNodeRequestLog("node1")),
-				withRequestLast24h(19, withNodeRequestLog("node1")),
-				withRequestLast24h(20, withNodeRequestLog("node1")),
-				withRequestLast24h(21, withNodeRequestLog("node1")),
-				withRequestLast24h(22, withNodeRequestLog("node1")),
-				withRequestLast24h(23, withNodeRequestLog("node1")),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(3, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1")),
+				setRequestCountTotals,
 			),
 		},
 		{
@@ -255,36 +256,37 @@ func TestSetRequestCountsForNode(t *testing.T) {
 					withUser("mia", withCounts("delete", 1386)),
 				),
 			),
-			status: &apiv1.DeprecatedAPIRequestStatus{},
+			status: &apiv1.APIRequestCountStatus{},
 			expected: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1")),
-				withRequestLast24h(0, withNodeRequestLog("node1")),
-				withRequestLast24h(1, withNodeRequestLog("node1")),
-				withRequestLast24h(2, withNodeRequestLog("node1")),
-				withRequestLast24h(3, withNodeRequestLog("node1",
-					withRequestUser("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(3, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
 				)),
-				withRequestLast24h(4, withNodeRequestLog("node1",
-					withRequestUser("mia", withRequestCount("delete", 1386)),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", withRequestCount("delete", 1386)),
 				)),
-				withRequestLast24h(6, withNodeRequestLog("node1")),
-				withRequestLast24h(7, withNodeRequestLog("node1")),
-				withRequestLast24h(8, withNodeRequestLog("node1")),
-				withRequestLast24h(9, withNodeRequestLog("node1")),
-				withRequestLast24h(10, withNodeRequestLog("node1")),
-				withRequestLast24h(11, withNodeRequestLog("node1")),
-				withRequestLast24h(12, withNodeRequestLog("node1")),
-				withRequestLast24h(13, withNodeRequestLog("node1")),
-				withRequestLast24h(14, withNodeRequestLog("node1")),
-				withRequestLast24h(15, withNodeRequestLog("node1")),
-				withRequestLast24h(16, withNodeRequestLog("node1")),
-				withRequestLast24h(17, withNodeRequestLog("node1")),
-				withRequestLast24h(18, withNodeRequestLog("node1")),
-				withRequestLast24h(19, withNodeRequestLog("node1")),
-				withRequestLast24h(20, withNodeRequestLog("node1")),
-				withRequestLast24h(21, withNodeRequestLog("node1")),
-				withRequestLast24h(22, withNodeRequestLog("node1")),
-				withRequestLast24h(23, withNodeRequestLog("node1")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1")),
+				setRequestCountTotals,
 			),
 		},
 		{
@@ -303,64 +305,66 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				),
 			),
 			status: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1")),
-				withRequestLast24h(0, withNodeRequestLog("node1")),
-				withRequestLast24h(1, withNodeRequestLog("node1")),
-				withRequestLast24h(2, withNodeRequestLog("node1")),
-				withRequestLast24h(3, withNodeRequestLog("node1",
-					withRequestUser("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(3, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
 				)),
-				withRequestLast24h(4, withNodeRequestLog("node1",
-					withRequestUser("mia", withRequestCount("delete", 1386)),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", withRequestCount("delete", 1386)),
 				)),
-				withRequestLast24h(6, withNodeRequestLog("node1")),
-				withRequestLast24h(7, withNodeRequestLog("node1")),
-				withRequestLast24h(8, withNodeRequestLog("node1")),
-				withRequestLast24h(9, withNodeRequestLog("node1")),
-				withRequestLast24h(10, withNodeRequestLog("node1")),
-				withRequestLast24h(11, withNodeRequestLog("node1")),
-				withRequestLast24h(12, withNodeRequestLog("node1")),
-				withRequestLast24h(13, withNodeRequestLog("node1")),
-				withRequestLast24h(14, withNodeRequestLog("node1")),
-				withRequestLast24h(15, withNodeRequestLog("node1")),
-				withRequestLast24h(16, withNodeRequestLog("node1")),
-				withRequestLast24h(17, withNodeRequestLog("node1")),
-				withRequestLast24h(18, withNodeRequestLog("node1")),
-				withRequestLast24h(19, withNodeRequestLog("node1")),
-				withRequestLast24h(20, withNodeRequestLog("node1")),
-				withRequestLast24h(21, withNodeRequestLog("node1")),
-				withRequestLast24h(22, withNodeRequestLog("node1")),
-				withRequestLast24h(23, withNodeRequestLog("node1")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1")),
+				setRequestCountTotals,
 			),
 			expected: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1")),
-				withRequestLast24h(0, withNodeRequestLog("node1")),
-				withRequestLast24h(1, withNodeRequestLog("node1")),
-				withRequestLast24h(2, withNodeRequestLog("node1")),
-				withRequestLast24h(4, withNodeRequestLog("node1",
-					withRequestUser("mia", withRequestCount("delete", 2772)),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", withRequestCount("delete", 2772)),
 				)),
-				withRequestLast24h(5, withNodeRequestLog("node1",
-					withRequestUser("mia", withRequestCount("list", 434)),
+				withRequestLast24h(5, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", withRequestCount("list", 434)),
 				)),
-				withRequestLast24h(6, withNodeRequestLog("node1")),
-				withRequestLast24h(7, withNodeRequestLog("node1")),
-				withRequestLast24h(8, withNodeRequestLog("node1")),
-				withRequestLast24h(9, withNodeRequestLog("node1")),
-				withRequestLast24h(10, withNodeRequestLog("node1")),
-				withRequestLast24h(11, withNodeRequestLog("node1")),
-				withRequestLast24h(12, withNodeRequestLog("node1")),
-				withRequestLast24h(13, withNodeRequestLog("node1")),
-				withRequestLast24h(14, withNodeRequestLog("node1")),
-				withRequestLast24h(15, withNodeRequestLog("node1")),
-				withRequestLast24h(16, withNodeRequestLog("node1")),
-				withRequestLast24h(17, withNodeRequestLog("node1")),
-				withRequestLast24h(18, withNodeRequestLog("node1")),
-				withRequestLast24h(19, withNodeRequestLog("node1")),
-				withRequestLast24h(20, withNodeRequestLog("node1")),
-				withRequestLast24h(21, withNodeRequestLog("node1")),
-				withRequestLast24h(22, withNodeRequestLog("node1")),
-				withRequestLast24h(23, withNodeRequestLog("node1")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1")),
+				setRequestCountTotals,
 			),
 		},
 		{
@@ -375,144 +379,175 @@ func TestSetRequestCountsForNode(t *testing.T) {
 				),
 			),
 			status: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1")),
-				withRequestLast24h(0, withNodeRequestLog("node1")),
-				withRequestLast24h(1, withNodeRequestLog("node1")),
-				withRequestLast24h(2, withNodeRequestLog("node1")),
-				withRequestLast24h(3, withNodeRequestLog("node1",
-					withRequestUser("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(3, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
 				)),
-				withRequestLast24h(4, withNodeRequestLog("node1",
-					withRequestUser("mia", withRequestCount("delete", 1386)),
+				withRequestLast24h(4, withPerNodeAPIRequestLog("node1",
+					withPerUserAPIRequestCount("mia", withRequestCount("delete", 1386)),
 				)),
-				withRequestLast24h(6, withNodeRequestLog("node1")),
-				withRequestLast24h(7, withNodeRequestLog("node1")),
-				withRequestLast24h(8, withNodeRequestLog("node1")),
-				withRequestLast24h(9, withNodeRequestLog("node1")),
-				withRequestLast24h(10, withNodeRequestLog("node1")),
-				withRequestLast24h(11, withNodeRequestLog("node1")),
-				withRequestLast24h(12, withNodeRequestLog("node1")),
-				withRequestLast24h(13, withNodeRequestLog("node1")),
-				withRequestLast24h(14, withNodeRequestLog("node1")),
-				withRequestLast24h(15, withNodeRequestLog("node1")),
-				withRequestLast24h(16, withNodeRequestLog("node1")),
-				withRequestLast24h(17, withNodeRequestLog("node1")),
-				withRequestLast24h(18, withNodeRequestLog("node1")),
-				withRequestLast24h(19, withNodeRequestLog("node1")),
-				withRequestLast24h(20, withNodeRequestLog("node1")),
-				withRequestLast24h(21, withNodeRequestLog("node1")),
-				withRequestLast24h(22, withNodeRequestLog("node1")),
-				withRequestLast24h(23, withNodeRequestLog("node1")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1")),
+				setRequestCountTotals,
 			),
 			expected: deprecatedAPIRequestStatus(
-				withRequestLastHour(withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(0, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(1, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(2, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
+				withRequestLastHour(withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(0, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(1, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(2, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
 				withRequestLast24h(3,
-					withNodeRequestLog("node1",
-						withRequestUser("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
+					withPerNodeAPIRequestLog("node1",
+						withPerUserAPIRequestCount("eva", withRequestCount("get", 625), withRequestCount("watch", 540)),
 					),
-					withNodeRequestLog("node2",
-						withRequestUser("mia", withRequestCount("get", 305)),
-						withRequestUser("ivy", withRequestCount("create", 1113)),
-						withRequestUser("zoe", withRequestCount("delete", 1386), withRequestCount("patch", 1217)),
+					withPerNodeAPIRequestLog("node2",
+						withPerUserAPIRequestCount("mia", withRequestCount("get", 305)),
+						withPerUserAPIRequestCount("ivy", withRequestCount("create", 1113)),
+						withPerUserAPIRequestCount("zoe", withRequestCount("delete", 1386), withRequestCount("patch", 1217)),
 					),
 				),
 				withRequestLast24h(4,
-					withNodeRequestLog("node1",
-						withRequestUser("mia", withRequestCount("delete", 1386)),
+					withPerNodeAPIRequestLog("node1",
+						withPerUserAPIRequestCount("mia", withRequestCount("delete", 1386)),
 					),
-					withNodeRequestLog("node2"),
+					withPerNodeAPIRequestLog("node2"),
 				),
-				withRequestLast24h(6, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(7, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(8, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(9, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(10, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(11, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(12, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(13, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(14, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(15, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(16, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(17, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(18, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(19, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(20, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(21, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(22, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
-				withRequestLast24h(23, withNodeRequestLog("node1"), withNodeRequestLog("node2")),
+				withRequestLast24h(6, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(7, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(8, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(9, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(10, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(11, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(12, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(13, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(14, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(15, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(16, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(17, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(18, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(19, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(20, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(21, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(22, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				withRequestLast24h(23, withPerNodeAPIRequestLog("node1"), withPerNodeAPIRequestLog("node2")),
+				setRequestCountTotals,
 			),
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			SetRequestCountsForNode(tc.nodeName, tc.expiredHour, tc.countsToPersist)(tc.status)
-			assert.Equal(t, tc.status, tc.expected)
+			assert.Equal(t, tc.expected, tc.status)
 		})
 	}
 
 }
 
-func withRequestUser(user string, options ...func(*apiv1.RequestUser)) func(*apiv1.NodeRequestLog) {
-	return func(nodeRequestlog *apiv1.NodeRequestLog) {
-		requestUser := &apiv1.RequestUser{
+func withPerUserAPIRequestCount(user string, options ...func(*apiv1.PerUserAPIRequestCount)) func(*apiv1.PerNodeAPIRequestLog) {
+	return func(nodeRequestlog *apiv1.PerNodeAPIRequestLog) {
+		requestUser := &apiv1.PerUserAPIRequestCount{
 			UserName: user,
 		}
 		for _, f := range options {
 			f(requestUser)
 		}
-		nodeRequestlog.Users = append(nodeRequestlog.Users, *requestUser)
+		nodeRequestlog.ByUser = append(nodeRequestlog.ByUser, *requestUser)
 	}
 }
 
-func withRequestCount(verb string, count int) func(user *apiv1.RequestUser) {
-	return func(requestUser *apiv1.RequestUser) {
-		requestCount := apiv1.RequestCount{Verb: verb, Count: count}
-		requestUser.Requests = append(requestUser.Requests, requestCount)
-		requestUser.Count += count
+func withRequestCount(verb string, count int64) func(user *apiv1.PerUserAPIRequestCount) {
+	return func(requestUser *apiv1.PerUserAPIRequestCount) {
+		requestCount := apiv1.PerVerbAPIRequestCount{Verb: verb, RequestCount: count}
+		requestUser.ByVerb = append(requestUser.ByVerb, requestCount)
+		requestUser.RequestCount += count
 	}
 }
 
-func deprecatedAPIRequestStatus(options ...func(*apiv1.DeprecatedAPIRequestStatus)) *apiv1.DeprecatedAPIRequestStatus {
-	status := &apiv1.DeprecatedAPIRequestStatus{}
+func setRequestCountTotals(status *apiv1.APIRequestCountStatus) {
+	totalForDay := int64(0)
+	for hourIndex, hourlyCount := range status.Last24h {
+		totalForHour := int64(0)
+		for nodeIndex, nodeCount := range hourlyCount.ByNode {
+			totalForNode := int64(0)
+			for _, userCount := range nodeCount.ByUser {
+				totalForNode += userCount.RequestCount
+			}
+			status.Last24h[hourIndex].ByNode[nodeIndex].RequestCount = totalForNode
+			totalForHour += totalForNode
+		}
+		status.Last24h[hourIndex].RequestCount = totalForHour
+		totalForDay += totalForHour
+	}
+	status.RequestCount = totalForDay
+
+	totalForCurrentHour := int64(0)
+	for nodeIndex, nodeCount := range status.CurrentHour.ByNode {
+		totalForNode := int64(0)
+		for _, userCount := range nodeCount.ByUser {
+			totalForNode += userCount.RequestCount
+		}
+		status.CurrentHour.ByNode[nodeIndex].RequestCount = totalForNode
+		totalForCurrentHour += totalForNode
+	}
+	status.CurrentHour.RequestCount = totalForCurrentHour
+}
+
+func deprecatedAPIRequestStatus(options ...func(*apiv1.APIRequestCountStatus)) *apiv1.APIRequestCountStatus {
+	status := &apiv1.APIRequestCountStatus{}
 	for _, f := range options {
 		f(status)
 	}
 	return status
 }
 
-func requestLog(options ...func(*apiv1.RequestLog)) apiv1.RequestLog {
-	requestLog := &apiv1.RequestLog{}
+func requestLog(options ...func(*apiv1.PerResourceAPIRequestLog)) apiv1.PerResourceAPIRequestLog {
+	requestLog := &apiv1.PerResourceAPIRequestLog{}
 	for _, f := range options {
 		f(requestLog)
 	}
 	return *requestLog
 }
 
-func withRequestLastHour(options ...func(*apiv1.RequestLog)) func(*apiv1.DeprecatedAPIRequestStatus) {
-	return func(status *apiv1.DeprecatedAPIRequestStatus) {
-		status.RequestsLastHour = requestLog(options...)
+func withRequestLastHour(options ...func(*apiv1.PerResourceAPIRequestLog)) func(*apiv1.APIRequestCountStatus) {
+	return func(status *apiv1.APIRequestCountStatus) {
+		status.CurrentHour = requestLog(options...)
 	}
 }
 
-func withRequestLast24h(hour int, options ...func(*apiv1.RequestLog)) func(*apiv1.DeprecatedAPIRequestStatus) {
-	return func(status *apiv1.DeprecatedAPIRequestStatus) {
-		if status.RequestsLast24h == nil {
-			status.RequestsLast24h = make([]apiv1.RequestLog, 24)
+func withRequestLast24h(hour int, options ...func(*apiv1.PerResourceAPIRequestLog)) func(*apiv1.APIRequestCountStatus) {
+	return func(status *apiv1.APIRequestCountStatus) {
+		if status.Last24h == nil {
+			status.Last24h = make([]apiv1.PerResourceAPIRequestLog, 24)
 		}
-		status.RequestsLast24h[hour] = requestLog(options...)
+		status.Last24h[hour] = requestLog(options...)
 	}
 }
 
-func withNodeRequestLog(node string, options ...func(*apiv1.NodeRequestLog)) func(*apiv1.RequestLog) {
-	return func(log *apiv1.RequestLog) {
-		nodeRequestLog := &apiv1.NodeRequestLog{NodeName: node}
+func withPerNodeAPIRequestLog(node string, options ...func(*apiv1.PerNodeAPIRequestLog)) func(*apiv1.PerResourceAPIRequestLog) {
+	return func(log *apiv1.PerResourceAPIRequestLog) {
+		nodeRequestLog := &apiv1.PerNodeAPIRequestLog{NodeName: node}
 		for _, f := range options {
 			f(nodeRequestLog)
 		}
-		log.Nodes = append(log.Nodes, *nodeRequestLog)
+		log.ByNode = append(log.ByNode, *nodeRequestLog)
 	}
 }
 
@@ -581,8 +616,8 @@ func withUser(user string, options ...func(*userRequestCounts)) func(counts *hou
 	}
 }
 
-func withCounts(verb string, count int) func(*userRequestCounts) {
+func withCounts(verb string, count int64) func(*userRequestCounts) {
 	return func(u *userRequestCounts) {
-		u.verbsToRequestCounts[verb] = &verbRequestCount{count: uint32(count)}
+		u.verbsToRequestCounts[verb] = &verbRequestCount{count: count}
 	}
 }

@@ -37,8 +37,19 @@ func (c *clusterRequestCounts) Node(nodeName string) *apiRequestCounts {
 	return c.nodeToRequestCount[nodeName]
 }
 
-func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user, verb string, count int) {
+func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
 	c.Node(node).IncrementRequestCount(resource, hour, user, verb, count)
+}
+
+func (c *clusterRequestCounts) String() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	mapStrings := []string{}
+	for _, k := range sets.StringKeySet(c.nodeToRequestCount).List() {
+		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.nodeToRequestCount[k]))
+	}
+	return fmt.Sprintf("nodeToRequestCount: {%v}", strings.Join(mapStrings, ", "))
 }
 
 type apiRequestCounts struct {
@@ -76,7 +87,7 @@ func (c *apiRequestCounts) Add(requestCounts *apiRequestCounts) {
 	}
 }
 
-func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user, verb string, count int) {
+func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
 	c.Resource(resource).IncrementRequestCount(hour, user, verb, count)
 }
 
@@ -176,7 +187,7 @@ func (c *resourceRequestCounts) Add(requestCounts *resourceRequestCounts) {
 	}
 }
 
-func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb string, count int) {
+func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb string, count int64) {
 	c.Hour(hour).IncrementRequestCount(user, verb, count)
 }
 
@@ -250,7 +261,7 @@ func (c *hourlyRequestCounts) Add(requestCounts *hourlyRequestCounts) {
 	}
 }
 
-func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int) {
+func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int64) {
 	c.User(user).IncrementRequestCount(verb, count)
 }
 
@@ -322,7 +333,7 @@ func (c *userRequestCounts) Add(requestCounts *userRequestCounts) {
 	}
 }
 
-func (c *userRequestCounts) IncrementRequestCount(verb string, count int) {
+func (c *userRequestCounts) IncrementRequestCount(verb string, count int64) {
 	c.Verb(verb).IncrementRequestCount(count)
 }
 
@@ -364,19 +375,19 @@ func (c *userRequestCounts) String() string {
 }
 
 type verbRequestCount struct {
-	count uint32
+	count int64
 }
 
-func (c *verbRequestCount) Add(count uint32) {
-	atomic.AddUint32(&c.count, count)
+func (c *verbRequestCount) Add(count int64) {
+	atomic.AddInt64(&c.count, count)
 }
 
-func (c *verbRequestCount) IncrementRequestCount(count int) {
-	c.Add(uint32(count))
+func (c *verbRequestCount) IncrementRequestCount(count int64) {
+	c.Add(count)
 }
 
 func (c *verbRequestCount) Equals(rhs *verbRequestCount) bool {
-	lhsV := atomic.LoadUint32(&c.count)
-	rhsV := atomic.LoadUint32(&rhs.count)
+	lhsV := atomic.LoadInt64(&c.count)
+	rhsV := atomic.LoadInt64(&rhs.count)
 	return lhsV == rhsV
 }

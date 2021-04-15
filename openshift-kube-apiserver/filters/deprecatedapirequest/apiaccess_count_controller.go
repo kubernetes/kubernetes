@@ -14,7 +14,7 @@ import (
 )
 
 // NewController returns a controller
-func NewController(client apiclientv1.DeprecatedAPIRequestInterface, nodeName string) *controller {
+func NewController(client apiclientv1.APIRequestCountInterface, nodeName string) *controller {
 	ret := &controller{
 		client:       client,
 		nodeName:     nodeName,
@@ -32,7 +32,7 @@ type APIRequestLogger interface {
 }
 
 type controller struct {
-	client       apiclientv1.DeprecatedAPIRequestInterface
+	client       apiclientv1.APIRequestCountInterface
 	nodeName     string
 	updatePeriod time.Duration
 
