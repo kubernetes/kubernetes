@@ -301,6 +301,65 @@ func TestGetHugepageLimitsFromResources(t *testing.T) {
 	}
 }
 
+func TestLinuxContainerConfigCPUShare(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	if err != nil {
+		t.Fatalf("error creating test RuntimeManager: %v", err)
+	}
+	// since our testing pods are burstEffort ones, we need to set memory capacity info
+	m.machineInfo.MemoryCapacity = 1
+
+	for _, tc := range []struct {
+		name     string
+		pod      *v1.Pod
+		expected int64
+	}{
+		{
+			"CPURequestSetAsZero",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "test",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("0"),
+							},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("4"),
+							},
+						},
+					}},
+				},
+			},
+			2,
+		},
+		{
+			"CPURequestSetAsEmpty",
+			&v1.Pod{
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name: "test",
+						Resources: v1.ResourceRequirements{
+							Requests: v1.ResourceList{},
+							Limits: v1.ResourceList{
+								v1.ResourceCPU: resource.MustParse("4"),
+							},
+						},
+					}},
+				},
+			},
+			4096,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := m.generateLinuxContainerConfig(&tc.pod.Spec.Containers[0], tc.pod, nil, "", nil)
+			if diff := cmp.Diff(tc.expected, got.Resources.CpuShares); diff != "" {
+				t.Errorf("%v: diff (-want +got):\n%v", t.Name(), diff)
+			}
+		})
+	}
+}
+
 func TestGenerateLinuxContainerConfigNamespaces(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 	_, _, m, err := createTestRuntimeManager()
