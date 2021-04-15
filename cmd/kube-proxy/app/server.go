@@ -142,66 +142,101 @@ func (o *Options) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
 	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
 	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
+	fs.MarkDeprecated("kubeconfig", "This flag is deprecated and will be removed in a future release.")
 	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
+	fs.MarkDeprecated("cluster-cidr", "This flag is deprecated and will be removed in a future release.")
 	fs.StringVar(&o.config.ClientConnection.ContentType, "kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
+	fs.MarkDeprecated("kube-api-content-type", "This flag is deprecated and will be removed in a future release.")
 	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
+	fs.MarkDeprecated("ipvs-scheduler", "This flag is deprecated and will be removed in a future release.")
 	fs.StringVar(&o.config.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.config.ShowHiddenMetricsForVersion,
 		"The previous version for which you want to show hidden metrics. "+
 			"Only the previous minor version is meaningful, other values will not be allowed. "+
 			"The format is <major>.<minor>, e.g.: '1.16'. "+
 			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
 			"rather than being surprised when they are permanently removed in the release after that.")
+	fs.MarkDeprecated("show-hidden-metrics-for-version", "This flag is deprecated and will be removed in a future release.")
 
 	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
+	fs.MarkDeprecated("ipvs-exclude-cidrs", "This flag is deprecated and will be removed in a future release.")
 	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
 		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
+	fs.MarkDeprecated("nodeport-addresses", "This flag is deprecated and will be removed in a future release.")
 
 	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
 
 	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
+	fs.MarkDeprecated("bind-address", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
+	fs.MarkDeprecated("healthz-bind-address", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
+	fs.MarkDeprecated("metrics-bind-address", "This flag is deprecated and will be removed in a future release.")
 	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
+	fs.MarkDeprecated("bind-address-hard-fail", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
+	fs.MarkDeprecated("proxy-port-range", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' or 'kernelspace' (windows). If blank, use the best-available proxy (currently iptables). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
+	fs.MarkDeprecated("proxy-mode", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
+	fs.MarkDeprecated("feature-gates", "This flag is deprecated and will be removed in a future release.")
 
 	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
 	fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
 	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
 	fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
 	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
+	fs.MarkDeprecated("oom-score-adj", "This flag is deprecated and will be removed in a future release.")
 	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
+	fs.MarkDeprecated("iptables-masquerade-bit", "This flag is deprecated and will be removed in a future release.")
 	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
+	fs.MarkDeprecated("conntrack-max-per-core", "This flag is deprecated and will be removed in a future release.")
 	fs.Int32Var(o.config.Conntrack.Min, "conntrack-min", *o.config.Conntrack.Min,
 		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
+	fs.MarkDeprecated("conntrack-min", "This flag is deprecated and will be removed in a future release.")
 	fs.Int32Var(&o.config.ClientConnection.Burst, "kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
+	fs.MarkDeprecated("kube-api-burst", "This flag is deprecated and will be removed in a future release.")
 
 	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.MarkDeprecated("iptables-sync-period", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.MarkDeprecated("iptables-min-sync-period", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
+	fs.MarkDeprecated("ipvs-sync-period", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
+	fs.MarkDeprecated("ipvs-min-sync-period", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPVS.TCPTimeout.Duration, "ipvs-tcp-timeout", o.config.IPVS.TCPTimeout.Duration, "The timeout for idle IPVS TCP connections, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
+	fs.MarkDeprecated("ipvs-tcp-timeout", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPVS.TCPFinTimeout.Duration, "ipvs-tcpfin-timeout", o.config.IPVS.TCPFinTimeout.Duration, "The timeout for IPVS TCP connections after receiving a FIN packet, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
+	fs.MarkDeprecated("ipvs-tcpfin-timeout", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.IPVS.UDPTimeout.Duration, "ipvs-udp-timeout", o.config.IPVS.UDPTimeout.Duration, "The timeout for IPVS UDP packets, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
+	fs.MarkDeprecated("ipvs-udp-timeout", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", o.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
+	fs.MarkDeprecated("conntrack-tcp-timeout-established", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(
 		&o.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
 		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
 		"NAT timeout for TCP connections in the CLOSE_WAIT state")
+	fs.MarkDeprecated("conntrack-tcp-timeout-close-wait", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
+	fs.MarkDeprecated("config-sync-period", "This flag is deprecated and will be removed in a future release.")
 	fs.DurationVar(&o.config.UDPIdleTimeout.Duration, "udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
+	fs.MarkDeprecated("udp-timeout", "This flag is deprecated and will be removed in a future release.")
 
 	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
+	fs.MarkDeprecated("ipvs-strict-arp", "This flag is deprecated and will be removed in a future release.")
 	fs.BoolVar(&o.config.IPTables.MasqueradeAll, "masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
+	fs.MarkDeprecated("masquerade-all", "This flag is deprecated and will be removed in a future release.")
 	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
+	fs.MarkDeprecated("profiling", "This flag is deprecated and will be removed in a future release.")
 
 	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
+	fs.MarkDeprecated("kube-api-qps", "This flag is deprecated and will be removed in a future release.")
 	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic")
+	fs.MarkDeprecated("detect-local-mode", "This flag is deprecated and will be removed in a future release.")
 }
 
 // NewOptions returns initialized Options
