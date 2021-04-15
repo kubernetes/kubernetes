@@ -3,7 +3,6 @@
 filters:
   ".*":
     approvers:
-    - erictune
     - lavalamp
     - smarterclayton
     - thockin
@@ -20,7 +19,6 @@ filters:
     - vishh
     - mikedanese
     - liggitt
-    - erictune
     - pmorie
     - sttts
     - dchen1107
