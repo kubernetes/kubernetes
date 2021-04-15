@@ -20,7 +20,7 @@ import (
 	"net"
 	"testing"
 
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
+	utilipvs "k8s.io/component-helpers/networking/utils/ipvs"
 )
 
 func TestVirtualServer(t *testing.T) {

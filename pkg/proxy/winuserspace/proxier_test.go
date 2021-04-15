@@ -34,8 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	netshtest "k8s.io/component-helpers/networking/utils/netsh/testing"
 	"k8s.io/kubernetes/pkg/proxy"
-	netshtest "k8s.io/kubernetes/pkg/util/netsh/testing"
 )
 
 const (

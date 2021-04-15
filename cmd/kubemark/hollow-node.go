@@ -41,6 +41,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
+	fakeiptables "k8s.io/component-helpers/networking/utils/iptables/testing"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
@@ -49,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cri/remote"
 	fakeremote "k8s.io/kubernetes/pkg/kubelet/cri/remote/fake"
 	"k8s.io/kubernetes/pkg/kubemark"
-	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	fakeexec "k8s.io/utils/exec/testing"

@@ -44,6 +44,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-helpers/networking/utils/conntrack"
+	utilipset "k8s.io/component-helpers/networking/utils/ipset"
+	utiliptables "k8s.io/component-helpers/networking/utils/iptables"
+	utilipvs "k8s.io/component-helpers/networking/utils/ipvs"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
@@ -52,10 +56,6 @@ import (
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	"k8s.io/kubernetes/pkg/util/async"
-	"k8s.io/kubernetes/pkg/util/conntrack"
-	utilipset "k8s.io/kubernetes/pkg/util/ipset"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 )
 

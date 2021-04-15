@@ -22,8 +22,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilipvs "k8s.io/component-helpers/networking/utils/ipvs"
 	"k8s.io/klog/v2"
-	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 )
 
 const (

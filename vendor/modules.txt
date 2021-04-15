@@ -778,7 +778,6 @@ github.com/mitchellh/go-wordwrap
 github.com/mitchellh/mapstructure
 # github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
 # github.com/moby/ipvs v1.0.1 => github.com/moby/ipvs v1.0.1
-## explicit
 github.com/moby/ipvs
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 # github.com/moby/spdystream v0.2.0 => github.com/moby/spdystream v0.2.0
@@ -2281,6 +2280,16 @@ k8s.io/component-helpers/apimachinery/lease
 k8s.io/component-helpers/apps/poddisruptionbudget
 k8s.io/component-helpers/auth/rbac/reconciliation
 k8s.io/component-helpers/auth/rbac/validation
+k8s.io/component-helpers/networking/utils/conntrack
+k8s.io/component-helpers/networking/utils/ipconfig
+k8s.io/component-helpers/networking/utils/ipset
+k8s.io/component-helpers/networking/utils/ipset/testing
+k8s.io/component-helpers/networking/utils/iptables
+k8s.io/component-helpers/networking/utils/iptables/testing
+k8s.io/component-helpers/networking/utils/ipvs
+k8s.io/component-helpers/networking/utils/ipvs/testing
+k8s.io/component-helpers/networking/utils/netsh
+k8s.io/component-helpers/networking/utils/netsh/testing
 k8s.io/component-helpers/node/topology
 k8s.io/component-helpers/scheduling/corev1
 k8s.io/component-helpers/scheduling/corev1/nodeaffinity

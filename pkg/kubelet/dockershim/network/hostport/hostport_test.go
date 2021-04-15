@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
+	utiliptables "k8s.io/component-helpers/networking/utils/iptables"
 )
 
 type fakeSocket struct {

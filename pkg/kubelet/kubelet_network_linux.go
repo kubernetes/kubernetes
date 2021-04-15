@@ -24,9 +24,9 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utiliptables "k8s.io/component-helpers/networking/utils/iptables"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )

@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/component-helpers/networking/utils/netsh"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
-	"k8s.io/kubernetes/pkg/util/netsh"
 )
 
 const allAvailableInterfaces string = ""

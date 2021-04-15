@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package ipconfig provides an interface and implementations for running Windows ipconfig commands.
-package ipconfig // import "k8s.io/kubernetes/pkg/util/ipconfig"
+// Package netsh provides an interface and implementations for running Windows netsh commands.
+package netsh // import "k8s.io/component-helpers/networking/utils/netsh"

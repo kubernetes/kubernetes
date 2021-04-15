@@ -35,8 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	ipttest "k8s.io/component-helpers/networking/utils/iptables/testing"
 	"k8s.io/kubernetes/pkg/proxy"
-	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
 )

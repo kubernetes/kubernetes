@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"net"
 
+	utiliptables "k8s.io/component-helpers/networking/utils/iptables"
 	"k8s.io/klog/v2"
-	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnet "k8s.io/utils/net"
 )
 
