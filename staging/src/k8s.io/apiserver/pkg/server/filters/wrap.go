@@ -28,7 +28,7 @@ import (
 )
 
 // WithPanicRecovery wraps an http Handler to recover and log panics (except in the special case of http.ErrAbortHandler panics, which suppress logging).
-func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolver, isTerminating func() bool) http.Handler {
+func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolver) http.Handler {
 	return withPanicRecovery(handler, func(w http.ResponseWriter, req *http.Request, err interface{}) {
 		if err == http.ErrAbortHandler {
 			// Honor the http.ErrAbortHandler sentinel panic value
@@ -51,16 +51,20 @@ func WithPanicRecovery(handler http.Handler, resolver request.RequestInfoResolve
 			// This call can have different handlers, but the default chain rate limits. Call it after the metrics are updated
 			// in case the rate limit delays it.  If you outrun the rate for this one timed out requests, something has gone
 			// seriously wrong with your server, but generally having a logging signal for timeouts is useful.
-			runtime.HandleError(fmt.Errorf("timeout or abort while handling: %v %q", req.Method, req.URL.Path))
+			runtime.HandleError(fmt.Errorf("timeout or abort while handling: method=%v URI=%q audit-ID=%q", req.Method, req.RequestURI, request.GetAuditIDTruncated(req)))
 			return
 		}
 		http.Error(w, "This request caused apiserver to panic. Look in the logs for details.", http.StatusInternalServerError)
-		klog.Errorf("apiserver panic'd on %v %v", req.Method, req.RequestURI)
-	}, isTerminating)
+		klog.ErrorS(nil, "apiserver panic'd", "method", req.Method, "URI", req.RequestURI, "audit-ID", request.GetAuditIDTruncated(req))
+	})
 }
 
-func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{}), isTerminating func() bool) http.Handler {
-	handler = httplog.WithLogging(handler, httplog.DefaultStacktracePred, isTerminating)
+// WithHTTPLogging enables logging of incoming requests.
+func WithHTTPLogging(handler http.Handler, isTerminating func() bool) http.Handler {
+	return httplog.WithLogging(handler, httplog.DefaultStacktracePred, isTerminating)
+}
+
+func withPanicRecovery(handler http.Handler, crashHandler func(http.ResponseWriter, *http.Request, interface{})) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		defer runtime.HandleCrash(func(err interface{}) {
 			crashHandler(w, req, err)

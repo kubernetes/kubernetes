@@ -853,7 +853,8 @@ func newHandlerChain(t *testing.T, handler http.Handler, filter utilflowcontrol.
 	// we don't have any request with invalid timeout, so leaving audit policy and sink nil.
 	handler = apifilters.WithRequestDeadline(handler, nil, nil, longRunningRequestCheck, nil, requestTimeout)
 	handler = apifilters.WithRequestInfo(handler, requestInfoFactory)
-	handler = WithPanicRecovery(handler, requestInfoFactory, nil)
+	handler = WithPanicRecovery(handler, requestInfoFactory)
+	handler = apifilters.WithAuditID(handler)
 	return handler
 }
 
