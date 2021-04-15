@@ -342,11 +342,6 @@ func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplat
 	return errors.New("CreatePods() is not implemented for podControlAdapter")
 }
 
-func (pc podControlAdapter) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	// This is not used by RSC.
-	return errors.New("CreatePodsOnNode() is not implemented for podControlAdapter")
-}
-
 func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
