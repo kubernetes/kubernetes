@@ -531,7 +531,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 
 	var succeededIndexes string
 	if isIndexedJob(&job) {
-		succeededIndexes, succeeded = calculateSucceededIndexes(pods)
+		succeededIndexes, succeeded = calculateSucceededIndexes(pods, *job.Spec.Completions)
 	}
 	jobConditionsChanged := false
 	manageJobCalled := false
@@ -810,7 +810,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		wait := sync.WaitGroup{}
 
 		var indexesToAdd []int
-		if job.Spec.Completions != nil && isIndexedJob(job) {
+		if isIndexedJob(job) {
 			indexesToAdd = firstPendingIndexes(allPods, int(diff), int(*job.Spec.Completions))
 			diff = int32(len(indexesToAdd))
 		}
@@ -889,7 +889,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 
 // activePodsForRemoval returns Pods that should be removed because there
 // are too many pods running or, if this is an indexed job, there are repeated
-// indexes or some pods don't have indexes.
+// indexes or invalid indexes or some pods don't have indexes.
 // Sorts candidate pods in the order such that not-ready < ready, unscheduled
 // < scheduled, and pending < running. This ensures that we delete pods
 // in the earlier stages whenever possible.
@@ -899,7 +899,7 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 	if isIndexedJob(job) {
 		rm = make([]*v1.Pod, 0, rmAtLeast)
 		left = make([]*v1.Pod, 0, len(pods)-rmAtLeast)
-		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods)
+		rm, left = appendDuplicatedIndexPodsForRemoval(rm, left, pods, int(*job.Spec.Completions))
 	} else {
 		left = pods
 	}
@@ -953,7 +953,8 @@ func getBackoff(queue workqueue.RateLimitingInterface, key interface{}) time.Dur
 func countPodsByPhase(job *batch.Job, pods []*v1.Pod, phase v1.PodPhase) int {
 	result := 0
 	for _, p := range pods {
-		if phase == p.Status.Phase && (!isIndexedJob(job) || getCompletionIndex(p.Annotations) != unknownCompletionIndex) {
+		idx := getCompletionIndex(p.Annotations)
+		if phase == p.Status.Phase && (!isIndexedJob(job) || (idx != unknownCompletionIndex && idx < int(*job.Spec.Completions))) {
 			result++
 		}
 	}

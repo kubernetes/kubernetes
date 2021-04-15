@@ -40,7 +40,7 @@ func isIndexedJob(job *batch.Job) bool {
 
 // calculateSucceededIndexes returns a string representation of the list of
 // succeeded indexes in compressed format and the number of succeeded indexes.
-func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {
+func calculateSucceededIndexes(pods []*v1.Pod, completions int32) (string, int32) {
 	sort.Sort(byCompletionIndex(pods))
 	var result strings.Builder
 	var lastSucceeded int
@@ -50,6 +50,9 @@ func calculateSucceededIndexes(pods []*v1.Pod) (string, int32) {
 		ix := getCompletionIndex(p.Annotations)
 		if ix == unknownCompletionIndex {
 			continue
+		}
+		if ix >= int(completions) {
+			break
 		}
 		if p.Status.Phase == v1.PodSucceeded {
 			if firstSucceeded == math.MinInt32 {
@@ -126,19 +129,26 @@ func firstPendingIndexes(pods []*v1.Pod, count, completions int) []int {
 // is the number of repetitions. The pods to be removed are appended to `rm`,
 // while the remaining pods are appended to `left`.
 // All pods that don't have a completion index are appended to `rm`.
-func appendDuplicatedIndexPodsForRemoval(rm, left, pods []*v1.Pod) ([]*v1.Pod, []*v1.Pod) {
+// All pods with index not in valid range are appended to `rm`.
+func appendDuplicatedIndexPodsForRemoval(rm, left, pods []*v1.Pod, completions int) ([]*v1.Pod, []*v1.Pod) {
 	sort.Sort(byCompletionIndex(pods))
 	lastIndex := unknownCompletionIndex
 	firstRepeatPos := 0
+	countLooped := 0
 	for i, p := range pods {
 		ix := getCompletionIndex(p.Annotations)
+		if ix >= completions {
+			rm = append(rm, pods[i:]...)
+			break
+		}
 		if ix != lastIndex {
 			rm, left = appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:i], lastIndex)
 			firstRepeatPos = i
 			lastIndex = ix
 		}
+		countLooped += 1
 	}
-	return appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:], lastIndex)
+	return appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods[firstRepeatPos:countLooped], lastIndex)
 }
 
 func appendPodsWithSameIndexForRemovalAndRemaining(rm, left, pods []*v1.Pod, ix int) ([]*v1.Pod, []*v1.Pod) {
