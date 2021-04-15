@@ -248,7 +248,7 @@ function Get-RemoteFile {
     $httpResponseMessage.Wait()
     if (-not $httpResponseMessage.IsCanceled) {
       # Check if the request was successful.
-      # 
+      #
       # DO NOT replace with EnsureSuccessStatusCode(), it prints the
       # OAuth2 bearer token.
       if (-not $httpResponseMessage.Result.IsSuccessStatusCode) {
@@ -295,7 +295,7 @@ function Check-StorageScope {
   While($true) {
     $data = Get-InstanceMetadata -Key "service-accounts/default/scopes"
     if ($data) {
-      return ($data -match "auth/devstorage")
+      return ($data -match "auth/devstorage") -or ($data -match "auth/cloud-platform")
     }
     Start-Sleep -Seconds 1
   }
