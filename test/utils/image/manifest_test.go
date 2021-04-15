@@ -149,7 +149,7 @@ func TestGetMappedImageConfigs(t *testing.T) {
 		actual[source.GetE2EImage()] = mapping.GetE2EImage()
 	}
 	expected := map[string]string{
-		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ekf1DrFA",
+		"docker.io/source/repo:1.0": "quay.io/repo/for-test:e2e-0-docker-io-source-repo-1-0-72R4aXm7YnxQ4_ek",
 	}
 	if !reflect.DeepEqual(expected, actual) {
 		t.Fatal(diff.ObjectReflectDiff(expected, actual))
