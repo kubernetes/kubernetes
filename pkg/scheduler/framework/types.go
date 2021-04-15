@@ -75,15 +75,21 @@ const (
 	WildCard              GVK = "*"
 )
 
-// WildCardEvent semantically matches all resources on all actions.
-var WildCardEvent = ClusterEvent{Resource: WildCard, ActionType: All}
-
 // ClusterEvent abstracts how a system resource's state gets changed.
 // Resource represents the standard API resources such as Pod, Node, etc.
 // ActionType denotes the specific change such as Add, Update or Delete.
 type ClusterEvent struct {
 	Resource   GVK
 	ActionType ActionType
+	Label      string
+}
+
+// IsWildCard returns true if ClusterEvent follows WildCard semantics
+func (ce ClusterEvent) IsWildCard() bool {
+	if ce.Resource == WildCard && ce.ActionType == All {
+		return true
+	}
+	return false
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to

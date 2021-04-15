@@ -119,8 +119,8 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 
 	nodeInfo := sched.SchedulerCache.UpdateNode(oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
-	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != "" {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(event, preCheckForNode(nodeInfo))
+	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo))
 	}
 }
 
@@ -412,24 +412,24 @@ func addAllEventHandlers(
 	)
 }
 
-func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) string {
+func nodeSchedulingPropertiesChange(newNode *v1.Node, oldNode *v1.Node) *framework.ClusterEvent {
 	if nodeSpecUnschedulableChanged(newNode, oldNode) {
-		return queue.NodeSpecUnschedulableChange
+		return &queue.NodeSpecUnschedulableChange
 	}
 	if nodeAllocatableChanged(newNode, oldNode) {
-		return queue.NodeAllocatableChange
+		return &queue.NodeAllocatableChange
 	}
 	if nodeLabelsChanged(newNode, oldNode) {
-		return queue.NodeLabelChange
+		return &queue.NodeLabelChange
 	}
 	if nodeTaintsChanged(newNode, oldNode) {
-		return queue.NodeTaintChange
+		return &queue.NodeTaintChange
 	}
 	if nodeConditionsChanged(newNode, oldNode) {
-		return queue.NodeConditionChange
+		return &queue.NodeConditionChange
 	}
 
-	return ""
+	return nil
 }
 
 func nodeAllocatableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
