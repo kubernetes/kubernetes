@@ -2630,8 +2630,8 @@ k8s.io/utils/trace
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/kustomize/api v0.8.5 => sigs.k8s.io/kustomize/api v0.8.5
-# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.5
+# sigs.k8s.io/kustomize/api v0.8.8 => sigs.k8s.io/kustomize/api v0.8.8
+# sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.8
 sigs.k8s.io/kustomize/api/builtins
 sigs.k8s.io/kustomize/api/filesys
 sigs.k8s.io/kustomize/api/filters/annotations
@@ -2652,7 +2652,6 @@ sigs.k8s.io/kustomize/api/hasher
 sigs.k8s.io/kustomize/api/ifc
 sigs.k8s.io/kustomize/api/image
 sigs.k8s.io/kustomize/api/internal/accumulator
-sigs.k8s.io/kustomize/api/internal/conflict
 sigs.k8s.io/kustomize/api/internal/generators
 sigs.k8s.io/kustomize/api/internal/git
 sigs.k8s.io/kustomize/api/internal/kusterr
@@ -2665,7 +2664,6 @@ sigs.k8s.io/kustomize/api/internal/plugins/utils
 sigs.k8s.io/kustomize/api/internal/target
 sigs.k8s.io/kustomize/api/internal/utils
 sigs.k8s.io/kustomize/api/internal/validate
-sigs.k8s.io/kustomize/api/internal/wrappy
 sigs.k8s.io/kustomize/api/konfig
 sigs.k8s.io/kustomize/api/konfig/builtinpluginconsts
 sigs.k8s.io/kustomize/api/krusty
@@ -2677,17 +2675,16 @@ sigs.k8s.io/kustomize/api/resid
 sigs.k8s.io/kustomize/api/resmap
 sigs.k8s.io/kustomize/api/resource
 sigs.k8s.io/kustomize/api/types
-# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.7
-# sigs.k8s.io/kustomize/kustomize/v4 v4.0.5 => sigs.k8s.io/kustomize/kustomize/v4 v4.0.5
-# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.0.5
+# sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.10
+# sigs.k8s.io/kustomize/kustomize/v4 v4.1.2 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.2
+# sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.2
 sigs.k8s.io/kustomize/kustomize/v4/commands/build
-# sigs.k8s.io/kustomize/kyaml v0.10.15 => sigs.k8s.io/kustomize/kyaml v0.10.15
-# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.10.15
+# sigs.k8s.io/kustomize/kyaml v0.10.17 => sigs.k8s.io/kustomize/kyaml v0.10.17
+# sigs.k8s.io/kustomize/kyaml => sigs.k8s.io/kustomize/kyaml v0.10.17
 sigs.k8s.io/kustomize/kyaml/comments
 sigs.k8s.io/kustomize/kyaml/errors
 sigs.k8s.io/kustomize/kyaml/ext
 sigs.k8s.io/kustomize/kyaml/fieldmeta
-sigs.k8s.io/kustomize/kyaml/filtersutil
 sigs.k8s.io/kustomize/kyaml/fn/runtime/container
 sigs.k8s.io/kustomize/kyaml/fn/runtime/exec
 sigs.k8s.io/kustomize/kyaml/fn/runtime/runtimeutil

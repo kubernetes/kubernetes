@@ -19,5 +19,8 @@ namespace:
   group: apiregistration.k8s.io
   kind: APIService
   create: true
+- path: spec/conversion/webhook/clientConfig/service/namespace
+  group: apiextensions.k8s.io
+  kind: CustomResourceDefinition
 `
 )

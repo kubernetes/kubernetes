@@ -6,14 +6,12 @@ package resmap
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/resource"
 	"sigs.k8s.io/kustomize/api/types"
-	kyaml_yaml "sigs.k8s.io/kustomize/kyaml/yaml"
-	"sigs.k8s.io/yaml"
+	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // resWrangler implements ResMap.
@@ -36,6 +34,18 @@ func newOne() *resWrangler {
 // Clear implements ResMap.
 func (m *resWrangler) Clear() {
 	m.rList = nil
+}
+
+// DropEmpties quickly drops empty resources.
+// It doesn't use Append, which checks for Id collisions.
+func (m *resWrangler) DropEmpties() {
+	var rList []*resource.Resource
+	for _, r := range m.rList {
+		if !r.IsEmpty() {
+			rList = append(rList, r)
+		}
+	}
+	m.rList = rList
 }
 
 // Size implements ResMap.
@@ -66,22 +76,27 @@ func (m *resWrangler) Append(res *resource.Resource) error {
 		return fmt.Errorf(
 			"may not add resource with an already registered id: %s", id)
 	}
-	m.rList = append(m.rList, res)
+	m.append(res)
 	return nil
+}
+
+// append appends without performing an Id check
+func (m *resWrangler) append(res *resource.Resource) {
+	m.rList = append(m.rList, res)
 }
 
 // Remove implements ResMap.
 func (m *resWrangler) Remove(adios resid.ResId) error {
-	tmp := newOne()
+	var rList []*resource.Resource
 	for _, r := range m.rList {
 		if r.CurId() != adios {
-			tmp.Append(r)
+			rList = append(rList, r)
 		}
 	}
-	if tmp.Size() != m.Size()-1 {
+	if len(rList) != m.Size()-1 {
 		return fmt.Errorf("id %s not found in removal", adios)
 	}
-	m.rList = tmp.rList
+	m.rList = rList
 	return nil
 }
 
@@ -118,16 +133,7 @@ func (m *resWrangler) Debug(title string) {
 		} else {
 			fmt.Println("---")
 		}
-		fmt.Printf("# %d  %s\n", i, r.OrgId())
-		m, err := r.Map()
-		if err != nil {
-			panic(err)
-		}
-		blob, err := yaml.Marshal(m)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(string(blob))
+		fmt.Printf("# %d  %s\n%s\n", i, r.OrgId(), r.String())
 	}
 }
 
@@ -273,7 +279,7 @@ func (m *resWrangler) AsYaml() ([]byte, error) {
 	firstObj := true
 	var b []byte
 	buf := bytes.NewBuffer(b)
-	for _, res := range m.Resources() {
+	for _, res := range m.rList {
 		out, err := res.AsYAML()
 		if err != nil {
 			m, _ := res.Map()
@@ -297,7 +303,7 @@ func (m *resWrangler) AsYaml() ([]byte, error) {
 func (m *resWrangler) ErrorIfNotEqualSets(other ResMap) error {
 	m2, ok := other.(*resWrangler)
 	if !ok {
-		panic("bad cast")
+		return fmt.Errorf("bad cast to resWrangler 1")
 	}
 	if m.Size() != m2.Size() {
 		return fmt.Errorf(
@@ -317,9 +323,9 @@ func (m *resWrangler) ErrorIfNotEqualSets(other ResMap) error {
 				"id in self matches %d in other; id: %s", len(others), id)
 		}
 		r2 := others[0]
-		if !r1.KunstructEqual(r2) {
+		if !r1.NodeEqual(r2) {
 			return fmt.Errorf(
-				"kunstruct not equal: \n -- %s,\n -- %s\n\n--\n%#v\n------\n%#v\n",
+				"nodes unequal: \n -- %s,\n -- %s\n\n--\n%#v\n------\n%#v\n",
 				r1, r2, r1, r2)
 		}
 		seen[m2.indexOfResource(r2)] = true
@@ -334,7 +340,7 @@ func (m *resWrangler) ErrorIfNotEqualSets(other ResMap) error {
 func (m *resWrangler) ErrorIfNotEqualLists(other ResMap) error {
 	m2, ok := other.(*resWrangler)
 	if !ok {
-		panic("bad cast")
+		return fmt.Errorf("bad cast to resWrangler 2")
 	}
 	if m.Size() != m2.Size() {
 		return fmt.Errorf(
@@ -388,7 +394,7 @@ func (m *resWrangler) SubsetThatCouldBeReferencedByResource(
 	}
 	result := newOne()
 	roleBindingNamespaces := getNamespacesForRoleBinding(referrer)
-	for _, possibleTarget := range m.Resources() {
+	for _, possibleTarget := range m.rList {
 		id := possibleTarget.CurId()
 		if !id.IsNamespaceableKind() {
 			// A cluster-scoped resource can be referred to by anything.
@@ -435,16 +441,21 @@ func getNamespacesForRoleBinding(r *resource.Resource) map[string]bool {
 	return result
 }
 
-func (m *resWrangler) append(res *resource.Resource) {
-	m.rList = append(m.rList, res)
-}
-
 // AppendAll implements ResMap.
 func (m *resWrangler) AppendAll(other ResMap) error {
 	if other == nil {
 		return nil
 	}
-	for _, res := range other.Resources() {
+	m2, ok := other.(*resWrangler)
+	if !ok {
+		return fmt.Errorf("bad cast to resWrangler 3")
+	}
+	return m.appendAll(m2.rList)
+}
+
+// appendAll appends all the resources, error on Id collision.
+func (m *resWrangler) appendAll(list []*resource.Resource) error {
+	for _, res := range list {
 		if err := m.Append(res); err != nil {
 			return err
 		}
@@ -457,7 +468,11 @@ func (m *resWrangler) AbsorbAll(other ResMap) error {
 	if other == nil {
 		return nil
 	}
-	for _, r := range other.Resources() {
+	m2, ok := other.(*resWrangler)
+	if !ok {
+		return fmt.Errorf("bad cast to resWrangler 4")
+	}
+	for _, r := range m2.rList {
 		err := m.appendReplaceOrMerge(r)
 		if err != nil {
 			return err
@@ -522,7 +537,7 @@ func (m *resWrangler) Select(s types.Selector) ([]*resource.Resource, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, r := range m.Resources() {
+	for _, r := range m.rList {
 		curId := r.CurId()
 		orgId := r.OrgId()
 
@@ -567,77 +582,39 @@ func (m *resWrangler) Select(s types.Selector) ([]*resource.Resource, error) {
 	return result, nil
 }
 
-// ToRNodeSlice converts the resources in the resmp
-// to a list of RNodes
-func (m *resWrangler) ToRNodeSlice() ([]*kyaml_yaml.RNode, error) {
-	var rnodes []*kyaml_yaml.RNode
-	for _, r := range m.Resources() {
-		s, err := r.AsYAML()
-		if err != nil {
-			return nil, err
-		}
-		rnode, err := kyaml_yaml.Parse(string(s))
-		if err != nil {
-			return nil, err
-		}
-		rnodes = append(rnodes, rnode)
+// ToRNodeSlice returns a copy of the resources as RNodes.
+func (m *resWrangler) ToRNodeSlice() []*kyaml.RNode {
+	result := make([]*kyaml.RNode, len(m.rList))
+	for i := range m.rList {
+		result[i] = m.rList[i].AsRNode()
 	}
-	return rnodes, nil
+	return result
 }
 
+// ApplySmPatch applies the patch, and errors on Id collisions.
 func (m *resWrangler) ApplySmPatch(
 	selectedSet *resource.IdSet, patch *resource.Resource) error {
-	newRm := New()
-	for _, res := range m.Resources() {
-		if !selectedSet.Contains(res.CurId()) {
-			newRm.Append(res)
-			continue
-		}
-		patchCopy := patch.DeepCopy()
-		patchCopy.CopyMergeMetaDataFieldsFrom(patch)
-		patchCopy.SetGvk(res.GetGvk())
-		err := res.ApplySmPatch(patchCopy)
-		if err != nil {
-			// Check for an error string from UnmarshalJSON that's indicative
-			// of an object that's missing basic KRM fields, and thus may have been
-			// entirely deleted (an acceptable outcome).  This error handling should
-			// be deleted along with use of ResMap and apimachinery functions like
-			// UnmarshalJSON.
-			if !strings.Contains(err.Error(), "Object 'Kind' is missing") {
-				// Some unknown error, let it through.
+	var list []*resource.Resource
+	for _, res := range m.rList {
+		if selectedSet.Contains(res.CurId()) {
+			patchCopy := patch.DeepCopy()
+			patchCopy.CopyMergeMetaDataFieldsFrom(patch)
+			patchCopy.SetGvk(res.GetGvk())
+			patchCopy.SetKind(patch.GetKind())
+			if err := res.ApplySmPatch(patchCopy); err != nil {
 				return err
 			}
-			empty, err := res.IsEmpty()
-			if err != nil {
-				return err
-			}
-			if !empty {
-				m, _ := res.Map()
-				return errors.Wrapf(
-					err, "with unexpectedly non-empty object map of size %d",
-					len(m))
-			}
-			// Fall through to handle deleted object.
 		}
-		empty, err := res.IsEmpty()
-		if err != nil {
-			return err
-		}
-		if !empty {
-			// IsEmpty means all fields have been removed from the object.
-			// This can happen if a patch required deletion of the
-			// entire resource (not just a part of it).  This means
-			// the overall resmap must shrink by one.
-			newRm.Append(res)
+		if !res.IsEmpty() {
+			list = append(list, res)
 		}
 	}
 	m.Clear()
-	m.AppendAll(newRm)
-	return nil
+	return m.appendAll(list)
 }
 
 func (m *resWrangler) RemoveBuildAnnotations() {
-	for _, r := range m.Resources() {
+	for _, r := range m.rList {
 		r.RemoveBuildAnnotations()
 	}
 }

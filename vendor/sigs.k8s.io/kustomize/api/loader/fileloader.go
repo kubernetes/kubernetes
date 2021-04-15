@@ -319,7 +319,6 @@ func (fl *fileLoader) Load(path string) ([]byte, error) {
 		}
 		return body, nil
 	}
-
 	if !filepath.IsAbs(path) {
 		path = fl.root.Join(path)
 	}
