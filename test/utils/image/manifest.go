@@ -306,7 +306,7 @@ func getRepositoryMappedConfig(index int, config Config, repo string) Config {
 
 	h := sha256.New()
 	h.Write([]byte(pullSpec))
-	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil)[:16])
+	hash := base64.RawURLEncoding.EncodeToString(h.Sum(nil))[:16]
 
 	shortName := reCharSafe.ReplaceAllLiteralString(pullSpec, "-")
 	shortName = reDashes.ReplaceAllLiteralString(shortName, "-")
