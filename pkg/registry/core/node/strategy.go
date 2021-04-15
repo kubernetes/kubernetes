@@ -22,6 +22,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -223,7 +224,7 @@ type ResourceGetter interface {
 func NodeToSelectableFields(node *api.Node) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&node.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
+		"spec.unschedulable": strconv.FormatBool(node.Spec.Unschedulable),
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

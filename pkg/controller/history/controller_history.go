@@ -99,7 +99,7 @@ func HashControllerRevision(revision *apps.ControllerRevision, probe *int32) str
 	if probe != nil {
 		hf.Write([]byte(strconv.FormatInt(int64(*probe), 10)))
 	}
-	return rand.SafeEncodeString(fmt.Sprint(hf.Sum32()))
+	return rand.SafeEncodeString(strconv.FormatUint(uint64(hf.Sum32()), 10))
 }
 
 // SortControllerRevisions sorts revisions by their Revision.

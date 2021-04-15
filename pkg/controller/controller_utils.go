@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1172,8 +1173,7 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 		binary.LittleEndian.PutUint32(collisionCountBytes, uint32(*collisionCount))
 		podTemplateSpecHasher.Write(collisionCountBytes)
 	}
-
-	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+	return rand.SafeEncodeString(strconv.FormatUint(uint64(podTemplateSpecHasher.Sum32()), 10))
 }
 
 func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
