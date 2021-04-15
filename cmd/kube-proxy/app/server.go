@@ -21,23 +21,11 @@ package app
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
-	gerrors "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -59,31 +47,25 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog/v2"
-	"k8s.io/kube-proxy/config/v1alpha1"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/cluster/ports"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
-	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
-	kubeproxyconfigv1alpha1 "k8s.io/kubernetes/pkg/proxy/apis/config/v1alpha1"
-	"k8s.io/kubernetes/pkg/proxy/apis/config/validation"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/ipvs"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
-	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/filesystem"
-	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"net/http"
+	"time"
+
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/utils/exec"
-	utilpointer "k8s.io/utils/pointer"
 )
 
 const (
@@ -93,373 +75,9 @@ const (
 	proxyModeKernelspace = "kernelspace"
 )
 
-// proxyRun defines the interface to run a specified ProxyServer
-type proxyRun interface {
-	Run() error
-	CleanupAndExit() error
-}
-
-// Options contains everything necessary to create and run a proxy server.
-type Options struct {
-	// ConfigFile is the location of the proxy server's configuration file.
-	ConfigFile string
-	// WriteConfigTo is the path where the default configuration will be written.
-	WriteConfigTo string
-	// CleanupAndExit, when true, makes the proxy server clean up iptables and ipvs rules, then exit.
-	CleanupAndExit bool
-	// WindowsService should be set to true if kube-proxy is running as a service on Windows.
-	// Its corresponding flag only gets registered in Windows builds
-	WindowsService bool
-	// config is the proxy server's configuration object.
-	config *kubeproxyconfig.KubeProxyConfiguration
-	// watcher is used to watch on the update change of ConfigFile
-	watcher filesystem.FSWatcher
-	// proxyServer is the interface to run the proxy server
-	proxyServer proxyRun
-	// errCh is the channel that errors will be sent
-	errCh chan error
-
-	// The fields below here are placeholders for flags that can't be directly mapped into
-	// config.KubeProxyConfiguration.
-	//
-	// TODO remove these fields once the deprecated flags are removed.
-
-	// master is used to override the kubeconfig's URL to the apiserver.
-	master string
-	// healthzPort is the port to be used by the healthz server.
-	healthzPort int32
-	// metricsPort is the port to be used by the metrics server.
-	metricsPort int32
-
-	// hostnameOverride, if set from the command line flag, takes precedence over the `HostnameOverride` value from the config file
-	hostnameOverride string
-}
-
-// AddFlags adds flags to fs and binds them to options.
-func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	o.addOSFlags(fs)
-
-	fs.StringVar(&o.ConfigFile, "config", o.ConfigFile, "The path to the configuration file.")
-	fs.StringVar(&o.WriteConfigTo, "write-config-to", o.WriteConfigTo, "If set, write the default configuration values to this file and exit.")
-	fs.StringVar(&o.config.ClientConnection.Kubeconfig, "kubeconfig", o.config.ClientConnection.Kubeconfig, "Path to kubeconfig file with authorization information (the master location can be overridden by the master flag).")
-	fs.StringVar(&o.config.ClusterCIDR, "cluster-cidr", o.config.ClusterCIDR, "The CIDR range of pods in the cluster. When configured, traffic sent to a Service cluster IP from outside this range will be masqueraded and traffic sent from pods to an external LoadBalancer IP will be directed to the respective cluster IP instead")
-	fs.StringVar(&o.config.ClientConnection.ContentType, "kube-api-content-type", o.config.ClientConnection.ContentType, "Content type of requests sent to apiserver.")
-	fs.StringVar(&o.master, "master", o.master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
-	fs.StringVar(&o.hostnameOverride, "hostname-override", o.hostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
-	fs.StringVar(&o.config.IPVS.Scheduler, "ipvs-scheduler", o.config.IPVS.Scheduler, "The ipvs scheduler type when proxy mode is ipvs")
-	fs.StringVar(&o.config.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.config.ShowHiddenMetricsForVersion,
-		"The previous version for which you want to show hidden metrics. "+
-			"Only the previous minor version is meaningful, other values will not be allowed. "+
-			"The format is <major>.<minor>, e.g.: '1.16'. "+
-			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
-			"rather than being surprised when they are permanently removed in the release after that.")
-
-	fs.StringSliceVar(&o.config.IPVS.ExcludeCIDRs, "ipvs-exclude-cidrs", o.config.IPVS.ExcludeCIDRs, "A comma-separated list of CIDR's which the ipvs proxier should not touch when cleaning up IPVS rules.")
-	fs.StringSliceVar(&o.config.NodePortAddresses, "nodeport-addresses", o.config.NodePortAddresses,
-		"A string slice of values which specify the addresses to use for NodePorts. Values may be valid IP blocks (e.g. 1.2.3.0/24, 1.2.3.4/32). The default empty string slice ([]) means to use all local addresses.")
-
-	fs.BoolVar(&o.CleanupAndExit, "cleanup", o.CleanupAndExit, "If true cleanup iptables and ipvs rules and exit.")
-
-	fs.Var(utilflag.IPVar{Val: &o.config.BindAddress}, "bind-address", "The IP address for the proxy server to serve on (set to '0.0.0.0' for all IPv4 interfaces and '::' for all IPv6 interfaces)")
-	fs.Var(utilflag.IPPortVar{Val: &o.config.HealthzBindAddress}, "healthz-bind-address", "The IP address with port for the health check server to serve on (set to '0.0.0.0:10256' for all IPv4 interfaces and '[::]:10256' for all IPv6 interfaces). Set empty to disable.")
-	fs.Var(utilflag.IPPortVar{Val: &o.config.MetricsBindAddress}, "metrics-bind-address", "The IP address with port for the metrics server to serve on (set to '0.0.0.0:10249' for all IPv4 interfaces and '[::]:10249' for all IPv6 interfaces). Set empty to disable.")
-	fs.BoolVar(&o.config.BindAddressHardFail, "bind-address-hard-fail", o.config.BindAddressHardFail, "If true kube-proxy will treat failure to bind to a port as fatal and exit")
-	fs.Var(utilflag.PortRangeVar{Val: &o.config.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, single port or beginPort+offset, inclusive) that may be consumed in order to proxy service traffic. If (unspecified, 0, or 0-0) then ports will be randomly chosen.")
-	fs.Var(&o.config.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster) or 'ipvs' or 'kernelspace' (windows). If blank, use the best-available proxy (currently iptables). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
-	fs.Var(cliflag.NewMapStringBool(&o.config.FeatureGates), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(utilfeature.DefaultFeatureGate.KnownFeatures(), "\n"))
-
-	fs.Int32Var(&o.healthzPort, "healthz-port", o.healthzPort, "The port to bind the health check server. Use 0 to disable.")
-	fs.MarkDeprecated("healthz-port", "This flag is deprecated and will be removed in a future release. Please use --healthz-bind-address instead.")
-	fs.Int32Var(&o.metricsPort, "metrics-port", o.metricsPort, "The port to bind the metrics server. Use 0 to disable.")
-	fs.MarkDeprecated("metrics-port", "This flag is deprecated and will be removed in a future release. Please use --metrics-bind-address instead.")
-	fs.Int32Var(o.config.OOMScoreAdj, "oom-score-adj", utilpointer.Int32PtrDerefOr(o.config.OOMScoreAdj, int32(qos.KubeProxyOOMScoreAdj)), "The oom-score-adj value for kube-proxy process. Values must be within the range [-1000, 1000]")
-	fs.Int32Var(o.config.IPTables.MasqueradeBit, "iptables-masquerade-bit", utilpointer.Int32PtrDerefOr(o.config.IPTables.MasqueradeBit, 14), "If using the pure iptables proxy, the bit of the fwmark space to mark packets requiring SNAT with.  Must be within the range [0, 31].")
-	fs.Int32Var(o.config.Conntrack.MaxPerCore, "conntrack-max-per-core", *o.config.Conntrack.MaxPerCore,
-		"Maximum number of NAT connections to track per CPU core (0 to leave the limit as-is and ignore conntrack-min).")
-	fs.Int32Var(o.config.Conntrack.Min, "conntrack-min", *o.config.Conntrack.Min,
-		"Minimum number of conntrack entries to allocate, regardless of conntrack-max-per-core (set conntrack-max-per-core=0 to leave the limit as-is).")
-	fs.Int32Var(&o.config.ClientConnection.Burst, "kube-api-burst", o.config.ClientConnection.Burst, "Burst to use while talking with kubernetes apiserver")
-
-	fs.DurationVar(&o.config.IPTables.SyncPeriod.Duration, "iptables-sync-period", o.config.IPTables.SyncPeriod.Duration, "The maximum interval of how often iptables rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
-	fs.DurationVar(&o.config.IPTables.MinSyncPeriod.Duration, "iptables-min-sync-period", o.config.IPTables.MinSyncPeriod.Duration, "The minimum interval of how often the iptables rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&o.config.IPVS.SyncPeriod.Duration, "ipvs-sync-period", o.config.IPVS.SyncPeriod.Duration, "The maximum interval of how often ipvs rules are refreshed (e.g. '5s', '1m', '2h22m').  Must be greater than 0.")
-	fs.DurationVar(&o.config.IPVS.MinSyncPeriod.Duration, "ipvs-min-sync-period", o.config.IPVS.MinSyncPeriod.Duration, "The minimum interval of how often the ipvs rules can be refreshed as endpoints and services change (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&o.config.IPVS.TCPTimeout.Duration, "ipvs-tcp-timeout", o.config.IPVS.TCPTimeout.Duration, "The timeout for idle IPVS TCP connections, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&o.config.IPVS.TCPFinTimeout.Duration, "ipvs-tcpfin-timeout", o.config.IPVS.TCPFinTimeout.Duration, "The timeout for IPVS TCP connections after receiving a FIN packet, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&o.config.IPVS.UDPTimeout.Duration, "ipvs-udp-timeout", o.config.IPVS.UDPTimeout.Duration, "The timeout for IPVS UDP packets, 0 to leave as-is. (e.g. '5s', '1m', '2h22m').")
-	fs.DurationVar(&o.config.Conntrack.TCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", o.config.Conntrack.TCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
-	fs.DurationVar(
-		&o.config.Conntrack.TCPCloseWaitTimeout.Duration, "conntrack-tcp-timeout-close-wait",
-		o.config.Conntrack.TCPCloseWaitTimeout.Duration,
-		"NAT timeout for TCP connections in the CLOSE_WAIT state")
-	fs.DurationVar(&o.config.ConfigSyncPeriod.Duration, "config-sync-period", o.config.ConfigSyncPeriod.Duration, "How often configuration from the apiserver is refreshed.  Must be greater than 0.")
-	fs.DurationVar(&o.config.UDPIdleTimeout.Duration, "udp-timeout", o.config.UDPIdleTimeout.Duration, "How long an idle UDP connection will be kept open (e.g. '250ms', '2s').  Must be greater than 0. Only applicable for proxy-mode=userspace")
-
-	fs.BoolVar(&o.config.IPVS.StrictARP, "ipvs-strict-arp", o.config.IPVS.StrictARP, "Enable strict ARP by setting arp_ignore to 1 and arp_announce to 2")
-	fs.BoolVar(&o.config.IPTables.MasqueradeAll, "masquerade-all", o.config.IPTables.MasqueradeAll, "If using the pure iptables proxy, SNAT all traffic sent via Service cluster IPs (this not commonly needed)")
-	fs.BoolVar(&o.config.EnableProfiling, "profiling", o.config.EnableProfiling, "If true enables profiling via web interface on /debug/pprof handler.")
-
-	fs.Float32Var(&o.config.ClientConnection.QPS, "kube-api-qps", o.config.ClientConnection.QPS, "QPS to use while talking with kubernetes apiserver")
-	fs.Var(&o.config.DetectLocalMode, "detect-local-mode", "Mode to use to detect local traffic")
-}
-
-// NewOptions returns initialized Options
-func NewOptions() *Options {
-	return &Options{
-		config:      new(kubeproxyconfig.KubeProxyConfiguration),
-		healthzPort: ports.ProxyHealthzPort,
-		metricsPort: ports.ProxyStatusPort,
-		errCh:       make(chan error),
-	}
-}
-
-// Complete completes all the required options.
-func (o *Options) Complete() error {
-	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
-		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
-		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
-		o.config.MetricsBindAddress = addressFromDeprecatedFlags(o.config.MetricsBindAddress, o.metricsPort)
-	}
-
-	// Load the config file here in Complete, so that Validate validates the fully-resolved config.
-	if len(o.ConfigFile) > 0 {
-		c, err := o.loadConfigFromFile(o.ConfigFile)
-		if err != nil {
-			return err
-		}
-		o.config = c
-
-		if err := o.initWatcher(); err != nil {
-			return err
-		}
-	}
-
-	if err := o.processHostnameOverrideFlag(); err != nil {
-		return err
-	}
-
-	return utilfeature.DefaultMutableFeatureGate.SetFromMap(o.config.FeatureGates)
-}
-
-// Creates a new filesystem watcher and adds watches for the config file.
-func (o *Options) initWatcher() error {
-	fswatcher := filesystem.NewFsnotifyWatcher()
-	err := fswatcher.Init(o.eventHandler, o.errorHandler)
-	if err != nil {
-		return err
-	}
-	err = fswatcher.AddWatch(o.ConfigFile)
-	if err != nil {
-		return err
-	}
-	o.watcher = fswatcher
-	return nil
-}
-
-func (o *Options) eventHandler(ent fsnotify.Event) {
-	eventOpIs := func(Op fsnotify.Op) bool {
-		return ent.Op&Op == Op
-	}
-	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
-		// error out when ConfigFile is updated
-		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
-		return
-	}
-	o.errCh <- nil
-}
-
-func (o *Options) errorHandler(err error) {
-	o.errCh <- err
-}
-
-// processHostnameOverrideFlag processes hostname-override flag
-func (o *Options) processHostnameOverrideFlag() error {
-	// Check if hostname-override flag is set and use value since configFile always overrides
-	if len(o.hostnameOverride) > 0 {
-		hostName := strings.TrimSpace(o.hostnameOverride)
-		if len(hostName) == 0 {
-			return fmt.Errorf("empty hostname-override is invalid")
-		}
-		o.config.HostnameOverride = strings.ToLower(hostName)
-	}
-
-	return nil
-}
-
-// Validate validates all the required options.
-func (o *Options) Validate() error {
-	if errs := validation.Validate(o.config); len(errs) != 0 {
-		return errs.ToAggregate()
-	}
-
-	return nil
-}
-
-// Run runs the specified ProxyServer.
-func (o *Options) Run() error {
-	defer close(o.errCh)
-	if len(o.WriteConfigTo) > 0 {
-		return o.writeConfigFile()
-	}
-
-	proxyServer, err := NewProxyServer(o)
-	if err != nil {
-		return err
-	}
-
-	if o.CleanupAndExit {
-		return proxyServer.CleanupAndExit()
-	}
-
-	o.proxyServer = proxyServer
-	return o.runLoop()
-}
-
-// runLoop will watch on the update change of the proxy server's configuration file.
-// Return an error when updated
-func (o *Options) runLoop() error {
-	if o.watcher != nil {
-		o.watcher.Run()
-	}
-
-	// run the proxy in goroutine
-	go func() {
-		err := o.proxyServer.Run()
-		o.errCh <- err
-	}()
-
-	for {
-		err := <-o.errCh
-		if err != nil {
-			return err
-		}
-	}
-}
-
-func (o *Options) writeConfigFile() (err error) {
-	const mediaType = runtime.ContentTypeYAML
-	info, ok := runtime.SerializerInfoForMediaType(proxyconfigscheme.Codecs.SupportedMediaTypes(), mediaType)
-	if !ok {
-		return fmt.Errorf("unable to locate encoder -- %q is not a supported media type", mediaType)
-	}
-
-	encoder := proxyconfigscheme.Codecs.EncoderForVersion(info.Serializer, v1alpha1.SchemeGroupVersion)
-
-	configFile, err := os.Create(o.WriteConfigTo)
-	if err != nil {
-		return err
-	}
-
-	defer func() {
-		ferr := configFile.Close()
-		if ferr != nil && err == nil {
-			err = ferr
-		}
-	}()
-
-	if err = encoder.Encode(o.config, configFile); err != nil {
-		return err
-	}
-
-	klog.Infof("Wrote configuration to: %s\n", o.WriteConfigTo)
-
-	return nil
-}
-
-// addressFromDeprecatedFlags returns server address from flags
-// passed on the command line based on the following rules:
-// 1. If port is 0, disable the server (e.g. set address to empty).
-// 2. Otherwise, set the port portion of the config accordingly.
-func addressFromDeprecatedFlags(addr string, port int32) string {
-	if port == 0 {
-		return ""
-	}
-	return proxyutil.AppendPortIfNeeded(addr, port)
-}
-
-// newLenientSchemeAndCodecs returns a scheme that has only v1alpha1 registered into
-// it and a CodecFactory with strict decoding disabled.
-func newLenientSchemeAndCodecs() (*runtime.Scheme, *serializer.CodecFactory, error) {
-	lenientScheme := runtime.NewScheme()
-	if err := kubeproxyconfig.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config API to lenient scheme: %v", err)
-	}
-	if err := kubeproxyconfigv1alpha1.AddToScheme(lenientScheme); err != nil {
-		return nil, nil, fmt.Errorf("failed to add kube-proxy config v1alpha1 API to lenient scheme: %v", err)
-	}
-	lenientCodecs := serializer.NewCodecFactory(lenientScheme, serializer.DisableStrict)
-	return lenientScheme, &lenientCodecs, nil
-}
-
-// loadConfigFromFile loads the contents of file and decodes it as a
-// KubeProxyConfiguration object.
-func (o *Options) loadConfigFromFile(file string) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	data, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
-
-	return o.loadConfig(data)
-}
-
-// loadConfig decodes a serialized KubeProxyConfiguration to the internal type.
-func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-
-	configObj, gvk, err := proxyconfigscheme.Codecs.UniversalDecoder().Decode(data, nil, nil)
-	if err != nil {
-		// Try strict decoding first. If that fails decode with a lenient
-		// decoder, which has only v1alpha1 registered, and log a warning.
-		// The lenient path is to be dropped when support for v1alpha1 is dropped.
-		if !runtime.IsStrictDecodingError(err) {
-			return nil, gerrors.Wrap(err, "failed to decode")
-		}
-
-		_, lenientCodecs, lenientErr := newLenientSchemeAndCodecs()
-		if lenientErr != nil {
-			return nil, lenientErr
-		}
-
-		configObj, gvk, lenientErr = lenientCodecs.UniversalDecoder().Decode(data, nil, nil)
-		if lenientErr != nil {
-			// Lenient decoding failed with the current version, return the
-			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
-		}
-
-		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
-		klog.Warningf("using lenient decoding as strict decoding failed: %v", err)
-	}
-
-	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
-	if !ok {
-		return nil, fmt.Errorf("got unexpected config type: %v", gvk)
-	}
-	return proxyConfig, nil
-}
-
-// ApplyDefaults applies the default values to Options.
-func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
-	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	proxyconfigscheme.Scheme.Default(external)
-
-	internal, err := proxyconfigscheme.Scheme.ConvertToVersion(external, kubeproxyconfig.SchemeGroupVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	out := internal.(*kubeproxyconfig.KubeProxyConfiguration)
-
-	return out, nil
-}
-
 // NewProxyCommand creates a *cobra.Command object with default parameters
 func NewProxyCommand() *cobra.Command {
-	opts := NewOptions()
+	opts := options.NewOptions()
 
 	cmd := &cobra.Command{
 		Use: "kube-proxy",
@@ -474,10 +92,6 @@ with the apiserver API to configure the proxy.`,
 			verflag.PrintAndExitIfRequested()
 			cliflag.PrintFlags(cmd.Flags())
 
-			if err := initForOS(opts.WindowsService); err != nil {
-				klog.Fatalf("failed OS init: %v", err)
-			}
-
 			if err := opts.Complete(); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
@@ -485,7 +99,10 @@ with the apiserver API to configure the proxy.`,
 				klog.Fatalf("failed validate: %v", err)
 			}
 
-			if err := opts.Run(); err != nil {
+			// log the kube-proxy config for inspection
+			klog.V(5).InfoS("KubeProxyConfiguration", "configuration", *opts.ComponentConfig)
+
+			if err := Run(opts); err != nil {
 				klog.Exit(err)
 			}
 		},
@@ -500,7 +117,7 @@ with the apiserver API to configure the proxy.`,
 	}
 
 	var err error
-	opts.config, err = opts.ApplyDefaults(opts.config)
+	opts.ComponentConfig, err = opts.ApplyDefaults(opts.ComponentConfig)
 	if err != nil {
 		klog.Fatalf("unable to create flag defaults: %v", err)
 	}
@@ -511,6 +128,30 @@ with the apiserver API to configure the proxy.`,
 	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
 
 	return cmd
+}
+
+// Run runs the specified ProxyServer using options.
+func Run(opts *options.Options) error {
+	defer close(opts.ErrCh)
+	if len(opts.WriteConfigTo) > 0 {
+		return opts.WriteConfigFile()
+	}
+
+	if err := initForOS(opts.WindowsService); err != nil {
+		klog.Fatalf("failed OS init: %v", err)
+	}
+
+	proxyServer, err := NewProxyServer(opts.ComponentConfig, opts.CleanupAndExit, opts.Master)
+	if err != nil {
+		return err
+	}
+
+	if opts.CleanupAndExit {
+		return proxyServer.CleanupAndExit()
+	}
+
+	opts.ProxyServer = proxyServer
+	return opts.RunLoop()
 }
 
 // ProxyServer represents all the parameters required to start the Kubernetes proxy server. All
