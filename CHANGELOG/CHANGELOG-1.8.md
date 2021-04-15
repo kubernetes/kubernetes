@@ -1428,10 +1428,8 @@ scalability testing in a continuous integration (CI) environment. The SIG
 defined a concrete process for scalability testing, created
 documentation for the current scalability thresholds, and defined a new set of
 Service Level Indicators (SLIs) and Service Level Objectives (SLOs) for the system.
-Here's the release [scalability validation report].
 
 [SIG Scalability]: https://github.com/kubernetes/community/tree/master/sig-scalability
-[scalability validation report]: https://github.com/kubernetes/enhancements/tree/master/release-1.8/scalability_validation_report.md
 
 ### SIG Scheduling
 
