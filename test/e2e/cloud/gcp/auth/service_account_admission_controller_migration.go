@@ -32,6 +32,7 @@ var upgradeTests = []upgrades.Test{
 
 var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:BoundServiceAccountTokenVolume]", func() {
 	f := framework.NewDefaultFramework("serviceaccount-admission-controller-migration")
+	testFrameworks := upgrades.CreateUpgradeFrameworks(upgradeTests)
 
 	ginkgo.Describe("master upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
@@ -47,7 +48,7 @@ var _ = SIGDescribe("ServiceAccount admission controller migration [Feature:Boun
 
 			extraEnvs := []string{"KUBE_FEATURE_GATES=BoundServiceAccountTokenVolume=true"}
 			upgradeFunc := common.ControlPlaneUpgradeFunc(f, upgCtx, serviceaccountAdmissionControllerMigrationTest, extraEnvs)
-			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testSuite, upgrades.MasterUpgrade, upgradeFunc)
+			upgrades.RunUpgradeSuite(upgCtx, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 })
