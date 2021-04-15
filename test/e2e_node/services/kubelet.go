@@ -87,11 +87,11 @@ func RunKubelet() {
 
 const (
 	// Ports of different e2e services.
-	kubeletReadOnlyPort = "10255"
+	kubeletHealthCheckPort = "10248"
 	// KubeletRootDirectory specifies the directory where the kubelet runtime information is stored.
 	KubeletRootDirectory = "/var/lib/kubelet"
 	// Health check url of kubelet
-	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
+	kubeletHealthCheckURL = "http://127.0.0.1:" + kubeletHealthCheckPort + "/healthz"
 )
 
 // startKubelet starts the Kubelet in a separate process or returns an error

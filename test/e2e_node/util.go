@@ -71,8 +71,8 @@ const (
 	defaultPodResourcesPath    = "/var/lib/kubelet/pod-resources"
 	defaultPodResourcesTimeout = 10 * time.Second
 	defaultPodResourcesMaxSize = 1024 * 1024 * 16 // 16 Mb
-	kubeletReadOnlyPort        = "10255"
-	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletReadOnlyPort + "/healthz"
+	kubeletHealthCheckPort     = "10248"
+	kubeletHealthCheckURL      = "http://127.0.0.1:" + kubeletHealthCheckPort + "/healthz"
 )
 
 func getNodeSummary() (*stats.Summary, error) {
