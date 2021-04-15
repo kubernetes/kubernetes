@@ -205,8 +205,8 @@ func createCSIOperationContext(volumeSpec *volume.Spec, timeout time.Duration) (
 	return context.WithTimeout(ctx, timeout)
 }
 
-// GetPodInfoAttrs returns pod info for NodePublish
-func GetPodInfoAttrs(pod *api.Pod, volumeMode storage.VolumeLifecycleMode) map[string]string {
+// getPodInfoAttrs returns pod info for NodePublish
+func getPodInfoAttrs(pod *api.Pod, volumeMode storage.VolumeLifecycleMode) map[string]string {
 	attrs := map[string]string{
 		"csi.storage.k8s.io/pod.name":            pod.Name,
 		"csi.storage.k8s.io/pod.namespace":       pod.Namespace,

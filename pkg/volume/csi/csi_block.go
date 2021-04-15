@@ -222,7 +222,7 @@ func (m *csiBlockMapper) publishVolumeForBlock(
 		return "", errors.New(log("blockMapper.publishVolumeForBlock failed to get VolumeLifecycleMode: %v", err))
 	}
 	if podInfoEnabled {
-		volAttribs = mergeMap(volAttribs, GetPodInfoAttrs(m.pod, volumeLifecycleMode))
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(m.pod, volumeLifecycleMode))
 	}
 
 	nodePublishSecrets := map[string]string{}

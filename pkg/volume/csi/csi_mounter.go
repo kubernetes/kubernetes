@@ -225,7 +225,7 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
 	if podInfoEnabled {
-		volAttribs = mergeMap(volAttribs, GetPodInfoAttrs(c.pod, c.volumeLifecycleMode))
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, c.volumeLifecycleMode))
 	}
 
 	// Inject pod service account token into volume attributes
