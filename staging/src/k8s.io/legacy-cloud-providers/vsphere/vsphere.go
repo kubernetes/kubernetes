@@ -904,6 +904,10 @@ func (vs *VSphere) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 func (vs *VSphere) isZoneEnabled() bool {
 	isEnabled := vs.cfg != nil && vs.cfg.Labels.Zone != "" && vs.cfg.Labels.Region != ""
+	// Return false within kubelet in case of credentials stored in secret.
+	// Otherwise kubelet will not be able to obtain zone labels from vSphere and create initial node
+	// due to no credentials at this step.
+	// See https://github.com/kubernetes/kubernetes/blob/b960f7a0e04687c17e0b0801e17e7cab89f273cc/pkg/kubelet/kubelet_node_status.go#L384-L386
 	if isEnabled && vs.isSecretInfoProvided && vs.nodeManager.credentialManager == nil {
 		klog.V(1).Info("Zones can not be populated now due to credentials in Secret, skip.")
 		return false
