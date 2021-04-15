@@ -9,8 +9,7 @@ import (
 	"sigs.k8s.io/kustomize/api/resid"
 )
 
-// FieldSpec completely specifies a kustomizable field in
-// an unstructured representation of a k8s API object.
+// FieldSpec completely specifies a kustomizable field in a k8s API object.
 // It helps define the operands of transformations.
 //
 // For example, a directive to add a common label to objects
