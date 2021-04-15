@@ -1117,6 +1117,7 @@ func TestReadyCondition(t *testing.T) {
 		appArmorValidateHostFunc  func() error
 		cmStatus                  cm.Status
 		nodeShutdownManagerErrors error
+		nodeCertErrors            error
 		expectConditions          []v1.NodeCondition
 		expectEvents              []testEvent
 	}{
@@ -1160,6 +1161,12 @@ func TestReadyCondition(t *testing.T) {
 			node:                      withCapacity.DeepCopy(),
 			nodeShutdownManagerErrors: errors.New("node is shutting down"),
 			expectConditions:          []v1.NodeCondition{*makeReadyCondition(false, "node is shutting down", now, now)},
+		},
+		{
+			desc:             "new, not ready: cert unavailable",
+			node:             withCapacity.DeepCopy(),
+			nodeCertErrors:   errors.New("no serving certificate available for the kubelet"),
+			expectConditions: []v1.NodeCondition{*makeReadyCondition(false, "no serving certificate available for the kubelet", now, now)},
 		},
 		{
 			desc:             "new, not ready: runtime and network errors",
@@ -1244,6 +1251,9 @@ func TestReadyCondition(t *testing.T) {
 			nodeShutdownErrorsFunc := func() error {
 				return tc.nodeShutdownManagerErrors
 			}
+			nodeCertErrorsFunc := func() error {
+				return tc.nodeCertErrors
+			}
 			events := []testEvent{}
 			recordEventFunc := func(eventType, event string) {
 				events = append(events, testEvent{
@@ -1252,7 +1262,7 @@ func TestReadyCondition(t *testing.T) {
 				})
 			}
 			// construct setter
-			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, recordEventFunc)
+			setter := ReadyCondition(nowFunc, runtimeErrorsFunc, networkErrorsFunc, storageErrorsFunc, tc.appArmorValidateHostFunc, cmStatusFunc, nodeShutdownErrorsFunc, nodeCertErrorsFunc, recordEventFunc)
 			// call setter on node
 			if err := setter(tc.node); err != nil {
 				t.Fatalf("unexpected error: %v", err)

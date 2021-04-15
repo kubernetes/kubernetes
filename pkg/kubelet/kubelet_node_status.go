@@ -628,7 +628,7 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		nodestatus.MemoryPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderMemoryPressure, kl.recordNodeStatusEvent),
 		nodestatus.DiskPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderDiskPressure, kl.recordNodeStatusEvent),
 		nodestatus.PIDPressureCondition(kl.clock.Now, kl.evictionManager.IsUnderPIDPressure, kl.recordNodeStatusEvent),
-		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.recordNodeStatusEvent),
+		nodestatus.ReadyCondition(kl.clock.Now, kl.runtimeState.runtimeErrors, kl.runtimeState.networkErrors, kl.runtimeState.storageErrors, validateHostFunc, kl.containerManager.Status, kl.shutdownManager.ShutdownStatus, kl.validateNodeCert, kl.recordNodeStatusEvent),
 		nodestatus.VolumesInUse(kl.volumeManager.ReconcilerStatesHasBeenSynced, kl.volumeManager.GetVolumesInUse),
 		// TODO(mtaufen): I decided not to move this setter for now, since all it does is send an event
 		// and record state back to the Kubelet runtime object. In the future, I'd like to isolate
@@ -637,6 +637,17 @@ func (kl *Kubelet) defaultNodeStatusFuncs() []func(*v1.Node) error {
 		kl.recordNodeSchedulableEvent,
 	)
 	return setters
+}
+
+// Check if node has valid serving cert
+func (kl *Kubelet) validateNodeCert() error {
+	if kl.serverCertificateManager != nil {
+		cert := kl.serverCertificateManager.Current()
+		if cert == nil {
+			return fmt.Errorf("no serving certificate available for the kubelet")
+		}
+	}
+	return nil
 }
 
 // Validate given node IP belongs to the current host
