@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
+// This key is for testing purposes only and is not considered secure.
 const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
 AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
@@ -87,7 +88,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(
 		serviceaccount.JWTTokenAuthenticator(
-			iss,
+			[]string{iss},
 			[]interface{}{&pk},
 			aud,
 			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(

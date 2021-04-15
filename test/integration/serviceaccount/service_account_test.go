@@ -395,7 +395,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		externalInformers.Core().V1().ServiceAccounts().Lister(),
 		externalInformers.Core().V1().Pods().Lister(),
 	)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),

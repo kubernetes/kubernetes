@@ -34,6 +34,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -46,6 +47,13 @@ import (
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	testutil "k8s.io/kubernetes/test/utils"
 )
+
+// This key is for testing purposes only and is not considered secure.
+const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
 
 // TearDownFunc is to be called to tear down a test server.
 type TearDownFunc func()
@@ -182,9 +190,26 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	if err := fs.Parse(customFlags); err != nil {
 		return result, err
 	}
+
+	saSigningKeyFile, err := ioutil.TempFile("/tmp", "insecure_test_key")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	defer os.RemoveAll(saSigningKeyFile.Name())
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
+	}
+	s.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	s.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	s.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
+
 	completedOptions, err := app.Complete(s)
 	if err != nil {
 		return result, fmt.Errorf("failed to set default ServerRunOptions: %v", err)
+	}
+
+	if errs := completedOptions.Validate(); len(errs) != 0 {
+		return result, fmt.Errorf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
 	}
 
 	t.Logf("runtime-config=%v", completedOptions.APIEnablement.RuntimeConfig)

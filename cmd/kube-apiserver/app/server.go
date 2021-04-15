@@ -416,7 +416,7 @@ func CreateKubeAPIServerConfig(
 		pubKeys = append(pubKeys, keys...)
 	}
 	// Plumb the required metadata through ExtraConfig.
-	config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuer
+	config.ExtraConfig.ServiceAccountIssuerURL = s.Authentication.ServiceAccounts.Issuers[0]
 	config.ExtraConfig.ServiceAccountJWKSURI = s.Authentication.ServiceAccounts.JWKSURI
 	config.ExtraConfig.ServiceAccountPublicKeys = pubKeys
 
@@ -633,7 +633,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
-	if s.ServiceAccountSigningKeyFile != "" && s.Authentication.ServiceAccounts.Issuer != "" {
+	if s.ServiceAccountSigningKeyFile != "" && len(s.Authentication.ServiceAccounts.Issuers) != 0 && s.Authentication.ServiceAccounts.Issuers[0] != "" {
 		sk, err := keyutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
 		if err != nil {
 			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
@@ -655,7 +655,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			}
 		}
 
-		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuer, sk)
+		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuers[0], sk)
 		if err != nil {
 			return options, fmt.Errorf("failed to build token generator: %v", err)
 		}
