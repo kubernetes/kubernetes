@@ -1,20 +1,25 @@
 package deprecatedapirequest
 
 import (
+	"strings"
 	"testing"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/diff"
-
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/diff"
 )
 
-func gvr(group, version, resource string) schema.GroupVersionResource {
-	return schema.GroupVersionResource{
-		Group:    group,
-		Version:  version,
-		Resource: resource,
+func gvr(resource string) schema.GroupVersionResource {
+	s := strings.SplitN(resource, ".", 3)
+	switch len(s) {
+	case 3:
+		return schema.GroupVersionResource{Group: s[2], Version: s[1], Resource: s[0]}
+	case 2:
+		return schema.GroupVersionResource{Version: s[1], Resource: s[0]}
+	case 1:
+		return schema.GroupVersionResource{Resource: s[0]}
 	}
+	panic(s)
 }
 
 func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
@@ -25,13 +30,13 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 		verb     string
 		count    int
 	}{
-		{gvr("group", "v1", "test"), testTime(0, 0), "bob", "get", 1},
-		{gvr("group", "v1", "test"), testTime(0, 1), "bob", "list", 2},
-		{gvr("group", "v1", "test"), testTime(1, 0), "bob", "get", 1},
-		{gvr("group", "v2", "test"), testTime(2, 0), "bob", "get", 1},
-		{gvr("group", "v2", "test"), testTime(2, 1), "sue", "list", 2},
-		{gvr("group", "v2", "test"), testTime(2, 2), "sue", "get", 1},
-		{gvr("group", "v2", "test"), testTime(2, 3), "sue", "get", 3},
+		{gvr("test.v1.group"), testTime(0, 0), "bob", "get", 1},
+		{gvr("test.v1.group"), testTime(0, 1), "bob", "list", 2},
+		{gvr("test.v1.group"), testTime(1, 0), "bob", "get", 1},
+		{gvr("test.v2.group"), testTime(2, 0), "bob", "get", 1},
+		{gvr("test.v2.group"), testTime(2, 1), "sue", "list", 2},
+		{gvr("test.v2.group"), testTime(2, 2), "sue", "get", 1},
+		{gvr("test.v2.group"), testTime(2, 3), "sue", "get", 3},
 	}
 	actual := newAPIRequestCounts("nodeName")
 	for _, tc := range testCases {
@@ -40,8 +45,8 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 	expected := &apiRequestCounts{
 		nodeName: "nodeName",
 		resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-			gvr("group", "v1", "test"): {
-				resource: gvr("group", "v1", "test"),
+			gvr("test.v1.group"): {
+				resource: gvr("test.v1.group"),
 				hourToRequestCount: map[int]*hourlyRequestCounts{
 					0: {
 						usersToRequestCounts: map[string]*userRequestCounts{
@@ -53,8 +58,8 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 						},
 					},
 				}},
-			gvr("group", "v2", "test"): {
-				resource: gvr("group", "v2", "test"),
+			gvr("test.v2.group"): {
+				resource: gvr("test.v2.group"),
 				hourToRequestCount: map[int]*hourlyRequestCounts{
 					2: {
 						usersToRequestCounts: map[string]*userRequestCounts{
@@ -88,8 +93,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			existing: newAPIRequestCounts(""),
 			additional: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -101,8 +106,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			},
 			expected: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -117,8 +122,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			name: "SourceEmpty",
 			existing: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -131,8 +136,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			additional: &apiRequestCounts{resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{}},
 			expected: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -147,8 +152,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			name: "MergeCount",
 			existing: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -160,8 +165,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			},
 			additional: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -173,8 +178,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			},
 			expected: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "", "resource"): {
-						resource: gvr("", "", "resource"),
+					gvr("resource.."): {
+						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -189,8 +194,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			name: "Merge",
 			existing: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "v1", "resource"): {
-						resource: gvr("", "v1", "resource"),
+					gvr("resource.v1."): {
+						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -202,8 +207,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			},
 			additional: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "v1", "resource"): {
-						resource: gvr("", "v1", "resource"),
+					gvr("resource.v1."): {
+						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -217,8 +222,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 								},
 							},
 						}},
-					gvr("", "v2", "resource"): {
-						resource: gvr("", "v2", "resource"),
+					gvr("resource.v2."): {
+						resource: gvr("resource.v2"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -230,8 +235,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 			},
 			expected: &apiRequestCounts{
 				resourceToRequestCount: map[schema.GroupVersionResource]*resourceRequestCounts{
-					gvr("", "v1", "resource"): {
-						resource: gvr("", "v1", "resource"),
+					gvr("resource.v1."): {
+						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
@@ -245,8 +250,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 								},
 							},
 						}},
-					gvr("", "v2", "resource"): {
-						resource: gvr("", "v2", "resource"),
+					gvr("resource.v2."): {
+						resource: gvr("resource.v2"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
 								usersToRequestCounts: map[string]*userRequestCounts{
