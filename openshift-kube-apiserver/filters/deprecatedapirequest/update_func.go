@@ -24,7 +24,7 @@ func SetRequestCountsForNode(nodeName string, expiredHour int, countsToPersist *
 		// our input data.
 		updatedCounts := existingNodeLogFromAPI.Resource(countsToPersist.resource)
 		updatedCounts.Add(countsToPersist)
-		hourlyRequestLogs := resourceRequestCountToHourlyNodeRequestLog(nodeName, countsToPersist)
+		hourlyRequestLogs := resourceRequestCountToHourlyNodeRequestLog(nodeName, updatedCounts)
 
 		newStatus := setRequestCountsForNode(status, nodeName, expiredHour, hourlyRequestLogs)
 		status.RequestsLast24h = newStatus.RequestsLast24h
