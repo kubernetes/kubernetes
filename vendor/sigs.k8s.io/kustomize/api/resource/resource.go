@@ -12,153 +12,184 @@ import (
 
 	"sigs.k8s.io/kustomize/api/filters/patchstrategicmerge"
 	"sigs.k8s.io/kustomize/api/ifc"
-	"sigs.k8s.io/kustomize/api/internal/wrappy"
 	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
-	"sigs.k8s.io/kustomize/kyaml/filtersutil"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	kyaml "sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/yaml"
 )
 
-// Resource is a representation of a Kubernetes Resource Model (KRM) object
+// Resource is an RNode, representing a Kubernetes Resource Model object,
 // paired with metadata used by kustomize.
-// For more history, see sigs.k8s.io/kustomize/api/ifc.Unstructured
 type Resource struct {
-	kunStr      ifc.Kunstructured
+	// TODO: Inline RNode, dropping complexity. Resource is just a decorator.
+	node        *kyaml.RNode
 	options     *types.GenArgs
 	refBy       []resid.ResId
 	refVarNames []string
 }
 
 const (
+	buildAnnotationPreviousKinds      = konfig.ConfigAnnoDomain + "/previousKinds"
 	buildAnnotationPreviousNames      = konfig.ConfigAnnoDomain + "/previousNames"
 	buildAnnotationPrefixes           = konfig.ConfigAnnoDomain + "/prefixes"
 	buildAnnotationSuffixes           = konfig.ConfigAnnoDomain + "/suffixes"
 	buildAnnotationPreviousNamespaces = konfig.ConfigAnnoDomain + "/previousNamespaces"
+
+	// the following are only for patches, to specify whether they can change names
+	// and kinds of their targets
+	buildAnnotationAllowNameChange = konfig.ConfigAnnoDomain + "/allowNameChange"
+	buildAnnotationAllowKindChange = konfig.ConfigAnnoDomain + "/allowKindChange"
 )
 
 var buildAnnotations = []string{
+	buildAnnotationPreviousKinds,
 	buildAnnotationPreviousNames,
 	buildAnnotationPrefixes,
 	buildAnnotationSuffixes,
 	buildAnnotationPreviousNamespaces,
+	buildAnnotationAllowNameChange,
+	buildAnnotationAllowKindChange,
+}
+
+func (r *Resource) AsRNode() *kyaml.RNode {
+	return r.node.Copy()
 }
 
 func (r *Resource) ResetPrimaryData(incoming *Resource) {
-	r.kunStr = incoming.Copy()
+	r.node = incoming.node.Copy()
 }
 
 func (r *Resource) GetAnnotations() map[string]string {
-	annotations := r.kunStr.GetAnnotations()
-	if annotations == nil {
+	annotations, err := r.node.GetAnnotations()
+	if err != nil || annotations == nil {
 		return make(map[string]string)
 	}
 	return annotations
 }
 
-func (r *Resource) Copy() ifc.Kunstructured {
-	return r.kunStr.Copy()
-}
-
 func (r *Resource) GetFieldValue(f string) (interface{}, error) {
-	return r.kunStr.GetFieldValue(f)
+	//nolint:staticcheck
+	return r.node.GetFieldValue(f)
 }
 
 func (r *Resource) GetDataMap() map[string]string {
-	return r.kunStr.GetDataMap()
+	return r.node.GetDataMap()
 }
 
 func (r *Resource) GetBinaryDataMap() map[string]string {
-	return r.kunStr.GetBinaryDataMap()
+	return r.node.GetBinaryDataMap()
 }
 
 func (r *Resource) GetGvk() resid.Gvk {
-	return r.kunStr.GetGvk()
+	meta, err := r.node.GetMeta()
+	if err != nil {
+		return resid.GvkFromString("")
+	}
+	g, v := resid.ParseGroupVersion(meta.APIVersion)
+	return resid.Gvk{Group: g, Version: v, Kind: meta.Kind}
+}
+
+func (r *Resource) Hash(h ifc.KustHasher) (string, error) {
+	return h.Hash(r.node)
 }
 
 func (r *Resource) GetKind() string {
-	return r.kunStr.GetKind()
+	return r.node.GetKind()
 }
 
 func (r *Resource) GetLabels() map[string]string {
-	return r.kunStr.GetLabels()
+	l, err := r.node.GetLabels()
+	if err != nil {
+		return map[string]string{}
+	}
+	return l
 }
 
 func (r *Resource) GetName() string {
-	return r.kunStr.GetName()
+	return r.node.GetName()
 }
 
 func (r *Resource) GetSlice(p string) ([]interface{}, error) {
-	return r.kunStr.GetSlice(p)
+	//nolint:staticcheck
+	return r.node.GetSlice(p)
 }
 
 func (r *Resource) GetString(p string) (string, error) {
-	return r.kunStr.GetString(p)
+	//nolint:staticcheck
+	return r.node.GetString(p)
 }
 
-func (r *Resource) IsEmpty() (bool, error) {
-	m, err := r.kunStr.Map()
-	return len(m) == 0, err
+func (r *Resource) IsEmpty() bool {
+	return r.node.IsNilOrEmpty()
 }
 
 func (r *Resource) Map() (map[string]interface{}, error) {
-	return r.kunStr.Map()
+	return r.node.Map()
 }
 
 func (r *Resource) MarshalJSON() ([]byte, error) {
-	return r.kunStr.MarshalJSON()
+	return r.node.MarshalJSON()
 }
 
 func (r *Resource) MatchesLabelSelector(selector string) (bool, error) {
-	return r.kunStr.MatchesLabelSelector(selector)
+	return r.node.MatchesLabelSelector(selector)
 }
 
 func (r *Resource) MatchesAnnotationSelector(selector string) (bool, error) {
-	return r.kunStr.MatchesAnnotationSelector(selector)
+	return r.node.MatchesAnnotationSelector(selector)
 }
 
 func (r *Resource) SetAnnotations(m map[string]string) {
 	if len(m) == 0 {
 		// Force field erasure.
-		r.kunStr.SetAnnotations(nil)
+		r.node.SetAnnotations(nil)
 		return
 	}
-	r.kunStr.SetAnnotations(m)
+	r.node.SetAnnotations(m)
 }
 
 func (r *Resource) SetDataMap(m map[string]string) {
-	r.kunStr.SetDataMap(m)
+	r.node.SetDataMap(m)
 }
 
 func (r *Resource) SetBinaryDataMap(m map[string]string) {
-	r.kunStr.SetBinaryDataMap(m)
+	r.node.SetBinaryDataMap(m)
 }
 
 func (r *Resource) SetGvk(gvk resid.Gvk) {
-	r.kunStr.SetGvk(gvk)
+	r.node.SetMapField(
+		kyaml.NewScalarRNode(gvk.Kind), kyaml.KindField)
+	r.node.SetMapField(
+		kyaml.NewScalarRNode(gvk.ApiVersion()), kyaml.APIVersionField)
 }
 
 func (r *Resource) SetLabels(m map[string]string) {
 	if len(m) == 0 {
 		// Force field erasure.
-		r.kunStr.SetLabels(nil)
+		r.node.SetLabels(nil)
 		return
 	}
-	r.kunStr.SetLabels(m)
+	r.node.SetLabels(m)
 }
 
 func (r *Resource) SetName(n string) {
-	r.kunStr.SetName(n)
+	r.node.SetName(n)
 }
 
 func (r *Resource) SetNamespace(n string) {
-	r.kunStr.SetNamespace(n)
+	r.node.SetNamespace(n)
+}
+
+func (r *Resource) SetKind(k string) {
+	gvk := r.GetGvk()
+	gvk.Kind = k
+	r.SetGvk(gvk)
 }
 
 func (r *Resource) UnmarshalJSON(s []byte) error {
-	return r.kunStr.UnmarshalJSON(s)
+	return r.node.UnmarshalJSON(s)
 }
 
 // ResCtx is an interface describing the contextual added
@@ -178,14 +209,14 @@ type ResCtxMatcher func(ResCtx) bool
 // DeepCopy returns a new copy of resource
 func (r *Resource) DeepCopy() *Resource {
 	rc := &Resource{
-		kunStr: r.Copy(),
+		node: r.node.Copy(),
 	}
 	rc.copyOtherFields(r)
 	return rc
 }
 
 // CopyMergeMetaDataFields copies everything but the non-metadata in
-// the ifc.Kunstructured map, merging labels and annotations.
+// the resource.
 func (r *Resource) CopyMergeMetaDataFieldsFrom(other *Resource) {
 	r.SetLabels(mergeStringMaps(other.GetLabels(), r.GetLabels()))
 	r.SetAnnotations(
@@ -251,8 +282,10 @@ func (r *Resource) ReferencesEqual(other *Resource) bool {
 	return len(setSelf) == len(setOther)
 }
 
-func (r *Resource) KunstructEqual(o *Resource) bool {
-	return reflect.DeepEqual(r.kunStr, o.kunStr)
+// NodeEqual returns true if the resource's nodes are
+// equal, ignoring ancillary information like genargs, refby, etc.
+func (r *Resource) NodeEqual(o *Resource) bool {
+	return reflect.DeepEqual(r.node, o.node)
 }
 
 func (r *Resource) copyRefBy() []resid.ResId {
@@ -351,10 +384,39 @@ func (r *Resource) RemoveBuildAnnotations() {
 	r.SetAnnotations(annotations)
 }
 
-func (r *Resource) setPreviousNamespaceAndName(ns string, n string) *Resource {
+func (r *Resource) setPreviousId(ns string, n string, k string) *Resource {
 	r.appendCsvAnnotation(buildAnnotationPreviousNames, n)
 	r.appendCsvAnnotation(buildAnnotationPreviousNamespaces, ns)
+	r.appendCsvAnnotation(buildAnnotationPreviousKinds, k)
 	return r
+}
+
+func (r *Resource) SetAllowNameChange(value string) {
+	annotations := r.GetAnnotations()
+	annotations[buildAnnotationAllowNameChange] = value
+	r.SetAnnotations(annotations)
+}
+
+func (r *Resource) NameChangeAllowed() bool {
+	annotations := r.GetAnnotations()
+	if allowed, set := annotations[buildAnnotationAllowNameChange]; set && allowed == "true" {
+		return true
+	}
+	return false
+}
+
+func (r *Resource) SetAllowKindChange(value string) {
+	annotations := r.GetAnnotations()
+	annotations[buildAnnotationAllowKindChange] = value
+	r.SetAnnotations(annotations)
+}
+
+func (r *Resource) KindChangeAllowed() bool {
+	annotations := r.GetAnnotations()
+	if allowed, set := annotations[buildAnnotationAllowKindChange]; set && allowed == "true" {
+		return true
+	}
+	return false
 }
 
 // String returns resource as JSON.
@@ -430,14 +492,19 @@ func (r *Resource) PrevIds() []resid.ResId {
 	//     pairs on one annotation so there is no chance of error
 	names := r.getCsvAnnotation(buildAnnotationPreviousNames)
 	ns := r.getCsvAnnotation(buildAnnotationPreviousNamespaces)
-	if len(names) != len(ns) {
+	kinds := r.getCsvAnnotation(buildAnnotationPreviousKinds)
+	if len(names) != len(ns) || len(names) != len(kinds) {
 		panic(errors.New(
-			"number of previous names not equal to " +
-				"number of previous namespaces"))
+			"number of previous names, " +
+				"number of previous namespaces, " +
+				"number of previous kinds not equal"))
 	}
 	for i := range names {
+		k := kinds[i]
+		gvk := r.GetGvk()
+		gvk.Kind = k
 		ids = append(ids, resid.NewResIdWithNamespace(
-			r.GetGvk(), names[i], ns[i]))
+			gvk, names[i], ns[i]))
 	}
 	return ids
 }
@@ -445,7 +512,7 @@ func (r *Resource) PrevIds() []resid.ResId {
 // StorePreviousId stores the resource's current ID via build annotations.
 func (r *Resource) StorePreviousId() {
 	id := r.CurId()
-	r.setPreviousNamespaceAndName(id.EffectiveNamespace(), id.Name)
+	r.setPreviousId(id.EffectiveNamespace(), id.Name, id.Kind)
 }
 
 // CurId returns a ResId for the resource using the
@@ -478,38 +545,35 @@ func (r *Resource) AppendRefVarName(variable types.Var) {
 
 // ApplySmPatch applies the provided strategic merge patch.
 func (r *Resource) ApplySmPatch(patch *Resource) error {
-	node, err := filtersutil.GetRNode(patch)
-	if err != nil {
+	n, ns, k := r.GetName(), r.GetNamespace(), r.GetKind()
+	if patch.NameChangeAllowed() || patch.KindChangeAllowed() {
+		r.StorePreviousId()
+	}
+	if err := r.ApplyFilter(patchstrategicmerge.Filter{
+		Patch: patch.node,
+	}); err != nil {
 		return err
 	}
-	n, ns := r.GetName(), r.GetNamespace()
-	err = r.ApplyFilter(patchstrategicmerge.Filter{
-		Patch: node,
-	})
-	if err != nil {
-		return err
+	if r.IsEmpty() {
+		return nil
 	}
-	empty, err := r.IsEmpty()
-	if err != nil {
-		return err
+	if !patch.KindChangeAllowed() {
+		r.SetKind(k)
 	}
-	if !empty {
+	if !patch.NameChangeAllowed() {
 		r.SetName(n)
-		r.SetNamespace(ns)
 	}
-	return err
+	r.SetNamespace(ns)
+	return nil
 }
 
 func (r *Resource) ApplyFilter(f kio.Filter) error {
-	if wn, ok := r.kunStr.(*wrappy.WNode); ok {
-		l, err := f.Filter([]*kyaml.RNode{wn.AsRNode()})
-		if len(l) == 0 {
-			// Hack to deal with deletion.
-			r.kunStr = wrappy.NewWNode()
-		}
-		return err
+	l, err := f.Filter([]*kyaml.RNode{r.node})
+	if len(l) == 0 {
+		// The node was deleted.  The following makes r.IsEmpty() true.
+		r.node = nil
 	}
-	return filtersutil.ApplyToJSON(f, r)
+	return err
 }
 
 func mergeStringMaps(maps ...map[string]string) map[string]string {

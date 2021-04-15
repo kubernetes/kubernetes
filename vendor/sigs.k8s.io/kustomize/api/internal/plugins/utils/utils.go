@@ -34,7 +34,7 @@ func GoBin() string {
 // has her ${g}/${v}/$lower(${k})/${k}.go files.
 func DeterminePluginSrcRoot(fSys filesys.FileSystem) (string, error) {
 	return konfig.FirstDirThatExistsElseError(
-		"source directory", fSys, []konfig.NotedFunc{
+		"plugin src root", fSys, []konfig.NotedFunc{
 			{
 				Note: "relative to unit test",
 				F: func() string {

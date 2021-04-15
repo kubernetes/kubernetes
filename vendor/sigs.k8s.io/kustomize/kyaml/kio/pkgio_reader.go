@@ -71,6 +71,10 @@ type LocalPackageReadWriter struct {
 	NoDeleteFiles bool `yaml:"noDeleteFiles,omitempty"`
 
 	files sets.String
+
+	// FileSkipFunc is a function which returns true if reader should ignore
+	// the file
+	FileSkipFunc LocalPackageSkipFileFunc
 }
 
 func (r *LocalPackageReadWriter) Read() ([]*yaml.RNode, error) {
@@ -81,6 +85,7 @@ func (r *LocalPackageReadWriter) Read() ([]*yaml.RNode, error) {
 		ErrorIfNonResources: r.ErrorIfNonResources,
 		SetAnnotations:      r.SetAnnotations,
 		PackageFileName:     r.PackageFileName,
+		FileSkipFunc:        r.FileSkipFunc,
 	}.Read()
 	if err != nil {
 		return nil, errors.Wrap(err)
@@ -133,6 +138,11 @@ func (r *LocalPackageReadWriter) getFiles(nodes []*yaml.RNode) (sets.String, err
 	return val, nil
 }
 
+// LocalPackageSkipFileFunc is a function which returns true if the file
+// in the package should be ignored by reader.
+// relPath is an OS specific relative path
+type LocalPackageSkipFileFunc func(relPath string) bool
+
 // LocalPackageReader reads ResourceNodes from a local package.
 type LocalPackageReader struct {
 	Kind string `yaml:"kind,omitempty"`
@@ -163,6 +173,10 @@ type LocalPackageReader struct {
 
 	// SetAnnotations are annotations to set on the Resources as they are read.
 	SetAnnotations map[string]string `yaml:"setAnnotations,omitempty"`
+
+	// FileSkipFunc is a function which returns true if reader should ignore
+	// the file
+	FileSkipFunc LocalPackageSkipFileFunc
 }
 
 var _ Reader = LocalPackageReader{}
@@ -215,24 +229,24 @@ func (r LocalPackageReader) Read() ([]*yaml.RNode, error) {
 		if info.IsDir() {
 			return r.shouldSkipDir(path, ignoreFilesMatcher)
 		}
-		if match, err := r.shouldSkipFile(path, ignoreFilesMatcher); err != nil {
+
+		// get the relative path to file within the package so we can write the files back out
+		// to another location.
+		relPath, err := filepath.Rel(pathRelativeTo, path)
+		if err != nil {
+			return errors.WrapPrefixf(err, pathRelativeTo)
+		}
+		if match, err := r.shouldSkipFile(path, relPath, ignoreFilesMatcher); err != nil {
 			return err
-		} else if !match {
+		} else if match {
 			// skip this file
 			return nil
 		}
 
-		// get the relative path to file within the package so we can write the files back out
-		// to another location.
-		path, err = filepath.Rel(pathRelativeTo, path)
+		r.initReaderAnnotations(relPath, info)
+		nodes, err := r.readFile(path, info)
 		if err != nil {
-			return errors.WrapPrefixf(err, pathRelativeTo)
-		}
-
-		r.initReaderAnnotations(path, info)
-		nodes, err := r.readFile(filepath.Join(pathRelativeTo, path), info)
-		if err != nil {
-			return errors.WrapPrefixf(err, filepath.Join(pathRelativeTo, path))
+			return errors.WrapPrefixf(err, path)
 		}
 		operand = append(operand, nodes...)
 		return nil
@@ -258,21 +272,25 @@ func (r *LocalPackageReader) readFile(path string, _ os.FileInfo) ([]*yaml.RNode
 }
 
 // shouldSkipFile returns true if the file should be skipped
-func (r *LocalPackageReader) shouldSkipFile(path string, matcher *ignoreFilesMatcher) (bool, error) {
+func (r *LocalPackageReader) shouldSkipFile(path, relPath string, matcher *ignoreFilesMatcher) (bool, error) {
 	// check if the file is covered by a .krmignore file.
 	if matcher.matchFile(path) {
-		return false, nil
+		return true, nil
+	}
+
+	if r.FileSkipFunc != nil && r.FileSkipFunc(relPath) {
+		return true, nil
 	}
 
 	// check if the files are in scope
 	for _, g := range r.MatchFilesGlob {
 		if match, err := filepath.Match(g, filepath.Base(path)); err != nil {
-			return false, errors.Wrap(err)
+			return true, errors.Wrap(err)
 		} else if match {
-			return true, nil
+			return false, nil
 		}
 	}
-	return false, nil
+	return true, nil
 }
 
 // initReaderAnnotations adds the LocalPackageReader Annotations to r.SetAnnotations

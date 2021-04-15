@@ -20,12 +20,12 @@ func SortArrayAndComputeHash(s []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return Encode(Hash(string(data)))
+	return encode(hex256(string(data)))
 }
 
 // Copied from https://github.com/kubernetes/kubernetes
 // /blob/master/pkg/kubectl/util/hash/hash.go
-func Encode(hex string) (string, error) {
+func encode(hex string) (string, error) {
 	if len(hex) < 10 {
 		return "", fmt.Errorf(
 			"input length must be at least 10")
@@ -48,23 +48,18 @@ func Encode(hex string) (string, error) {
 	return string(enc), nil
 }
 
-// Hash returns the hex form of the sha256 of the argument.
-func Hash(data string) string {
+// hex256 returns the hex form of the sha256 of the argument.
+func hex256(data string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(data)))
 }
 
-// HashRNode returns the hash value of input RNode
-func HashRNode(node *yaml.RNode) (string, error) {
-	// get node kind
-	kindNode, err := node.Pipe(yaml.FieldMatcher{Name: "kind"})
-	if err != nil {
-		return "", err
-	}
-	kind := kindNode.YNode().Value
+// Hasher computes the hash of an RNode.
+type Hasher struct{}
 
-	// calculate hash for different kinds
-	encoded := ""
-	switch kind {
+// Hash returns a hash of the argument.
+func (h *Hasher) Hash(node *yaml.RNode) (r string, err error) {
+	var encoded string
+	switch node.GetKind() {
 	case "ConfigMap":
 		encoded, err = encodeConfigMap(node)
 	case "Secret":
@@ -77,10 +72,11 @@ func HashRNode(node *yaml.RNode) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return Encode(Hash(encoded))
+	return encode(hex256(encoded))
 }
 
-func getNodeValues(node *yaml.RNode, paths []string) (map[string]interface{}, error) {
+func getNodeValues(
+	node *yaml.RNode, paths []string) (map[string]interface{}, error) {
 	values := make(map[string]interface{})
 	for _, p := range paths {
 		vn, err := node.Pipe(yaml.Lookup(p))
@@ -117,8 +113,11 @@ func encodeConfigMap(node *yaml.RNode) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	m := map[string]interface{}{"kind": "ConfigMap", "name": values["metadata/name"],
-		"data": values["data"]}
+	m := map[string]interface{}{
+		"kind": "ConfigMap",
+		"name": values["metadata/name"],
+		"data": values["data"],
+	}
 	if _, ok := values["binaryData"].(map[string]interface{}); ok {
 		m["binaryData"] = values["binaryData"]
 	}
