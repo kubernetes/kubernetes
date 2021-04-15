@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"k8s.io/klog/v2"
 
@@ -221,11 +220,13 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	}
 
 	// Inject pod information into volume_attributes
-	podAttrs, err := c.podAttributes()
+	podInfoEnabled, err := c.plugin.podInfoEnabled(string(c.driverName))
 	if err != nil {
 		return volumetypes.NewTransientOperationFailure(log("mounter.SetUpAt failed to assemble volume attributes: %v", err))
 	}
-	volAttribs = mergeMap(volAttribs, podAttrs)
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, c.volumeLifecycleMode))
+	}
 
 	// Inject pod service account token into volume attributes
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIServiceAccountToken) {
@@ -280,45 +281,6 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
 	return nil
-}
-
-func (c *csiMountMgr) podAttributes() (map[string]string, error) {
-	kletHost, ok := c.plugin.host.(volume.KubeletVolumeHost)
-	if ok {
-		kletHost.WaitForCacheSync()
-	}
-
-	if c.plugin.csiDriverLister == nil {
-		return nil, fmt.Errorf("CSIDriverLister not found")
-	}
-
-	csiDriver, err := c.plugin.csiDriverLister.Get(string(c.driverName))
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			klog.V(4).Infof(log("CSIDriver %q not found, not adding pod information", c.driverName))
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	// if PodInfoOnMount is not set or false we do not set pod attributes
-	if csiDriver.Spec.PodInfoOnMount == nil || *csiDriver.Spec.PodInfoOnMount == false {
-		klog.V(4).Infof(log("CSIDriver %q does not require pod information", c.driverName))
-		return nil, nil
-	}
-
-	attrs := map[string]string{
-		"csi.storage.k8s.io/pod.name":            c.pod.Name,
-		"csi.storage.k8s.io/pod.namespace":       c.pod.Namespace,
-		"csi.storage.k8s.io/pod.uid":             string(c.pod.UID),
-		"csi.storage.k8s.io/serviceAccount.name": c.pod.Spec.ServiceAccountName,
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
-		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
-	}
-
-	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
-	return attrs, nil
 }
 
 func (c *csiMountMgr) podServiceAccountTokenAttrs() (map[string]string, error) {
