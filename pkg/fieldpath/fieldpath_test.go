@@ -268,3 +268,17 @@ func TestSplitMaybeSubscriptedPath(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkFormatMap(b *testing.B) {
+	m := map[string]string{
+		"foo":       "bar",
+		"abc":       "ddd",
+		"something": "label value",
+		"spec.pod.beta.kubernetes.io/statefulset-index": "1",
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		_ = FormatMap(m)
+	}
+}
