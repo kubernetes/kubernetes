@@ -158,7 +158,7 @@ func newHollowNodeCommand() *cobra.Command {
 		Long: "kubemark",
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			run(s)
+			run(cmd, s)
 		},
 		Args: func(cmd *cobra.Command, args []string) error {
 			for _, arg := range args {
@@ -174,9 +174,10 @@ func newHollowNodeCommand() *cobra.Command {
 	return cmd
 }
 
-func run(config *hollowNodeConfig) {
-	// To help debugging, immediately log version
+func run(cmd *cobra.Command, config *hollowNodeConfig) {
+	// To help debugging, immediately log version and print flags.
 	klog.Infof("Version: %+v", version.Get())
+	cliflag.PrintFlags(cmd.Flags())
 
 	if !knownMorphs.Has(config.Morph) {
 		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
