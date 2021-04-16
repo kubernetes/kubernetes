@@ -2196,14 +2196,6 @@
     not support sysctls'
   release: v1.21
   file: test/e2e/common/node/sysctl.go
-- testname: Sysctl, allow specified unsafe sysctls
-  codename: '[sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe
-    sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance]'
-  description: 'Pod is created with kernel.shm_rmid_forced. Should allow unsafe sysctls
-    that are specified. [LinuxOnly]: This test is marked as LinuxOnly since Windows
-    does not support sysctls'
-  release: v1.21
-  file: test/e2e/common/node/sysctl.go
 - testname: Environment variables, expansion
   codename: '[sig-node] Variable Expansion should allow composing env vars into new
     env vars [NodeConformance] [Conformance]'
