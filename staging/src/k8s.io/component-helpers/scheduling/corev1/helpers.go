@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // PodPriority returns priority of the given pod.
@@ -98,4 +99,48 @@ func getFilteredTaints(taints []v1.Taint, inclusionFilter taintsFilterFunc) []v1
 		filteredTaints = append(filteredTaints, taint)
 	}
 	return filteredTaints
+}
+
+// calculatePodResourceRequest returns the total non-zero requests. If Overhead is defined for the pod and the
+// PodOverhead feature is enabled, the Overhead is added to the result.
+// podResourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
+func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
+	var podRequest int64
+	for i := range pod.Spec.Containers {
+		container := &pod.Spec.Containers[i]
+		value := schedutil.GetNonzeroRequestForResource(resource, &container.Resources.Requests)
+		podRequest += value
+	}
+
+	for i := range pod.Spec.InitContainers {
+		initContainer := &pod.Spec.InitContainers[i]
+		value := schedutil.GetNonzeroRequestForResource(resource, &initContainer.Resources.Requests)
+		if podRequest < value {
+			podRequest = value
+		}
+	}
+
+	// If Overhead is being utilized, add to the total requests for the pod
+	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+		if quantity, found := pod.Spec.Overhead[resource]; found {
+			podRequest += quantity.Value()
+		}
+	}
+
+	return podRequest
+}
+
+// GetResourceRequest finds and returns the request value for a specific resource.
+func GetResourceRequest(pod *v1.Pod, resource v1.ResourceName) int64 {
+	if resource == v1.ResourcePods {
+		return 1
+	}
+
+	requestQuantity := GetResourceRequestQuantity(pod, resource)
+
+	if resource == v1.ResourceCPU {
+		return requestQuantity.MilliValue()
+	}
+
+	return requestQuantity.Value()
 }
