@@ -26,12 +26,17 @@ import (
 
 type PolicyV1Interface interface {
 	RESTClient() rest.Interface
+	EvictionsGetter
 	PodDisruptionBudgetsGetter
 }
 
 // PolicyV1Client is used to interact with features provided by the policy group.
 type PolicyV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *PolicyV1Client) Evictions(namespace string) EvictionInterface {
+	return newEvictions(c, namespace)
 }
 
 func (c *PolicyV1Client) PodDisruptionBudgets(namespace string) PodDisruptionBudgetInterface {

@@ -704,6 +704,14 @@
   description: PodDisruptionBudget API must support list and deletecollection operations.
   release: v1.21
   file: test/e2e/apps/disruption.go
+- testname: 'PodDisruptionBudget: block an eviction until the PDB is updated to allow
+    it'
+  codename: '[sig-apps] DisruptionController should block an eviction until the PDB
+    is updated to allow it [Conformance]'
+  description: Eviction API must block an eviction until the PDB is updated to allow
+    it
+  release: v1.22
+  file: test/e2e/apps/disruption.go
 - testname: 'PodDisruptionBudget: create, update, patch, and delete object'
   codename: '[sig-apps] DisruptionController should create a PodDisruptionBudget [Conformance]'
   description: PodDisruptionBudget API must support create, update, patch, and delete

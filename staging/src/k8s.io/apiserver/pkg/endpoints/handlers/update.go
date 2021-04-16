@@ -110,7 +110,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 			scope.err(err, w, req)
 			return
 		}
-		if gvk.GroupVersion() != defaultGVK.GroupVersion() {
+		if !scope.AcceptsGroupVersion(gvk.GroupVersion()) {
 			err = errors.NewBadRequest(fmt.Sprintf("the API version in the data (%s) does not match the expected API version (%s)", gvk.GroupVersion(), defaultGVK.GroupVersion()))
 			scope.err(err, w, req)
 			return
