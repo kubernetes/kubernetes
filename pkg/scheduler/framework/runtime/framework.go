@@ -131,7 +131,7 @@ func (f *frameworkImpl) getExtensionPoints(plugins *config.Plugins) []extensionP
 		{plugins.PostBind, &f.postBindPlugins},
 		{plugins.Permit, &f.permitPlugins},
 		{plugins.QueueSort, &f.queueSortPlugins},
-		// Keep Score plugin at the end. Only Score plugin can apply weight in case of other same name plugin.
+		// Keep Score plugin at the end, or else the weight might be overridden by other type of plugin with the same name, see #100613
 		// https://github.com/kubernetes/kubernetes/issues/100613
 		{plugins.Score, &f.scorePlugins},
 	}
