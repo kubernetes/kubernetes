@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/network/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -73,7 +74,8 @@ var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
 
 		for _, node := range nodes.Items {
 			// target Pod at Node
-			testPod.Spec.NodeName = node.Name
+			nodeSelection := e2epod.NodeSelection{Name: node.Name}
+			e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
 			_, err = pc.Create(context.TODO(), &testPod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
 		}
