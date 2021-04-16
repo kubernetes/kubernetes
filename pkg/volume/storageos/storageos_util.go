@@ -333,6 +333,8 @@ func pathDeviceType(path string) (deviceType, error) {
 	if err != nil {
 		return modeUnsupported, err
 	}
+	oo := os.ModeDevice
+	fmt.Println(oo)
 	switch mode := fi.Mode(); {
 	case mode&os.ModeDevice != 0:
 		return modeBlock, nil

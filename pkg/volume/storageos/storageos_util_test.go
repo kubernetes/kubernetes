@@ -19,6 +19,7 @@ package storageos
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	storageostypes "github.com/storageos/go-api/types"
@@ -204,6 +205,15 @@ func TestAttachVolume(t *testing.T) {
 		t.Fatalf("can't make a temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+
+	// device path
+	devicePath := filepath.Join(tmpDir, testVolUUID)
+	f, err := os.OpenFile(devicePath, os.O_CREATE|os.O_RDWR, os.ModeDevice)
+	defer f.Close()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+
 	plugMgr := volume.VolumePluginMgr{}
 	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(t, tmpDir, nil, nil))
 	plug, _ := plugMgr.FindPluginByName("kubernetes.io/storageos")
@@ -221,5 +231,12 @@ func TestAttachVolume(t *testing.T) {
 			plugin:       plug.(*storageosPlugin),
 		},
 		deviceDir: tmpDir,
+	}
+	volPath, err := util.AttachVolume(mounter)
+	if err != nil {
+		t.Fatalf("AttachVolume() returned error: %v", err)
+	}
+	if volPath == "" {
+		t.Fatalf("AttachVolume() volume path is empty")
 	}
 }
