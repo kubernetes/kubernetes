@@ -142,7 +142,7 @@ func (tk *TestKubeconfig) WriteFileViaContainer(podName, containerName string, p
 		}
 	}
 	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
-	// TODO: replace with `framework.NodeOSDistroIs` when #81245 is complete
+	// TODO(mauriciopoppe): remove this statement once we add `sync` to the test image, ref #101172
 	if e2epod.NodeOSDistroIs("windows") {
 		command = fmt.Sprintf("echo '%s' > '%s';", contents, path)
 	}
