@@ -2401,7 +2401,7 @@ func TestPluginWeights(t *testing.T) {
 			}
 			plugins := f.ListPlugins()
 
-			compareScoreWeight(t, plugins["ScorePlugin"], tt.plugins.Score.Enabled)
+			compareScoreWeight(t, plugins["ScorePlugin"][0], tt.plugins.Score.Enabled[0])
 		})
 	}
 }
