@@ -10,7 +10,6 @@ spec:
     plural: netnamespaces
     singular: netnamespace
   scope: Cluster
-  version: v1
   versions:
   - name: v1
     served: true

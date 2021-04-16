@@ -10,7 +10,6 @@ spec:
     plural: clusternetworks
     singular: clusternetwork
   scope: Cluster
-  version: v1
   versions:
   - name: v1
     served: true

@@ -919,9 +919,10 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
-# github.com/openshift/api v0.0.0-20210331193751-3acddb19d360 => github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
+# github.com/openshift/api v0.0.0-20210414143350-f71e361ed3f4 => github.com/openshift/api v0.0.0-20210414143350-f71e361ed3f4
 ## explicit
-# github.com/openshift/api => github.com/openshift/api v0.0.0-20210331193751-3acddb19d360
+# github.com/openshift/api => github.com/openshift/api v0.0.0-20210414143350-f71e361ed3f4
+github.com/openshift/api/apiserver/v1
 github.com/openshift/api/apps/v1
 github.com/openshift/api/authorization/v1
 github.com/openshift/api/build/v1
@@ -962,9 +963,11 @@ github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/user
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/util/sort
 # github.com/openshift/build-machinery-go => github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359
-# github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f => github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f
+# github.com/openshift/client-go v0.0.0-20210407181114-a8e62c60e930 => github.com/openshift/client-go v0.0.0-20210407181114-454af31d1145
 ## explicit
-# github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210331195552-cf6c2669e01f
+# github.com/openshift/client-go => github.com/openshift/client-go v0.0.0-20210407181114-454af31d1145
+github.com/openshift/client-go/apiserver/clientset/versioned/scheme
+github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1
 github.com/openshift/client-go/apps/clientset/versioned
 github.com/openshift/client-go/apps/clientset/versioned/scheme
 github.com/openshift/client-go/apps/clientset/versioned/typed/apps/v1
