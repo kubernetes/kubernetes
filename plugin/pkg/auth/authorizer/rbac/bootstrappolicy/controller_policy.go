@@ -397,6 +397,8 @@ func buildControllerRoles() ([]rbacv1.ClusterRole, []rbacv1.ClusterRoleBinding) 
 			rbacv1helpers.NewRule("get", "list", "watch", "update").Groups(legacyGroup).Resources("secrets").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("pods").RuleOrDie(),
 			rbacv1helpers.NewRule("list", "watch", "get").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "get").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
+			rbacv1helpers.NewRule("list", "get").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
 			eventsRule(),
 		},
 	})

@@ -19,17 +19,24 @@ package secretprotection
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	storageListers "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
@@ -37,6 +44,17 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+)
+
+const (
+	deprecatedProvisionerSecretNameKey      = "provisioner-secret-name"
+	deprecatedProvisionerSecretNamespaceKey = "provisioner-secret-namespace"
+	provisionerSecretNameKey                = "csi.storage.k8s.io/provisioner-secret-name"
+	provisionerSecretNamespaceKey           = "csi.storage.k8s.io/provisioner-secret-namespace"
+
+	tokenPVNameKey       = "pv.name"
+	tokenPVCNameKey      = "pvc.name"
+	tokenPVCNamespaceKey = "pvc.namespace"
 )
 
 // Controller is controller that removes SecretProtectionFinalizer
@@ -53,6 +71,12 @@ type Controller struct {
 	pvLister       corelisters.PersistentVolumeLister
 	pvListerSynced cache.InformerSynced
 
+	pvcLister       corelisters.PersistentVolumeClaimLister
+	pvcListerSynced cache.InformerSynced
+
+	scLister       storageListers.StorageClassLister
+	scListerSynced cache.InformerSynced
+
 	queue workqueue.RateLimitingInterface
 
 	// allows overriding of StorageObjectInUseProtection feature Enabled/Disabled for testing
@@ -60,7 +84,7 @@ type Controller struct {
 }
 
 // NewSecretProtectionController returns a new instance of SecretProtectionController.
-func NewSecretProtectionController(secretInformer coreinformers.SecretInformer, podInformer coreinformers.PodInformer, pvInformer coreinformers.PersistentVolumeInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
+func NewSecretProtectionController(secretInformer coreinformers.SecretInformer, podInformer coreinformers.PodInformer, pvInformer coreinformers.PersistentVolumeInformer, pvcInformer coreinformers.PersistentVolumeClaimInformer, scInformer storageinformers.StorageClassInformer, cl clientset.Interface, storageObjectInUseProtectionFeatureEnabled bool) *Controller {
 	e := &Controller{
 		client:                              cl,
 		queue:                               workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "secretprotection"),
@@ -106,6 +130,17 @@ func NewSecretProtectionController(secretInformer coreinformers.SecretInformer, 
 			e.pvAddedDeletedUpdated(old, new, false)
 		},
 	})
+
+	e.pvcLister = pvcInformer.Lister()
+	e.pvcListerSynced = pvcInformer.Informer().HasSynced
+	pvcInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		DeleteFunc: func(obj interface{}) {
+			e.pvcDeleted()
+		},
+	})
+
+	e.scLister = scInformer.Lister()
+	e.scListerSynced = scInformer.Informer().HasSynced
 
 	return e
 }
@@ -271,7 +306,7 @@ func (c *Controller) askInformer(secret *v1.Secret) (bool, error) {
 		return false, fmt.Errorf("cache-based list of PVs failed while processing %s/%s: %s", secret.Namespace, secret.Name, err.Error())
 	}
 	for _, pv := range pvs {
-		if c.pvUsesSecret(pv, secret) {
+		if c.pvUsesSecret(pv, secret, false /* askAPI */) {
 			return true, nil
 		}
 	}
@@ -301,7 +336,7 @@ func (c *Controller) askAPIServer(secret *v1.Secret) (bool, error) {
 	}
 
 	for _, pv := range pvsList.Items {
-		if c.pvUsesSecret(&pv, secret) {
+		if c.pvUsesSecret(&pv, secret, true /* askAPI */) {
 			return true, nil
 		}
 	}
@@ -330,9 +365,9 @@ func (c *Controller) podUsesSecret(pod *v1.Pod, secret *v1.Secret) bool {
 	return false
 }
 
-func (c *Controller) pvUsesSecret(pv *v1.PersistentVolume, secret *v1.Secret) bool {
+func (c *Controller) pvUsesSecret(pv *v1.PersistentVolume, secret *v1.Secret, askAPI bool) bool {
 	secretKey := fmt.Sprintf("%s/%s", secret.Namespace, secret.Name)
-	for _, secretKeyUsed := range getSecretsUsedByPV(pv) {
+	for _, secretKeyUsed := range c.getSecretsUsedByPV(pv, askAPI) {
 		if secretKey == secretKeyUsed {
 			klog.V(2).InfoS("PV uses Secret", "pv", klog.KObj(pv), "secret", klog.KObj(secret))
 			return true
@@ -483,12 +518,12 @@ func (*Controller) parsePV(obj interface{}) *v1.PersistentVolume {
 func (c *Controller) enqueueSecretsForPV(pv *v1.PersistentVolume, deleted bool) {
 	klog.V(4).InfoS("Enqueuing Secrets for PV", "pv", klog.KObj(pv), "pvUID", pv.UID)
 	// Enqueue all Secrets that the PV uses
-	for _, secretKey := range getSecretsUsedByPV(pv) {
+	for _, secretKey := range c.getSecretsUsedByPV(pv, false /* askAPI */) {
 		c.queue.Add(secretKey)
 	}
 }
 
-func getSecretsUsedByPV(pv *v1.PersistentVolume) []string {
+func (c *Controller) getSecretsUsedByPV(pv *v1.PersistentVolume, askAPI bool) []string {
 	secretKeys := []string{}
 
 	switch {
@@ -514,7 +549,177 @@ func getSecretsUsedByPV(pv *v1.PersistentVolume) []string {
 			secretKeys = append(secretKeys, fmt.Sprintf("%s/%s",
 				csi.ControllerExpandSecretRef.Namespace, csi.ControllerExpandSecretRef.Name))
 		}
+
+		// Handle provisioner secret, whose reference is not directly stored in PV
+		if pv.Spec.StorageClassName != "" {
+			secretKey, err := c.getProvisionerSecretKey(pv, askAPI)
+			if err != nil {
+				// TODO: PVC would already be deleted when PV is deleted,
+				// so we will miss a chance to queue the secret to remove finalizer.
+				// Current workaround is to queue all the secrets on PVC deletion.
+				klog.Error(err)
+			} else {
+				secretKeys = append(secretKeys, secretKey)
+			}
+		}
 	}
 
 	return secretKeys
+}
+
+func (c *Controller) getProvisionerSecretKey(pv *v1.PersistentVolume, askAPI bool) (string, error) {
+	var sc *storagev1.StorageClass
+	var pvc *v1.PersistentVolumeClaim
+	var err error
+
+	// No StorageClass name is defined
+	if pv.Spec.StorageClassName == "" {
+		return "", nil
+	}
+	// Get StorageClass for the PV
+	if askAPI {
+		sc, err = c.client.StorageV1().StorageClasses().Get(context.TODO(), pv.Spec.StorageClassName, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+	} else {
+		sc, err = c.scLister.Get(pv.Spec.StorageClassName)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Get the template for provisioner secret from StorageClass parameters
+	nsTempl, nameTempl, err := getProvisionerSecretTemplate(sc.Parameters)
+	if err != nil {
+		return "", err
+	}
+	// No valid secret is defined in StorageClass
+	if nsTempl == "" || nameTempl == "" {
+		return "", nil
+	}
+
+	if requirePVC(nsTempl) || requirePVC(nameTempl) {
+		if pv.Spec.ClaimRef == nil {
+			return "", fmt.Errorf("template %q or %q requires information on PVC, but reference to PVC from the PV %q is empty: %v", nsTempl, nameTempl, pv.Name, pv)
+		}
+
+		// Get PVC
+		if askAPI {
+			pvc, err = c.client.CoreV1().PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(context.TODO(), pv.Spec.ClaimRef.Name, metav1.GetOptions{})
+			if err != nil {
+				return "", err
+			}
+		} else {
+			pvc, err = c.pvcLister.PersistentVolumeClaims(pv.Spec.ClaimRef.Namespace).Get(pv.Spec.ClaimRef.Name)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+
+	// Resolve namespace for provisioner secret
+	ns, err := c.resolveNamespaceTemplate(nsTempl, pv, pvc)
+	if err != nil {
+		return "", err
+	}
+	// Resolve name for provisioner secret
+	name, err := c.resolveNameTemplate(nameTempl, pv, pvc)
+	if err != nil {
+		return "", err
+	}
+
+	if ns == "" || name == "" {
+		return "", fmt.Errorf("namespace %s or name %s is empty for provisioner secret for PV %s, StorageClass: %v", ns, name, pv.Name, sc)
+	}
+
+	return fmt.Sprintf("%s/%s", ns, name), nil
+}
+
+func (c *Controller) resolveNamespaceTemplate(template string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (string, error) {
+	return c.resolveTemplate(template, pv, pvc, false /* isName */)
+}
+
+func (c *Controller) resolveNameTemplate(template string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim) (string, error) {
+	return c.resolveTemplate(template, pv, pvc, true /* isName */)
+}
+
+func (c *Controller) resolveTemplate(template string, pv *v1.PersistentVolume, pvc *v1.PersistentVolumeClaim, isName bool) (string, error) {
+	params := map[string]string{tokenPVNameKey: pv.Name}
+	if requirePVC(template) {
+		if pvc == nil {
+			return "", fmt.Errorf("template %q requires pvc, but pvc is nil", template)
+		}
+		// Add params
+		params[tokenPVCNamespaceKey] = pvc.Namespace
+		if isName {
+			// Add params only for name
+			params[tokenPVCNameKey] = pvc.Name
+			// TODO: need to confirm that annotation is supported for provisioner
+			// as implemented in https://github.com/kubernetes-csi/external-provisioner/blob/213cd3d4e56fb439b06922ecf85d230a99d4e70d/pkg/controller/controller.go#L1596
+			// but doens't seem to be mentioned in https://kubernetes-csi.github.io/docs/secrets-and-credentials-storage-class.html#createdelete-volume-secret
+		}
+	}
+
+	missingParams := sets.NewString()
+	resolved := os.Expand(template, func(k string) string {
+		v, ok := params[k]
+		if !ok {
+			missingParams.Insert(k)
+		}
+		return v
+	})
+	if missingParams.Len() > 0 {
+		return "", fmt.Errorf("invalid tokens: %q", missingParams.List())
+	}
+	if len(validation.IsDNS1123Subdomain(resolved)) > 0 {
+		return "", fmt.Errorf("%q is resolved to %q, but is not a valid dns name", template, resolved)
+	}
+	return resolved, nil
+}
+
+func requirePVC(template string) bool {
+	return strings.Contains(template, "${pvc.")
+}
+
+func getProvisionerSecretTemplate(scParams map[string]string) (string, string, error) {
+	var nsTempl, nameTempl string
+	var nsOK, nameOK bool
+
+	if nsTempl, nsOK = scParams[provisionerSecretNamespaceKey]; !nsOK {
+		nsTempl, nsOK = scParams[deprecatedProvisionerSecretNamespaceKey]
+	}
+
+	if nameTempl, nameOK = scParams[provisionerSecretNameKey]; !nameOK {
+		nameTempl, nameOK = scParams[deprecatedProvisionerSecretNameKey]
+	}
+
+	if nsOK != nameOK {
+		return "", "", fmt.Errorf("only namespace or name is found for provisioner secret, namespace %q, name %q: %v", nsTempl, nameTempl, scParams)
+	} else if !nsOK && !nameOK {
+		// Not defined in parameters
+		return "", "", nil
+	}
+
+	return nsTempl, nameTempl, nil
+}
+
+// pvcDeleted reacts to PVC delete events
+func (c *Controller) pvcDeleted() {
+	// TODO: find a wise way to enqueue only related secrets
+	c.enqueueAllSecret()
+}
+
+func (c *Controller) enqueueAllSecret() {
+	klog.V(4).InfoS("Enqueuing all Secrets on PVC deletion")
+	secrets, err := c.secretLister.List(labels.Everything())
+	if err != nil {
+		// Just log and return
+		klog.Error(err)
+		return
+	}
+	// Enqueue all Secrets that the pod uses
+	for _, secret := range secrets {
+		c.queue.Add(secret.Namespace + "/" + secret.Name)
+	}
 }

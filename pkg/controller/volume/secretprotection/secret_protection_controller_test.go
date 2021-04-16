@@ -18,6 +18,7 @@ package secretprotection
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +37,7 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/controller"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -48,10 +51,12 @@ type reaction struct {
 const (
 	defaultNS         = "default"
 	defaultPVName     = "pv1"
+	defaultPVCName    = "pvc1"
 	defaultSecretName = "secret1"
 	defaultPodName    = "pod1"
 	defaultNodeName   = "node1"
 	defaultUID        = "uid1"
+	defaultScName     = "sc1"
 )
 
 func pod() *v1.Pod {
@@ -157,6 +162,45 @@ func withPVUID(uid types.UID, pv *v1.PersistentVolume) *v1.PersistentVolume {
 	return pv
 }
 
+func withScName(scName string, pv *v1.PersistentVolume) *v1.PersistentVolume {
+	pv.Spec.StorageClassName = scName
+	return pv
+}
+
+func bindWithPVC(pvcNamespace, pvcName string, pv *v1.PersistentVolume) *v1.PersistentVolume {
+	pv.Spec.ClaimRef = &v1.ObjectReference{
+		Namespace: pvcNamespace,
+		Name:      pvcName,
+	}
+	return pv
+}
+
+func sc() *storagev1.StorageClass {
+	return &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: defaultScName,
+		},
+		Parameters: map[string]string{},
+	}
+}
+
+func addScParameters(params map[string]string, sc *storagev1.StorageClass) *storagev1.StorageClass {
+	for k, v := range params {
+		sc.Parameters[k] = v
+	}
+	return sc
+}
+
+func pvc() *v1.PersistentVolumeClaim {
+	return &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      defaultPVCName,
+			Namespace: defaultNS,
+		},
+		Spec: v1.PersistentVolumeClaimSpec{},
+	}
+}
+
 func secret() *v1.Secret {
 	return &v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -168,6 +212,12 @@ func secret() *v1.Secret {
 
 func withProtectionFinalizer(secret *v1.Secret) *v1.Secret {
 	secret.Finalizers = append(secret.Finalizers, volumeutil.SecretProtectionFinalizer)
+	return secret
+}
+
+func withNsAndName(ns, name string, secret *v1.Secret) *v1.Secret {
+	secret.ObjectMeta.Namespace = ns
+	secret.ObjectMeta.Name = name
 	return secret
 }
 
@@ -201,6 +251,8 @@ func TestSecretProtectionController(t *testing.T) {
 	podGVK := api.Kind("Pod").WithVersion("v1")
 	pvGVR := api.Resource("persistentvolumes").WithVersion("v1")
 	pvGVK := api.Kind("PersistentVolume").WithVersion("v1")
+	pvcGVR := api.Resource("persistentvolumeclaims").WithVersion("v1")
+	scGVR := storageapi.Resource("storageclasses").WithVersion("v1")
 
 	tests := []struct {
 		name string
@@ -414,6 +466,91 @@ func TestSecretProtectionController(t *testing.T) {
 			storageObjectInUseProtectionEnabled: true,
 		},
 		{
+			name: "deleted secret with finalizer + CSI PV referencing the StorageClass that directly referencing the secret as provisioner secret is requested to delete but is not deleted -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolumeStatus(v1.VolumeReleased, withScName(defaultScName, csiPV())),
+				addScParameters(
+					map[string]string{
+						"provisioner-secret-namespace":               defaultNS,
+						"csi.storage.k8s.io/provisioner-secret-name": defaultSecretName,
+					}, sc()),
+			},
+			updatedSecret:                       deleted(withProtectionFinalizer(secret())),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "deleted secret with finalizer + CSI PV referencing the StorageClass that directly referencing UNRELATED secret as provisioner secret is requested to delete but is not deleted -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolumeStatus(v1.VolumeReleased, withScName(defaultScName, csiPV())),
+				addScParameters(
+					map[string]string{
+						"provisioner-secret-namespace":               defaultNS,
+						"csi.storage.k8s.io/provisioner-secret-name": "unrelated-secret",
+					}, sc()),
+			},
+			updatedSecret: deleted(withProtectionFinalizer(secret())),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK, defaultNS, metav1.ListOptions{}),
+				clienttesting.NewRootListAction(pvGVR, pvGVK, metav1.ListOptions{}),
+				clienttesting.NewRootGetAction(scGVR, defaultScName),
+				clienttesting.NewUpdateAction(secretGVR, defaultNS, deleted(secret())),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "deleted secret with finalizer + CSI PV referencing the StorageClass that referencing the secret as provisioner secret via PVC information is requested to delete but is not deleted -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolumeStatus(v1.VolumeReleased, bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV()))),
+				pvc(),
+				addScParameters(
+					map[string]string{
+						"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}",
+						"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+					}, sc()),
+			},
+			updatedSecret: deleted(withProtectionFinalizer(
+				withNsAndName(
+					fmt.Sprintf("ns-%s-%s", defaultPVName, defaultNS),
+					fmt.Sprintf("sec-%s-%s-%s", defaultPVName, defaultNS, defaultPVCName),
+					secret()))),
+			expectedActions:                     []clienttesting.Action{},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
+			name: "deleted secret with finalizer + CSI PV referencing the StorageClass that referencing the UNRELATED secret as provisioner secret via PVC information is requested to delete but is not deleted -> finalizer is not removed",
+			initialObjects: []runtime.Object{
+				withVolumeStatus(v1.VolumeReleased, bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV()))),
+				pvc(),
+				addScParameters(
+					map[string]string{
+						"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}",
+						"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+					}, sc()),
+			},
+			updatedSecret: deleted(withProtectionFinalizer(
+				withNsAndName(
+					fmt.Sprintf("ns-%s-%s", defaultPVName, defaultNS),
+					fmt.Sprintf("unrelated-sec-%s-%s-%s", defaultPVName, defaultNS, defaultPVCName),
+					secret()))),
+			expectedActions: []clienttesting.Action{
+				clienttesting.NewListAction(podGVR, podGVK,
+					fmt.Sprintf("ns-%s-%s", defaultPVName, defaultNS),
+					metav1.ListOptions{}),
+				clienttesting.NewRootListAction(pvGVR, pvGVK, metav1.ListOptions{}),
+				clienttesting.NewRootGetAction(scGVR, defaultScName),
+				clienttesting.NewGetAction(pvcGVR, defaultNS, defaultPVCName),
+				clienttesting.NewUpdateAction(secretGVR,
+					fmt.Sprintf("ns-%s-%s", defaultPVName, defaultNS),
+					deleted(
+						withNsAndName(
+							fmt.Sprintf("ns-%s-%s", defaultPVName, defaultNS),
+							fmt.Sprintf("unrelated-sec-%s-%s-%s", defaultPVName, defaultNS, defaultPVCName),
+							secret()))),
+			},
+			storageObjectInUseProtectionEnabled: true,
+		},
+		{
 			name: "deleted secret with finalizer + CSI PV with the controller publish secret exists but is not in the Informer's cache yet -> finalizer is not removed",
 			initialObjects: []runtime.Object{
 				withControllerPublishSecret(defaultSecretName, csiPV()),
@@ -611,9 +748,11 @@ func TestSecretProtectionController(t *testing.T) {
 		secretInformer := informers.Core().V1().Secrets()
 		podInformer := informers.Core().V1().Pods()
 		pvInformer := informers.Core().V1().PersistentVolumes()
+		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
+		scInformer := informers.Storage().V1().StorageClasses()
 
 		// Create the controller
-		ctrl := NewSecretProtectionController(secretInformer, podInformer, pvInformer, client, test.storageObjectInUseProtectionEnabled)
+		ctrl := NewSecretProtectionController(secretInformer, podInformer, pvInformer, pvcInformer, scInformer, client, test.storageObjectInUseProtectionEnabled)
 
 		// Populate the informers with initial objects so the controller can
 		// Get() and List() it.
@@ -625,6 +764,10 @@ func TestSecretProtectionController(t *testing.T) {
 				podInformer.Informer().GetStore().Add(obj)
 			case *v1.PersistentVolume:
 				pvInformer.Informer().GetStore().Add(obj)
+			case *v1.PersistentVolumeClaim:
+				pvcInformer.Informer().GetStore().Add(obj)
+			case *storagev1.StorageClass:
+				scInformer.Informer().GetStore().Add(obj)
 			default:
 				t.Fatalf("Unknown initalObject type: %+v", obj)
 			}
@@ -704,5 +847,262 @@ func TestSecretProtectionController(t *testing.T) {
 			}
 		}
 
+	}
+}
+
+func TestGetProvisionerSecretKey(t *testing.T) {
+	tests := []struct {
+		name      string
+		pv        *v1.PersistentVolume
+		pvc       *v1.PersistentVolumeClaim
+		sc        *storagev1.StorageClass
+		askAPI    bool
+		expected  string
+		expectErr bool
+	}{
+		// Informer cases
+		{
+			name:      "PV without StorageClass name returns empty and no error",
+			pv:        csiPV(),
+			expected:  "",
+			expectErr: false,
+		},
+		{
+			name:      "PV with non-existent StorageClass name returns empty and error",
+			pv:        withScName("non-existent-sc", csiPV()),
+			sc:        sc(),
+			expected:  "",
+			expectErr: true,
+		},
+		{
+			name:      "PV with StorageClass name that has no parameters returns empty and no error",
+			pv:        withScName(defaultScName, csiPV()),
+			sc:        sc(),
+			expected:  "",
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has deprecated provisioner key parameters w/o replacement returns the expected key and no error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated":                    "should have no effect",
+					"provisioner-secret-namespace": "ns1",
+					"provisioner-secret-name":      "sec1",
+				}, sc()),
+			expected:  "ns1/sec1",
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/o replacement returns the expected key and no error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns1",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec1",
+				}, sc()),
+			expected:  "ns1/sec1",
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has mixed(deprecated/current) provisioner key parameters w/o replacement returns the expected key and no error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"provisioner-secret-namespace":               "ns1",
+					"csi.storage.k8s.io/provisioner-secret-name": "sec1",
+				}, sc()),
+			expected:  "ns1/sec1",
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameter only for ns returns empty and error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"provisioner-secret-namespace": "ns1",
+				}, sc()),
+			expected:  "",
+			expectErr: true,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameter only for name returns empty and error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"csi.storage.k8s.io/provisioner-secret-name": "sec1",
+				}, sc()),
+			expected:  "",
+			expectErr: true,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/ pv related replacement returns the expected key and no error",
+			pv:   withScName(defaultScName, csiPV()),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}",
+				}, sc()),
+			expected:  fmt.Sprintf("ns-%s/sec-%s", defaultPVName, defaultPVName),
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/ pvc related replacement returns the expected key and no error",
+			pv:   bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV())),
+			pvc:  pvc(),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pvc.namespace}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pvc.name}",
+				}, sc()),
+			expected:  fmt.Sprintf("ns-%s/sec-%s", defaultNS, defaultPVCName),
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/ multiple replacement returns the expected key and no error",
+			pv:   bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV())),
+			pvc:  pvc(),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+				}, sc()),
+			expected: fmt.Sprintf("ns-%s-%s/sec-%s-%s-%s",
+				defaultPVName, defaultNS,
+				defaultPVName, defaultNS, defaultPVCName),
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/ invalid replacement token returns empty and error",
+			pv:   bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV())),
+			pvc:  pvc(),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}-${pvc.name}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+				}, sc()),
+			expected:  "",
+			expectErr: true,
+		},
+		// API cases
+		{
+			name:      "With askAPI true, PV with non-existent StorageClass name returns empty and error",
+			pv:        withScName("non-existent-sc", csiPV()),
+			sc:        sc(),
+			askAPI:    true,
+			expected:  "",
+			expectErr: true,
+		},
+		{
+			name:      "With askAPI true, PV with StorageClass name that has no parameters returns empty and no error",
+			pv:        withScName(defaultScName, csiPV()),
+			sc:        sc(),
+			askAPI:    true,
+			expected:  "",
+			expectErr: false,
+		},
+		{
+			name: "With askAPI true, PV with StorageClass name that has provisioner key parameters w/ multiple replacement returns the expected key and no error",
+			pv:   bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV())),
+			pvc:  pvc(),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+				}, sc()),
+			askAPI: true,
+			expected: fmt.Sprintf("ns-%s-%s/sec-%s-%s-%s",
+				defaultPVName, defaultNS,
+				defaultPVName, defaultNS, defaultPVCName),
+			expectErr: false,
+		},
+		{
+			name: "PV with StorageClass name that has provisioner key parameters w/ invalid replacement token returns empty and error",
+			pv:   bindWithPVC(defaultNS, defaultPVCName, withScName(defaultScName, csiPV())),
+			pvc:  pvc(),
+			sc: addScParameters(
+				map[string]string{
+					"unrelated": "should have no effect",
+					"csi.storage.k8s.io/provisioner-secret-namespace": "ns-${pv.name}-${pvc.namespace}-${pvc.name}",
+					"csi.storage.k8s.io/provisioner-secret-name":      "sec-${pv.name}-${pvc.namespace}-${pvc.name}",
+				}, sc()),
+			askAPI:    true,
+			expected:  "",
+			expectErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		var (
+			clientObjs    []runtime.Object
+			informersObjs []runtime.Object
+		)
+		if test.pv != nil {
+			clientObjs = append(clientObjs, test.pv)
+			informersObjs = append(informersObjs, test.pv)
+		}
+		if test.pvc != nil {
+			clientObjs = append(clientObjs, test.pvc)
+			informersObjs = append(informersObjs, test.pvc)
+		}
+		if test.sc != nil {
+			clientObjs = append(clientObjs, test.sc)
+			informersObjs = append(informersObjs, test.sc)
+		}
+
+		// Create client with initial data
+		client := fake.NewSimpleClientset(clientObjs...)
+
+		// Create informers
+		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		secretInformer := informers.Core().V1().Secrets()
+		podInformer := informers.Core().V1().Pods()
+		pvInformer := informers.Core().V1().PersistentVolumes()
+		pvcInformer := informers.Core().V1().PersistentVolumeClaims()
+		scInformer := informers.Storage().V1().StorageClasses()
+
+		// Create the controller
+		ctrl := NewSecretProtectionController(secretInformer, podInformer, pvInformer, pvcInformer, scInformer, client, true /* storageObjectInUseProtectionEnabled */)
+
+		// Populate the informers with initial objects so the controller can
+		// Get() and List() it.
+		for _, obj := range informersObjs {
+			switch obj.(type) {
+			case *v1.Secret:
+				secretInformer.Informer().GetStore().Add(obj)
+			case *v1.Pod:
+				podInformer.Informer().GetStore().Add(obj)
+			case *v1.PersistentVolume:
+				pvInformer.Informer().GetStore().Add(obj)
+			case *v1.PersistentVolumeClaim:
+				pvcInformer.Informer().GetStore().Add(obj)
+			case *storagev1.StorageClass:
+				scInformer.Informer().GetStore().Add(obj)
+			default:
+				t.Fatalf("Unknown initalObject type: %+v", obj)
+			}
+		}
+
+		result, err := ctrl.getProvisionerSecretKey(test.pv, test.askAPI)
+
+		if test.expectErr {
+			if err == nil {
+				t.Errorf("Test %q: expects error but got no error", test.name)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("Test %q: expects no error but got error: %v", test.name, err)
+			}
+		}
+
+		if result != test.expected {
+			t.Errorf("Test %q: expects %q but got %q", test.name, test.expected, result)
+		}
 	}
 }

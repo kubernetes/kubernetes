@@ -601,6 +601,8 @@ func startSecretProtectionController(ctx ControllerContext) (http.Handler, bool,
 		ctx.InformerFactory.Core().V1().Secrets(),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().PersistentVolumes(),
+		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		ctx.InformerFactory.Storage().V1().StorageClasses(),
 		ctx.ClientBuilder.ClientOrDie("secret-protection-controller"),
 		utilfeature.DefaultFeatureGate.Enabled(features.StorageObjectInUseProtection),
 	).Run(1, ctx.Stop)

@@ -1326,6 +1326,20 @@ items:
     - watch
   - apiGroups:
     - ""
+    resources:
+    - persistentvolumeclaims
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - storage.k8s.io
+    resources:
+    - storageclasses
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - ""
     - events.k8s.io
     resources:
     - events
