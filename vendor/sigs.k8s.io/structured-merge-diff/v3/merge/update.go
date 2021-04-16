@@ -197,7 +197,7 @@ func shallowCopyManagers(managers fieldpath.ManagedFields) fieldpath.ManagedFiel
 	return newManagers
 }
 
-// prune will remove a list or map item, iff:
+// prune will remove a field, list or map item, iff:
 // * applyingManager applied it last time
 // * applyingManager didn't apply it this time
 // * no other applier claims to manage it
@@ -213,7 +213,8 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 		return nil, fmt.Errorf("failed to convert merged object to last applied version: %v", err)
 	}
 
-	pruned := convertedMerged.RemoveItems(lastSet.Set())
+	sc, tr := convertedMerged.Schema(), convertedMerged.TypeRef()
+	pruned := convertedMerged.RemoveItems(lastSet.Set().EnsureNamedFieldsAreMembers(sc, tr))
 	pruned, err = s.addBackOwnedItems(convertedMerged, pruned, managers, applyingManager)
 	if err != nil {
 		return nil, fmt.Errorf("failed add back owned items: %v", err)
@@ -225,18 +226,16 @@ func (s *Updater) prune(merged *typed.TypedValue, managers fieldpath.ManagedFiel
 	return s.Converter.Convert(pruned, managers[applyingManager].APIVersion())
 }
 
-// addBackOwnedItems adds back any list and map items that were removed by prune,
-// but other appliers (or the current applier's new config) claim to own.
+// addBackOwnedItems adds back any fields, list and map items that were removed by prune,
+// but other appliers or updaters (or the current applier's new config) claim to own.
 func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFields fieldpath.ManagedFields, applyingManager string) (*typed.TypedValue, error) {
 	var err error
 	managedAtVersion := map[fieldpath.APIVersion]*fieldpath.Set{}
 	for _, managerSet := range managedFields {
-		if managerSet.Applied() {
-			if _, ok := managedAtVersion[managerSet.APIVersion()]; !ok {
-				managedAtVersion[managerSet.APIVersion()] = fieldpath.NewSet()
-			}
-			managedAtVersion[managerSet.APIVersion()] = managedAtVersion[managerSet.APIVersion()].Union(managerSet.Set())
+		if _, ok := managedAtVersion[managerSet.APIVersion()]; !ok {
+			managedAtVersion[managerSet.APIVersion()] = fieldpath.NewSet()
 		}
+		managedAtVersion[managerSet.APIVersion()] = managedAtVersion[managerSet.APIVersion()].Union(managerSet.Set())
 	}
 	for version, managed := range managedAtVersion {
 		merged, err = s.Converter.Convert(merged, version)
@@ -261,14 +260,15 @@ func (s *Updater) addBackOwnedItems(merged, pruned *typed.TypedValue, managedFie
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field set from pruned object at version %v: %v", version, err)
 		}
-		pruned = merged.RemoveItems(mergedSet.Difference(prunedSet.Union(managed)))
+		sc, tr := merged.Schema(), merged.TypeRef()
+		pruned = merged.RemoveItems(mergedSet.EnsureNamedFieldsAreMembers(sc, tr).Difference(prunedSet.EnsureNamedFieldsAreMembers(sc, tr).Union(managed.EnsureNamedFieldsAreMembers(sc, tr))))
 	}
 	return pruned, nil
 }
 
-// addBackDanglingItems makes sure that the only items removed by prune are items that were
-// previously owned by the currently applying manager. This will add back unowned items and items
-// which are owned by Updaters that shouldn't be removed.
+// addBackDanglingItems makes sure that the fields list and map items removed by prune were
+// previously owned by the currently applying manager. This will add back fields list and map items
+// that are unowned or that are owned by Updaters and shouldn't be removed.
 func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet fieldpath.VersionedSet) (*typed.TypedValue, error) {
 	convertedPruned, err := s.Converter.Convert(pruned, lastSet.APIVersion())
 	if err != nil {
@@ -285,5 +285,9 @@ func (s *Updater) addBackDanglingItems(merged, pruned *typed.TypedValue, lastSet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field set from merged object in last applied version: %v", err)
 	}
-	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(lastSet.Set())), nil
+	sc, tr := merged.Schema(), merged.TypeRef()
+	prunedSet = prunedSet.EnsureNamedFieldsAreMembers(sc, tr)
+	mergedSet = mergedSet.EnsureNamedFieldsAreMembers(sc, tr)
+	last := lastSet.Set().EnsureNamedFieldsAreMembers(sc, tr)
+	return merged.RemoveItems(mergedSet.Difference(prunedSet).Intersection(last)), nil
 }

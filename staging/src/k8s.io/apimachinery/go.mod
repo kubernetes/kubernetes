@@ -33,7 +33,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20200410145947-61e04a5be9a6 // release-1.18
-	sigs.k8s.io/structured-merge-diff/v3 v3.0.0
+	sigs.k8s.io/structured-merge-diff/v3 v3.0.1
 	sigs.k8s.io/yaml v1.2.0
 )
 
