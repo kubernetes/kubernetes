@@ -20,7 +20,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"reflect"
 	"sync"
 	"time"
 
@@ -29,7 +28,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/util"
-	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 var (
@@ -256,7 +254,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 			curEndpoints = state.endpoints
 		}
 
-		if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
+		if !exists || state == nil || len(curEndpoints) != len(newEndpoints) || !util.SlicesEquiv(util.SliceCopyStrings(curEndpoints), newEndpoints) {
 			klog.V(1).Infof("LoadBalancerRR: Setting endpoints for %s to %+v", svcPort, newEndpoints)
 			lb.updateAffinityMap(svcPort, newEndpoints)
 			// OnEndpointsUpdate can be called without NewService being called externally.
@@ -304,17 +302,6 @@ func (lb *LoadBalancerRR) OnEndpointsDelete(endpoints *v1.Endpoints) {
 }
 
 func (lb *LoadBalancerRR) OnEndpointsSynced() {
-}
-
-// Tests whether two slices are equivalent.  This sorts both slices in-place.
-func slicesEquiv(lhs, rhs []string) bool {
-	if len(lhs) != len(rhs) {
-		return false
-	}
-	if reflect.DeepEqual(slice.SortStrings(lhs), slice.SortStrings(rhs)) {
-		return true
-	}
-	return false
 }
 
 func (lb *LoadBalancerRR) CleanupStaleStickySessions(svcPort proxy.ServicePortName) {

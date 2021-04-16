@@ -23,6 +23,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
@@ -498,4 +500,25 @@ func RevertPorts(replacementPortsMap, originalPortsMap map[utilnet.LocalPort]uti
 // CountBytesLines counts the number of lines in a bytes slice
 func CountBytesLines(b []byte) int {
 	return bytes.Count(b, []byte{'\n'})
+}
+
+// SlicesEquiv Tests whether two slices are equivalent.  This sorts both slices in-place.
+func SlicesEquiv(lhs, rhs []string) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	sort.Strings(lhs)
+	sort.Strings(rhs)
+	return reflect.DeepEqual(lhs, rhs)
+}
+
+// SliceCopyStrings copies the contents of the specified string slice
+// into a new slice.
+func SliceCopyStrings(s []string) []string {
+	if s == nil {
+		return nil
+	}
+	c := make([]string, len(s))
+	copy(c, s)
+	return c
 }

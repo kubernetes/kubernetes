@@ -21,17 +21,6 @@ import (
 	"sort"
 )
 
-// CopyStrings copies the contents of the specified string slice
-// into a new slice.
-func CopyStrings(s []string) []string {
-	if s == nil {
-		return nil
-	}
-	c := make([]string, len(s))
-	copy(c, s)
-	return c
-}
-
 // SortStrings sorts the specified string slice in place. It returns the same
 // slice that was provided in order to facilitate method chaining.
 func SortStrings(s []string) []string {

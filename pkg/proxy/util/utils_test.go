@@ -1269,3 +1269,67 @@ func randSeq() string {
 	}
 	return string(b)
 }
+
+func TestCopyStrings(t *testing.T) {
+	var src1 []string
+	dest1 := SliceCopyStrings(src1)
+
+	if !reflect.DeepEqual(src1, dest1) {
+		t.Errorf("%v and %v are not equal", src1, dest1)
+	}
+
+	src2 := []string{}
+	dest2 := SliceCopyStrings(src2)
+
+	if !reflect.DeepEqual(src2, dest2) {
+		t.Errorf("%v and %v are not equal", src2, dest2)
+	}
+
+	src3 := []string{"a", "c", "b"}
+	dest3 := SliceCopyStrings(src3)
+
+	if !reflect.DeepEqual(src3, dest3) {
+		t.Errorf("%v and %v are not equal", src3, dest3)
+	}
+
+	src3[0] = "A"
+	if reflect.DeepEqual(src3, dest3) {
+		t.Errorf("CopyStrings didn't make a copy")
+	}
+}
+
+func TestSlicesEquiv(t *testing.T) {
+	testCases := []struct {
+		name     string
+		lhs      []string
+		rhs      []string
+		expected bool
+	}{
+		{
+			name:     "different lenghts",
+			lhs:      []string{"a", "b"},
+			rhs:      []string{"a", "b", "c"},
+			expected: false,
+		},
+		{
+			name:     "different values",
+			rhs:      []string{"a", "b"},
+			lhs:      []string{"a", "c"},
+			expected: false,
+		},
+		{
+			name:     "same values unordered",
+			rhs:      []string{"a", "b", "c", "d"},
+			lhs:      []string{"d", "b", "c", "a"},
+			expected: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got := SlicesEquiv(testCase.lhs, testCase.rhs)
+			if got != testCase.expected {
+				t.Fatalf("expected: %t, got: %t", testCase.expected, got)
+			}
+		})
+	}
+}
