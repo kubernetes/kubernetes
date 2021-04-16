@@ -2384,10 +2384,8 @@ func TestPluginWeights(t *testing.T) {
 		{
 			name: "Add multiple plugins with weights",
 			plugins: &config.Plugins{
-				QueueSort: config.PluginSet{Enabled: []config.Plugin{{Name: queueSortPlugin}}},
-				Score:     config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
-				PostBind:  config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
-				Bind:      config.PluginSet{Enabled: []config.Plugin{{Name: bindPlugin}}},
+				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
 			},
 		},
 	}
@@ -2395,24 +2393,23 @@ func TestPluginWeights(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
-			f, err := NewFramework(registry, &profile)
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
 			if err != nil {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 			plugins := f.ListPlugins()
 
+			if len(plugins["ScorePlugin"]) == 0 {
+				t.Fatalf("Expect at least one ScorePlugin, got empty from: %v", plugins)
+			}
 			compareScoreWeight(t, plugins["ScorePlugin"][0], tt.plugins.Score.Enabled[0])
 		})
 	}
 }
 
-func compareScoreWeight(t *testing.T, gotScores []config.Plugin, wantScores []config.Plugin) {
-	for _, ws := range wantScores {
-		for _, gs := range gotScores {
-			if gs.Name == ws.Name && gs.Weight != ws.Weight {
-				t.Errorf("Expect weight to be %d, got: %d for plugin %s", ws.Weight, gs.Weight, gs.Name)
-			}
-		}
+func compareScoreWeight(t *testing.T, gotScorePl config.Plugin, wantedScorePl config.Plugin) {
+	if gotScorePl.Name == wantedScorePl.Name && gotScorePl.Weight != wantedScorePl.Weight {
+		t.Errorf("Expect weight to be %d, got: %d for plugin %s", wantedScorePl.Weight, gotScorePl.Weight, gotScorePl.Name)
 	}
 }
 
