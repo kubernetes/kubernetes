@@ -507,8 +507,10 @@ with the apiserver API to configure the proxy.`,
 
 	opts.AddFlags(cmd.Flags())
 
-	// TODO handle error
-	cmd.MarkFlagFilename("config", "yaml", "yml", "json")
+	// MarkFlagFilename only fail when config flag not exist, so if err != nil, should fata
+	if err := cmd.MarkFlagFilename("config", "yaml", "yml", "json"); err != nil {
+		klog.Fatalf("unable to mark flag file name: %v", err)
+	}
 
 	return cmd
 }
