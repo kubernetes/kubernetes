@@ -206,7 +206,7 @@ func NewPod(uid, name string) *v1.Pod {
 	}
 }
 
-// NewPod returns a test pod object
+// NewPodWithVolume returns a test pod object
 func NewPodWithVolume(podName, volumeName, nodeName string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

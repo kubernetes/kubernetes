@@ -282,7 +282,7 @@ var ValidateClusterName = apimachineryvalidation.ValidateClusterName
 // (where it should be) and this file.
 var ValidateClassName = apimachineryvalidation.NameIsDNSSubdomain
 
-// ValidatePiorityClassName can be used to check whether the given priority
+// ValidatePriorityClassName can be used to check whether the given priority
 // class name is valid.
 var ValidatePriorityClassName = apimachineryvalidation.NameIsDNSSubdomain
 
