@@ -29,10 +29,8 @@ import (
 
 	certificatesv1 "k8s.io/api/certificates/v1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -942,7 +940,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        errors.NewUnauthorized("unauthorized"),
+			clientErr:        apierrors.NewUnauthorized("unauthorized"),
 			expectRotateFail: true,
 			expectHealthy:    true,
 		},
@@ -951,7 +949,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        errors.NewGenericServerResponse(401, "POST", schema.GroupResource{}, "", "", 0, true),
+			clientErr:        apierrors.NewGenericServerResponse(401, "POST", schema.GroupResource{}, "", "", 0, true),
 			expectRotateFail: true,
 			expectHealthy:    true,
 		},
@@ -960,7 +958,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        errors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, true),
+			clientErr:        apierrors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, true),
 			expectRotateFail: true,
 			expectHealthy:    false,
 		},
@@ -969,7 +967,7 @@ func TestServerHealth(t *testing.T) {
 			certs:       currentCerts,
 
 			failureType:      createError,
-			clientErr:        errors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, false),
+			clientErr:        apierrors.NewGenericServerResponse(404, "POST", schema.GroupResource{}, "", "", 0, false),
 			expectRotateFail: true,
 			expectHealthy:    true,
 		},
@@ -1136,12 +1134,12 @@ func newClientset(opts fakeClient) *fake.Clientset {
 				if opts.noV1 {
 					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
 				}
-				return true, &certificatesv1.CertificateSigningRequestList{Items: []certificatesv1.CertificateSigningRequest{{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}}}}, nil
+				return true, &certificatesv1.CertificateSigningRequestList{Items: []certificatesv1.CertificateSigningRequest{{ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"}}}}, nil
 			case "v1beta1":
 				if opts.noV1beta1 {
 					return true, nil, apierrors.NewNotFound(certificatesv1.Resource("certificatesigningrequests"), "")
 				}
-				return true, &certificatesv1beta1.CertificateSigningRequestList{Items: []certificatesv1beta1.CertificateSigningRequest{{ObjectMeta: v1.ObjectMeta{UID: "fake-uid"}}}}, nil
+				return true, &certificatesv1beta1.CertificateSigningRequestList{Items: []certificatesv1beta1.CertificateSigningRequest{{ObjectMeta: metav1.ObjectMeta{UID: "fake-uid"}}}}, nil
 			default:
 				return false, nil, nil
 			}
