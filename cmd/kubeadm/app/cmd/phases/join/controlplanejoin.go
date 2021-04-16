@@ -43,7 +43,7 @@ func getControlPlaneJoinPhaseFlags(name string) []string {
 		options.ControlPlane,
 		options.NodeName,
 	}
-	if name == "etcd" {
+	if name == "etcd" || name == "all" {
 		flags = append(flags, options.Patches)
 	}
 	if name != "mark-control-plane" {
