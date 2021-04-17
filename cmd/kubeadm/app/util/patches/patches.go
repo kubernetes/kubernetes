@@ -283,7 +283,11 @@ func getPatchSetsFromPath(targetPath string, knownTargets []string, output io.Wr
 		goto return_path_error
 	}
 	if !info.IsDir() {
-		err = errors.New("not a directory")
+		err = &os.PathError{
+			Op:   "getPatchSetsFromPath",
+			Path: info.Name(),
+			Err:  errors.New("not a directory"),
+		}
 		goto return_path_error
 	}
 
