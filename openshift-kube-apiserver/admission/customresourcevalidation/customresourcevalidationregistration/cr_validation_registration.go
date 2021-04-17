@@ -8,6 +8,7 @@ import (
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/clusterresourcequota"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/config"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/console"
+	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/dns"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/features"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/image"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation/network"
@@ -24,6 +25,7 @@ var AllCustomResourceValidators = []string{
 	authentication.PluginName,
 	features.PluginName,
 	console.PluginName,
+	dns.PluginName,
 	image.PluginName,
 	oauth.PluginName,
 	project.PluginName,
@@ -43,6 +45,7 @@ func RegisterCustomResourceValidation(plugins *admission.Plugins) {
 	authentication.Register(plugins)
 	features.Register(plugins)
 	console.Register(plugins)
+	dns.Register(plugins)
 	image.Register(plugins)
 	oauth.Register(plugins)
 	project.Register(plugins)
