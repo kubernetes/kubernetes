@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	// Use buckets ranging from 5 ms to 2.5 seconds (admission webhooks timeout at 30 seconds by default).
+	// Use buckets ranging from 5 ms to 10 seconds (admission webhooks timeout at 30 seconds by default).
 	latencyBuckets       = []float64{0.005, 0.025, 0.1, 0.5, 2.5, 5.0, 10.0}
 	latencySummaryMaxAge = 5 * time.Hour
 
