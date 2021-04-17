@@ -28,11 +28,12 @@ import (
 
 	units "github.com/docker/go-units"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/v1/resource"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
+	"k8s.io/kubernetes/pkg/kubelet/managed"
 )
 
 const (
@@ -170,6 +171,9 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
+		if enabled, _ := managed.IsPodManaged(pod); enabled {
+			continue
+		}
 		qosClass := v1qos.GetPodQOS(pod)
 		if qosClass != v1.PodQOSBurstable {
 			// we only care about the burstable qos tier
