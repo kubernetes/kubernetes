@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -46,8 +47,8 @@
   "status": {
     "replicas": 70007838,
     "selector": {
-      "19": "20"
+      "20": "21"
     },
-    "targetSelector": "21"
+    "targetSelector": "22"
   }
 }

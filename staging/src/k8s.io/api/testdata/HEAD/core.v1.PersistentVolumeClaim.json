@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -63,13 +64,13 @@
         "Ł%ŨȈ\u003eŅ£趕ã/鈱$-议}ȧ外ĺ稥": "713"
       }
     },
-    "volumeName": "25",
-    "storageClassName": "26",
+    "volumeName": "26",
+    "storageClassName": "27",
     "volumeMode": "娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^",
     "dataSource": {
-      "apiGroup": "27",
-      "kind": "28",
-      "name": "29"
+      "apiGroup": "28",
+      "kind": "29",
+      "name": "30"
     }
   },
   "status": {
@@ -86,8 +87,8 @@
         "status": "ƣKʘńw:5塋",
         "lastProbeTime": "2588-10-04T08:20:38Z",
         "lastTransitionTime": "2095-10-31T02:52:44Z",
-        "reason": "30",
-        "message": "31"
+        "reason": "31",
+        "message": "32"
       }
     ]
   }

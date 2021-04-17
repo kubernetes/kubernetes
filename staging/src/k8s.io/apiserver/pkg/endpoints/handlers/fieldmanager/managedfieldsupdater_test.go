@@ -27,7 +27,7 @@ import (
 )
 
 func TestNoManagedFieldsUpdateDoesntUpdateTime(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), false, nil)
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), "", nil)
 
 	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{

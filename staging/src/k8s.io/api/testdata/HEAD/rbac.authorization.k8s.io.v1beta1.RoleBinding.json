@@ -36,21 +36,22 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "subjects": [
     {
-      "kind": "19",
-      "apiGroup": "20",
-      "name": "21",
-      "namespace": "22"
+      "kind": "20",
+      "apiGroup": "21",
+      "name": "22",
+      "namespace": "23"
     }
   ],
   "roleRef": {
-    "apiGroup": "23",
-    "kind": "24",
-    "name": "25"
+    "apiGroup": "24",
+    "kind": "25",
+    "name": "26"
   }
 }

@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -31,12 +32,12 @@ metadata:
   uid: "7"
 spec:
   annotations:
-    "20": "21"
+    "21": "22"
   containers:
-  - image: "19"
-  namespace: "22"
+  - image: "20"
+  namespace: "23"
 status:
   allowed: true
   auditAnnotations:
-    "24": "25"
-  reason: "23"
+    "25": "26"
+  reason: "24"

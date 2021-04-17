@@ -1,8 +1,8 @@
 apiVersion: v1
 binaryData:
-  "21": Hg==
+  "22": Hg==
 data:
-  "19": "20"
+  "20": "21"
 immutable: false
 kind: ConfigMap
 metadata:
@@ -22,6 +22,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:

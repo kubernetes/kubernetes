@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -44,12 +45,12 @@
     "gracePeriodSeconds": 3850803321873644574,
     "preconditions": {
       "uid": "枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě",
-      "resourceVersion": "19"
+      "resourceVersion": "20"
     },
     "orphanDependents": true,
     "propagationPolicy": "蓏Ŋ",
     "dryRun": [
-      "20"
+      "21"
     ]
   }
 }

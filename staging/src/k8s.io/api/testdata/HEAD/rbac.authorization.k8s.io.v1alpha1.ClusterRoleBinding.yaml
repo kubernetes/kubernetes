@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -30,11 +31,11 @@ metadata:
   selfLink: "5"
   uid: "7"
 roleRef:
-  apiGroup: "23"
-  kind: "24"
-  name: "25"
+  apiGroup: "24"
+  kind: "25"
+  name: "26"
 subjects:
-- apiVersion: "20"
-  kind: "19"
-  name: "21"
-  namespace: "22"
+- apiVersion: "21"
+  kind: "20"
+  name: "22"
+  namespace: "23"

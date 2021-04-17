@@ -969,31 +969,32 @@ func TestExtractModifyApply(t *testing.T) {
 				}
 			},
 		},
-		{
-			// Append a condition to the status if the object
-			name: "modify-status-conditions",
-			modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
-				apply.WithStatus(appsv1ac.DeploymentStatus().
-					WithConditions(appsv1ac.DeploymentCondition().
-						WithType(appsv1.DeploymentProgressing).
-						WithStatus(v1.ConditionUnknown).
-						WithLastTransitionTime(metav1.Now()).
-						WithLastUpdateTime(metav1.Now()).
-						WithMessage("progressing").
-						WithReason("TestExtractModifyApply_Status"),
-					),
-				)
-			},
-			verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
-				conditions := applied.Status.Conditions
-				if len(conditions) != 1 {
-					t.Errorf("Expected 1 conditions but got %d", len(conditions))
-				}
-				if *conditions[0].Type != appsv1.DeploymentProgressing {
-					t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
-				}
-			},
-		},
+		// TODO: We probably need "ExtractStatus" (or a variadic argument to "Extract").
+		// {
+		// 	// Append a condition to the status if the object
+		// 	name: "modify-status-conditions",
+		// 	modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+		// 		apply.WithStatus(appsv1ac.DeploymentStatus().
+		// 			WithConditions(appsv1ac.DeploymentCondition().
+		// 				WithType(appsv1.DeploymentProgressing).
+		// 				WithStatus(v1.ConditionUnknown).
+		// 				WithLastTransitionTime(metav1.Now()).
+		// 				WithLastUpdateTime(metav1.Now()).
+		// 				WithMessage("progressing").
+		// 				WithReason("TestExtractModifyApply_Status"),
+		// 			),
+		// 		)
+		// 	},
+		// 	verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+		// 		conditions := applied.Status.Conditions
+		// 		if len(conditions) != 1 {
+		// 			t.Errorf("Expected 1 conditions but got %d", len(conditions))
+		// 		}
+		// 		if *conditions[0].Type != appsv1.DeploymentProgressing {
+		// 			t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
+		// 		}
+		// 	},
+		// },
 	}
 
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())

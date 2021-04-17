@@ -36,12 +36,13 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "value": -595102844,
   "globalDefault": true,
-  "description": "19",
+  "description": "20",
   "preemptionPolicy": "J枊a"
 }

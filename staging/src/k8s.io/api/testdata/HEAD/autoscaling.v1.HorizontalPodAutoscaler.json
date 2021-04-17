@@ -36,15 +36,16 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "scaleTargetRef": {
-      "kind": "19",
-      "name": "20",
-      "apiVersion": "21"
+      "kind": "20",
+      "name": "21",
+      "apiVersion": "22"
     },
     "minReplicas": 896585016,
     "maxReplicas": -1971381490,

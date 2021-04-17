@@ -18,6 +18,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -30,4 +31,4 @@ metadata:
   resourceVersion: "11042405498087606203"
   selfLink: "5"
   uid: "7"
-range: "19"
+range: "20"

@@ -266,6 +266,12 @@ func TestValidateManagedFieldsInvalid(t *testing.T) {
 			Manager:    "field\nmanager",
 			APIVersion: "v1",
 		},
+		{
+			Operation:   metav1.ManagedFieldsOperationApply,
+			FieldsType:  "FieldsV1",
+			APIVersion:  "v1",
+			Subresource: "TooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLongTooLong",
+		},
 	}
 
 	for _, test := range tests {
@@ -291,9 +297,10 @@ func TestValidateMangedFieldsValid(t *testing.T) {
 			APIVersion: "v1",
 		},
 		{
-			Operation:  metav1.ManagedFieldsOperationApply,
-			FieldsType: "FieldsV1",
-			APIVersion: "v1",
+			Operation:   metav1.ManagedFieldsOperationApply,
+			FieldsType:  "FieldsV1",
+			APIVersion:  "v1",
+			Subresource: "scale",
 		},
 		{
 			Operation:  metav1.ManagedFieldsOperationApply,

@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -50,7 +51,7 @@
     "fsGroupPolicy": "/ʕVŚ(ĿȊ甞谐颋ǅSǡ",
     "tokenRequests": [
       {
-        "audience": "19",
+        "audience": "20",
         "expirationSeconds": -8506428344202195448
       }
     ],

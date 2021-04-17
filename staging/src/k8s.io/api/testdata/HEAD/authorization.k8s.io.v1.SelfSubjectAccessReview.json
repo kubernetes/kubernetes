@@ -36,28 +36,29 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "spec": {
     "resourceAttributes": {
-      "namespace": "19",
-      "verb": "20",
-      "group": "21",
-      "version": "22",
-      "resource": "23",
-      "subresource": "24",
-      "name": "25"
+      "namespace": "20",
+      "verb": "21",
+      "group": "22",
+      "version": "23",
+      "resource": "24",
+      "subresource": "25",
+      "name": "26"
     },
     "nonResourceAttributes": {
-      "path": "26",
-      "verb": "27"
+      "path": "27",
+      "verb": "28"
     }
   },
   "status": {
     "allowed": true,
-    "reason": "28",
-    "evaluationError": "29"
+    "reason": "29",
+    "evaluationError": "30"
   }
 }

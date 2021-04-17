@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -60,8 +61,8 @@
         "type": "ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗",
         "status": "獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ",
         "lastTransitionTime": "2559-09-14T11:32:46Z",
-        "reason": "19",
-        "message": "20"
+        "reason": "20",
+        "message": "21"
       }
     ]
   }

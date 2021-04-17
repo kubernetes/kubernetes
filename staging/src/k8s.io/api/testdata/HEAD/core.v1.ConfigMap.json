@@ -36,15 +36,16 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
   "immutable": false,
   "data": {
-    "19": "20"
+    "20": "21"
   },
   "binaryData": {
-    "21": "Hg=="
+    "22": "Hg=="
   }
 }

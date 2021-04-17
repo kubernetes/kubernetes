@@ -36,7 +36,8 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fieldsType": "18"
+        "fieldsType": "18",
+        "subresource": "19"
       }
     ]
   },
@@ -44,22 +45,22 @@
   "status": {
     "storageVersions": [
       {
-        "apiServerID": "19",
-        "encodingVersion": "20",
+        "apiServerID": "20",
+        "encodingVersion": "21",
         "decodableVersions": [
-          "21"
+          "22"
         ]
       }
     ],
-    "commonEncodingVersion": "22",
+    "commonEncodingVersion": "23",
     "conditions": [
       {
         "type": "Hr鯹)晿\u003co,c鮽ort昍řČ扷5Ɨ",
         "status": "ěĂ凗蓏Ŋ蛊ĉy緅縕",
         "observedGeneration": -6114802437535409255,
         "lastTransitionTime": "2030-04-26T16:31:03Z",
-        "reason": "23",
-        "message": "24"
+        "reason": "24",
+        "message": "25"
       }
     ]
   }

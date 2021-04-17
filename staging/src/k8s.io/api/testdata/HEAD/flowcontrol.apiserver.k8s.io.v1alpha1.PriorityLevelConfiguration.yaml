@@ -17,6 +17,7 @@ metadata:
     fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+    subresource: "19"
   name: "2"
   namespace: "4"
   ownerReferences:
@@ -42,7 +43,7 @@ spec:
 status:
   conditions:
   - lastTransitionTime: "2559-09-14T11:32:46Z"
-    message: "20"
-    reason: "19"
+    message: "21"
+    reason: "20"
     status: 獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ
     type: ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗
