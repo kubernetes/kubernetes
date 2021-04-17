@@ -206,6 +206,8 @@ func (t *Tester) TestDelete(valid runtime.Object, createFn CreateFunc, getFn Get
 	t.testDeleteNoGraceful(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, false)
 	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, dryRunOpts)
 	t.testDeleteWithUID(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, opts)
+	t.testDeleteWithResourceVersion(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, dryRunOpts)
+	t.testDeleteWithResourceVersion(valid.DeepCopyObject(), createFn, getFn, isNotFoundFn, opts)
 }
 
 // Test gracefully deleting an object.
@@ -917,12 +919,16 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 
 	foo := obj.DeepCopyObject()
 	t.setObjectMeta(foo, t.namer(1))
-	objectMeta := t.getObjectMetaOrFail(foo)
-	objectMeta.SetResourceVersion("RV0000")
 	if err := createFn(ctx, foo); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	opts.Preconditions = metav1.NewRVDeletionPrecondition("RV1111").Preconditions
+	newObj, err := getFn(ctx, foo)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	objectMeta := t.getObjectMetaOrFail(newObj)
+
+	opts.Preconditions = metav1.NewRVDeletionPrecondition("wrongVersion").Preconditions
 	_, wasDeleted, err := t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, &opts)
 	if err == nil || !errors.IsConflict(err) {
 		t.Errorf("unexpected error: %v", err)
@@ -930,7 +936,7 @@ func (t *Tester) testDeleteWithResourceVersion(obj runtime.Object, createFn Crea
 	if wasDeleted {
 		t.Errorf("unexpected, object %s should not have been deleted immediately", objectMeta.GetName())
 	}
-	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewRVDeletionPrecondition("RV0000"))
+	obj, _, err = t.storage.(rest.GracefulDeleter).Delete(ctx, objectMeta.GetName(), rest.ValidateAllObjectFunc, metav1.NewRVDeletionPrecondition(objectMeta.GetResourceVersion()))
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
