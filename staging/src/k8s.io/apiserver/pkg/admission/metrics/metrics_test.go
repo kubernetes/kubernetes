@@ -47,6 +47,7 @@ func TestObserveAdmissionStep(t *testing.T) {
 		"operation": string(admission.Create),
 		"type":      "admit",
 		"rejected":  "false",
+		"namespace": "ns",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_step_admission_duration_seconds", wantLabels, 1)
 	expectFindMetric(t, "apiserver_admission_step_admission_duration_seconds_summary", wantLabels)
@@ -70,6 +71,7 @@ func TestObserveAdmissionController(t *testing.T) {
 		"operation": string(admission.Create),
 		"type":      "admit",
 		"rejected":  "false",
+		"namespace": "ns",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_controller_admission_duration_seconds", wantLabels, 1)
 
@@ -85,6 +87,7 @@ func TestObserveWebhook(t *testing.T) {
 		"operation": string(admission.Create),
 		"type":      "admit",
 		"rejected":  "false",
+		"namespace": "ns",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
 }
@@ -100,6 +103,7 @@ func TestObserveWebhookRejection(t *testing.T) {
 		"type":           "admit",
 		"error_type":     "no_error",
 		"rejection_code": "500",
+		"namespace":      "ns",
 	}
 	wantLabels600 := map[string]string{
 		"name":           "x",
@@ -107,6 +111,7 @@ func TestObserveWebhookRejection(t *testing.T) {
 		"type":           "admit",
 		"error_type":     "no_error",
 		"rejection_code": "600",
+		"namespace":      "ns",
 	}
 	wantLabelsCallingWebhookError := map[string]string{
 		"name":           "x",
@@ -114,6 +119,7 @@ func TestObserveWebhookRejection(t *testing.T) {
 		"type":           "validate",
 		"error_type":     "calling_webhook_error",
 		"rejection_code": "0",
+		"namespace":      "ns",
 	}
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
 	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
