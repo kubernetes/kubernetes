@@ -937,6 +937,7 @@ github.com/openshift/api/image/v1
 github.com/openshift/api/kubecontrolplane/v1
 github.com/openshift/api/network/v1
 github.com/openshift/api/oauth/v1
+github.com/openshift/api/operator/v1
 github.com/openshift/api/osin/v1
 github.com/openshift/api/pkg/serialization
 github.com/openshift/api/project/v1
