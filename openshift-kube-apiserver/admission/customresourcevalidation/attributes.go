@@ -7,6 +7,7 @@ import (
 
 	authorizationv1 "github.com/openshift/api/authorization/v1"
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	quotav1 "github.com/openshift/api/quota/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 )
@@ -47,6 +48,7 @@ var supportedObjectsScheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(configv1.Install(supportedObjectsScheme))
+	utilruntime.Must(operatorv1.Install(supportedObjectsScheme))
 	utilruntime.Must(quotav1.Install(supportedObjectsScheme))
 	utilruntime.Must(securityv1.Install(supportedObjectsScheme))
 	utilruntime.Must(authorizationv1.Install(supportedObjectsScheme))
