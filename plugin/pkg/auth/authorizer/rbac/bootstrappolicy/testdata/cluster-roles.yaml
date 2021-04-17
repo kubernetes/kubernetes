@@ -143,6 +143,16 @@ items:
     - patch
     - update
   - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - create
+    - delete
+    - deletecollection
+    - patch
+    - update
+  - apiGroups:
     - apps
     resources:
     - daemonsets
@@ -267,6 +277,14 @@ items:
     - ""
     resources:
     - namespaces
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
     verbs:
     - get
     - list

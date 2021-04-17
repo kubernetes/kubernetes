@@ -287,6 +287,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				rbacv1helpers.NewRule(Write...).Groups(legacyGroup).Resources("replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
 					"services", "services/proxy", "endpoints", "persistentvolumeclaims", "configmaps", "secrets").RuleOrDie(),
 
+				rbacv1helpers.NewRule(Write...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
+
 				rbacv1helpers.NewRule(Write...).Groups(appsGroup).Resources(
 					"statefulsets", "statefulsets/scale",
 					"daemonsets",
@@ -319,6 +321,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
 				// indicator of which namespaces you have access to.
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("namespaces").RuleOrDie(),
+
+				rbacv1helpers.NewRule(Read...).Groups(discoveryGroup).Resources("endpointslices").RuleOrDie(),
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
 					"controllerrevisions",
