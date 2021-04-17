@@ -792,7 +792,7 @@ func VolumeLimits(volumePluginListFunc func() []volume.VolumePluginWithAttachLim
 		for _, volumePlugin := range pluginWithLimits {
 			attachLimits, err := volumePlugin.GetVolumeLimits()
 			if err != nil {
-				klog.V(4).InfoS("Error getting volume limit for plugin", "plugin", volumePlugin.GetPluginName())
+				klog.V(4).InfoS("Skipping volume limits for volume plugin", "plugin", volumePlugin.GetPluginName())
 				continue
 			}
 			for limitKey, value := range attachLimits {
