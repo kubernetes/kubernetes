@@ -300,7 +300,8 @@ type realIPGetter struct {
 // 172.17.0.1 dev docker0  scope host  src 172.17.0.1
 // 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
 // Then filter out dev==kube-ipvs0, and cut the unique src IP fields,
-// Node IP set: [100.106.89.164, 127.0.0.1, 172.17.0.1, 192.168.122.1]
+// Node IP set: [100.106.89.164, 172.17.0.1, 192.168.122.1]
+// Note that loopback addresses are excluded.
 func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	// Pass in empty filter device name for list all LOCAL type addresses.
 	nodeAddress, err := r.nl.GetLocalAddresses("", DefaultDummyDevice)
@@ -309,7 +310,11 @@ func (r *realIPGetter) NodeIPs() (ips []net.IP, err error) {
 	}
 	// translate ip string to IP
 	for _, ipStr := range nodeAddress.UnsortedList() {
-		ips = append(ips, net.ParseIP(ipStr))
+		a := net.ParseIP(ipStr)
+		if a.IsLoopback() {
+			continue
+		}
+		ips = append(ips, a)
 	}
 	return ips, nil
 }
@@ -1131,6 +1136,10 @@ func (proxier *Proxier) syncProxyRules() {
 		} else {
 			nodeAddresses = nodeAddrSet.List()
 			for _, address := range nodeAddresses {
+				a := net.ParseIP(address)
+				if a.IsLoopback() {
+					continue
+				}
 				if utilproxy.IsZeroCIDR(address) {
 					nodeIPs, err = proxier.ipGetter.NodeIPs()
 					if err != nil {
@@ -1138,7 +1147,7 @@ func (proxier *Proxier) syncProxyRules() {
 					}
 					break
 				}
-				nodeIPs = append(nodeIPs, net.ParseIP(address))
+				nodeIPs = append(nodeIPs, a)
 			}
 		}
 	}
