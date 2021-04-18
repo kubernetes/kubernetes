@@ -3818,7 +3818,8 @@ func TestCleanLegacyService(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"}), false, v1.IPv4Protocol)
+	excludeCIDRs, _ := utilnet.ParseCIDRs([]string{"3.3.3.0/24", "4.4.4.0/24"})
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, false, v1.IPv4Protocol)
 
 	// All ipvs services that were processed in the latest sync loop.
 	activeServices := map[string]bool{"ipvs0": true, "ipvs1": true}
@@ -4018,7 +4019,8 @@ func TestCleanLegacyRealServersExcludeCIDRs(t *testing.T) {
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
 	gtm := NewGracefulTerminationManager(ipvs)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"4.4.4.4/32"}), false, v1.IPv4Protocol)
+	excludeCIDRs, _ := utilnet.ParseCIDRs([]string{"4.4.4.4/32"})
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, false, v1.IPv4Protocol)
 	fp.gracefuldeleteManager = gtm
 
 	vs := &utilipvs.VirtualServer{
@@ -4072,7 +4074,8 @@ func TestCleanLegacyService6(t *testing.T) {
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
-	fp := NewFakeProxier(ipt, ipvs, ipset, nil, parseExcludedCIDRs([]string{"3000::/64", "4000::/64"}), false, v1.IPv4Protocol)
+	excludeCIDRs, _ := utilnet.ParseCIDRs([]string{"3000::/64", "4000::/64"})
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, excludeCIDRs, false, v1.IPv4Protocol)
 	fp.nodeIP = net.ParseIP("::1")
 
 	// All ipvs services that were processed in the latest sync loop.

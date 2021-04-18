@@ -327,21 +327,6 @@ func (r *realIPGetter) BindedIPs() (sets.String, error) {
 // Proxier implements proxy.Provider
 var _ proxy.Provider = &Proxier{}
 
-// parseExcludedCIDRs parses the input strings and returns net.IPNet
-// The validation has been done earlier so the error condition will never happen under normal conditions
-func parseExcludedCIDRs(excludeCIDRs []string) []*net.IPNet {
-	var cidrExclusions []*net.IPNet
-	for _, excludedCIDR := range excludeCIDRs {
-		_, n, err := net.ParseCIDR(excludedCIDR)
-		if err != nil {
-			klog.Errorf("Error parsing exclude CIDR %q,  err: %v", excludedCIDR, err)
-			continue
-		}
-		cidrExclusions = append(cidrExclusions, n)
-	}
-	return cidrExclusions
-}
-
 // NewProxier returns a new Proxier given an iptables and ipvs Interface instance.
 // Because of the iptables and ipvs logic, it is assumed that there is only a single Proxier active on a machine.
 // An error will be returned if it fails to update or acquire the initial lock.
@@ -462,6 +447,9 @@ func NewProxier(ipt utiliptables.Interface,
 		klog.Warningf("IP Family: %s, NodePortAddresses of wrong family; %s", ipFamily, strings.Join(ips, ","))
 	}
 
+	// excludeCIDRs has been validated before, here we just parse it to IPNet list
+	parsedExcludeCIDRs, _ := utilnet.ParseCIDRs(excludeCIDRs)
+
 	proxier := &Proxier{
 		ipFamily:              ipFamily,
 		portsMap:              make(map[utilnet.LocalPort]utilnet.Closeable),
@@ -471,7 +459,7 @@ func NewProxier(ipt utiliptables.Interface,
 		endpointsChanges:      proxy.NewEndpointChangeTracker(hostname, nil, ipFamily, recorder, endpointSlicesEnabled, nil),
 		syncPeriod:            syncPeriod,
 		minSyncPeriod:         minSyncPeriod,
-		excludeCIDRs:          parseExcludedCIDRs(excludeCIDRs),
+		excludeCIDRs:          parsedExcludeCIDRs,
 		iptables:              ipt,
 		masqueradeAll:         masqueradeAll,
 		masqueradeMark:        masqueradeMark,
