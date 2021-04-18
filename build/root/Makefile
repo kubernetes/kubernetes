@@ -527,12 +527,13 @@ define CMD_HELP_INFO
 endef
 #TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
 EXCLUDE_TARGET=BUILD OWNERS
-.PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+CMD_TARGET = $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+.PHONY: $(CMD_TARGET)
 ifeq ($(PRINT_HELP),y)
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
+$(CMD_TARGET):
 	@echo "$$CMD_HELP_INFO"
 else
-$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
+$(CMD_TARGET): generated_files
 	hack/make-rules/build.sh cmd/$@
 endif
 
