@@ -709,6 +709,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			return nil, fmt.Errorf("the server could not properly serve the CR subresources")
 		}
 		if subresources == nil || subresources.Scale == nil {
+			replicasPathInCustomResource[schema.GroupVersion{Group: crd.Spec.Group, Version: v.Name}.String()] = nil
 			continue
 		}
 		path := fieldpath.Path{}

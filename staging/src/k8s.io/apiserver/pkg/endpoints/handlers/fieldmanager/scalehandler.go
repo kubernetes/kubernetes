@@ -69,8 +69,8 @@ func (h *ScaleHandler) ToSubresource() ([]metav1.ManagedFieldsEntry, error) {
 	t := map[string]*metav1.Time{}
 	for manager, versionedSet := range managed.Fields() {
 		path, ok := h.mappings[string(versionedSet.APIVersion())]
-		// Drop the field if the APIVersion of the managed field is unknown
-		if !ok {
+		// Skip the entry if the APIVersion is unknown
+		if !ok || path == nil {
 			continue
 		}
 
@@ -110,13 +110,15 @@ func (h *ScaleHandler) ToParent(scaleEntries []metav1.ManagedFieldsEntry) ([]met
 	for manager, versionedSet := range parentFields {
 		// Get the main resource "replicas" path
 		path, ok := h.mappings[string(versionedSet.APIVersion())]
-		// Drop the field if the APIVersion of the managed field is unknown
+		// Drop the entry if the APIVersion is unknown.
 		if !ok {
 			continue
 		}
 
-		// If the parent entry does not have the replicas path, just keep it as it is
-		if !versionedSet.Set().Has(path) {
+		// If the parent entry does not have the replicas path or it is nil, just
+		// keep it as it is. The path is nil for Custom Resources without scale
+		// subresource.
+		if path == nil || !versionedSet.Set().Has(path) {
 			f[manager] = versionedSet
 			t[manager] = decodedParentEntries.Times()[manager]
 			continue

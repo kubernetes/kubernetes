@@ -578,7 +578,7 @@ func TestTransformingManagedFieldsToParent(t *testing.T) {
 			},
 		},
 		{
-			desc: "drops other fields if the api version is unknown",
+			desc: "drops the entry if the api version is unknown",
 			parent: []metav1.ManagedFieldsEntry{
 				{
 					Manager:    "test",
@@ -636,14 +636,16 @@ func TestTransformingManagedFieldsToParent(t *testing.T) {
 
 func TestTransformingManagedFieldsToParentMultiVersion(t *testing.T) {
 	tests := []struct {
-		desc        string
-		mappings    ResourcePathMappings
-		parent      []metav1.ManagedFieldsEntry
-		subresource []metav1.ManagedFieldsEntry
-		expected    []metav1.ManagedFieldsEntry
+		desc         string
+		groupVersion schema.GroupVersion
+		mappings     ResourcePathMappings
+		parent       []metav1.ManagedFieldsEntry
+		subresource  []metav1.ManagedFieldsEntry
+		expected     []metav1.ManagedFieldsEntry
 	}{
 		{
-			desc: "multi-version",
+			desc:         "multi-version",
+			groupVersion: schema.GroupVersion{Group: "apps", Version: "v1"},
 			mappings: ResourcePathMappings{
 				"apps/v1": fieldpath.MakePathOrDie("spec", "the-replicas"),
 				"apps/v2": fieldpath.MakePathOrDie("spec", "not-the-replicas"),
@@ -699,13 +701,71 @@ func TestTransformingManagedFieldsToParentMultiVersion(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc:         "Custom resource without scale subresource, scaling a version with `scale`",
+			groupVersion: schema.GroupVersion{Group: "mygroup", Version: "v1"},
+			mappings: ResourcePathMappings{
+				"mygroup/v1": fieldpath.MakePathOrDie("spec", "the-replicas"),
+				"mygroup/v2": nil,
+			},
+			parent: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "test",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "mygroup/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:the-replicas":{},"f:selector":{}}}`)},
+				},
+				{
+					Manager:    "test-other",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "mygroup/v2",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:test-other":{}}}`)},
+				},
+			},
+			subresource: []metav1.ManagedFieldsEntry{
+				{
+					Manager:     "scale",
+					Operation:   metav1.ManagedFieldsOperationUpdate,
+					APIVersion:  "autoscaling/v1",
+					FieldsType:  "FieldsV1",
+					FieldsV1:    &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:replicas":{}}}`)},
+					Subresource: "scale",
+				},
+			},
+			expected: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "test",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "mygroup/v1",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:selector":{}}}`)},
+				},
+				{
+					Manager:    "test-other",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "mygroup/v2",
+					FieldsType: "FieldsV1",
+					FieldsV1:   &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:test-other":{}}}`)},
+				},
+				{
+					Manager:     "scale",
+					Operation:   metav1.ManagedFieldsOperationUpdate,
+					APIVersion:  "mygroup/v1",
+					FieldsType:  "FieldsV1",
+					FieldsV1:    &metav1.FieldsV1{Raw: []byte(`{"f:spec":{"f:the-replicas":{}}}`)},
+					Subresource: "scale",
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
 			handler := NewScaleHandler(
 				test.parent,
-				schema.GroupVersion{Group: "apps", Version: "v1"},
+				test.groupVersion,
 				test.mappings,
 			)
 			parentEntries, err := handler.ToParent(test.subresource)
