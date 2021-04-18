@@ -691,7 +691,7 @@ func makeBasePodAndStatus() (*v1.Pod, *kubecontainer.PodStatus) {
 			{
 				Id:       "sandboxID",
 				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
-				Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: "sandboxuid", Attempt: uint32(0)},
+				Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: "sandboxuid", Attempt: 0},
 				Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.0.0.1"},
 			},
 		},
@@ -747,7 +747,7 @@ func TestComputePodActions(t *testing.T) {
 			actions: podActions{
 				KillPod:           true,
 				CreateSandbox:     true,
-				Attempt:           uint32(0),
+				Attempt:           0,
 				ContainersToStart: []int{0, 1, 2},
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
@@ -806,7 +806,7 @@ func TestComputePodActions(t *testing.T) {
 				KillPod:           true,
 				CreateSandbox:     true,
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(1),
+				Attempt:           1,
 				ContainersToStart: []int{0, 1, 2},
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
@@ -822,7 +822,7 @@ func TestComputePodActions(t *testing.T) {
 				KillPod:           true,
 				CreateSandbox:     true,
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(1),
+				Attempt:           1,
 				ContainersToStart: []int{0, 2},
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
@@ -835,7 +835,7 @@ func TestComputePodActions(t *testing.T) {
 				KillPod:           true,
 				CreateSandbox:     true,
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(1),
+				Attempt:           1,
 				ContainersToStart: []int{0, 1, 2},
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 			},
@@ -892,7 +892,7 @@ func TestComputePodActions(t *testing.T) {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				// no ready sandbox
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-				status.SandboxStatuses[0].Metadata.Attempt = uint32(1)
+				status.SandboxStatuses[0].Metadata.Attempt = 1
 				// all containers exited
 				for i := range status.ContainerStatuses {
 					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
@@ -901,7 +901,7 @@ func TestComputePodActions(t *testing.T) {
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(2),
+				Attempt:           2,
 				CreateSandbox:     false,
 				KillPod:           true,
 				ContainersToStart: []int{},
@@ -915,7 +915,7 @@ func TestComputePodActions(t *testing.T) {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				// no ready sandbox
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-				status.SandboxStatuses[0].Metadata.Attempt = uint32(1)
+				status.SandboxStatuses[0].Metadata.Attempt = 1
 				// all containers succeeded
 				for i := range status.ContainerStatuses {
 					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
@@ -924,7 +924,7 @@ func TestComputePodActions(t *testing.T) {
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(2),
+				Attempt:           2,
 				CreateSandbox:     false,
 				KillPod:           true,
 				ContainersToStart: []int{},
@@ -938,13 +938,13 @@ func TestComputePodActions(t *testing.T) {
 			mutateStatusFn: func(status *kubecontainer.PodStatus) {
 				// no ready sandbox
 				status.SandboxStatuses[0].State = runtimeapi.PodSandboxState_SANDBOX_NOTREADY
-				status.SandboxStatuses[0].Metadata.Attempt = uint32(2)
+				status.SandboxStatuses[0].Metadata.Attempt = 2
 				// no visible containers
 				status.ContainerStatuses = []*kubecontainer.Status{}
 			},
 			actions: podActions{
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(3),
+				Attempt:           3,
 				CreateSandbox:     true,
 				KillPod:           true,
 				ContainersToStart: []int{0, 1, 2},
@@ -1053,7 +1053,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				KillPod:                  true,
 				CreateSandbox:            true,
 				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
+				Attempt:                  1,
 				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
 				ContainersToStart:        []int{},
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
@@ -1140,7 +1140,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				KillPod:           true,
 				CreateSandbox:     false,
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
-				Attempt:           uint32(1),
+				Attempt:           1,
 				ContainersToStart: []int{},
 				ContainersToKill:  getKillMapWithInitContainers(basePod, baseStatus, []int{}),
 			},
@@ -1155,7 +1155,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				KillPod:                  true,
 				CreateSandbox:            true,
 				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
+				Attempt:                  1,
 				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
 				ContainersToStart:        []int{},
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
@@ -1171,7 +1171,7 @@ func TestComputePodActionsWithInitContainers(t *testing.T) {
 				KillPod:                  true,
 				CreateSandbox:            true,
 				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
+				Attempt:                  1,
 				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
 				ContainersToStart:        []int{},
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
@@ -1313,7 +1313,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				KillPod:                  true,
 				CreateSandbox:            true,
 				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
+				Attempt:                  1,
 				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
 				ContainersToStart:        []int{},
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
@@ -1328,7 +1328,7 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 				KillPod:                  true,
 				CreateSandbox:            true,
 				SandboxID:                baseStatus.SandboxStatuses[0].Id,
-				Attempt:                  uint32(1),
+				Attempt:                  1,
 				NextInitContainerToStart: &basePod.Spec.InitContainers[0],
 				ContainersToStart:        []int{},
 				ContainersToKill:         getKillMapWithInitContainers(basePod, baseStatus, []int{}),
@@ -1371,6 +1371,91 @@ func TestComputePodActionsWithInitAndEphemeralContainers(t *testing.T) {
 		actions := m.computePodActions(pod, status)
 		verifyActions(t, &test.actions, &actions, desc)
 	}
+}
+
+func TestComputePodActionsWithMultiRunningContainer(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "foo-ns",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "foo1",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+
+	status := &kubecontainer.PodStatus{
+		ID:        pod.UID,
+		Name:      pod.Name,
+		Namespace: pod.Namespace,
+		SandboxStatuses: []*runtimeapi.PodSandboxStatus{
+			{
+				Id:       "sandboxID",
+				State:    runtimeapi.PodSandboxState_SANDBOX_READY,
+				Metadata: &runtimeapi.PodSandboxMetadata{Name: pod.Name, Namespace: pod.Namespace, Uid: "sandboxuid", Attempt: 0},
+				Network:  &runtimeapi.PodSandboxNetworkStatus{Ip: "10.0.0.1"},
+			},
+		},
+		ContainerStatuses: []*kubecontainer.Status{
+			{
+				ID:   kubecontainer.ContainerID{ID: "id1"},
+				Name: "foo1", State: kubecontainer.ContainerStateRunning,
+				Hash: kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+			},
+			{
+				ID:   kubecontainer.ContainerID{ID: "id2"},
+				Name: "foo1", State: kubecontainer.ContainerStateRunning,
+				Hash: kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+			},
+			{
+				ID:   kubecontainer.ContainerID{ID: "id3"},
+				Name: "foo1", State: kubecontainer.ContainerStateRunning,
+				Hash: kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+			},
+			{
+				ID:   kubecontainer.ContainerID{ID: "id4"},
+				Name: "foo1", State: kubecontainer.ContainerStateExited,
+				Hash: kubecontainer.HashContainer(&pod.Spec.Containers[0]),
+			},
+		},
+	}
+
+	expectation := podActions{
+		KillPod:           false,
+		CreateSandbox:     false,
+		SandboxID:         status.SandboxStatuses[0].Id,
+		Attempt:           0,
+		ContainersToStart: []int{},
+		ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+			{ID: "id2"}: {container: &pod.Spec.Containers[0], name: "foo1"},
+			{ID: "id3"}: {container: &pod.Spec.Containers[0], name: "foo1"},
+		},
+	}
+	actions := m.computePodActions(pod, status)
+	verifyActions(t, &expectation, &actions, "kill other running containers")
+
+	expectation = podActions{
+		KillPod:           false,
+		CreateSandbox:     false,
+		SandboxID:         status.SandboxStatuses[0].Id,
+		Attempt:           0,
+		ContainersToStart: []int{0},
+		ContainersToKill: map[kubecontainer.ContainerID]containerToKillInfo{
+			{ID: "id2"}: {container: &pod.Spec.Containers[0], name: "foo1"},
+			{ID: "id3"}: {container: &pod.Spec.Containers[0], name: "foo1"},
+		},
+	}
+	status.ContainerStatuses[0].State = kubecontainer.ContainerStateExited
+	actions = m.computePodActions(pod, status)
+	verifyActions(t, &expectation, &actions, "kill all running containers")
 }
 
 func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {

@@ -346,6 +346,18 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 	return nil
 }
 
+// GetAllContainerStatusesByName return all running container status in the pod status with the given name.
+// the containers have already been sorted by CreatedAt
+func (podStatus *PodStatus) GetAllContainerStatusesByName(containerName string) []*Status {
+	var containerStatuses []*Status
+	for _, containerStatus := range podStatus.ContainerStatuses {
+		if containerStatus.Name == containerName {
+			containerStatuses = append(containerStatuses, containerStatus)
+		}
+	}
+	return containerStatuses
+}
+
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 	runningContainerStatuses := []*Status{}

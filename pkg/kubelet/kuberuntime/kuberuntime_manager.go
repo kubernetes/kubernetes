@@ -610,8 +610,33 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	keepCount := 0
 	// check the status of containers.
 	for idx, container := range pod.Spec.Containers {
-		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		var containerStatus *kubecontainer.Status
+		var runningContainerStatuses []*kubecontainer.Status
+		containerStatuses := podStatus.GetAllContainerStatusesByName(container.Name)
+		if len(containerStatuses) > 0 {
+			containerStatus = containerStatuses[0]
+		}
+		for _, status := range containerStatuses {
+			if status.State == kubecontainer.ContainerStateRunning {
+				runningContainerStatuses = append(runningContainerStatuses, status)
+			}
+		}
 
+		// kill the all running containers when the lastest one is not running
+		// or kill the olders when the lastest one is running
+		if len(runningContainerStatuses) > 0 {
+			if containerStatus.State == kubecontainer.ContainerStateRunning {
+				runningContainerStatuses = runningContainerStatuses[1:]
+			}
+			for _, containerStatus := range runningContainerStatuses {
+				changes.ContainersToKill[containerStatus.ID] = containerToKillInfo{
+					name:      containerStatus.Name,
+					container: &pod.Spec.Containers[idx],
+					message:   "too many running container, try killing one",
+					reason:    reasonUnknown,
+				}
+			}
+		}
 		// Call internal container post-stop lifecycle hook for any non-running container so that any
 		// allocated cpus are released immediately. If the container is restarted, cpus will be re-allocated
 		// to it.
