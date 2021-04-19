@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -791,7 +792,7 @@ func newReconciler(client *fake.Clientset, maxEndpointsPerSubset int32) *reconci
 	return &reconciler{
 		client:                client,
 		maxEndpointsPerSubset: maxEndpointsPerSubset,
-		endpointSliceTracker:  newEndpointSliceTracker(),
+		endpointSliceTracker:  endpointsliceutil.NewEndpointSliceTracker(),
 		metricsCache:          metrics.NewCache(maxEndpointsPerSubset),
 		eventRecorder:         recorder,
 	}

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/endpointslice/topologycache"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 	"k8s.io/kubernetes/pkg/features"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -1522,7 +1523,7 @@ func TestSyncServiceStaleInformer(t *testing.T) {
 
 			err = esController.syncService(fmt.Sprintf("%s/%s", ns, serviceName))
 			// Check if we got a StaleInformerCache error
-			if isStaleInformerCacheErr(err) != testcase.expectError {
+			if endpointsliceutil.IsStaleInformerCacheErr(err) != testcase.expectError {
 				t.Fatalf("Expected error because informer cache is outdated")
 			}
 

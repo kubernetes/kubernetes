@@ -42,11 +42,11 @@ func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
 	return endpointHash(endpointutil.DeepHashObjectToString(hashObj))
 }
 
-// endpointSet provides simple methods for comparing sets of Endpoints.
-type endpointSet map[endpointHash]*discovery.Endpoint
+// EndpointSet provides simple methods for comparing sets of Endpoints.
+type EndpointSet map[endpointHash]*discovery.Endpoint
 
 // Insert adds items to the set.
-func (s endpointSet) Insert(items ...*discovery.Endpoint) endpointSet {
+func (s EndpointSet) Insert(items ...*discovery.Endpoint) EndpointSet {
 	for _, item := range items {
 		s[hashEndpoint(item)] = item
 	}
@@ -54,7 +54,7 @@ func (s endpointSet) Insert(items ...*discovery.Endpoint) endpointSet {
 }
 
 // Delete removes all items from the set.
-func (s endpointSet) Delete(items ...*discovery.Endpoint) endpointSet {
+func (s EndpointSet) Delete(items ...*discovery.Endpoint) EndpointSet {
 	for _, item := range items {
 		delete(s, hashEndpoint(item))
 	}
@@ -62,18 +62,18 @@ func (s endpointSet) Delete(items ...*discovery.Endpoint) endpointSet {
 }
 
 // Has returns true if and only if item is contained in the set.
-func (s endpointSet) Has(item *discovery.Endpoint) bool {
+func (s EndpointSet) Has(item *discovery.Endpoint) bool {
 	_, contained := s[hashEndpoint(item)]
 	return contained
 }
 
 // Returns an endpoint matching the hash if contained in the set.
-func (s endpointSet) Get(item *discovery.Endpoint) *discovery.Endpoint {
+func (s EndpointSet) Get(item *discovery.Endpoint) *discovery.Endpoint {
 	return s[hashEndpoint(item)]
 }
 
 // UnsortedList returns the slice with contents in random order.
-func (s endpointSet) UnsortedList() []*discovery.Endpoint {
+func (s EndpointSet) UnsortedList() []*discovery.Endpoint {
 	endpoints := make([]*discovery.Endpoint, 0, len(s))
 	for _, endpoint := range s {
 		endpoints = append(endpoints, endpoint)
@@ -82,7 +82,7 @@ func (s endpointSet) UnsortedList() []*discovery.Endpoint {
 }
 
 // Returns a single element from the set.
-func (s endpointSet) PopAny() (*discovery.Endpoint, bool) {
+func (s EndpointSet) PopAny() (*discovery.Endpoint, bool) {
 	for _, endpoint := range s {
 		s.Delete(endpoint)
 		return endpoint, true
@@ -91,6 +91,6 @@ func (s endpointSet) PopAny() (*discovery.Endpoint, bool) {
 }
 
 // Len returns the size of the set.
-func (s endpointSet) Len() int {
+func (s EndpointSet) Len() int {
 	return len(s)
 }

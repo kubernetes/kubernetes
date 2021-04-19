@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/endpointslicemirroring/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
+	endpointsliceutil "k8s.io/kubernetes/pkg/controller/util/endpointslice"
 )
 
 // reconciler is responsible for transforming current EndpointSlice state into
@@ -41,7 +42,7 @@ type reconciler struct {
 	// endpointSliceTracker tracks the list of EndpointSlices and associated
 	// resource versions expected for each Endpoints resource. It can help
 	// determine if a cached EndpointSlice is out of date.
-	endpointSliceTracker *endpointSliceTracker
+	endpointSliceTracker *endpointsliceutil.EndpointSliceTracker
 
 	// eventRecorder allows reconciler to record an event if it finds an invalid
 	// IP address in an Endpoints resource.
@@ -173,7 +174,7 @@ func (r *reconciler) reconcile(endpoints *corev1.Endpoints, existingSlices []*di
 func (r *reconciler) reconcileByPortMapping(
 	endpoints *corev1.Endpoints,
 	existingSlices []*discovery.EndpointSlice,
-	desiredSet endpointSet,
+	desiredSet endpointsliceutil.EndpointSet,
 	endpointPorts []discovery.EndpointPort,
 	addressType discovery.AddressType,
 ) (slicesByAction, totalsByAction) {
@@ -306,7 +307,7 @@ func endpointSlicesByKey(existingSlices []*discovery.EndpointSlice) map[addrType
 
 // totalChanges returns the total changes that will be required for an
 // EndpointSlice to match a desired set of endpoints.
-func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointSet) totalsByAction {
+func totalChanges(existingSlice *discovery.EndpointSlice, desiredSet endpointsliceutil.EndpointSet) totalsByAction {
 	totals := totalsByAction{}
 	existingMatches := 0
 
