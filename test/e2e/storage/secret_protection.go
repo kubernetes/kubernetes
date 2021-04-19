@@ -23,6 +23,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -38,10 +39,12 @@ import (
 type csiSecretType string
 
 const (
-	controllerPublishSecret csiSecretType = "ControllerPublishSecret"
-	nodeStageSecret         csiSecretType = "NodeStageSecret"
-	nodePublishSecret       csiSecretType = "NodePublishSecret"
-	controllerExpandSecret  csiSecretType = "ControllerExpandSecret"
+	controllerPublishSecret     csiSecretType = "ControllerPublishSecret"
+	nodeStageSecret             csiSecretType = "NodeStageSecret"
+	nodePublishSecret           csiSecretType = "NodePublishSecret"
+	controllerExpandSecret      csiSecretType = "ControllerExpandSecret"
+	provisionerSecret           csiSecretType = "ProvisionerSecret"
+	provisionerSecretByTemplate csiSecretType = "ProvisionerSecretByTemplate"
 
 	// secretDeleteTimeout is how long to wait for a secret to be deleted.
 	secretDeleteTimeout = 1 * time.Minute
@@ -137,6 +140,15 @@ var _ = utils.SIGDescribe("Secret Protection", func() {
 	ginkgo.It("Verify that secret used by a CSI PV as controllerExpandSecret is not removed immediately", func() {
 		testDeleteSecretUsedByPV(f.ClientSet, f.Namespace.Name, secret.Name, controllerExpandSecret)
 	})
+
+	ginkgo.It("Verify that secret used by a CSI PV as provisionerSecret is not removed immediately", func() {
+		testDeleteSecretUsedByPV(f.ClientSet, f.Namespace.Name, secret.Name, provisionerSecret)
+	})
+
+	ginkgo.It("Verify that secret used by a CSI PV as provisionerSecret via template is not removed immediately", func() {
+		testDeleteSecretUsedByPV(f.ClientSet, f.Namespace.Name, secret.Name, provisionerSecretByTemplate)
+	})
+
 })
 
 func testDeleteSecretUsedByPV(cs clientset.Interface, namespace, secretName string, secretType csiSecretType) {
@@ -152,8 +164,7 @@ func testDeleteSecretUsedByPV(cs clientset.Interface, namespace, secretName stri
 	framework.ExpectError(err, "Protected Secret is unexpectedly deleted")
 
 	ginkgo.By("Deleting the PV using the secret")
-	err = e2epv.DeletePersistentVolume(cs, pv.Name)
-	framework.ExpectNoError(err, "Failed to delete PV")
+	deletePVUsingSecret(cs, pv, namespace, secretName, secretType)
 
 	ginkgo.By("Waiting for the unprotected secret to be deleted")
 	err = waitForSecretDeleted(cs, namespace, secretName, framework.Poll, secretDeleteTimeout)
@@ -170,6 +181,14 @@ func createPVUsingSecret(cs clientset.Interface, namespace, secretName string, s
 		VolumeHandle: string(uuid.NewUUID()),
 	}
 
+	pvConfig := e2epv.PersistentVolumeConfig{
+		PVSource: v1.PersistentVolumeSource{
+			CSI: csiVolSource,
+		},
+	}
+
+	pv := e2epv.MakePersistentVolume(pvConfig)
+
 	switch secretType {
 	case controllerPublishSecret:
 		csiVolSource.ControllerPublishSecretRef = secretRef
@@ -179,21 +198,114 @@ func createPVUsingSecret(cs clientset.Interface, namespace, secretName string, s
 		csiVolSource.NodePublishSecretRef = secretRef
 	case controllerExpandSecret:
 		csiVolSource.ControllerExpandSecretRef = secretRef
+	case provisionerSecret:
+		createResourceForProvisionerSecret(cs, pv, namespace, secretName, false /* byTemplate */)
+	case provisionerSecretByTemplate:
+		createResourceForProvisionerSecret(cs, pv, namespace, secretName, true /* byTemplate */)
 	default:
 		framework.Failf("Unkown secretType %v is specified", secretType)
 	}
 
-	pvConfig := e2epv.PersistentVolumeConfig{
-		PVSource: v1.PersistentVolumeSource{
-			CSI: csiVolSource,
+	pv, err := e2epv.CreatePV(cs, pv)
+	framework.ExpectNoError(err, "Error creating PV")
+
+	return pv
+}
+
+func createResourceForProvisionerSecret(cs clientset.Interface, pv *v1.PersistentVolume, namespace, secretName string, byTemplate bool) {
+	var pvcName, secretNamespeceTemplate, secretNameTemplate string
+	var err error
+
+	if byTemplate {
+		pvcName = secretName
+		// ${pvc.namespace} will be resolved to the same value to namespace
+		secretNamespeceTemplate = "${pvc.namespace}"
+		// ${pvc.name} will be resolved to the same value to secretName
+		secretNameTemplate = "${pvc.name}"
+	} else {
+		pvcName = "pvc-" + namespace
+		secretNamespeceTemplate = namespace
+		secretNameTemplate = secretName
+	}
+
+	// Generate name based on namespace to avoid conflict
+	scName := "sc-" + namespace
+
+	// Create StorageClass with referencing to the secret
+	sc := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: scName,
+		},
+		Provisioner: "com.example.dummy/dummy",
+		Parameters: map[string]string{
+			"csi.storage.k8s.io/provisioner-secret-namespace": secretNamespeceTemplate,
+			"csi.storage.k8s.io/provisioner-secret-name":      secretNameTemplate,
 		},
 	}
 
-	pv := e2epv.MakePersistentVolume(pvConfig)
-	pv, err := e2epv.CreatePV(cs, pv)
-	framework.ExpectNoError(err, "Error creating secret")
+	sc, err = cs.StorageV1().StorageClasses().Create(context.TODO(), sc, metav1.CreateOptions{})
+	framework.ExpectNoError(err, "Error creating StorageClass")
 
-	return pv
+	// Create PVC using the StorageClass and binding to the PV
+	pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
+		Name: pvcName,
+		// secret_protection controller doesn't check this value,
+		// instead, it checks pv.Spec.StorageClassName
+		StorageClassName: &scName,
+	}, namespace)
+	// Bind PV to PVC
+	pvc.Spec.DataSource = &v1.TypedLocalObjectReference{Kind: "PersistentVolume", Name: pv.Name}
+	pvc, err = e2epv.CreatePVC(cs, namespace, pvc)
+	framework.ExpectNoError(err, "Error creating PVC")
+
+	// Bind PVC to PV
+	pv.Spec.ClaimRef = &v1.ObjectReference{
+		Kind:       "PersistentVolumeClaim",
+		APIVersion: "v1",
+		Name:       pvc.Name,
+		Namespace:  pvc.Namespace,
+		UID:        pvc.UID,
+	}
+	pv.Spec.StorageClassName = scName
+
+	framework.Logf("Resources: PV: %#v, PVC: %#v, StorageClass: %#v", pv, pvc, sc)
+}
+
+func deletePVUsingSecret(cs clientset.Interface, pv *v1.PersistentVolume, namespace, secretName string, secretType csiSecretType) {
+	// Do secretType specific deletion before PV deletion
+	switch secretType {
+	case controllerPublishSecret, nodeStageSecret, nodePublishSecret, controllerExpandSecret:
+		// Do nothing
+	case provisionerSecret:
+		deleteResourceForProvisionerSecret(cs, pv, namespace, secretName, false /* byTemplate */)
+	case provisionerSecretByTemplate:
+		deleteResourceForProvisionerSecret(cs, pv, namespace, secretName, true /* byTemplate */)
+	default:
+		framework.Failf("Unkown secretType %v is specified", secretType)
+	}
+	// Delete PV
+	err := e2epv.DeletePersistentVolume(cs, pv.Name)
+	framework.ExpectNoError(err, "Failed to delete PV")
+}
+
+func deleteResourceForProvisionerSecret(cs clientset.Interface, pv *v1.PersistentVolume, namespace, secretName string, byTemplate bool) {
+	var pvcName string
+
+	if byTemplate {
+		pvcName = secretName
+	} else {
+		pvcName = "pvc-" + namespace
+	}
+
+	scName := "sc-" + namespace
+
+	// Delete PVC using the StorageClass and binding to the PV
+	err := e2epv.DeletePersistentVolumeClaim(cs, pvcName, namespace)
+	framework.ExpectNoError(err, "Error deleting PVC")
+
+	// Delete StorageClass with referencing to the secret
+	err = cs.StorageV1().StorageClasses().Delete(context.TODO(), scName, metav1.DeleteOptions{})
+	framework.ExpectNoError(err, "Error deleting StorageClass")
 }
 
 // waitForSecretDeleted waits for a Secret to get deleted or until timeout occurs, whichever comes first.
