@@ -313,6 +313,34 @@ type AWSPlatformStatus struct {
 	// There must be only one ServiceEndpoint for a service.
 	// +optional
 	ServiceEndpoints []AWSServiceEndpoint `json:"serviceEndpoints,omitempty"`
+
+	// resourceTags is a list of additional tags to apply to AWS resources created for the cluster.
+	// See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html for information on tagging AWS resources.
+	// AWS supports a maximum of 50 tags per resource. OpenShift reserves 25 tags for its use, leaving 25 tags
+	// available for the user.
+	// +kubebuilder:validation:MaxItems=25
+	// +optional
+	ResourceTags []AWSResourceTag `json:"resourceTags,omitempty"`
+}
+
+// AWSResourceTag is a tag to apply to AWS resources created for the cluster.
+type AWSResourceTag struct {
+	// key is the key of the tag
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
+	// +kubebuilder:validation:Pattern=`^[0-9A-Za-z_.:/=+-@]+$`
+	// +required
+	Key string `json:"key"`
+	// value is the value of the tag.
+	// Some AWS service do not support empty values. Since tags are added to resources in many services, the
+	// length of the tag value must meet the requirements of all services.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=256
+	// +kubebuilder:validation:Pattern=`^[0-9A-Za-z_.:/=+-@]+$`
+	// +required
+	Value string `json:"value"`
 }
 
 // AzurePlatformSpec holds the desired state of the Azure infrastructure provider.
