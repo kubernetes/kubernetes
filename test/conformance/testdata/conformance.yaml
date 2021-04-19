@@ -707,7 +707,7 @@
 - testname: 'PodDisruptionBudget: block an eviction until the PDB is updated to allow
     it'
   codename: '[sig-apps] DisruptionController should block an eviction until the PDB
-    is updated to allow it [Conformance]'
+    is updated to allow it [MinimumKubeletVersion:1.21] [Conformance]'
   description: Eviction API must block an eviction until the PDB is updated to allow
     it
   release: v1.22
