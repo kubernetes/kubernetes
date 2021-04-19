@@ -39,6 +39,7 @@ import (
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	admissionv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
+	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
@@ -126,6 +127,8 @@ var (
 		gvr("", "v1", "nodes/proxy"):    {"*": testSubresourceProxy},
 		gvr("", "v1", "pods/proxy"):     {"*": testSubresourceProxy},
 		gvr("", "v1", "services/proxy"): {"*": testSubresourceProxy},
+
+		gvr("", "v1", "serviceaccounts/token"): {"create": testTokenCreate},
 
 		gvr("random.numbers.com", "v1", "integers"): {"create": testPruningRandomNumbers},
 		gvr("custom.fancy.com", "v2", "pants"):      {"create": testNoPruningCustomFancy},
@@ -880,6 +883,27 @@ func getParentGVR(gvr schema.GroupVersionResource) schema.GroupVersionResource {
 		parentGVR.Resource = strings.Split(parentGVR.Resource, "/")[0]
 	}
 	return parentGVR
+}
+
+func testTokenCreate(c *testContext) {
+	saGVR := gvr("", "v1", "serviceaccounts")
+	sa, err := createOrGetResource(c.client, saGVR, c.resources[saGVR])
+	if err != nil {
+		c.t.Error(err)
+		return
+	}
+
+	c.admissionHolder.expect(c.gvr, gvk(c.resource.Group, c.resource.Version, c.resource.Kind), gvkCreateOptions, v1beta1.Create, sa.GetName(), sa.GetNamespace(), true, false, true)
+	if err = c.clientset.CoreV1().RESTClient().Post().Namespace(sa.GetNamespace()).Resource("serviceaccounts").Name(sa.GetName()).SubResource("token").Body(&authenticationv1.TokenRequest{
+		ObjectMeta: metav1.ObjectMeta{Name: sa.GetName()},
+		Spec: authenticationv1.TokenRequestSpec{
+			Audiences: []string{"api"},
+		},
+	}).Do(context.TODO()).Error(); err != nil {
+		c.t.Error(err)
+		return
+	}
+	c.admissionHolder.verify(c.t)
 }
 
 func testSubresourceUpdate(c *testContext) {

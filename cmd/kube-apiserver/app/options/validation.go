@@ -113,7 +113,7 @@ func validateTokenRequest(options *ServerRunOptions) []error {
 	var errs []error
 
 	enableAttempted := options.ServiceAccountSigningKeyFile != "" ||
-		options.Authentication.ServiceAccounts.Issuer != "" ||
+		(len(options.Authentication.ServiceAccounts.Issuers) != 0 && options.Authentication.ServiceAccounts.Issuers[0] != "") ||
 		len(options.Authentication.APIAudiences) != 0
 
 	enableSucceeded := options.ServiceAccountIssuer != nil

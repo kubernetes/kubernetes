@@ -69,7 +69,7 @@ func TestDynamicClientBuilder(t *testing.T) {
 			if opts.Authentication.ServiceAccounts == nil {
 				opts.Authentication.ServiceAccounts = &kubeoptions.ServiceAccountAuthenticationOptions{}
 			}
-			opts.Authentication.ServiceAccounts.Issuer = iss
+			opts.Authentication.ServiceAccounts.Issuers = []string{iss}
 			opts.Authentication.ServiceAccounts.KeyFiles = []string{tmpfile.Name()}
 		},
 		ModifyServerConfig: func(config *controlplane.Config) {
