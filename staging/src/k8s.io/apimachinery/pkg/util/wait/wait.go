@@ -77,8 +77,8 @@ func (g *Group) Start(f func()) {
 // Forever calls f every period for ever.
 //
 // Forever is syntactic sugar on top of Until.
-func Forever(f func(), period time.Duration) {
-	Until(f, period, NeverStop)
+func Forever(ctx context.Context, f func(context.Context), period time.Duration) {
+	Until(ctx, f, period, NeverStop)
 }
 
 // Until loops until stop channel is closed, running f every period.
@@ -86,8 +86,8 @@ func Forever(f func(), period time.Duration) {
 // Until is syntactic sugar on top of JitterUntil with zero jitter factor and
 // with sliding = true (which means the timer for period starts after the f
 // completes).
-func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
-	JitterUntil(f, period, 0.0, true, stopCh)
+func Until(ctx context.Context, f func(context.Context), period time.Duration, stopCh <-chan struct{}) {
+	JitterUntil(ctx, f, period, 0.0, true, stopCh)
 }
 
 // UntilWithContext loops until context is done, running f every period.
@@ -105,8 +105,8 @@ func UntilWithContext(ctx context.Context, f func(context.Context), period time.
 // NonSlidingUntil is syntactic sugar on top of JitterUntil with zero jitter
 // factor, with sliding = false (meaning the timer for period starts at the same
 // time as the function starts).
-func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
-	JitterUntil(f, period, 0.0, false, stopCh)
+func NonSlidingUntil(ctx context.Context, f func(context.Context), period time.Duration, stopCh <-chan struct{}) {
+	JitterUntil(ctx, f, period, 0.0, false, stopCh)
 }
 
 // NonSlidingUntilWithContext loops until context is done, running f every
@@ -129,15 +129,15 @@ func NonSlidingUntilWithContext(ctx context.Context, f func(context.Context), pe
 //
 // Close stopCh to stop. f may not be invoked if stop channel is already
 // closed. Pass NeverStop to if you don't want it stop.
-func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	BackoffUntil(f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
+func JitterUntil(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
+	BackoffUntil(ctx, f, NewJitteredBackoffManager(period, jitterFactor, &clock.RealClock{}), sliding, stopCh)
 }
 
 // BackoffUntil loops until stop channel is closed, run f every duration given by BackoffManager.
 //
 // If sliding is true, the period is computed after f runs. If it is false then
 // period includes the runtime for f.
-func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
+func BackoffUntil(ctx context.Context, f func(context.Context), backoff BackoffManager, sliding bool, stopCh <-chan struct{}) {
 	var t clock.Timer
 	for {
 		select {
@@ -152,7 +152,7 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 
 		func() {
 			defer runtime.HandleCrash()
-			f()
+			f(ctx)
 		}()
 
 		if sliding {
@@ -182,7 +182,7 @@ func BackoffUntil(f func(), backoff BackoffManager, sliding bool, stopCh <-chan 
 //
 // Cancel context to stop. f may not be invoked if context is already expired.
 func JitterUntilWithContext(ctx context.Context, f func(context.Context), period time.Duration, jitterFactor float64, sliding bool) {
-	JitterUntil(func() { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
+	JitterUntil(ctx, func(context.Context) { f(ctx) }, period, jitterFactor, sliding, ctx.Done())
 }
 
 // Jitter returns a time.Duration between duration and duration + maxFactor *
