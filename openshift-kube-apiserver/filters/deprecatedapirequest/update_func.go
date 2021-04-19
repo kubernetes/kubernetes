@@ -124,7 +124,7 @@ func resourceRequestCountToHourlyNodeRequestLog(nodeName string, resourceRequest
 			}
 
 			hourlyNodeRequests[hour].ByUser = append(hourlyNodeRequests[hour].ByUser, apiUserStatus)
-			sort.Stable(byNumberOfUserRequests(hourlyNodeRequests[hour].ByUser))
+			sort.Stable(sort.Reverse(byNumberOfUserRequests(hourlyNodeRequests[hour].ByUser)))
 		}
 		hourlyNodeRequests[hour].RequestCount = totalRequestsThisHour
 	}
@@ -162,7 +162,7 @@ func canonicalizeStatus(status *apiv1.APIRequestCountStatus) {
 				userCount := nodeCount.ByUser[k]
 				sort.Stable(byVerb(userCount.ByVerb))
 			}
-			sort.Stable(byNumberOfUserRequests(nodeCount.ByUser))
+			sort.Stable(sort.Reverse(byNumberOfUserRequests(nodeCount.ByUser)))
 		}
 		sort.Stable(byNode(status.Last24h[hour].ByNode))
 	}
