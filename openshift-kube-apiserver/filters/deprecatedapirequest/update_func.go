@@ -1,20 +1,17 @@
 package deprecatedapirequest
 
 import (
-	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 
 	apiv1 "github.com/openshift/api/apiserver/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/openshift-kube-apiserver/filters/deprecatedapirequest/v1helpers"
 )
 
 // IncrementRequestCounts add additional api request counts to the log.
 // countsToPersist must not be mutated
-func SetRequestCountsForNode(nodeName string, expiredHour int, countsToPersist *resourceRequestCounts) v1helpers.UpdateStatusFunc {
+func SetRequestCountsForNode(nodeName string, currentHour, expiredHour int, countsToPersist *resourceRequestCounts) v1helpers.UpdateStatusFunc {
 	return func(status *apiv1.APIRequestCountStatus) {
 		existingLogsFromAPI := apiStatusToRequestCount(countsToPersist.resource, status)
 		existingNodeLogFromAPI := existingLogsFromAPI.Node(nodeName)
@@ -26,19 +23,15 @@ func SetRequestCountsForNode(nodeName string, expiredHour int, countsToPersist *
 		updatedCounts.Add(countsToPersist)
 		hourlyRequestLogs := resourceRequestCountToHourlyNodeRequestLog(nodeName, updatedCounts)
 
-		newStatus := setRequestCountsForNode(status, nodeName, expiredHour, hourlyRequestLogs)
+		newStatus := setRequestCountsForNode(status, nodeName, currentHour, expiredHour, hourlyRequestLogs)
 		status.Last24h = newStatus.Last24h
 		status.CurrentHour = newStatus.CurrentHour
 		status.RemovedInRelease = removedRelease(countsToPersist.resource)
 		status.RequestCount = newStatus.RequestCount
-
-		// TODO remove when we start writing, but I want data tonight.
-		content, _ := json.MarshalIndent(status.CurrentHour, "", "  ")
-		klog.V(2).Infof("updating top %v APIRequest counts with last hour:\n%v", countsToPersist.resource, string(content))
 	}
 }
 
-func setRequestCountsForNode(status *apiv1.APIRequestCountStatus, nodeName string, expiredHour int, hourlyNodeRequests []apiv1.PerNodeAPIRequestLog) *apiv1.APIRequestCountStatus {
+func setRequestCountsForNode(status *apiv1.APIRequestCountStatus, nodeName string, currentHour, expiredHour int, hourlyNodeRequests []apiv1.PerNodeAPIRequestLog) *apiv1.APIRequestCountStatus {
 	newStatus := status.DeepCopy()
 	newStatus.Last24h = []apiv1.PerResourceAPIRequestLog{}
 	newStatus.CurrentHour = apiv1.PerResourceAPIRequestLog{}
@@ -74,7 +67,6 @@ func setRequestCountsForNode(status *apiv1.APIRequestCountStatus, nodeName strin
 
 	// get all our sorting before copying
 	canonicalizeStatus(newStatus)
-	currentHour := time.Now().Hour()
 	newStatus.CurrentHour = newStatus.Last24h[currentHour]
 
 	return newStatus
@@ -95,7 +87,8 @@ func resourceRequestCountToHourlyNodeRequestLog(nodeName string, resourceRequest
 	}
 
 	for hour, hourlyCount := range resourceRequestCounts.hourToRequestCount {
-		totalRequestsThisHour := int64(0)
+		// be sure to suppress the "extra" added back into memory so we don't double count requests
+		totalRequestsThisHour := int64(0) - hourlyCount.countToSuppress
 		for user, userCount := range hourlyCount.usersToRequestCounts {
 			apiUserStatus := apiv1.PerUserAPIRequestCount{
 				UserName:     user,

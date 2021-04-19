@@ -191,6 +191,12 @@ func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb strin
 	c.Hour(hour).IncrementRequestCount(user, verb, count)
 }
 
+func (c *resourceRequestCounts) RemoveHour(hour int) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	delete(c.hourToRequestCount, hour)
+}
+
 func (c *resourceRequestCounts) Equals(rhs *resourceRequestCounts) bool {
 	if c.resource != rhs.resource {
 		return false
@@ -229,7 +235,10 @@ func (c *resourceRequestCounts) String() string {
 }
 
 type hourlyRequestCounts struct {
-	lock                 sync.RWMutex
+	lock sync.RWMutex
+	// countToSupress is the number of requests to remove from the count to avoid double counting in persistence
+	// TODO I think I'd like this in look-aside data, but I don't see an easy way to plumb it.
+	countToSuppress      int64
 	usersToRequestCounts map[string]*userRequestCounts
 }
 
@@ -259,10 +268,17 @@ func (c *hourlyRequestCounts) Add(requestCounts *hourlyRequestCounts) {
 	for user, userCount := range requestCounts.usersToRequestCounts {
 		c.User(user).Add(userCount)
 	}
+	c.countToSuppress += requestCounts.countToSuppress
 }
 
 func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int64) {
 	c.User(user).IncrementRequestCount(verb, count)
+}
+
+func (c *hourlyRequestCounts) RemoveUser(user string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	delete(c.usersToRequestCounts, user)
 }
 
 func (c *hourlyRequestCounts) Equals(rhs *hourlyRequestCounts) bool {
@@ -270,6 +286,10 @@ func (c *hourlyRequestCounts) Equals(rhs *hourlyRequestCounts) bool {
 	defer c.lock.RUnlock()
 	rhs.lock.RLock()
 	defer rhs.lock.RUnlock()
+
+	if c.countToSuppress != rhs.countToSuppress {
+		return false
+	}
 
 	if len(c.usersToRequestCounts) != len(rhs.usersToRequestCounts) {
 		return false
@@ -295,7 +315,7 @@ func (c *hourlyRequestCounts) String() string {
 	for _, k := range sets.StringKeySet(c.usersToRequestCounts).List() {
 		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.usersToRequestCounts[k].String()))
 	}
-	return fmt.Sprintf("usersToRequestCounts: {%v}", strings.Join(mapStrings, ", "))
+	return fmt.Sprintf("countToSuppress=%d usersToRequestCounts: {%v}", c.countToSuppress, strings.Join(mapStrings, ", "))
 }
 
 type userRequestCounts struct {
