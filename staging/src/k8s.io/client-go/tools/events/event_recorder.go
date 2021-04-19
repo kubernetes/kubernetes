@@ -40,6 +40,7 @@ type recorderImpl struct {
 	clock clock.Clock
 }
 
+// 发送event 的broadcaster
 func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
 	timestamp := metav1.MicroTime{time.Now()}
 	message := fmt.Sprintf(note, args...)
@@ -59,6 +60,7 @@ func (recorder *recorderImpl) Eventf(regarding runtime.Object, related runtime.O
 	event := recorder.makeEvent(refRegarding, refRelated, timestamp, eventtype, reason, message, recorder.reportingController, recorder.reportingInstance, action)
 	go func() {
 		defer utilruntime.HandleCrash()
+		// 发送event到broadcaster，watchers 讲接收并处理这个event
 		recorder.Action(watch.Added, event)
 	}()
 }

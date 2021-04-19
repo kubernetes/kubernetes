@@ -124,6 +124,7 @@ func runCommand(cmd *cobra.Command, opts *options.Options, registryOptions ...Op
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// registryOptions 默认为空
 	cc, sched, err := Setup(ctx, opts, registryOptions...)
 	if err != nil {
 		return err
@@ -144,6 +145,24 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		return fmt.Errorf("unable to register configz: %s", err)
 	}
 
+	/*
+		https://blog.csdn.net/liukuan73/article/details/54894080
+		EventBroadcaster用来接收Event并且把它们转交给EventSink、Watcher和Log。
+		EventBroadcaster定义了包括四个方法的一组接口，分别是：
+		// 将收到的Events交于相应的处理函数
+		StartEventWatcher(eventHandler func(*api.Event)) watch.Interface
+
+		// 将收到的Events交于EventSink
+		StartRecordingToSink(sink EventSink) watch.Interface
+
+		// 将收到的Events交于相应的Log供日志输出
+		StartLogging(logf func(format string, args ...interface{})) watch.Interface
+
+		// 初始化一个EventRecorder，并向EventBroadcaster发送Events
+		NewRecorder(source api.EventSource) EventRecorder
+
+		StartRecordingToSink()方法先根据当前时间生成一个随机数发生器randGen，接着实例化一个EventCorrelator，最后将recordToSink()函数作为处理函数，实现了StartEventWatcher。
+	*/
 	// Prepare the event broadcaster.
 	cc.EventBroadcaster.StartRecordingToSink(ctx.Done())
 
@@ -153,6 +172,9 @@ func Run(ctx context.Context, cc *schedulerserverconfig.CompletedConfig, sched *
 		checks = append(checks, cc.LeaderElection.WatchDog)
 	}
 
+	/*
+		http://cache.baiducontent.com/c?m=VZDz2bbTkbPDZ7KmSWM4LtWKi3MGv9cEGHUDzh6wjlQ28tnb-aQMDvW05UZuKatb-eH0DNUaQJ5rq8F_RZcYA9ka1jpz7NBbZyj3eAcVx25FIJhV-k69digxy0CTrws8Pu9LT1oBZFfT4gntztSOra&p=c3759a41d39109be4bbe9b7c5655&newp=c4759a41d3941de40be2963c7f4a92695d0fc20e38ddd701298ffe0cc4241a1a1a3aecbf2c24140ed4c4786702af4f5feff635723d0034f1f689df08d2ecce7e78d46c&s=cfcd208495d565ef&user=baidu&fm=sc&query=LeaderElection&qid=dc2681490011bbd9&p1=3
+	*/
 	waitingForLeader := make(chan struct{})
 	isLeader := func() bool {
 		select {
@@ -301,17 +323,180 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 		return nil, nil, utilerrors.NewAggregate(errs)
 	}
 
+	/*
+		 {
+			"ComponentConfig": {
+			  "Parallelism": 16,
+			  "AlgorithmSource": {
+				"Policy": null,
+				"Provider": "DefaultProvider"
+			  },
+			  "LeaderElection": {
+				"LeaderElect": true,
+				"LeaseDuration": "15s",
+				"RenewDeadline": "10s",
+				"RetryPeriod": "2s",
+				"ResourceLock": "leases",
+				"ResourceName": "kube-scheduler",
+				"ResourceNamespace": "kube-system"
+			  },
+			  "ClientConnection": {
+				"Kubeconfig": "",
+				"AcceptContentTypes": "",
+				"ContentType": "application/vnd.kubernetes.protobuf",
+				"QPS": 50,
+				"Burst": 100
+			  },
+			  "HealthzBindAddress": "0.0.0.0:10251",
+			  "MetricsBindAddress": "0.0.0.0:10251",
+			  "EnableProfiling": true,
+			  "EnableContentionProfiling": true,
+			  "PercentageOfNodesToScore": 0,
+			  "PodInitialBackoffSeconds": 1,
+			  "PodMaxBackoffSeconds": 10,
+			  "Profiles": [
+				{
+				  "SchedulerName": "default-scheduler",
+				  "Plugins": null,
+				  "PluginConfig": null
+				}
+			  ],
+			  "Extenders": null
+			},
+			"SecureServing": {
+			  "BindAddress": "0.0.0.0",
+			  "BindPort": 10259,
+			  "BindNetwork": "",
+			  "Required": false,
+			  "ExternalAddress": "",
+			  "Listener": null,
+			  "ServerCert": {
+				"CertKey": {
+				  "CertFile": "",
+				  "KeyFile": ""
+				},
+				"CertDirectory": "",
+				"PairName": "kube-scheduler",
+				"GeneratedCert": null,
+				"FixtureDirectory": ""
+			  },
+			  "SNICertKeys": null,
+			  "CipherSuites": null,
+			  "MinTLSVersion": "",
+			  "HTTP2MaxStreamsPerConnection": 0,
+			  "PermitPortSharing": false,
+			  "PermitAddressSharing": false
+			},
+			"CombinedInsecureServing": {
+			  "Healthz": {
+				"BindAddress": "",
+				"BindPort": 0,
+				"BindNetwork": "tcp",
+				"Listener": null
+			  },
+			  "Metrics": {
+				"BindAddress": "",
+				"BindPort": 0,
+				"BindNetwork": "tcp",
+				"Listener": null
+			  },
+			  "BindPort": 10251,
+			  "BindAddress": "0.0.0.0"
+			},
+			"Authentication": {
+			  "RemoteKubeConfigFile": "",
+			  "RemoteKubeConfigFileOptional": true,
+			  "CacheTTL": 10000000000,
+			  "ClientCert": {
+				"ClientCA": "",
+				"CAContentProvider": null
+			  },
+			  "RequestHeader": {
+				"ClientCAFile": "",
+				"UsernameHeaders": [
+				  "x-remote-user"
+				],
+				"GroupHeaders": [
+				  "x-remote-group"
+				],
+				"ExtraHeaderPrefixes": [
+				  "x-remote-extra-"
+				],
+				"AllowedNames": null
+			  },
+			  "SkipInClusterLookup": false,
+			  "TolerateInClusterLookupFailure": true,
+			  "WebhookRetryBackoff": {
+				"Duration": 500000000,
+				"Factor": 1.5,
+				"Jitter": 0.2,
+				"Steps": 5,
+				"Cap": 0
+			  },
+			  "ClientTimeout": 10000000000
+			},
+			"Authorization": {
+			  "RemoteKubeConfigFile": "",
+			  "RemoteKubeConfigFileOptional": true,
+			  "AllowCacheTTL": 10000000000,
+			  "DenyCacheTTL": 10000000000,
+			  "AlwaysAllowPaths": [
+				"/healthz",
+				"/readyz",
+				"/livez"
+			  ],
+			  "AlwaysAllowGroups": [
+				"system:masters"
+			  ],
+			  "ClientTimeout": 10000000000,
+			  "WebhookRetryBackoff": {
+				"Duration": 500000000,
+				"Factor": 1.5,
+				"Jitter": 0.2,
+				"Steps": 5,
+				"Cap": 0
+			  }
+			},
+			"Metrics": {
+			  "ShowHiddenMetricsForVersion": "",
+			  "DisabledMetrics": null,
+			  "AllowListMapping": null
+			},
+			"Logs": {
+			  "LogFormat": "text",
+			  "LogSanitization": false
+			},
+			"Deprecated": {
+			  "PolicyConfigFile": "",
+			  "PolicyConfigMapName": "",
+			  "PolicyConfigMapNamespace": "kube-system",
+			  "UseLegacyPolicyConfig": false,
+			  "AlgorithmProvider": "",
+			  "HardPodAffinitySymmetricWeight": 1,
+			  "SchedulerName": "default-scheduler"
+			},
+			"ConfigFile": "",
+			"WriteConfigTo": "",
+			"Master": ""
+		  }
+	*/
+
+	// config 里初始化 event client 和 client Interface
 	c, err := opts.Config()
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Get the completed config
+	 //cc 包了一层c，并且添加了apiserver的认证和授权
 	cc := c.Complete()
 
+	 // 加载外部out of tree的framework
 	outOfTreeRegistry := make(runtime.Registry)
 	for _, option := range outOfTreeRegistryOptions {
+		 // 执行外部插件func(func)
 		if err := option(outOfTreeRegistry); err != nil {
+			 // 应该是把插件写到runtime.Registry这个map里，后面在调用
 			return nil, nil, err
 		}
 	}
@@ -320,6 +505,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	completedProfiles := make([]kubeschedulerconfig.KubeSchedulerProfile, 0)
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
+		 // 484 line 初始了NewInformerFactory
 		cc.InformerFactory,
 		recorderFactory,
 		ctx.Done(),

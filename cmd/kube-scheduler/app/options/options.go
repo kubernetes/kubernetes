@@ -219,6 +219,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		}
 	}
 	o.Metrics.Apply()
+	// 加载配置到全局变量
 	o.Logs.Apply()
 	return nil
 }
@@ -253,12 +254,14 @@ func (o *Options) Validate() []error {
 // Config return a scheduler config object
 func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	if o.SecureServing != nil {
+		// 如果没有提供证书，创建自签名的证书，赋值给o.SecureServing.ServerCert.GeneratedCert,
 		if err := o.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 			return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
 		}
 	}
 
 	c := &schedulerappconfig.Config{}
+	// 如果提供了配置文件从配置文件里加载配置， 否则从option里加载配置，并加载log和metric到全局配置
 	if err := o.ApplyTo(c); err != nil {
 		return nil, err
 	}
@@ -270,11 +273,14 @@ func (o *Options) Config() (*schedulerappconfig.Config, error) {
 	}
 
 	// Prepare kube clients.
+	 //event client include all of clientside and just invoked event client by NewEventBroadcasterAdapter
 	client, eventClient, err := createClients(kubeConfig)
+	// client 和 eventClient 是一样的 唯一不同是client 添加了 userAgent header
 	if err != nil {
 		return nil, err
 	}
 
+	// EventBroadcaster 发送 event 事件 https://www.jianshu.com/p/5c332af5ef52
 	c.EventBroadcaster = events.NewEventBroadcasterAdapter(eventClient)
 
 	// Set up leader election if enabled.

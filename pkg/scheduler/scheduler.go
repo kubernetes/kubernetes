@@ -195,21 +195,27 @@ func New(client clientset.Interface,
 
 	stopEverything := stopCh
 	if stopEverything == nil {
+		// 如果stop没有提供，内部提供一个永不停止的channel（外部无法引用）
 		stopEverything = wait.NeverStop
 	}
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {
+		 // opt 是一个功能，加载options config 到options
 		opt(&options)
 	}
 
+	// 后台 1s清一次expired pods，30s 标记pod 为expired
 	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
+	 // 初始内部插件
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
+		 //  初始外部插件
 		return nil, err
 	}
 
+	 //创建一个空的快照， 每次调度开始的时候先创建快照
 	snapshot := internalcache.NewEmptySnapshot()
 
 	configurator := &Configurator{
@@ -234,21 +240,25 @@ func New(client clientset.Interface,
 	var sched *Scheduler
 	source := options.schedulerAlgorithmSource
 	switch {
+		 //从默认加载算法
 	case source.Provider != nil:
 		// Create the config from a named algorithm provider.
 		sc, err := configurator.createFromProvider(*source.Provider)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
+		 //赋值Scheduler
 		sched = sc
 	case source.Policy != nil:
 		// Create the config from a user specified policy source.
 		policy := &schedulerapi.Policy{}
 		switch {
+			// 从文件加载算法
 		case source.Policy.File != nil:
 			if err := initPolicyFromFile(source.Policy.File.Path, policy); err != nil {
 				return nil, err
 			}
+			 //从configmap 加载算法
 		case source.Policy.ConfigMap != nil:
 			if err := initPolicyFromConfigMap(client, source.Policy.ConfigMap, policy); err != nil {
 				return nil, err
@@ -262,6 +272,7 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
+		 //赋值Scheduler
 		sched = sc
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
@@ -270,6 +281,7 @@ func New(client clientset.Interface,
 	sched.StopEverything = stopEverything
 	sched.client = client
 
+	 //注册informer
 	addAllEventHandlers(sched, informerFactory)
 	return sched, nil
 }
@@ -313,6 +325,23 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi
 // Run begins watching and scheduling. It starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
 	sched.SchedulingQueue.Run()
+	/*
+		scheduleOne
+		每次对一个 pod 进行调度，主要有以下步骤：
+
+		从 scheduler 调度队列中取出一个 pod，如果该 pod 处于删除状态则跳过
+		执行调度逻辑 sched.schedule() 返回通过预算及优选算法过滤后选出的最佳 node
+		如果过滤算法没有选出合适的 node，则返回 core.FitError
+		若没有合适的 node 会判断是否启用了抢占策略，若启用了则执行抢占机制
+		判断是否需要 VolumeScheduling 特性
+		执行 reserve plugin
+		pod 对应的 spec.NodeName 写上 scheduler 最终选择的 node，更新 scheduler cache
+		请求 apiserver 异步处理最终的绑定操作，写入到 etcd
+		执行 permit plugin
+		执行 prebind plugin
+		执行 postbind plugin
+	*/
+	//0代表没有间隔的串行的取pod执行
 	wait.UntilWithContext(ctx, sched.scheduleOne, 0)
 	sched.SchedulingQueue.Close()
 }

@@ -348,6 +348,7 @@ func (p *PriorityQueue) AddUnschedulableIfNotPresent(pInfo *framework.QueuedPodI
 	return nil
 }
 
+// 清空回退队列的pod， 添加pod到activeQ
 // flushBackoffQCompleted Moves all pods from backoffQ which have completed backoff in to activeQ
 func (p *PriorityQueue) flushBackoffQCompleted() {
 	p.lock.Lock()
@@ -359,14 +360,18 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 		}
 		pod := rawPodInfo.(*framework.QueuedPodInfo).Pod
 		boTime := p.getBackoffTime(rawPodInfo.(*framework.QueuedPodInfo))
+		
 		if boTime.After(p.clock.Now()) {
+			//如果backoff时间没到，跳过并通过wait.Until等1秒钟后再次尝试。
 			return
 		}
+		 // 弹出backoffQ
 		_, err := p.podBackoffQ.Pop()
 		if err != nil {
 			klog.ErrorS(err, "Unable to pop pod from backoff queue despite backoff completion", "pod", klog.KObj(pod))
 			return
 		}
+		 // 加入到activeQ
 		p.activeQ.Add(rawPodInfo)
 		metrics.SchedulerQueueIncomingPods.WithLabelValues("active", BackoffComplete).Inc()
 		defer p.cond.Broadcast()

@@ -722,6 +722,7 @@ func (cache *schedulerCache) cleanupExpiredAssumedPods() {
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
 // It also reports metrics on the cache size for nodes, pods, and assumed pods.
+// 在schedulerCache中cleanupExpiredAssumedPods，定时的轮询，清理过期的Pod
 func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()

@@ -233,6 +233,7 @@ func RunServer(
 			listener = tls.NewListener(listener, server.TLSConfig)
 		}
 
+		 //这里持续处理连接， 一般用ListenAndServe， 但是这里自定义了listener
 		err := server.Serve(listener)
 
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())

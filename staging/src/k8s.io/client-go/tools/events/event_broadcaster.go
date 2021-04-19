@@ -64,10 +64,12 @@ type eventKey struct {
 }
 
 type eventBroadcasterImpl struct {
+	// Bradcaster 分发event
 	*watch.Broadcaster
 	mu            sync.Mutex
 	eventCache    map[eventKey]*eventsv1.Event
 	sleepDuration time.Duration
+	// 一个接口发送event到api server
 	sink          EventSink
 }
 
@@ -159,12 +161,14 @@ func (e *eventBroadcasterImpl) finishSeries() {
 }
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
+// NewRecorder 返回 EventRecorder接口（带eventF方法） 并携带源信息
 func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, reportingController string) EventRecorder {
 	hostname, _ := os.Hostname()
 	reportingInstance := reportingController + "-" + hostname
 	return &recorderImpl{scheme, reportingController, reportingInstance, e.Broadcaster, clock.RealClock{}}
 }
 
+// recordToSink 尝试发送event到api server
 func (e *eventBroadcasterImpl) recordToSink(event *eventsv1.Event, clock clock.Clock) {
 	// Make a copy before modification, because there could be multiple listeners.
 	eventCopy := event.DeepCopy()
@@ -201,6 +205,7 @@ func (e *eventBroadcasterImpl) recordToSink(event *eventsv1.Event, clock clock.C
 	}()
 }
 
+// attemptRecording 尝试发送event到api server
 func (e *eventBroadcasterImpl) attemptRecording(event *eventsv1.Event) *eventsv1.Event {
 	tries := 0
 	for {
@@ -218,6 +223,7 @@ func (e *eventBroadcasterImpl) attemptRecording(event *eventsv1.Event) *eventsv1
 	}
 }
 
+// recordEvent 调用sink接口发送 event 到api server
 func recordEvent(sink EventSink, event *eventsv1.Event) (*eventsv1.Event, bool) {
 	var newEvent *eventsv1.Event
 	var err error
@@ -290,10 +296,12 @@ func getKey(event *eventsv1.Event) eventKey {
 	return key
 }
 
+// 添加watch 到Broadcaster， 并从watch接收event， 调用hander 方法处理event
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value is used to stop recording
 func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime.Object)) func() {
 	watcher := e.Watch()
+	 // 后台监听event 并处理
 	go func() {
 		defer utilruntime.HandleCrash()
 		for {
@@ -304,9 +312,11 @@ func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(event runtime
 			eventHandler(watchEvent.Object)
 		}
 	}()
+	 //返回watcher 的stop 方法，用于关闭watcher
 	return watcher.Stop
 }
 
+// 发送event 到api server
 func (e *eventBroadcasterImpl) startRecordingEvents(stopCh <-chan struct{}) {
 	eventHandler := func(obj runtime.Object) {
 		event, ok := obj.(*eventsv1.Event)
@@ -316,8 +326,10 @@ func (e *eventBroadcasterImpl) startRecordingEvents(stopCh <-chan struct{}) {
 		}
 		e.recordToSink(event, clock.RealClock{})
 	}
+	//  新建watcher 并后台用eventHander
 	stopWatcher := e.StartEventWatcher(eventHandler)
 	go func() {
+		//通过关闭入参来关闭watcher
 		<-stopCh
 		stopWatcher()
 	}()

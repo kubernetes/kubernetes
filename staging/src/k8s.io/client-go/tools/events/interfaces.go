@@ -38,25 +38,31 @@ type EventRecorder interface {
 	// (ReportingController is a type of a Controller reporting an Event, e.g. k8s.io/node-controller, k8s.io/kubelet.)
 	// take in regarding's name; it should be in UpperCamelCase format (starting with a capital letter).
 	// 'note' is intended to be human readable.
+	// 发送event到broadcaster
 	Eventf(regarding runtime.Object, related runtime.Object, eventtype, reason, action, note string, args ...interface{})
 }
 
 // EventBroadcaster knows how to receive events and send them to any EventSink, watcher, or log.
 type EventBroadcaster interface {
 	// StartRecordingToSink starts sending events received from the specified eventBroadcaster.
+	// 发送event  到apiserver
 	StartRecordingToSink(stopCh <-chan struct{})
 
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
+	//返回EventRecorder接口 包含Eventf方法发送event到broadcaster
 	NewRecorder(scheme *runtime.Scheme, reportingController string) EventRecorder
 
 	// StartEventWatcher enables you to watch for emitted events without usage
 	// of StartRecordingToSink. This lets you also process events in a custom way (e.g. in tests).
 	// NOTE: events received on your eventHandler should be copied before being used.
 	// TODO: figure out if this can be removed.
+	// 提供自定义的eventHander接口， 每个event处理之前要copy，event自带copy 方法
+	// 开启新的watch 并处理eventHander
 	StartEventWatcher(eventHandler func(event runtime.Object)) func()
 
 	// Shutdown shuts down the broadcaster
+	//关闭广播
 	Shutdown()
 }
 
@@ -76,6 +82,14 @@ type EventSink interface {
 //
 // Deprecated: This interface will be removed once migration is completed.
 type EventBroadcasterAdapter interface {
+	/*
+		https://www.bookstack.cn/read/source-code-reading-notes/kubernetes-k8s_events.md
+			StartEventWatcher() ： EventBroadcaster 中的核心方法，接收各模块产生的 events，参数为一个处理 events 的函数，用户可以使用 StartEventWatcher() 接收 events 然后使用自定义的 handle 进行处理
+			StartRecordingToSink() ： 调用 StartEventWatcher() 接收 events，并将收到的 events 发送到 apiserver
+			StartLogging() ：也是调用 StartEventWatcher() 接收 events，然后保存 events 到日志
+			NewRecorder() ：会创建一个指定 EventSource 的 EventRecorder，EventSource 指明了哪个节点的哪个组件
+			StartRecordingToSink() ： 调用 StartEventWatcher() 接收 events，并将收到的 events 发送到 apiserver
+	*/
 	// StartRecordingToSink starts sending events received from the specified eventBroadcaster.
 	StartRecordingToSink(stopCh <-chan struct{})
 

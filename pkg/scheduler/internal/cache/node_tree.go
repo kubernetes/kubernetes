@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
+//  根本就不是tree形结构， 只是有个列表存zones 和一个map存zone到Nodes的映射，而且是hold node name
 // nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
 // keys to "NodeTree.tree" and values of "NodeTree.tree" are arrays of node names.
 // NodeTree is NOT thread-safe, any concurrent updates/reads from it must be synchronized by the caller.
@@ -49,6 +50,7 @@ func newNodeTree(nodes []*v1.Node) *nodeTree {
 // addNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
 // is added to the array of nodes in that zone.
 func (nt *nodeTree) addNode(n *v1.Node) {
+	 //从objectMeta里的Lables里读取zone
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na {
@@ -72,6 +74,7 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na {
 			if nodeName == n.Name {
+				 //为什么没有从zones里删掉呢
 				nt.tree[zone] = append(na[:i], na[i+1:]...)
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
