@@ -43,6 +43,24 @@ const (
 	RemoteEventMessageFmt = "Kubelet restarting to use %s, UID: %s, ResourceVersion: %s, KubeletConfigKey: %s"
 )
 
+// restartForNewConfig presumes the Kubelet is managed by a babysitter, e.g. systemd
+// It will send an event before exiting.
+var restartForNewConfig = func(eventClient v1core.EventsGetter, nodeName string, source checkpoint.RemoteConfigSource) {
+	message := LocalEventMessage
+	if source != nil {
+		message = fmt.Sprintf(RemoteEventMessageFmt, source.APIPath(), source.UID(), source.ResourceVersion(), source.KubeletFilename())
+	}
+	// we directly log and send the event, instead of using the event recorder,
+	// because the event recorder won't flush its queue before we exit (we'd lose the event)
+	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
+	klog.V(3).InfoS("Event created", "event", klog.KObj(event), "involvedObject", event.InvolvedObject, "eventType", event.Type, "reason", event.Reason, "message", event.Message)
+	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(context.TODO(), event, metav1.CreateOptions{}); err != nil {
+		klog.ErrorS(err, "Kubelet config controller failed to send event")
+	}
+	klog.InfoS("Kubelet config controller event", "message", message)
+	os.Exit(0)
+}
+
 // pokeConfiSourceWorker tells the worker thread that syncs config sources that work needs to be done
 func (cc *Controller) pokeConfigSourceWorker() {
 	select {
@@ -185,24 +203,6 @@ func (cc *Controller) resetConfig() (bool, string, error) {
 		return false, status.InternalError, err
 	}
 	return updated, "", nil
-}
-
-// restartForNewConfig presumes the Kubelet is managed by a babysitter, e.g. systemd
-// It will send an event before exiting.
-func restartForNewConfig(eventClient v1core.EventsGetter, nodeName string, source checkpoint.RemoteConfigSource) {
-	message := LocalEventMessage
-	if source != nil {
-		message = fmt.Sprintf(RemoteEventMessageFmt, source.APIPath(), source.UID(), source.ResourceVersion(), source.KubeletFilename())
-	}
-	// we directly log and send the event, instead of using the event recorder,
-	// because the event recorder won't flush its queue before we exit (we'd lose the event)
-	event := makeEvent(nodeName, apiv1.EventTypeNormal, KubeletConfigChangedEventReason, message)
-	klog.V(3).InfoS("Event created", "event", klog.KObj(event), "involvedObject", event.InvolvedObject, "eventType", event.Type, "reason", event.Reason, "message", event.Message)
-	if _, err := eventClient.Events(apiv1.NamespaceDefault).Create(context.TODO(), event, metav1.CreateOptions{}); err != nil {
-		klog.ErrorS(err, "Kubelet config controller failed to send event")
-	}
-	klog.InfoS("Kubelet config controller event", "message", message)
-	os.Exit(0)
 }
 
 // latestNodeConfigSource returns a copy of the most recent NodeConfigSource from the Node with `nodeName` in `store`
