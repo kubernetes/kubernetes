@@ -37,7 +37,8 @@ type InTreePlugin interface {
 	// TranslateInTreeInlineVolumeToCSI takes a inline volume and will translate
 	// the in-tree inline volume source to a CSIPersistentVolumeSource
 	// A PV object containing the CSIPersistentVolumeSource in it's spec is returned
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+	// podNamespace is only needed for azurefile to fetch secret namespace, no need to be set for other plugins.
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 
 	// TranslateInTreePVToCSI takes a persistent volume and will translate
 	// the in-tree pv source to a CSI Source. The input persistent volume can be modified

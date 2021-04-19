@@ -86,7 +86,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeStorageClassToCSI(sc 
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AWSElasticBlockStore set from in-tree
 // and converts the AWSElasticBlockStore source to a CSIPersistentVolumeSource
-func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AWSElasticBlockStore == nil {
 		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
 	}

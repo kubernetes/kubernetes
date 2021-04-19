@@ -314,7 +314,7 @@ func TestTranslatevSphereInTreeInlineVolumeToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inlinevolume)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.inlinevolume, "")
 		if err == nil && tc.expErr {
 			t.Errorf("Expected error, but did not get one.")
 			continue
