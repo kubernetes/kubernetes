@@ -390,3 +390,23 @@ run_kubectl_all_namespace_tests() {
   set +o nounset
   set +o errexit
 }
+
+
+run_deprecated_api_tests() {
+  set -o nounset
+  set -o errexit
+
+  create_and_use_new_namespace
+  kube::log::status "Testing deprecated APIs"
+
+  # Test deprecated API request output
+  # TODO(liggitt): switch this to a custom deprecated resource once CRDs support marking versions as deprecated
+  output_message=$(kubectl get podsecuritypolicies.v1beta1.policy 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
+  output_message=$(! kubectl get podsecuritypolicies.v1beta1.policy --warnings-as-errors 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'PodSecurityPolicy is deprecated'
+  kube::test::if_has_string "${output_message}" 'Error: 1 warning received'
+
+  set +o nounset
+  set +o errexit
+}
