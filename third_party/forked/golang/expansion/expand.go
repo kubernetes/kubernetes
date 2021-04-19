@@ -81,8 +81,18 @@ func Expand(input string, mapping func(string) string) string {
 func tryReadVariableName(input string) (string, bool, int) {
 	switch input[0] {
 	case operator:
-		// Escaped operator; return it.
-		return input[0:1], false, 1
+		// Check whether the operator is followed by a variable reference
+		if len(input) > 1 && input[1] == referenceOpener {
+			// Scan to expression closer
+			for i := 2; i < len(input); i++ {
+				if input[i] == referenceCloser {
+					// Complete reference found; return the reference, effectively escaping it.
+					return input[0:i], false, i
+				}
+			}
+		}
+		// Incomplete reference; return the (original) operator and do not advance any extra steps
+		return string(operator), false, 0
 	case referenceOpener:
 		// Scan to expression closer
 		for i := 1; i < len(input); i++ {

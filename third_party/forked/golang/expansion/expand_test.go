@@ -132,7 +132,7 @@ func doExpansionTest(t *testing.T, mapping func(string) string) {
 		{
 			name:     "mixed in escapes",
 			input:    "f000-$$VAR_A",
-			expected: "f000-$VAR_A",
+			expected: "f000-$$VAR_A",
 		},
 		{
 			name:     "backslash escape ignored",
@@ -202,22 +202,32 @@ func doExpansionTest(t *testing.T, mapping func(string) string) {
 		{
 			name:     "multiple (even) operators, var undefined",
 			input:    "$$$$$$(BIG_MONEY)",
-			expected: "$$$(BIG_MONEY)",
+			expected: "$$$$$(BIG_MONEY)",
 		},
 		{
 			name:     "multiple (even) operators, var defined",
 			input:    "$$$$$$(VAR_A)",
-			expected: "$$$(VAR_A)",
+			expected: "$$$$$(VAR_A)",
 		},
 		{
 			name:     "multiple (odd) operators, var undefined",
 			input:    "$$$$$$$(GOOD_ODDS)",
-			expected: "$$$$(GOOD_ODDS)",
+			expected: "$$$$$$(GOOD_ODDS)",
 		},
 		{
 			name:     "multiple (odd) operators, var defined",
 			input:    "$$$$$$$(VAR_A)",
-			expected: "$$$A",
+			expected: "$$$$$$(VAR_A)",
+		},
+		{
+			name:     "multiple (even) operators, without variable",
+			input:    "$$",
+			expected: "$$",
+		},
+		{
+			name:     "multiple (odd) operators, without variable",
+			input:    "$$$",
+			expected: "$$$",
 		},
 		{
 			name:     "missing open expression",
@@ -268,6 +278,16 @@ func doExpansionTest(t *testing.T, mapping func(string) string) {
 			name:     "escaped operators in variable names are not escaped",
 			input:    "$(foo$$var)",
 			expected: "$(foo$$var)",
+		},
+		{
+			name:     "empty variable reference",
+			input:    "$()",
+			expected: "$()",
+		},
+		{
+			name:     "escaped empty variable reference",
+			input:    "$$()",
+			expected: "$()",
 		},
 		{
 			name:     "newline not expanded",
