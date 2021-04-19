@@ -32,13 +32,14 @@ import (
 
 // StreamOptions holds information pertaining to the current streaming session:
 // input/output streams, if the client is requesting a TTY, and a terminal size queue to
-// support terminal resizing.
+// support terminal resizing, Use channel to send signals when you need to close the stream.
 type StreamOptions struct {
 	Stdin             io.Reader
 	Stdout            io.Writer
 	Stderr            io.Writer
 	Tty               bool
 	TerminalSizeQueue TerminalSizeQueue
+	CloseChan         chan bool
 }
 
 // Executor is an interface for transporting shell-style streams.
@@ -104,7 +105,7 @@ func NewSPDYExecutorForProtocols(transport http.RoundTripper, upgrader spdy.Upgr
 }
 
 // Stream opens a protocol streamer to the server and streams until a client closes
-// the connection or the server disconnects.
+// the connection or the server disconnects, unless the CloseChan receives the close signal.
 func (e *streamExecutor) Stream(options StreamOptions) error {
 	req, err := http.NewRequest(e.method, e.url.String(), nil)
 	if err != nil {
@@ -121,6 +122,11 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 		return err
 	}
 	defer conn.Close()
+
+	go func() {
+		<-options.CloseChan
+		conn.Close()
+	}()
 
 	var streamer streamProtocolHandler
 
