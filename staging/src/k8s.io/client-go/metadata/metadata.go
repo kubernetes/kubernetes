@@ -64,7 +64,9 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	config.NegotiatedSerializer = metainternalversionscheme.Codecs.WithoutConversion()
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = metainternalversionscheme.Codecs.WithoutConversion()
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
