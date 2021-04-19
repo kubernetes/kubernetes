@@ -42,7 +42,9 @@ func ConfigFor(inConfig *rest.Config) *rest.Config {
 	config := rest.CopyConfig(inConfig)
 	config.AcceptContentTypes = "application/json"
 	config.ContentType = "application/json"
-	config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = basicNegotiatedSerializer{} // this gets used for discovery and error handling types
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()
 	}

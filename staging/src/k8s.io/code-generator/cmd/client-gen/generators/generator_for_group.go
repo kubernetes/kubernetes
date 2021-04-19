@@ -217,8 +217,9 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 		gv := scheme.Scheme.PrioritizedVersionsForGroup("$.groupName$")[0]
 		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = scheme.Codecs
-
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
+	}
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
@@ -235,8 +236,10 @@ func setConfigDefaults(config *$.restConfig|raw$) error {
 	gv := $.SchemeGroupVersion|raw$
 	config.GroupVersion =  &gv
 	config.APIPath = $.apiPath$
-	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
 	if config.UserAgent == "" {
 		config.UserAgent = $.restDefaultKubernetesUserAgent|raw$()
 	}
