@@ -43,8 +43,8 @@ require (
 	k8s.io/kube-openapi v0.0.0-20210305001622-591a79e4bda7
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	sigs.k8s.io/kustomize/api v0.8.5
-	sigs.k8s.io/kustomize/kustomize/v4 v4.0.5
+	sigs.k8s.io/kustomize/api v0.8.8
+	sigs.k8s.io/kustomize/kustomize/v4 v4.1.2
 	sigs.k8s.io/yaml v1.2.0
 )
 
