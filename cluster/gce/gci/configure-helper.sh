@@ -820,6 +820,12 @@ EOF
 network-project-id = ${NETWORK_PROJECT_ID}
 EOF
   fi
+  if [[ -n "${STACK_TYPE:-}" ]]; then
+    use_cloud_config="true"
+    cat <<EOF >>/etc/gce.conf
+stack-type = ${STACK_TYPE}
+EOF
+  fi
   if [[ -n "${NODE_NETWORK:-}" ]]; then
     use_cloud_config="true"
     cat <<EOF >>/etc/gce.conf
