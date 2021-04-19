@@ -191,9 +191,38 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.SetReadOnlyRootFilesystem(&readOnlyRootFS)
 	}
 
+	isPrivileged := sc.Privileged() != nil && *sc.Privileged()
+	addCapSysAdmin := false
+	if caps != nil {
+		for _, cap := range caps.Add {
+			if string(cap) == "CAP_SYS_ADMIN" {
+				addCapSysAdmin = true
+				break
+			}
+		}
+	}
+
 	// if the SCC sets DefaultAllowPrivilegeEscalation and the container security context
 	// allowPrivilegeEscalation is not set, then default to that set by the SCC.
-	if s.scc.DefaultAllowPrivilegeEscalation != nil && sc.AllowPrivilegeEscalation() == nil {
+	//
+	// Exception: privileged pods and CAP_SYS_ADMIN capability
+	//
+	// This corresponds to Kube's pod validation:
+	//
+	//     if sc.AllowPrivilegeEscalation != nil && !*sc.AllowPrivilegeEscalation {
+	//        if sc.Privileged != nil && *sc.Privileged {
+	//            allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `privileged` to true"))
+	//        }
+	//
+	//        if sc.Capabilities != nil {
+	//            for _, cap := range sc.Capabilities.Add {
+	//                if string(cap) == "CAP_SYS_ADMIN" {
+	//                    allErrs = append(allErrs, field.Invalid(fldPath, sc, "cannot set `allowPrivilegeEscalation` to false and `capabilities.Add` CAP_SYS_ADMIN"))
+	//                }
+	//            }
+	//        }
+	//    }
+	if s.scc.DefaultAllowPrivilegeEscalation != nil && sc.AllowPrivilegeEscalation() == nil && !isPrivileged && !addCapSysAdmin {
 		sc.SetAllowPrivilegeEscalation(s.scc.DefaultAllowPrivilegeEscalation)
 	}
 
