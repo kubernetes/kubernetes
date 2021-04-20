@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	testutils "k8s.io/kubernetes/test/utils"
@@ -414,7 +415,7 @@ func waitForAllContainerRemoval(podName, podNS string) {
 }
 
 func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
-	var pods []*v1.Pod
+	podMap := make(map[string]*v1.Pod)
 
 	for podID := 0; podID < numPods; podID++ {
 		podName := fmt.Sprintf("gu-pod-%d", podID)
@@ -422,30 +423,39 @@ func runTopologyManagerPositiveTest(f *framework.Framework, numPods int, ctnAttr
 		pod := makeTopologyManagerTestPod(podName, ctnAttrs, initCtnAttrs)
 		pod = f.PodClient().CreateSync(pod)
 		framework.Logf("created pod %s", podName)
-		pods = append(pods, pod)
+		podMap[podName] = pod
 	}
 
 	// per https://github.com/kubernetes/enhancements/blob/master/keps/sig-node/693-topology-manager/README.md#multi-numa-systems-tests
 	// we can do a menaingful validation only when using the single-numa node policy
 	if envInfo.policy == topologymanager.PolicySingleNumaNode {
-		for podID := 0; podID < numPods; podID++ {
-			validatePodAlignment(f, pods[podID], envInfo)
+		for _, pod := range podMap {
+			validatePodAlignment(f, pod, envInfo)
 		}
 		if envInfo.scope == podScopeTopology {
-			for podID := 0; podID < numPods; podID++ {
-				err := validatePodAlignmentWithPodScope(f, pods[podID], envInfo)
+			for _, pod := range podMap {
+				err := validatePodAlignmentWithPodScope(f, pod, envInfo)
 				framework.ExpectNoError(err)
 			}
 		}
 	}
 
-	for podID := 0; podID < numPods; podID++ {
-		pod := pods[podID]
-		framework.Logf("deleting the pod %s/%s and waiting for container removal",
-			pod.Namespace, pod.Name)
-		deletePodSyncByName(f, pod.Name)
-		waitForAllContainerRemoval(pod.Name, pod.Namespace)
+	deletePodsAsync(f, podMap)
+}
+
+func deletePodsAsync(f *framework.Framework, podMap map[string]*v1.Pod) {
+	var wg sync.WaitGroup
+	for _, pod := range podMap {
+		wg.Add(1)
+		go func(podNS, podName string) {
+			defer ginkgo.GinkgoRecover()
+			defer wg.Done()
+
+			deletePodSyncByName(f, podName)
+			waitForAllContainerRemoval(podName, podNS)
+		}(pod.Namespace, pod.Name)
 	}
+	wg.Wait()
 }
 
 func runTopologyManagerNegativeTest(f *framework.Framework, ctnAttrs, initCtnAttrs []tmCtnAttribute, envInfo *testEnvInfo) {
