@@ -2,6 +2,7 @@ FROM registry.ci.openshift.org/ocp/builder:ubi8.art AS builder
 WORKDIR /go/src/github.com/openshift/kubernetes/build/pause
 COPY . .
 RUN dnf install -y gcc glibc-static && \
+    mkdir -p bin && \
     gcc -Os -Wall -Werror -static -o bin/pause ./linux/pause.c
 
 FROM scratch
