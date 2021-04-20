@@ -110,19 +110,21 @@ func getRecentUnmetScheduleTimes(cj batchv1.CronJob, now time.Time) ([]time.Time
 		// CronJob as last known start time.
 		earliestTime = cj.ObjectMeta.CreationTimestamp.Time
 	}
+
+	latestTime := now
 	if cj.Spec.StartingDeadlineSeconds != nil {
 		// Controller is not going to schedule anything below this point
-		schedulingDeadline := now.Add(-time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
+		schedulingDeadline := sched.Next(earliestTime).Add(time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds))
 
-		if schedulingDeadline.After(earliestTime) {
-			earliestTime = schedulingDeadline
+		if schedulingDeadline.Before(now) {
+			latestTime = schedulingDeadline
 		}
 	}
-	if earliestTime.After(now) {
+	if earliestTime.After(latestTime) {
 		return []time.Time{}, nil
 	}
 
-	for t := sched.Next(earliestTime); !t.After(now); t = sched.Next(t) {
+	for t := sched.Next(earliestTime); !t.After(latestTime); t = sched.Next(t) {
 		starts = append(starts, t)
 		// An object might miss several starts. For example, if
 		// controller gets wedged on friday at 5:01pm when everyone has
