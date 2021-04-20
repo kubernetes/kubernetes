@@ -37,6 +37,7 @@ write_files:
     content: |
       [Unit]
       Description=Download and install k8s binaries and configurations
+      Requires=network-online.target
       After=network-online.target
 
       [Service]
@@ -45,7 +46,7 @@ write_files:
       ExecStartPre=/bin/mkdir -p /home/kubernetes/bin
       ExecStartPre=/bin/mount --bind /home/kubernetes/bin /home/kubernetes/bin
       ExecStartPre=/bin/mount -o remount,exec /home/kubernetes/bin
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+      ExecStartPre=/usr/bin/curl --fail --retry 600 --retry-delay 3 --retry-connrefused --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/configure.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/configure.sh
       ExecStart=/home/kubernetes/bin/configure.sh
 
@@ -58,12 +59,13 @@ write_files:
     content: |
       [Unit]
       Description=Configure kube internal route
+      Requires=kube-master-installation.service
       After=kube-master-installation.service
 
       [Service]
       Type=oneshot
       RemainAfterExit=yes
-      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
+      ExecStartPre=/usr/bin/curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error -H "X-Google-Metadata-Request: True" -o /home/kubernetes/bin/kube-master-internal-route.sh http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-internal-route
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/kube-master-internal-route.sh
       ExecStart=/home/kubernetes/bin/kube-master-internal-route.sh
 
@@ -76,6 +78,7 @@ write_files:
     content: |
       [Unit]
       Description=Configure kubernetes master
+      Requires=kube-master-installation.service
       After=kube-master-installation.service
 
       [Service]
@@ -100,7 +103,6 @@ write_files:
       Restart=always
       RestartSec=10
       RemainAfterExit=yes
-      RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh container-runtime
 
@@ -118,7 +120,6 @@ write_files:
       [Service]
       Restart=always
       RestartSec=10
-      RemainAfterExit=yes
       RemainAfterExit=yes
       ExecStartPre=/bin/chmod 544 /home/kubernetes/bin/health-monitor.sh
       ExecStart=/home/kubernetes/bin/health-monitor.sh kubelet
