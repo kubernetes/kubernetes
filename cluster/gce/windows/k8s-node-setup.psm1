@@ -1641,7 +1641,7 @@ function Install-Pigz {
       # Windows path it'll use it instead of the default unzipper.
       # See: https://github.com/containerd/containerd/issues/1896
       Add-MachineEnvironmentPath -Path $PIGZ_ROOT
-      # Add process exclusion for Windows Defender to boost performance. 
+      # Add process exclusion for Windows Defender to boost performance.
       Add-MpPreference -ExclusionProcess "$PIGZ_ROOT\unpigz.exe"
       Log-Output "Installed Pigz $PIGZ_VERSION"
     } else {
@@ -1653,12 +1653,12 @@ function Install-Pigz {
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$LOGGINGAGENT_VERSION = '1.6.0'
+$LOGGINGAGENT_VERSION = '1.7.3'
 $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
 
-$LOGGINGEXPORTER_VERSION = 'v0.10.3'
+$LOGGINGEXPORTER_VERSION = 'v0.16.2'
 $LOGGINGEXPORTER_ROOT = 'C:\flb-exporter'
 $LOGGINGEXPORTER_SERVICE = 'flb-exporter'
 $LOGGINGEXPORTER_CMDLINE = '*flb-exporter.exe*'
@@ -1808,6 +1808,10 @@ function Configure-LoggingAgent {
 
   $fluentbit_parser_file = "$LOGGINGAGENT_ROOT\conf\parsers.conf"
   $PARSERS_CONFIG | Out-File -FilePath $fluentbit_parser_file -Encoding ASCII
+
+  # Create directory for all the log position files.
+  New-Item -Type Directory -Path "/var/run/google-fluentbit/pos-files/"
+
   Log-Output "Wrote logging config to $fluentbit_parser_file"
 }
 
@@ -1816,7 +1820,7 @@ $FLUENTBIT_CONFIG = @'
 [SERVICE]
     Flush         5
     Grace         120
-    Log_Level     debug
+    Log_Level     info
     Log_File      /var/log/fluentbit.log
     Daemon        off
     Parsers_File  parsers.conf
@@ -1867,15 +1871,13 @@ $FLUENTBIT_CONFIG = @'
     #
     # storage.backlog.mem_limit 5M
 
-
 [INPUT]
     Name         winlog
     Interval_Sec 2
     # Channels Setup,Windows PowerShell
     Channels     application,system,security
     Tag          winevent.raw
-    DB           winlog.sqlite   #
-
+    DB           /var/run/google-fluentbit/pos-files/winlog.db
 
 # Json Log Example:
 # {"log":"[info:2016-02-16T16:04:05.930-08:00] Some log text here\n","stream":"stdout","time":"2016-02-17T00:04:05.931087621Z"}
@@ -1884,40 +1886,19 @@ $FLUENTBIT_CONFIG = @'
     Alias            kube_containers
     Tag              kube_<namespace_name>_<pod_name>_<container_name>
     Tag_Regex        (?<pod_name>[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)_(?<namespace_name>[^_]+)_(?<container_name>.+)-
-    Path             /var/log/containers/*.log
     Mem_Buf_Limit    5MB
     Skip_Long_Lines  On
     Refresh_Interval 5
-    DB               flb_kube.db
+    Path             C:\var\log\containers\*.log
+    DB               /var/run/google-fluentbit/pos-files/flb_kube.db
 
-    # Settings from fluentd missing here.
-    # tag reform.*
-    # format json
-    # time_key time
-    # time_format %Y-%m-%dT%H:%M:%S.%NZ
-
-
-# Example:
-# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
-[INPUT]
-    Name             tail
-    Alias            kubelet
-    Tag              kubelet
-    #Multiline        on
-    #Multiline_Flush  5
-    Mem_Buf_Limit    5MB
-    Skip_Long_Lines  On
-    Refresh_Interval 5
-    Path /etc/kubernetes/logs/kubelet.log
-    DB               /etc/kubernetes/logs/gcp-kubelet.db
-
-    # Copied from fluentbit config. How is this used ? In match stages ?
-    Parser_Firstline /^\w\d{4}/
-    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-
-    # missing from fluentbit
-    #   time_format %m%d %H:%M:%S.%N
-
+[FILTER]
+    Name         parser
+    Match        kube_*
+    Key_Name     log
+    Reserve_Data True
+    Parser       docker
+    Parser       containerd
 
 # Example:
 # I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
@@ -1925,86 +1906,80 @@ $FLUENTBIT_CONFIG = @'
     Name             tail
     Alias            csi-proxy
     Tag              csi-proxy
-    #Multiline        on
-    #Multiline_Flush  5
     Mem_Buf_Limit    5MB
     Skip_Long_Lines  On
     Refresh_Interval 5
     Path             /etc/kubernetes/logs/csi-proxy.log
-    DB               /etc/kubernetes/logs/gcp-csi-proxy.db
-
-    # Copied from fluentbit config. How is this used ? In match stages ?
-    Parser_Firstline /^\w\d{4}/
-    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-
-    # missing from fluentbit
-    #   time_format %m%d %H:%M:%S.%N
-
-# Example:
-# time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
-[INPUT]
-    Name             tail
-    Alias            container-runtime
-    Tag container-runtime
-    #Multiline        on
-    #Multiline_Flush  5
-    Mem_Buf_Limit    5MB
-    Skip_Long_Lines  On
-    Refresh_Interval 5
-    Path             /etc/kubernetes/logs/containerd.log
-    DB               /etc/kubernetes/logs/gcp-containerd.log.pos
-
-    # Copied from fluentbit config. How is this used ? In match stages ?
-    Parser_Firstline /^\w\d{4}/
-    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
-
-    # missing from fluentbit
-    #   time_format %m%d %H:%M:%S.%N
-
+    DB               /var/run/google-fluentbit/pos-files/csi-proxy.db
+    Multiline        On
+    Parser_Firstline glog
 
 # I1118 21:26:53.975789       6 proxier.go:1096] Port "nodePort for kube-system/default-http-backend:http" (:31429/tcp) was open before and is still needed
 [INPUT]
     Name             tail
     Alias            kube-proxy
     Tag              kube-proxy
-    #Multiline        on
-    #Multiline_Flush  5
     Mem_Buf_Limit    5MB
     Skip_Long_Lines  On
     Refresh_Interval 5
     Path             /etc/kubernetes/logs/kube-proxy.log
-    DB               /etc/kubernetes/logs/gcp-kubeproxy.db
+    DB               /var/run/google-fluentbit/pos-files/kube-proxy.db
+    Multiline        On
+    Parser_Firstline glog
 
-    # Copied from fluentbit config. How is this used ? In match stages ?
-    Parser_Firstline /^\w\d{4}/
-    Parser_1         ^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+# Example:
+# time="2019-12-10T21:27:59.836946700Z" level=info msg="loading plugin \"io.containerd.grpc.v1.cri\"..." type=io.containerd.grpc.v1
+[INPUT]
+    Name             tail
+    Alias            container-runtime
+    Tag              container-runtime
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/containerd.log
+    DB               /var/run/google-fluentbit/pos-files/container-runtime.db
+    # TODO: Add custom parser for containerd logs once format is settled.
 
-    # missing from fluentbit
-    #   time_format %m%d %H:%M:%S.%N
+# Example:
+# I0204 07:32:30.020537    3368 server.go:1048] POST /stats/container/: (13.972191ms) 200 [[Go-http-client/1.1] 10.244.1.3:40537]
+[INPUT]
+    Name             tail
+    Alias            kubelet
+    Tag              kubelet
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             /etc/kubernetes/logs/kubelet.log
+    DB               /var/run/google-fluentbit/pos-files/kubelet.db
+    Multiline        On
+    Parser_Firstline glog
 
 [FILTER]
     Name        modify
     Match       *
     Hard_rename log message
 
-# [OUTPUT]
-#    Name        http
-#    Match       *
-#    Host        127.0.0.1
-#    Port        2021
-#    URI         /logs
-#    header_tag  FLUENT-TAG
-#    Format      msgpack
-#    Retry_Limit 2
+[FILTER]
+    Name         parser
+    Match        kube_*
+    Key_Name     message
+    Reserve_Data True
+    Parser       glog
+    Parser       json
 
 [OUTPUT]
-    name  stackdriver
-    match *
+    Name        http
+    Match       *
+    Host        127.0.0.1
+    Port        2021
+    URI         /logs
+    header_tag  FLUENT-TAG
+    Format      msgpack
+    Retry_Limit 2
 '@
 
 # Fluentbit parsers config file
 $PARSERS_CONFIG = @'
-
 [PARSER]
     Name        docker
     Format      json
@@ -2041,22 +2016,6 @@ $PARSERS_CONFIG = @'
     Format      json
     Time_Key    timestamp
     Time_Format %Y-%m-%dT%H:%M:%S.%L%z
-
-# ----------
-
-[PARSER]
-    Name   json
-    Format json
-    Time_Key time
-    Time_Format %d/%b/%Y:%H:%M:%S %z
-
-[PARSER]
-    Name         docker
-    Format       json
-    Time_Key     time
-    Time_Format  %Y-%m-%dT%H:%M:%S.%L
-    Time_Keep    On
-
 
 [PARSER]
     Name        syslog-rfc5424
