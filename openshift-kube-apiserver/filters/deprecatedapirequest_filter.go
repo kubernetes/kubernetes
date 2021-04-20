@@ -17,9 +17,6 @@ func WithDeprecatedApiRequestLogging(handler http.Handler, controller deprecated
 		if !ok {
 			return
 		}
-		if !controller.IsDeprecated(info.Resource, info.APIVersion, info.APIGroup) {
-			return
-		}
 		timestamp, ok := request.ReceivedTimestampFrom(req.Context())
 		if !ok {
 			return

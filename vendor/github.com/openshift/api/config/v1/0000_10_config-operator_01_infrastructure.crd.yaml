@@ -248,6 +248,37 @@ spec:
                         description: region holds the default AWS region for new AWS
                           resources created by the cluster.
                         type: string
+                      resourceTags:
+                        description: resourceTags is a list of additional tags to
+                          apply to AWS resources created for the cluster. See https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html
+                          for information on tagging AWS resources. AWS supports a
+                          maximum of 50 tags per resource. OpenShift reserves 25 tags
+                          for its use, leaving 25 tags available for the user.
+                        type: array
+                        maxItems: 25
+                        items:
+                          description: AWSResourceTag is a tag to apply to AWS resources
+                            created for the cluster.
+                          type: object
+                          required:
+                          - key
+                          - value
+                          properties:
+                            key:
+                              description: key is the key of the tag
+                              type: string
+                              maxLength: 128
+                              minLength: 1
+                              pattern: ^[0-9A-Za-z_.:/=+-@]+$
+                            value:
+                              description: value is the value of the tag. Some AWS
+                                service do not support empty values. Since tags are
+                                added to resources in many services, the length of
+                                the tag value must meet the requirements of all services.
+                              type: string
+                              maxLength: 256
+                              minLength: 1
+                              pattern: ^[0-9A-Za-z_.:/=+-@]+$
                       serviceEndpoints:
                         description: ServiceEndpoints list contains custom endpoints
                           which will override default service endpoint of AWS Services.

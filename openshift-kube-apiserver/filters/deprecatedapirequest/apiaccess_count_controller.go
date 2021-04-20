@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	apiv1 "github.com/openshift/api/apiserver/v1"
+
 	apiclientv1 "github.com/openshift/client-go/apiserver/clientset/versioned/typed/apiserver/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -14,7 +16,7 @@ import (
 )
 
 // NewController returns a controller
-func NewController(client apiclientv1.DeprecatedAPIRequestInterface, nodeName string) *controller {
+func NewController(client apiclientv1.APIRequestCountInterface, nodeName string) *controller {
 	ret := &controller{
 		client:       client,
 		nodeName:     nodeName,
@@ -32,7 +34,7 @@ type APIRequestLogger interface {
 }
 
 type controller struct {
-	client       apiclientv1.DeprecatedAPIRequestInterface
+	client       apiclientv1.APIRequestCountInterface
 	nodeName     string
 	updatePeriod time.Duration
 
@@ -79,47 +81,83 @@ func (c *controller) Start(stop <-chan struct{}) {
 	}()
 
 	// write out logs every c.updatePeriod
-	go wait.Until(func() {
-		klog.V(2).Infof("updating top APIRequest counts")
-		defer klog.V(2).Infof("finished updating top APIRequest counts")
+	go wait.UntilWithContext(ctx, c.persistRequestCountForAllResources, c.updatePeriod)
+}
 
-		// get the current count to persist, start a new in-memory count
-		countsToPersist := c.resetRequestCount()
+func (c *controller) persistRequestCountForAllResources(ctx context.Context) {
+	klog.V(2).Infof("updating top APIRequest counts")
+	defer klog.V(2).Infof("finished updating top APIRequest counts")
 
-		// remove stale data
-		expiredHour := (time.Now().Hour() + 1) % 24
-		countsToPersist.ExpireOldestCounts(expiredHour)
+	// get the current count to persist, start a new in-memory count
+	countsToPersist := c.resetRequestCount()
 
-		// when this function returns, add any remaining counts back to the total to be retried for update
-		defer c.requestCounts.Add(countsToPersist)
+	// remove stale data
+	expiredHour := (time.Now().Hour() + 1) % 24
+	currentHour := time.Now().Hour()
+	countsToPersist.ExpireOldestCounts(expiredHour)
 
-		var wg sync.WaitGroup
-		for _, resourceCount := range countsToPersist.resourceToRequestCount {
-			wg.Add(1)
-			go func(localResourceCount *resourceRequestCounts) {
-				defer wg.Done()
+	// when this function returns, add any remaining counts back to the total to be retried for update
+	defer c.requestCounts.Add(countsToPersist)
 
-				klog.V(2).Infof("updating top %v APIRequest counts", localResourceCount.resource)
-				defer klog.V(2).Infof("finished updating top %v APIRequest counts", localResourceCount.resource)
+	var wg sync.WaitGroup
+	for gvr := range countsToPersist.resourceToRequestCount {
+		resourceCount := countsToPersist.Resource(gvr)
+		wg.Add(1)
+		go c.persistRequestCountForResource(ctx, &wg, currentHour, expiredHour, resourceCount)
+	}
+	wg.Wait()
+}
 
-				_, _, err := v1helpers.ApplyStatus(
-					ctx,
-					c.client,
-					resourceToAPIName(localResourceCount.resource),
-					SetRequestCountsForNode(c.nodeName, expiredHour, localResourceCount),
-				)
-				if err != nil {
-					runtime.HandleError(err)
-					return
-				}
+func (c *controller) persistRequestCountForResource(ctx context.Context, wg *sync.WaitGroup, currentHour, expiredHour int, localResourceCount *resourceRequestCounts) {
+	defer wg.Done()
 
-				// on successful update, remove the counts
-				countsToPersist.RemoveResource(localResourceCount.resource)
-			}(resourceCount)
+	klog.V(2).Infof("updating top %v APIRequest counts", localResourceCount.resource)
+	defer klog.V(2).Infof("finished updating top %v APIRequest counts", localResourceCount.resource)
+
+	status, _, err := v1helpers.ApplyStatus(
+		ctx,
+		c.client,
+		resourceToAPIName(localResourceCount.resource),
+		SetRequestCountsForNode(c.nodeName, currentHour, expiredHour, localResourceCount),
+	)
+	if err != nil {
+		runtime.HandleError(err)
+		return
+	}
+
+	// on successful update, remove the counts we don't need.  This is every hour except the current hour
+	// and every user recorded for the current hour on this node
+	removePersistedRequestCounts(c.nodeName, currentHour, status, localResourceCount)
+}
+
+// removePersistedRequestCounts removes the counts we don't need to keep in memory.
+// This is every hour except the current hour (those will no longer change) and every user recorded for the current hour on this node.
+// Then it tracks the amount that needs to be kept out of the sum. This is logically the amount we're adding back in.
+// Because we already counted all the users in the persisted sum, we need to exclude the amount we'll be placing back
+// in memory.
+func removePersistedRequestCounts(nodeName string, currentHour int, persistedStatus *apiv1.APIRequestCountStatus, localResourceCount *resourceRequestCounts) {
+	for hourIndex := range localResourceCount.hourToRequestCount {
+		if currentHour != hourIndex {
+			localResourceCount.RemoveHour(hourIndex)
 		}
-		wg.Wait()
+	}
+	for _, persistedNodeCount := range persistedStatus.CurrentHour.ByNode {
+		if persistedNodeCount.NodeName != nodeName {
+			continue
+		}
+		for _, peristedUserCount := range persistedNodeCount.ByUser {
+			localResourceCount.Hour(currentHour).RemoveUser(peristedUserCount.UserName)
+		}
+	}
 
-	}, c.updatePeriod, stop)
+	countToSuppress := int64(0)
+	for _, userCounts := range localResourceCount.Hour(currentHour).usersToRequestCounts {
+		for _, verbCount := range userCounts.verbsToRequestCounts {
+			countToSuppress += verbCount.count
+		}
+	}
+
+	localResourceCount.Hour(currentHour).countToSuppress = countToSuppress
 }
 
 func resourceToAPIName(resource schema.GroupVersionResource) string {

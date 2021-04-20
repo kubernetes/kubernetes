@@ -37,8 +37,19 @@ func (c *clusterRequestCounts) Node(nodeName string) *apiRequestCounts {
 	return c.nodeToRequestCount[nodeName]
 }
 
-func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user, verb string, count int) {
+func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
 	c.Node(node).IncrementRequestCount(resource, hour, user, verb, count)
+}
+
+func (c *clusterRequestCounts) String() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	mapStrings := []string{}
+	for _, k := range sets.StringKeySet(c.nodeToRequestCount).List() {
+		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.nodeToRequestCount[k]))
+	}
+	return fmt.Sprintf("nodeToRequestCount: {%v}", strings.Join(mapStrings, ", "))
 }
 
 type apiRequestCounts struct {
@@ -76,7 +87,7 @@ func (c *apiRequestCounts) Add(requestCounts *apiRequestCounts) {
 	}
 }
 
-func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user, verb string, count int) {
+func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
 	c.Resource(resource).IncrementRequestCount(hour, user, verb, count)
 }
 
@@ -176,8 +187,14 @@ func (c *resourceRequestCounts) Add(requestCounts *resourceRequestCounts) {
 	}
 }
 
-func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb string, count int) {
+func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb string, count int64) {
 	c.Hour(hour).IncrementRequestCount(user, verb, count)
+}
+
+func (c *resourceRequestCounts) RemoveHour(hour int) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	delete(c.hourToRequestCount, hour)
 }
 
 func (c *resourceRequestCounts) Equals(rhs *resourceRequestCounts) bool {
@@ -218,7 +235,10 @@ func (c *resourceRequestCounts) String() string {
 }
 
 type hourlyRequestCounts struct {
-	lock                 sync.RWMutex
+	lock sync.RWMutex
+	// countToSupress is the number of requests to remove from the count to avoid double counting in persistence
+	// TODO I think I'd like this in look-aside data, but I don't see an easy way to plumb it.
+	countToSuppress      int64
 	usersToRequestCounts map[string]*userRequestCounts
 }
 
@@ -248,10 +268,17 @@ func (c *hourlyRequestCounts) Add(requestCounts *hourlyRequestCounts) {
 	for user, userCount := range requestCounts.usersToRequestCounts {
 		c.User(user).Add(userCount)
 	}
+	c.countToSuppress += requestCounts.countToSuppress
 }
 
-func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int) {
+func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int64) {
 	c.User(user).IncrementRequestCount(verb, count)
+}
+
+func (c *hourlyRequestCounts) RemoveUser(user string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	delete(c.usersToRequestCounts, user)
 }
 
 func (c *hourlyRequestCounts) Equals(rhs *hourlyRequestCounts) bool {
@@ -259,6 +286,10 @@ func (c *hourlyRequestCounts) Equals(rhs *hourlyRequestCounts) bool {
 	defer c.lock.RUnlock()
 	rhs.lock.RLock()
 	defer rhs.lock.RUnlock()
+
+	if c.countToSuppress != rhs.countToSuppress {
+		return false
+	}
 
 	if len(c.usersToRequestCounts) != len(rhs.usersToRequestCounts) {
 		return false
@@ -284,7 +315,7 @@ func (c *hourlyRequestCounts) String() string {
 	for _, k := range sets.StringKeySet(c.usersToRequestCounts).List() {
 		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.usersToRequestCounts[k].String()))
 	}
-	return fmt.Sprintf("usersToRequestCounts: {%v}", strings.Join(mapStrings, ", "))
+	return fmt.Sprintf("countToSuppress=%d usersToRequestCounts: {%v}", c.countToSuppress, strings.Join(mapStrings, ", "))
 }
 
 type userRequestCounts struct {
@@ -322,7 +353,7 @@ func (c *userRequestCounts) Add(requestCounts *userRequestCounts) {
 	}
 }
 
-func (c *userRequestCounts) IncrementRequestCount(verb string, count int) {
+func (c *userRequestCounts) IncrementRequestCount(verb string, count int64) {
 	c.Verb(verb).IncrementRequestCount(count)
 }
 
@@ -364,19 +395,19 @@ func (c *userRequestCounts) String() string {
 }
 
 type verbRequestCount struct {
-	count uint32
+	count int64
 }
 
-func (c *verbRequestCount) Add(count uint32) {
-	atomic.AddUint32(&c.count, count)
+func (c *verbRequestCount) Add(count int64) {
+	atomic.AddInt64(&c.count, count)
 }
 
-func (c *verbRequestCount) IncrementRequestCount(count int) {
-	c.Add(uint32(count))
+func (c *verbRequestCount) IncrementRequestCount(count int64) {
+	c.Add(count)
 }
 
 func (c *verbRequestCount) Equals(rhs *verbRequestCount) bool {
-	lhsV := atomic.LoadUint32(&c.count)
-	rhsV := atomic.LoadUint32(&rhs.count)
+	lhsV := atomic.LoadInt64(&c.count)
+	rhsV := atomic.LoadInt64(&rhs.count)
 	return lhsV == rhsV
 }

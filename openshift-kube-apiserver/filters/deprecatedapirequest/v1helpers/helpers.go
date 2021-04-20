@@ -12,19 +12,20 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-type UpdateStatusFunc func(status *apiv1.DeprecatedAPIRequestStatus)
+type UpdateStatusFunc func(status *apiv1.APIRequestCountStatus)
 
-func ApplyStatus(ctx context.Context, client apiclientv1.DeprecatedAPIRequestInterface, name string, updateFuncs ...UpdateStatusFunc) (*apiv1.DeprecatedAPIRequestStatus, bool, error) {
+func ApplyStatus(ctx context.Context, client apiclientv1.APIRequestCountInterface, name string, updateFuncs ...UpdateStatusFunc) (*apiv1.APIRequestCountStatus, bool, error) {
 	updated := false
-	var updatedStatus *apiv1.DeprecatedAPIRequestStatus
+	var updatedStatus *apiv1.APIRequestCountStatus
 	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		check, err := client.Get(ctx, name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
 			// on a not found, let's create this thing.
-			requestCount := &apiv1.DeprecatedAPIRequest{
+			requestCount := &apiv1.APIRequestCount{
 				ObjectMeta: metav1.ObjectMeta{Name: name},
-				// TODO fix spec here
-				Spec: apiv1.DeprecatedAPIRequestSpec{RemovedRelease: "1.1"},
+				Spec: apiv1.APIRequestCountSpec{
+					NumberOfUsersToReport: 10,
+				},
 			}
 			check, err = client.Create(ctx, requestCount, metav1.CreateOptions{})
 		}

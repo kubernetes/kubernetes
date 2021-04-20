@@ -28,7 +28,7 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 		ts       time.Time
 		user     string
 		verb     string
-		count    int
+		count    int64
 	}{
 		{gvr("test.v1.group"), testTime(0, 0), "bob", "get", 1},
 		{gvr("test.v1.group"), testTime(0, 1), "bob", "list", 2},
