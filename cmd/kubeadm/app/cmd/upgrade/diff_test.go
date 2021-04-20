@@ -43,7 +43,7 @@ func TestRunDiff(t *testing.T) {
 	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
 
 	// create a temporary file with valid ClusterConfiguration
-	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta2\n" +
+	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta3\n" +
 		"kind: ClusterConfiguration\n" +
 		"kubernetesVersion: " + currentVersion)
 	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)

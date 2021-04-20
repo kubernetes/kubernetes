@@ -44,17 +44,17 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "Invalid v1beta1 causes error",
+			name: "Invalid v1beta2 causes error",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: JoinConfiguration
 			`),
 			expectErr: true,
 		},
 		{
-			name: "valid v1beta1 is loaded",
+			name: "valid v1beta2 is loaded",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: kubeadm.k8s.io/v1beta2
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
 				discovery:
@@ -67,17 +67,17 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			`),
 		},
 		{
-			name: "Invalid v1beta2 causes error",
+			name: "Invalid v1beta3 causes error",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 			`),
 			expectErr: true,
 		},
 		{
-			name: "valid v1beta2 is loaded",
+			name: "valid v1beta3 is loaded",
 			fileContents: dedent.Dedent(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: JoinConfiguration
 				caCertPath: /etc/kubernetes/pki/ca.crt
 				discovery:

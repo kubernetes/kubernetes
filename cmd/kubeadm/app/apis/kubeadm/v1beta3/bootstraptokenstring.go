@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta3
 
 import (
 	"fmt"
@@ -26,7 +26,6 @@ import (
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 )
 
-// DEPRECATED - This group version of BootstrapTokenString is deprecated by apis/kubeadm/v1beta2/BootstrapTokenString.
 // BootstrapTokenString is a token of the format abcdef.abcdef0123456789 that is used
 // for both validation of the practically of the API server from a joining node's point
 // of view and as an authentication method for the node in the bootstrap phase of

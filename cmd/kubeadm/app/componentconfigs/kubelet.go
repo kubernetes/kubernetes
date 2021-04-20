@@ -30,7 +30,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -128,15 +128,15 @@ func (kc *kubeletConfig) Default(cfg *kubeadmapi.ClusterConfiguration, _ *kubead
 	}
 
 	if kc.config.StaticPodPath == "" {
-		kc.config.StaticPodPath = kubeadmapiv1beta2.DefaultManifestsDir
-	} else if kc.config.StaticPodPath != kubeadmapiv1beta2.DefaultManifestsDir {
-		warnDefaultComponentConfigValue(kind, "staticPodPath", kubeadmapiv1beta2.DefaultManifestsDir, kc.config.StaticPodPath)
+		kc.config.StaticPodPath = kubeadmapiv1.DefaultManifestsDir
+	} else if kc.config.StaticPodPath != kubeadmapiv1.DefaultManifestsDir {
+		warnDefaultComponentConfigValue(kind, "staticPodPath", kubeadmapiv1.DefaultManifestsDir, kc.config.StaticPodPath)
 	}
 
 	clusterDNS := ""
 	dnsIP, err := constants.GetDNSIP(cfg.Networking.ServiceSubnet, features.Enabled(cfg.FeatureGates, features.IPv6DualStack))
 	if err != nil {
-		clusterDNS = kubeadmapiv1beta2.DefaultClusterDNSIP
+		clusterDNS = kubeadmapiv1.DefaultClusterDNSIP
 	} else {
 		clusterDNS = dnsIP.String()
 	}

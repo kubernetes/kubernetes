@@ -25,7 +25,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -156,7 +156,7 @@ func getSANDescription(certSpec *certsphase.KubeadmCert) string {
 	//Defaulted config we will use to get SAN certs
 	defaultConfig := cmdutil.DefaultInitConfiguration()
 	// GetAPIServerAltNames errors without an AdvertiseAddress; this is as good as any.
-	defaultConfig.LocalAPIEndpoint = kubeadmapiv1beta2.APIEndpoint{
+	defaultConfig.LocalAPIEndpoint = kubeadmapiv1.APIEndpoint{
 		AdvertiseAddress: "127.0.0.1",
 	}
 

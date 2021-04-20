@@ -1,7 +1,7 @@
-// +build !windows
+// +build windows
 
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta3
 
 const (
-	// DefaultCACertPath defines default location of CA certificate on Linux
-	DefaultCACertPath = "/etc/kubernetes/pki/ca.crt"
+	// DefaultCACertPath defines default location of CA certificate on Windows
+	DefaultCACertPath = "C:/etc/kubernetes/pki/ca.crt"
 	// DefaultUrlScheme defines default socket url prefix
-	DefaultUrlScheme = "unix"
+	DefaultUrlScheme = "npipe"
 )

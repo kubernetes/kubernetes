@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta3
 
 import (
 	"net/url"
@@ -67,7 +67,6 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 
 // SetDefaults_InitConfiguration assigns default values for the InitConfiguration
 func SetDefaults_InitConfiguration(obj *InitConfiguration) {
-	SetDefaults_ClusterConfiguration(&obj.ClusterConfiguration)
 	SetDefaults_BootstrapTokens(obj)
 	SetDefaults_APIEndpoint(&obj.LocalAPIEndpoint)
 }

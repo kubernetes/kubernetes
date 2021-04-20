@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,32 +19,16 @@ limitations under the License.
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm
 
-// Package v1beta1 has been deprecated by v1beta2
-// Package v1beta1 defines the v1beta1 version of the kubeadm configuration file format.
-// This version graduates the configuration format to BETA and is a big step towards GA.
+// Package v1beta3 defines the v1beta3 version of the kubeadm configuration file format.
+// This version improves on the v1beta2 format by fixing some minor issues and adding a few new fields.
 //
-//A list of changes since v1alpha3:
-//	- "apiServerEndpoint" in InitConfiguration was renamed to "localAPIEndpoint" for better clarity of what the field
-//	represents.
-//	- Common fields in ClusterConfiguration such as "*extraArgs" and "*extraVolumes" for control plane components are now moved
-//	under component structs - i.e. "apiServer", "controllerManager", "scheduler".
-//	- "auditPolicy" was removed from ClusterConfiguration. Please use "extraArgs" in "apiServer" to configure this feature instead.
-//	- "unifiedControlPlaneImage" in ClusterConfiguration was changed to a boolean field called "useHyperKubeImage".
-//	- ClusterConfiguration now has a "dns" field which can be used to select and configure the cluster DNS addon.
-//	- "featureGates" still exists under ClusterConfiguration, but there are no supported feature gates in 1.13.
-//	See the Kubernetes 1.13 changelog for further details.
-//	- Both "localEtcd" and "dns" configurations now support custom image repositories.
-//	- The "controlPlane*"-related fields in JoinConfiguration were refactored into a sub-structure.
-//	- "clusterName" was removed from JoinConfiguration and the name is now fetched from the existing cluster.
+// A list of changes since v1beta2:
+//	- TODO
 //
 // Migration from old kubeadm config versions
 //
-// Please convert your v1alpha3 configuration files to v1beta1 using the "kubeadm config migrate" command of kubeadm v1.13.x
-// (conversion from older releases of kubeadm config files requires older release of kubeadm as well e.g.
-//	kubeadm v1.11 should be used to migrate v1alpha1 to v1alpha2; kubeadm v1.12 should be used to translate v1alpha2 to v1alpha3)
-//
-// Nevertheless, kubeadm v1.13.x will support reading from v1alpha3 version of the kubeadm config file format, but this support
-// will be dropped in the v1.14 release.
+// - kubeadm v1.15.x and newer can be used to migrate from the v1beta1 to v1beta2.
+// - kubeadm v1.22.x no longer supports v1beta1 and older APIs, but can be used to migrate v1beta2 to v1beta3.
 //
 // Basics
 //
@@ -56,10 +40,10 @@ limitations under the License.
 //
 // kubeadm supports the following configuration types:
 //
-//     apiVersion: kubeadm.k8s.io/v1beta1
+//     apiVersion: kubeadm.k8s.io/v1beta3
 //     kind: InitConfiguration
 //
-//     apiVersion: kubeadm.k8s.io/v1beta1
+//     apiVersion: kubeadm.k8s.io/v1beta3
 //     kind: ClusterConfiguration
 //
 //     apiVersion: kubelet.config.k8s.io/v1beta1
@@ -68,7 +52,7 @@ limitations under the License.
 //     apiVersion: kubeproxy.config.k8s.io/v1alpha1
 //     kind: KubeProxyConfiguration
 //
-//     apiVersion: kubeadm.k8s.io/v1beta1
+//     apiVersion: kubeadm.k8s.io/v1beta3
 //     kind: JoinConfiguration
 //
 // To print the defaults for "init" and "join" actions use the following commands:
@@ -94,7 +78,7 @@ limitations under the License.
 // InitConfiguration, ClusterConfiguration, KubeProxyConfiguration, KubeletConfiguration, but only one
 // between InitConfiguration and ClusterConfiguration is mandatory.
 //
-//     apiVersion: kubeadm.k8s.io/v1beta1
+//     apiVersion: kubeadm.k8s.io/v1beta3
 //     kind: InitConfiguration
 //     bootstrapTokens:
 //         ...
@@ -112,7 +96,7 @@ limitations under the License.
 // - LocalAPIEndpoint, that represents the endpoint of the instance of the API server to be deployed on this node;
 // use it e.g. to customize the API server advertise address.
 //
-//     apiVersion: kubeadm.k8s.io/v1beta1
+//     apiVersion: kubeadm.k8s.io/v1beta3
 //     kind: ClusterConfiguration
 //     networking:
 //         ...
@@ -160,7 +144,7 @@ limitations under the License.
 // Here is a fully populated example of a single YAML file containing multiple
 // configuration types to be used during a `kubeadm init` run.
 //
-// 	apiVersion: kubeadm.k8s.io/v1beta1
+// 	apiVersion: kubeadm.k8s.io/v1beta3
 // 	kind: InitConfiguration
 // 	bootstrapTokens:
 // 	- token: "9a08jv.c0izixklcxtmnze7"
@@ -182,11 +166,14 @@ limitations under the License.
 // 	    effect: "NoSchedule"
 // 	  kubeletExtraArgs:
 // 	    v: 4
+//	  ignorePreflightErrors:
+//	  - IsPrivilegedUser
 // 	localAPIEndpoint:
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
+//	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
 // 	---
-// 	apiVersion: kubeadm.k8s.io/v1beta1
+// 	apiVersion: kubeadm.k8s.io/v1beta3
 // 	kind: ClusterConfiguration
 // 	etcd:
 // 	  # one of local or external
@@ -261,7 +248,7 @@ limitations under the License.
 //
 // When executing kubeadm join with the --config option, the JoinConfiguration type should be provided.
 //
-//    apiVersion: kubeadm.k8s.io/v1beta1
+//    apiVersion: kubeadm.k8s.io/v1beta3
 //    kind: JoinConfiguration
 //       ...
 //
@@ -275,7 +262,7 @@ limitations under the License.
 //
 // - APIEndpoint, that represents the endpoint of the instance of the API server to be eventually deployed on this node.
 //
-package v1beta1 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+package v1beta3 // import "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 
 //TODO: The BootstrapTokenString object should move out to either k8s.io/client-go or k8s.io/api in the future
 //(probably as part of Bootstrap Tokens going GA). It should not be staged under the kubeadm API as it is now.

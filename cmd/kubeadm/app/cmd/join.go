@@ -34,7 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/join"
@@ -127,8 +127,8 @@ type joinOptions struct {
 	token                 string `datapolicy:"token"`
 	controlPlane          bool
 	ignorePreflightErrors []string
-	externalcfg           *kubeadmapiv1beta2.JoinConfiguration
-	joinControlPlane      *kubeadmapiv1beta2.JoinControlPlane
+	externalcfg           *kubeadmapiv1.JoinConfiguration
+	joinControlPlane      *kubeadmapiv1.JoinControlPlane
 	patchesDir            string
 }
 
@@ -224,7 +224,7 @@ func newCmdJoin(out io.Writer, joinOptions *joinOptions) *cobra.Command {
 }
 
 // addJoinConfigFlags adds join flags bound to the config to the specified flagset
-func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.JoinConfiguration, jcp *kubeadmapiv1beta2.JoinControlPlane) {
+func addJoinConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.JoinConfiguration, jcp *kubeadmapiv1.JoinControlPlane) {
 	flagSet.StringVar(
 		&cfg.NodeRegistration.Name, options.NodeName, cfg.NodeRegistration.Name,
 		`Specify the node name.`,
@@ -291,20 +291,20 @@ func addJoinOtherFlags(flagSet *flag.FlagSet, joinOptions *joinOptions) {
 // newJoinOptions returns a struct ready for being used for creating cmd join flags.
 func newJoinOptions() *joinOptions {
 	// initialize the public kubeadm config API by applying defaults
-	externalcfg := &kubeadmapiv1beta2.JoinConfiguration{}
+	externalcfg := &kubeadmapiv1.JoinConfiguration{}
 
 	// Add optional config objects to host flags.
 	// un-set objects will be cleaned up afterwards (into newJoinData func)
-	externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{}
-	externalcfg.Discovery.BootstrapToken = &kubeadmapiv1beta2.BootstrapTokenDiscovery{}
-	externalcfg.ControlPlane = &kubeadmapiv1beta2.JoinControlPlane{}
+	externalcfg.Discovery.File = &kubeadmapiv1.FileDiscovery{}
+	externalcfg.Discovery.BootstrapToken = &kubeadmapiv1.BootstrapTokenDiscovery{}
+	externalcfg.ControlPlane = &kubeadmapiv1.JoinControlPlane{}
 
 	// This object is used for storage of control-plane flags.
-	joinControlPlane := &kubeadmapiv1beta2.JoinControlPlane{}
+	joinControlPlane := &kubeadmapiv1.JoinControlPlane{}
 
 	// Apply defaults
 	kubeadmscheme.Scheme.Default(externalcfg)
-	kubeadmapiv1beta2.SetDefaults_JoinControlPlane(joinControlPlane)
+	kubeadmapiv1.SetDefaults_JoinControlPlane(joinControlPlane)
 
 	return &joinOptions{
 		externalcfg:      externalcfg,
@@ -360,8 +360,8 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 	if !opt.controlPlane {
 		// Use a defaulted JoinControlPlane object to detect if the user has passed
 		// other control-plane related flags.
-		defaultJCP := &kubeadmapiv1beta2.JoinControlPlane{}
-		kubeadmapiv1beta2.SetDefaults_JoinControlPlane(defaultJCP)
+		defaultJCP := &kubeadmapiv1.JoinControlPlane{}
+		kubeadmapiv1.SetDefaults_JoinControlPlane(defaultJCP)
 
 		// This list must match the JCP flags in addJoinConfigFlags()
 		joinControlPlaneFlags := []string{
@@ -405,7 +405,7 @@ func newJoinData(cmd *cobra.Command, args []string, opt *joinOptions, out io.Wri
 			return nil, errors.Errorf("File %s does not exists. Please use 'kubeadm join phase control-plane-prepare' subcommands to generate it.", adminKubeConfigPath)
 		}
 		klog.V(1).Infof("[preflight] found discovery flags missing for this command. using FileDiscovery: %s", adminKubeConfigPath)
-		opt.externalcfg.Discovery.File = &kubeadmapiv1beta2.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
+		opt.externalcfg.Discovery.File = &kubeadmapiv1.FileDiscovery{KubeConfigPath: adminKubeConfigPath}
 		opt.externalcfg.Discovery.BootstrapToken = nil //NB. this could be removed when we get better control on args (e.g. phases without discovery should have NoArgs )
 	}
 

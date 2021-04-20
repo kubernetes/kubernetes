@@ -31,7 +31,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
@@ -62,7 +62,7 @@ func TestKubeProxyDefault(t *testing.T) {
 			expected: kubeProxyConfig{
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
-					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv6,
+					BindAddress:  kubeadmapiv1.DefaultProxyBindAddressv6,
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
@@ -78,7 +78,7 @@ func TestKubeProxyDefault(t *testing.T) {
 			expected: kubeProxyConfig{
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
-					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv4,
+					BindAddress:  kubeadmapiv1.DefaultProxyBindAddressv4,
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
@@ -96,7 +96,7 @@ func TestKubeProxyDefault(t *testing.T) {
 			expected: kubeProxyConfig{
 				config: kubeproxyconfig.KubeProxyConfiguration{
 					FeatureGates: map[string]bool{},
-					BindAddress:  kubeadmapiv1beta2.DefaultProxyBindAddressv6,
+					BindAddress:  kubeadmapiv1.DefaultProxyBindAddressv6,
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
@@ -117,7 +117,7 @@ func TestKubeProxyDefault(t *testing.T) {
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: true,
 					},
-					BindAddress: kubeadmapiv1beta2.DefaultProxyBindAddressv6,
+					BindAddress: kubeadmapiv1.DefaultProxyBindAddressv6,
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},
@@ -137,7 +137,7 @@ func TestKubeProxyDefault(t *testing.T) {
 					FeatureGates: map[string]bool{
 						features.IPv6DualStack: false,
 					},
-					BindAddress: kubeadmapiv1beta2.DefaultProxyBindAddressv6,
+					BindAddress: kubeadmapiv1.DefaultProxyBindAddressv6,
 					ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 						Kubeconfig: kubeproxyKubeConfigFileName,
 					},

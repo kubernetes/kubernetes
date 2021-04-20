@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
@@ -986,7 +986,7 @@ func TestValidateSocketPath(t *testing.T) {
 		expectedErrors bool
 	}{
 		{name: "valid path", criSocket: "/some/path", expectedErrors: false},
-		{name: "valid socket url", criSocket: kubeadmapiv1beta2.DefaultUrlScheme + "://" + "/some/path", expectedErrors: false},
+		{name: "valid socket url", criSocket: kubeadmapiv1.DefaultUrlScheme + "://" + "/some/path", expectedErrors: false},
 		{name: "unsupported url scheme", criSocket: "bla:///some/path", expectedErrors: true},
 		{name: "unparseable url", criSocket: ":::", expectedErrors: true},
 		{name: "invalid CRISocket (path is not absolute)", criSocket: "some/path", expectedErrors: true},

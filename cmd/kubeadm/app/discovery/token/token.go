@@ -35,7 +35,7 @@ import (
 	bootstrap "k8s.io/cluster-bootstrap/token/jws"
 	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin"
@@ -72,7 +72,7 @@ func retrieveValidatedConfigInfo(client clientset.Interface, cfg *kubeadmapi.Dis
 	}
 
 	endpoint := cfg.BootstrapToken.APIServerEndpoint
-	insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1beta2.DefaultClusterName)
+	insecureBootstrapConfig := buildInsecureBootstrapKubeConfig(endpoint, kubeadmapiv1.DefaultClusterName)
 	clusterName := insecureBootstrapConfig.Contexts[insecureBootstrapConfig.CurrentContext].Cluster
 
 	klog.V(1).Infof("[discovery] Created cluster-info discovery client, requesting info from %q", endpoint)
