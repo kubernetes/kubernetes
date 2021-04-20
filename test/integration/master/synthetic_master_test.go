@@ -93,10 +93,6 @@ func TestAppsPrefix(t *testing.T) {
 	testPrefix(t, "/apis/apps/")
 }
 
-func TestExtensionsPrefix(t *testing.T) {
-	testPrefix(t, "/apis/extensions/")
-}
-
 func TestKubernetesService(t *testing.T) {
 	config := framework.NewMasterConfig()
 	_, _, closeFn := framework.RunAMaster(config)

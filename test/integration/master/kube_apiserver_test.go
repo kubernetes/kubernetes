@@ -199,7 +199,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{name}`)
 	if err != nil {
 		t.Fatalf("unexpected error getting CRD OpenAPI path: %v", err)
 	}
@@ -224,7 +224,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 			},
 			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
+					Name:    "v1",
 					Served:  true,
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
@@ -247,7 +247,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Expect the CRD path to not change
-	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1/customresourcedefinitions/{name}`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -289,7 +289,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 			},
 			Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 				{
-					Name:    "v1beta1",
+					Name:    "v1",
 					Served:  true,
 					Storage: true,
 					Schema: &apiextensionsv1.CustomResourceValidation{
@@ -312,7 +312,7 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	}
 
 	// Expect the apiextensions definition to not change, since the overlapping definition will get renamed.
-	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition`)
+	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1.CustomResourceDefinition`)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
