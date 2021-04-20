@@ -57,10 +57,11 @@ type CreateJobOptions struct {
 
 	PrintObj func(obj runtime.Object) error
 
-	Name    string
-	Image   string
-	From    string
-	Command []string
+	Name       string
+	Image      string
+	From       string
+	Controller bool
+	Command    []string
 
 	Namespace        string
 	EnforceNamespace bool
@@ -105,6 +106,7 @@ func NewCmdCreateJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *
 	cmdutil.AddDryRunFlag(cmd)
 	cmd.Flags().StringVar(&o.Image, "image", o.Image, "Image name to run.")
 	cmd.Flags().StringVar(&o.From, "from", o.From, "The name of the resource to create a Job from (only cronjob is supported).")
+	cmd.Flags().BoolVar(&o.Controller, "controller", o.Controller, "Mark the created job to be managed by the controller (Must with --from)")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 	return cmd
 }
@@ -258,21 +260,25 @@ func (o *CreateJobOptions) createJobFromCronJob(cronJob *batchv1.CronJob) *batch
 		annotations[k] = v
 	}
 
+	ownerReference := metav1.OwnerReference{
+		APIVersion: batchv1.SchemeGroupVersion.String(),
+		Kind:       "CronJob",
+		Name:       cronJob.GetName(),
+		UID:        cronJob.GetUID(),
+	}
+	if o.Controller {
+		ownerReference.Controller = &o.Controller
+		ownerReference.BlockOwnerDeletion = &o.Controller
+	}
+
 	job := &batchv1.Job{
 		// this is ok because we know exactly how we want to be serialized
 		TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        o.Name,
-			Annotations: annotations,
-			Labels:      cronJob.Spec.JobTemplate.Labels,
-			OwnerReferences: []metav1.OwnerReference{
-				{
-					APIVersion: batchv1.SchemeGroupVersion.String(),
-					Kind:       "CronJob",
-					Name:       cronJob.GetName(),
-					UID:        cronJob.GetUID(),
-				},
-			},
+			Name:            o.Name,
+			Annotations:     annotations,
+			Labels:          cronJob.Spec.JobTemplate.Labels,
+			OwnerReferences: []metav1.OwnerReference{ownerReference},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}
