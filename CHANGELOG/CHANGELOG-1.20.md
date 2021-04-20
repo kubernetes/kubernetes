@@ -1081,7 +1081,7 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
 - Kubelet's deprecated endpoint `metrics/resource/v1alpha1` has been removed, please adopt `metrics/resource`. ([#94272](https://github.com/kubernetes/kubernetes/pull/94272), [@RainbowMango](https://github.com/RainbowMango)) [SIG Instrumentation and Node]
 - Removes deprecated scheduler metrics DeprecatedSchedulingDuration, DeprecatedSchedulingAlgorithmPredicateEvaluationSecondsDuration, DeprecatedSchedulingAlgorithmPriorityEvaluationSecondsDuration ([#94884](https://github.com/kubernetes/kubernetes/pull/94884), [@arghya88](https://github.com/arghya88)) [SIG Instrumentation and Scheduling]
 - Scheduler alpha metrics binding_duration_seconds and scheduling_algorithm_preemption_evaluation_seconds are deprecated, Both of those metrics are now covered as part of framework_extension_point_duration_seconds, the former as a PostFilter the latter and a Bind plugin. The plan is to remove both in 1.21 ([#95001](https://github.com/kubernetes/kubernetes/pull/95001), [@arghya88](https://github.com/arghya88)) [SIG Instrumentation and Scheduling]
-- Support 'controlplane' as a valid EgressSelection type in the EgressSelectorConfiguration API. 'Master' is deprecated and will be removed in v1.22. ([#95235](https://github.com/kubernetes/kubernetes/pull/95235), [@andrewsykim](https://github.com/andrewsykim)) [SIG API Machinery]
+- Support `controlplane` as a valid EgressSelection type in the EgressSelectorConfiguration API. `Master` is deprecated and will be removed in v1.22. ([#95235](https://github.com/kubernetes/kubernetes/pull/95235), [@andrewsykim](https://github.com/andrewsykim)) [SIG API Machinery]
 - The v1alpha1 PodPreset API and admission plugin has been removed with no built-in replacement. Admission webhooks can be used to modify pods on creation. ([#94090](https://github.com/kubernetes/kubernetes/pull/94090), [@deads2k](https://github.com/deads2k)) [SIG API Machinery, Apps, CLI, Cloud Provider, Scalability and Testing]
 
 
@@ -1213,8 +1213,8 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
     
     - switched one spot to use kube::logging
     - make kube::util::find-binary return an error when it doesn't find
-      anything so that hack scripts fail fast instead of with '' binary not
-      found errors.
+      anything so that hack scripts fail fast instead of with "binary not
+      found errors".
     - this required deleting some genfeddoc stuff. the binary no longer
       exists in k/k repo since we removed federation/, and I don't see it
       in https://github.com/kubernetes-sigs/kubefed/ either. I'm assuming
