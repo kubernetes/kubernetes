@@ -35,9 +35,7 @@ import (
 	authenticationv1 "k8s.io/api/authentication/v1"
 	api "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	storagev1 "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -225,7 +223,7 @@ func TestMounterSetUp(t *testing.T) {
 					DetachError: nil,
 				},
 			}
-			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
@@ -352,7 +350,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 			attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+			_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 			if err != nil {
 				t.Fatalf("failed to setup VolumeAttachment: %v", err)
 			}
@@ -480,7 +478,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			if tc.createAttachment {
 				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 				if err != nil {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
@@ -594,7 +592,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			if csiMounter.volumeLifecycleMode == storage.VolumeLifecyclePersistent {
 				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
-				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 				if err != nil {
 					t.Fatalf("failed to setup VolumeAttachment: %v", err)
 				}
@@ -827,7 +825,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 		attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
 		attachment := makeTestAttachment(attachID, "test-node", pvName)
 
-		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, metav1.CreateOptions{})
+		_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(context.TODO(), attachment, meta.CreateOptions{})
 		if err != nil {
 			t.Errorf("failed to setup VolumeAttachment: %v", err)
 			continue
@@ -950,28 +948,28 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 
 	tests := []struct {
 		desc              string
-		driver            *storagev1.CSIDriver
+		driver            *storage.CSIDriver
 		volumeContext     map[string]string
 		wantVolumeContext map[string]string
 	}{
 		{
 			desc: "csi driver has no ServiceAccountToken",
-			driver: &storagev1.CSIDriver{
+			driver: &storage.CSIDriver{
 				ObjectMeta: meta.ObjectMeta{
 					Name: testDriver,
 				},
-				Spec: storagev1.CSIDriverSpec{},
+				Spec: storage.CSIDriverSpec{},
 			},
 			wantVolumeContext: nil,
 		},
 		{
 			desc: "one token with empty string as audience",
-			driver: &storagev1.CSIDriver{
+			driver: &storage.CSIDriver{
 				ObjectMeta: meta.ObjectMeta{
 					Name: testDriver,
 				},
-				Spec: storagev1.CSIDriverSpec{
-					TokenRequests: []storagev1.TokenRequest{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{
 						{
 							Audience: "",
 						},
@@ -982,12 +980,12 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 		},
 		{
 			desc: "one token with non-empty string as audience",
-			driver: &storagev1.CSIDriver{
+			driver: &storage.CSIDriver{
 				ObjectMeta: meta.ObjectMeta{
 					Name: testDriver,
 				},
-				Spec: storagev1.CSIDriverSpec{
-					TokenRequests: []storagev1.TokenRequest{
+				Spec: storage.CSIDriverSpec{
+					TokenRequests: []storage.TokenRequest{
 						{
 							Audience: gcp,
 						},
@@ -1017,7 +1015,7 @@ func TestPodServiceAccountTokenAttrs(t *testing.T) {
 					tr.Spec.Audiences = []string{"api"}
 				}
 				tr.Status.Token = fmt.Sprintf("%v:%v:%d:%v", action.GetNamespace(), testAccount, *tr.Spec.ExpirationSeconds, tr.Spec.Audiences)
-				tr.Status.ExpirationTimestamp = metav1.NewTime(time.Unix(1, 1))
+				tr.Status.ExpirationTimestamp = meta.NewTime(time.Unix(1, 1))
 				return true, tr, nil
 			}))
 			plug, tmpDir := newTestPlugin(t, client)
