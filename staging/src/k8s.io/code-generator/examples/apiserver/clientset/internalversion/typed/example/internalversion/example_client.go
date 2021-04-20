@@ -74,8 +74,9 @@ func setConfigDefaults(config *rest.Config) error {
 		gv := scheme.Scheme.PrioritizedVersionsForGroup("example.apiserver.code-generator.k8s.io")[0]
 		config.GroupVersion = &gv
 	}
-	config.NegotiatedSerializer = scheme.Codecs
-
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = scheme.Codecs
+	}
 	if config.QPS == 0 {
 		config.QPS = 5
 	}
