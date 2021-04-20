@@ -28,15 +28,14 @@ import (
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 	"github.com/golang/protobuf/proto"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 	jsoniter "github.com/json-iterator/go"
 	"github.com/munnerz/goautoneg"
 	"gopkg.in/yaml.v2"
-
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
