@@ -1560,7 +1560,7 @@ The new storage capacity tracking alpha feature is known to be affected by a lim
   qualified domain name (FQDN) of a Pod is set as hostname of its containers. 
   In Linux containers, this means setting the FQDN in the hostname field of the 
   kernel (the nodename field of struct utsname).  In Windows containers, this
-  means setting the this means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. 
+  means setting the registry value of hostname for the registry key HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters to FQDN. 
   If a pod does not have FQDN, this has no effect. ([#91699](https://github.com/kubernetes/kubernetes/pull/91699), [@javidiaz](https://github.com/javidiaz)) [SIG Apps, Network, Node and Testing]
 - The CertificateSigningRequest API is promoted to certificates.k8s.io/v1 with the following changes:
   - `spec.signerName` is now required, and requests for `kubernetes.io/legacy-unknown` are not allowed to be created via the `certificates.k8s.io/v1` API
