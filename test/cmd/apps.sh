@@ -45,6 +45,8 @@ run_daemonset_tests() {
   # pod has field for kubectl set field manager
   output_message=$(kubectl get daemonsets bind --show-managed-fields -o=jsonpath='{.metadata.managedFields[*].manager}' "${kube_flags[@]:?}" 2>&1)
   kube::test::if_has_string "${output_message}" 'kubectl-set'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert daemonsets pods,events
 
   # Rollout restart should change generation
   kubectl rollout restart daemonset/bind "${kube_flags[@]:?}"
@@ -210,6 +212,8 @@ run_deployment_tests() {
   kube::test::describe_resource_assert rs "Name:" "Pod Template:" "Labels:" "Selector:" "Controlled By" "Replicas:" "Pods Status:" "Volumes:"
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert deployments replicasets,events
   # Clean up
   kubectl delete deployment test-nginx-apps "${kube_flags[@]:?}"
 
@@ -284,6 +288,8 @@ run_deployment_tests() {
   # autoscale 2~3 pods, no CPU utilization specified
   kubectl-with-retry autoscale deployment nginx-deployment "${kube_flags[@]:?}" --min=2 --max=3
   kube::test::get_object_assert 'hpa nginx-deployment' "{{${hpa_min_field:?}}} {{${hpa_max_field:?}}} {{${hpa_cpu_field:?}}}" '2 3 80'
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert horizontalpodautoscalers events
   # Clean up
   # Note that we should delete hpa first, otherwise it may fight with the deployment reaper.
   kubectl delete hpa nginx-deployment "${kube_flags[@]:?}"
@@ -501,6 +507,9 @@ run_stateful_set_tests() {
   # Command: create statefulset
   kubectl create -f hack/testdata/rollingupdate-statefulset.yaml "${kube_flags[@]:?}"
 
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert statefulsets pods,events
+
   ### Scale statefulset test with current-replicas and replicas
   # Pre-condition: 0 replicas
   kube::test::get_object_assert 'statefulset nginx' "{{${statefulset_replicas_field:?}}}" '0'
@@ -588,6 +597,8 @@ run_rs_tests() {
   kube::test::describe_resource_events_assert rs true
   # Describe command (resource only) should print detailed information
   kube::test::describe_resource_assert pods "Name:" "Image:" "Node:" "Labels:" "Status:" "Controlled By"
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert replicasets pods,events
 
   ### Scale replica set frontend with current-replicas and replicas
   # Pre-condition: 3 replicas

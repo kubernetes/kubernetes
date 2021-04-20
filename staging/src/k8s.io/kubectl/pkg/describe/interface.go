@@ -48,6 +48,7 @@ type ResourceDescriber interface {
 // describer to control what is printed.
 type DescriberSettings struct {
 	ShowEvents bool
+	ChunkSize  int64
 }
 
 // ObjectDescriber is an interface for displaying arbitrary objects with extra
