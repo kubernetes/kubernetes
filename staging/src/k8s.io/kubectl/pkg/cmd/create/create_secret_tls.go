@@ -325,7 +325,7 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 	secretTLS := newSecretObj(o.Name, namespace, corev1.SecretTypeTLS)
 	secretTLS.Data[corev1.TLSCertKey] = []byte(tlsCert)
 	secretTLS.Data[corev1.TLSPrivateKeyKey] = []byte(tlsKey)
-	if len(o.CertAuthority) != 0 {
+	if len(tlsCertAuthority) != 0 {
 		secretTLS.Data["ca.crt"] = []byte(tlsCertAuthority)
 	}
 	if o.AppendHash {
