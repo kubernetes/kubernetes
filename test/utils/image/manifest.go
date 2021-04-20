@@ -373,6 +373,9 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 			}
 		}
 		last := strings.SplitN(parts[countParts-1], ":", 2)
+		if len(last) == 1 {
+			return "", fmt.Errorf("image %q is required to be in an image:tag format", imageURL)
+		}
 		config := getRepositoryMappedConfig(index, Config{
 			registry: parts[0],
 			name:     strings.Join([]string{strings.Join(parts[1:countParts-1], "/"), last[0]}, "/"),
