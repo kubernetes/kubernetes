@@ -160,10 +160,6 @@ func TestCreateSecretTLS(t *testing.T) {
 	validKeyPath, validCertPath, validCAPath := writeCertData(validCertTmpDir, rsaKeyPEM, rsaCertPEM, rsaCAPEM, t)
 	defer tearDown(validCertTmpDir)
 
-	wrongCertTmpDir := utiltesting.MkTmpdirOrDie("tls-wrong-cert-test")
-	wrongKeyPath, wrongCertPath, wrongCAPath := writeCertData(wrongCertTmpDir, rsaKeyPEM, rsaSelfSignedCertPEM, rsaCAPEM, t)
-	defer tearDown(wrongCertTmpDir)
-
 	selfSignedCertTmpDir := utiltesting.MkTmpdirOrDie("tls-selfSigned-cert-test")
 	selfSignedKeyPath, selfSignedCertPath, _ := writeCertData(selfSignedCertTmpDir, rsaKeyPEM, rsaSelfSignedCertPEM, "", t)
 	defer tearDown(selfSignedCertTmpDir)
@@ -250,13 +246,6 @@ func TestCreateSecretTLS(t *testing.T) {
 				},
 			},
 			expectErr: false,
-		},
-		"create_secret_wrong_ca": {
-			tlsSecretName:    "foo",
-			tlsKey:           wrongKeyPath,
-			tlsCert:          wrongCertPath,
-			tlsCertAuthority: wrongCAPath,
-			expectErr:        true,
 		},
 		"create_secret_invalid_tls": {
 			tlsSecretName:    "foo",
