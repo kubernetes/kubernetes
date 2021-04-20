@@ -27,18 +27,30 @@ run_crd_tests() {
   kubectl "${kube_flags_with_token[@]:?}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "foos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "foos",
       "kind": "Foo"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -49,18 +61,30 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "bars.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "bars",
       "kind": "Bar"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -74,20 +98,32 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "resources.mygroup.example.com"
   },
   "spec": {
     "group": "mygroup.example.com",
-    "version": "v1alpha1",
     "scope": "Namespaced",
     "names": {
       "plural": "resources",
       "singular": "resource",
       "kind": "Kind",
       "listKind": "KindList"
-    }
+    },
+    "versions": [
+      {
+        "name": "v1alpha1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "x-kubernetes-preserve-unknown-fields": true,
+            "type": "object"
+          }
+        }
+      }
+    ]
   }
 }
 __EOF__
@@ -99,30 +135,37 @@ __EOF__
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__
 {
   "kind": "CustomResourceDefinition",
-  "apiVersion": "apiextensions.k8s.io/v1beta1",
+  "apiVersion": "apiextensions.k8s.io/v1",
   "metadata": {
     "name": "validfoos.company.com"
   },
   "spec": {
     "group": "company.com",
-    "version": "v1",
     "scope": "Namespaced",
     "names": {
       "plural": "validfoos",
       "kind": "ValidFoo"
     },
-    "validation": {
-      "openAPIV3Schema": {
-        "properties": {
-          "spec": {
-            "type": "array",
-            "items": {
-              "type": "number"
+    "versions": [
+      {
+        "name": "v1",
+        "served": true,
+        "storage": true,
+        "schema": {
+          "openAPIV3Schema": {
+            "type": "object",
+            "properties": {
+              "spec": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              }
             }
           }
         }
       }
-    }
+    ]
   }
 }
 __EOF__
