@@ -55,6 +55,10 @@ func NewOptions() *Options {
 // Validate verifies if any unsupported flag is set
 // for non-default logging format
 func (o *Options) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	errs := []error{}
 	if o.LogFormat != defaultLogFormat {
 		allFlags := unsupportedLoggingFlags(hyphensToUnderscores)

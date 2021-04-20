@@ -232,6 +232,10 @@ func emptySchedulerProfileConfig(profiles []kubeschedulerconfig.KubeSchedulerPro
 
 // Validate validates all the required options.
 func (o *Options) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	var errs []error
 
 	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig); err != nil {

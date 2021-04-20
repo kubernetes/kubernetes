@@ -74,6 +74,10 @@ func (o *DeprecatedOptions) AddFlags(fs *pflag.FlagSet, cfg *kubeschedulerconfig
 
 // Validate validates the deprecated scheduler options.
 func (o *DeprecatedOptions) Validate() []error {
+	if o == nil {
+		return nil
+	}
+
 	var errs []error
 
 	if o.UseLegacyPolicyConfig && len(o.PolicyConfigFile) == 0 {

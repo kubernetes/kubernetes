@@ -110,6 +110,10 @@ func (s *ServerRunOptions) DefaultAdvertiseAddress(secure *SecureServingOptions)
 
 // Validate checks validation of ServerRunOptions
 func (s *ServerRunOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	errors := []error{}
 
 	if s.LivezGracePeriod < 0 {

@@ -60,6 +60,10 @@ type RequestHeaderAuthenticationOptions struct {
 }
 
 func (s *RequestHeaderAuthenticationOptions) Validate() []error {
+	if s == nil {
+		return nil
+	}
+
 	allErrors := []error{}
 
 	if err := checkForWhiteSpaceOnly("requestheader-username-headers", s.UsernameHeaders...); err != nil {
