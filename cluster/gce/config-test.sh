@@ -91,7 +91,7 @@ ALLOWED_NOTREADY_NODES=${ALLOWED_NOTREADY_NODES:-$(($(get-num-nodes) / 100))}
 # on Container-optimized OS (cos, previously known as gci). If
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
-# https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
+# https://github.com/kubernetes/test-infra/blob/master/jobs/e2e_node/image-config.yaml
 GCI_VERSION=${KUBE_GCI_VERSION:-cos-85-13310-1041-9}
 export MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 export MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
