@@ -91,7 +91,10 @@ spec:
             name: csi-data-dir
 
         - name: hostpath
-          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.6.2
+          # WARNING: manually downgraded from 1.6.2 to 1.4.0 because 1.5.x and 1.6.x have
+          # a bug that causes E2E testing to fail (https://github.com/kubernetes-csi/csi-driver-host-path/pull/210#discussion_r605592438,
+          # https://github.com/kubernetes-csi/csi-driver-host-path/issues/251).
+          image: k8s.gcr.io/sig-storage/hostpathplugin:v1.4.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
