@@ -47,7 +47,6 @@ type DynamicCertKeyPairContent struct {
 	queue workqueue.RateLimitingInterface
 }
 
-var _ Notifier = &DynamicCertKeyPairContent{}
 var _ CertKeyContentProvider = &DynamicCertKeyPairContent{}
 var _ ControllerRunner = &DynamicCertKeyPairContent{}
 

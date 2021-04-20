@@ -464,9 +464,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 		// prime values and start listeners
 		if m.ClusterAuthenticationInfo.ClientCA != nil {
-			if notifier, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.Notifier); ok {
-				notifier.AddListener(controller)
-			}
+			m.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
 				if err := controller.RunOnce(); err != nil {
@@ -476,9 +474,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 		}
 		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
-			if notifier, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.Notifier); ok {
-				notifier.AddListener(controller)
-			}
+			m.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
 				if err := controller.RunOnce(); err != nil {
