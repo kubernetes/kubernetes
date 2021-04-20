@@ -377,13 +377,6 @@ const (
 	CSIMigrationvSphere featuregate.Feature = "CSIMigrationvSphere"
 
 	// owner: @divyenpatel
-	// beta: v1.19 (requires: vSphere vCenter/ESXi Version: 7.0u1, HW Version: VM version 15)
-	//
-	// Disables the vSphere in-tree driver.
-	// Expects vSphere CSI Driver to be installed and configured on all nodes.
-	CSIMigrationvSphereComplete featuregate.Feature = "CSIMigrationvSphereComplete"
-
-	// owner: @divyenpatel
 	// alpha: v1.21
 	//
 	// Disables the vSphere in-tree driver.
@@ -770,7 +763,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIMigrationAzureFile:                          {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires Azure File CSI driver)
 	InTreePluginAzureFileUnregister:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationvSphere:                            {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires vSphere CSI driver)
-	CSIMigrationvSphereComplete:                    {Default: false, PreRelease: featuregate.Beta}, // remove in 1.22
 	InTreePluginvSphereUnregister:                  {Default: false, PreRelease: featuregate.Alpha},
 	CSIMigrationOpenStack:                          {Default: true, PreRelease: featuregate.Beta},
 	InTreePluginOpenStackUnregister:                {Default: false, PreRelease: featuregate.Alpha},
