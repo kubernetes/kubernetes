@@ -18,6 +18,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/sigs.k8s.io/structured-merge-diff/v3/schema:go_default_library",
         "//vendor/sigs.k8s.io/structured-merge-diff/v3/value:go_default_library",
     ],
 )
