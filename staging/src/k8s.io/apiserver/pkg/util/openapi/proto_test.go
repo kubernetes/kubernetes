@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // TestOpenAPIDefinitionsToProtoSchema tests the openapi parser

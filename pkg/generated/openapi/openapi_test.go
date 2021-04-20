@@ -21,10 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-openapi/spec"
-
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func TestOpenAPIRoundtrip(t *testing.T) {

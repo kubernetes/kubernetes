@@ -31,7 +31,6 @@ import (
 	"testing"
 	"time"
 
-	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
@@ -83,13 +83,13 @@ func init() {
 
 func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 	return kubeopenapi.OpenAPIDefinition{
-		Schema: openapi.Schema{
-			SchemaProps: openapi.SchemaProps{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
 				Description: "Description",
-				Properties:  map[string]openapi.Schema{},
+				Properties:  map[string]spec.Schema{},
 			},
-			VendorExtensible: openapi.VendorExtensible{
-				Extensions: openapi.Extensions{
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
 					"x-kubernetes-group-version-kind": []interface{}{
 						map[string]interface{}{
 							"group":   "",
@@ -372,7 +372,7 @@ func TestUpdateOpenAPISpec(t *testing.T) {
 
 	// verify we are able to update the served spec using the exposed service
 	newSpec := []byte(`{"swagger":"2.0","info":{"title":"Test Updated Generic API Server Swagger","version":"v0.1.0"},"paths":null}`)
-	swagger := new(openapi.Swagger)
+	swagger := new(spec.Swagger)
 	err = json.Unmarshal(newSpec, swagger)
 	assert.NoError(err)
 

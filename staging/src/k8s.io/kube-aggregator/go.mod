@@ -7,7 +7,6 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/go-openapi/spec v0.19.5
 	github.com/gogo/protobuf v1.3.2
 	github.com/json-iterator/go v1.1.10
 	github.com/spf13/cobra v1.1.1

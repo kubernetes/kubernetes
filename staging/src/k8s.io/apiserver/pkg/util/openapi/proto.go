@@ -19,10 +19,10 @@ package openapi
 import (
 	"encoding/json"
 
-	"github.com/go-openapi/spec"
 	openapi_v2 "github.com/googleapis/gnostic/openapiv2"
 
 	"k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // ToProtoModels builds the proto formatted models from OpenAPI spec

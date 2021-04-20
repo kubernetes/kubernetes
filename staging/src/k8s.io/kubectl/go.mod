@@ -15,7 +15,6 @@ require (
 	github.com/fatih/camelcase v1.0.0
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/fvbommel/sortorder v1.0.1
-	github.com/go-openapi/spec v0.19.5
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
 	github.com/google/go-cmp v0.5.2
 	github.com/googleapis/gnostic v0.5.1

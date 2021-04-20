@@ -6,7 +6,6 @@ go 1.16
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/go-openapi/spec v0.19.5
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect

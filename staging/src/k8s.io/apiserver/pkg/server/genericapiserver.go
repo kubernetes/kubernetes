@@ -25,7 +25,6 @@ import (
 	"time"
 
 	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/go-openapi/spec"
 
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/kube-openapi/pkg/handler"
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // Info about an API group.

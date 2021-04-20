@@ -22,10 +22,10 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/go-openapi/spec"
 	openapiv2 "github.com/googleapis/gnostic/openapiv2"
 	"k8s.io/gengo/types"
 	utilproto "k8s.io/kube-openapi/pkg/util/proto"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 type typeModels struct {
