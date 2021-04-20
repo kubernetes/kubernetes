@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -228,6 +229,8 @@ func (o *Options) Complete() error {
 		if err != nil {
 			return err
 		}
+		// make flags take precedence
+		mergo.Merge(c, o.config, mergo.WithOverride)
 		o.config = c
 
 		if err := o.initWatcher(); err != nil {

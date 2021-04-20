@@ -625,3 +625,76 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 
 	}
 }
+
+func TestFlagOverwrites(t *testing.T) {
+	setUp := func(mode string) (*os.File, string, error) {
+		tempDir, err := ioutil.TempDir("", "kubeproxy-config-overwrite")
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
+		}
+		fullPath := filepath.Join(tempDir, "kube-proxy-config")
+		file, err := os.Create(fullPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
+		}
+
+		_, err = file.WriteString(fmt.Sprintf(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "%s"`, mode))
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
+		}
+
+		return file, tempDir, nil
+	}
+
+	tearDown := func(file *os.File, tempDir string) {
+		file.Close()
+		os.RemoveAll(tempDir)
+	}
+
+	testCases := []struct {
+		name        string
+		proxyServer proxyRun
+		flagMode    kubeproxyconfig.ProxyMode
+		configMode  string
+		expectMode  kubeproxyconfig.ProxyMode
+	}{
+		{
+			name:       "flag not set",
+			flagMode:   "",
+			configMode: "ipvs",
+			expectMode: "ipvs",
+		},
+		{
+			name:       "flag overwrites empty proxy component config",
+			flagMode:   "ipvs",
+			configMode: "",
+			expectMode: "ipvs",
+		},
+		{
+			name:       "flag take precedence on proxy component configs",
+			flagMode:   "iptables",
+			configMode: "ipvs",
+			expectMode: "iptables",
+		},
+	}
+
+	for _, tc := range testCases {
+		file, tempDir, err := setUp(tc.configMode)
+		if err != nil {
+			t.Fatalf("unexpected error when setting up environment: %v", err)
+		}
+
+		opt := NewOptions()
+		opt.ConfigFile = file.Name()
+		opt.config.Mode = tc.flagMode
+		err = opt.Complete()
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.Equal(t, tc.expectMode, opt.config.Mode)
+
+		tearDown(file, tempDir)
+	}
+}
