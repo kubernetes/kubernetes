@@ -12,7 +12,7 @@ import (
 // IncrementRequestCounts add additional api request counts to the log.
 // countsToPersist must not be mutated
 func SetRequestCountsForNode(nodeName string, currentHour, expiredHour int, countsToPersist *resourceRequestCounts) v1helpers.UpdateStatusFunc {
-	return func(status *apiv1.APIRequestCountStatus) {
+	return func(maxNumUsers int, status *apiv1.APIRequestCountStatus) {
 		existingLogsFromAPI := apiStatusToRequestCount(countsToPersist.resource, status)
 		existingNodeLogFromAPI := existingLogsFromAPI.Node(nodeName)
 		existingNodeLogFromAPI.ExpireOldestCounts(expiredHour)
@@ -21,7 +21,7 @@ func SetRequestCountsForNode(nodeName string, currentHour, expiredHour int, coun
 		// our input data.
 		updatedCounts := existingNodeLogFromAPI.Resource(countsToPersist.resource)
 		updatedCounts.Add(countsToPersist)
-		hourlyRequestLogs := resourceRequestCountToHourlyNodeRequestLog(nodeName, updatedCounts)
+		hourlyRequestLogs := resourceRequestCountToHourlyNodeRequestLog(nodeName, maxNumUsers, updatedCounts)
 
 		newStatus := setRequestCountsForNode(status, nodeName, currentHour, expiredHour, hourlyRequestLogs)
 		status.Last24h = newStatus.Last24h
@@ -72,10 +72,8 @@ func setRequestCountsForNode(status *apiv1.APIRequestCountStatus, nodeName strin
 	return newStatus
 }
 
-const numberOfUsersInAPI = 10
-
 // in this function we have exclusive access to resourceRequestCounts, so do the easy map navigation
-func resourceRequestCountToHourlyNodeRequestLog(nodeName string, resourceRequestCounts *resourceRequestCounts) []apiv1.PerNodeAPIRequestLog {
+func resourceRequestCountToHourlyNodeRequestLog(nodeName string, maxNumUsers int, resourceRequestCounts *resourceRequestCounts) []apiv1.PerNodeAPIRequestLog {
 	hourlyNodeRequests := []apiv1.PerNodeAPIRequestLog{}
 	for i := 0; i < 24; i++ {
 		hourlyNodeRequests = append(hourlyNodeRequests,
@@ -108,7 +106,7 @@ func resourceRequestCountToHourlyNodeRequestLog(nodeName string, resourceRequest
 			totalRequestsThisHour += totalCount
 
 			// the api resource has an interesting property of only keeping the last few.  Having a short list makes the sort faster
-			hasMaxEntries := len(hourlyNodeRequests[hour].ByUser) >= numberOfUsersInAPI
+			hasMaxEntries := len(hourlyNodeRequests[hour].ByUser) >= maxNumUsers
 			if hasMaxEntries {
 				currentSmallestCount := hourlyNodeRequests[hour].ByUser[len(hourlyNodeRequests[hour].ByUser)-1].RequestCount
 				if apiUserStatus.RequestCount <= currentSmallestCount {
