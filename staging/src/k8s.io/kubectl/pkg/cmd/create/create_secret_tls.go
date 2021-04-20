@@ -246,8 +246,8 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 
 	if len(tlsCertAuthority) > 0 {
 		// validate certAuthority is a valid certificate
-		rest = tlsCertAuthority
-		for {
+		var block *pem.Block
+		for rest := tlsCertAuthority; len(rest) > 0; {
 			block, rest = pem.Decode(rest)
 			if block == nil || block.Type != "CERTIFICATE" {
 				return nil, fmt.Errorf("failed to decode PEM block containing certificate authority.")
@@ -256,23 +256,6 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse PEM block in certificate authority: %s.", err)
 			}
-			if len(rest) == 0 {
-				break
-			}
-		}
-
-		// validate that the certificate is valid with certAuthority
-		roots := x509.NewCertPool()
-		if !roots.AppendCertsFromPEM([]byte(tlsCertAuthority)) {
-			return nil, fmt.Errorf("could not use certificate authority for validating.")
-		}
-		// validate only valid root and (impliticly) generation time
-		opts := x509.VerifyOptions{
-			Roots: roots,
-		}
-
-		if _, err := _tlsCert.Verify(opts); err != nil {
-			return nil, fmt.Errorf("failed to verify certificate: %s", err.Error())
 		}
 	}
 
