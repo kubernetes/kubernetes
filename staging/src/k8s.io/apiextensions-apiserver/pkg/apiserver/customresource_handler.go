@@ -1077,7 +1077,12 @@ func (s unstructuredNegotiatedSerializer) EncoderForVersion(encoder runtime.Enco
 }
 
 func (s unstructuredNegotiatedSerializer) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
-	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{structuralSchemas: s.structuralSchemas, structuralSchemaGK: s.structuralSchemaGK, preserveUnknownFields: s.preserveUnknownFields}}
+	d := schemaCoercingDecoder{delegate: decoder, validator: unstructuredSchemaCoercer{
+		metadataMode:          metadataCoercePrune,
+		structuralSchemas:     s.structuralSchemas,
+		structuralSchemaGK:    s.structuralSchemaGK,
+		preserveUnknownFields: s.preserveUnknownFields,
+	}}
 	return versioning.NewCodec(nil, d, runtime.UnsafeObjectConvertor(Scheme), Scheme, Scheme, unstructuredDefaulter{
 		delegate:           Scheme,
 		structuralSchemas:  s.structuralSchemas,
@@ -1191,13 +1196,15 @@ func (t crdConversionRESTOptionsGetter) GetRESTOptions(resource schema.GroupReso
 	if err == nil {
 		d := schemaCoercingDecoder{delegate: ret.StorageConfig.Codec, validator: unstructuredSchemaCoercer{
 			// drop invalid fields while decoding old CRs (before we haven't had any ObjectMeta validation)
-			dropInvalidMetadata:   true,
+			metadataMode: metadataCoercePruneAndDropInvalid,
+
 			repairGeneration:      true,
 			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
 		}}
 		c := schemaCoercingConverter{delegate: t.converter, validator: unstructuredSchemaCoercer{
+			metadataMode:          metadataCoercePrune,
 			structuralSchemas:     t.structuralSchemas,
 			structuralSchemaGK:    t.structuralSchemaGK,
 			preserveUnknownFields: t.preserveUnknownFields,
@@ -1286,6 +1293,14 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 	return v.delegate.ConvertFieldLabel(gvk, label, value)
 }
 
+type metadataCoerceMode int
+
+const (
+	metadataCoerceNone metadataCoerceMode = iota
+	metadataCoercePrune
+	metadataCoercePruneAndDropInvalid
+)
+
 // unstructuredSchemaCoercer adds to unstructured unmarshalling what json.Unmarshal does
 // in addition for native types when decoding into Golang structs:
 //
@@ -1293,8 +1308,8 @@ func (v schemaCoercingConverter) ConvertFieldLabel(gvk schema.GroupVersionKind, 
 // - generic pruning of unknown fields following a structural schema
 // - removal of non-defaulted non-nullable null map values.
 type unstructuredSchemaCoercer struct {
-	dropInvalidMetadata bool
-	repairGeneration    bool
+	metadataMode     metadataCoerceMode
+	repairGeneration bool
 
 	structuralSchemas     map[string]*structuralschema.Structural
 	structuralSchemaGK    schema.GroupKind
@@ -1311,9 +1326,30 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if err != nil {
 		return err
 	}
-	objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u.Object, v.dropInvalidMetadata)
-	if err != nil {
-		return err
+
+	restoreObjectMeta := func() error { return nil }
+	if v.metadataMode == metadataCoerceNone {
+		// avoid expensive unmarshal+marshal of schemaobjectmeta.GetObjectMeta
+		objectMeta, foundObjectMeta, err := unstructured.NestedFieldNoCopy(u.UnstructuredContent(), "metadata")
+		if err != nil {
+			return err
+		}
+		if foundObjectMeta {
+			restoreObjectMeta = func() error {
+				return unstructured.SetNestedField(u.UnstructuredContent(), objectMeta, "metadata")
+			}
+			delete(u.UnstructuredContent(), "metadata")
+		}
+	} else {
+		objectMeta, foundObjectMeta, err := schemaobjectmeta.GetObjectMeta(u.Object, v.metadataMode == metadataCoercePruneAndDropInvalid)
+		if err != nil {
+			return err
+		}
+		if foundObjectMeta {
+			restoreObjectMeta = func() error {
+				return schemaobjectmeta.SetObjectMeta(u.Object, objectMeta)
+			}
+		}
 	}
 
 	// compare group and kind because also other object like DeleteCollection options pass through here
@@ -1327,12 +1363,8 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 			structuralpruning.Prune(u.Object, v.structuralSchemas[gv.Version], false)
 			structuraldefaulting.PruneNonNullableNullsWithoutDefaults(u.Object, v.structuralSchemas[gv.Version])
 		}
-		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.dropInvalidMetadata); err != nil {
+		if err := schemaobjectmeta.Coerce(nil, u.Object, v.structuralSchemas[gv.Version], false, v.metadataMode == metadataCoercePruneAndDropInvalid); err != nil {
 			return err
-		}
-		// fixup missing generation in very old CRs
-		if v.repairGeneration && objectMeta.Generation == 0 {
-			objectMeta.Generation = 1
 		}
 	}
 
@@ -1343,9 +1375,20 @@ func (v *unstructuredSchemaCoercer) apply(u *unstructured.Unstructured) error {
 	if foundApiVersion {
 		u.SetAPIVersion(apiVersion)
 	}
-	if foundObjectMeta {
-		if err := schemaobjectmeta.SetObjectMeta(u.Object, objectMeta); err != nil {
+	if err := restoreObjectMeta(); err != nil {
+		return err
+	}
+
+	// fixup missing generation in very old CRs
+	if v.repairGeneration && gv.Group == v.structuralSchemaGK.Group && kind == v.structuralSchemaGK.Kind {
+		gen, found, err := unstructured.NestedInt64(u.UnstructuredContent(), "metadata", "generation")
+		if err != nil {
 			return err
+		}
+		if !found || gen == 0 {
+			if err := unstructured.SetNestedField(u.UnstructuredContent(), int64(1), "metadata", "generation"); err != nil {
+				return err
+			}
 		}
 	}
 
