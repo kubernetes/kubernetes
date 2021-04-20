@@ -47,6 +47,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/job/metrics"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/utils/integer"
 )
@@ -138,6 +139,8 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 
 	jm.updateHandler = jm.updateJobStatus
 	jm.syncHandler = jm.syncJob
+
+	metrics.Register()
 
 	return jm
 }
@@ -440,7 +443,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
-func (jm *Controller) syncJob(key string) (bool, error) {
+func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
@@ -479,6 +482,21 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		jm.recorder.Event(&job, v1.EventTypeWarning, "UnknownCompletionMode", "Skipped Job sync because completion mode is unknown")
 		return false, nil
 	}
+
+	completionMode := string(batch.NonIndexedCompletion)
+	if isIndexedJob(&job) {
+		completionMode = string(batch.IndexedCompletion)
+	}
+
+	defer func() {
+		result := "success"
+		if rErr != nil {
+			result = "error"
+		}
+
+		metrics.JobSyncDurationSeconds.WithLabelValues(completionMode, result).Observe(time.Since(startTime).Seconds())
+		metrics.JobSyncNum.WithLabelValues(completionMode, result).Inc()
+	}()
 
 	// Check the expectations of the job before counting active pods, otherwise a new pod can sneak in
 	// and update the expectations after we've retrieved active pods from the store. If a new pod enters
@@ -546,6 +564,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, v1.ConditionTrue, failureReason, failureMessage))
 		jobConditionsChanged = true
 		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
+		metrics.JobFinishedNum.WithLabelValues(completionMode, "failed").Inc()
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(&job, activePods, succeeded, pods)
@@ -581,6 +600,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 			now := metav1.Now()
 			job.Status.CompletionTime = &now
 			jm.recorder.Event(&job, v1.EventTypeNormal, "Completed", "Job completed")
+			metrics.JobFinishedNum.WithLabelValues(completionMode, "succeeded").Inc()
 		} else if utilfeature.DefaultFeatureGate.Enabled(features.SuspendJob) && manageJobCalled {
 			// Update the conditions / emit events only if manageJob was called in
 			// this syncJob. Otherwise wait for the right syncJob call to make
@@ -613,7 +633,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 		}
 	}
 
-	forget := false
+	forget = false
 	// Check if the number of jobs succeeded increased since the last check. If yes "forget" should be true
 	// This logic is linked to the issue: https://github.com/kubernetes/kubernetes/issues/56853 that aims to
 	// improve the Job backoff policy when parallelism > 1 and few Jobs failed but others succeed.
