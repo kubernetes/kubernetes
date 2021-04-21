@@ -90,9 +90,6 @@ func (t *volumePerformanceTestSuite) GetTestSuiteInfo() storageframework.TestSui
 func (t *volumePerformanceTestSuite) SkipUnsupportedTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 }
 
-func (t *volumePerformanceTestSuite) SkipRedundantSuite(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
-}
-
 func (t *volumePerformanceTestSuite) DefineTests(driver storageframework.TestDriver, pattern storageframework.TestPattern) {
 	type local struct {
 		config      *storageframework.PerTestConfig
