@@ -45,6 +45,6 @@ func main() {
 	// Set environment variables used by kubectl so the output is consistent,
 	// regardless of where we run.
 	os.Setenv("HOME", "/home/username")
-	kubectl := cmd.NewKubectlCommand(io.Reader, io.Discard, io.Discard)
+	kubectl := cmd.NewKubectlCommand(os.Stdin, io.Discard, io.Discard)
 	doc.GenMarkdownTree(kubectl, outDir)
 }
