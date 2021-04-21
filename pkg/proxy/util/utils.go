@@ -50,7 +50,7 @@ var (
 	ErrAddressNotAllowed = errors.New("address not allowed")
 
 	// ErrNoAddresses indicates there are no addresses for the hostname
-	ErrNoAddresses = errors.New("No addresses for hostname")
+	ErrNoAddresses = errors.New("no addresses for hostname")
 )
 
 // isValidEndpoint checks that the given host / port pair are valid endpoint

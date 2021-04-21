@@ -576,7 +576,7 @@ func NewProxier(
 		time.Sleep(10 * time.Second)
 		hnsNetworkInfo, err = hns.getNetworkByName(hnsNetworkName)
 		if err != nil {
-			return nil, fmt.Errorf("Could not find HNS network %s", hnsNetworkName)
+			return nil, fmt.Errorf("could not find HNS network %s", hnsNetworkName)
 		}
 	}
 
@@ -617,7 +617,7 @@ func NewProxier(
 			}
 		}
 		if len(hostMac) == 0 {
-			return nil, fmt.Errorf("Could not find host mac address for %s", nodeIP)
+			return nil, fmt.Errorf("could not find host mac address for %s", nodeIP)
 		}
 	}
 
