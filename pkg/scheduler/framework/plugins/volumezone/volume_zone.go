@@ -116,10 +116,6 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			return framework.AsStatus(err)
 		}
 
-		if pvc == nil {
-			return framework.NewStatus(framework.Error, fmt.Sprintf("PersistentVolumeClaim was not found: %q", pvcName))
-		}
-
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
@@ -146,10 +142,6 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		pv, err := pl.pvLister.Get(pvName)
 		if err != nil {
 			return framework.AsStatus(err)
-		}
-
-		if pv == nil {
-			return framework.NewStatus(framework.Error, fmt.Sprintf("PersistentVolume was not found: %q", pvName))
 		}
 
 		for k, v := range pv.ObjectMeta.Labels {
