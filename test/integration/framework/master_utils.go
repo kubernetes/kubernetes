@@ -26,7 +26,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -52,6 +51,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/klog/v2"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controlplane"
 	"k8s.io/kubernetes/pkg/generated/openapi"

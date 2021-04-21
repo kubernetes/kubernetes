@@ -22,6 +22,7 @@ require (
 	github.com/mitchellh/mapstructure v1.1.2
 	github.com/rubiojr/go-vhd v0.0.0-20200706105327-02e210299021
 	github.com/satori/go.uuid v1.2.0 // indirect
+	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.6.1
 	github.com/vmware/govmomi v0.20.3
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83

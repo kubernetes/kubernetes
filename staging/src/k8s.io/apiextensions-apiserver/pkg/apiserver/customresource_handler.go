@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	goopenapispec "github.com/go-openapi/spec"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 
 	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
@@ -130,7 +129,7 @@ type crdHandler struct {
 	// staticOpenAPISpec is used as a base for the schema of CR's for the
 	// purpose of managing fields, it is how CR handlers get the structure
 	// of TypeMeta and ObjectMeta
-	staticOpenAPISpec *goopenapispec.Swagger
+	staticOpenAPISpec *spec.Swagger
 
 	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
@@ -185,7 +184,7 @@ func NewCustomResourceDefinitionHandler(
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
 	minRequestTimeout time.Duration,
-	staticOpenAPISpec *goopenapispec.Swagger,
+	staticOpenAPISpec *spec.Swagger,
 	maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
@@ -1343,7 +1342,7 @@ func serverStartingError() error {
 // buildOpenAPIModelsForApply constructs openapi models from any validation schemas specified in the custom resource,
 // and merges it with the models defined in the static OpenAPI spec.
 // Returns nil models if the ServerSideApply feature is disabled, or the static spec is nil, or an error is encountered.
-func buildOpenAPIModelsForApply(staticOpenAPISpec *goopenapispec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
+func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensionsv1.CustomResourceDefinition) (proto.Models, error) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 		return nil, nil
 	}
@@ -1351,7 +1350,7 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *goopenapispec.Swagger, crd *a
 		return nil, nil
 	}
 
-	specs := []*goopenapispec.Swagger{}
+	specs := []*spec.Swagger{}
 	for _, v := range crd.Spec.Versions {
 		// Defaults are not pruned here, but before being served.
 		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripValueValidation: true, StripNullable: true, AllowNonStructural: false})

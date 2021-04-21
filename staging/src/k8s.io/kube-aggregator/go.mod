@@ -7,7 +7,6 @@ go 1.16
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/go-openapi/spec v0.19.5
 	github.com/gogo/protobuf v1.3.2
 	github.com/json-iterator/go v1.1.10
 	github.com/spf13/cobra v1.1.1
@@ -21,7 +20,7 @@ require (
 	k8s.io/code-generator v0.0.0
 	k8s.io/component-base v0.0.0
 	k8s.io/klog/v2 v2.8.0
-	k8s.io/kube-openapi v0.0.0-20210323165736-1a6458611d18
+	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1
 )

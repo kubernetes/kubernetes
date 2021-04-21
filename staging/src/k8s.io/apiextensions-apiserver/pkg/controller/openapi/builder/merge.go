@@ -17,8 +17,8 @@ limitations under the License.
 package builder
 
 import (
-	"github.com/go-openapi/spec"
 	"k8s.io/kube-openapi/pkg/aggregator"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 // MergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.

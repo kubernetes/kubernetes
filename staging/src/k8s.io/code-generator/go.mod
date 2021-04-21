@@ -6,7 +6,6 @@ go 1.16
 
 require (
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
-	github.com/go-openapi/spec v0.19.5
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/google/go-cmp v0.5.2 // indirect
@@ -29,7 +28,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
 	k8s.io/klog/v2 v2.8.0
-	k8s.io/kube-openapi v0.0.0-20210323165736-1a6458611d18
+	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
 
