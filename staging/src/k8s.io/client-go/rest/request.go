@@ -602,7 +602,7 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	if latency > extraLongThrottleLatency {
 		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
 		// but we use a throttled logger to prevent spamming.
-		globalThrottledLogger.Infof(message)
+		globalThrottledLogger.Infof("%s", message)
 	}
 	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
