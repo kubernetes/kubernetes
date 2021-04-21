@@ -1008,6 +1008,38 @@ func TestToken(t *testing.T) {
 			},
 		},
 		{
+			name: "required-claims-multiple-values",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				RequiredClaims: map[string]string{
+					"hd":  "example.com",
+					"sub": "test",
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"hd": [
+					"example.com",
+					"foobar.com"
+				],
+				"sub": "test",
+				"exp": %d
+			}`, valid.Unix()),
+			want: &user.DefaultInfo{
+				Name: "jane",
+			},
+		},
+		{
 			name: "no-required-claim",
 			options: Options{
 				IssuerURL:     "https://auth.example.com",
@@ -1052,6 +1084,34 @@ func TestToken(t *testing.T) {
 				"aud": "my-client",
 				"username": "jane",
 				"hd": "example.org",
+				"exp": %d
+			}`, valid.Unix()),
+			wantErr: true,
+		},
+		{
+			name: "invalid-required-claim-multiple-values",
+			options: Options{
+				IssuerURL:     "https://auth.example.com",
+				ClientID:      "my-client",
+				UsernameClaim: "username",
+				GroupsClaim:   "groups",
+				RequiredClaims: map[string]string{
+					"hd": "example.com",
+				},
+				now: func() time.Time { return now },
+			},
+			signingKey: loadRSAPrivKey(t, "testdata/rsa_1.pem", jose.RS256),
+			pubKeys: []*jose.JSONWebKey{
+				loadRSAKey(t, "testdata/rsa_1.pem", jose.RS256),
+			},
+			claims: fmt.Sprintf(`{
+				"iss": "https://auth.example.com",
+				"aud": "my-client",
+				"username": "jane",
+				"hd": [
+					"example.org",
+					"example.net"
+				],
 				"exp": %d
 			}`, valid.Unix()),
 			wantErr: true,
