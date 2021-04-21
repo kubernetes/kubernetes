@@ -83,7 +83,7 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 
 	endpoints, err := hcsshim.HNSListEndpointRequest()
 	if err != nil {
-		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+		return nil, fmt.Errorf("failed to list endpoints: %w", err)
 	}
 	for _, endpoint := range endpoints {
 		equal := false
@@ -139,7 +139,7 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 	} else {
 		createdEndpoint, err = hnsNetwork.CreateEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Local endpoint creation failed: %v", err)
+			return nil, fmt.Errorf("local endpoint creation failed: %w", err)
 		}
 	}
 	return &endpointsInfo{
