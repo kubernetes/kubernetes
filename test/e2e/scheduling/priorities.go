@@ -546,7 +546,6 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 			Name:   "",
 			Labels: balancePodLabel,
 			Resources: &v1.ResourceRequirements{
-				Limits:   needCreateResource,
 				Requests: needCreateResource,
 			},
 			Affinity: &v1.Affinity{
