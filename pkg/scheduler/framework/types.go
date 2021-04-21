@@ -554,25 +554,16 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	for rName, rQuantity := range rl {
 		switch rName {
 		case v1.ResourceMemory:
-			if mem := rQuantity.Value(); mem > r.Memory {
-				r.Memory = mem
-			}
+			r.Memory = max(r.Memory, rQuantity.Value())
 		case v1.ResourceCPU:
-			if cpu := rQuantity.MilliValue(); cpu > r.MilliCPU {
-				r.MilliCPU = cpu
-			}
+			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
 		case v1.ResourceEphemeralStorage:
 			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				if ephemeralStorage := rQuantity.Value(); ephemeralStorage > r.EphemeralStorage {
-					r.EphemeralStorage = ephemeralStorage
-				}
+				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
 			}
 		default:
 			if schedutil.IsScalarResourceName(rName) {
-				value := rQuantity.Value()
-				if value > r.ScalarResources[rName] {
-					r.SetScalar(rName, value)
-				}
+				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))
 			}
 		}
 	}
