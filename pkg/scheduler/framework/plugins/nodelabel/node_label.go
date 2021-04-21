@@ -99,7 +99,7 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	check := func(labels []string, presence bool) bool {
 		for _, label := range labels {
 			exists := nodeLabels.Has(label)
-			if (exists && !presence) || (!exists && presence) {
+			if exists != presence {
 				return false
 			}
 		}
