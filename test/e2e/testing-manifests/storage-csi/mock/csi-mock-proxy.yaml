@@ -73,7 +73,7 @@ spec:
         # test for directories or create them. It needs additional privileges
         # for that.
         - name: busybox
-          image: k8s.gcr.io/busybox
+          image: k8s.gcr.io/e2e-test-images/busybox:1.29-1
           securityContext:
             privileged: true
           command:
