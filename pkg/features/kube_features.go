@@ -748,6 +748,7 @@ const (
 
 	// owner: @jayunit100 @abhiraut @rikatz
 	// beta: v1.21
+	// ga: v1.22
 	//
 	// Labels all namespaces with a default label "kubernetes.io/metadata.name: <namespaceName>"
 	NamespaceDefaultLabelName featuregate.Feature = "NamespaceDefaultLabelName"
@@ -869,7 +870,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceInternalTrafficPolicy:                   {Default: false, PreRelease: featuregate.Alpha},
 	SuspendJob:                                     {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
-	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.Beta}, // graduate to GA and lock to default in 1.22, remove in 1.24
+	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
