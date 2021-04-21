@@ -87,6 +87,7 @@
     - [Removed](#removed-5)
 - [v1.20.0](#v1200)
   - [Downloads for v1.20.0](#downloads-for-v1200)
+    - [Source Code](#source-code-6)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
@@ -131,7 +132,7 @@
     - [Removed](#removed-6)
 - [v1.20.0-rc.0](#v1200-rc0)
   - [Downloads for v1.20.0-rc.0](#downloads-for-v1200-rc0)
-    - [Source Code](#source-code-6)
+    - [Source Code](#source-code-7)
     - [Client binaries](#client-binaries-7)
     - [Server binaries](#server-binaries-7)
     - [Node binaries](#node-binaries-7)
@@ -146,7 +147,7 @@
     - [Removed](#removed-7)
 - [v1.20.0-beta.2](#v1200-beta2)
   - [Downloads for v1.20.0-beta.2](#downloads-for-v1200-beta2)
-    - [Source Code](#source-code-7)
+    - [Source Code](#source-code-8)
     - [Client binaries](#client-binaries-8)
     - [Server binaries](#server-binaries-8)
     - [Node binaries](#node-binaries-8)
@@ -166,7 +167,7 @@
     - [Removed](#removed-8)
 - [v1.20.0-beta.1](#v1200-beta1)
   - [Downloads for v1.20.0-beta.1](#downloads-for-v1200-beta1)
-    - [Source Code](#source-code-8)
+    - [Source Code](#source-code-9)
     - [Client binaries](#client-binaries-9)
     - [Server binaries](#server-binaries-9)
     - [Node binaries](#node-binaries-9)
@@ -184,7 +185,7 @@
     - [Removed](#removed-9)
 - [v1.20.0-beta.0](#v1200-beta0)
   - [Downloads for v1.20.0-beta.0](#downloads-for-v1200-beta0)
-    - [Source Code](#source-code-9)
+    - [Source Code](#source-code-10)
     - [Client binaries](#client-binaries-10)
     - [Server binaries](#server-binaries-10)
     - [Node binaries](#node-binaries-10)
@@ -204,7 +205,7 @@
     - [Removed](#removed-10)
 - [v1.20.0-alpha.3](#v1200-alpha3)
   - [Downloads for v1.20.0-alpha.3](#downloads-for-v1200-alpha3)
-    - [Source Code](#source-code-10)
+    - [Source Code](#source-code-11)
     - [Client binaries](#client-binaries-11)
     - [Server binaries](#server-binaries-11)
     - [Node binaries](#node-binaries-11)
@@ -220,7 +221,7 @@
     - [Removed](#removed-11)
 - [v1.20.0-alpha.2](#v1200-alpha2)
   - [Downloads for v1.20.0-alpha.2](#downloads-for-v1200-alpha2)
-    - [Source Code](#source-code-11)
+    - [Source Code](#source-code-12)
     - [Client binaries](#client-binaries-12)
     - [Server binaries](#server-binaries-12)
     - [Node binaries](#node-binaries-12)
@@ -237,7 +238,7 @@
     - [Removed](#removed-12)
 - [v1.20.0-alpha.1](#v1200-alpha1)
   - [Downloads for v1.20.0-alpha.1](#downloads-for-v1200-alpha1)
-    - [Source Code](#source-code-12)
+    - [Source Code](#source-code-13)
     - [Client binaries](#client-binaries-13)
     - [Server binaries](#server-binaries-13)
     - [Node binaries](#node-binaries-13)
@@ -873,6 +874,8 @@ _Nothing has changed._
 [Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.20.0
+
+### Source Code
 
 filename | sha512 hash
 -------- | -----------

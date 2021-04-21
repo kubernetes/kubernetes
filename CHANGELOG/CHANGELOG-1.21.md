@@ -2,6 +2,7 @@
 
 - [v1.21.0](#v1210)
   - [Downloads for v1.21.0](#downloads-for-v1210)
+    - [Source Code](#source-code)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
@@ -36,7 +37,7 @@
     - [Removed](#removed)
 - [v1.21.0-rc.0](#v1210-rc0)
   - [Downloads for v1.21.0-rc.0](#downloads-for-v1210-rc0)
-    - [Source Code](#source-code)
+    - [Source Code](#source-code-1)
     - [Client binaries](#client-binaries-1)
     - [Server binaries](#server-binaries-1)
     - [Node binaries](#node-binaries-1)
@@ -54,7 +55,7 @@
     - [Removed](#removed-1)
 - [v1.21.0-beta.1](#v1210-beta1)
   - [Downloads for v1.21.0-beta.1](#downloads-for-v1210-beta1)
-    - [Source Code](#source-code-1)
+    - [Source Code](#source-code-2)
     - [Client binaries](#client-binaries-2)
     - [Server binaries](#server-binaries-2)
     - [Node binaries](#node-binaries-2)
@@ -74,7 +75,7 @@
     - [Removed](#removed-2)
 - [v1.21.0-beta.0](#v1210-beta0)
   - [Downloads for v1.21.0-beta.0](#downloads-for-v1210-beta0)
-    - [Source Code](#source-code-2)
+    - [Source Code](#source-code-3)
     - [Client binaries](#client-binaries-3)
     - [Server binaries](#server-binaries-3)
     - [Node binaries](#node-binaries-3)
@@ -95,7 +96,7 @@
     - [Removed](#removed-3)
 - [v1.21.0-alpha.3](#v1210-alpha3)
   - [Downloads for v1.21.0-alpha.3](#downloads-for-v1210-alpha3)
-    - [Source Code](#source-code-3)
+    - [Source Code](#source-code-4)
     - [Client binaries](#client-binaries-4)
     - [Server binaries](#server-binaries-4)
     - [Node binaries](#node-binaries-4)
@@ -115,7 +116,7 @@
     - [Removed](#removed-4)
 - [v1.21.0-alpha.2](#v1210-alpha2)
   - [Downloads for v1.21.0-alpha.2](#downloads-for-v1210-alpha2)
-    - [Source Code](#source-code-4)
+    - [Source Code](#source-code-5)
     - [Client binaries](#client-binaries-5)
     - [Server binaries](#server-binaries-5)
     - [Node binaries](#node-binaries-5)
@@ -134,7 +135,7 @@
     - [Removed](#removed-5)
 - [v1.21.0-alpha.1](#v1210-alpha1)
   - [Downloads for v1.21.0-alpha.1](#downloads-for-v1210-alpha1)
-    - [Source Code](#source-code-5)
+    - [Source Code](#source-code-6)
     - [Client binaries](#client-binaries-6)
     - [Server binaries](#server-binaries-6)
     - [Node binaries](#node-binaries-6)
@@ -160,6 +161,8 @@
 [Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.21.0
+
+### Source Code
 
 filename | sha512 hash
 -------- | -----------
