@@ -367,6 +367,10 @@ func (c *csiMountMgr) TearDownAt(dir string) error {
 
 	// clean mount point dir
 	if err := removeMountDir(c.plugin, dir); err != nil {
+		if isCorruptedDir(dir) {
+			klog.Warningf(log("dir[%s] is corrupted, error: %v, skip mount dir removal", dir, err))
+			return nil
+		}
 		return errors.New(log("mounter.TearDownAt failed to clean mount dir [%s]: %v", dir, err))
 	}
 	klog.V(4).Infof(log("mounter.TearDownAt successfully unmounted dir [%s]", dir))
