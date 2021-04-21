@@ -17,18 +17,19 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 )
 
-const (
-	testInitConfig = `---
-apiVersion: kubeadm.k8s.io/v1beta3
+var testInitConfig = fmt.Sprintf(`---
+apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
@@ -41,11 +42,10 @@ nodeRegistration:
     - c
     - d
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: %[1]s
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory

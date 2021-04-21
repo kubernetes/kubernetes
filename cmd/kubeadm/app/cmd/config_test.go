@@ -31,6 +31,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
 	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -81,10 +82,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta3
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.CurrentKubernetesVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -93,10 +94,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta3
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.MinimumControlPlaneVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
 		},
 	}
 
@@ -382,11 +383,11 @@ func TestImagesPull(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	cfg := []byte(dedent.Dedent(`
+	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
 		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
-		apiVersion: kubeadm.k8s.io/v1beta2
+		apiVersion: %s
 		kind: InitConfiguration
-	`))
+	`, kubeadmapiv1old.SchemeGroupVersion.String())))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
 

@@ -18,6 +18,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -37,6 +38,8 @@ import (
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testresources "k8s.io/kubernetes/cmd/kubeadm/test/resources"
@@ -46,24 +49,24 @@ var k8sVersionString = kubeadmconstants.MinimumControlPlaneVersion.String()
 var k8sVersion = version.MustParseGeneric(k8sVersionString)
 var nodeName = "mynode"
 var cfgFiles = map[string][]byte{
-	"InitConfiguration_v1beta2": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta2
+	"InitConfiguration_v1beta2": []byte(fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
-`),
-	"ClusterConfiguration_v1beta2": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta2
+`, kubeadmapiv1old.SchemeGroupVersion.String())),
+	"ClusterConfiguration_v1beta2": []byte(fmt.Sprintf(`
+apiVersion: %s
 kind: ClusterConfiguration
-kubernetesVersion: ` + k8sVersionString + `
-`),
-	"InitConfiguration_v1beta3": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta3
+kubernetesVersion: %s
+`, kubeadmapiv1old.SchemeGroupVersion.String(), k8sVersionString)),
+	"InitConfiguration_v1beta3": []byte(fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
-`),
-	"ClusterConfiguration_v1beta3": []byte(`
-apiVersion: kubeadm.k8s.io/v1beta3
+`, kubeadmapiv1.SchemeGroupVersion.String())),
+	"ClusterConfiguration_v1beta3": []byte(fmt.Sprintf(`
+apiVersion: %s
 kind: ClusterConfiguration
-kubernetesVersion: ` + k8sVersionString + `
-`),
+kubernetesVersion: %s
+`, kubeadmapiv1.SchemeGroupVersion.String(), k8sVersionString)),
 	"Kube-proxy_componentconfig": []byte(`
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration

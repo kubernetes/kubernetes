@@ -203,10 +203,10 @@ var (
 		yaml string
 		obj  kubeadmapiv1.ClusterConfiguration
 	}{
-		yaml: dedent.Dedent(`
+		yaml: dedent.Dedent(fmt.Sprintf(`
 			apiServer:
 			  timeoutForControlPlane: 4m
-			apiVersion: kubeadm.k8s.io/v1beta3
+			apiVersion: %s
 			certificatesDir: /etc/kubernetes/pki
 			clusterName: LeCluster
 			controllerManager: {}
@@ -222,7 +222,7 @@ var (
 			  dnsDomain: cluster.local
 			  serviceSubnet: 10.96.0.0/12
 			scheduler: {}
-		`),
+		`, kubeadmapiv1.SchemeGroupVersion.String())),
 		obj: kubeadmapiv1.ClusterConfiguration{
 			TypeMeta: metav1.TypeMeta{
 				APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
@@ -275,9 +275,9 @@ func TestConfigBaseMarshal(t *testing.T) {
 		}
 
 		got := strings.TrimSpace(string(b))
-		expected := strings.TrimSpace(dedent.Dedent(`
+		expected := strings.TrimSpace(dedent.Dedent(fmt.Sprintf(`
 			apiServer: {}
-			apiVersion: kubeadm.k8s.io/v1beta3
+			apiVersion: %s
 			clusterName: LeCluster
 			controllerManager: {}
 			dns:
@@ -287,7 +287,7 @@ func TestConfigBaseMarshal(t *testing.T) {
 			kubernetesVersion: 1.2.3
 			networking: {}
 			scheduler: {}
-		`))
+		`, kubeadmapiv1.SchemeGroupVersion.String())))
 
 		if expected != got {
 			t.Fatalf("Missmatch between expected and got:\nExpected:\n%s\n---\nGot:\n%s", expected, got)
@@ -326,10 +326,10 @@ func TestConfigBaseUnmarshal(t *testing.T) {
 
 func TestGeneratedConfigFromCluster(t *testing.T) {
 	fakeKnownContext(func() {
-		testYAML := dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1beta3
+		testYAML := dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
-		`)
+		`, kubeadmapiv1.SchemeGroupVersion.String()))
 		testYAMLHash := fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(testYAML)))
 		// The SHA256 sum of "The quick brown fox jumps over the lazy dog"
 		const mismatchHash = "sha256:d7a8fbb307d7809469ca9abcb0082e4f8d5651e46d3cdb762d02d0bf37c9e592"
@@ -405,10 +405,10 @@ func runClusterConfigFromTest(t *testing.T, perform func(t *testing.T, in string
 			},
 			{
 				name: "Unknown kind returns an error",
-				in: dedent.Dedent(`
-					apiVersion: kubeadm.k8s.io/v1beta3
+				in: dedent.Dedent(fmt.Sprintf(`
+					apiVersion: %s
 					kind: Configuration
-				`),
+				`, kubeadmapiv1.SchemeGroupVersion.String())),
 				expectErr: true,
 			},
 			{
