@@ -1777,21 +1777,21 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Dynamic Snapshot (retain policy)] snapshottable[Feature:VolumeSnapshotDataSource] volume snapshot controller  should check snapshot fields, check restore correctly works after modifying source data, check deletion": "should check snapshot fields, check restore correctly works after modifying source data, check deletion [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (immediate-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read-only inline ephemeral volume": "should create read-only inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should create read/write inline ephemeral volume": "should create read/write inline ephemeral volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support multiple inline ephemeral volumes": "should support multiple inline ephemeral volumes [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Generic Ephemeral-volume (default fs) (late-binding)] ephemeral should support two pods which share the same volume": "should support two pods which share the same volume [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] CSI Volumes [Driver: csi-hostpath] [Testpattern: Inline-volume (default fs)] subPath should be able to unmount after the subpath directory is deleted [LinuxOnly]": "should be able to unmount after the subpath directory is deleted [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
