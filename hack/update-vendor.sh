@@ -366,20 +366,6 @@ done
 kube::log::status "vendor: running 'go mod vendor'"
 go mod vendor >>"${LOG_FILE}" 2>&1
 
-# sort recorded packages for a given vendored dependency in modules.txt.
-# `go mod vendor` outputs in imported order, which means slight go changes (or different platforms) can result in a differently ordered modules.txt.
-# 1. prefix '#' lines with the module name and capture the module name
-# 2. prefix '##' with the most recently captured module name
-# 3. output other lines as-is
-# sort lines
-# strip anything before '#'
-awk '{
-  if($1=="#")       { current_module=$2; print $2 " " $0;      }
-  else if($1=="##") { print current_module " " $0; }
-  else              { print }
-}' < vendor/modules.txt | sort -k1,1 -s | sed 's/[^#]*#/#/' > "${TMP_DIR}/modules.txt.tmp"
-mv "${TMP_DIR}/modules.txt.tmp" vendor/modules.txt
-
 # create a symlink in vendor directory pointing to the staging components.
 # This lets other packages and tools use the local staging components as if they were vendored.
 for repo in $(kube::util::list_staging_repos); do
