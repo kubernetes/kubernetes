@@ -86,10 +86,7 @@ type ClusterEvent struct {
 
 // IsWildCard returns true if ClusterEvent follows WildCard semantics
 func (ce ClusterEvent) IsWildCard() bool {
-	if ce.Resource == WildCard && ce.ActionType == All {
-		return true
-	}
-	return false
+	return ce.Resource == WildCard && ce.ActionType == All
 }
 
 // QueuedPodInfo is a Pod wrapper with additional information related to
@@ -776,6 +773,13 @@ func (n *NodeInfo) resetSlicesIfEmpty() {
 	}
 }
 
+func max(a, b int64) int64 {
+	if a >= b {
+		return a
+	}
+	return b
+}
+
 // resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
@@ -790,13 +794,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	for _, ic := range pod.Spec.InitContainers {
 		resPtr.SetMaxResource(ic.Resources.Requests)
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
-		if non0CPU < non0CPUReq {
-			non0CPU = non0CPUReq
-		}
-
-		if non0Mem < non0MemReq {
-			non0Mem = non0MemReq
-		}
+		non0CPU = max(non0CPU, non0CPUReq)
+		non0Mem = max(non0Mem, non0MemReq)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
