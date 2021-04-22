@@ -17,6 +17,7 @@ limitations under the License.
 package statefulset
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -56,7 +57,7 @@ func TestStatefulPodControlCreatesPods(t *testing.T) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
 	})
-	if err := control.CreateStatefulPod(set, pod); err != nil {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); err != nil {
 		t.Errorf("StatefulPodControl failed to create Pod error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -90,7 +91,7 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, pod, apierrors.NewAlreadyExists(action.GetResource().GroupResource(), pod.Name)
 	})
-	if err := control.CreateStatefulPod(set, pod); !apierrors.IsAlreadyExists(err) {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); !apierrors.IsAlreadyExists(err) {
 		t.Errorf("Failed to create Pod error: %s", err)
 	}
 	events := collectEvents(recorder.Events)
@@ -117,7 +118,7 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
 	})
-	if err := control.CreateStatefulPod(set, pod); err == nil {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); err == nil {
 		t.Error("Failed to produce error on PVC creation failure")
 	}
 	events := collectEvents(recorder.Events)
@@ -153,7 +154,7 @@ func TestStatefulPodControlCreatePodPvcDeleting(t *testing.T) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
 	})
-	if err := control.CreateStatefulPod(set, pod); err == nil {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); err == nil {
 		t.Error("Failed to produce error on deleting PVC")
 	}
 	events := collectEvents(recorder.Events)
@@ -191,7 +192,7 @@ func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
 		create := action.(core.CreateAction)
 		return true, create.GetObject(), nil
 	})
-	if err := control.CreateStatefulPod(set, pod); err == nil {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); err == nil {
 		t.Error("Failed to produce error on PVC creation failure")
 	}
 	events := collectEvents(recorder.Events)
@@ -220,7 +221,7 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
 		return true, nil, apierrors.NewInternalError(errors.New("API server down"))
 	})
-	if err := control.CreateStatefulPod(set, pod); err == nil {
+	if err := control.CreateStatefulPod(context.TODO(), set, pod); err == nil {
 		t.Error("Failed to produce error on Pod creation failure")
 	}
 	events := collectEvents(recorder.Events)

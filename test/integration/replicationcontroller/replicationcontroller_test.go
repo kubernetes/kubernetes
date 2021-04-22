@@ -137,7 +137,7 @@ func runControllerAndInformers(t *testing.T, rm *replication.ReplicationManager,
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
-	go rm.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
 	return stopCh
 }
 

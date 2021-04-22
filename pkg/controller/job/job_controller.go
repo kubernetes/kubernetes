@@ -514,7 +514,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 	}
 	// If any adoptions are attempted, we should first recheck for deletion
 	// with an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
 		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
@@ -530,7 +530,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 	}
 	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerKind, canAdoptFunc, finalizers...)
 	// When adopting Pods, this operation adds an ownerRef and finalizers.
-	pods, err = cm.ClaimPods(pods)
+	pods, err = cm.ClaimPods(context.TODO(), pods)
 	if err != nil || !withFinalizers {
 		return pods, err
 	}

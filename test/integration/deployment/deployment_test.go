@@ -56,8 +56,8 @@ func TestNewDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -123,8 +123,8 @@ func TestDeploymentRollingUpdate(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	replicas := int32(20)
 	tester := &deploymentTester{t: t, c: c, deployment: newDeployment(name, ns.Name, replicas)}
@@ -266,8 +266,8 @@ func TestPausedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Verify that the paused deployment won't create new replica set.
 	if err := tester.expectNoNewReplicaSet(); err != nil {
@@ -367,8 +367,8 @@ func TestScalePausedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -448,8 +448,8 @@ func TestDeploymentHashCollision(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -551,8 +551,8 @@ func TestFailedDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
 		t.Fatal(err)
@@ -593,8 +593,8 @@ func TestOverlappingDeployments(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Create 2 deployments with overlapping selectors
 	var err error
@@ -667,8 +667,8 @@ func TestScaledRolloutDeployment(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Create a deployment with rolling update strategy, max surge = 3, and max unavailable = 2
 	var err error
@@ -870,8 +870,8 @@ func TestSpecReplicasChange(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Scale up/down deployment and verify its replicaset has matching .spec.replicas
 	if err = tester.scaleDeployment(2); err != nil {
@@ -928,8 +928,8 @@ func TestDeploymentAvailableCondition(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the deployment to be observed by the controller and has at least specified number of updated replicas
 	if err = tester.waitForDeploymentUpdatedReplicasGTE(replicas); err != nil {
@@ -1045,8 +1045,8 @@ func TestGeneralReplicaSetAdoption(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1137,8 +1137,8 @@ func TestDeploymentScaleSubresource(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
@@ -1181,8 +1181,8 @@ func TestReplicaSetOrphaningAndAdoptionWhenLabelsChange(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	informers.Start(stopCh)
-	go rm.Run(5, stopCh)
-	go dc.Run(5, stopCh)
+	go rm.Run(context.TODO(), 5)
+	go dc.Run(context.TODO(), 5)
 
 	// Wait for the Deployment to be updated to revision 1
 	if err := tester.waitForDeploymentRevisionAndImage("1", fakeImage); err != nil {
