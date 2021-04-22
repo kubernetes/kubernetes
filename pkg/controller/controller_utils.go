@@ -1029,7 +1029,7 @@ func (o ReplicaSetsBySizeNewer) Less(i, j int) bool {
 
 // AddOrUpdateTaintOnNode add taints to the node. If taint was added into node, it'll issue API calls
 // to update nodes; otherwise, no API calls. Return error if any.
-func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
+func AddOrUpdateTaintOnNode(ctx context.Context, c clientset.Interface, nodeName string, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -1040,10 +1040,10 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -1064,7 +1064,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 		if !updated {
 			return nil
 		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+		return PatchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
@@ -1072,7 +1072,7 @@ func AddOrUpdateTaintOnNode(c clientset.Interface, nodeName string, taints ...*v
 // won't fail if target taint doesn't exist or has been removed.
 // If passed a node it'll check if there's anything to be done, if taint is not present it won't issue
 // any API calls.
-func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
+func RemoveTaintOffNode(ctx context.Context, c clientset.Interface, nodeName string, node *v1.Node, taints ...*v1.Taint) error {
 	if len(taints) == 0 {
 		return nil
 	}
@@ -1097,10 +1097,10 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		// First we try getting node from the API server cache, as it's cheaper. If it fails
 		// we get it from etcd to be sure to have fresh data.
 		if firstTry {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{ResourceVersion: "0"})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{ResourceVersion: "0"})
 			firstTry = false
 		} else {
-			oldNode, err = c.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+			oldNode, err = c.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
 		}
 		if err != nil {
 			return err
@@ -1121,12 +1121,12 @@ func RemoveTaintOffNode(c clientset.Interface, nodeName string, node *v1.Node, t
 		if !updated {
 			return nil
 		}
-		return PatchNodeTaints(c, nodeName, oldNode, newNode)
+		return PatchNodeTaints(ctx, c, nodeName, oldNode, newNode)
 	})
 }
 
 // PatchNodeTaints patches node's taints.
-func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
+func PatchNodeTaints(ctx context.Context, c clientset.Interface, nodeName string, oldNode *v1.Node, newNode *v1.Node) error {
 	oldData, err := json.Marshal(oldNode)
 	if err != nil {
 		return fmt.Errorf("failed to marshal old node %#v for node %q: %v", oldNode, nodeName, err)
@@ -1145,7 +1145,7 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 		return fmt.Errorf("failed to create patch for node %q: %v", nodeName, err)
 	}
 
-	_, err = c.CoreV1().Nodes().Patch(context.TODO(), nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	_, err = c.CoreV1().Nodes().Patch(ctx, nodeName, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
 	return err
 }
 

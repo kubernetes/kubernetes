@@ -95,13 +95,13 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
+func (rc *RouteController) Run(ctx context.Context, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
 	klog.Info("Starting route controller")
 	defer klog.Info("Shutting down route controller")
 
-	if !cache.WaitForNamedCacheSync("route", stopCh, rc.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("route", ctx.Done(), rc.nodeListerSynced) {
 		return
 	}
 
@@ -115,16 +115,16 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	// We should have a watch on node and if we observe a new node (with CIDR?)
 	// trigger reconciliation for that node.
 	go wait.NonSlidingUntil(func() {
-		if err := rc.reconcileNodeRoutes(); err != nil {
+		if err := rc.reconcileNodeRoutes(ctx); err != nil {
 			klog.Errorf("Couldn't reconcile node routes: %v", err)
 		}
-	}, syncPeriod, stopCh)
+	}, syncPeriod, ctx.Done())
 
-	<-stopCh
+	<-ctx.Done()
 }
 
-func (rc *RouteController) reconcileNodeRoutes() error {
-	routeList, err := rc.routes.ListRoutes(context.TODO(), rc.clusterName)
+func (rc *RouteController) reconcileNodeRoutes(ctx context.Context) error {
+	routeList, err := rc.routes.ListRoutes(ctx, rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
 	}
@@ -132,10 +132,10 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	if err != nil {
 		return fmt.Errorf("error listing nodes: %v", err)
 	}
-	return rc.reconcile(nodes, routeList)
+	return rc.reconcile(ctx, nodes, routeList)
 }
 
-func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
+func (rc *RouteController) reconcile(ctx context.Context, nodes []*v1.Node, routes []*cloudprovider.Route) error {
 	var l sync.Mutex
 	// for each node a map of podCIDRs and their created status
 	nodeRoutesStatuses := make(map[types.NodeName]map[string]bool)
@@ -192,7 +192,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					// CreateRoute calls in flight.
 					rateLimiter <- struct{}{}
 					klog.Infof("Creating route for node %s %s with hint %s, throttled %v", nodeName, route.DestinationCIDR, nameHint, time.Since(startTime))
-					err := rc.routes.CreateRoute(context.TODO(), rc.clusterName, nameHint, route)
+					err := rc.routes.CreateRoute(ctx, rc.clusterName, nameHint, route)
 					<-rateLimiter
 					if err != nil {
 						msg := fmt.Sprintf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Since(startTime), err)
@@ -245,7 +245,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 					// respect the rate limiter
 					rateLimiter <- struct{}{}
 					klog.Infof("Deleting route %s %s", route.Name, route.DestinationCIDR)
-					if err := rc.routes.DeleteRoute(context.TODO(), rc.clusterName, route); err != nil {
+					if err := rc.routes.DeleteRoute(ctx, rc.clusterName, route); err != nil {
 						klog.Errorf("Could not delete route %s %s after %v: %v", route.Name, route.DestinationCIDR, time.Since(startTime), err)
 					} else {
 						klog.Infof("Deleted route %s %s after %v", route.Name, route.DestinationCIDR, time.Since(startTime))

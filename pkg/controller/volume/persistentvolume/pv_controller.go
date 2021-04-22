@@ -249,12 +249,12 @@ type PersistentVolumeController struct {
 // these events.
 // For easier readability, it was split into syncUnboundClaim and syncBoundClaim
 // methods.
-func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClaim) error {
+func (ctrl *PersistentVolumeController) syncClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
 	klog.V(4).Infof("synchronizing PersistentVolumeClaim[%s]: %s", claimToClaimKey(claim), getClaimStatusForLogging(claim))
 
 	// Set correct "migrated-to" annotations on PVC and update in API server if
 	// necessary
-	newClaim, err := ctrl.updateClaimMigrationAnnotations(claim)
+	newClaim, err := ctrl.updateClaimMigrationAnnotations(ctx, claim)
 	if err != nil {
 		// Nothing was saved; we will fall back into the same
 		// condition in the next call to this method
@@ -263,7 +263,7 @@ func (ctrl *PersistentVolumeController) syncClaim(claim *v1.PersistentVolumeClai
 	claim = newClaim
 
 	if !metav1.HasAnnotation(claim.ObjectMeta, pvutil.AnnBindCompleted) {
-		return ctrl.syncUnboundClaim(claim)
+		return ctrl.syncUnboundClaim(ctx, claim)
 	} else {
 		return ctrl.syncBoundClaim(claim)
 	}
@@ -330,7 +330,7 @@ func (ctrl *PersistentVolumeController) emitEventForUnboundDelayBindingClaim(cla
 
 // syncUnboundClaim is the main controller method to decide what to do with an
 // unbound claim.
-func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVolumeClaim) error {
+func (ctrl *PersistentVolumeController) syncUnboundClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
 	// This is a new PVC that has not completed binding
 	// OBSERVATION: pvc is "Pending"
 	if claim.Spec.VolumeName == "" {
@@ -356,7 +356,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *v1.PersistentVol
 					return err
 				}
 			case storagehelpers.GetPersistentVolumeClaimClass(claim) != "":
-				if err = ctrl.provisionClaim(claim); err != nil {
+				if err = ctrl.provisionClaim(ctx, claim); err != nil {
 					return err
 				}
 				return nil
@@ -539,12 +539,12 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *v1.PersistentVolum
 // It's invoked by appropriate cache.Controller callbacks when a volume is
 // created, updated or periodically synced. We do not differentiate between
 // these events.
-func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) error {
+func (ctrl *PersistentVolumeController) syncVolume(ctx context.Context, volume *v1.PersistentVolume) error {
 	klog.V(4).Infof("synchronizing PersistentVolume[%s]: %s", volume.Name, getVolumeStatusForLogging(volume))
 
 	// Set correct "migrated-to" annotations on PV and update in API server if
 	// necessary
-	newVolume, err := ctrl.updateVolumeMigrationAnnotations(volume)
+	newVolume, err := ctrl.updateVolumeMigrationAnnotations(ctx, volume)
 	if err != nil {
 		// Nothing was saved; we will fall back into the same
 		// condition in the next call to this method
@@ -1451,7 +1451,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *v1.PersistentVolu
 
 // provisionClaim starts new asynchronous operation to provision a claim if
 // provisioning is enabled.
-func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolumeClaim) error {
+func (ctrl *PersistentVolumeController) provisionClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) error {
 	if !ctrl.enableDynamicProvisioning {
 		return nil
 	}
@@ -1474,9 +1474,9 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 		ctrl.operationTimestamps.AddIfNotExist(claimKey, ctrl.getProvisionerName(plugin, storageClass), "provision")
 		var err error
 		if plugin == nil {
-			_, err = ctrl.provisionClaimOperationExternal(claim, storageClass)
+			_, err = ctrl.provisionClaimOperationExternal(ctx, claim, storageClass)
 		} else {
-			_, err = ctrl.provisionClaimOperation(claim, plugin, storageClass)
+			_, err = ctrl.provisionClaimOperation(ctx, claim, plugin, storageClass)
 		}
 		// if error happened, record an error count metric
 		// timestamp entry will remain in cache until a success binding has happened
@@ -1491,6 +1491,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
+	ctx context.Context,
 	claim *v1.PersistentVolumeClaim,
 	plugin vol.ProvisionableVolumePlugin,
 	storageClass *storage.StorageClass) (string, error) {
@@ -1513,7 +1514,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 	klog.V(4).Infof("provisionClaimOperation [%s]: plugin name: %s, provisioner name: %s", claimToClaimKey(claim), pluginName, provisionerName)
 
 	// Add provisioner annotation to be consistent with external provisioner workflow
-	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
+	newClaim, err := ctrl.setClaimProvisioner(ctx, claim, provisionerName)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
 		klog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)
@@ -1696,6 +1697,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(
 // provisionClaimOperationExternal provisions a volume using external provisioner async-ly
 // This method will be running in a standalone go-routine scheduled in "provisionClaim"
 func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
+	ctx context.Context,
 	claim *v1.PersistentVolumeClaim,
 	storageClass *storage.StorageClass) (string, error) {
 	claimClass := storagehelpers.GetPersistentVolumeClaimClass(claim)
@@ -1714,7 +1716,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 		}
 	}
 	// Add provisioner annotation so external provisioners know when to start
-	newClaim, err := ctrl.setClaimProvisioner(claim, provisionerName)
+	newClaim, err := ctrl.setClaimProvisioner(ctx, claim, provisionerName)
 	if err != nil {
 		// Save failed, the controller will retry in the next sync
 		klog.V(2).Infof("error saving claim %s: %v", claimToClaimKey(claim), err)

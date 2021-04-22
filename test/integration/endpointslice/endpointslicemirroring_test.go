@@ -77,12 +77,12 @@ func TestEndpointSliceMirroring(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go epController.Run(5, stopCh)
-	go epsController.Run(5, stopCh)
-	go epsmController.Run(5, stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epController.Run(ctx, 5)
+	go epsController.Run(5, ctx.Done())
+	go epsmController.Run(5, ctx.Done())
 
 	testCases := []struct {
 		testName                     string
@@ -180,7 +180,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			if tc.service != nil {
 				resourceName = tc.service.Name
 				tc.service.Namespace = ns.Name
-				_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), tc.service, metav1.CreateOptions{})
+				_, err = client.CoreV1().Services(ns.Name).Create(ctx, tc.service, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating service: %v", err)
 				}
@@ -189,7 +189,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 			if tc.customEndpoints != nil {
 				resourceName = tc.customEndpoints.Name
 				tc.customEndpoints.Namespace = ns.Name
-				_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), tc.customEndpoints, metav1.CreateOptions{})
+				_, err = client.CoreV1().Endpoints(ns.Name).Create(ctx, tc.customEndpoints, metav1.CreateOptions{})
 				if err != nil {
 					t.Fatalf("Error creating endpoints: %v", err)
 				}
@@ -197,7 +197,7 @@ func TestEndpointSliceMirroring(t *testing.T) {
 
 			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + resourceName
-				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
+				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
 					t.Logf("Error listing EndpointSlices: %v", err)
 					return false, err
@@ -255,10 +255,10 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 		1*time.Second)
 
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
-	go epsmController.Run(1, stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informers.Start(ctx.Done())
+	go epsmController.Run(1, ctx.Done())
 
 	testCases := []struct {
 		testName      string
@@ -325,19 +325,19 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 				}},
 			}
 
-			_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+			_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating service: %v", err)
 			}
 
-			_, err = client.CoreV1().Endpoints(ns.Name).Create(context.TODO(), customEndpoints, metav1.CreateOptions{})
+			_, err = client.CoreV1().Endpoints(ns.Name).Create(ctx, customEndpoints, metav1.CreateOptions{})
 			if err != nil {
 				t.Fatalf("Error creating endpoints: %v", err)
 			}
 
 			// update endpoint
 			tc.tweakEndpoint(customEndpoints)
-			_, err = client.CoreV1().Endpoints(ns.Name).Update(context.TODO(), customEndpoints, metav1.UpdateOptions{})
+			_, err = client.CoreV1().Endpoints(ns.Name).Update(ctx, customEndpoints, metav1.UpdateOptions{})
 			if err != nil {
 				t.Fatalf("Error updating endpoints: %v", err)
 			}
@@ -345,7 +345,7 @@ func TestEndpointSliceMirroringUpdates(t *testing.T) {
 			// verify the endpoint updates were mirrored
 			err = wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
 				lSelector := discovery.LabelServiceName + "=" + service.Name
-				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(context.TODO(), metav1.ListOptions{LabelSelector: lSelector})
+				esList, err := client.DiscoveryV1().EndpointSlices(ns.Name).List(ctx, metav1.ListOptions{LabelSelector: lSelector})
 				if err != nil {
 					t.Logf("Error listing EndpointSlices: %v", err)
 					return false, err

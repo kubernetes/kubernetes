@@ -114,13 +114,13 @@ func TestDualStackEndpoints(t *testing.T) {
 		client,
 		1*time.Second)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	// Start informer and controllers
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informers.Start(stopCh)
+	informers.Start(ctx.Done())
 	// use only one worker to serialize the updates
-	go epController.Run(1, stopCh)
-	go epsController.Run(1, stopCh)
+	go epController.Run(ctx, 1)
+	go epsController.Run(1, ctx.Done())
 
 	var testcases = []struct {
 		name           string

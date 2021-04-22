@@ -162,10 +162,10 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	stopCh := make(chan struct{})
-	informer.Start(stopCh)
-	go controller.Run(stopCh, 1)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +180,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClass(t *testing.T) {
 		},
 	}
 
-	_, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -211,10 +211,10 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 
 	controller, cloud, informer := newServiceController(t, client)
 
-	stopCh := make(chan struct{})
-	informer.Start(stopCh)
-	go controller.Run(stopCh, 1)
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	informer.Start(ctx.Done())
+	go controller.Run(ctx, 1)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -229,7 +229,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 		},
 	}
 
-	service, err = client.CoreV1().Services(ns.Name).Create(context.TODO(), service, metav1.CreateOptions{})
+	service, err = client.CoreV1().Services(ns.Name).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Error creating test service: %v", err)
 	}
@@ -239,7 +239,7 @@ func Test_ServiceLoadBalancerEnableLoadBalancerClassThenUpdateLoadBalancerClass(
 	}
 
 	service.Spec.LoadBalancerClass = utilpointer.StringPtr("test.com/update")
-	_, err = client.CoreV1().Services(ns.Name).Update(context.TODO(), service, metav1.UpdateOptions{})
+	_, err = client.CoreV1().Services(ns.Name).Update(ctx, service, metav1.UpdateOptions{})
 	if err == nil {
 		t.Fatal("Error updating test service load balancer class should throw error")
 	}

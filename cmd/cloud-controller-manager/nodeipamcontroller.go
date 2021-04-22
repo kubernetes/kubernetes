@@ -20,6 +20,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -57,8 +58,8 @@ func (nodeIpamController *nodeIPAMController) StartNodeIpamControllerWrapper(ini
 	}
 	nodeIpamController.nodeIPAMControllerOptions.ApplyTo(&nodeIpamController.nodeIPAMControllerConfiguration)
 
-	return func(ctx genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
-		return startNodeIpamController(initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, ctx, cloud)
+	return func(ctx context.Context, controllerContext genericcontrollermanager.ControllerContext) (controller.Interface, bool, error) {
+		return startNodeIpamController(initContext, completedConfig, nodeIpamController.nodeIPAMControllerConfiguration, controllerContext, cloud)
 	}
 }
 
