@@ -35,7 +35,7 @@ func startBootstrapSignerController(ctx context.Context, controllerContext Contr
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating BootstrapSigner controller: %v", err)
 	}
-	go bsc.Run(controllerContext.Stop)
+	go bsc.Run(ctx, controllerContext.Stop)
 	return nil, true, nil
 }
 
@@ -48,6 +48,6 @@ func startTokenCleanerController(ctx context.Context, controllerContext Controll
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating TokenCleaner controller: %v", err)
 	}
-	go tcc.Run(controllerContext.Stop)
+	go tcc.Run(ctx, controllerContext.Stop)
 	return nil, true, nil
 }
