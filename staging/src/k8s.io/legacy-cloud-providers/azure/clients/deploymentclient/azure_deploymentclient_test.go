@@ -378,7 +378,8 @@ func TestListWithNextPage(t *testing.T) {
 	resourceID := "/subscriptions/subscriptionID/resourceGroups/rg/providers/Microsoft.Resources/deployments"
 	armClient := mockarmclient.NewMockInterface(ctrl)
 	dpList := []resources.DeploymentExtended{getTestDeploymentExtended("dep"), getTestDeploymentExtended("dep1"), getTestDeploymentExtended("dep2")}
-	partialResponse, err := json.Marshal(resources.DeploymentListResult{Value: &dpList, NextLink: to.StringPtr("nextLink")})
+	// DeploymentListResult.MarshalJson() doesn't include "nextLink" in its result, hence partialResponse is composed manually below.
+	partialResponse, err := json.Marshal(map[string]interface{}{"value": dpList, "nextLink": "nextLink"})
 	assert.NoError(t, err)
 	pagedResponse, err := json.Marshal(resources.DeploymentListResult{Value: &dpList})
 	assert.NoError(t, err)
