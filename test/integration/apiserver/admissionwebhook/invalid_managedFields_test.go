@@ -125,6 +125,7 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 	// Make sure reset happens on patch requests
 	// wait until new webhook is called
 	if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
+		defer recordedWarnings.Reset()
 		pod, err = client.CoreV1().Pods("default").Patch(context.TODO(), invalidManagedFieldsMarkerFixture.Name, types.JSONPatchType, []byte("[]"), metav1.PatchOptions{})
 		if err != nil {
 			return false, err
@@ -133,21 +134,20 @@ func TestMutatingWebhookResetsInvalidManagedFields(t *testing.T) {
 			lastErr = err
 			return false, nil
 		}
+		if warningWriter.WarningCount() != 1 {
+			lastErr = fmt.Errorf("expected one warning, got: %v", warningWriter.WarningCount())
+			return false, nil
+		}
+		if !strings.Contains(recordedWarnings.String(), expectedWarning) {
+			lastErr = fmt.Errorf("unexpected warning, expected: \n%v\n, got: \n%v",
+				expectedWarning, recordedWarnings.String())
+			return false, nil
+		}
+		lastErr = nil
 		return true, nil
-	}); err != nil {
+	}); err != nil || lastErr != nil {
 		t.Fatalf("failed to wait for apiserver handling webhook mutation: %v, last error: %v", err, lastErr)
 	}
-	if lastErr != nil {
-		t.Fatal(lastErr)
-	}
-	if warningWriter.WarningCount() != 1 {
-		t.Errorf("expected one warning, got: %v", warningWriter.WarningCount())
-	}
-	if !strings.Contains(recordedWarnings.String(), expectedWarning) {
-		t.Errorf("unexpected warning, expected: \n%v\n, got: \n%v",
-			expectedWarning, recordedWarnings.String())
-	}
-	recordedWarnings.Reset()
 
 	// Make sure reset happens in update requests
 	pod, err = client.CoreV1().Pods("default").Update(context.TODO(), pod, metav1.UpdateOptions{})
