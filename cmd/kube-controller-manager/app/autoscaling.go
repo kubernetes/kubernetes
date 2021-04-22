@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"net/http"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,17 +35,17 @@ import (
 	"k8s.io/metrics/pkg/client/external_metrics"
 )
 
-func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
+func startHPAController(ctx context.Context, controllerContext ControllerContext) (http.Handler, bool, error) {
+	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "autoscaling", Version: "v1", Resource: "horizontalpodautoscalers"}] {
 		return nil, false, nil
 	}
 
-	if ctx.ComponentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients {
+	if controllerContext.ComponentConfig.HPAController.HorizontalPodAutoscalerUseRESTClients {
 		// use the new-style clients if support for custom metrics is enabled
-		return startHPAControllerWithRESTClient(ctx)
+		return startHPAControllerWithRESTClient(controllerContext)
 	}
 
-	return startHPAControllerWithLegacyClient(ctx)
+	return startHPAControllerWithLegacyClient(controllerContext)
 }
 
 func startHPAControllerWithRESTClient(ctx ControllerContext) (http.Handler, bool, error) {

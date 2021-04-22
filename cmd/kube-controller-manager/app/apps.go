@@ -21,6 +21,7 @@ limitations under the License.
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -33,65 +34,65 @@ import (
 	"k8s.io/kubernetes/pkg/controller/statefulset"
 )
 
-func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
+func startDaemonSetController(ctx context.Context, controllerContext ControllerContext) (http.Handler, bool, error) {
+	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
 		return nil, false, nil
 	}
 	dsc, err := daemon.NewDaemonSetsController(
-		ctx.InformerFactory.Apps().V1().DaemonSets(),
-		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Core().V1().Nodes(),
-		ctx.ClientBuilder.ClientOrDie("daemon-set-controller"),
+		controllerContext.InformerFactory.Apps().V1().DaemonSets(),
+		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Core().V1().Nodes(),
+		controllerContext.ClientBuilder.ClientOrDie("daemon-set-controller"),
 		flowcontrol.NewBackOff(1*time.Second, 15*time.Minute),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating DaemonSets controller: %v", err)
 	}
-	go dsc.Run(int(ctx.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs), ctx.Stop)
+	go dsc.Run(int(controllerContext.ComponentConfig.DaemonSetController.ConcurrentDaemonSetSyncs), controllerContext.Stop)
 	return nil, true, nil
 }
 
-func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
+func startStatefulSetController(ctx context.Context, controllerContext ControllerContext) (http.Handler, bool, error) {
+	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
 		return nil, false, nil
 	}
 	go statefulset.NewStatefulSetController(
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.InformerFactory.Apps().V1().StatefulSets(),
-		ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
-		ctx.ClientBuilder.ClientOrDie("statefulset-controller"),
-	).Run(int(ctx.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs), ctx.Stop)
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.InformerFactory.Apps().V1().StatefulSets(),
+		controllerContext.InformerFactory.Core().V1().PersistentVolumeClaims(),
+		controllerContext.InformerFactory.Apps().V1().ControllerRevisions(),
+		controllerContext.ClientBuilder.ClientOrDie("statefulset-controller"),
+	).Run(int(controllerContext.ComponentConfig.StatefulSetController.ConcurrentStatefulSetSyncs), controllerContext.Stop)
 	return nil, true, nil
 }
 
-func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
+func startReplicaSetController(ctx context.Context, controllerContext ControllerContext) (http.Handler, bool, error) {
+	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
 		return nil, false, nil
 	}
 	go replicaset.NewReplicaSetController(
-		ctx.InformerFactory.Apps().V1().ReplicaSets(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.ClientBuilder.ClientOrDie("replicaset-controller"),
+		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.ClientBuilder.ClientOrDie("replicaset-controller"),
 		replicaset.BurstReplicas,
-	).Run(int(ctx.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), ctx.Stop)
+	).Run(int(controllerContext.ComponentConfig.ReplicaSetController.ConcurrentRSSyncs), controllerContext.Stop)
 	return nil, true, nil
 }
 
-func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
+func startDeploymentController(ctx context.Context, controllerContext ControllerContext) (http.Handler, bool, error) {
+	if !controllerContext.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
 		return nil, false, nil
 	}
 	dc, err := deployment.NewDeploymentController(
-		ctx.InformerFactory.Apps().V1().Deployments(),
-		ctx.InformerFactory.Apps().V1().ReplicaSets(),
-		ctx.InformerFactory.Core().V1().Pods(),
-		ctx.ClientBuilder.ClientOrDie("deployment-controller"),
+		controllerContext.InformerFactory.Apps().V1().Deployments(),
+		controllerContext.InformerFactory.Apps().V1().ReplicaSets(),
+		controllerContext.InformerFactory.Core().V1().Pods(),
+		controllerContext.ClientBuilder.ClientOrDie("deployment-controller"),
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating Deployment controller: %v", err)
 	}
-	go dc.Run(int(ctx.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), ctx.Stop)
+	go dc.Run(int(controllerContext.ComponentConfig.DeploymentController.ConcurrentDeploymentSyncs), controllerContext.Stop)
 	return nil, true, nil
 }
