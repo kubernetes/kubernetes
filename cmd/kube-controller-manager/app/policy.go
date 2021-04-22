@@ -58,6 +58,6 @@ func startDisruptionController(ctx context.Context, controllerContext Controller
 		controllerContext.RESTMapper,
 		scaleClient,
 		client.Discovery(),
-	).Run(controllerContext.Stop)
+	).Run(ctx, controllerContext.Stop)
 	return nil, true, nil
 }

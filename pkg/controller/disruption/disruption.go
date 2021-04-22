@@ -114,7 +114,7 @@ type controllerAndScale struct {
 
 // podControllerFinder is a function type that maps a pod to a list of
 // controllers and their scale.
-type podControllerFinder func(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error)
+type podControllerFinder func(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error)
 
 func NewDisruptionController(
 	podInformer coreinformers.PodInformer,
@@ -192,7 +192,7 @@ var (
 )
 
 // getPodReplicaSet finds a replicaset which has no matching deployments.
-func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+func (dc *DisruptionController) getPodReplicaSet(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
 	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
 	if !ok || err != nil {
 		return nil, err
@@ -214,7 +214,7 @@ func (dc *DisruptionController) getPodReplicaSet(controllerRef *metav1.OwnerRefe
 }
 
 // getPodStatefulSet returns the statefulset referenced by the provided controllerRef.
-func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+func (dc *DisruptionController) getPodStatefulSet(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
 	ok, err := verifyGroupKind(controllerRef, controllerKindSS.Kind, []string{"apps"})
 	if !ok || err != nil {
 		return nil, err
@@ -232,7 +232,7 @@ func (dc *DisruptionController) getPodStatefulSet(controllerRef *metav1.OwnerRef
 }
 
 // getPodDeployments finds deployments for any replicasets which are being managed by deployments.
-func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+func (dc *DisruptionController) getPodDeployment(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
 	ok, err := verifyGroupKind(controllerRef, controllerKindRS.Kind, []string{"apps", "extensions"})
 	if !ok || err != nil {
 		return nil, err
@@ -265,7 +265,7 @@ func (dc *DisruptionController) getPodDeployment(controllerRef *metav1.OwnerRefe
 	return &controllerAndScale{deployment.UID, *(deployment.Spec.Replicas)}, nil
 }
 
-func (dc *DisruptionController) getPodReplicationController(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+func (dc *DisruptionController) getPodReplicationController(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
 	ok, err := verifyGroupKind(controllerRef, controllerKindRC.Kind, []string{""})
 	if !ok || err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ func (dc *DisruptionController) getPodReplicationController(controllerRef *metav
 	return &controllerAndScale{rc.UID, *(rc.Spec.Replicas)}, nil
 }
 
-func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
+func (dc *DisruptionController) getScaleController(ctx context.Context, controllerRef *metav1.OwnerReference, namespace string) (*controllerAndScale, error) {
 	gv, err := schema.ParseGroupVersion(controllerRef.APIVersion)
 	if err != nil {
 		return nil, err
@@ -298,7 +298,7 @@ func (dc *DisruptionController) getScaleController(controllerRef *metav1.OwnerRe
 	}
 	gr := mapping.Resource.GroupResource()
 
-	scale, err := dc.scaleNamespacer.Scales(namespace).Get(context.TODO(), gr, controllerRef.Name, metav1.GetOptions{})
+	scale, err := dc.scaleNamespacer.Scales(namespace).Get(ctx, gr, controllerRef.Name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// The IsNotFound error can mean either that the resource does not exist,
@@ -356,7 +356,7 @@ func verifyGroupKind(controllerRef *metav1.OwnerReference, expectedKind string, 
 	return false, nil
 }
 
-func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
+func (dc *DisruptionController) Run(ctx context.Context, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer dc.queue.ShutDown()
 
@@ -373,7 +373,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	} else {
 		klog.Infof("No api server defined - no events will be sent to API server.")
 	}
-	go wait.Until(dc.worker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, dc.worker, time.Second)
 	go wait.Until(dc.recheckWorker, time.Second, stopCh)
 
 	<-stopCh
@@ -513,19 +513,19 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 	return pods, nil
 }
 
-func (dc *DisruptionController) worker() {
-	for dc.processNextWorkItem() {
+func (dc *DisruptionController) worker(ctx context.Context) {
+	for dc.processNextWorkItem(ctx) {
 	}
 }
 
-func (dc *DisruptionController) processNextWorkItem() bool {
+func (dc *DisruptionController) processNextWorkItem(ctx context.Context) bool {
 	dKey, quit := dc.queue.Get()
 	if quit {
 		return false
 	}
 	defer dc.queue.Done(dKey)
 
-	err := dc.sync(dKey.(string))
+	err := dc.sync(ctx, dKey.(string))
 	if err == nil {
 		dc.queue.Forget(dKey)
 		return true
@@ -552,7 +552,7 @@ func (dc *DisruptionController) processNextRecheckWorkItem() bool {
 	return true
 }
 
-func (dc *DisruptionController) sync(key string) error {
+func (dc *DisruptionController) sync(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Since(startTime))
@@ -571,7 +571,7 @@ func (dc *DisruptionController) sync(key string) error {
 		return err
 	}
 
-	err = dc.trySync(pdb)
+	err = dc.trySync(ctx, pdb)
 	// If the reason for failure was a conflict, then allow this PDB update to be
 	// requeued without triggering the failSafe logic.
 	if errors.IsConflict(err) {
@@ -585,7 +585,7 @@ func (dc *DisruptionController) sync(key string) error {
 	return nil
 }
 
-func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
+func (dc *DisruptionController) trySync(ctx context.Context, pdb *policy.PodDisruptionBudget) error {
 	pods, err := dc.getPodsForPdb(pdb)
 	if err != nil {
 		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "NoPods", "Failed to get pods: %v", err)
@@ -595,7 +595,7 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 		dc.recorder.Eventf(pdb, v1.EventTypeNormal, "NoPods", "No matching pods found")
 	}
 
-	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
+	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(ctx, pdb, pods)
 	if err != nil {
 		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
 		return err
@@ -615,7 +615,7 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	return err
 }
 
-func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, err error) {
+func (dc *DisruptionController) getExpectedPodCount(ctx context.Context, pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount, desiredHealthy int32, err error) {
 	err = nil
 	// TODO(davidopp): consider making the way expectedCount and rules about
 	// permitted controller configurations (specifically, considering it an error
@@ -623,7 +623,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	// handled the same way for integer and percentage minAvailable
 
 	if pdb.Spec.MaxUnavailable != nil {
-		expectedCount, err = dc.getExpectedScale(pdb, pods)
+		expectedCount, err = dc.getExpectedScale(ctx, pdb, pods)
 		if err != nil {
 			return
 		}
@@ -641,7 +641,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal
 			expectedCount = int32(len(pods))
 		} else if pdb.Spec.MinAvailable.Type == intstr.String {
-			expectedCount, err = dc.getExpectedScale(pdb, pods)
+			expectedCount, err = dc.getExpectedScale(ctx, pdb, pods)
 			if err != nil {
 				return
 			}
@@ -657,7 +657,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 	return
 }
 
-func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
+func (dc *DisruptionController) getExpectedScale(ctx context.Context, pdb *policy.PodDisruptionBudget, pods []*v1.Pod) (expectedCount int32, err error) {
 	// When the user specifies a fraction of pods that must be available, we
 	// use as the fraction's denominator
 	// SUM_{all c in C} scale(c)
@@ -690,7 +690,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 		foundController := false
 		for _, finder := range dc.finders() {
 			var controllerNScale *controllerAndScale
-			controllerNScale, err = finder(controllerRef, pod.Namespace)
+			controllerNScale, err = finder(ctx, controllerRef, pod.Namespace)
 			if err != nil {
 				return
 			}
