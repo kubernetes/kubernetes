@@ -11,7 +11,6 @@ import (
 type ApiserverV1Interface interface {
 	RESTClient() rest.Interface
 	APIRequestCountsGetter
-	DeprecatedAPIRequestsGetter
 }
 
 // ApiserverV1Client is used to interact with features provided by the apiserver.openshift.io group.
@@ -21,10 +20,6 @@ type ApiserverV1Client struct {
 
 func (c *ApiserverV1Client) APIRequestCounts() APIRequestCountInterface {
 	return newAPIRequestCounts(c)
-}
-
-func (c *ApiserverV1Client) DeprecatedAPIRequests() DeprecatedAPIRequestInterface {
-	return newDeprecatedAPIRequests(c)
 }
 
 // NewForConfig creates a new ApiserverV1Client for the given config.

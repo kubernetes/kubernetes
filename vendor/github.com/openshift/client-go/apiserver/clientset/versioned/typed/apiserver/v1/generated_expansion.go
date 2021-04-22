@@ -3,5 +3,3 @@
 package v1
 
 type APIRequestCountExpansion interface{}
-
-type DeprecatedAPIRequestExpansion interface{}

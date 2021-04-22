@@ -316,6 +316,7 @@ spec:
                 description: removedInRelease is when the API will be removed.
                 type: string
                 maxLength: 64
+                minLength: 0
                 pattern: ^[0-9][0-9]*\.[0-9][0-9]*$
               requestCount:
                 description: requestCount is a sum of all requestCounts across all

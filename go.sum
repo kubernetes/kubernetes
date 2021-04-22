@@ -401,13 +401,13 @@ github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d h1:p
 github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.8.0 h1:+77ba4ar4jsCbL1GLbFL8fFM57w6suPfSS9PDLDY7KM=
 github.com/opencontainers/selinux v1.8.0/go.mod h1:RScLhm78qiWa2gbVCcGkC7tCGdgk3ogry1nUQF8Evvo=
-github.com/openshift/api v0.0.0-20210416115537-a60c0dc032fd h1:sVq/ry3UcDUrKphFarBvTPEFuWBXuGewzXraItYh9eg=
-github.com/openshift/api v0.0.0-20210416115537-a60c0dc032fd/go.mod h1:dZ4kytOo3svxJHNYd0J55hwe/6IQG5gAUHUE0F3Jkio=
+github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c h1:vEOCkpisFTnbTtDfC313LEVmA+d38KEEroN/iABOSlw=
+github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c/go.mod h1:dZ4kytOo3svxJHNYd0J55hwe/6IQG5gAUHUE0F3Jkio=
 github.com/openshift/apiserver-library-go v0.0.0-20210415093535-9176fb31e5dc h1:gLfHgd50Sa5GoxVHidJzpVR0QT/31kxv6gIJSuuBP9M=
 github.com/openshift/apiserver-library-go v0.0.0-20210415093535-9176fb31e5dc/go.mod h1:nqn2IWld2A+Q9Lp/xGsbmUr2RyDCQixRU83yqAbymUM=
 github.com/openshift/build-machinery-go v0.0.0-20210209125900-0da259a2c359/go.mod h1:b1BuldmJlbA/xYtdZvKi+7j5YGB44qJUJDZ9zwiNCfE=
-github.com/openshift/client-go v0.0.0-20210416122133-a6ef8fb5934b h1:3YQry4QJbTMRKbCTe+6zzZZXEOoGD1TxRyDbHSNFukw=
-github.com/openshift/client-go v0.0.0-20210416122133-a6ef8fb5934b/go.mod h1:t9pZ1Uuiq13Bxxw64OHZvSZSRyEFhe5Z+6pQpcMoerk=
+github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535 h1:JGSJhDJiQxqUETyqseqeXD7X/hgA6V/F3WW/2dN4QCs=
+github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535/go.mod h1:v5/AYttPCjfqMGC1Ed/vutuDpuXmgWc5O+W9nwQ7EtE=
 github.com/openshift/ginkgo v4.7.0-origin.0+incompatible h1:2qD1n/RAnycWMPjYS6MEAUzRmVoF0ql7ozk1ANv8dcM=
 github.com/openshift/ginkgo v4.7.0-origin.0+incompatible/go.mod h1:8METQ1gDhl0KW+pGH4c0DIJYEN/ksVCL6hOuHPmXGnk=
 github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427 h1:/6Xf107BJIzdfRe9xfuU4xnx7TUHQ7vzDMWiNYPmxfM=
