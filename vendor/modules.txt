@@ -11,9 +11,9 @@ cloud.google.com/go/compute/metadata
 # cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.2.0
 # cloud.google.com/go/storage => cloud.google.com/go/storage v1.6.0
 # dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
-# github.com/Azure/azure-sdk-for-go v43.0.0+incompatible => github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go v53.1.0+incompatible => github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
 ## explicit
-# github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
+# github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry
 github.com/Azure/azure-sdk-for-go/services/containerservice/mgmt/2020-04-01/containerservice
@@ -29,14 +29,14 @@ github.com/Azure/go-ansiterm/winterm
 # github.com/Azure/go-autorest v14.2.0+incompatible => github.com/Azure/go-autorest v14.2.0+incompatible
 github.com/Azure/go-autorest
 # github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-# github.com/Azure/go-autorest/autorest v0.11.12 => github.com/Azure/go-autorest/autorest v0.11.12
+# github.com/Azure/go-autorest/autorest v0.11.17 => github.com/Azure/go-autorest/autorest v0.11.17
 ## explicit
 github.com/Azure/go-autorest/autorest
-# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.12
-# github.com/Azure/go-autorest/autorest/adal v0.9.5 => github.com/Azure/go-autorest/autorest/adal v0.9.5
+# github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.17
+# github.com/Azure/go-autorest/autorest/adal v0.9.10 => github.com/Azure/go-autorest/autorest/adal v0.9.10
 ## explicit
 github.com/Azure/go-autorest/autorest/adal
-# github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.5
+# github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.10
 github.com/Azure/go-autorest/autorest/azure
 # github.com/Azure/go-autorest/autorest/date v0.3.0 => github.com/Azure/go-autorest/autorest/date v0.3.0
 github.com/Azure/go-autorest/autorest/date
@@ -438,6 +438,9 @@ github.com/go-ozzo/ozzo-validation/is
 ## explicit
 github.com/godbus/dbus/v5
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
+# github.com/gofrs/uuid v4.0.0+incompatible => github.com/gofrs/uuid v4.0.0+incompatible
+github.com/gofrs/uuid
+# github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 # github.com/gogo/protobuf v1.3.2 => github.com/gogo/protobuf v1.3.2
 ## explicit
 # github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
@@ -980,9 +983,6 @@ github.com/russross/blackfriday
 github.com/russross/blackfriday/v2
 # github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
 # github.com/ryanuber/columnize => github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f
-# github.com/satori/go.uuid v1.2.0 => github.com/satori/go.uuid v1.2.0
-github.com/satori/go.uuid
-# github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 # github.com/sean-/seed => github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
 # github.com/seccomp/libseccomp-golang v0.9.1 => github.com/seccomp/libseccomp-golang v0.9.1
 github.com/seccomp/libseccomp-golang
