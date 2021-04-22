@@ -10,6 +10,7 @@ go_library(
         "dedicatedhosts.go",
         "diskencryptionsets.go",
         "disks.go",
+        "enums.go",
         "galleries.go",
         "galleryapplications.go",
         "galleryapplicationversions.go",

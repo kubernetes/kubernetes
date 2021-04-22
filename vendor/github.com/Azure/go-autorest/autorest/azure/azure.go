@@ -37,6 +37,9 @@ const (
 	// should be included in the response.
 	HeaderReturnClientID = "x-ms-return-client-request-id"
 
+	// HeaderContentType is the type of the content in the HTTP response.
+	HeaderContentType = "Content-Type"
+
 	// HeaderRequestID is the Azure extension header of the service generated request ID returned
 	// in the response.
 	HeaderRequestID = "x-ms-request-id"
@@ -89,54 +92,85 @@ func (se ServiceError) Error() string {
 
 // UnmarshalJSON implements the json.Unmarshaler interface for the ServiceError type.
 func (se *ServiceError) UnmarshalJSON(b []byte) error {
-	// per the OData v4 spec the details field must be an array of JSON objects.
-	// unfortunately not all services adhear to the spec and just return a single
-	// object instead of an array with one object.  so we have to perform some
-	// shenanigans to accommodate both cases.
 	// http://docs.oasis-open.org/odata/odata-json-format/v4.0/os/odata-json-format-v4.0-os.html#_Toc372793091
 
-	type serviceError1 struct {
+	type serviceErrorInternal struct {
 		Code           string                   `json:"code"`
 		Message        string                   `json:"message"`
-		Target         *string                  `json:"target"`
-		Details        []map[string]interface{} `json:"details"`
-		InnerError     map[string]interface{}   `json:"innererror"`
-		AdditionalInfo []map[string]interface{} `json:"additionalInfo"`
+		Target         *string                  `json:"target,omitempty"`
+		AdditionalInfo []map[string]interface{} `json:"additionalInfo,omitempty"`
+		// not all services conform to the OData v4 spec.
+		// the following fields are where we've seen discrepancies
+
+		// spec calls for []map[string]interface{} but have seen map[string]interface{}
+		Details interface{} `json:"details,omitempty"`
+
+		// spec calls for map[string]interface{} but have seen []map[string]interface{} and string
+		InnerError interface{} `json:"innererror,omitempty"`
 	}
 
-	type serviceError2 struct {
-		Code           string                   `json:"code"`
-		Message        string                   `json:"message"`
-		Target         *string                  `json:"target"`
-		Details        map[string]interface{}   `json:"details"`
-		InnerError     map[string]interface{}   `json:"innererror"`
-		AdditionalInfo []map[string]interface{} `json:"additionalInfo"`
+	sei := serviceErrorInternal{}
+	if err := json.Unmarshal(b, &sei); err != nil {
+		return err
 	}
 
-	se1 := serviceError1{}
-	err := json.Unmarshal(b, &se1)
-	if err == nil {
-		se.populate(se1.Code, se1.Message, se1.Target, se1.Details, se1.InnerError, se1.AdditionalInfo)
-		return nil
+	// copy the fields we know to be correct
+	se.AdditionalInfo = sei.AdditionalInfo
+	se.Code = sei.Code
+	se.Message = sei.Message
+	se.Target = sei.Target
+
+	// converts an []interface{} to []map[string]interface{}
+	arrayOfObjs := func(v interface{}) ([]map[string]interface{}, bool) {
+		arrayOf, ok := v.([]interface{})
+		if !ok {
+			return nil, false
+		}
+		final := []map[string]interface{}{}
+		for _, item := range arrayOf {
+			as, ok := item.(map[string]interface{})
+			if !ok {
+				return nil, false
+			}
+			final = append(final, as)
+		}
+		return final, true
 	}
 
-	se2 := serviceError2{}
-	err = json.Unmarshal(b, &se2)
-	if err == nil {
-		se.populate(se2.Code, se2.Message, se2.Target, nil, se2.InnerError, se2.AdditionalInfo)
-		se.Details = append(se.Details, se2.Details)
-		return nil
-	}
-	return err
-}
+	// convert the remaining fields, falling back to raw JSON if necessary
 
-func (se *ServiceError) populate(code, message string, target *string, details []map[string]interface{}, inner map[string]interface{}, additional []map[string]interface{}) {
-	se.Code = code
-	se.Message = message
-	se.Target = target
-	se.Details = details
-	se.InnerError = inner
-	se.AdditionalInfo = additional
+	if c, ok := arrayOfObjs(sei.Details); ok {
+		se.Details = c
+	} else if c, ok := sei.Details.(map[string]interface{}); ok {
+		se.Details = []map[string]interface{}{c}
+	} else if sei.Details != nil {
+		// stuff into Details
+		se.Details = []map[string]interface{}{
+			{"raw": sei.Details},
+		}
+	}
+
+	if c, ok := sei.InnerError.(map[string]interface{}); ok {
+		se.InnerError = c
+	} else if c, ok := arrayOfObjs(sei.InnerError); ok {
+		// if there's only one error extract it
+		if len(c) == 1 {
+			se.InnerError = c[0]
+		} else {
+			// multiple errors, stuff them into the value
+			se.InnerError = map[string]interface{}{
+				"multi": c,
+			}
+		}
+	} else if c, ok := sei.InnerError.(string); ok {
+		se.InnerError = map[string]interface{}{"error": c}
+	} else if sei.InnerError != nil {
+		// stuff into InnerError
+		se.InnerError = map[string]interface{}{
+			"raw": sei.InnerError,
+		}
+	}
+	return nil
 }
 
 // RequestError describes an error response returned by Azure service.
@@ -169,6 +203,11 @@ type Resource struct {
 	Provider       string
 	ResourceType   string
 	ResourceName   string
+}
+
+// String function returns a string in form of azureResourceID
+func (r Resource) String() string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/%s/%s/%s", r.SubscriptionID, r.ResourceGroup, r.Provider, r.ResourceType, r.ResourceName)
 }
 
 // ParseResourceID parses a resource ID into a ResourceDetails struct.
@@ -302,16 +341,30 @@ func WithErrorUnlessStatusCode(codes ...int) autorest.RespondDecorator {
 					// Check if error is unwrapped ServiceError
 					decoder := autorest.NewDecoder(encodedAs, bytes.NewReader(b.Bytes()))
 					if err := decoder.Decode(&e.ServiceError); err != nil {
-						return err
+						return fmt.Errorf("autorest/azure: error response cannot be parsed: %q error: %v", b.String(), err)
+					}
+
+					// for example, should the API return the literal value `null` as the response
+					if e.ServiceError == nil {
+						e.ServiceError = &ServiceError{
+							Code:    "Unknown",
+							Message: "Unknown service error",
+							Details: []map[string]interface{}{
+								{
+									"HttpResponse.Body": b.String(),
+								},
+							},
+						}
 					}
 				}
-				if e.ServiceError.Message == "" {
+
+				if e.ServiceError != nil && e.ServiceError.Message == "" {
 					// if we're here it means the returned error wasn't OData v4 compliant.
 					// try to unmarshal the body in hopes of getting something.
 					rawBody := map[string]interface{}{}
 					decoder := autorest.NewDecoder(encodedAs, bytes.NewReader(b.Bytes()))
 					if err := decoder.Decode(&rawBody); err != nil {
-						return err
+						return fmt.Errorf("autorest/azure: error response cannot be parsed: %q error: %v", b.String(), err)
 					}
 
 					e.ServiceError = &ServiceError{

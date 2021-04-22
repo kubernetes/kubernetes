@@ -6,6 +6,7 @@ go_library(
         "client.go",
         "deploymentoperations.go",
         "deployments.go",
+        "enums.go",
         "groups.go",
         "models.go",
         "providers.go",

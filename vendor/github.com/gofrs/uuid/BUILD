@@ -8,8 +8,8 @@ go_library(
         "sql.go",
         "uuid.go",
     ],
-    importmap = "k8s.io/kubernetes/vendor/github.com/satori/go.uuid",
-    importpath = "github.com/satori/go.uuid",
+    importmap = "k8s.io/kubernetes/vendor/github.com/gofrs/uuid",
+    importpath = "github.com/gofrs/uuid",
     visibility = ["//visibility:public"],
 )
 

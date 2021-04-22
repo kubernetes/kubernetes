@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "client.go",
+        "enums.go",
         "models.go",
         "operations.go",
         "registries.go",

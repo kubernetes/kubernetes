@@ -39,7 +39,7 @@ go_library(
         "//vendor/github.com/Azure/azure-sdk-for-go/version:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
         "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/satori/go.uuid:go_default_library",
+        "//vendor/github.com/gofrs/uuid:go_default_library",
     ],
 )
 

@@ -18,6 +18,7 @@ go_library(
         "ddoscustompolicies.go",
         "ddosprotectionplans.go",
         "defaultsecurityrules.go",
+        "enums.go",
         "expressroutecircuitauthorizations.go",
         "expressroutecircuitconnections.go",
         "expressroutecircuitpeerings.go",

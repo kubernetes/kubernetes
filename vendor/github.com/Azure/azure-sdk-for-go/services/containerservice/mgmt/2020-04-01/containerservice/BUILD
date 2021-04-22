@@ -6,6 +6,7 @@ go_library(
         "agentpools.go",
         "client.go",
         "containerservices.go",
+        "enums.go",
         "managedclusters.go",
         "models.go",
         "openshiftmanagedclusters.go",
