@@ -162,7 +162,7 @@ func NewHorizontalController(
 }
 
 // Run begins watching and syncing.
-func (a *HorizontalController) Run(stopCh <-chan struct{}) {
+func (a *HorizontalController) Run(ctx context.Context, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer a.queue.ShutDown()
 
@@ -174,7 +174,7 @@ func (a *HorizontalController) Run(stopCh <-chan struct{}) {
 	}
 
 	// start a single worker (we may wish to start more in the future)
-	go wait.Until(a.worker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, a.worker, time.Second)
 
 	<-stopCh
 }
@@ -209,20 +209,20 @@ func (a *HorizontalController) deleteHPA(obj interface{}) {
 	a.queue.Forget(key)
 }
 
-func (a *HorizontalController) worker() {
-	for a.processNextWorkItem() {
+func (a *HorizontalController) worker(ctx context.Context) {
+	for a.processNextWorkItem(ctx) {
 	}
 	klog.Infof("horizontal pod autoscaler controller worker shutting down")
 }
 
-func (a *HorizontalController) processNextWorkItem() bool {
+func (a *HorizontalController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := a.queue.Get()
 	if quit {
 		return false
 	}
 	defer a.queue.Done(key)
 
-	deleted, err := a.reconcileKey(key.(string))
+	deleted, err := a.reconcileKey(ctx, key.(string))
 	if err != nil {
 		utilruntime.HandleError(err)
 	}
@@ -350,7 +350,7 @@ func (a *HorizontalController) computeReplicasForMetric(hpa *autoscalingv2.Horiz
 	return replicaCountProposal, metricNameProposal, timestampProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 }
 
-func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error) {
+func (a *HorizontalController) reconcileKey(ctx context.Context, key string) (deleted bool, err error) {
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return true, err
@@ -368,7 +368,7 @@ func (a *HorizontalController) reconcileKey(key string) (deleted bool, err error
 		return false, err
 	}
 
-	return false, a.reconcileAutoscaler(hpa, key)
+	return false, a.reconcileAutoscaler(ctx, hpa, key)
 }
 
 // computeStatusForObjectMetric computes the desired number of replicas for the specified metric of type ObjectMetricSourceType.
@@ -571,7 +571,7 @@ func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32
 	}
 }
 
-func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
+func (a *HorizontalController) reconcileAutoscaler(ctx context.Context, hpav1Shared *autoscalingv1.HorizontalPodAutoscaler, key string) error {
 	// make a copy so that we never mutate the shared informer cache (conversion can mutate the object)
 	hpav1 := hpav1Shared.DeepCopy()
 	// then, convert to autoscaling/v2, which makes our lives easier when calculating metrics
@@ -589,7 +589,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 		return fmt.Errorf("invalid API version in scale target reference: %v", err)
 	}
 
@@ -602,7 +602,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 		return fmt.Errorf("unable to determine resource for scale target reference: %v", err)
 	}
 
@@ -610,7 +610,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedGetScale", err.Error())
 		setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedGetScale", "the HPA controller was unable to get the target's current scale: %v", err)
-		a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+		a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 		return fmt.Errorf("failed to query scale subresource for %s: %v", reference, err)
 	}
 	setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionTrue, "SucceededGetScale", "the HPA controller was able to get the target's current scale")
@@ -653,7 +653,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 		metricDesiredReplicas, metricName, metricStatuses, metricTimestamp, err = a.computeReplicasForMetrics(hpa, scale, hpa.Spec.Metrics)
 		if err != nil {
 			a.setCurrentReplicasInStatus(hpa, currentReplicas)
-			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
+			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
 				utilruntime.HandleError(err)
 			}
 			a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedComputeMetricsReplicas", err.Error())
@@ -688,7 +688,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 			a.eventRecorder.Eventf(hpa, v1.EventTypeWarning, "FailedRescale", "New size: %d; reason: %s; error: %v", desiredReplicas, rescaleReason, err.Error())
 			setCondition(hpa, autoscalingv2.AbleToScale, v1.ConditionFalse, "FailedUpdateScale", "the HPA controller was unable to update the target scale: %v", err)
 			a.setCurrentReplicasInStatus(hpa, currentReplicas)
-			if err := a.updateStatusIfNeeded(hpaStatusOriginal, hpa); err != nil {
+			if err := a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa); err != nil {
 				utilruntime.HandleError(err)
 			}
 			return fmt.Errorf("failed to rescale %s: %v", reference, err)
@@ -704,7 +704,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 	}
 
 	a.setStatus(hpa, currentReplicas, desiredReplicas, metricStatuses, rescale)
-	return a.updateStatusIfNeeded(hpaStatusOriginal, hpa)
+	return a.updateStatusIfNeeded(ctx, hpaStatusOriginal, hpa)
 }
 
 // stabilizeRecommendation:
@@ -1146,16 +1146,16 @@ func (a *HorizontalController) setStatus(hpa *autoscalingv2.HorizontalPodAutosca
 }
 
 // updateStatusIfNeeded calls updateStatus only if the status of the new HPA is not the same as the old status
-func (a *HorizontalController) updateStatusIfNeeded(oldStatus *autoscalingv2.HorizontalPodAutoscalerStatus, newHPA *autoscalingv2.HorizontalPodAutoscaler) error {
+func (a *HorizontalController) updateStatusIfNeeded(ctx context.Context, oldStatus *autoscalingv2.HorizontalPodAutoscalerStatus, newHPA *autoscalingv2.HorizontalPodAutoscaler) error {
 	// skip a write if we wouldn't need to update
 	if apiequality.Semantic.DeepEqual(oldStatus, &newHPA.Status) {
 		return nil
 	}
-	return a.updateStatus(newHPA)
+	return a.updateStatus(ctx, newHPA)
 }
 
 // updateStatus actually does the update request for the status of the given HPA
-func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAutoscaler) error {
+func (a *HorizontalController) updateStatus(ctx context.Context, hpa *autoscalingv2.HorizontalPodAutoscaler) error {
 	// convert back to autoscalingv1
 	hpaRaw, err := unsafeConvertToVersionVia(hpa, autoscalingv1.SchemeGroupVersion)
 	if err != nil {
@@ -1164,7 +1164,7 @@ func (a *HorizontalController) updateStatus(hpa *autoscalingv2.HorizontalPodAuto
 	}
 	hpav1 := hpaRaw.(*autoscalingv1.HorizontalPodAutoscaler)
 
-	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(context.TODO(), hpav1, metav1.UpdateOptions{})
+	_, err = a.hpaNamespacer.HorizontalPodAutoscalers(hpav1.Namespace).UpdateStatus(ctx, hpav1, metav1.UpdateOptions{})
 	if err != nil {
 		a.eventRecorder.Event(hpa, v1.EventTypeWarning, "FailedUpdateStatus", err.Error())
 		return fmt.Errorf("failed to update status for %s: %v", hpa.Name, err)
