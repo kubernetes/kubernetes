@@ -509,7 +509,7 @@ func listRSDeleteCollection(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 	rsClient := f.ClientSet.AppsV1().ReplicaSets(ns)
-	zero := int64(0)
+	one := int64(1)
 	rsName := "test-rs"
 	replicas := int32(3)
 	e2eValue := rand.String(5)
@@ -539,7 +539,7 @@ func listRSDeleteCollection(f *framework.Framework) {
 	framework.ExpectEqual(len(rsList.Items), 1, "filtered list wasn't found")
 
 	ginkgo.By("DeleteCollection of the ReplicaSets")
-	err = rsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
+	err = rsClient.DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: "e2e=" + e2eValue})
 	framework.ExpectNoError(err, "failed to delete ReplicaSets")
 
 	ginkgo.By("After DeleteCollection verify that ReplicaSets have been deleted")
