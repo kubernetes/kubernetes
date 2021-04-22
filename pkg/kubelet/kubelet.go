@@ -1995,11 +1995,21 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 	case update := <-kl.readinessManager.Updates():
 		ready := update.Result == proberesults.Success
 		kl.statusManager.SetContainerReadiness(update.PodUID, update.ContainerID, ready)
-		handleProbeSync(kl, update, handler, "readiness", map[bool]string{true: "ready", false: ""}[ready])
+
+		status := ""
+		if ready {
+			status = "ready"
+		}
+		handleProbeSync(kl, update, handler, "readiness", status)
 	case update := <-kl.startupManager.Updates():
 		started := update.Result == proberesults.Success
 		kl.statusManager.SetContainerStartup(update.PodUID, update.ContainerID, started)
-		handleProbeSync(kl, update, handler, "startup", map[bool]string{true: "started", false: "unhealthy"}[started])
+
+		status := "unhealthy"
+		if started {
+			status = "started"
+		}
+		handleProbeSync(kl, update, handler, "startup", status)
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
 			// If the sources aren't ready or volume manager has not yet synced the states,
