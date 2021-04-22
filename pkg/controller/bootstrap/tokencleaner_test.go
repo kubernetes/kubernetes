@@ -17,6 +17,7 @@ limitations under the License.
 package bootstrap
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -56,7 +57,7 @@ func TestCleanerNoExpiration(t *testing.T) {
 	secret := newTokenSecret("tokenID", "tokenSecret")
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{}
 
@@ -73,7 +74,7 @@ func TestCleanerExpired(t *testing.T) {
 	addSecretExpiration(secret, timeString(-time.Hour))
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{
 		core.NewDeleteAction(
@@ -95,7 +96,7 @@ func TestCleanerNotExpired(t *testing.T) {
 	addSecretExpiration(secret, timeString(time.Hour))
 	secrets.Informer().GetIndexer().Add(secret)
 
-	cleaner.evalSecret(secret)
+	cleaner.evalSecret(context.TODO(), secret)
 
 	expected := []core.Action{}
 
@@ -114,7 +115,7 @@ func TestCleanerExpiredAt(t *testing.T) {
 	cleaner.enqueueSecrets(secret)
 	expected := []core.Action{}
 	verifyFunc := func() {
-		cleaner.processNextWorkItem()
+		cleaner.processNextWorkItem(context.TODO())
 		verifyActions(t, expected, cl.Actions())
 	}
 	// token has not expired currently
