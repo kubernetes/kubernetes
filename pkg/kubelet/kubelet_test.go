@@ -1622,7 +1622,9 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 
 func TestDoesNotDeletePodDirsIfContainerIsRunning(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
+	defer testKubelet.kubelet.podKiller.Close()
 	runningPod := &kubecontainer.Pod{
 		ID:        "12345678",
 		Name:      "pod1",
