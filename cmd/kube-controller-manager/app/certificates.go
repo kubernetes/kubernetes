@@ -52,7 +52,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kubelet-serving certificate controller: %v", err)
 		}
-		go kubeletServingSigner.Run(5, ctx.Done())
+		go kubeletServingSigner.Run(ctx, 5)
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kubelet-serving")
 	}
@@ -62,7 +62,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client-kubelet certificate controller: %v", err)
 		}
-		go kubeletClientSigner.Run(5, ctx.Done())
+		go kubeletClientSigner.Run(ctx, 5)
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client-kubelet")
 	}
@@ -72,7 +72,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/kube-apiserver-client certificate controller: %v", err)
 		}
-		go kubeAPIServerClientSigner.Run(5, ctx.Done())
+		go kubeAPIServerClientSigner.Run(ctx, 5)
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client")
 	}
@@ -82,7 +82,7 @@ func startCSRSigningController(ctx context.Context, controllerContext Controller
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to start kubernetes.io/legacy-unknown certificate controller: %v", err)
 		}
-		go legacyUnknownSigner.Run(5, ctx.Done())
+		go legacyUnknownSigner.Run(ctx, 5)
 	} else {
 		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/legacy-unknown")
 	}
@@ -153,7 +153,7 @@ func startCSRApprovingController(ctx context.Context, controllerContext Controll
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller"),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go approver.Run(5, ctx.Done())
+	go approver.Run(ctx, 5)
 
 	return nil, true, nil
 }
@@ -163,7 +163,7 @@ func startCSRCleanerController(ctx context.Context, controllerContext Controller
 		controllerContext.ClientBuilder.ClientOrDie("certificate-controller").CertificatesV1().CertificateSigningRequests(),
 		controllerContext.InformerFactory.Certificates().V1().CertificateSigningRequests(),
 	)
-	go cleaner.Run(1, ctx.Done())
+	go cleaner.Run(ctx, 1)
 	return nil, true, nil
 }
 
@@ -189,6 +189,6 @@ func startRootCACertPublisher(ctx context.Context, controllerContext ControllerC
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
-	go sac.Run(1, ctx.Done())
+	go sac.Run(ctx, 1)
 	return nil, true, nil
 }
