@@ -77,7 +77,7 @@ func initDisruptionController(t *testing.T, testCtx *testutils.TestContext) *dis
 
 	informers.Start(testCtx.Scheduler.StopEverything)
 	informers.WaitForCacheSync(testCtx.Scheduler.StopEverything)
-	go dc.Run(testCtx.Scheduler.StopEverything)
+	go dc.Run(testCtx.Ctx)
 	return dc
 }
 
