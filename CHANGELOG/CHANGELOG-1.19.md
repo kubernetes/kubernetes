@@ -149,6 +149,7 @@
     - [Removed](#removed-9)
 - [v1.19.0](#v1190)
   - [Downloads for v1.19.0](#downloads-for-v1190)
+    - [Source Code](#source-code-10)
     - [Client Binaries](#client-binaries-10)
     - [Server Binaries](#server-binaries-10)
     - [Node Binaries](#node-binaries-10)
@@ -193,7 +194,7 @@
     - [Removed](#removed-11)
 - [v1.19.0-rc.4](#v1190-rc4)
   - [Downloads for v1.19.0-rc.4](#downloads-for-v1190-rc4)
-    - [Source Code](#source-code-10)
+    - [Source Code](#source-code-11)
     - [Client binaries](#client-binaries-11)
     - [Server binaries](#server-binaries-11)
     - [Node binaries](#node-binaries-11)
@@ -208,7 +209,7 @@
     - [Removed](#removed-12)
 - [v1.19.0-rc.3](#v1190-rc3)
   - [Downloads for v1.19.0-rc.3](#downloads-for-v1190-rc3)
-    - [Source Code](#source-code-11)
+    - [Source Code](#source-code-12)
     - [Client binaries](#client-binaries-12)
     - [Server binaries](#server-binaries-12)
     - [Node binaries](#node-binaries-12)
@@ -222,7 +223,7 @@
     - [Removed](#removed-13)
 - [v1.19.0-rc.2](#v1190-rc2)
   - [Downloads for v1.19.0-rc.2](#downloads-for-v1190-rc2)
-    - [Source Code](#source-code-12)
+    - [Source Code](#source-code-13)
     - [Client binaries](#client-binaries-13)
     - [Server binaries](#server-binaries-13)
     - [Node binaries](#node-binaries-13)
@@ -238,7 +239,7 @@
     - [Removed](#removed-14)
 - [v1.19.0-rc.1](#v1190-rc1)
   - [Downloads for v1.19.0-rc.1](#downloads-for-v1190-rc1)
-    - [Source Code](#source-code-13)
+    - [Source Code](#source-code-14)
     - [Client binaries](#client-binaries-14)
     - [Server binaries](#server-binaries-14)
     - [Node binaries](#node-binaries-14)
@@ -258,7 +259,7 @@
     - [Removed](#removed-15)
 - [v1.19.0-beta.2](#v1190-beta2)
   - [Downloads for v1.19.0-beta.2](#downloads-for-v1190-beta2)
-    - [Source Code](#source-code-14)
+    - [Source Code](#source-code-15)
     - [Client binaries](#client-binaries-15)
     - [Server binaries](#server-binaries-15)
     - [Node binaries](#node-binaries-15)
@@ -275,7 +276,7 @@
     - [Removed](#removed-16)
 - [v1.19.0-beta.1](#v1190-beta1)
   - [Downloads for v1.19.0-beta.1](#downloads-for-v1190-beta1)
-    - [Source Code](#source-code-15)
+    - [Source Code](#source-code-16)
     - [Client binaries](#client-binaries-16)
     - [Server binaries](#server-binaries-16)
     - [Node binaries](#node-binaries-16)
@@ -293,7 +294,7 @@
     - [Removed](#removed-17)
 - [v1.19.0-beta.0](#v1190-beta0)
   - [Downloads for v1.19.0-beta.0](#downloads-for-v1190-beta0)
-    - [Source Code](#source-code-16)
+    - [Source Code](#source-code-17)
     - [Client binaries](#client-binaries-17)
     - [Server binaries](#server-binaries-17)
     - [Node binaries](#node-binaries-17)
@@ -309,6 +310,7 @@
     - [Removed](#removed-18)
 - [v1.19.0-alpha.3](#v1190-alpha3)
   - [Downloads for v1.19.0-alpha.3](#downloads-for-v1190-alpha3)
+    - [Source Code](#source-code-18)
     - [Client Binaries](#client-binaries-18)
     - [Server Binaries](#server-binaries-18)
     - [Node Binaries](#node-binaries-18)
@@ -323,6 +325,7 @@
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-12)
 - [v1.19.0-alpha.2](#v1190-alpha2)
   - [Downloads for v1.19.0-alpha.2](#downloads-for-v1190-alpha2)
+    - [Source Code](#source-code-19)
     - [Client Binaries](#client-binaries-19)
     - [Server Binaries](#server-binaries-19)
     - [Node Binaries](#node-binaries-19)
@@ -336,6 +339,7 @@
     - [Other (Cleanup or Flake)](#other-cleanup-or-flake-13)
 - [v1.19.0-alpha.1](#v1190-alpha1)
   - [Downloads for v1.19.0-alpha.1](#downloads-for-v1190-alpha1)
+    - [Source Code](#source-code-20)
     - [Client Binaries](#client-binaries-20)
     - [Server Binaries](#server-binaries-20)
     - [Node Binaries](#node-binaries-20)
@@ -1291,6 +1295,8 @@ _Nothing has changed._
 [Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.19.0
+
+### Source Code
 
 filename | sha512 hash
 -------- | -----------
@@ -3385,6 +3391,8 @@ filename | sha512 hash
 
 ## Downloads for v1.19.0-alpha.3
 
+### Source Code
+
 filename | sha512 hash
 -------- | -----------
 [kubernetes.tar.gz](https://dl.k8s.io/v1.19.0-alpha.3/kubernetes.tar.gz) | `49df3a77453b759d3262be6883dd9018426666b4261313725017eed42da1bc8dd1af037ec6c11357a6360c0c32c2486490036e9e132c9026f491325ce353c84b`
@@ -3495,6 +3503,8 @@ filename | sha512 hash
 [Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.19.0-alpha.2
+
+### Source Code
 
 filename | sha512 hash
 -------- | -----------
@@ -3636,6 +3646,8 @@ filename | sha512 hash
 [Documentation](https://docs.k8s.io)
 
 ## Downloads for v1.19.0-alpha.1
+
+### Source Code
 
 filename | sha512 hash
 -------- | -----------
