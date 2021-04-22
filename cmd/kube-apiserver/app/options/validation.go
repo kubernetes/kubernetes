@@ -31,6 +31,14 @@ import (
 	netutils "k8s.io/utils/net"
 )
 
+func validateMasterCount(options *ServerRunOptions) []error {
+	var errs []error
+	if options.MasterCount <= 0 {
+		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", options.MasterCount))
+	}
+	return errs
+}
+
 // TODO: Longer term we should read this from some config store, rather than a flag.
 // validateClusterIPFlags is expected to be called after Complete()
 func validateClusterIPFlags(options *ServerRunOptions) []error {
@@ -162,9 +170,7 @@ func validateAPIServerIdentity(options *ServerRunOptions) []error {
 // Validate checks ServerRunOptions and return a slice of found errs.
 func (s *ServerRunOptions) Validate() []error {
 	var errs []error
-	if s.MasterCount <= 0 {
-		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
-	}
+	errs = append(errs, validateMasterCount(s)...)
 	errs = append(errs, s.Etcd.Validate()...)
 	errs = append(errs, validateClusterIPFlags(s)...)
 	errs = append(errs, validateServiceNodePort(s)...)
