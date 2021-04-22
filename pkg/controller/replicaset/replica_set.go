@@ -86,7 +86,7 @@ type ReplicaSetController struct {
 	// It resumes normal action after observing the watch events for them.
 	burstReplicas int
 	// To allow injection of syncReplicaSet for testing.
-	syncHandler func(rsKey string) error
+	syncHandler func(ctx context.Context, rsKey string) error
 
 	// A TTLCache of pod creates/deletes each rc expects to see.
 	expectations *controller.UIDTrackingControllerExpectations
@@ -173,7 +173,7 @@ func (rsc *ReplicaSetController) SetEventRecorder(recorder record.EventRecorder)
 }
 
 // Run begins watching and syncing.
-func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
+func (rsc *ReplicaSetController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rsc.queue.ShutDown()
 
@@ -186,7 +186,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(rsc.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, rsc.worker, time.Second)
 	}
 
 	<-stopCh
@@ -510,19 +510,19 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (rsc *ReplicaSetController) worker() {
-	for rsc.processNextWorkItem() {
+func (rsc *ReplicaSetController) worker(ctx context.Context) {
+	for rsc.processNextWorkItem(ctx) {
 	}
 }
 
-func (rsc *ReplicaSetController) processNextWorkItem() bool {
+func (rsc *ReplicaSetController) processNextWorkItem(ctx context.Context) bool {
 	key, quit := rsc.queue.Get()
 	if quit {
 		return false
 	}
 	defer rsc.queue.Done(key)
 
-	err := rsc.syncHandler(key.(string))
+	err := rsc.syncHandler(ctx, key.(string))
 	if err == nil {
 		rsc.queue.Forget(key)
 		return true
@@ -642,7 +642,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
-func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
+func (rsc *ReplicaSetController) syncReplicaSet(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
@@ -681,7 +681,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 
 	// NOTE: filteredPods are pointing to objects from cache - if you need to
 	// modify them, you need to copy it first.
-	filteredPods, err = rsc.claimPods(rs, selector, filteredPods)
+	filteredPods, err = rsc.claimPods(ctx, rs, selector, filteredPods)
 	if err != nil {
 		return err
 	}
@@ -709,11 +709,11 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	return manageReplicasErr
 }
 
-func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
+func (rsc *ReplicaSetController) claimPods(ctx context.Context, rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(context.TODO(), rs.Name, metav1.GetOptions{})
+		fresh, err := rsc.kubeClient.AppsV1().ReplicaSets(rs.Namespace).Get(ctx, rs.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
