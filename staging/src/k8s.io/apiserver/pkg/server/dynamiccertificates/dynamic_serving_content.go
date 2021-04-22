@@ -17,6 +17,7 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
@@ -123,7 +124,7 @@ func (c *DynamicCertKeyPairContent) RunOnce() error {
 }
 
 // Run starts the controller and blocks until stopCh is closed.
-func (c *DynamicCertKeyPairContent) Run(workers int, stopCh <-chan struct{}) {
+func (c *DynamicCertKeyPairContent) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 

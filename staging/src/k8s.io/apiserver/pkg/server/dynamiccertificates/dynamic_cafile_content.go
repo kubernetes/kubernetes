@@ -18,6 +18,7 @@ package dynamiccertificates
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
@@ -53,7 +54,7 @@ type ControllerRunner interface {
 	RunOnce() error
 
 	// Run should be called a go .Run
-	Run(workers int, stopCh <-chan struct{})
+	Run(ctx context.Context, workers int, stopCh <-chan struct{})
 }
 
 // DynamicFileCAContent provies a CAContentProvider that can dynamically react to new file content
@@ -160,7 +161,7 @@ func (c *DynamicFileCAContent) RunOnce() error {
 }
 
 // Run starts the kube-apiserver and blocks until stopCh is closed.
-func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
+func (c *DynamicFileCAContent) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
