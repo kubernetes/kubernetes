@@ -47,7 +47,9 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"google.golang.org/grpc/codes"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -142,7 +144,12 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		storageframework.CapPVCDataSource:       true,
 		storageframework.CapControllerExpansion: true,
 		storageframework.CapSingleNodeVolume:    true,
-		storageframework.CapVolumeLimits:        true,
+
+		// This is needed for the
+		// testsuites/volumelimits.go `should support volume limits`
+		// test. --maxvolumespernode=10 gets
+		// added when patching the deployment.
+		storageframework.CapVolumeLimits: true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -152,7 +159,8 @@ func InitHostPathCSIDriver() storageframework.TestDriver {
 		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-health-monitor/external-health-monitor-controller/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
@@ -220,16 +228,47 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 	}
 
 	o := utils.PatchCSIOptions{
-		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            config.GetUniqueDriverName(),
-		DriverContainerName:      "hostpath",
-		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName()},
+		OldDriverName:       h.driverInfo.Name,
+		NewDriverName:       config.GetUniqueDriverName(),
+		DriverContainerName: "hostpath",
+		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName(),
+			// This is needed for the
+			// testsuites/volumelimits.go `should support volume limits`
+			// test.
+			"--maxvolumespernode=10",
+		},
 		ProvisionerContainerName: "csi-provisioner",
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
-		return utils.PatchCSIDeployment(config.Framework, o, item)
+		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
+			return err
+		}
+
+		// Remove csi-external-health-monitor-agent and
+		// csi-external-health-monitor-controller
+		// containers. They are not needed for any of the
+		// tests and in practice apparently caused enough
+		// overhead that even unrelated tests timed out. For
+		// example, in the pull-kubernetes-e2e-kind test, 43
+		// out of 5771 tests failed, including tests from
+		// sig-node, sig-cli, sig-api-machinery, sig-network.
+		switch item := item.(type) {
+		case *appsv1.StatefulSet:
+			var containers []v1.Container
+			for _, container := range item.Spec.Template.Spec.Containers {
+				switch container.Name {
+				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
+					// Remove these containers.
+				default:
+					// Keep the others.
+					containers = append(containers, container)
+				}
+			}
+			item.Spec.Template.Spec.Containers = containers
+		}
+		return nil
 	}, h.manifests...)
 
 	if err != nil {
@@ -408,7 +447,7 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) MockCSITestDriver {
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
-		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
+		"test/e2e/testing-manifests/storage-csi/external-snapshotter/csi-snapshotter/rbac-csi-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-mock-rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/mock/csi-storageclass.yaml",
 	}
@@ -611,7 +650,25 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*storageframework.P
 		FSGroupPolicy:     m.fsGroupPolicy,
 	}
 	cleanup, err := utils.CreateFromManifests(f, m.driverNamespace, func(item interface{}) error {
-		return utils.PatchCSIDeployment(f, o, item)
+		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
+			return err
+		}
+
+		switch item := item.(type) {
+		case *rbacv1.ClusterRole:
+			if strings.HasPrefix(item.Name, "external-snapshotter-runner") {
+				// Re-enable access to secrets for the snapshotter sidecar for
+				// https://github.com/kubernetes/kubernetes/blob/6ede5ca95f78478fa627ecfea8136e0dff34436b/test/e2e/storage/csi_mock_volume.go#L1539-L1548
+				// It was disabled in https://github.com/kubernetes-csi/external-snapshotter/blob/501cc505846c03ee665355132f2da0ce7d5d747d/deploy/kubernetes/csi-snapshotter/rbac-csi-snapshotter.yaml#L26-L32
+				item.Rules = append(item.Rules, rbacv1.PolicyRule{
+					APIGroups: []string{""},
+					Resources: []string{"secrets"},
+					Verbs:     []string{"get", "list"},
+				})
+			}
+		}
+
+		return nil
 	}, m.manifests...)
 
 	if err != nil {

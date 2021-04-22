@@ -34,9 +34,39 @@ spec:
       labels:
         app: csi-hostpathplugin
     spec:
+      serviceAccount: csi-external-health-monitor-controller
       containers:
+        - name: csi-external-health-monitor-agent
+          image: k8s.gcr.io/sig-storage/csi-external-health-monitor-agent:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-external-health-monitor-controller
+          image: k8s.gcr.io/sig-storage/csi-external-health-monitor-controller:v0.2.0
+          args:
+            - "--v=5"
+            - "--csi-address=$(ADDRESS)"
+            - "--leader-election"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: "IfNotPresent"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
         - name: node-driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v1.3.0
+          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.0.1
           args:
             - --v=5
             - --csi-address=/csi/csi.sock
@@ -61,15 +91,15 @@ spec:
             name: csi-data-dir
 
         - name: hostpath
+          # WARNING: manually downgraded from 1.6.2 to 1.4.0 because 1.5.x and 1.6.x have
+          # a bug that causes E2E testing to fail (https://github.com/kubernetes-csi/csi-driver-host-path/pull/210#discussion_r605592438,
+          # https://github.com/kubernetes-csi/csi-driver-host-path/issues/251).
           image: k8s.gcr.io/sig-storage/hostpathplugin:v1.4.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--nodeid=$(KUBE_NODE_NAME)"
-            # The only difference to github.com/kubernetes-csi/csi-driver-host-path/deploy
-            # - we have a tests that checks node limits.
-            - "--maxvolumespernode=10"
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -109,7 +139,7 @@ spec:
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
-          image: k8s.gcr.io/sig-storage/livenessprobe:v1.1.0
+          image: k8s.gcr.io/sig-storage/livenessprobe:v2.2.0
           args:
           - --csi-address=/csi/csi.sock
           - --health-port=9898
