@@ -97,7 +97,7 @@ func (h *HeapsterMetricsClient) GetResourceMetric(resource v1.ResourceName, name
 				if !found {
 					missing = true
 					klog.V(2).Infof("missing resource metric %v for container %s in pod %s/%s", resource, c.Name, namespace, m.Name)
-					continue
+					break
 				}
 				podSum += resValue.MilliValue()
 			}
