@@ -160,7 +160,7 @@ func NewCmdCreateIngress(f cmdutil.Factory, ioStreams genericclioptions.IOStream
 	cmd.Flags().StringVar(&o.IngressClass, "class", o.IngressClass, "Ingress Class to be used")
 	cmd.Flags().StringArrayVar(&o.Rules, "rule", o.Rules, "Rule in format host/path=service:port[,tls=secretname]. Paths containing the leading character '*' are considered pathType=Prefix. tls argument is optional.")
 	cmd.Flags().StringVar(&o.DefaultBackend, "default-backend", o.DefaultBackend, "Default service for backend, in format of svcname:port")
-	cmd.Flags().StringArrayVar(&o.Annotations, "annotation", o.Annotations, "Annotation to insert in the ingress object, in the format annotation=value")
+	cmd.Flags().StringArrayVar(&o.Annotations, "annotation", o.Annotations, "Annotation to insert in the ingress object, in the format annotation=[value]")
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.FieldManager, "kubectl-create")
 
 	return cmd
@@ -228,6 +228,12 @@ func (o *CreateIngressOptions) Validate() error {
 		}
 	}
 
+	for _, annotation := range o.Annotations {
+		if an := strings.SplitN(annotation, "=", 2); len(an) != 2 {
+			return fmt.Errorf("annotation %s is invalid and should be in format key=[value]", annotation)
+		}
+	}
+
 	if len(o.DefaultBackend) > 0 && len(strings.Split(o.DefaultBackend, ":")) != 2 {
 		return fmt.Errorf("default-backend should be in format servicename:serviceport")
 	}
@@ -285,8 +291,8 @@ func (o *CreateIngressOptions) createIngress() *networkingv1.Ingress {
 }
 
 func (o *CreateIngressOptions) buildAnnotations() map[string]string {
-	var annotations map[string]string
-	annotations = make(map[string]string)
+
+	var annotations = make(map[string]string)
 
 	for _, annotation := range o.Annotations {
 		an := strings.SplitN(annotation, "=", 2)
