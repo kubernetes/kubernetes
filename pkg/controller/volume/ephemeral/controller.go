@@ -45,7 +45,7 @@ import (
 
 // Controller creates PVCs for ephemeral inline volumes in a pod spec.
 type Controller interface {
-	Run(workers int, stopCh <-chan struct{})
+	Run(ctx context.Context, workers int, stopCh <-chan struct{})
 }
 
 type ephemeralController struct {
@@ -163,7 +163,7 @@ func (ec *ephemeralController) onPVCDelete(obj interface{}) {
 	}
 }
 
-func (ec *ephemeralController) Run(workers int, stopCh <-chan struct{}) {
+func (ec *ephemeralController) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 	defer ec.queue.ShutDown()
 
@@ -175,25 +175,25 @@ func (ec *ephemeralController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(ec.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, ec.runWorker, time.Second)
 	}
 
 	<-stopCh
 }
 
-func (ec *ephemeralController) runWorker() {
-	for ec.processNextWorkItem() {
+func (ec *ephemeralController) runWorker(ctx context.Context) {
+	for ec.processNextWorkItem(ctx) {
 	}
 }
 
-func (ec *ephemeralController) processNextWorkItem() bool {
+func (ec *ephemeralController) processNextWorkItem(ctx context.Context) bool {
 	key, shutdown := ec.queue.Get()
 	if shutdown {
 		return false
 	}
 	defer ec.queue.Done(key)
 
-	err := ec.syncHandler(key.(string))
+	err := ec.syncHandler(ctx, key.(string))
 	if err == nil {
 		ec.queue.Forget(key)
 		return true
@@ -207,7 +207,7 @@ func (ec *ephemeralController) processNextWorkItem() bool {
 
 // syncHandler is invoked for each pod which might need to be processed.
 // If an error is returned from this function, the pod will be requeued.
-func (ec *ephemeralController) syncHandler(key string) error {
+func (ec *ephemeralController) syncHandler(ctx context.Context, key string) error {
 	namespace, name, err := kcache.SplitMetaNamespaceKey(key)
 	if err != nil {
 		return err
@@ -229,7 +229,7 @@ func (ec *ephemeralController) syncHandler(key string) error {
 	}
 
 	for _, vol := range pod.Spec.Volumes {
-		if err := ec.handleVolume(pod, vol); err != nil {
+		if err := ec.handleVolume(ctx, pod, vol); err != nil {
 			ec.recorder.Event(pod, v1.EventTypeWarning, events.FailedBinding, fmt.Sprintf("ephemeral volume %s: %v", vol.Name, err))
 			return fmt.Errorf("pod %s, ephemeral volume %s: %v", key, vol.Name, err)
 		}
@@ -239,7 +239,7 @@ func (ec *ephemeralController) syncHandler(key string) error {
 }
 
 // handleEphemeralVolume is invoked for each volume of a pod.
-func (ec *ephemeralController) handleVolume(pod *v1.Pod, vol v1.Volume) error {
+func (ec *ephemeralController) handleVolume(ctx context.Context, pod *v1.Pod, vol v1.Volume) error {
 	klog.V(5).Infof("ephemeral: checking volume %s", vol.Name)
 	ephemeral := vol.Ephemeral
 	if ephemeral == nil {
@@ -282,7 +282,7 @@ func (ec *ephemeralController) handleVolume(pod *v1.Pod, vol v1.Volume) error {
 		Spec: ephemeral.VolumeClaimTemplate.Spec,
 	}
 	ephemeralvolumemetrics.EphemeralVolumeCreateAttempts.Inc()
-	_, err = ec.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{})
+	_, err = ec.kubeClient.CoreV1().PersistentVolumeClaims(pod.Namespace).Create(ctx, pvc, metav1.CreateOptions{})
 	if err != nil {
 		ephemeralvolumemetrics.EphemeralVolumeCreateFailures.Inc()
 		return fmt.Errorf("create PVC %s: %v", pvcName, err)

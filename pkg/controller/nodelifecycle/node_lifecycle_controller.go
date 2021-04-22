@@ -533,7 +533,7 @@ func NewNodeLifecycleController(
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *Controller) Run(stopCh <-chan struct{}) {
+func (nc *Controller) Run(ctx context.Context, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Starting node controller")
@@ -577,7 +577,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	// Incorporate the results of node health signal pushed from kubelet to master.
 	go wait.Until(func() {
-		if err := nc.monitorNodeHealth(); err != nil {
+		if err := nc.monitorNodeHealth(ctx); err != nil {
 			klog.Errorf("Error monitoring node health: %v", err)
 		}
 	}, nc.nodeMonitorPeriod, stopCh)
@@ -753,7 +753,7 @@ func (nc *Controller) doEvictionPass() {
 // monitorNodeHealth verifies node health are constantly updated by kubelet, and
 // if not, post "NodeReady==ConditionUnknown".
 // This function will taint nodes who are not ready or not reachable for a long period of time.
-func (nc *Controller) monitorNodeHealth() error {
+func (nc *Controller) monitorNodeHealth(ctx context.Context) error {
 	// We are listing nodes from local cache as we can tolerate some small delays
 	// comparing to state from etcd and there is eventual consistency anyway.
 	nodes, err := nc.nodeLister.List(labels.Everything())
@@ -796,7 +796,7 @@ func (nc *Controller) monitorNodeHealth() error {
 				return true, nil
 			}
 			name := node.Name
-			node, err = nc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+			node, err = nc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("Failed while getting a Node to retry updating node health. Probably Node %s was deleted.", name)
 				return false, err

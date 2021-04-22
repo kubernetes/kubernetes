@@ -83,7 +83,7 @@ func NewPodGC(kubeClient clientset.Interface, podInformer coreinformers.PodInfor
 	return gcc
 }
 
-func (gcc *PodGCController) Run(stop <-chan struct{}) {
+func (gcc *PodGCController) Run(ctx context.Context, stop <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Starting GC controller")
@@ -94,12 +94,12 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 		return
 	}
 
-	go wait.Until(gcc.gc, gcCheckPeriod, stop)
+	go wait.UntilWithContext(ctx, gcc.gc, gcCheckPeriod)
 
 	<-stop
 }
 
-func (gcc *PodGCController) gc() {
+func (gcc *PodGCController) gc(ctx context.Context) {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error while listing all pods: %v", err)
@@ -113,7 +113,7 @@ func (gcc *PodGCController) gc() {
 	if gcc.terminatedPodThreshold > 0 {
 		gcc.gcTerminated(pods)
 	}
-	gcc.gcOrphaned(pods, nodes)
+	gcc.gcOrphaned(ctx, pods, nodes)
 	gcc.gcUnscheduledTerminating(pods)
 }
 
@@ -157,7 +157,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 }
 
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
-func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
+func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, nodes []*v1.Node) {
 	klog.V(4).Infof("GC'ing orphaned")
 	existingNodeNames := sets.NewString()
 	for _, node := range nodes {
@@ -170,7 +170,7 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 		}
 	}
 	// Check if nodes are still missing after quarantine period
-	deletedNodesNames, quit := gcc.discoverDeletedNodes(existingNodeNames)
+	deletedNodesNames, quit := gcc.discoverDeletedNodes(ctx, existingNodeNames)
 	if quit {
 		return
 	}
@@ -188,7 +188,7 @@ func (gcc *PodGCController) gcOrphaned(pods []*v1.Pod, nodes []*v1.Node) {
 	}
 }
 
-func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) (sets.String, bool) {
+func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNodeNames sets.String) (sets.String, bool) {
 	deletedNodesNames := sets.NewString()
 	for gcc.nodeQueue.Len() > 0 {
 		item, quit := gcc.nodeQueue.Get()
@@ -197,7 +197,7 @@ func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) 
 		}
 		nodeName := item.(string)
 		if !existingNodeNames.Has(nodeName) {
-			exists, err := gcc.checkIfNodeExists(nodeName)
+			exists, err := gcc.checkIfNodeExists(ctx, nodeName)
 			switch {
 			case err != nil:
 				klog.Errorf("Error while getting node %q: %v", nodeName, err)
@@ -211,8 +211,8 @@ func (gcc *PodGCController) discoverDeletedNodes(existingNodeNames sets.String) 
 	return deletedNodesNames, false
 }
 
-func (gcc *PodGCController) checkIfNodeExists(name string) (bool, error) {
-	_, fetchErr := gcc.kubeClient.CoreV1().Nodes().Get(context.TODO(), name, metav1.GetOptions{})
+func (gcc *PodGCController) checkIfNodeExists(ctx context.Context, name string) (bool, error) {
+	_, fetchErr := gcc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if errors.IsNotFound(fetchErr) {
 		return false, nil
 	}

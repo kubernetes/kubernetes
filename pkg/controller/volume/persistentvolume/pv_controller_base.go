@@ -204,7 +204,7 @@ func (ctrl *PersistentVolumeController) storeClaimUpdate(claim interface{}) (boo
 
 // updateVolume runs in worker thread and handles "volume added",
 // "volume updated" and "periodic sync" events.
-func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume) {
+func (ctrl *PersistentVolumeController) updateVolume(ctx context.Context, volume *v1.PersistentVolume) {
 	// Store the new volume version in the cache and do not process it if this
 	// is an old version.
 	new, err := ctrl.storeVolumeUpdate(volume)
@@ -215,7 +215,7 @@ func (ctrl *PersistentVolumeController) updateVolume(volume *v1.PersistentVolume
 		return
 	}
 
-	err = ctrl.syncVolume(volume)
+	err = ctrl.syncVolume(ctx, volume)
 	if err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
@@ -252,7 +252,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(volume *v1.PersistentVolume
 
 // updateClaim runs in worker thread and handles "claim added",
 // "claim updated" and "periodic sync" events.
-func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeClaim) {
+func (ctrl *PersistentVolumeController) updateClaim(ctx context.Context, claim *v1.PersistentVolumeClaim) {
 	// Store the new claim version in the cache and do not process it if this is
 	// an old version.
 	new, err := ctrl.storeClaimUpdate(claim)
@@ -262,7 +262,7 @@ func (ctrl *PersistentVolumeController) updateClaim(claim *v1.PersistentVolumeCl
 	if !new {
 		return
 	}
-	err = ctrl.syncClaim(claim)
+	err = ctrl.syncClaim(ctx, claim)
 	if err != nil {
 		if errors.IsConflict(err) {
 			// Version conflict error happens quite often and the controller
@@ -300,7 +300,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(claim *v1.PersistentVolumeCl
 }
 
 // Run starts all of this controller's control loops
-func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
+func (ctrl *PersistentVolumeController) Run(ctx context.Context, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer ctrl.claimQueue.ShutDown()
 	defer ctrl.volumeQueue.ShutDown()
@@ -315,15 +315,15 @@ func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	ctrl.initializeCaches(ctrl.volumeLister, ctrl.claimLister)
 
 	go wait.Until(ctrl.resync, ctrl.resyncPeriod, stopCh)
-	go wait.Until(ctrl.volumeWorker, time.Second, stopCh)
-	go wait.Until(ctrl.claimWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, ctrl.volumeWorker, time.Second)
+	go wait.UntilWithContext(ctx, ctrl.claimWorker, time.Second)
 
 	metrics.Register(ctrl.volumes.store, ctrl.claims, &ctrl.volumePluginMgr)
 
 	<-stopCh
 }
 
-func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
+func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(ctx context.Context, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolumeClaim, error) {
 	// TODO: update[Claim|Volume]MigrationAnnotations can be optimized to not
 	// copy the claim/volume if no modifications are required. Though this
 	// requires some refactoring as well as an interesting change in the
@@ -335,7 +335,7 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 	if !modified {
 		return claimClone, nil
 	}
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claimClone.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
 	}
@@ -346,13 +346,13 @@ func (ctrl *PersistentVolumeController) updateClaimMigrationAnnotations(claim *v
 	return newClaim, nil
 }
 
-func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
+func (ctrl *PersistentVolumeController) updateVolumeMigrationAnnotations(ctx context.Context, volume *v1.PersistentVolume) (*v1.PersistentVolume, error) {
 	volumeClone := volume.DeepCopy()
 	modified := updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, volumeClone.Annotations, pvutil.AnnDynamicallyProvisioned)
 	if !modified {
 		return volumeClone, nil
 	}
-	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(context.TODO(), volumeClone, metav1.UpdateOptions{})
+	newVol, err := ctrl.kubeClient.CoreV1().PersistentVolumes().Update(ctx, volumeClone, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("persistent Volume Controller can't anneal migration annotations: %v", err)
 	}
@@ -408,7 +408,7 @@ func updateMigrationAnnotations(cmpm CSIMigratedPluginManager, translator CSINam
 
 // volumeWorker processes items from volumeQueue. It must run only once,
 // syncVolume is not assured to be reentrant.
-func (ctrl *PersistentVolumeController) volumeWorker() {
+func (ctrl *PersistentVolumeController) volumeWorker(ctx context.Context) {
 	workFunc := func() bool {
 		keyObj, quit := ctrl.volumeQueue.Get()
 		if quit {
@@ -427,7 +427,7 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 		if err == nil {
 			// The volume still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateVolume(volume)
+			ctrl.updateVolume(ctx, volume)
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -466,7 +466,7 @@ func (ctrl *PersistentVolumeController) volumeWorker() {
 
 // claimWorker processes items from claimQueue. It must run only once,
 // syncClaim is not reentrant.
-func (ctrl *PersistentVolumeController) claimWorker() {
+func (ctrl *PersistentVolumeController) claimWorker(ctx context.Context) {
 	workFunc := func() bool {
 		keyObj, quit := ctrl.claimQueue.Get()
 		if quit {
@@ -485,7 +485,7 @@ func (ctrl *PersistentVolumeController) claimWorker() {
 		if err == nil {
 			// The claim still exists in informer cache, the event must have
 			// been add/update/sync
-			ctrl.updateClaim(claim)
+			ctrl.updateClaim(ctx, claim)
 			return false
 		}
 		if !errors.IsNotFound(err) {
@@ -548,7 +548,7 @@ func (ctrl *PersistentVolumeController) resync() {
 
 // setClaimProvisioner saves
 // claim.Annotations[pvutil.AnnStorageProvisioner] = class.Provisioner
-func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
+func (ctrl *PersistentVolumeController) setClaimProvisioner(ctx context.Context, claim *v1.PersistentVolumeClaim, provisionerName string) (*v1.PersistentVolumeClaim, error) {
 	if val, ok := claim.Annotations[pvutil.AnnStorageProvisioner]; ok && val == provisionerName {
 		// annotation is already set, nothing to do
 		return claim, nil
@@ -559,7 +559,7 @@ func (ctrl *PersistentVolumeController) setClaimProvisioner(claim *v1.Persistent
 	claimClone := claim.DeepCopy()
 	metav1.SetMetaDataAnnotation(&claimClone.ObjectMeta, pvutil.AnnStorageProvisioner, provisionerName)
 	updateMigrationAnnotations(ctrl.csiMigratedPluginManager, ctrl.translator, claimClone.Annotations, pvutil.AnnStorageProvisioner)
-	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(context.TODO(), claimClone, metav1.UpdateOptions{})
+	newClaim, err := ctrl.kubeClient.CoreV1().PersistentVolumeClaims(claim.Namespace).Update(ctx, claimClone, metav1.UpdateOptions{})
 	if err != nil {
 		return newClaim, err
 	}

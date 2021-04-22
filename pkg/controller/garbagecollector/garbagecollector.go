@@ -133,7 +133,7 @@ func (gc *GarbageCollector) resyncMonitors(deletableResources map[schema.GroupVe
 }
 
 // Run starts garbage collector workers.
-func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+func (gc *GarbageCollector) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer gc.attemptToDelete.ShutDown()
 	defer gc.attemptToOrphan.ShutDown()
@@ -152,7 +152,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 
 	// gc workers
 	for i := 0; i < workers; i++ {
-		go wait.Until(gc.runAttemptToDeleteWorker, 1*time.Second, stopCh)
+		go wait.UntilWithContext(ctx, gc.runAttemptToDeleteWorker, 1*time.Second)
 		go wait.Until(gc.runAttemptToOrphanWorker, 1*time.Second, stopCh)
 	}
 
@@ -290,8 +290,8 @@ func (gc *GarbageCollector) IsSynced() bool {
 	return gc.dependencyGraphBuilder.IsSynced()
 }
 
-func (gc *GarbageCollector) runAttemptToDeleteWorker() {
-	for gc.attemptToDeleteWorker() {
+func (gc *GarbageCollector) runAttemptToDeleteWorker(ctx context.Context) {
+	for gc.attemptToDeleteWorker(ctx) {
 	}
 }
 
@@ -299,7 +299,7 @@ var enqueuedVirtualDeleteEventErr = goerrors.New("enqueued virtual delete event"
 
 var namespacedOwnerOfClusterScopedObjectErr = goerrors.New("cluster-scoped objects cannot refer to namespaced owners")
 
-func (gc *GarbageCollector) attemptToDeleteWorker() bool {
+func (gc *GarbageCollector) attemptToDeleteWorker(ctx context.Context) bool {
 	item, quit := gc.attemptToDelete.Get()
 	gc.workerLock.RLock()
 	defer gc.workerLock.RUnlock()
@@ -329,7 +329,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		}
 	}
 
-	err := gc.attemptToDeleteItem(n)
+	err := gc.attemptToDeleteItem(ctx, n)
 	if err == enqueuedVirtualDeleteEventErr {
 		// a virtual event was produced and will be handled by processGraphChanges, no need to requeue this node
 		return true
@@ -364,7 +364,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 // isDangling check if a reference is pointing to an object that doesn't exist.
 // If isDangling looks up the referenced object at the API server, it also
 // returns its latest state.
-func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *node) (
+func (gc *GarbageCollector) isDangling(ctx context.Context, reference metav1.OwnerReference, item *node) (
 	dangling bool, owner *metav1.PartialObjectMetadata, err error) {
 
 	// check for recorded absent cluster-scoped parent
@@ -404,7 +404,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	// TODO: It's only necessary to talk to the API server if the owner node
 	// is a "virtual" node. The local graph could lag behind the real
 	// status, but in practice, the difference is small.
-	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(context.TODO(), reference.Name, metav1.GetOptions{})
+	owner, err = gc.metadataClient.Resource(resource).Namespace(resourceDefaultNamespace(namespaced, item.identity.Namespace)).Get(ctx, reference.Name, metav1.GetOptions{})
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(absentOwnerCacheKey)
@@ -428,10 +428,10 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 // waitingForDependentsDeletion: the owner exists, its deletionTimestamp is non-nil, and it has
 // FinalizerDeletingDependents
 // This function communicates with the server.
-func (gc *GarbageCollector) classifyReferences(item *node, latestReferences []metav1.OwnerReference) (
+func (gc *GarbageCollector) classifyReferences(ctx context.Context, item *node, latestReferences []metav1.OwnerReference) (
 	solid, dangling, waitingForDependentsDeletion []metav1.OwnerReference, err error) {
 	for _, reference := range latestReferences {
-		isDangling, owner, err := gc.isDangling(reference, item)
+		isDangling, owner, err := gc.isDangling(ctx, reference, item)
 		if err != nil {
 			return nil, nil, nil, err
 		}
@@ -467,7 +467,7 @@ func ownerRefsToUIDs(refs []metav1.OwnerReference) []types.UID {
 //
 // if the API get request returns a NotFound error, or the retrieved item's uid does not match,
 // a virtual delete event for the node is enqueued and enqueuedVirtualDeleteEventErr is returned.
-func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
+func (gc *GarbageCollector) attemptToDeleteItem(ctx context.Context, item *node) error {
 	klog.V(2).InfoS("Processing object", "object", klog.KRef(item.identity.Namespace, item.identity.Name),
 		"objectUID", item.identity.UID, "kind", item.identity.Kind, "virtual", !item.isObserved())
 
@@ -511,7 +511,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		return nil
 	}
 
-	solid, dangling, waitingForDependentsDeletion, err := gc.classifyReferences(item, ownerReferences)
+	solid, dangling, waitingForDependentsDeletion, err := gc.classifyReferences(ctx, item, ownerReferences)
 	if err != nil {
 		return err
 	}
