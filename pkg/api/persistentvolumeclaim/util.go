@@ -36,13 +36,7 @@ func DropDisabledFields(pvcSpec, oldPVCSpec *core.PersistentVolumeClaimSpec) {
 }
 
 func dataSourceInUse(oldPVCSpec *core.PersistentVolumeClaimSpec) bool {
-	if oldPVCSpec == nil {
-		return false
-	}
-	if oldPVCSpec.DataSource != nil {
-		return true
-	}
-	return false
+	return oldPVCSpec != nil && oldPVCSpec.DataSource != nil
 }
 
 func dataSourceIsEnabled(pvcSpec *core.PersistentVolumeClaimSpec) bool {

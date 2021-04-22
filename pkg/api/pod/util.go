@@ -700,21 +700,11 @@ func podAffinityNamespaceSelectorInUse(podSpec *api.PodSpec) bool {
 }
 
 func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	return len(podSpec.EphemeralContainers) > 0
+	return podSpec != nil && len(podSpec.EphemeralContainers) > 0
 }
 
 func fsGroupPolicyInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	securityContext := podSpec.SecurityContext
-	if securityContext != nil && securityContext.FSGroupChangePolicy != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.SecurityContext != nil && podSpec.SecurityContext.FSGroupChangePolicy != nil
 }
 
 // subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
@@ -739,13 +729,7 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 
 // overheadInUse returns true if the pod spec is non-nil and has Overhead set
 func overheadInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Overhead != nil {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.Overhead != nil
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -781,13 +765,7 @@ func appArmorInUse(podAnnotations map[string]string) bool {
 
 // podPriorityInUse returns true if the pod spec is non-nil and has Priority or PriorityClassName set.
 func podPriorityInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil {
-		return false
-	}
-	if podSpec.Priority != nil || podSpec.PriorityClassName != "" {
-		return true
-	}
-	return false
+	return podSpec != nil && podSpec.Priority != nil && len(podSpec.PriorityClassName) > 0
 }
 
 // emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
@@ -874,21 +852,12 @@ func ephemeralInUse(podSpec *api.PodSpec) bool {
 
 // podPriorityInUse returns true if status is not nil and number of PodIPs is greater than one
 func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
-	if podStatus == nil {
-		return false
-	}
-	if len(podStatus.PodIPs) > 1 {
-		return true
-	}
-	return false
+	return podStatus != nil && len(podStatus.PodIPs) > 1
 }
 
 // setHostnameAsFQDNInUse returns true if any pod's spec defines setHostnameAsFQDN field.
 func setHostnameAsFQDNInUse(podSpec *api.PodSpec) bool {
-	if podSpec == nil || podSpec.SetHostnameAsFQDN == nil {
-		return false
-	}
-	return *podSpec.SetHostnameAsFQDN
+	return podSpec != nil && podSpec.SetHostnameAsFQDN != nil && *podSpec.SetHostnameAsFQDN
 }
 
 // SeccompAnnotationForField takes a pod seccomp profile field and returns the
