@@ -16,6 +16,8 @@ go_library(
         "retriablerequest_1.8.go",
         "sender.go",
         "utility.go",
+        "utility_1.13.go",
+        "utility_legacy.go",
         "version.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/Azure/go-autorest/autorest",

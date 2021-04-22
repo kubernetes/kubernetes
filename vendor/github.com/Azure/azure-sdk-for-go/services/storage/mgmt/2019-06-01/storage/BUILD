@@ -8,6 +8,7 @@ go_library(
         "blobservices.go",
         "client.go",
         "encryptionscopes.go",
+        "enums.go",
         "fileservices.go",
         "fileshares.go",
         "managementpolicies.go",

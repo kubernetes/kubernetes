@@ -42,6 +42,52 @@ const (
 
 var pollingCodes = [...]int{http.StatusNoContent, http.StatusAccepted, http.StatusCreated, http.StatusOK}
 
+// FutureAPI contains the set of methods on the Future type.
+type FutureAPI interface {
+	// Response returns the last HTTP response.
+	Response() *http.Response
+
+	// Status returns the last status message of the operation.
+	Status() string
+
+	// PollingMethod returns the method used to monitor the status of the asynchronous operation.
+	PollingMethod() PollingMethodType
+
+	// DoneWithContext queries the service to see if the operation has completed.
+	DoneWithContext(context.Context, autorest.Sender) (bool, error)
+
+	// GetPollingDelay returns a duration the application should wait before checking
+	// the status of the asynchronous request and true; this value is returned from
+	// the service via the Retry-After response header.  If the header wasn't returned
+	// then the function returns the zero-value time.Duration and false.
+	GetPollingDelay() (time.Duration, bool)
+
+	// WaitForCompletionRef will return when one of the following conditions is met: the long
+	// running operation has completed, the provided context is cancelled, or the client's
+	// polling duration has been exceeded.  It will retry failed polling attempts based on
+	// the retry value defined in the client up to the maximum retry attempts.
+	// If no deadline is specified in the context then the client.PollingDuration will be
+	// used to determine if a default deadline should be used.
+	// If PollingDuration is greater than zero the value will be used as the context's timeout.
+	// If PollingDuration is zero then no default deadline will be used.
+	WaitForCompletionRef(context.Context, autorest.Client) error
+
+	// MarshalJSON implements the json.Marshaler interface.
+	MarshalJSON() ([]byte, error)
+
+	// MarshalJSON implements the json.Unmarshaler interface.
+	UnmarshalJSON([]byte) error
+
+	// PollingURL returns the URL used for retrieving the status of the long-running operation.
+	PollingURL() string
+
+	// GetResult should be called once polling has completed successfully.
+	// It makes the final GET call to retrieve the resultant payload.
+	GetResult(autorest.Sender) (*http.Response, error)
+}
+
+var _ FutureAPI = (*Future)(nil)
+
 // Future provides a mechanism to access the status and results of an asynchronous request.
 // Since futures are stateful they should be passed by value to avoid race conditions.
 type Future struct {
@@ -167,7 +213,13 @@ func (f *Future) WaitForCompletionRef(ctx context.Context, client autorest.Clien
 		cancelCtx, cancel = context.WithTimeout(ctx, d)
 		defer cancel()
 	}
-
+	// if the initial response has a Retry-After, sleep for the specified amount of time before starting to poll
+	if delay, ok := f.GetPollingDelay(); ok {
+		if delayElapsed := autorest.DelayForBackoff(delay, 0, cancelCtx.Done()); !delayElapsed {
+			err = cancelCtx.Err()
+			return
+		}
+	}
 	done, err := f.DoneWithContext(ctx, client)
 	for attempts := 0; !done; done, err = f.DoneWithContext(ctx, client) {
 		if attempts >= client.RetryAttempts {
@@ -407,12 +459,12 @@ func (pt *pollingTrackerBase) updateRawBody() error {
 		if err != nil {
 			return autorest.NewErrorWithError(err, "pollingTrackerBase", "updateRawBody", nil, "failed to read response body")
 		}
+		// put the body back so it's available to other callers
+		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
 		// observed in 204 responses over HTTP/2.0; the content length is -1 but body is empty
 		if len(b) == 0 {
 			return nil
 		}
-		// put the body back so it's available to other callers
-		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
 		if err = json.Unmarshal(b, &pt.rawBody); err != nil {
 			return autorest.NewErrorWithError(err, "pollingTrackerBase", "updateRawBody", nil, "failed to unmarshal response body")
 		}
@@ -460,7 +512,12 @@ func (pt *pollingTrackerBase) updateErrorFromResponse() {
 		re := respErr{}
 		defer pt.resp.Body.Close()
 		var b []byte
-		if b, err = ioutil.ReadAll(pt.resp.Body); err != nil || len(b) == 0 {
+		if b, err = ioutil.ReadAll(pt.resp.Body); err != nil {
+			goto Default
+		}
+		// put the body back so it's available to other callers
+		pt.resp.Body = ioutil.NopCloser(bytes.NewReader(b))
+		if len(b) == 0 {
 			goto Default
 		}
 		if err = json.Unmarshal(b, &re); err != nil {

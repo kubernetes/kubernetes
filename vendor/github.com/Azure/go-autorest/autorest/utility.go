@@ -26,8 +26,6 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-
-	"github.com/Azure/go-autorest/autorest/adal"
 )
 
 // EncodedAs is a series of constants specifying various data encodings
@@ -207,18 +205,6 @@ func ChangeToGet(req *http.Request) *http.Request {
 	return req
 }
 
-// IsTokenRefreshError returns true if the specified error implements the TokenRefreshError
-// interface.  If err is a DetailedError it will walk the chain of Original errors.
-func IsTokenRefreshError(err error) bool {
-	if _, ok := err.(adal.TokenRefreshError); ok {
-		return true
-	}
-	if de, ok := err.(DetailedError); ok {
-		return IsTokenRefreshError(de.Original)
-	}
-	return false
-}
-
 // IsTemporaryNetworkError returns true if the specified error is a temporary network error or false
 // if it's not.  If the error doesn't implement the net.Error interface the return value is true.
 func IsTemporaryNetworkError(err error) bool {
@@ -236,4 +222,11 @@ func DrainResponseBody(resp *http.Response) error {
 		return err
 	}
 	return nil
+}
+
+func setHeader(r *http.Request, key, value string) {
+	if r.Header == nil {
+		r.Header = make(http.Header)
+	}
+	r.Header.Set(key, value)
 }
