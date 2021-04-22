@@ -149,7 +149,7 @@ func NewAttachDetachController(
 	adc.volumeAttachmentSynced = volumeAttachmentInformer.Informer().HasSynced
 
 	if err := adc.volumePluginMgr.InitPlugins(plugins, prober, adc); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for Attach/Detach Controller: %+v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for Attach/Detach Controller: %w", err)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -206,7 +206,7 @@ func NewAttachDetachController(
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
 	if err := common.AddPodPVCIndexerIfNotPresent(adc.podIndexer); err != nil {
-		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{

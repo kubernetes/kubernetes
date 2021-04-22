@@ -545,7 +545,7 @@ func TestSync(t *testing.T) {
 			newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeAvailable, v1.PersistentVolumeReclaimDelete, classEmpty),
 			func() []*v1.PersistentVolume {
 				volumes := newVolumeArray("volume4-10", "10Gi", "uid4-10", "claim4-10", v1.VolumeFailed, v1.PersistentVolumeReclaimDelete, classEmpty)
-				volumes[0].Status.Message = `Error getting deleter volume plugin for volume "volume4-10": no volume plugin matched`
+				volumes[0].Status.Message = `error getting deleter volume plugin for volume "volume4-10": no volume plugin matched`
 				return volumes
 			}(),
 			noclaims,

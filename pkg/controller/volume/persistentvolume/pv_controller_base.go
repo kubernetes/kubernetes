@@ -104,7 +104,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	// Prober is nil because PV is not aware of Flexvolume.
 	if err := controller.volumePluginMgr.InitPlugins(p.VolumePlugins, nil /* prober */, controller); err != nil {
-		return nil, fmt.Errorf("Could not initialize volume plugins for PersistentVolume Controller: %v", err)
+		return nil, fmt.Errorf("could not initialize volume plugins for PersistentVolume Controller: %w", err)
 	}
 
 	p.VolumeInformer.Informer().AddEventHandler(
@@ -138,7 +138,7 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
 	if err := common.AddPodPVCIndexerIfNotPresent(controller.podIndexer); err != nil {
-		return nil, fmt.Errorf("Could not initialize attach detach controller: %v", err)
+		return nil, fmt.Errorf("could not initialize attach detach controller: %w", err)
 	}
 
 	csiTranslator := csitrans.New()
@@ -595,11 +595,11 @@ func getVolumeStatusForLogging(volume *v1.PersistentVolume) string {
 func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bool, error) {
 	objName, err := controller.KeyFunc(obj)
 	if err != nil {
-		return false, fmt.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return false, fmt.Errorf("couldn't get key for object %+v: %w", obj, err)
 	}
 	oldObj, found, err := store.Get(obj)
 	if err != nil {
-		return false, fmt.Errorf("Error finding %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error finding %s %q in controller cache: %w", className, objName, err)
 	}
 
 	objAccessor, err := meta.Accessor(obj)
@@ -611,7 +611,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 		// This is a new object
 		klog.V(4).Infof("storeObjectUpdate: adding %s %q, version %s", className, objName, objAccessor.GetResourceVersion())
 		if err = store.Add(obj); err != nil {
-			return false, fmt.Errorf("Error adding %s %q to controller cache: %v", className, objName, err)
+			return false, fmt.Errorf("error adding %s %q to controller cache: %w", className, objName, err)
 		}
 		return true, nil
 	}
@@ -623,11 +623,11 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	objResourceVersion, err := strconv.ParseInt(objAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing ResourceVersion %q of %s %q: %s", objAccessor.GetResourceVersion(), className, objName, err)
 	}
 	oldObjResourceVersion, err := strconv.ParseInt(oldObjAccessor.GetResourceVersion(), 10, 64)
 	if err != nil {
-		return false, fmt.Errorf("Error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
+		return false, fmt.Errorf("error parsing old ResourceVersion %q of %s %q: %s", oldObjAccessor.GetResourceVersion(), className, objName, err)
 	}
 
 	// Throw away only older version, let the same version pass - we do want to
@@ -639,7 +639,7 @@ func storeObjectUpdate(store cache.Store, obj interface{}, className string) (bo
 
 	klog.V(4).Infof("storeObjectUpdate updating %s %q with version %s", className, objName, objAccessor.GetResourceVersion())
 	if err = store.Update(obj); err != nil {
-		return false, fmt.Errorf("Error updating %s %q in controller cache: %v", className, objName, err)
+		return false, fmt.Errorf("error updating %s %q in controller cache: %w", className, objName, err)
 	}
 	return true, nil
 }

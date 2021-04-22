@@ -288,7 +288,7 @@ func (r *reconciler) deleteEndpoints(namespace, name string, endpointSlices []*d
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("Error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
+		return fmt.Errorf("error(s) deleting %d/%d EndpointSlices for %s/%s Endpoints, including: %s", len(errs), len(endpointSlices), namespace, name, errs[0])
 	}
 	return nil
 }
