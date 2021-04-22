@@ -17,6 +17,7 @@ limitations under the License.
 package daemon
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -323,7 +324,7 @@ func setPodReadiness(t *testing.T, dsc *daemonSetsController, ready bool, count 
 
 func currentDSHash(dsc *daemonSetsController, ds *apps.DaemonSet) (string, error) {
 	// Construct histories of the DaemonSet, and get the hash of current history
-	cur, _, err := dsc.constructHistory(ds)
+	cur, _, err := dsc.constructHistory(context.TODO(), ds)
 	if err != nil {
 		return "", err
 	}

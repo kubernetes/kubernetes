@@ -383,7 +383,7 @@ func expectSyncDaemonSets(t *testing.T, manager *daemonSetsController, ds *apps.
 		t.Fatal("could not get key for daemon")
 	}
 
-	err = manager.syncHandler(key)
+	err = manager.syncHandler(context.TODO(), key)
 	if err != nil {
 		t.Log(err)
 	}
@@ -547,7 +547,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	// create of DS adds to queue, processes
 	waitForQueueLength(1, "created DS")
-	ok := dsc.processNextWorkItem()
+	ok := dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
@@ -576,7 +576,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 
 	// process updates DS, update adds to queue
 	waitForQueueLength(1, "updated DS")
-	ok = dsc.processNextWorkItem()
+	ok = dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("queue is shutting down")
 	}
@@ -624,7 +624,7 @@ func TestExpectationsOnRecreate(t *testing.T) {
 	}
 
 	waitForQueueLength(1, "recreated DS")
-	ok = dsc.processNextWorkItem()
+	ok = dsc.processNextWorkItem(context.TODO())
 	if !ok {
 		t.Fatal("Queue is shutting down!")
 	}
@@ -2797,7 +2797,7 @@ func TestGetNodesToDaemonPods(t *testing.T) {
 				}
 			}
 
-			nodesToDaemonPods, err := manager.getNodesToDaemonPods(ds)
+			nodesToDaemonPods, err := manager.getNodesToDaemonPods(context.TODO(), ds)
 			if err != nil {
 				t.Fatalf("getNodesToDaemonPods() error: %v", err)
 			}
@@ -3552,7 +3552,7 @@ func TestStoreDaemonSetStatus(t *testing.T) {
 				}
 				return true, ds, nil
 			})
-			if err := storeDaemonSetStatus(fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
+			if err := storeDaemonSetStatus(context.TODO(), fakeClient.AppsV1().DaemonSets("default"), ds, 2, 2, 2, 2, 2, 2, 2, true); err != tt.expectedError {
 				t.Errorf("storeDaemonSetStatus() got %v, expected %v", err, tt.expectedError)
 			}
 			if getCalled != tt.expectedGetCalled {

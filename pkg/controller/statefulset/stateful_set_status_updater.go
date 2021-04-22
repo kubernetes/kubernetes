@@ -33,7 +33,7 @@ import (
 type StatefulSetStatusUpdaterInterface interface {
 	// UpdateStatefulSetStatus sets the set's Status to status. Implementations are required to retry on conflicts,
 	// but fail on other errors. If the returned error is nil set's Status has been successfully set to status.
-	UpdateStatefulSetStatus(set *apps.StatefulSet, status *apps.StatefulSetStatus) error
+	UpdateStatefulSetStatus(ctx context.Context, set *apps.StatefulSet, status *apps.StatefulSetStatus) error
 }
 
 // NewRealStatefulSetStatusUpdater returns a StatefulSetStatusUpdaterInterface that updates the Status of a StatefulSet,
@@ -50,11 +50,13 @@ type realStatefulSetStatusUpdater struct {
 }
 
 func (ssu *realStatefulSetStatusUpdater) UpdateStatefulSetStatus(
+	ctx context.Context,
 	set *apps.StatefulSet,
 	status *apps.StatefulSetStatus) error {
 	// don't wait due to limited number of clients, but backoff after the default number of steps
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		set.Status = *status
+		// TODO: This context.TODO should use a real context once we have RetryOnConflictWithContext
 		_, updateErr := ssu.client.AppsV1().StatefulSets(set.Namespace).UpdateStatus(context.TODO(), set, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return nil

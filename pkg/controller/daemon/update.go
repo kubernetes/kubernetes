@@ -40,8 +40,8 @@ import (
 
 // rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
 // remaining within the constraints imposed by the update strategy.
-func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
-	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+func (dsc *DaemonSetsController) rollingUpdate(ctx context.Context, ds *apps.DaemonSet, nodeList []*v1.Node, hash string) error {
+	nodeToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -234,10 +234,10 @@ func findUpdatedPodsOnNode(ds *apps.DaemonSet, podsOnNode []*v1.Pod, hash string
 // constructHistory finds all histories controlled by the given DaemonSet, and
 // update current history revision number, or create current history if need to.
 // It also deduplicates current history, and adds missing unique labels to existing histories.
-func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
+func (dsc *DaemonSetsController) constructHistory(ctx context.Context, ds *apps.DaemonSet) (cur *apps.ControllerRevision, old []*apps.ControllerRevision, err error) {
 	var histories []*apps.ControllerRevision
 	var currentHistories []*apps.ControllerRevision
-	histories, err = dsc.controlledHistories(ds)
+	histories, err = dsc.controlledHistories(ctx, ds)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -247,7 +247,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 		if _, ok := history.Labels[apps.DefaultDaemonSetUniqueLabelKey]; !ok {
 			toUpdate := history.DeepCopy()
 			toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = toUpdate.Name
-			history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
+			history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -269,12 +269,12 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	switch len(currentHistories) {
 	case 0:
 		// Create a new history if the current one isn't found
-		cur, err = dsc.snapshot(ds, currRevision)
+		cur, err = dsc.snapshot(ctx, ds, currRevision)
 		if err != nil {
 			return nil, nil, err
 		}
 	default:
-		cur, err = dsc.dedupCurHistories(ds, currentHistories)
+		cur, err = dsc.dedupCurHistories(ctx, ds, currentHistories)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -282,7 +282,7 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 		if cur.Revision < currRevision {
 			toUpdate := cur.DeepCopy()
 			toUpdate.Revision = currRevision
-			_, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
+			_, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
 			if err != nil {
 				return nil, nil, err
 			}
@@ -291,8 +291,8 @@ func (dsc *DaemonSetsController) constructHistory(ds *apps.DaemonSet) (cur *apps
 	return cur, old, err
 }
 
-func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.ControllerRevision) error {
-	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ds)
+func (dsc *DaemonSetsController) cleanupHistory(ctx context.Context, ds *apps.DaemonSet, old []*apps.ControllerRevision) error {
+	nodesToDaemonPods, err := dsc.getNodesToDaemonPods(ctx, ds)
 	if err != nil {
 		return fmt.Errorf("couldn't get node to daemon pod mapping for daemon set %q: %v", ds.Name, err)
 	}
@@ -323,7 +323,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 			continue
 		}
 		// Clean up
-		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(context.TODO(), history.Name, metav1.DeleteOptions{})
+		err := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, history.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return err
 		}
@@ -343,7 +343,7 @@ func maxRevision(histories []*apps.ControllerRevision) int64 {
 	return max
 }
 
-func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) dedupCurHistories(ctx context.Context, ds *apps.DaemonSet, curHistories []*apps.ControllerRevision) (*apps.ControllerRevision, error) {
 	if len(curHistories) == 1 {
 		return curHistories[0], nil
 	}
@@ -361,7 +361,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 			continue
 		}
 		// Relabel pods before dedup
-		pods, err := dsc.getDaemonPods(ds)
+		pods, err := dsc.getDaemonPods(ctx, ds)
 		if err != nil {
 			return nil, err
 		}
@@ -372,14 +372,14 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 					toUpdate.Labels = make(map[string]string)
 				}
 				toUpdate.Labels[apps.DefaultDaemonSetUniqueLabelKey] = keepCur.Labels[apps.DefaultDaemonSetUniqueLabelKey]
-				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(context.TODO(), toUpdate, metav1.UpdateOptions{})
+				_, err = dsc.kubeClient.CoreV1().Pods(ds.Namespace).Update(ctx, toUpdate, metav1.UpdateOptions{})
 				if err != nil {
 					return nil, err
 				}
 			}
 		}
 		// Remove duplicates
-		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(context.TODO(), cur.Name, metav1.DeleteOptions{})
+		err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Delete(ctx, cur.Name, metav1.DeleteOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -391,7 +391,7 @@ func (dsc *DaemonSetsController) dedupCurHistories(ds *apps.DaemonSet, curHistor
 // This also reconciles ControllerRef by adopting/orphaning.
 // Note that returned histories are pointers to objects in the cache.
 // If you want to modify one, you need to deep-copy it first.
-func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) controlledHistories(ctx context.Context, ds *apps.DaemonSet) ([]*apps.ControllerRevision, error) {
 	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
@@ -405,8 +405,8 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 	}
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
-	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
+		fresh, err := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -417,7 +417,7 @@ func (dsc *DaemonSetsController) controlledHistories(ds *apps.DaemonSet) ([]*app
 	})
 	// Use ControllerRefManager to adopt/orphan as needed.
 	cm := controller.NewControllerRevisionControllerRefManager(dsc.crControl, ds, selector, controllerKind, canAdoptFunc)
-	return cm.ClaimControllerRevisions(histories)
+	return cm.ClaimControllerRevisions(ctx, histories)
 }
 
 // Match check if the given DaemonSet's template matches the template stored in the given history.
@@ -456,7 +456,7 @@ func getPatch(ds *apps.DaemonSet) ([]byte, error) {
 	return patch, err
 }
 
-func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
+func (dsc *DaemonSetsController) snapshot(ctx context.Context, ds *apps.DaemonSet, revision int64) (*apps.ControllerRevision, error) {
 	patch, err := getPatch(ds)
 	if err != nil {
 		return nil, err
@@ -475,10 +475,10 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 		Revision: revision,
 	}
 
-	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(context.TODO(), history, metav1.CreateOptions{})
+	history, err = dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Create(ctx, history, metav1.CreateOptions{})
 	if outerErr := err; errors.IsAlreadyExists(outerErr) {
 		// TODO: Is it okay to get from historyLister?
-		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(context.TODO(), name, metav1.GetOptions{})
+		existedHistory, getErr := dsc.kubeClient.AppsV1().ControllerRevisions(ds.Namespace).Get(ctx, name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
@@ -493,7 +493,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 
 		// Handle name collisions between different history
 		// Get the latest DaemonSet from the API server to make sure collision count is only increased when necessary
-		currDS, getErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
+		currDS, getErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).Get(ctx, ds.Name, metav1.GetOptions{})
 		if getErr != nil {
 			return nil, getErr
 		}
@@ -505,7 +505,7 @@ func (dsc *DaemonSetsController) snapshot(ds *apps.DaemonSet, revision int64) (*
 			currDS.Status.CollisionCount = new(int32)
 		}
 		*currDS.Status.CollisionCount++
-		_, updateErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).UpdateStatus(context.TODO(), currDS, metav1.UpdateOptions{})
+		_, updateErr := dsc.kubeClient.AppsV1().DaemonSets(ds.Namespace).UpdateStatus(ctx, currDS, metav1.UpdateOptions{})
 		if updateErr != nil {
 			return nil, updateErr
 		}

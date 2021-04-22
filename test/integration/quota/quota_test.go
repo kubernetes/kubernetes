@@ -106,7 +106,7 @@ func TestQuota(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(context.TODO(), 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -337,7 +337,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(context.TODO(), 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
@@ -467,7 +467,7 @@ func TestQuotaLimitService(t *testing.T) {
 		replicationcontroller.BurstReplicas,
 	)
 	rm.SetEventRecorder(&record.FakeRecorder{})
-	go rm.Run(3, controllerCh)
+	go rm.Run(context.TODO(), 3)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
 	listerFuncForResource := generic.ListerFuncForResourceFunc(informers.ForResource)
