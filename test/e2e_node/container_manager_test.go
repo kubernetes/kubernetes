@@ -238,7 +238,7 @@ var _ = SIGDescribe("Container Manager Misc [Serial]", func() {
 					err    error
 				)
 				gomega.Eventually(func() error {
-					wsPids, err = getPidsForProcess("test-webserver", "")
+					wsPids, err = getPidsForProcess("agnhost", "")
 					if err != nil {
 						return fmt.Errorf("failed to get list of test-webserver process pids: %v", err)
 					}
