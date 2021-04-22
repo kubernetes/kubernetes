@@ -40,7 +40,7 @@ func startJobController(ctx context.Context, controllerContext ControllerContext
 		controllerContext.InformerFactory.Core().V1().Pods(),
 		controllerContext.InformerFactory.Batch().V1().Jobs(),
 		controllerContext.ClientBuilder.ClientOrDie("job-controller"),
-	).Run(int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs), controllerContext.Stop)
+	).Run(ctx, int(controllerContext.ComponentConfig.JobController.ConcurrentJobSyncs), controllerContext.Stop)
 	return nil, true, nil
 }
 
@@ -65,6 +65,6 @@ func startCronJobController(ctx context.Context, controllerContext ControllerCon
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating CronJob controller: %v", err)
 	}
-	go cjc.Run(controllerContext.Stop)
+	go cjc.Run(ctx, controllerContext.Stop)
 	return nil, true, nil
 }

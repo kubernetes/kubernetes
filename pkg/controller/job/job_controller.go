@@ -71,7 +71,7 @@ type Controller struct {
 
 	// To allow injection of updateJobStatus for testing.
 	updateHandler func(job *batch.Job) error
-	syncHandler   func(jobKey string) (bool, error)
+	syncHandler   func(ctx context.Context, jobKey string) (bool, error)
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced cache.InformerSynced
@@ -143,7 +143,7 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (jm *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (jm *Controller) Run(ctx context.Context, workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 
@@ -155,7 +155,7 @@ func (jm *Controller) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(jm.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, jm.worker, time.Second)
 	}
 
 	<-stopCh
@@ -381,19 +381,19 @@ func (jm *Controller) enqueueController(obj interface{}, immediate bool) {
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (jm *Controller) worker() {
-	for jm.processNextWorkItem() {
+func (jm *Controller) worker(ctx context.Context) {
+	for jm.processNextWorkItem(ctx) {
 	}
 }
 
-func (jm *Controller) processNextWorkItem() bool {
+func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	key, quit := jm.queue.Get()
 	if quit {
 		return false
 	}
 	defer jm.queue.Done(key)
 
-	forget, err := jm.syncHandler(key.(string))
+	forget, err := jm.syncHandler(ctx, key.(string))
 	if err == nil {
 		if forget {
 			jm.queue.Forget(key)
@@ -410,7 +410,7 @@ func (jm *Controller) processNextWorkItem() bool {
 // getPodsForJob returns the set of pods that this Job should manage.
 // It also reconciles ControllerRef by adopting/orphaning.
 // Note that the returned Pods are pointers into the cache.
-func (jm *Controller) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
+func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(j.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't convert Job selector: %v", err)
@@ -424,7 +424,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 	// If any adoptions are attempted, we should first recheck for deletion
 	// with an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {
-		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
+		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -440,7 +440,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
-func (jm *Controller) syncJob(key string) (bool, error) {
+func (jm *Controller) syncJob(ctx context.Context, key string) (bool, error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
@@ -485,7 +485,7 @@ func (jm *Controller) syncJob(key string) (bool, error) {
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
 
-	pods, err := jm.getPodsForJob(&job)
+	pods, err := jm.getPodsForJob(ctx, &job)
 	if err != nil {
 		return false, err
 	}

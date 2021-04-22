@@ -90,23 +90,23 @@ func NewController(kubeClient clientset.Interface) (*Controller, error) {
 }
 
 // Run starts the main goroutine responsible for watching and syncing jobs.
-func (jm *Controller) Run(stopCh <-chan struct{}) {
+func (jm *Controller) Run(ctx context.Context, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	klog.Infof("Starting CronJob Manager")
 	// Check things every 10 second.
-	go wait.Until(jm.syncAll, 10*time.Second, stopCh)
+	go wait.UntilWithContext(ctx, jm.syncAll, 10*time.Second)
 	<-stopCh
 	klog.Infof("Shutting down CronJob Manager")
 }
 
 // syncAll lists all the CronJobs and Jobs and reconciles them.
-func (jm *Controller) syncAll() {
+func (jm *Controller) syncAll(ctx context.Context) {
 	// List children (Jobs) before parents (CronJob).
 	// This guarantees that if we see any Job that got orphaned by the GC orphan finalizer,
 	// we must also see that the parent CronJob has non-nil DeletionTimestamp (see #42639).
 	// Note that this only works because we are NOT using any caches here.
 	jobListFunc := func(opts metav1.ListOptions) (runtime.Object, error) {
-		return jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(context.TODO(), opts)
+		return jm.kubeClient.BatchV1().Jobs(metav1.NamespaceAll).List(ctx, opts)
 	}
 
 	js := make([]batchv1.Job, 0)
