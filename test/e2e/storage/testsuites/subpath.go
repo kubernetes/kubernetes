@@ -817,7 +817,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	// Check that container has restarted
 	ginkgo.By("Waiting for container to restart")
 	restarts := int32(0)
-	err = wait.PollImmediate(10*time.Second, 2*time.Minute, func() (bool, error) {
+	err = wait.PollImmediate(10*time.Second, framework.PodStartTimeout, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -844,7 +844,7 @@ func testPodContainerRestartWithHooks(f *framework.Framework, pod *v1.Pod, hooks
 	ginkgo.By("Waiting for container to stop restarting")
 	stableCount := int(0)
 	stableThreshold := int(time.Minute / framework.Poll)
-	err = wait.PollImmediate(framework.Poll, 2*time.Minute, func() (bool, error) {
+	err = wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
 		pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
