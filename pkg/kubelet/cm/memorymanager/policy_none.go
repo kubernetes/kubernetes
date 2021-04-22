@@ -66,3 +66,8 @@ func (p *none) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Contai
 func (p *none) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
 	return nil
 }
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (p *none) GetAllocatableMemory(s state.State) []state.Block {
+	return []state.Block{}
+}

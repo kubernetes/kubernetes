@@ -83,6 +83,12 @@ type Manager interface {
 
 	// GetMemoryNUMANodes provides NUMA nodes that are used to allocate the container memory
 	GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int
+
+	// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+	GetAllocatableMemory() []state.Block
+
+	// GetMemory returns the memory allocated by a container from NUMA nodes
+	GetMemory(podUID, containerName string) []state.Block
 }
 
 type manager struct {
@@ -115,6 +121,9 @@ type manager struct {
 
 	// stateFileDirectory holds the directory where the state file for checkpoints is held.
 	stateFileDirectory string
+
+	// allocatableMemory holds the allocatable memory for each NUMA node
+	allocatableMemory []state.Block
 }
 
 var _ Manager = &manager{}
@@ -173,6 +182,8 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 		return err
 	}
 
+	m.allocatableMemory = m.policy.GetAllocatableMemory(m.state)
+
 	return nil
 }
 
@@ -184,7 +195,7 @@ func (m *manager) AddContainer(pod *v1.Pod, container *v1.Container, containerID
 	m.containerMap.Add(string(pod.UID), container.Name, containerID)
 }
 
-// GetMemory provides NUMA nodes that used to allocate the container memory
+// GetMemoryNUMANodes provides NUMA nodes that used to allocate the container memory
 func (m *manager) GetMemoryNUMANodes(pod *v1.Pod, container *v1.Container) sets.Int {
 	// Get NUMA node affinity of blocks assigned to the container during Allocate()
 	numaNodes := sets.NewInt()
@@ -406,4 +417,14 @@ func getSystemReservedMemory(machineInfo *cadvisorapi.MachineInfo, nodeAllocatab
 	}
 
 	return reservedMemoryConverted, nil
+}
+
+// GetAllocatableMemory returns the amount of allocatable memory for each NUMA node
+func (m *manager) GetAllocatableMemory() []state.Block {
+	return m.allocatableMemory
+}
+
+// GetMemory returns the memory allocated by a container from NUMA nodes
+func (m *manager) GetMemory(podUID, containerName string) []state.Block {
+	return m.state.GetMemoryBlocks(podUID, containerName)
 }
