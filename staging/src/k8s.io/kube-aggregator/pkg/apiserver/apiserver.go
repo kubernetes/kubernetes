@@ -107,7 +107,7 @@ type CompletedConfig struct {
 }
 
 type runnable interface {
-	Run(stopCh <-chan struct{}) error
+	Run(ctx context.Context) error
 }
 
 // preparedGenericAPIServer is a private wrapper that enforces a call of PrepareRun() before Run can be invoked.
@@ -172,7 +172,7 @@ func (cfg *Config) Complete() CompletedConfig {
 }
 
 // NewWithDelegate returns a new instance of APIAggregator from the given config.
-func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
+func (c completedConfig) NewWithDelegate(ctx context.Context, delegationTarget genericapiserver.DelegationTarget) (*APIAggregator, error) {
 	genericServer, err := c.GenericConfig.New("kube-aggregator", delegationTarget)
 	if err != nil {
 		return nil, err
@@ -240,18 +240,18 @@ func (c completedConfig) NewWithDelegate(delegationTarget genericapiserver.Deleg
 
 	apiserviceRegistrationController := NewAPIServiceRegistrationController(informerFactory.Apiregistration().V1().APIServices(), s)
 	if len(c.ExtraConfig.ProxyClientCertFile) > 0 && len(c.ExtraConfig.ProxyClientKeyFile) > 0 {
-		aggregatorProxyCerts, err := dynamiccertificates.NewDynamicServingContentFromFiles("aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
+		aggregatorProxyCerts, err := dynamiccertificates.NewDynamicServingContentFromFiles(ctx, "aggregator-proxy-cert", c.ExtraConfig.ProxyClientCertFile, c.ExtraConfig.ProxyClientKeyFile)
 		if err != nil {
 			return nil, err
 		}
-		if err := aggregatorProxyCerts.RunOnce(); err != nil {
+		if err := aggregatorProxyCerts.RunOnce(ctx); err != nil {
 			return nil, err
 		}
 		aggregatorProxyCerts.AddListener(apiserviceRegistrationController)
 		s.proxyCurrentCertKeyContent = aggregatorProxyCerts.CurrentCertKeyContent
 
 		s.GenericAPIServer.AddPostStartHookOrDie("aggregator-reload-proxy-client-cert", func(context genericapiserver.PostStartHookContext) error {
-			go aggregatorProxyCerts.Run(1, context.StopCh)
+			go aggregatorProxyCerts.Run(ctx, 1)
 			return nil
 		})
 	}
@@ -389,8 +389,8 @@ func (s *APIAggregator) PrepareRun() (preparedAPIAggregator, error) {
 	return preparedAPIAggregator{APIAggregator: s, runnable: prepared}, nil
 }
 
-func (s preparedAPIAggregator) Run(stopCh <-chan struct{}) error {
-	return s.runnable.Run(stopCh)
+func (s preparedAPIAggregator) Run(ctx context.Context) error {
+	return s.runnable.Run(ctx)
 }
 
 // AddAPIService adds an API service.  It is not thread-safe, so only call it on one thread at a time please.

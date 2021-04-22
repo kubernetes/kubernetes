@@ -89,7 +89,7 @@ type Publisher struct {
 	rootCA []byte
 
 	// To allow injection for testing.
-	syncHandler func(key string) error
+	syncHandler func(ctx context.Context, key string) error
 
 	cmLister       corelisters.ConfigMapLister
 	cmListerSynced cache.InformerSynced
@@ -100,22 +100,22 @@ type Publisher struct {
 }
 
 // Run starts process
-func (c *Publisher) Run(workers int, stopCh <-chan struct{}) {
+func (c *Publisher) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
 	klog.Infof("Starting root CA certificate configmap publisher")
 	defer klog.Infof("Shutting down root CA certificate configmap publisher")
 
-	if !cache.WaitForNamedCacheSync("crt configmap", stopCh, c.cmListerSynced) {
+	if !cache.WaitForNamedCacheSync("crt configmap", ctx.Done(), c.cmListerSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(c.runWorker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, c.runWorker, time.Second)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 func (c *Publisher) configMapDeleted(obj interface{}) {
@@ -155,21 +155,21 @@ func (c *Publisher) namespaceUpdated(oldObj interface{}, newObj interface{}) {
 	c.queue.Add(newNamespace.Name)
 }
 
-func (c *Publisher) runWorker() {
-	for c.processNextWorkItem() {
+func (c *Publisher) runWorker(ctx context.Context, ) {
+	for c.processNextWorkItem(ctx) {
 	}
 }
 
 // processNextWorkItem deals with one key off the queue. It returns false when
 // it's time to quit.
-func (c *Publisher) processNextWorkItem() bool {
+func (c *Publisher) processNextWorkItem(ctx context.Context, ) bool {
 	key, quit := c.queue.Get()
 	if quit {
 		return false
 	}
 	defer c.queue.Done(key)
 
-	if err := c.syncHandler(key.(string)); err != nil {
+	if err := c.syncHandler(ctx, key.(string)); err != nil {
 		utilruntime.HandleError(fmt.Errorf("syncing %q failed: %v", key, err))
 		c.queue.AddRateLimited(key)
 		return true
@@ -179,7 +179,7 @@ func (c *Publisher) processNextWorkItem() bool {
 	return true
 }
 
-func (c *Publisher) syncNamespace(ns string) (err error) {
+func (c *Publisher) syncNamespace(ctx context.Context, ns string) (err error) {
 	startTime := time.Now()
 	defer func() {
 		recordMetrics(startTime, err)
@@ -189,7 +189,7 @@ func (c *Publisher) syncNamespace(ns string) (err error) {
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {
 	case apierrors.IsNotFound(err):
-		_, err = c.client.CoreV1().ConfigMaps(ns).Create(context.TODO(), &v1.ConfigMap{
+		_, err = c.client.CoreV1().ConfigMaps(ns).Create(ctx, &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:        RootCACertConfigMapName,
 				Annotations: map[string]string{DescriptionAnnotation: Description},
@@ -224,7 +224,7 @@ func (c *Publisher) syncNamespace(ns string) (err error) {
 	}
 	cm.Annotations[DescriptionAnnotation] = Description
 
-	_, err = c.client.CoreV1().ConfigMaps(ns).Update(context.TODO(), cm, metav1.UpdateOptions{})
+	_, err = c.client.CoreV1().ConfigMaps(ns).Update(ctx, cm, metav1.UpdateOptions{})
 	return err
 }
 

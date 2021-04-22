@@ -75,7 +75,7 @@ func recognizers() []csrRecognizer {
 	return recognizers
 }
 
-func (a *sarApprover) handle(csr *capi.CertificateSigningRequest) error {
+func (a *sarApprover) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	if len(csr.Status.Certificate) != 0 {
 		return nil
 	}

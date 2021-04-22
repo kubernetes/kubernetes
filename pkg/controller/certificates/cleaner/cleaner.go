@@ -76,36 +76,36 @@ func NewCSRCleanerController(
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (ccc *CSRCleanerController) Run(workers int, stopCh <-chan struct{}) {
+func (ccc *CSRCleanerController) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Starting CSR cleaner controller")
 	defer klog.Infof("Shutting down CSR cleaner controller")
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(ccc.worker, pollingInterval, stopCh)
+		go wait.UntilWithContext(ctx, ccc.worker, pollingInterval)
 	}
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // worker runs a thread that dequeues CSRs, handles them, and marks them done.
-func (ccc *CSRCleanerController) worker() {
+func (ccc *CSRCleanerController) worker(ctx context.Context) {
 	csrs, err := ccc.csrLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Unable to list CSRs: %v", err)
 		return
 	}
 	for _, csr := range csrs {
-		if err := ccc.handle(csr); err != nil {
+		if err := ccc.handle(ctx, csr); err != nil {
 			klog.Errorf("Error while attempting to clean CSR %q: %v", csr.Name, err)
 		}
 	}
 }
 
-func (ccc *CSRCleanerController) handle(csr *capi.CertificateSigningRequest) error {
+func (ccc *CSRCleanerController) handle(ctx context.Context, csr *capi.CertificateSigningRequest) error {
 	if isIssuedPastDeadline(csr) || isDeniedPastDeadline(csr) || isFailedPastDeadline(csr) || isPendingPastDeadline(csr) || isIssuedExpired(csr) {
-		if err := ccc.csrClient.Delete(context.TODO(), csr.Name, metav1.DeleteOptions{}); err != nil {
+		if err := ccc.csrClient.Delete(ctx, csr.Name, metav1.DeleteOptions{}); err != nil {
 			return fmt.Errorf("unable to delete CSR %q: %v", csr.Name, err)
 		}
 	}

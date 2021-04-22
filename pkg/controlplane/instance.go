@@ -341,7 +341,7 @@ func (c *Config) Complete() CompletedConfig {
 // Certain config fields will be set to a default value if unset.
 // Certain config fields must be specified, including:
 //   KubeletClientConfig
-func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
+func (c completedConfig) New(ctx context.Context, delegationTarget genericapiserver.DelegationTarget) (*Instance, error) {
 	if reflect.DeepEqual(c.ExtraConfig.KubeletClientConfig, kubeletclient.KubeletClientConfig{}) {
 		return nil, fmt.Errorf("Master.New() called with empty config.KubeletClientConfig")
 	}
@@ -457,20 +457,20 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			m.ClusterAuthenticationInfo.ClientCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.ClientCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(1, hookContext.StopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 		if m.ClusterAuthenticationInfo.RequestHeaderCA != nil {
 			m.ClusterAuthenticationInfo.RequestHeaderCA.AddListener(controller)
 			if controller, ok := m.ClusterAuthenticationInfo.RequestHeaderCA.(dynamiccertificates.ControllerRunner); ok {
 				// runonce to be sure that we have a value.
-				if err := controller.RunOnce(); err != nil {
+				if err := controller.RunOnce(ctx); err != nil {
 					runtime.HandleError(err)
 				}
-				go controller.Run(1, hookContext.StopCh)
+				go controller.Run(ctx, 1)
 			}
 		}
 

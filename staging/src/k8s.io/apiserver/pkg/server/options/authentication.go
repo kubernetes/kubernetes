@@ -17,6 +17,7 @@ limitations under the License.
 package options
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -115,12 +116,12 @@ func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 // ToAuthenticationRequestHeaderConfig returns a RequestHeaderConfig config object for these options
 // if necessary, nil otherwise.
-func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig() (*authenticatorfactory.RequestHeaderConfig, error) {
+func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig(ctx context.Context) (*authenticatorfactory.RequestHeaderConfig, error) {
 	if len(s.ClientCAFile) == 0 {
 		return nil, nil
 	}
 
-	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile("request-header", s.ClientCAFile)
+	caBundleProvider, err := dynamiccertificates.NewDynamicCAContentFromFile(ctx,"request-header", s.ClientCAFile)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +148,7 @@ type ClientCertAuthenticationOptions struct {
 }
 
 // GetClientVerifyOptionFn provides verify options for your authenticator while respecting the preferred order of verifiers.
-func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamiccertificates.CAContentProvider, error) {
+func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider(ctx context.Context) (dynamiccertificates.CAContentProvider, error) {
 	if s.CAContentProvider != nil {
 		return s.CAContentProvider, nil
 	}
@@ -156,7 +157,7 @@ func (s *ClientCertAuthenticationOptions) GetClientCAContentProvider() (dynamicc
 		return nil, nil
 	}
 
-	return dynamiccertificates.NewDynamicCAContentFromFile("client-ca-bundle", s.ClientCA)
+	return dynamiccertificates.NewDynamicCAContentFromFile(ctx, "client-ca-bundle", s.ClientCA)
 }
 
 func (s *ClientCertAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -275,7 +276,7 @@ func (s *DelegatingAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		"Note that this can result in authentication that treats all requests as anonymous.")
 }
 
-func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
+func (s *DelegatingAuthenticationOptions) ApplyTo(ctx context.Context, authenticationInfo *server.AuthenticationInfo, servingInfo *server.SecureServingInfo, openAPIConfig *openapicommon.Config) error {
 	if s == nil {
 		authenticationInfo.Authenticator = nil
 		return nil
@@ -302,7 +303,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	clientCASpecified := s.ClientCert != ClientCertAuthenticationOptions{}
 	var clientCAProvider dynamiccertificates.CAContentProvider
 	if clientCASpecified {
-		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider()
+		clientCAProvider, err = s.ClientCert.GetClientCAContentProvider(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to load client CA provider: %v", err)
 		}
@@ -330,7 +331,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	requestHeaderCAFileSpecified := len(s.RequestHeader.ClientCAFile) > 0
 	var requestHeaderConfig *authenticatorfactory.RequestHeaderConfig
 	if requestHeaderCAFileSpecified {
-		requestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+		requestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig(ctx)
 		if err != nil {
 			return fmt.Errorf("unable to create request header authentication config: %v", err)
 		}
@@ -339,7 +340,7 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 		if client == nil {
 			klog.Warningf("No authentication-kubeconfig provided in order to lookup requestheader-client-ca-file in configmap/%s in %s, so request-header client certificate authentication won't work.", authenticationConfigMapName, authenticationConfigMapNamespace)
 		} else {
-			requestHeaderConfig, err = s.createRequestHeaderConfig(client)
+			requestHeaderConfig, err = s.createRequestHeaderConfig(ctx, client)
 			if err != nil {
 				if s.TolerateInClusterLookupFailure {
 					klog.Warningf("Error looking up in-cluster authentication configuration: %v", err)
@@ -380,14 +381,14 @@ const (
 	authenticationConfigMapName = "extension-apiserver-authentication"
 )
 
-func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(client kubernetes.Interface) (*authenticatorfactory.RequestHeaderConfig, error) {
+func (s *DelegatingAuthenticationOptions) createRequestHeaderConfig(ctx context.Context, client kubernetes.Interface) (*authenticatorfactory.RequestHeaderConfig, error) {
 	dynamicRequestHeaderProvider, err := newDynamicRequestHeaderController(client)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create request header authentication config: %v", err)
 	}
 
 	//  look up authentication configuration in the cluster and in case of an err defer to authentication-tolerate-lookup-failure flag
-	if err := dynamicRequestHeaderProvider.RunOnce(); err != nil {
+	if err := dynamicRequestHeaderProvider.RunOnce(ctx); err != nil {
 		return nil, err
 	}
 
