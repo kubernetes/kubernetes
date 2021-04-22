@@ -82,7 +82,7 @@ func (mc *basicMirrorClient) CreateMirrorPod(pod *v1.Pod) error {
 
 	// With the MirrorPodNodeRestriction feature, mirror pods are required to have an owner reference
 	// to the owning node.
-	// See http://git.k8s.io/enhancements/keps/sig-auth/20190916-noderestriction-pods.md
+	// See https://git.k8s.io/enhancements/keps/sig-auth/1314-node-restriction-pods/README.md
 	nodeUID, err := mc.getNodeUID()
 	if err != nil {
 		return fmt.Errorf("failed to get node UID: %v", err)
