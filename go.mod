@@ -10,9 +10,9 @@ go 1.16
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-	github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.12
-	github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.17
+	github.com/Azure/go-autorest/autorest/adal v0.9.10
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20200415212048-7901bc822317
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
@@ -149,11 +149,11 @@ replace (
 	cloud.google.com/go/pubsub => cloud.google.com/go/pubsub v1.2.0
 	cloud.google.com/go/storage => cloud.google.com/go/storage v1.6.0
 	dmitri.shuralyov.com/gpu/mtl => dmitri.shuralyov.com/gpu/mtl v0.0.0-20201218220906-28db891af037
-	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v43.0.0+incompatible
+	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v53.1.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.2.0+incompatible
-	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.12
-	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.11.17
+	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.9.10
 	github.com/Azure/go-autorest/autorest/date => github.com/Azure/go-autorest/autorest/date v0.3.0
 	github.com/Azure/go-autorest/autorest/mocks => github.com/Azure/go-autorest/autorest/mocks v0.4.1
 	github.com/Azure/go-autorest/autorest/to => github.com/Azure/go-autorest/autorest/to v0.2.0
@@ -267,6 +267,7 @@ replace (
 	github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
 	github.com/gobuffalo/here => github.com/gobuffalo/here v0.6.0
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.3
+	github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/gogo/protobuf => github.com/gogo/protobuf v1.3.2
 	github.com/golang/freetype => github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -408,7 +409,6 @@ replace (
 	github.com/russross/blackfriday => github.com/russross/blackfriday v1.5.2
 	github.com/russross/blackfriday/v2 => github.com/russross/blackfriday/v2 v2.0.1
 	github.com/ryanuber/columnize => github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f
-	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/sean-/seed => github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529
 	github.com/seccomp/libseccomp-golang => github.com/seccomp/libseccomp-golang v0.9.1
 	github.com/sergi/go-diff => github.com/sergi/go-diff v1.1.0

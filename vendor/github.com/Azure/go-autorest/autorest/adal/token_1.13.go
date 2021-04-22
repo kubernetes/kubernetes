@@ -18,6 +18,7 @@ package adal
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -33,4 +34,44 @@ func getMSIEndpoint(ctx context.Context, sender Sender) (*http.Response, error) 
 	q.Add("api-version", msiAPIVersion)
 	req.URL.RawQuery = q.Encode()
 	return sender.Do(req)
+}
+
+// EnsureFreshWithContext will refresh the token if it will expire within the refresh window (as set by
+// RefreshWithin) and autoRefresh flag is on.  This method is safe for concurrent use.
+func (mt *MultiTenantServicePrincipalToken) EnsureFreshWithContext(ctx context.Context) error {
+	if err := mt.PrimaryToken.EnsureFreshWithContext(ctx); err != nil {
+		return fmt.Errorf("failed to refresh primary token: %w", err)
+	}
+	for _, aux := range mt.AuxiliaryTokens {
+		if err := aux.EnsureFreshWithContext(ctx); err != nil {
+			return fmt.Errorf("failed to refresh auxiliary token: %w", err)
+		}
+	}
+	return nil
+}
+
+// RefreshWithContext obtains a fresh token for the Service Principal.
+func (mt *MultiTenantServicePrincipalToken) RefreshWithContext(ctx context.Context) error {
+	if err := mt.PrimaryToken.RefreshWithContext(ctx); err != nil {
+		return fmt.Errorf("failed to refresh primary token: %w", err)
+	}
+	for _, aux := range mt.AuxiliaryTokens {
+		if err := aux.RefreshWithContext(ctx); err != nil {
+			return fmt.Errorf("failed to refresh auxiliary token: %w", err)
+		}
+	}
+	return nil
+}
+
+// RefreshExchangeWithContext refreshes the token, but for a different resource.
+func (mt *MultiTenantServicePrincipalToken) RefreshExchangeWithContext(ctx context.Context, resource string) error {
+	if err := mt.PrimaryToken.RefreshExchangeWithContext(ctx, resource); err != nil {
+		return fmt.Errorf("failed to refresh primary token: %w", err)
+	}
+	for _, aux := range mt.AuxiliaryTokens {
+		if err := aux.RefreshExchangeWithContext(ctx, resource); err != nil {
+			return fmt.Errorf("failed to refresh auxiliary token: %w", err)
+		}
+	}
+	return nil
 }

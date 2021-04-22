@@ -30,6 +30,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,15 @@ const (
 
 	// the API version to use for the App Service MSI endpoint
 	appServiceAPIVersion = "2017-09-01"
+
+	// secret header used when authenticating against app service MSI endpoint
+	secretHeader = "Secret"
+
+	// the format for expires_on in UTC with AM/PM
+	expiresOnDateFormatPM = "1/2/2006 15:04:05 PM +00:00"
+
+	// the format for expires_on in UTC without AM/PM
+	expiresOnDateFormat = "1/2/2006 15:04:05 +00:00"
 )
 
 // OAuthTokenProvider is an interface which should be implemented by an access token retriever
@@ -727,14 +737,16 @@ func newServicePrincipalTokenFromMSI(msiEndpoint, resource string, userAssignedI
 
 	v := url.Values{}
 	v.Set("resource", resource)
-	// App Service MSI currently only supports token API version 2017-09-01
-	if isAppService() {
+	// we only support token API version 2017-09-01 for app services
+	clientIDParam := "client_id"
+	if isASEEndpoint(*msiEndpointURL) {
 		v.Set("api-version", appServiceAPIVersion)
+		clientIDParam = "clientid"
 	} else {
 		v.Set("api-version", msiAPIVersion)
 	}
 	if userAssignedID != nil {
-		v.Set("client_id", *userAssignedID)
+		v.Set(clientIDParam, *userAssignedID)
 	}
 	if identityResourceID != nil {
 		v.Set("mi_res_id", *identityResourceID)
@@ -892,7 +904,6 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 		spt.inner.Token = *token
 		return spt.InvokeRefreshCallbacks(spt.inner.Token)
 	}
-
 	req, err := http.NewRequest(http.MethodPost, spt.inner.OauthConfig.TokenEndpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("adal: Failed to build the refresh request. Error = '%v'", err)
@@ -901,7 +912,7 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 	// Add header when runtime is on App Service or Functions
 	if isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
 		asMSISecret, _ := os.LookupEnv(asMSISecretEnv)
-		req.Header.Add("Secret", asMSISecret)
+		req.Header.Add(secretHeader, asMSISecret)
 	}
 	req = req.WithContext(ctx)
 	if !isIMDS(spt.inner.OauthConfig.TokenEndpoint) {
@@ -937,7 +948,10 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 
 	if _, ok := spt.inner.Secret.(*ServicePrincipalMSISecret); ok {
 		req.Method = http.MethodGet
-		req.Header.Set(metadataHeader, "true")
+		// the metadata header isn't applicable for ASE
+		if !isASEEndpoint(spt.inner.OauthConfig.TokenEndpoint) {
+			req.Header.Set(metadataHeader, "true")
+		}
 	}
 
 	var resp *http.Response
@@ -964,9 +978,9 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 
 	if resp.StatusCode != http.StatusOK {
 		if err != nil {
-			return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Failed reading response body: %v", resp.StatusCode, err), resp)
+			return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Failed reading response body: %v Endpoint %s", resp.StatusCode, err, req.URL.String()), resp)
 		}
-		return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Response body: %s", resp.StatusCode, string(rb)), resp)
+		return newTokenRefreshError(fmt.Sprintf("adal: Refresh request failed. Status Code = '%d'. Response body: %s Endpoint %s", resp.StatusCode, string(rb), req.URL.String()), resp)
 	}
 
 	// for the following error cases don't return a TokenRefreshError.  the operation succeeded
@@ -979,15 +993,60 @@ func (spt *ServicePrincipalToken) refreshInternal(ctx context.Context, resource 
 	if len(strings.Trim(string(rb), " ")) == 0 {
 		return fmt.Errorf("adal: Empty service principal token received during refresh")
 	}
-	var token Token
+	token := struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+
+		// AAD returns expires_in as a string, ADFS returns it as an int
+		ExpiresIn json.Number `json:"expires_in"`
+		// expires_on can be in two formats, a UTC time stamp or the number of seconds.
+		ExpiresOn string      `json:"expires_on"`
+		NotBefore json.Number `json:"not_before"`
+
+		Resource string `json:"resource"`
+		Type     string `json:"token_type"`
+	}{}
+	// return a TokenRefreshError in the follow error cases as the token is in an unexpected format
 	err = json.Unmarshal(rb, &token)
 	if err != nil {
-		return fmt.Errorf("adal: Failed to unmarshal the service principal token during refresh. Error = '%v' JSON = '%s'", err, string(rb))
+		return newTokenRefreshError(fmt.Sprintf("adal: Failed to unmarshal the service principal token during refresh. Error = '%v' JSON = '%s'", err, string(rb)), resp)
 	}
+	expiresOn := json.Number("")
+	// ADFS doesn't include the expires_on field
+	if token.ExpiresOn != "" {
+		if expiresOn, err = parseExpiresOn(token.ExpiresOn); err != nil {
+			return newTokenRefreshError(fmt.Sprintf("adal: failed to parse expires_on: %v value '%s'", err, token.ExpiresOn), resp)
+		}
+	}
+	spt.inner.Token.AccessToken = token.AccessToken
+	spt.inner.Token.RefreshToken = token.RefreshToken
+	spt.inner.Token.ExpiresIn = token.ExpiresIn
+	spt.inner.Token.ExpiresOn = expiresOn
+	spt.inner.Token.NotBefore = token.NotBefore
+	spt.inner.Token.Resource = token.Resource
+	spt.inner.Token.Type = token.Type
 
-	spt.inner.Token = token
+	return spt.InvokeRefreshCallbacks(spt.inner.Token)
+}
 
-	return spt.InvokeRefreshCallbacks(token)
+// converts expires_on to the number of seconds
+func parseExpiresOn(s string) (json.Number, error) {
+	// convert the expiration date to the number of seconds from now
+	timeToDuration := func(t time.Time) json.Number {
+		dur := t.Sub(time.Now().UTC())
+		return json.Number(strconv.FormatInt(int64(dur.Round(time.Second).Seconds()), 10))
+	}
+	if _, err := strconv.ParseInt(s, 10, 64); err == nil {
+		// this is the number of seconds case, no conversion required
+		return json.Number(s), nil
+	} else if eo, err := time.Parse(expiresOnDateFormatPM, s); err == nil {
+		return timeToDuration(eo), nil
+	} else if eo, err := time.Parse(expiresOnDateFormat, s); err == nil {
+		return timeToDuration(eo), nil
+	} else {
+		// unknown format
+		return json.Number(""), err
+	}
 }
 
 // retry logic specific to retrieving a token from the IMDS endpoint
@@ -1118,46 +1177,6 @@ func (mt *MultiTenantServicePrincipalToken) AuxiliaryOAuthTokens() []string {
 	return tokens
 }
 
-// EnsureFreshWithContext will refresh the token if it will expire within the refresh window (as set by
-// RefreshWithin) and autoRefresh flag is on.  This method is safe for concurrent use.
-func (mt *MultiTenantServicePrincipalToken) EnsureFreshWithContext(ctx context.Context) error {
-	if err := mt.PrimaryToken.EnsureFreshWithContext(ctx); err != nil {
-		return fmt.Errorf("failed to refresh primary token: %v", err)
-	}
-	for _, aux := range mt.AuxiliaryTokens {
-		if err := aux.EnsureFreshWithContext(ctx); err != nil {
-			return fmt.Errorf("failed to refresh auxiliary token: %v", err)
-		}
-	}
-	return nil
-}
-
-// RefreshWithContext obtains a fresh token for the Service Principal.
-func (mt *MultiTenantServicePrincipalToken) RefreshWithContext(ctx context.Context) error {
-	if err := mt.PrimaryToken.RefreshWithContext(ctx); err != nil {
-		return fmt.Errorf("failed to refresh primary token: %v", err)
-	}
-	for _, aux := range mt.AuxiliaryTokens {
-		if err := aux.RefreshWithContext(ctx); err != nil {
-			return fmt.Errorf("failed to refresh auxiliary token: %v", err)
-		}
-	}
-	return nil
-}
-
-// RefreshExchangeWithContext refreshes the token, but for a different resource.
-func (mt *MultiTenantServicePrincipalToken) RefreshExchangeWithContext(ctx context.Context, resource string) error {
-	if err := mt.PrimaryToken.RefreshExchangeWithContext(ctx, resource); err != nil {
-		return fmt.Errorf("failed to refresh primary token: %v", err)
-	}
-	for _, aux := range mt.AuxiliaryTokens {
-		if err := aux.RefreshExchangeWithContext(ctx, resource); err != nil {
-			return fmt.Errorf("failed to refresh auxiliary token: %v", err)
-		}
-	}
-	return nil
-}
-
 // NewMultiTenantServicePrincipalToken creates a new MultiTenantServicePrincipalToken with the specified credentials and resource.
 func NewMultiTenantServicePrincipalToken(multiTenantCfg MultiTenantOAuthConfig, clientID string, secret string, resource string) (*MultiTenantServicePrincipalToken, error) {
 	if err := validateStringParam(clientID, "clientID"); err != nil {
@@ -1180,6 +1199,55 @@ func NewMultiTenantServicePrincipalToken(multiTenantCfg MultiTenantOAuthConfig, 
 	m.PrimaryToken = primary
 	for i := range auxTenants {
 		aux, err := NewServicePrincipalToken(*auxTenants[i], clientID, secret, resource)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create SPT for auxiliary tenant: %v", err)
+		}
+		m.AuxiliaryTokens[i] = aux
+	}
+	return &m, nil
+}
+
+// NewMultiTenantServicePrincipalTokenFromCertificate creates a new MultiTenantServicePrincipalToken with the specified certificate credentials and resource.
+func NewMultiTenantServicePrincipalTokenFromCertificate(multiTenantCfg MultiTenantOAuthConfig, clientID string, certificate *x509.Certificate, privateKey *rsa.PrivateKey, resource string) (*MultiTenantServicePrincipalToken, error) {
+	if err := validateStringParam(clientID, "clientID"); err != nil {
+		return nil, err
+	}
+	if err := validateStringParam(resource, "resource"); err != nil {
+		return nil, err
+	}
+	if certificate == nil {
+		return nil, fmt.Errorf("parameter 'certificate' cannot be nil")
+	}
+	if privateKey == nil {
+		return nil, fmt.Errorf("parameter 'privateKey' cannot be nil")
+	}
+	auxTenants := multiTenantCfg.AuxiliaryTenants()
+	m := MultiTenantServicePrincipalToken{
+		AuxiliaryTokens: make([]*ServicePrincipalToken, len(auxTenants)),
+	}
+	primary, err := NewServicePrincipalTokenWithSecret(
+		*multiTenantCfg.PrimaryTenant(),
+		clientID,
+		resource,
+		&ServicePrincipalCertificateSecret{
+			PrivateKey:  privateKey,
+			Certificate: certificate,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create SPT for primary tenant: %v", err)
+	}
+	m.PrimaryToken = primary
+	for i := range auxTenants {
+		aux, err := NewServicePrincipalTokenWithSecret(
+			*auxTenants[i],
+			clientID,
+			resource,
+			&ServicePrincipalCertificateSecret{
+				PrivateKey:  privateKey,
+				Certificate: certificate,
+			},
+		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create SPT for auxiliary tenant: %v", err)
 		}

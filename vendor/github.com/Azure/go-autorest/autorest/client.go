@@ -165,7 +165,8 @@ type Client struct {
 	// Setting this to zero will use the provided context to control the duration.
 	PollingDuration time.Duration
 
-	// RetryAttempts sets the default number of retry attempts for client.
+	// RetryAttempts sets the total number of times the client will attempt to make an HTTP request.
+	// Set the value to 1 to disable retries.  DO NOT set the value to less than 1.
 	RetryAttempts int
 
 	// RetryDuration sets the delay duration for retries.

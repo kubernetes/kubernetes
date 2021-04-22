@@ -6,8 +6,8 @@ go 1.16
 
 require (
 	cloud.google.com/go v0.54.0 // indirect
-	github.com/Azure/go-autorest/autorest v0.11.12
-	github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/go-autorest/autorest v0.11.17
+	github.com/Azure/go-autorest/autorest/adal v0.9.10
 	github.com/davecgh/go-spew v1.1.1
 	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/gogo/protobuf v1.3.2
