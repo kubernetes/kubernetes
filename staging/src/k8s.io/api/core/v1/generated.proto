@@ -1362,19 +1362,6 @@ message EphemeralContainerCommon {
   optional bool tty = 18;
 }
 
-// A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
-message EphemeralContainers {
-  // +optional
-  optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
-
-  // A list of ephemeral containers associated with this pod. New ephemeral containers
-  // may be appended to this list, but existing ephemeral containers may not be removed
-  // or modified.
-  // +patchMergeKey=name
-  // +patchStrategy=merge
-  repeated EphemeralContainer ephemeralContainers = 2;
-}
-
 // Represents an ephemeral volume that is handled by a normal storage driver.
 message EphemeralVolumeSource {
   // Will be used to create a stand-alone PVC to provision the volume.

@@ -4439,20 +4439,6 @@ type Binding struct {
 	Target ObjectReference
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// EphemeralContainers is a list of ephemeral containers used with the Pod ephemeralcontainers subresource.
-type EphemeralContainers struct {
-	metav1.TypeMeta
-	// +optional
-	metav1.ObjectMeta
-
-	// A list of ephemeral containers associated with this pod. New ephemeral containers
-	// may be appended to this list, but existing ephemeral containers may not be removed
-	// or modified.
-	EphemeralContainers []EphemeralContainer
-}
-
 // Preconditions must be fulfilled before an operation (update, delete, etc.) is carried out.
 type Preconditions struct {
 	// Specifies the target UID.
