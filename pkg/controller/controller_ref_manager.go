@@ -195,7 +195,7 @@ func (m *PodControllerRefManager) ClaimPods(ctx context.Context, pods []*v1.Pod,
 		return m.AdoptPod(ctx, obj.(*v1.Pod))
 	}
 	release := func(obj metav1.Object) error {
-		return m.ReleasePod(obj.(*v1.Pod))
+		return m.ReleasePod(ctx, obj.(*v1.Pod))
 	}
 
 	for _, pod := range pods {
@@ -224,19 +224,19 @@ func (m *PodControllerRefManager) AdoptPod(ctx context.Context, pod *v1.Pod) err
 	if err != nil {
 		return err
 	}
-	return m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
+	return m.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patchBytes)
 }
 
 // ReleasePod sends a patch to free the pod from the control of the controller.
 // It returns the error if the patching fails. 404 and 422 errors are ignored.
-func (m *PodControllerRefManager) ReleasePod(pod *v1.Pod) error {
+func (m *PodControllerRefManager) ReleasePod(ctx context.Context, pod *v1.Pod) error {
 	klog.V(2).Infof("patching pod %s_%s to remove its controllerRef to %s/%s:%s",
 		pod.Namespace, pod.Name, m.controllerKind.GroupVersion(), m.controllerKind.Kind, m.Controller.GetName())
 	patchBytes, err := GenerateDeleteOwnerRefStrategicMergeBytes(pod.UID, []types.UID{m.Controller.GetUID()}, m.finalizers...)
 	if err != nil {
 		return err
 	}
-	err = m.podControl.PatchPod(pod.Namespace, pod.Name, patchBytes)
+	err = m.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patchBytes)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If the pod no longer exists, ignore it.

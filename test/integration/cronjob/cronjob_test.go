@@ -159,8 +159,8 @@ func TestCronJobLaunchesPodAndCleansUp(t *testing.T) {
 	defer close(stopCh)
 
 	informerSet.Start(stopCh)
-	go cjc.Run(1, stopCh)
-	go jc.Run(1, stopCh)
+	go cjc.Run(context.TODO(), 1)
+	go jc.Run(context.TODO(), 1)
 
 	_, err := cjClient.Create(context.TODO(), newCronJob(cronJobName, ns.Name, "* * * * ?"), metav1.CreateOptions{})
 	if err != nil {

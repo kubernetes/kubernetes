@@ -452,7 +452,7 @@ type PodControlInterface interface {
 	// DeletePod deletes the pod identified by podID.
 	DeletePod(namespace string, podID string, object runtime.Object) error
 	// PatchPod patches the pod.
-	PatchPod(namespace, name string, data []byte) error
+	PatchPod(ctx context.Context, namespace, name string, data []byte) error
 }
 
 // RealPodControl is the default implementation of PodControlInterface.
@@ -531,8 +531,8 @@ func (r RealPodControl) CreatePodsWithGenerateName(namespace string, template *v
 	return r.createPods(namespace, pod, controllerObject)
 }
 
-func (r RealPodControl) PatchPod(namespace, name string, data []byte) error {
-	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(context.TODO(), name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+func (r RealPodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
+	_, err := r.KubeClient.CoreV1().Pods(namespace).Patch(ctx, name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
@@ -616,7 +616,7 @@ type FakePodControl struct {
 
 var _ PodControlInterface = &FakePodControl{}
 
-func (f *FakePodControl) PatchPod(namespace, name string, data []byte) error {
+func (f *FakePodControl) PatchPod(ctx context.Context, namespace, name string, data []byte) error {
 	f.Lock()
 	defer f.Unlock()
 	f.Patches = append(f.Patches, data)

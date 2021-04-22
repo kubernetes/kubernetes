@@ -85,10 +85,9 @@ type Controller struct {
 	podControl controller.PodControlInterface
 
 	// To allow injection of the following for testing.
-	updateStatusHandler func(job *batch.Job) (*batch.Job, error)
-	patchJobHandler     func(job *batch.Job, patch []byte) error
-	syncHandler         func(jobKey string) (bool, error)
-
+	updateStatusHandler func(ctx context.Context, job *batch.Job) (*batch.Job, error)
+	patchJobHandler     func(ctx context.Context, job *batch.Job, patch []byte) error
+	syncHandler         func(ctx context.Context, jobKey string) (bool, error)
 	// podStoreSynced returns true if the pod store has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	podStoreSynced cache.InformerSynced
@@ -179,7 +178,7 @@ func NewController(podInformer coreinformers.PodInformer, jobInformer batchinfor
 }
 
 // Run the main goroutine responsible for watching and syncing jobs.
-func (jm *Controller) Run(workers int, stopCh <-chan struct{}) {
+func (jm *Controller) Run(ctx context.Context, workers int) {
 	defer utilruntime.HandleCrash()
 	defer jm.queue.ShutDown()
 	defer jm.orphanQueue.ShutDown()
@@ -187,17 +186,17 @@ func (jm *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting job controller")
 	defer klog.Infof("Shutting down job controller")
 
-	if !cache.WaitForNamedCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSync("job", ctx.Done(), jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 
 	for i := 0; i < workers; i++ {
-		go wait.Until(jm.worker, time.Second, stopCh)
+		go wait.UntilWithContext(ctx, jm.worker, time.Second)
 	}
 
-	go wait.Until(jm.orphanWorker, time.Second, stopCh)
+	go wait.UntilWithContext(ctx, jm.orphanWorker, time.Second)
 
-	<-stopCh
+	<-ctx.Done()
 }
 
 // getPodJobs returns a list of Jobs that potentially match a Pod.
@@ -466,19 +465,19 @@ func (jm *Controller) enqueueOrphanPod(obj *v1.Pod) {
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (jm *Controller) worker() {
-	for jm.processNextWorkItem() {
+func (jm *Controller) worker(ctx context.Context) {
+	for jm.processNextWorkItem(ctx) {
 	}
 }
 
-func (jm *Controller) processNextWorkItem() bool {
+func (jm *Controller) processNextWorkItem(ctx context.Context) bool {
 	key, quit := jm.queue.Get()
 	if quit {
 		return false
 	}
 	defer jm.queue.Done(key)
 
-	forget, err := jm.syncHandler(key.(string))
+	forget, err := jm.syncHandler(ctx, key.(string))
 	if err == nil {
 		if forget {
 			jm.queue.Forget(key)
@@ -497,18 +496,18 @@ func (jm *Controller) processNextWorkItem() bool {
 	return true
 }
 
-func (jm *Controller) orphanWorker() {
-	for jm.processNextOrphanPod() {
+func (jm *Controller) orphanWorker(ctx context.Context) {
+	for jm.processNextOrphanPod(ctx) {
 	}
 }
 
-func (jm Controller) processNextOrphanPod() bool {
+func (jm Controller) processNextOrphanPod(ctx context.Context) bool {
 	key, quit := jm.orphanQueue.Get()
 	if quit {
 		return false
 	}
 	defer jm.orphanQueue.Done(key)
-	err := jm.syncOrphanPod(key.(string))
+	err := jm.syncOrphanPod(ctx, key.(string))
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing orphan pod: %v", err))
 		jm.orphanQueue.AddRateLimited(key)
@@ -520,7 +519,7 @@ func (jm Controller) processNextOrphanPod() bool {
 }
 
 // syncOrphanPod removes the tracking finalizer from an orphan pod if found.
-func (jm Controller) syncOrphanPod(key string) error {
+func (jm Controller) syncOrphanPod(ctx context.Context, key string) error {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing orphan pod %q (%v)", key, time.Since(startTime))
@@ -540,7 +539,7 @@ func (jm Controller) syncOrphanPod(key string) error {
 		return err
 	}
 	if patch := removeTrackingFinalizerPatch(sharedPod); patch != nil {
-		if err := jm.podControl.PatchPod(ns, name, patch); err != nil && !apierrors.IsNotFound(err) {
+		if err := jm.podControl.PatchPod(ctx, ns, name, patch); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -551,7 +550,7 @@ func (jm Controller) syncOrphanPod(key string) error {
 // It also reconciles ControllerRef by adopting/orphaning, adding tracking
 // finalizers, if enabled.
 // Note that the returned Pods are pointers into the cache.
-func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Pod, error) {
+func (jm *Controller) getPodsForJob(ctx context.Context, j *batch.Job, withFinalizers bool) ([]*v1.Pod, error) {
 	selector, err := metav1.LabelSelectorAsSelector(j.Spec.Selector)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't convert Job selector: %v", err)
@@ -565,7 +564,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 	// If any adoptions are attempted, we should first recheck for deletion
 	// with an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func(ctx context.Context) (metav1.Object, error) {
-		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(context.TODO(), j.Name, metav1.GetOptions{})
+		fresh, err := jm.kubeClient.BatchV1().Jobs(j.Namespace).Get(ctx, j.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -580,7 +579,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 	}
 	cm := controller.NewPodControllerRefManager(jm.podControl, j, selector, controllerKind, canAdoptFunc, finalizers...)
 	// When adopting Pods, this operation adds an ownerRef and finalizers.
-	pods, err = cm.ClaimPods(context.TODO(), pods)
+	pods, err = cm.ClaimPods(ctx, pods)
 	if err != nil || !withFinalizers {
 		return pods, err
 	}
@@ -604,7 +603,7 @@ func (jm *Controller) getPodsForJob(j *batch.Job, withFinalizers bool) ([]*v1.Po
 // syncJob will sync the job with the given key if it has had its expectations fulfilled, meaning
 // it did not expect to see any more of its pods created or deleted. This function is not meant to be invoked
 // concurrently with the same key.
-func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
+func (jm *Controller) syncJob(ctx context.Context, key string) (forget bool, rErr error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
@@ -671,7 +670,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		uncounted = newUncountedTerminatedPods(*job.Status.UncountedTerminatedPods)
 		expectedRmFinalizers = jm.finalizerExpectations.getExpectedUIDs(key)
 	} else if patch := removeTrackingAnnotationPatch(&job); patch != nil {
-		if err := jm.patchJobHandler(&job, patch); err != nil {
+		if err := jm.patchJobHandler(ctx, &job, patch); err != nil {
 			return false, fmt.Errorf("removing tracking finalizer from job %s: %w", key, err)
 		}
 	}
@@ -681,7 +680,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
 
-	pods, err := jm.getPodsForJob(&job, uncounted != nil)
+	pods, err := jm.getPodsForJob(ctx, &job, uncounted != nil)
 	if err != nil {
 		return false, err
 	}
@@ -747,7 +746,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	} else {
 		manageJobCalled := false
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, action, manageJobErr = jm.manageJob(&job, activePods, succeeded, succeededIndexes)
+			active, action, manageJobErr = jm.manageJob(ctx, &job, activePods, succeeded, succeededIndexes)
 			manageJobCalled = true
 		}
 		complete := false
@@ -810,7 +809,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		needsStatusUpdate := suspendCondChanged || active != job.Status.Active || !equalReady(ready, job.Status.Ready)
 		job.Status.Active = active
 		job.Status.Ready = ready
-		err = jm.trackJobStatusAndRemoveFinalizers(&job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate)
+		err = jm.trackJobStatusAndRemoveFinalizers(ctx, &job, pods, prevSucceededIndexes, *uncounted, expectedRmFinalizers, finishedCondition, needsStatusUpdate)
 		if err != nil {
 			return false, fmt.Errorf("tracking status: %w", err)
 		}
@@ -825,7 +824,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 	// Legacy path: tracking without finalizers.
 
 	// Ensure that there are no leftover tracking finalizers.
-	if err := jm.removeTrackingFinalizersFromAllPods(pods); err != nil {
+	if err := jm.removeTrackingFinalizersFromAllPods(ctx, pods); err != nil {
 		return false, fmt.Errorf("removing disabled finalizers from job pods %s: %w", key, err)
 	}
 
@@ -841,7 +840,7 @@ func (jm *Controller) syncJob(key string) (forget bool, rErr error) {
 		job.Status.UncountedTerminatedPods = nil
 		jm.enactJobFinished(&job, finishedCondition)
 
-		if _, err := jm.updateStatusHandler(&job); err != nil {
+		if _, err := jm.updateStatusHandler(ctx, &job); err != nil {
 			return forget, err
 		}
 
@@ -882,7 +881,7 @@ func (jm *Controller) deleteActivePods(job *batch.Job, pods []*v1.Pod) (int32, e
 
 // deleteJobPods deletes the pods, returns the number of successful removals
 // and any error.
-func (jm *Controller) deleteJobPods(job *batch.Job, jobKey string, pods []*v1.Pod) (int32, error) {
+func (jm *Controller) deleteJobPods(ctx context.Context, job *batch.Job, jobKey string, pods []*v1.Pod) (int32, error) {
 	errCh := make(chan error, len(pods))
 	successfulDeletes := int32(len(pods))
 
@@ -903,7 +902,7 @@ func (jm *Controller) deleteJobPods(job *batch.Job, jobKey string, pods []*v1.Po
 		go func(pod *v1.Pod) {
 			defer wg.Done()
 			if patch := removeTrackingFinalizerPatch(pod); patch != nil {
-				if err := jm.podControl.PatchPod(pod.Namespace, pod.Name, patch); err != nil {
+				if err := jm.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patch); err != nil {
 					failDelete(pod, fmt.Errorf("removing completion finalizer: %w", err))
 					return
 				}
@@ -919,7 +918,7 @@ func (jm *Controller) deleteJobPods(job *batch.Job, jobKey string, pods []*v1.Po
 
 // removeTrackingFinalizersFromAllPods removes finalizers from any Job Pod. This is called
 // when Job tracking with finalizers is disabled.
-func (jm *Controller) removeTrackingFinalizersFromAllPods(pods []*v1.Pod) error {
+func (jm *Controller) removeTrackingFinalizersFromAllPods(ctx context.Context, pods []*v1.Pod) error {
 	var podsWithFinalizer []*v1.Pod
 	for _, pod := range pods {
 		if hasJobTrackingFinalizer(pod) {
@@ -930,7 +929,7 @@ func (jm *Controller) removeTrackingFinalizersFromAllPods(pods []*v1.Pod) error 
 		return nil
 	}
 	// Tracking with finalizers is disabled, no need to set expectations.
-	_, err := jm.removeTrackingFinalizerFromPods("", podsWithFinalizer)
+	_, err := jm.removeTrackingFinalizerFromPods(ctx, "", podsWithFinalizer)
 	return err
 }
 
@@ -942,7 +941,7 @@ func (jm *Controller) removeTrackingFinalizersFromAllPods(pods []*v1.Pod) error 
 // 4. Add Complete condition if satisfied with current counters.
 // It does this up to a limited number of Pods so that the size of .status
 // doesn't grow too much and this sync doesn't starve other Jobs.
-func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, expectedRmFinalizers sets.String, finishedCond *batch.JobCondition, needsFlush bool) error {
+func (jm *Controller) trackJobStatusAndRemoveFinalizers(ctx context.Context, job *batch.Job, pods []*v1.Pod, succeededIndexes orderedIntervals, uncounted uncountedTerminatedPods, expectedRmFinalizers sets.String, finishedCond *batch.JobCondition, needsFlush bool) error {
 	isIndexed := isIndexedJob(job)
 	var podsToRemoveFinalizer []*v1.Pod
 	uncountedStatus := job.Status.UncountedTerminatedPods
@@ -1014,14 +1013,14 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 		job.Status.CompletedIndexes = succeededIndexes.String()
 	}
 	var err error
-	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
+	if job, needsFlush, err = jm.flushUncountedAndRemoveFinalizers(ctx, job, podsToRemoveFinalizer, uidsWithFinalizer, &oldCounters, needsFlush); err != nil {
 		return err
 	}
 	if jm.enactJobFinished(job, finishedCond) {
 		needsFlush = true
 	}
 	if needsFlush {
-		if _, err := jm.updateStatusHandler(job); err != nil {
+		if _, err := jm.updateStatusHandler(ctx, job); err != nil {
 			return fmt.Errorf("removing uncounted pods from status: %w", err)
 		}
 		recordJobPodFinished(job, oldCounters)
@@ -1038,10 +1037,10 @@ func (jm *Controller) trackJobStatusAndRemoveFinalizers(job *batch.Job, pods []*
 // 4. (if not all removals succeeded) flush Job status again.
 // Returns whether there are pending changes in the Job status that need to be
 // flushed in subsequent calls.
-func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, needsFlush bool) (*batch.Job, bool, error) {
+func (jm *Controller) flushUncountedAndRemoveFinalizers(ctx context.Context, job *batch.Job, podsToRemoveFinalizer []*v1.Pod, uidsWithFinalizer sets.String, oldCounters *batch.JobStatus, needsFlush bool) (*batch.Job, bool, error) {
 	var err error
 	if needsFlush {
-		if job, err = jm.updateStatusHandler(job); err != nil {
+		if job, err = jm.updateStatusHandler(ctx, job); err != nil {
 			return job, needsFlush, fmt.Errorf("adding uncounted pods to status: %w", err)
 		}
 		recordJobPodFinished(job, *oldCounters)
@@ -1056,7 +1055,7 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRe
 	var rmErr error
 	if len(podsToRemoveFinalizer) > 0 {
 		var rmSucceded []bool
-		rmSucceded, rmErr = jm.removeTrackingFinalizerFromPods(jobKey, podsToRemoveFinalizer)
+		rmSucceded, rmErr = jm.removeTrackingFinalizerFromPods(ctx, jobKey, podsToRemoveFinalizer)
 		for i, p := range podsToRemoveFinalizer {
 			if rmSucceded[i] {
 				uidsWithFinalizer.Delete(string(p.UID))
@@ -1069,7 +1068,7 @@ func (jm *Controller) flushUncountedAndRemoveFinalizers(job *batch.Job, podsToRe
 		needsFlush = true
 	}
 	if rmErr != nil && needsFlush {
-		if job, err := jm.updateStatusHandler(job); err != nil {
+		if job, err := jm.updateStatusHandler(ctx, job); err != nil {
 			return job, needsFlush, fmt.Errorf("removing uncounted pods from status: %w", err)
 		}
 	}
@@ -1102,7 +1101,7 @@ func cleanUncountedPodsWithoutFinalizers(status *batch.JobStatus, uidsWithFinali
 // returns an array of booleans where the i-th value is true if the finalizer
 // of the i-th Pod was successfully removed (if the pod was deleted when this
 // function was called, it's considered as the finalizer was removed successfully).
-func (jm *Controller) removeTrackingFinalizerFromPods(jobKey string, pods []*v1.Pod) ([]bool, error) {
+func (jm *Controller) removeTrackingFinalizerFromPods(ctx context.Context, jobKey string, pods []*v1.Pod) ([]bool, error) {
 	errCh := make(chan error, len(pods))
 	succeeded := make([]bool, len(pods))
 	uids := make([]string, len(pods))
@@ -1122,7 +1121,7 @@ func (jm *Controller) removeTrackingFinalizerFromPods(jobKey string, pods []*v1.
 			pod := pods[i]
 			defer wg.Done()
 			if patch := removeTrackingFinalizerPatch(pod); patch != nil {
-				if err := jm.podControl.PatchPod(pod.Namespace, pod.Name, patch); err != nil {
+				if err := jm.podControl.PatchPod(ctx, pod.Namespace, pod.Name, patch); err != nil {
 					// In case of any failure, we don't expect a Pod update for the
 					// finalizer removed. Clear expectation now.
 					if jobKey != "" {
@@ -1264,7 +1263,7 @@ func jobSuspended(job *batch.Job) bool {
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
 // Does NOT modify <activePods>.
-func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded int32, succeededIndexes []interval) (int32, string, error) {
+func (jm *Controller) manageJob(ctx context.Context, job *batch.Job, activePods []*v1.Pod, succeeded int32, succeededIndexes []interval) (int32, string, error) {
 	active := int32(len(activePods))
 	parallelism := *job.Spec.Parallelism
 	jobKey, err := controller.KeyFunc(job)
@@ -1277,7 +1276,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		klog.V(4).InfoS("Deleting all active pods in suspended job", "job", klog.KObj(job), "active", active)
 		podsToDelete := activePodsForRemoval(job, activePods, int(active))
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
-		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
+		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
 		return active, metrics.JobSyncActionPodsDeleted, err
 	}
@@ -1315,7 +1314,7 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 	if len(podsToDelete) > 0 {
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
 		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", wantActive)
-		removed, err := jm.deleteJobPods(job, jobKey, podsToDelete)
+		removed, err := jm.deleteJobPods(ctx, job, jobKey, podsToDelete)
 		active -= removed
 		// While it is possible for a Job to require both pod creations and
 		// deletions at the same time (e.g. indexed Jobs with repeated indexes), we
@@ -1443,13 +1442,13 @@ func activePodsForRemoval(job *batch.Job, pods []*v1.Pod, rmAtLeast int) []*v1.P
 }
 
 // updateJobStatus calls the API to update the job status.
-func (jm *Controller) updateJobStatus(job *batch.Job) (*batch.Job, error) {
-	return jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(context.TODO(), job, metav1.UpdateOptions{})
+func (jm *Controller) updateJobStatus(ctx context.Context, job *batch.Job) (*batch.Job, error) {
+	return jm.kubeClient.BatchV1().Jobs(job.Namespace).UpdateStatus(ctx, job, metav1.UpdateOptions{})
 }
 
-func (jm *Controller) patchJob(job *batch.Job, data []byte) error {
+func (jm *Controller) patchJob(ctx context.Context, job *batch.Job, data []byte) error {
 	_, err := jm.kubeClient.BatchV1().Jobs(job.Namespace).Patch(
-		context.TODO(), job.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
+		ctx, job.Name, types.StrategicMergePatchType, data, metav1.PatchOptions{})
 	return err
 }
 
