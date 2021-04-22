@@ -92,6 +92,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 		FilenameOptions: &resource.FilenameOptions{},
 		DescriberSettings: &describe.DescriberSettings{
 			ShowEvents: true,
+			ChunkSize:  cmdutil.DefaultChunkSize,
 		},
 
 		CmdParent: parent,
@@ -115,6 +116,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&o.DescriberSettings.ShowEvents, "show-events", o.DescriberSettings.ShowEvents, "If true, display events related to the described object.")
+	cmdutil.AddChunkSizeFlag(cmd, &o.DescriberSettings.ChunkSize)
 	return cmd
 }
 
@@ -156,6 +158,7 @@ func (o *DescribeOptions) Run() error {
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		LabelSelectorParam(o.Selector).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
+		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
 		Do()
 	err := r.Err()
@@ -220,6 +223,7 @@ func (o *DescribeOptions) DescribeMatchingResources(originalError error, resourc
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, resource).
 		SingleResourceType().
+		RequestChunksOf(o.DescriberSettings.ChunkSize).
 		Flatten().
 		Do()
 	mapping, err := r.ResourceMapping()

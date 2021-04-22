@@ -317,6 +317,9 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" describe foos/test
   kubectl "${kube_flags[@]}" describe foos | grep listlabel=true
   kubectl "${kube_flags[@]}" describe foos | grep itemlabel=true
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert customresourcedefinitions events
+  kube::test::describe_resource_chunk_size_assert foos events
 
   # Delete the resource with cascading strategy background.
   kubectl "${kube_flags[@]}" delete foos test --cascade=background
