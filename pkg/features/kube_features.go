@@ -280,14 +280,6 @@ const (
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
 	NodeLease featuregate.Feature = "NodeLease"
 
-	// owner: @janosi
-	// alpha: v1.12
-	// beta:  v1.19
-	// GA:    v1.20
-	//
-	// Enables SCTP as new protocol for Service ports, NetworkPolicy, and ContainerPort in Pod/Containers definition
-	SCTPSupport featuregate.Feature = "SCTPSupport"
-
 	// owner: @rikatz
 	// alpha: v1.21
 	//
