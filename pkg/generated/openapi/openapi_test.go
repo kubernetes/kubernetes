@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	// TODO(#101375): required to get stable go.mod content until generated openapi stops requiring this package
+	_ "github.com/go-openapi/spec"
+
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
