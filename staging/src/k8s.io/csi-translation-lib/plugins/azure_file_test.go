@@ -102,10 +102,11 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 	translator := NewAzureFileCSITranslator()
 
 	cases := []struct {
-		name   string
-		volume *corev1.Volume
-		expVol *corev1.PersistentVolume
-		expErr bool
+		name         string
+		volume       *corev1.Volume
+		podNamespace string
+		expVol       *corev1.PersistentVolume
+		expErr       bool
 	}{
 		{
 			name:   "empty volume",
@@ -148,11 +149,44 @@ func TestTranslateAzureFileInTreeStorageClassToCSI(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "azure file volume with a pod namespace",
+			volume: &corev1.Volume{
+				VolumeSource: corev1.VolumeSource{
+					AzureFile: &corev1.AzureFileVolumeSource{
+						ReadOnly:   true,
+						SecretName: "secretname",
+						ShareName:  "sharename",
+					},
+				},
+			},
+			podNamespace: "test",
+			expVol: &corev1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "file.csi.azure.com-sharename",
+				},
+				Spec: corev1.PersistentVolumeSpec{
+					PersistentVolumeSource: corev1.PersistentVolumeSource{
+						CSI: &corev1.CSIPersistentVolumeSource{
+							Driver: "file.csi.azure.com",
+							NodeStageSecretRef: &corev1.SecretReference{
+								Name:      "secretname",
+								Namespace: "test",
+							},
+							ReadOnly:         true,
+							VolumeAttributes: map[string]string{shareNameField: "sharename"},
+							VolumeHandle:     "#secretname#sharename#",
+						},
+					},
+					AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+				},
+			},
+		},
 	}
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume, tc.podNamespace)
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
