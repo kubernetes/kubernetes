@@ -96,7 +96,7 @@ func TestRecycler(t *testing.T) {
 	}
 }
 
-func doTestPlugin(t *testing.T, spec *volume.Spec) {
+func doTestPlugin(t *testing.T, spec *volume.Spec, expectedDevice string) {
 	tmpDir, err := utiltesting.MkTmpdir("nfs_test")
 	if err != nil {
 		t.Fatalf("error creating temp dir: %v", err)
@@ -146,9 +146,6 @@ func doTestPlugin(t *testing.T, spec *volume.Spec) {
 		if mntDevs[0].Type != "nfs" {
 			t.Errorf("unexpected type of mounted devices. expected: %v, got %v", "nfs", mntDevs[0].Type)
 		}
-		src, _, _ := getVolumeSource(spec)
-		srvr := getServerFromSource(src)
-		expectedDevice := fmt.Sprintf("%s:%s", srvr, src.Path)
 		if mntDevs[0].Device != expectedDevice {
 			t.Errorf("unexpected nfs device, expected %q, got: %q", expectedDevice, mntDevs[0].Device)
 		}
@@ -195,7 +192,7 @@ func TestPluginVolume(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "localhost", Path: "/somepath", ReadOnly: false}},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "localhost:/somepath")
 }
 
 func TestIPV6VolumeSource(t *testing.T) {
@@ -203,7 +200,7 @@ func TestIPV6VolumeSource(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "0:0:0:0:0:0:0:1", Path: "/somepath", ReadOnly: false}},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "[0:0:0:0:0:0:0:1]:/somepath")
 }
 
 func TestIPV4VolumeSource(t *testing.T) {
@@ -211,7 +208,7 @@ func TestIPV4VolumeSource(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: v1.VolumeSource{NFS: &v1.NFSVolumeSource{Server: "127.0.0.1", Path: "/somepath", ReadOnly: false}},
 	}
-	doTestPlugin(t, volume.NewSpecFromVolume(vol))
+	doTestPlugin(t, volume.NewSpecFromVolume(vol), "127.0.0.1:/somepath")
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -226,7 +223,7 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false))
+	doTestPlugin(t, volume.NewSpecFromPersistentVolume(vol, false), "localhost:/somepath")
 }
 
 func TestPersistentClaimReadOnlyFlag(t *testing.T) {
