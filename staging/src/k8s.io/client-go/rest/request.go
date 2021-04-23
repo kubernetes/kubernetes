@@ -544,7 +544,7 @@ func (r Request) finalURLTemplate() url.URL {
 	} else {
 		// this should not happen that the only two possibilities are /api... and /apis..., just want to put an
 		// outlet here in case more API groups are added in future if ever possible:
-		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups
+		// https://kubernetes.io/docs/concepts/overview/kubernetes-api/#api-groups-and-versioning
 		// if a wrong API groups name is encountered, return the {prefix} for url.Path
 		url.Path = "/{prefix}"
 		url.RawQuery = ""
