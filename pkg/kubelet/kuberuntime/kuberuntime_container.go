@@ -649,9 +649,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 		gracePeriod = gracePeriod - m.executePreStopHook(pod, containerID, containerSpec, gracePeriod)
 	}
 	// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
-	if gracePeriod < minimumGracePeriodInSeconds {
-		gracePeriod = minimumGracePeriodInSeconds
-	}
+	gracePeriod = max(gracePeriod, minimumGracePeriodInSeconds)
 	if gracePeriodOverride != nil {
 		gracePeriod = *gracePeriodOverride
 		klog.V(3).InfoS("Killing container with a grace period override", "pod", klog.KObj(pod), "podUID", pod.UID,

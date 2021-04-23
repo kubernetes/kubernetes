@@ -37,9 +37,7 @@ func milliCPUToShares(milliCPU int64) int64 {
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
 	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
-	if shares < minShares {
-		return minShares
-	}
+	shares = max(shares, minShares)
 	return shares
 }
 
@@ -59,9 +57,7 @@ func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	quota = (milliCPU * period) / milliCPUToCPU
 
 	// quota needs to be a minimum of 1ms.
-	if quota < minQuotaPeriod {
-		quota = minQuotaPeriod
-	}
+	quota = max(quota, minQuotaPeriod)
 
 	return
 }
