@@ -347,11 +347,7 @@ func (c *Controller) queueEndpoints(obj interface{}) {
 // This does not ensure that a corresponding Service exists with a nil selector.
 // That check should be performed separately.
 func (c *Controller) shouldMirror(endpoints *v1.Endpoints) bool {
-	if endpoints == nil || skipMirror(endpoints.Labels) || hasLeaderElection(endpoints.Annotations) {
-		return false
-	}
-
-	return true
+	return endpoints != nil && !skipMirror(endpoints.Labels) && !hasLeaderElection(endpoints.Annotations)
 }
 
 // onServiceAdd queues a sync for the relevant Endpoints resource.

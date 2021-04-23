@@ -96,34 +96,22 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func areKubeletServingSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeletServingSignerConfiguration.CertFile) > 0 || len(config.KubeletServingSignerConfiguration.KeyFile) > 0
 }
 func areKubeletClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeletClientSignerConfiguration.CertFile) > 0 || len(config.KubeletClientSignerConfiguration.KeyFile) > 0
 }
 
 func areKubeAPIServerClientSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.KubeAPIServerClientSignerConfiguration.CertFile) > 0 || len(config.KubeAPIServerClientSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.KubeAPIServerClientSignerConfiguration.CertFile) > 0 || len(config.KubeAPIServerClientSignerConfiguration.KeyFile) > 0
 }
 
 func areLegacyUnknownSignerFilesSpecified(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
-	if len(config.LegacyUnknownSignerConfiguration.CertFile) > 0 || len(config.LegacyUnknownSignerConfiguration.KeyFile) > 0 {
-		// if only one is specified, it will error later during construction
-		return true
-	}
-	return false
+	// if only one is specified, it will error later during construction
+	return len(config.LegacyUnknownSignerConfiguration.CertFile) > 0 || len(config.LegacyUnknownSignerConfiguration.KeyFile) > 0
 }
 
 func anySpecificFilesSet(config csrsigningconfig.CSRSigningControllerConfiguration) bool {
