@@ -150,7 +150,7 @@ func tryConnect(service ServicePortPortalName, srcAddr net.Addr, protocol string
 		}
 		return outConn, nil
 	}
-	return nil, fmt.Errorf("failed to connect to an endpoint.")
+	return nil, fmt.Errorf("failed to connect to an endpoint")
 }
 
 func (tcp *tcpProxySocket) ProxyLoop(service ServicePortPortalName, myInfo *serviceInfo, proxier *Proxier) {
