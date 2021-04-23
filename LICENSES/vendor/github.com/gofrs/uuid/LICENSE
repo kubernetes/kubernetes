@@ -1,4 +1,4 @@
-= vendor/github.com/satori/go.uuid licensed under: =
+= vendor/github.com/gofrs/uuid licensed under: =
 
 Copyright (C) 2013-2018 by Maxim Bublis <b@codemonkey.ru>
 
@@ -21,4 +21,4 @@ LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-= vendor/github.com/satori/go.uuid/LICENSE ae4ba217c6e20c2d8f48f69966b9121b
+= vendor/github.com/gofrs/uuid/LICENSE ae4ba217c6e20c2d8f48f69966b9121b
