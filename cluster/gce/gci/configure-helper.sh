@@ -586,7 +586,7 @@ function mount-master-pd {
 
   # Contains all the data stored in etcd.
   mkdir -p "${mount_point}/var/etcd"
-  chmod 700 "${mount_point}/var/etcd"
+  chmod 750 "${mount_point}/var/etcd"
   ln -s -f "${mount_point}/var/etcd" /var/etcd
   mkdir -p /etc/srv
   # Contains the dynamically generated apiserver auth certs and keys.
@@ -596,8 +596,12 @@ function mount-master-pd {
   mkdir -p "${mount_point}/srv/sshproxy"
   ln -s -f "${mount_point}/srv/sshproxy" /etc/srv/sshproxy
 
-  chown -R etcd "${mount_point}/var/etcd"
-  chgrp -R etcd "${mount_point}/var/etcd"
+  if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
+    chown -R "${ETCD_RUNASUSER}":"${ETCD_RUNASGROUP}" "${mount_point}/var/etcd"
+  else
+    chown -R etcd "${mount_point}/var/etcd"
+    chgrp -R etcd "${mount_point}/var/etcd"
+  fi
 }
 
 # append_or_replace_prefixed_line ensures:
@@ -1897,9 +1901,7 @@ function start-etcd-servers {
   if [[ -e /etc/init.d/etcd ]]; then
     rm -f /etc/init.d/etcd
   fi
-  if [[ -n "${ETCD_RUNASUSER:-}" && -n "${ETCD_RUNASGROUP:-}" ]]; then
-    chown -R "${ETCD_RUNASUSER}":"${ETCD_RUNASGROUP}" /mnt/disks/master-pd/var/etcd
-  fi
+
   prepare-log-file /var/log/etcd.log "${ETCD_RUNASUSER:-0}"
   prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
 
