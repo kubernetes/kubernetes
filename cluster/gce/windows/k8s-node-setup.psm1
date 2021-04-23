@@ -288,6 +288,8 @@ function Set-EnvironmentVars {
     "MANIFESTS_DIR" = ${kube_env}['MANIFESTS_DIR']
     "INFRA_CONTAINER" = ${kube_env}['WINDOWS_INFRA_CONTAINER']
     "WINDOWS_ENABLE_PIGZ" = ${kube_env}['WINDOWS_ENABLE_PIGZ']
+    "ENABLE_NODE_PROBLEM_DETECTOR" = ${kube_env}['ENABLE_NODE_PROBLEM_DETECTOR']
+    "NODEPROBLEMDETECTOR_KUBECONFIG_FILE" = ${kube_env}['WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE']
 
     "Path" = ${env:Path} + ";" + ${kube_env}['NODE_DIR']
     "KUBE_NETWORK" = "l2bridge".ToLower()
@@ -667,30 +669,35 @@ function Create-KubeletKubeconfig {
   }
 }
 
-# Creates the kube-proxy user kubeconfig file at $env:KUBEPROXY_KUBECONFIG.
+# Creates the kubeconfig user file for applications that communicate with Kubernetes.
 #
 # Create-NodePki() must be called first.
 #
 # Required ${kube_env} keys:
 #   CA_CERT
-#   KUBE_PROXY_TOKEN
-function Create-KubeproxyKubeconfig {
-  if (-not (ShouldWrite-File ${env:KUBEPROXY_KUBECONFIG})) {
+#   KUBERNETES_MASTER_NAME
+function Create-Kubeconfig {
+  param (
+    [parameter(Mandatory=$true)] [string]$Name,
+    [parameter(Mandatory=$true)] [string]$Path,
+    [parameter(Mandatory=$true)] [string]$Token
+  )
+  if (-not (ShouldWrite-File $Path)) {
     return
   }
 
-  New-Item -Force -ItemType file ${env:KUBEPROXY_KUBECONFIG} | Out-Null
+  New-Item -Force -ItemType file $Path | Out-Null
 
   # In configure-helper.sh kubelet kubeconfig uses certificate-authority while
   # kubeproxy kubeconfig uses certificate-authority-data, ugh. Does it matter?
   # Use just one or the other for consistency?
-  Set-Content ${env:KUBEPROXY_KUBECONFIG} `
+  Set-Content $Path `
 'apiVersion: v1
 kind: Config
 users:
-- name: kube-proxy
+- name: APP_NAME
   user:
-    token: KUBEPROXY_TOKEN
+    token: APP_TOKEN
 clusters:
 - name: local
   cluster:
@@ -699,15 +706,29 @@ clusters:
 contexts:
 - context:
     cluster: local
-    user: kube-proxy
+    user: APP_NAME
   name: service-account-context
 current-context: service-account-context'.`
-    replace('KUBEPROXY_TOKEN', ${kube_env}['KUBE_PROXY_TOKEN']).`
-    replace('CA_CERT', ${kube_env}['CA_CERT']).`
-    replace('APISERVER_ADDRESS', ${kube_env}['KUBERNETES_MASTER_NAME'])
+  replace('APP_NAME', $Name).`
+  replace('APP_TOKEN', $Token).`
+  replace('CA_CERT', ${kube_env}['CA_CERT']).`
+  replace('APISERVER_ADDRESS', ${kube_env}['KUBERNETES_MASTER_NAME'])
 
-  Log-Output ("kubeproxy kubeconfig:`n" +
-              "$(Get-Content -Raw ${env:KUBEPROXY_KUBECONFIG})")
+  Log-Output ("${Name} kubeconfig:`n" +
+              "$(Get-Content -Raw ${Path})")
+}
+
+# Creates the kube-proxy user kubeconfig file at $env:KUBEPROXY_KUBECONFIG.
+#
+# Create-NodePki() must be called first.
+#
+# Required ${kube_env} keys:
+#   CA_CERT
+#   KUBE_PROXY_TOKEN
+function Create-KubeproxyKubeconfig {
+  Create-Kubeconfig -Name 'kube-proxy' `
+    -Path ${env:KUBEPROXY_KUBECONFIG} `
+    -Token ${kube_env}['KUBE_PROXY_TOKEN']
 }
 
 # Returns the IP alias range configured for this GCE instance.
@@ -1650,6 +1671,130 @@ function Install-Pigz {
   }
 }
 
+# Node Problem Detector Resources
+$NPD_SERVICE = "node-problem-detector"
+$DEFAULT_NPD_VERSION = '0.8.8'
+$DEFAULT_NPD_RELEASE_PATH = 'https://storage.googleapis.com/kubernetes-release'
+$DEFAULT_NPD_HASH = 'ff264e727fecf7114f00afb9b63755b47b62fc85bffb4a39062d4bbe105186d13cbd111431ae01e49cae3b6940c42934cac0fbbbcae2395df7a73507dc44bc80'
+
+# Install Node Problem Detector (NPD).
+# NPD analyzes the host for problems that can disrupt workloads.
+# https://github.com/kubernetes/node-problem-detector
+function DownloadAndInstall-NodeProblemDetector {
+  if ("${env:ENABLE_NODE_PROBLEM_DETECTOR}" -eq "standalone") {
+    if (ShouldWrite-File "${env:NODE_DIR}\node-problem-detector.exe") {
+      $npd_version = $DEFAULT_NPD_VERSION
+      $npd_hash = $DEFAULT_NPD_HASH
+      if (-not [string]::IsNullOrEmpty(${kube_env}['NODE_PROBLEM_DETECTOR_VERSION'])) {
+        $npd_version = ${kube_env}['NODE_PROBLEM_DETECTOR_VERSION']
+        $npd_hash = ${kube_env}['NODE_PROBLEM_DETECTOR_TAR_HASH']
+      }
+      $npd_release_path = $DEFAULT_NPD_RELEASE_PATH
+      if (-not [string]::IsNullOrEmpty(${kube_env}['NODE_PROBLEM_DETECTOR_RELEASE_PATH'])) {
+        $npd_release_path = ${kube_env}['NODE_PROBLEM_DETECTOR_RELEASE_PATH']
+      }
+
+      $npd_tar = "node-problem-detector-v${npd_version}-windows_amd64.tar.gz"
+
+      Log-Output "Downloading ${npd_tar}."
+
+      $npd_dir = "${env:K8S_DIR}\node-problem-detector"
+      New-Item -Path $npd_dir -ItemType Directory -Force -Confirm:$false
+
+      MustDownload-File `
+          -URLs "${npd_release_path}/node-problem-detector/${npd_tar}" `
+          -Hash $npd_hash `
+          -Algorithm SHA512 `
+          -OutFile "${npd_dir}\${npd_tar}"
+
+      tar xzvf "${npd_dir}\${npd_tar}" -C $npd_dir
+      Move-Item "${npd_dir}\bin\*" "${env:NODE_DIR}\" -Force -Confirm:$false
+      Remove-Item "${npd_dir}\bin" -Force -Confirm:$false
+      Remove-Item "${npd_dir}\${npd_tar}" -Force -Confirm:$false
+    }
+    else {
+        Log-Output "Node Problem Detector already installed."
+    }
+  }
+}
+
+# Creates the node-problem-detector user kubeconfig file at
+# $env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE.
+#
+# Create-NodePki() must be called first.
+#
+# Required ${kube_env} keys:
+#   CA_CERT
+#   NODE_PROBLEM_DETECTOR_TOKEN
+function Create-NodeProblemDetectorKubeConfig {
+  Create-Kubeconfig -Name 'node-problem-detector' `
+    -Path ${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE} `
+    -Token ${kube_env}['NODE_PROBLEM_DETECTOR_TOKEN']
+}
+
+# Configures NPD to run with the bundled monitor configs and report against the Kubernetes api server.
+function Configure-NodeProblemDetector {
+  $npd_bin = "${env:NODE_DIR}\node-problem-detector.exe"
+  if ("${env:ENABLE_NODE_PROBLEM_DETECTOR}" -eq "standalone" -and (Test-Path $npd_bin)) {
+    $npd_svc = Get-Service -Name $NPD_SERVICE -ErrorAction SilentlyContinue
+    if ($npd_svc -eq $null) {
+      $npd_dir = "${env:K8S_DIR}\node-problem-detector"
+      $npd_logs_dir = "${env:LOGS_DIR}\node-problem-detector"
+
+      New-Item -Path $npd_logs_dir -Type Directory -Force -Confirm:$false
+
+      $flags = ''
+      if ([string]::IsNullOrEmpty(${kube_env}['NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS'])) {
+        $system_log_monitors = @()
+        $system_stats_monitors = @()
+        $custom_plugin_monitors = @()
+
+        # Custom Plugin Monitors
+        $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubelet.json")
+        $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-kubeproxy.json")
+
+        # System Stats Monitors
+        $system_stats_monitors += @("${npd_dir}\config\windows-system-stats-monitor.json")
+
+        # NPD Configuration for CRI monitor
+        if (${env:CONTAINER_RUNTIME} -eq "containerd") {
+          $system_log_monitors += @("${npd_dir}\config\windows-containerd-monitor-filelog.json")
+          $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-containerd.json")
+        } else {
+          $custom_plugin_monitors += @("${npd_dir}\config\windows-health-checker-docker.json")
+        }
+
+        $flags="--v=2 --port=20256 --log_dir=${npd_logs_dir}"
+        if ($system_log_monitors.count -gt 0) {
+          $flags+=" --config.system-log-monitor={0}" -f ($system_log_monitors -join ",")
+        }
+        if ($system_stats_monitors.count -gt 0) {
+          $flags+=" --config.system-stats-monitor={0}" -f ($system_stats_monitors -join ",")
+        }
+        if ($custom_plugin_monitors.count -gt 0) {
+          $flags+=" --config.custom-plugin-monitor={0}" -f ($custom_plugin_monitors -join ",")
+        }
+      }
+      else {
+        $flags = ${kube_env}['NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS']
+      }
+      $kubernetes_master_name = ${kube_env}['KUBERNETES_MASTER_NAME']
+      $flags = "${flags} --apiserver-override=`"https://${kubernetes_master_name}?inClusterConfig=false&auth=${env:NODEPROBLEMDETECTOR_KUBECONFIG_FILE}`""
+
+      Log-Output "Creating service: ${NPD_SERVICE}"
+      Log-Output "${npd_bin} ${flags}"
+      sc.exe create $NPD_SERVICE binpath= "${npd_bin} ${flags}" displayName= "Node Problem Detector"
+      sc.exe failure $NPD_SERVICE reset= 30 actions= restart/5000
+      sc.exe start $NPD_SERVICE
+
+      Write-VerboseServiceInfoToConsole -Service $NPD_SERVICE
+    }
+    else {
+      Log-Output "${NPD_SERVICE} already configured."
+    }
+  }
+}
+
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
@@ -1899,6 +2044,21 @@ $FLUENTBIT_CONFIG = @'
     Reserve_Data True
     Parser       docker
     Parser       containerd
+
+# Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+# Example:
+# I0716 02:08:55.559351    3356 log_spam.go:42] Command line arguments:
+[INPUT]
+    Name             tail
+    Alias            node-problem-detector
+    Tag              node-problem-detector
+    Mem_Buf_Limit    5MB
+    Skip_Long_Lines  On
+    Refresh_Interval 5
+    Path             C:\etc\kubernetes\logs\node-problem-detector\*.log.INFO*
+    DB               /var/run/google-fluentbit/pos-files/node-problem-detector.db
+    Multiline        On
+    Parser_Firstline glog
 
 # Example:
 # I0928 03:15:50.440223    4880 main.go:51] Starting CSI-Proxy Server ...
