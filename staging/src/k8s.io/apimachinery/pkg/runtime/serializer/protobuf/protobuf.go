@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"sync"
 
 	"github.com/gogo/protobuf/proto"
 
@@ -42,6 +43,14 @@ var (
 	//
 	// This encoding scheme is experimental, and is subject to change at any time.
 	protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
+	defaultSize         = 100
+
+	pool = &sync.Pool{
+		New: func() interface{} {
+			var empty []byte
+			return empty
+		},
+	}
 )
 
 type errNotMarshalable struct {
@@ -89,6 +98,14 @@ var _ runtime.Serializer = &Serializer{}
 var _ recognizer.RecognizingDecoder = &Serializer{}
 
 const serializerIdentifier runtime.Identifier = "protobuf"
+
+func getSlice(size int) []byte {
+	in := pool.Get().([]byte)
+	if cap(in) < size {
+		return make([]byte, size, (size+1)*2)
+	}
+	return in[:size]
+}
 
 // Decode attempts to convert the provided data into a protobuf message, extract the stored schema kind, apply the provided default
 // gvk, and then load that data into an object matching the desired schema kind or the provided into. If into is *runtime.Unknown,
@@ -176,7 +193,8 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case *runtime.Unknown:
 		estimatedSize := prefixSize + uint64(t.Size())
-		data := make([]byte, estimatedSize)
+		data := getSlice(int(estimatedSize))
+		defer pool.Put(data)
 		i, err := t.MarshalTo(data[prefixSize:])
 		if err != nil {
 			return err
@@ -200,7 +218,8 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
 		estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
-		data := make([]byte, estimatedSize)
+		data := getSlice(int(estimatedSize))
+		defer pool.Put(data)
 
 		i, err := unk.NestedMarshalTo(data[prefixSize:], t, encodedSize)
 		if err != nil {
@@ -221,7 +240,8 @@ func (s *Serializer) doEncode(obj runtime.Object, w io.Writer) error {
 		unk.Raw = data
 
 		estimatedSize := prefixSize + uint64(unk.Size())
-		data = make([]byte, estimatedSize)
+		data = getSlice(int(estimatedSize))
+		defer pool.Put(data)
 
 		i, err := unk.MarshalTo(data[prefixSize:])
 		if err != nil {
@@ -407,7 +427,8 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
-		data := make([]byte, encodedSize)
+		data := getSlice(int(encodedSize))
+		defer pool.Put(data)
 
 		n, err := t.MarshalToSizedBuffer(data)
 		if err != nil {
@@ -420,7 +441,8 @@ func (s *RawSerializer) doEncode(obj runtime.Object, w io.Writer) error {
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalTo methods
 		encodedSize := uint64(t.Size())
-		data := make([]byte, encodedSize)
+		data := getSlice(int(encodedSize))
+		defer pool.Put(data)
 
 		n, err := t.MarshalTo(data)
 		if err != nil {
