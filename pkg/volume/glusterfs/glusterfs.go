@@ -581,7 +581,7 @@ func (plugin *glusterfsPlugin) collectGids(className string, gidTable *MinMaxAll
 func (plugin *glusterfsPlugin) getGidTable(className string, min int, max int) (*MinMaxAllocator, error) {
 	plugin.gidTableLock.Lock()
 	gidTable, ok := plugin.gidTable[className]
-	plugin.gidTableLock.Unlock()
+	defer plugin.gidTableLock.Unlock()
 
 	if ok {
 		err := gidTable.SetRange(min, max)
