@@ -36,7 +36,7 @@ ENV LOCALAPPDATA="C:\Users\ContainerAdministrator\AppData\Local" \
 USER ContainerAdministrator
 RUN setx /M PATH "C:\Powershell\;%PATH%"
 
-# intialize powershell module cache
+# initialize powershell module cache
 RUN powershell \
         -NoLogo \
         -NoProfile \
