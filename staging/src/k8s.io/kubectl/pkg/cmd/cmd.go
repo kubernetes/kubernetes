@@ -160,7 +160,7 @@ __kubectl_get_resource()
       __kubectl_get_resource_helper "" "$cur"
       return # the return status is that of the last command executed in the function body
     fi
-    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+    __kubectl_parse_get "${nouns[0]}"
 }
 
 # Same as __kubectl_get_resource (without s) but allows completion for multiple, comma-separated resource names.
@@ -181,7 +181,7 @@ __kubectl_get_resources()
       __kubectl_get_resource_helper "$HEAD" "$TAIL"
       return # the return status is that of the last command executed in the function body
     fi
-    __kubectl_parse_get "${nouns[${#nouns[@]} -1]}"
+    __kubectl_parse_get "${nouns[0]}"
 }
 
 __kubectl_get_resource_helper()
