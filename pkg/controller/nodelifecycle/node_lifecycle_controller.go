@@ -825,13 +825,6 @@ func (nc *Controller) monitorNodeHealth() error {
 				}
 				continue
 			}
-			if nc.runTaintManager {
-				nc.processTaintBaseEviction(node, &observedReadyCondition)
-			} else {
-				if err := nc.processNoTaintBaseEviction(node, &observedReadyCondition, gracePeriod, pods); err != nil {
-					utilruntime.HandleError(fmt.Errorf("unable to evict all pods from node %v: %v; queuing for retry", node.Name, err))
-				}
-			}
 
 			_, needsRetry := nc.nodesToRetry.Load(node.Name)
 			switch {
@@ -844,6 +837,14 @@ func (nc *Controller) monitorNodeHealth() error {
 					utilruntime.HandleError(fmt.Errorf("unable to mark all pods NotReady on node %v: %v; queuing for retry", node.Name, err))
 					nc.nodesToRetry.Store(node.Name, struct{}{})
 					continue
+				}
+			}
+
+			if nc.runTaintManager {
+				nc.processTaintBaseEviction(node, currentReadyCondition)
+			} else {
+				if err := nc.processNoTaintBaseEviction(node, currentReadyCondition, gracePeriod, pods); err != nil {
+					utilruntime.HandleError(fmt.Errorf("unable to evict all pods from node %v: %v; queuing for retry", node.Name, err))
 				}
 			}
 		}
