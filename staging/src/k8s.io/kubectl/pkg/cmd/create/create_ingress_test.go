@@ -30,6 +30,7 @@ func TestCreateIngressValidation(t *testing.T) {
 		defaultbackend string
 		ingressclass   string
 		rules          []string
+		annotations    []string
 		expected       string
 	}{
 		"no default backend and rule": {
@@ -48,6 +49,22 @@ func TestCreateIngressValidation(t *testing.T) {
 		"default backend is ok": {
 			defaultbackend: "xpto:4444",
 			expected:       "",
+		},
+		"invalid annotation": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"key1=value1",
+				"key2",
+			},
+			expected: "annotation key2 is invalid and should be in format key=[value]",
+		},
+		"valid annotations": {
+			defaultbackend: "xpto:4444",
+			annotations: []string{
+				"key1=value1",
+				"key2=",
+			},
+			expected: "",
 		},
 		"multiple conformant rules": {
 			rules: []string{
@@ -122,6 +139,7 @@ func TestCreateIngressValidation(t *testing.T) {
 				DefaultBackend: tc.defaultbackend,
 				Rules:          tc.rules,
 				IngressClass:   tc.ingressclass,
+				Annotations:    tc.annotations,
 			}
 
 			err := o.Validate()
