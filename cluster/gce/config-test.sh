@@ -604,6 +604,11 @@ export WINDOWS_ENABLE_PIGZ="${WINDOWS_ENABLE_PIGZ:-true}"
 # Enable Windows DSR (Direct Server Return)
 export WINDOWS_ENABLE_DSR="${WINDOWS_ENABLE_DSR:-false}"
 
+# Install Node Problem Detector (NPD) on Windows nodes.
+# NPD analyzes the host for problems that can disrupt workloads.
+export WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR="${WINDOWS_ENABLE_NODE_PROBLEM_DETECTOR:-none}"
+export WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS="${WINDOWS_NODE_PROBLEM_DETECTOR_CUSTOM_FLAGS:-}"
+
 # TLS_CIPHER_SUITES defines cipher suites allowed to be used by kube-apiserver.
 # If this variable is unset or empty, kube-apiserver will allow its default set of cipher suites.
 export TLS_CIPHER_SUITES=""

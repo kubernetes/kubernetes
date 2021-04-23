@@ -157,6 +157,8 @@ export WINDOWS_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.kubeconfig"
 export WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-kubeconfig"
 # Path for kube-proxy kubeconfig file on Windows nodes.
 export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
+# Path for kube-proxy kubeconfig file on Windows nodes.
+export WINDOWS_NODEPROBLEMDETECTOR_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\node-problem-detector.kubeconfig"
 # Pause container image for Windows container.
 export WINDOWS_INFRA_CONTAINER="k8s.gcr.io/pause:3.4.1"
 # Storage Path for csi-proxy. csi-proxy only needs to be installed for Windows.
