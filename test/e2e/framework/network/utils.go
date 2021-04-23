@@ -51,7 +51,7 @@ import (
 
 const (
 	// EndpointHTTPPort is an endpoint HTTP port for testing.
-	EndpointHTTPPort = 8080
+	EndpointHTTPPort = 8083
 	// EndpointUDPPort is an endpoint UDP port for testing.
 	EndpointUDPPort = 8081
 	// EndpointSCTPPort is an endpoint SCTP port for testing.
