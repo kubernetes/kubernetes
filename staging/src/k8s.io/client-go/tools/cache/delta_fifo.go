@@ -373,13 +373,8 @@ func dedupDeltas(deltas Deltas) Deltas {
 	a := &deltas[n-1]
 	b := &deltas[n-2]
 	if out := isDup(a, b); out != nil {
-		// `a` and `b` are duplicates. Only keep the one returned from isDup().
-		// TODO: This extra array allocation and copy seems unnecessary if
-		// all we do to dedup is compare the new delta with the last element
-		// in `items`, which could be done by mutating `items` directly.
-		// Might be worth profiling and investigating if it is safe to optimize.
-		d := append(Deltas{}, deltas[:n-2]...)
-		return append(d, *out)
+		deltas[n-2] = *out
+		return deltas[:n-1]
 	}
 	return deltas
 }
