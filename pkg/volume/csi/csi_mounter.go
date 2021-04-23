@@ -426,6 +426,9 @@ func removeMountDir(plug *csiPlugin, mountPath string) error {
 	}
 	if !mnt {
 		klog.V(4).Info(log("dir not mounted, deleting it [%s]", mountPath))
+		// Deprecation: Removal of this mountPath directory MUST be done by
+		// the CSI plugin according to the spec. This will no longer be done
+		// directly as part of TearDown by the kubelet in the future.
 		if err := os.Remove(mountPath); err != nil && !os.IsNotExist(err) {
 			return errors.New(log("failed to remove dir [%s]: %v", mountPath, err))
 		}
