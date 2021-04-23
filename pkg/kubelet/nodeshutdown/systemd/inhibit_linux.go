@@ -138,19 +138,18 @@ func (bus *DBusCon) MonitorShutdown() (<-chan bool, error) {
 
 	go func() {
 		for {
-			select {
-			case event := <-busChan:
-				if event == nil || len(event.Body) == 0 {
-					klog.ErrorS(nil, "Failed obtaining shutdown event, PrepareForShutdown event was empty")
-					continue
-				}
-				shutdownActive, ok := event.Body[0].(bool)
-				if !ok {
-					klog.ErrorS(nil, "Failed obtaining shutdown event, PrepareForShutdown event was not bool type as expected")
-					continue
-				}
-				shutdownChan <- shutdownActive
+			event := <-busChan
+			if event == nil || len(event.Body) == 0 {
+				klog.ErrorS(nil, "Failed obtaining shutdown event, PrepareForShutdown event was empty")
+				continue
 			}
+			shutdownActive, ok := event.Body[0].(bool)
+			if !ok {
+				klog.ErrorS(nil, "Failed obtaining shutdown event, PrepareForShutdown event was not bool type as expected")
+				continue
+			}
+			shutdownChan <- shutdownActive
+
 		}
 	}()
 
