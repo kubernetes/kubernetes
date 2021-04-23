@@ -39,11 +39,13 @@ func NewBootstrapAuthenticator(tokens oauthclient.OAuthAccessTokenInterface, get
 func (a *bootstrapAuthenticator) AuthenticateToken(ctx context.Context, name string) (*kauthenticator.Response, bool, error) {
 	// hash token for new-style sha256~ prefixed token
 	// TODO: reject non-sha256 prefix tokens in 4.7+
-	if strings.HasPrefix(name, sha256Prefix) {
-		withoutPrefix := strings.TrimPrefix(name, sha256Prefix)
-		h := sha256.Sum256([]byte(withoutPrefix))
-		name = sha256Prefix + base64.RawURLEncoding.EncodeToString(h[0:])
+	if !strings.HasPrefix(name, sha256Prefix) {
+		return nil, false, errOldFormat
 	}
+
+	withoutPrefix := strings.TrimPrefix(name, sha256Prefix)
+	h := sha256.Sum256([]byte(withoutPrefix))
+	name = sha256Prefix + base64.RawURLEncoding.EncodeToString(h[0:])
 
 	token, err := a.tokens.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
