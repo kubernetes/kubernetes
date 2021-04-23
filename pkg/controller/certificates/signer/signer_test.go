@@ -69,7 +69,7 @@ func TestSigner(t *testing.T) {
 		capi.UsageKeyEncipherment,
 		capi.UsageServerAuth,
 		capi.UsageClientAuth,
-	})
+	}, s.certTTL)
 	if err != nil {
 		t.Fatalf("failed to sign CSR: %v", err)
 	}
@@ -119,6 +119,8 @@ func TestHandle(t *testing.T) {
 		failed bool
 		// the signerName to be set on the generated CSR
 		signerName string
+		// use provided TTL
+		userTTL string
 		// if true, expect an error to be returned
 		err bool
 		// if true, expect an error to be returned during construction
@@ -274,6 +276,61 @@ func TestHandle(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:       "should sign and issue short lived cert if signerName is kubernetes.io/kube-apiserver-client",
+			signerName: "kubernetes.io/kube-apiserver-client",
+			commonName: "hello-world",
+			org:        []string{"some-org"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			userTTL:    "60",
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+				c, err := cert.ParseCertsPEM(csr.Status.Certificate)
+				if err != nil || len(c) == 0 {
+					t.Errorf("failed to parse generated certificate")
+					return
+				}
+				if ttl := c[0].NotAfter.Sub(c[0].NotBefore); ttl > 70*time.Second {
+					t.Errorf("expected certificate to be valid only for ~60s, it is %s", ttl)
+				}
+			},
+		},
+
+		{
+			name:       "should sign and issue cert valid for 1h overriding user that wants 24h",
+			signerName: "kubernetes.io/kube-apiserver-client",
+			commonName: "hello-world",
+			org:        []string{"some-org"},
+			usages:     []capi.KeyUsage{capi.UsageClientAuth, capi.UsageDigitalSignature, capi.UsageKeyEncipherment},
+			userTTL:    "8640",
+			approved:   true,
+			verify: func(t *testing.T, as []testclient.Action) {
+				if len(as) != 1 {
+					t.Errorf("expected one Update action but got %d", len(as))
+					return
+				}
+				csr := as[0].(testclient.UpdateAction).GetObject().(*capi.CertificateSigningRequest)
+				if len(csr.Status.Certificate) == 0 {
+					t.Errorf("expected certificate to be issued but it was not")
+				}
+				c, err := cert.ParseCertsPEM(csr.Status.Certificate)
+				if err != nil || len(c) == 0 {
+					t.Errorf("failed to parse generated certificate")
+					return
+				}
+				if ttl := c[0].NotAfter.Sub(c[0].NotBefore); ttl > 70*time.Minute {
+					t.Errorf("expected certificate to be valid only for ~1h, it is %s", ttl)
+				}
+			},
+		},
 	}
 
 	for _, c := range cases {
@@ -292,7 +349,7 @@ func TestHandle(t *testing.T) {
 				// continue with rest of test
 			}
 
-			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames})
+			csr := makeTestCSR(csrBuilder{cn: c.commonName, signerName: c.signerName, approved: c.approved, failed: c.failed, usages: c.usages, org: c.org, dnsNames: c.dnsNames, userTTL: c.userTTL})
 			if err := s.handle(csr); err != nil && !c.err {
 				t.Errorf("unexpected err: %v", err)
 			}
@@ -310,6 +367,7 @@ type csrBuilder struct {
 	dnsNames   []string
 	org        []string
 	signerName string
+	userTTL    string
 	approved   bool
 	failed     bool
 	usages     []capi.KeyUsage
@@ -338,6 +396,9 @@ func makeTestCSR(b csrBuilder) *capi.CertificateSigningRequest {
 	}
 	if b.signerName != "" {
 		csr.Spec.SignerName = b.signerName
+	}
+	if len(b.userTTL) > 0 {
+		csr.Annotations = map[string]string{userTTLSecondsAnnotationName: b.userTTL}
 	}
 	if b.approved {
 		csr.Status.Conditions = append(csr.Status.Conditions, capi.CertificateSigningRequestCondition{

@@ -22,6 +22,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"strconv"
 	"time"
 
 	capi "k8s.io/api/certificates/v1"
@@ -36,6 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
+
+const userTTLSecondsAnnotationName = "certificates.kubernetes.io/user-ttl-seconds"
 
 type CSRSigningController struct {
 	certificateController *certificates.CertificateController
@@ -173,7 +176,20 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 		// Ignore requests for kubernetes.io signerNames we don't recognize
 		return nil
 	}
-	cert, err := s.sign(x509cr, csr.Spec.Usages)
+
+	// allow users to specify shorter TTL that default pre-configured TTL
+	// this makes it possible to create short-lived on-demand certificates
+	ttl := s.certTTL
+	if csr.Annotations != nil {
+		if userTTL := csr.Annotations[userTTLSecondsAnnotationName]; len(userTTL) > 0 {
+			userTTLSeconds, err := strconv.Atoi(userTTL)
+			if err == nil && userTTLSeconds > 0 && (time.Second*time.Duration(userTTLSeconds)) < ttl {
+				ttl = time.Duration(userTTLSeconds) * time.Second
+			}
+		}
+	}
+
+	cert, err := s.sign(x509cr, csr.Spec.Usages, ttl)
 	if err != nil {
 		return fmt.Errorf("error auto signing csr: %v", err)
 	}
@@ -185,13 +201,13 @@ func (s *signer) handle(csr *capi.CertificateSigningRequest) error {
 	return nil
 }
 
-func (s *signer) sign(x509cr *x509.CertificateRequest, usages []capi.KeyUsage) ([]byte, error) {
+func (s *signer) sign(x509cr *x509.CertificateRequest, usages []capi.KeyUsage, ttl time.Duration) ([]byte, error) {
 	currCA, err := s.caProvider.currentCA()
 	if err != nil {
 		return nil, err
 	}
 	der, err := currCA.Sign(x509cr.Raw, authority.PermissiveSigningPolicy{
-		TTL:    s.certTTL,
+		TTL:    ttl,
 		Usages: usages,
 	})
 	if err != nil {
