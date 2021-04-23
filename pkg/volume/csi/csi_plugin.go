@@ -698,6 +698,13 @@ func (p *csiPlugin) NewBlockVolumeMapper(spec *volume.Spec, podRef *api.Pod, opt
 	}
 	klog.V(4).Info(log("created path successfully [%s]", dataDir))
 
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, errors.New(log("failed to get device path: %v", err))
+	}
+
+	mapper.MetricsProvider = NewMetricsCsi(pvSource.VolumeHandle, blockPath+"/"+string(podRef.UID), csiDriverName(pvSource.Driver))
+
 	// persist volume info data for teardown
 	node := string(p.host.GetNodeName())
 	attachID := getAttachmentName(pvSource.VolumeHandle, pvSource.Driver, node)
