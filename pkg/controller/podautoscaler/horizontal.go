@@ -905,12 +905,8 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 
 	// Bring the recommendation to within the upper and lower limits (stabilize).
 	recommendation := args.CurrentReplicas
-	if recommendation < upRecommendation {
-		recommendation = upRecommendation
-	}
-	if recommendation > downRecommendation {
-		recommendation = downRecommendation
-	}
+	recommendation = max(recommendation, upRecommendation)
+	recommendation = min(recommendation, downRecommendation)
 
 	// Record the unstabilized recommendation.
 	if foundOldSample {
