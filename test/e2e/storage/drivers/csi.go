@@ -47,7 +47,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"google.golang.org/grpc/codes"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -242,33 +241,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*storageframewo
 		NodeName:                 node.Name,
 	}
 	cleanup, err := utils.CreateFromManifests(config.Framework, driverNamespace, func(item interface{}) error {
-		if err := utils.PatchCSIDeployment(config.Framework, o, item); err != nil {
-			return err
-		}
-
-		// Remove csi-external-health-monitor-agent and
-		// csi-external-health-monitor-controller
-		// containers. They are not needed for any of the
-		// tests and in practice apparently caused enough
-		// overhead that even unrelated tests timed out. For
-		// example, in the pull-kubernetes-e2e-kind test, 43
-		// out of 5771 tests failed, including tests from
-		// sig-node, sig-cli, sig-api-machinery, sig-network.
-		switch item := item.(type) {
-		case *appsv1.StatefulSet:
-			var containers []v1.Container
-			for _, container := range item.Spec.Template.Spec.Containers {
-				switch container.Name {
-				case "csi-external-health-monitor-agent", "csi-external-health-monitor-controller":
-					// Remove these containers.
-				default:
-					// Keep the others.
-					containers = append(containers, container)
-				}
-			}
-			item.Spec.Template.Spec.Containers = containers
-		}
-		return nil
+		return utils.PatchCSIDeployment(config.Framework, o, item)
 	}, h.manifests...)
 
 	if err != nil {
