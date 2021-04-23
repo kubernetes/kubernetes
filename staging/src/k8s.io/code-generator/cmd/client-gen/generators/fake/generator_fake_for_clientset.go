@@ -64,12 +64,12 @@ func (g *genClientset) Imports(c *generator.Context) (imports []string) {
 			fakeGroupClientPackage := filepath.Join(groupClientPackage, "fake")
 
 			groupAlias := strings.ToLower(g.groupGoNames[clientgentypes.GroupVersion{Group: group.Group, Version: version.Version}])
-			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), groupClientPackage))
-			imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), fakeGroupClientPackage))
+			imports = append(imports, fmt.Sprintf("%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), filepath.ToSlash(groupClientPackage)))
+			imports = append(imports, fmt.Sprintf("fake%s%s \"%s\"", groupAlias, strings.ToLower(version.NonEmpty()), filepath.ToSlash(fakeGroupClientPackage)))
 		}
 	}
 	// the package that has the clientset Interface
-	imports = append(imports, fmt.Sprintf("clientset \"%s\"", g.realClientsetPackage))
+	imports = append(imports, fmt.Sprintf("clientset \"%s\"", filepath.ToSlash(g.realClientsetPackage)))
 	// imports for the code in commonTemplate
 	imports = append(imports,
 		"k8s.io/client-go/testing",

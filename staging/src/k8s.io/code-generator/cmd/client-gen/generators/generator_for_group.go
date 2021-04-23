@@ -64,7 +64,7 @@ func (g *genGroup) Namers(c *generator.Context) namer.NameSystems {
 
 func (g *genGroup) Imports(c *generator.Context) (imports []string) {
 	imports = append(imports, g.imports.ImportLines()...)
-	imports = append(imports, filepath.Join(g.clientsetPackage, "scheme"))
+	imports = append(imports, filepath.ToSlash(filepath.Join(g.clientsetPackage, "scheme")))
 	return
 }
 
