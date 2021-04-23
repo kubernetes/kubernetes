@@ -112,7 +112,7 @@ func isSysFSWritable() (bool, error) {
 	m := mount.New("" /* default mount path */)
 	mountPoints, err := m.List()
 	if err != nil {
-		klog.ErrorS(err,"Failed to list mount points")
+		klog.ErrorS(err, "Failed to list mount points")
 		return false, err
 	}
 
@@ -124,7 +124,7 @@ func isSysFSWritable() (bool, error) {
 		if len(mountPoint.Opts) > 0 && mountPoint.Opts[0] == permWritable {
 			return true, nil
 		}
-		klog.ErrorS(nil,"sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
+		klog.ErrorS(nil, "Sysfs is not writable", "mountPoint", mountPoint, "mountOptions", mountPoint.Opts)
 		return false, errReadOnlySysFS
 	}
 
