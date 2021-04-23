@@ -638,9 +638,6 @@ func CheckVolumeModeOfPath(f *framework.Framework, pod *v1.Pod, volMode v1.Persi
 // TODO: put this under e2epod once https://github.com/kubernetes/kubernetes/issues/81245
 // is resolved. Otherwise there will be dependency issue.
 func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, string, error) {
-	if framework.NodeOSDistroIs("windows") {
-		return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "powershell", "/c", shExec)
-	}
 	return f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
 }
 
