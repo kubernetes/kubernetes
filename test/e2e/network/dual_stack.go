@@ -120,7 +120,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 
 	// takes close to 140s to complete, so doesn't need to be marked [SLOW]
 	// TODO (aramase) remove phase 2 tag once phase 2 of dual stack is merged
-	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should be able to reach pod on ipv4 and ipv6 ip", func() {
 		serverDeploymentName := "dualstack-server"
 		clientDeploymentName := "dualstack-client"
 
@@ -209,7 +209,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
 
-	ginkgo.It("should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should create a single stack service with cluster ip from primary service range", func() {
 		serviceName := "defaultclusterip"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
@@ -256,7 +256,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv4 cluster ip [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should create service with ipv4 cluster ip", func() {
 		serviceName := "ipv4clusterip"
 		ns := f.Namespace.Name
 
@@ -301,7 +301,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv6 cluster ip [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should create service with ipv6 cluster ip", func() {
 		serviceName := "ipv6clusterip"
 		ns := f.Namespace.Name
 		ipv6 := v1.IPv6Protocol
@@ -346,7 +346,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should create service with ipv4,v6 cluster ip", func() {
 		serviceName := "ipv4ipv6clusterip"
 		ns := f.Namespace.Name
 
@@ -391,7 +391,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack]", func() {
+	ginkgo.It("should create service with ipv6,v4 cluster ip", func() {
 		serviceName := "ipv6ipv4clusterip"
 		ns := f.Namespace.Name
 
