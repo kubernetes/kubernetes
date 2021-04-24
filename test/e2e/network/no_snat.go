@@ -67,7 +67,7 @@ var (
 // Note: For those platforms that support Pods running in the host network (e.g. Linux):
 // pods in the host network of a node can communicate with all pods on all nodes without NAT
 // xref: https://kubernetes.io/docs/concepts/cluster-administration/networking/
-var _ = common.SIGDescribe("NoSNAT [Slow]", func() {
+var _ = common.SIGDescribe("NoSNAT", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
