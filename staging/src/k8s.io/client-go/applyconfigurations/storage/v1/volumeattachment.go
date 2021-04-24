@@ -58,8 +58,19 @@ func VolumeAttachment(name string) *VolumeAttachmentApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+	return extractVolumeAttachment(volumeAttachment, fieldManager, "")
+}
+
+// ExtractVolumeAttachmentStatus is the same as ExtractVolumeAttachment except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractVolumeAttachmentStatus(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string) (*VolumeAttachmentApplyConfiguration, error) {
+	return extractVolumeAttachment(volumeAttachment, fieldManager, "status")
+}
+
+func extractVolumeAttachment(volumeAttachment *apistoragev1.VolumeAttachment, fieldManager string, subresource string) (*VolumeAttachmentApplyConfiguration, error) {
 	b := &VolumeAttachmentApplyConfiguration{}
-	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b)
+	err := managedfields.ExtractInto(volumeAttachment, internal.Parser().Type("io.k8s.api.storage.v1.VolumeAttachment"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

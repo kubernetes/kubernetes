@@ -43,13 +43,14 @@ func TestExtractInto(t *testing.T) {
 		managedFields []metav1.ManagedFieldsEntry // written to object before test is run
 		fieldManager  string
 		expectedOut   interface{}
+		subresource   string
 	}{
 		{
 			name:    "unstructured, no matching manager",
 			obj:     &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"replicas": 1}}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr999", `{ "f:spec": { "f:replicas": {}}}`),
+				applyFieldsEntry("mgr999", `{ "f:spec": { "f:replicas": {}}}`, ""),
 			},
 			fieldManager: "mgr1",
 			expectedOut:  map[string]interface{}{},
@@ -59,7 +60,7 @@ func TestExtractInto(t *testing.T) {
 			obj:     &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"replicas": 1}}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`),
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
 			},
 			fieldManager: "mgr1",
 			expectedOut:  map[string]interface{}{"spec": map[string]interface{}{"replicas": 1}},
@@ -69,8 +70,8 @@ func TestExtractInto(t *testing.T) {
 			obj:     &unstructured.Unstructured{Object: map[string]interface{}{"spec": map[string]interface{}{"paused": true}}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`),
-				applyFieldsEntry("mgr2", `{ "f:spec": { "f:paused": {}}}`),
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
+				applyFieldsEntry("mgr2", `{ "f:spec": { "f:paused": {}}}`, ""),
 			},
 			fieldManager: "mgr2",
 			expectedOut:  map[string]interface{}{"spec": map[string]interface{}{"paused": true}},
@@ -80,7 +81,7 @@ func TestExtractInto(t *testing.T) {
 			obj:     &fakeDeployment{Spec: fakeDeploymentSpec{Replicas: &one}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr999", `{ "f:spec": { "f:replicas": {}}}`),
+				applyFieldsEntry("mgr999", `{ "f:spec": { "f:replicas": {}}}`, ""),
 			},
 			fieldManager: "mgr1",
 			expectedOut:  map[string]interface{}{},
@@ -90,7 +91,7 @@ func TestExtractInto(t *testing.T) {
 			obj:     &fakeDeployment{Spec: fakeDeploymentSpec{Replicas: &one}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`),
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
 			},
 			fieldManager: "mgr1",
 			expectedOut:  map[string]interface{}{"spec": map[string]interface{}{"replicas": int64(1)}},
@@ -100,11 +101,22 @@ func TestExtractInto(t *testing.T) {
 			obj:     &fakeDeployment{Spec: fakeDeploymentSpec{Replicas: &one, Paused: true}},
 			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
 			managedFields: []metav1.ManagedFieldsEntry{
-				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`),
-				applyFieldsEntry("mgr2", `{ "f:spec": { "f:paused": {}}}`),
+				applyFieldsEntry("mgr1", `{ "f:spec": { "f:replicas": {}}}`, ""),
+				applyFieldsEntry("mgr2", `{ "f:spec": { "f:paused": {}}}`, ""),
 			},
 			fieldManager: "mgr2",
 			expectedOut:  map[string]interface{}{"spec": map[string]interface{}{"paused": true}},
+		},
+		{
+			name:    "subresource",
+			obj:     &fakeDeployment{Status: fakeDeploymentStatus{Replicas: &one}},
+			objType: parser.Type("io.k8s.api.apps.v1.Deployment"),
+			managedFields: []metav1.ManagedFieldsEntry{
+				applyFieldsEntry("mgr1", `{ "f:status": { "f:replicas": {}}}`, "status"),
+			},
+			fieldManager: "mgr1",
+			expectedOut:  map[string]interface{}{"status": map[string]interface{}{"replicas": int64(1)}},
+			subresource:  "status",
 		},
 	}
 	for _, tc := range cases {
@@ -115,7 +127,7 @@ func TestExtractInto(t *testing.T) {
 				t.Fatalf("Error accessing object: %v", err)
 			}
 			accessor.SetManagedFields(tc.managedFields)
-			err = ExtractInto(tc.obj, tc.objType, tc.fieldManager, &out)
+			err = ExtractInto(tc.obj, tc.objType, tc.fieldManager, &out, tc.subresource)
 			if err != nil {
 				t.Fatalf("Unexpected extract error: %v", err)
 			}
@@ -126,24 +138,30 @@ func TestExtractInto(t *testing.T) {
 	}
 }
 
-func applyFieldsEntry(fieldManager string, fieldsJSON string) metav1.ManagedFieldsEntry {
+func applyFieldsEntry(fieldManager string, fieldsJSON string, subresource string) metav1.ManagedFieldsEntry {
 	return metav1.ManagedFieldsEntry{
-		Manager:    fieldManager,
-		Operation:  metav1.ManagedFieldsOperationApply,
-		APIVersion: "v1",
-		FieldsType: "FieldsV1",
-		FieldsV1:   &metav1.FieldsV1{Raw: []byte(fieldsJSON)},
+		Manager:     fieldManager,
+		Operation:   metav1.ManagedFieldsOperationApply,
+		APIVersion:  "v1",
+		FieldsType:  "FieldsV1",
+		FieldsV1:    &metav1.FieldsV1{Raw: []byte(fieldsJSON)},
+		Subresource: subresource,
 	}
 }
 
 type fakeDeployment struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Spec              fakeDeploymentSpec `json:"spec"`
+	Spec              fakeDeploymentSpec   `json:"spec"`
+	Status            fakeDeploymentStatus `json:"status"`
 }
 
 type fakeDeploymentSpec struct {
 	Replicas *int32 `json:"replicas"`
 	Paused   bool   `json:"paused,omitempty"`
+}
+
+type fakeDeploymentStatus struct {
+	Replicas *int32 `json:"replicas"`
 }
 
 func (o *fakeDeployment) GetObjectMeta() metav1.ObjectMeta {
@@ -173,12 +191,21 @@ const schemaYAML = typed.YAMLObject(`types:
     - name: spec
       type:
         namedType: io.k8s.api.apps.v1.DeploymentSpec
+    - name: status
+      type:
+        namedType: io.k8s.api.apps.v1.DeploymentStatus
 - name: io.k8s.api.apps.v1.DeploymentSpec
   map:
     fields:
     - name: paused
       type:
         scalar: boolean
+    - name: replicas
+      type:
+        scalar: numeric
+- name: io.k8s.api.apps.v1.DeploymentStatus
+  map:
+    fields:
     - name: replicas
       type:
         scalar: numeric
@@ -215,6 +242,9 @@ const schemaYAML = typed.YAMLObject(`types:
     - name: time
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+    - name: subresource
+      type:
+        scalar: string
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   map:
     elementType:

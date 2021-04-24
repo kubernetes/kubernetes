@@ -59,8 +59,19 @@ func StatefulSet(name, namespace string) *StatefulSetApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStatefulSet(statefulSet *appsv1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return extractStatefulSet(statefulSet, fieldManager, "")
+}
+
+// ExtractStatefulSetStatus is the same as ExtractStatefulSet except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStatefulSetStatus(statefulSet *appsv1beta2.StatefulSet, fieldManager string) (*StatefulSetApplyConfiguration, error) {
+	return extractStatefulSet(statefulSet, fieldManager, "status")
+}
+
+func extractStatefulSet(statefulSet *appsv1beta2.StatefulSet, fieldManager string, subresource string) (*StatefulSetApplyConfiguration, error) {
 	b := &StatefulSetApplyConfiguration{}
-	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.StatefulSet"), fieldManager, b)
+	err := managedfields.ExtractInto(statefulSet, internal.Parser().Type("io.k8s.api.apps.v1beta2.StatefulSet"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

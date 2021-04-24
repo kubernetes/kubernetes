@@ -59,8 +59,19 @@ func DaemonSet(name, namespace string) *DaemonSetApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return extractDaemonSet(daemonSet, fieldManager, "")
+}
+
+// ExtractDaemonSetStatus is the same as ExtractDaemonSet except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractDaemonSetStatus(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string) (*DaemonSetApplyConfiguration, error) {
+	return extractDaemonSet(daemonSet, fieldManager, "status")
+}
+
+func extractDaemonSet(daemonSet *extensionsv1beta1.DaemonSet, fieldManager string, subresource string) (*DaemonSetApplyConfiguration, error) {
 	b := &DaemonSetApplyConfiguration{}
-	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.extensions.v1beta1.DaemonSet"), fieldManager, b)
+	err := managedfields.ExtractInto(daemonSet, internal.Parser().Type("io.k8s.api.extensions.v1beta1.DaemonSet"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

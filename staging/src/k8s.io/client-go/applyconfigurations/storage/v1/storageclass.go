@@ -65,8 +65,19 @@ func StorageClass(name string) *StorageClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractStorageClass(storageClass *storagev1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+	return extractStorageClass(storageClass, fieldManager, "")
+}
+
+// ExtractStorageClassStatus is the same as ExtractStorageClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractStorageClassStatus(storageClass *storagev1.StorageClass, fieldManager string) (*StorageClassApplyConfiguration, error) {
+	return extractStorageClass(storageClass, fieldManager, "status")
+}
+
+func extractStorageClass(storageClass *storagev1.StorageClass, fieldManager string, subresource string) (*StorageClassApplyConfiguration, error) {
 	b := &StorageClassApplyConfiguration{}
-	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1.StorageClass"), fieldManager, b)
+	err := managedfields.ExtractInto(storageClass, internal.Parser().Type("io.k8s.api.storage.v1.StorageClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

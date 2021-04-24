@@ -58,8 +58,19 @@ func Node(name string) *NodeApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractNode(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+	return extractNode(node, fieldManager, "")
+}
+
+// ExtractNodeStatus is the same as ExtractNode except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractNodeStatus(node *apicorev1.Node, fieldManager string) (*NodeApplyConfiguration, error) {
+	return extractNode(node, fieldManager, "status")
+}
+
+func extractNode(node *apicorev1.Node, fieldManager string, subresource string) (*NodeApplyConfiguration, error) {
 	b := &NodeApplyConfiguration{}
-	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b)
+	err := managedfields.ExtractInto(node, internal.Parser().Type("io.k8s.api.core.v1.Node"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

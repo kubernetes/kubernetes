@@ -35,7 +35,22 @@ import (
 // that no managed fields were found for the fieldManager because other field managers
 // have taken ownership of all the fields previously owned by the fieldManager. It is
 // also possible the fieldManager never owned fields.
-func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldManager string, applyConfiguration interface{}) error {
+//
+// The provided object MUST bo a root resource object since subresource objects
+// do not contain their own managed fields. For example, an autoscaling.Scale
+// object read from a "scale" subresource does not have any managed fields and so
+// cannot be used as the object.
+//
+// If the fields of a subresource are a subset of the fields of the root object,
+// and their field paths and types are exactly the same, then ExtractInto can be
+// called with the root resource as the object and the subresource as the
+// applyConfiguration. This works for "status", obviously, because status is
+// represented by the exact same object as the root resource. This this does NOT
+// work, for example, with the "scale" subresources of Deployment, ReplicaSet and
+// StatefulSet. While the spec.replicas, status.replicas fields are in the same
+// exact field path locations as they are in autoscaling.Scale, the selector
+// fields are in different locations, and are a different type.
+func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldManager string, applyConfiguration interface{}, subresource string) error {
 	typedObj, err := toTyped(object, objectType)
 	if err != nil {
 		return fmt.Errorf("error converting obj to typed: %w", err)
@@ -45,7 +60,7 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 	if err != nil {
 		return fmt.Errorf("error accessing metadata: %w", err)
 	}
-	fieldsEntry, ok := findManagedFields(accessor, fieldManager)
+	fieldsEntry, ok := findManagedFields(accessor, fieldManager, subresource)
 	if !ok {
 		return nil
 	}
@@ -66,10 +81,10 @@ func ExtractInto(object runtime.Object, objectType typed.ParseableType, fieldMan
 	return nil
 }
 
-func findManagedFields(accessor metav1.Object, fieldManager string) (metav1.ManagedFieldsEntry, bool) {
+func findManagedFields(accessor metav1.Object, fieldManager string, subresource string) (metav1.ManagedFieldsEntry, bool) {
 	objManagedFields := accessor.GetManagedFields()
 	for _, mf := range objManagedFields {
-		if mf.Manager == fieldManager && mf.Operation == metav1.ManagedFieldsOperationApply {
+		if mf.Manager == fieldManager && mf.Operation == metav1.ManagedFieldsOperationApply && mf.Subresource == subresource {
 			return mf, true
 		}
 	}

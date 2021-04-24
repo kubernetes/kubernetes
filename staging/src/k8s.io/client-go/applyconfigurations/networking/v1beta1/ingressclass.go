@@ -57,8 +57,19 @@ func IngressClass(name string) *IngressClassApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+	return extractIngressClass(ingressClass, fieldManager, "")
+}
+
+// ExtractIngressClassStatus is the same as ExtractIngressClass except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractIngressClassStatus(ingressClass *networkingv1beta1.IngressClass, fieldManager string) (*IngressClassApplyConfiguration, error) {
+	return extractIngressClass(ingressClass, fieldManager, "status")
+}
+
+func extractIngressClass(ingressClass *networkingv1beta1.IngressClass, fieldManager string, subresource string) (*IngressClassApplyConfiguration, error) {
 	b := &IngressClassApplyConfiguration{}
-	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b)
+	err := managedfields.ExtractInto(ingressClass, internal.Parser().Type("io.k8s.api.networking.v1beta1.IngressClass"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

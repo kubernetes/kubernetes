@@ -59,8 +59,19 @@ func Job(name, namespace string) *JobApplyConfiguration {
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractJob(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+	return extractJob(job, fieldManager, "")
+}
+
+// ExtractJobStatus is the same as ExtractJob except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractJobStatus(job *apibatchv1.Job, fieldManager string) (*JobApplyConfiguration, error) {
+	return extractJob(job, fieldManager, "status")
+}
+
+func extractJob(job *apibatchv1.Job, fieldManager string, subresource string) (*JobApplyConfiguration, error) {
 	b := &JobApplyConfiguration{}
-	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b)
+	err := managedfields.ExtractInto(job, internal.Parser().Type("io.k8s.api.batch.v1.Job"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

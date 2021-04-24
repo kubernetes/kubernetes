@@ -62,8 +62,19 @@ func CSIStorageCapacity(name, namespace string) *CSIStorageCapacityApplyConfigur
 // applied if another fieldManager has updated or force applied any of the previously applied fields.
 // Experimental!
 func ExtractCSIStorageCapacity(cSIStorageCapacity *v1beta1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "")
+}
+
+// ExtractCSIStorageCapacityStatus is the same as ExtractCSIStorageCapacity except
+// that it extracts the status subresource applied configuration.
+// Experimental!
+func ExtractCSIStorageCapacityStatus(cSIStorageCapacity *v1beta1.CSIStorageCapacity, fieldManager string) (*CSIStorageCapacityApplyConfiguration, error) {
+	return extractCSIStorageCapacity(cSIStorageCapacity, fieldManager, "status")
+}
+
+func extractCSIStorageCapacity(cSIStorageCapacity *v1beta1.CSIStorageCapacity, fieldManager string, subresource string) (*CSIStorageCapacityApplyConfiguration, error) {
 	b := &CSIStorageCapacityApplyConfiguration{}
-	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIStorageCapacity"), fieldManager, b)
+	err := managedfields.ExtractInto(cSIStorageCapacity, internal.Parser().Type("io.k8s.api.storage.v1beta1.CSIStorageCapacity"), fieldManager, b, subresource)
 	if err != nil {
 		return nil, err
 	}

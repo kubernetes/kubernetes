@@ -969,32 +969,31 @@ func TestExtractModifyApply(t *testing.T) {
 				}
 			},
 		},
-		// TODO: We probably need "ExtractStatus" (or a variadic argument to "Extract").
-		// {
-		// 	// Append a condition to the status if the object
-		// 	name: "modify-status-conditions",
-		// 	modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
-		// 		apply.WithStatus(appsv1ac.DeploymentStatus().
-		// 			WithConditions(appsv1ac.DeploymentCondition().
-		// 				WithType(appsv1.DeploymentProgressing).
-		// 				WithStatus(v1.ConditionUnknown).
-		// 				WithLastTransitionTime(metav1.Now()).
-		// 				WithLastUpdateTime(metav1.Now()).
-		// 				WithMessage("progressing").
-		// 				WithReason("TestExtractModifyApply_Status"),
-		// 			),
-		// 		)
-		// 	},
-		// 	verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
-		// 		conditions := applied.Status.Conditions
-		// 		if len(conditions) != 1 {
-		// 			t.Errorf("Expected 1 conditions but got %d", len(conditions))
-		// 		}
-		// 		if *conditions[0].Type != appsv1.DeploymentProgressing {
-		// 			t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
-		// 		}
-		// 	},
-		// },
+		{
+			// Append a condition to the status if the object
+			name: "modify-status-conditions",
+			modifyStatusFunc: func(apply *appsv1ac.DeploymentApplyConfiguration) {
+				apply.WithStatus(appsv1ac.DeploymentStatus().
+					WithConditions(appsv1ac.DeploymentCondition().
+						WithType(appsv1.DeploymentProgressing).
+						WithStatus(v1.ConditionUnknown).
+						WithLastTransitionTime(metav1.Now()).
+						WithLastUpdateTime(metav1.Now()).
+						WithMessage("progressing").
+						WithReason("TestExtractModifyApply_Status"),
+					),
+				)
+			},
+			verifyStatusAppliedFunc: func(applied *appsv1ac.DeploymentApplyConfiguration) {
+				conditions := applied.Status.Conditions
+				if len(conditions) != 1 {
+					t.Errorf("Expected 1 conditions but got %d", len(conditions))
+				}
+				if *conditions[0].Type != appsv1.DeploymentProgressing {
+					t.Errorf("Expected condition name DeploymentProgressing but got: %s", *conditions[0].Type)
+				}
+			},
+		},
 	}
 
 	testServer := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--disable-admission-plugins", "ServiceAccount"}, framework.SharedEtcd())
@@ -1027,13 +1026,11 @@ func TestExtractModifyApply(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to apply: %v", err)
 			}
-
-			extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
-			if err != nil {
-				t.Fatalf("Failed to extract: %v", err)
-			}
-
 			if tc.modifyFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeployment(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
 				tc.modifyFunc(extractedDeployment)
 				result, err := deploymentClient.Apply(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 				if err != nil {
@@ -1049,12 +1046,16 @@ func TestExtractModifyApply(t *testing.T) {
 			}
 
 			if tc.modifyStatusFunc != nil {
+				extractedDeployment, err := appsv1ac.ExtractDeploymentStatus(actual, fieldMgr)
+				if err != nil {
+					t.Fatalf("Failed to extract: %v", err)
+				}
 				tc.modifyStatusFunc(extractedDeployment)
 				result, err := deploymentClient.ApplyStatus(context.TODO(), extractedDeployment, metav1.ApplyOptions{FieldManager: fieldMgr})
 				if err != nil {
 					t.Fatalf("Failed to apply extracted apply configuration to status: %v", err)
 				}
-				extractedResult, err := appsv1ac.ExtractDeployment(result, fieldMgr)
+				extractedResult, err := appsv1ac.ExtractDeploymentStatus(result, fieldMgr)
 				if err != nil {
 					t.Fatalf("Failed to extract: %v", err)
 				}
