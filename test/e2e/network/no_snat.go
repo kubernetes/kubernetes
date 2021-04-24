@@ -161,4 +161,65 @@ var _ = common.SIGDescribe("NoSNAT [Slow]", func() {
 
 	})
 
+	ginkgo.It("Should be able to send traffic between Pods and HostNetwork pods without SNAT [LinuxOnly]", func() {
+		cs := f.ClientSet
+		pc := cs.CoreV1().Pods(f.Namespace.Name)
+
+		ginkgo.By("creating a test pod on each Node")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+
+		var wg sync.WaitGroup
+		// limit the number of nodes to avoid duration issues on large clusters
+		maxNodes := len(nodes.Items)
+		if maxNodes > 10 {
+			maxNodes = 10
+		}
+		for i, node := range nodes.Items {
+			// create the last pod with hostNetwork true
+			if i == maxNodes-1 {
+				testPod.Spec.HostNetwork = true
+			}
+			if i == maxNodes {
+				break
+			}
+			// target Pod at Node
+			ginkgo.By("creating pod on node " + node.Name)
+			nodeSelection := e2epod.NodeSelection{Name: node.Name}
+			e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
+			wg.Add(1)
+			go func() {
+				defer ginkgo.GinkgoRecover()
+				f.PodClient().CreateSync(&testPod)
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
+		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
+		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: noSNATTestName})
+		framework.ExpectNoError(err)
+
+		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
+		for _, sourcePod := range pods.Items {
+			for _, targetPod := range pods.Items {
+				if targetPod.Name == sourcePod.Name {
+					continue
+				}
+				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort)
+				ginkgo.By("testing from pod " + sourcePod.Name + " to pod " + targetPod.Name)
+				wg.Add(1)
+				go func() {
+					defer ginkgo.GinkgoRecover()
+					sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
+					ginkgo.By("Verifying the preserved source ip")
+					framework.ExpectEqual(sourceIP, execPodIP)
+					wg.Done()
+				}()
+			}
+		}
+		wg.Wait()
+	})
+
 })
