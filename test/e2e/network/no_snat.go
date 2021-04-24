@@ -120,6 +120,45 @@ var _ = common.SIGDescribe("NoSNAT [Slow]", func() {
 			}
 		}
 		wg.Wait()
+	})
+
+	ginkgo.It("Should be able to send traffic between Pods and an agent on that Node without SNAT", func() {
+		cs := f.ClientSet
+		pc := cs.CoreV1().Pods(f.Namespace.Name)
+
+		ginkgo.By("creating a test pod on one Node")
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+
+		// use one node
+		node := nodes.Items[0]
+		// target Pod at Node
+		nodeSelection := e2epod.NodeSelection{Name: node.Name}
+		e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
+		f.PodClient().CreateSync(&testPod)
+		ginkgo.By("creating a hostnetwork test pod on the same Node")
+		testPod.Spec.HostNetwork = true
+		f.PodClient().CreateSync(&testPod)
+		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
+		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: noSNATTestName})
+		framework.ExpectNoError(err)
+
+		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
+		for _, sourcePod := range pods.Items {
+			for _, targetPod := range pods.Items {
+				if targetPod.Name == sourcePod.Name {
+					continue
+				}
+				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort)
+				ginkgo.By("testing from pod " + sourcePod.Name + " to pod " + targetPod.Name)
+
+				sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
+				ginkgo.By("Verifying the preserved source ip")
+				framework.ExpectEqual(sourceIP, execPodIP)
+			}
+		}
 
 	})
+
 })
