@@ -53,52 +53,27 @@ GIvEgkp0W7eG
 `
 
 var rsaCertPEM = `-----BEGIN CERTIFICATE-----
-MIIDCzCCAfMCFAIsO+psszOfir2J0i6dqWN6RnBQMA0GCSqGSIb3DQEBCwUAMEIx
-CzAJBgNVBAYTAlVTMRUwEwYDVQQHDAxEZWZhdWx0IENpdHkxHDAaBgNVBAoME0Rl
-ZmF1bHQgQ29tcGFueSBMdGQwHhcNMjEwNDEyMTAzOTU5WhcNMjEwNTEyMTAzOTU5
-WjBCMQswCQYDVQQGEwJVUzEVMBMGA1UEBwwMRGVmYXVsdCBDaXR5MRwwGgYDVQQK
-DBNEZWZhdWx0IENvbXBhbnkgTHRkMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB
-CgKCAQEA0DiDpc/hoS8cIoLAQY+mVzgegzSvQwAppsNKc9zPlNKOPjyPOfGnt6tn
-os74zMAh4L0JofNsPZGiNjXoZ1wsoBuKouzE0TY/lJ7Kz+YWk3ORcrnGJRlAAw/T
-FLskfamcJALfj2OEJkaLVpwZSiw/yPq1wVVb9Sr3iVJMaASxpONpKTHUu0U9Or5q
-RlR46vR4pK0b4nHRW1H5uGDg7xTDTUrZ6CJ2SZphsbppxsYTZDvp+prMJN/yXuUB
-LmfEtsiBpDF1TglMwHknGyPjRorq7GMeTj4zdHaEeMTRB2CAudwEwwWit89x8Yad
-rWDTw22bxpxT7I3BQIl7KWI1YkA1SQIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAc
-+FBQUbp1RE2ysq7vZaLmZtEvwm0D55J7QQByjLh6opiPwS1hj+rYAOMpMhC97oQF
-8saheoYocMhS6jL100tuA8n7MFVa4oFQSKn/S5bP9gecyTTikSbu8sRenV/959Xd
-l4Eo75Qq9eNv8AKfHzcMEBM8rhrQEwRsVlDN3c0jVsq/J3kPy+JEs3tcsVPS3ra3
-5ZDs53CSKQ6RHr6eagr/uQeoYn+NGx7bf88puZQhpg/S85H2am3e0vmesZ4xIeeD
-uF+xcXBtg6i8/Gm+kBzYYycYhlo8u5W26KByIM/qMj/cFYNuq4aiQ6SiTWAmutqz
-aHa9ghdQ169u3ScCJw6M
+MIIB0zCCAX2gAwIBAgIJAI/M7BYjwB+uMA0GCSqGSIb3DQEBBQUAMEUxCzAJBgNV
+BAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEwHwYDVQQKDBhJbnRlcm5ldCBX
+aWRnaXRzIFB0eSBMdGQwHhcNMTIwOTEyMjE1MjAyWhcNMTUwOTEyMjE1MjAyWjBF
+MQswCQYDVQQGEwJBVTETMBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50
+ZXJuZXQgV2lkZ2l0cyBQdHkgTHRkMFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBANLJ
+hPHhITqQbPklG3ibCVxwGMRfp/v4XqhfdQHdcVfHap6NQ5Wok/4xIA+ui35/MmNa
+rtNuC+BdZ1tMuVCPFZcCAwEAAaNQME4wHQYDVR0OBBYEFJvKs8RfJaXTH08W+SGv
+zQyKn0H8MB8GA1UdIwQYMBaAFJvKs8RfJaXTH08W+SGvzQyKn0H8MAwGA1UdEwQF
+MAMBAf8wDQYJKoZIhvcNAQEFBQADQQBJlffJHybjDGxRMqaRmDhX0+6v02TUKZsW
+r5QuVbpQhH6u+0UgcW0jp9QwpxoPTLTWGXEWBBBurxFwiCBhkQ+V
 -----END CERTIFICATE-----
 `
 
 var rsaKeyPEM = `-----BEGIN RSA PRIVATE KEY-----
-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
+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
 -----END RSA PRIVATE KEY-----
 `
 
@@ -160,10 +135,6 @@ func TestCreateSecretTLS(t *testing.T) {
 	validKeyPath, validCertPath, validCAPath := writeCertData(validCertTmpDir, rsaKeyPEM, rsaCertPEM, rsaCAPEM, t)
 	defer tearDown(validCertTmpDir)
 
-	selfSignedCertTmpDir := utiltesting.MkTmpdirOrDie("tls-selfSigned-cert-test")
-	selfSignedKeyPath, selfSignedCertPath, _ := writeCertData(selfSignedCertTmpDir, rsaKeyPEM, rsaSelfSignedCertPEM, "", t)
-	defer tearDown(selfSignedCertTmpDir)
-
 	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-invalid-cert-test")
 	invalidKeyPath, invalidCertPath, invalidCAPath := writeCertData(invalidCertTmpDir, "test", "test", "test", t)
 	defer tearDown(invalidCertTmpDir)
@@ -215,34 +186,13 @@ func TestCreateSecretTLS(t *testing.T) {
 					Kind:       "Secret",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo-th4dtb9f52",
+					Name: "foo-dh2cd92952",
 				},
 				Type: corev1.SecretTypeTLS,
 				Data: map[string][]byte{
 					corev1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
 					corev1.TLSCertKey:       []byte(rsaCertPEM),
 					"ca.crt":                []byte(rsaCAPEM),
-				},
-			},
-			expectErr: false,
-		},
-		"create_secret_selfsigned_tls": {
-			tlsSecretName:    "foo",
-			tlsKey:           selfSignedKeyPath,
-			tlsCert:          selfSignedCertPath,
-			tlsCertAuthority: "",
-			expected: &corev1.Secret{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: corev1.SchemeGroupVersion.String(),
-					Kind:       "Secret",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "foo",
-				},
-				Type: corev1.SecretTypeTLS,
-				Data: map[string][]byte{
-					corev1.TLSPrivateKeyKey: []byte(rsaKeyPEM),
-					corev1.TLSCertKey:       []byte(rsaSelfSignedCertPEM),
 				},
 			},
 			expectErr: false,
