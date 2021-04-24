@@ -825,6 +825,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		ginkgo.It("should report an error and create no PV", func() {
 			e2eskipper.SkipUnlessProviderIs("aws")
 			test := testsuites.StorageClassTest{
+				Client:      c,
 				Name:        "AWS EBS with invalid KMS key",
 				Provisioner: "kubernetes.io/aws-ebs",
 				Timeouts:    f.Timeouts,
