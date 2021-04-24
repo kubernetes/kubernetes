@@ -21,8 +21,6 @@ var (
 
 			`\[Feature:CrossNamespacePodAffinity\]`,
 
-			`\[Feature:GenericEphemeralVolume\]`,
-
 			`\[Feature:DaemonSetUpdateSurge\]`,
 
 			`\[Feature:StorageVersionAPI\]`,
@@ -103,9 +101,6 @@ var (
 			// NFS umount is broken in kernels 5.7+
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1854379
 			`\[sig-storage\].*\[Driver: nfs\] \[Testpattern: Dynamic PV \(default fs\)\].*subPath should be able to unmount after the subpath directory is deleted`,
-
-			// https://bugzilla.redhat.com/show_bug.cgi?id=1945104
-			`\[sig-storage\].*\[Driver: csi-hostpath\] \[Testpattern: Generic Ephemeral-volume`,
 
 			// https://bugzilla.redhat.com/show_bug.cgi?id=1945091
 			`\[Feature:IPv6DualStack\]`,
