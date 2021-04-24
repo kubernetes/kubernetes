@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	testPodPort    = "8080"
+	// try to use a no common port so it doesn't conflict using hostNetwork
+	testPodPort    = "8085"
 	noSNATTestName = "no-snat-test"
 )
 
@@ -60,8 +61,15 @@ var (
 )
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
-// We use the [Feature:NoSNAT] tag so that most jobs will skip this test by default.
-var _ = common.SIGDescribe("NoSNAT [Feature:NoSNAT] [Slow]", func() {
+// Kubernetes imposes the following fundamental requirements on any networking implementation
+// (barring any intentional network segmentation policies):
+//
+// pods on a node can communicate with all pods on all nodes without NAT
+// agents on a node (e.g. system daemons, kubelet) can communicate with all pods on that node
+// Note: For those platforms that support Pods running in the host network (e.g. Linux):
+// pods in the host network of a node can communicate with all pods on all nodes without NAT
+// xref: https://kubernetes.io/docs/concepts/cluster-administration/networking/
+var _ = common.SIGDescribe("NoSNAT [Slow]", func() {
 	f := framework.NewDefaultFramework("no-snat-test")
 	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
 		cs := f.ClientSet
