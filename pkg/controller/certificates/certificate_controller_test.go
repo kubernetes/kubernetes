@@ -18,68 +18,162 @@ package certificates
 
 import (
 	"context"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
 	certificates "k8s.io/api/certificates/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	ktesting "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
-// TODO flesh this out to cover things like not being able to find the csr in the cache, not
-// auto-approving, etc.
-func TestCertificateController(t *testing.T) {
+var (
+	apprpvedCondition = certificates.CertificateSigningRequestCondition{
+		Type:    certificates.CertificateApproved,
+		Reason:  "Approved reason",
+		Message: "Approved message",
+	}
+	deniedCondition = certificates.CertificateSigningRequestCondition{
+		Type:    certificates.CertificateDenied,
+		Reason:  "Denied reason",
+		Message: "Denied message",
+	}
+)
 
+func TestCertificateController(t *testing.T) {
 	csr := &certificates.CertificateSigningRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-csr",
 		},
 	}
-
 	client := fake.NewSimpleClientset(csr)
-	informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(csr), controller.NoResyncPeriodFunc())
 
-	handler := func(csr *certificates.CertificateSigningRequest) error {
-		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
-			Type:    certificates.CertificateApproved,
-			Reason:  "test reason",
-			Message: "test message",
-		})
+	testCases := map[string]struct {
+		keyIsDeleted         bool
+		handler              func(csr *certificates.CertificateSigningRequest) error
+		expectedLatestAction expectedAction
+		expectedIsApproved   bool
+	}{
+		"CSR approved": {
+			keyIsDeleted: false,
+			handler:      csrHandler(client, apprpvedCondition),
+			expectedLatestAction: expectedAction{
+				verb:        "update",
+				resource:    "certificatesigningrequests",
+				subresource: "approval",
+			},
+			expectedIsApproved: true,
+		},
+		"CSR is not approved": {
+			keyIsDeleted: false,
+			handler:      csrHandler(client, deniedCondition),
+			expectedLatestAction: expectedAction{
+				verb:        "update",
+				resource:    "certificatesigningrequests",
+				subresource: "approval",
+			},
+			expectedIsApproved: false,
+		},
+		"Not being able to find the csr in the cache": {
+			keyIsDeleted: true,
+			handler:      csrHandler(client, apprpvedCondition),
+			expectedLatestAction: expectedAction{
+				verb:        "watch",
+				resource:    "certificatesigningrequests",
+				subresource: "",
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		client.ClearActions()
+		fakeWatch := watch.NewFake()
+		client.PrependWatchReactor("certificatesigningrequests", ktesting.DefaultWatchReactor(fakeWatch, nil))
+		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+
+		controller := NewCertificateController(
+			"test-controller",
+			client,
+			informerFactory.Certificates().V1().CertificateSigningRequests(),
+			tc.handler,
+		)
+		controller.csrsSynced = func() bool { return true }
+
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+		informerFactory.Start(stopCh)
+		informerFactory.WaitForCacheSync(stopCh)
+		_ = wait.PollUntil(10*time.Millisecond, func() (bool, error) {
+			return controller.queue.Len() >= 1, nil
+		}, stopCh)
+
+		if tc.keyIsDeleted {
+			fakeWatch.Delete(csr)
+
+			// wait until csr is deleted
+			err := wait.PollImmediate(10*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+				obj, _ := controller.csrLister.Get("test-csr")
+				return obj == nil, nil
+			})
+			if err != nil {
+				t.Fatalf("Error waiting for CertificateSigningRequest: %v", err)
+			}
+		}
+
+		controller.processNextWorkItem()
+
+		actions := client.Actions()
+		latestAction := actions[len(actions)-1]
+		if latestAction.GetVerb() == "update" {
+			actualCSR := latestAction.(ktesting.UpdateActionImpl).GetObject().(*certificates.CertificateSigningRequest)
+			assert.Equal(t, tc.expectedIsApproved, IsCertificateRequestApproved(actualCSR), name+": unexpected RequestConditionType")
+		}
+		assert.Equal(t, tc.expectedLatestAction.verb, latestAction.GetVerb(), name+": unexpected verb")
+		assert.Equal(t, tc.expectedLatestAction.resource, latestAction.GetResource().Resource, name+": unexpected resource")
+		assert.Equal(t, tc.expectedLatestAction.subresource, latestAction.GetSubresource(), name+": unexpected subresource")
+	}
+}
+
+type expectedAction struct {
+	verb, resource, subresource string
+}
+
+func csrHandler(client *fake.Clientset, condition certificates.CertificateSigningRequestCondition) func(csr *certificates.CertificateSigningRequest) error {
+	return func(csr *certificates.CertificateSigningRequest) error {
+		csr.Status.Conditions = append(csr.Status.Conditions, condition)
 		_, err := client.CertificatesV1().CertificateSigningRequests().UpdateApproval(context.TODO(), csr.Name, csr, metav1.UpdateOptions{})
 		if err != nil {
 			return err
 		}
 		return nil
 	}
+}
 
-	controller := NewCertificateController(
-		"test",
-		client,
-		informerFactory.Certificates().V1().CertificateSigningRequests(),
-		handler,
-	)
-	controller.csrsSynced = func() bool { return true }
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-	informerFactory.Start(stopCh)
-	informerFactory.WaitForCacheSync(stopCh)
-	wait.PollUntil(10*time.Millisecond, func() (bool, error) {
-		return controller.queue.Len() >= 1, nil
-	}, stopCh)
-
-	controller.processNextWorkItem()
-
-	actions := client.Actions()
-	if len(actions) != 1 {
-		t.Errorf("expected 1 actions")
+func TestIgnorableError(t *testing.T) {
+	testCases := []struct {
+		name, errMessage string
+		expectedMessage  string
+		args             []interface{}
+	}{
+		{
+			name:            "A",
+			errMessage:      "foo in cache",
+			expectedMessage: "foo in cache",
+			args:            nil,
+		},
+		{
+			name:            "B",
+			errMessage:      "%v has %d words",
+			expectedMessage: "foo has 3 words",
+			args:            []interface{}{"foo", 3},
+		},
 	}
-	if a := actions[0]; !a.Matches("update", "certificatesigningrequests") ||
-		a.GetSubresource() != "approval" {
-		t.Errorf("unexpected action: %#v", a)
+	for _, tc := range testCases {
+		assert.Equal(t, tc.expectedMessage, IgnorableError(tc.errMessage, tc.args...).Error(), tc.name+": unexpected error message")
 	}
-
 }

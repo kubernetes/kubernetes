@@ -78,3 +78,91 @@ func TestIsCertificateRequestApproved(t *testing.T) {
 		assert.Equalf(t, tc.expectedIsApproved, IsCertificateRequestApproved(csr), "Failed to test: %s", tc.name)
 	}
 }
+
+func TestHasTrueCondition(t *testing.T) {
+	testCases := []struct {
+		name            string
+		conditions      []certificatesapi.CertificateSigningRequestCondition
+		conditionStatus certificatesapi.RequestConditionType
+		expected        bool
+	}{
+		{
+			name: "Type does not match and status no exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateDenied,
+					Status: "",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        false,
+		},
+		{
+			name: "Type does not match and not true status exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateDenied,
+					Status: "False",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        false,
+		},
+		{
+			name: "Type does not match and true status exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateDenied,
+					Status: "True",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        false,
+		},
+		{
+			name: "Type match and status no exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateApproved,
+					Status: "",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        true,
+		},
+		{
+			name: "Type match and not true status exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateApproved,
+					Status: "False",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        false,
+		},
+		{
+			name: "Type match and true status exist",
+			conditions: []certificatesapi.CertificateSigningRequestCondition{
+				{
+					Type:   certificatesapi.CertificateApproved,
+					Status: "True",
+				},
+			},
+			conditionStatus: "Approved",
+			expected:        true,
+		},
+	}
+	for _, tc := range testCases {
+		csr := &certificatesapi.CertificateSigningRequest{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "fake-csr",
+			},
+			Status: certificatesapi.CertificateSigningRequestStatus{
+				Conditions: tc.conditions,
+			},
+		}
+
+		assert.Equalf(t, tc.expected, HasTrueCondition(csr, tc.conditionStatus), "Failed to test: %s", tc.name)
+	}
+}
