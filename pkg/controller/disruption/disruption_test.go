@@ -51,6 +51,7 @@ import (
 	"k8s.io/klog/v2"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/controller"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -590,10 +591,7 @@ func TestScaleResource(t *testing.T) {
 	}
 
 	dc.sync(pdbName)
-	disruptionsAllowed := int32(0)
-	if replicas-pods < maxUnavailable {
-		disruptionsAllowed = maxUnavailable - (replicas - pods)
-	}
+	disruptionsAllowed := utilmath.MaxInt32(0, maxUnavailable-(replicas-pods))
 	ps.VerifyPdbStatus(t, pdbName, disruptionsAllowed, pods, replicas-maxUnavailable, replicas, map[string]metav1.Time{})
 }
 

@@ -35,6 +35,7 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 const (
@@ -349,10 +350,7 @@ func (c *containerLogManager) removeExcessLogs(logs []string) ([]string, error) 
 	// Other than those 2 files, we can have at most MaxFiles-2 rotated log files.
 	// Keep MaxFiles-2 files by removing old files.
 	// We should remove from oldest to newest, so as not to break ongoing `kubectl logs`.
-	maxRotatedFiles := c.policy.MaxFiles - 2
-	if maxRotatedFiles < 0 {
-		maxRotatedFiles = 0
-	}
+	maxRotatedFiles := utilmath.MaxInt(c.policy.MaxFiles-2, 0)
 	i := 0
 	for ; i < len(logs)-maxRotatedFiles; i++ {
 		if err := c.osInterface.Remove(logs[i]); err != nil {

@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 const (
@@ -179,13 +180,7 @@ func (pl *DefaultPreemption) preempt(ctx context.Context, state *framework.Cycle
 // candidates returned will never be greater than <numNodes>.
 func (pl *DefaultPreemption) calculateNumCandidates(numNodes int32) int32 {
 	n := (numNodes * pl.args.MinCandidateNodesPercentage) / 100
-	if n < pl.args.MinCandidateNodesAbsolute {
-		n = pl.args.MinCandidateNodesAbsolute
-	}
-	if n > numNodes {
-		n = numNodes
-	}
-	return n
+	return utilmath.BoundedInt32(n, pl.args.MinCandidateNodesAbsolute, numNodes)
 }
 
 // getOffsetAndNumCandidates chooses a random offset and calculates the number

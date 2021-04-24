@@ -37,6 +37,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	utilslice "k8s.io/kubernetes/pkg/util/slice"
 	utilexec "k8s.io/utils/exec"
 )
@@ -55,6 +56,8 @@ const (
 	ipRangesCapability     = "ipRanges"
 	bandwidthCapability    = "bandwidth"
 	dnsCapability          = "dns"
+
+	maxStringLength = 4096
 )
 
 type cniNetworkPlugin struct {
@@ -462,10 +465,5 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 
 func maxStringLengthInLog(length int) int {
 	// we allow no more than 4096-length strings to be logged
-	const maxStringLength = 4096
-
-	if length < maxStringLength {
-		return length
-	}
-	return maxStringLength
+	return utilmath.MinInt(length, maxStringLength)
 }

@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/discovery"
 	v1clientset "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/metadata"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // NamespacedResourcesDeleterInterface is the interface to delete a namespace with all resources in it.
@@ -526,9 +527,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 			errs = append(errs, err)
 			conditionUpdater.ProcessDeleteContentErr(err)
 		}
-		if gvrDeletionMetadata.finalizerEstimateSeconds > estimate {
-			estimate = gvrDeletionMetadata.finalizerEstimateSeconds
-		}
+		estimate = utilmath.MaxInt64(estimate, gvrDeletionMetadata.finalizerEstimateSeconds)
 		if gvrDeletionMetadata.numRemaining > 0 {
 			numRemainingTotals.gvrToNumRemaining[gvr] = gvrDeletionMetadata.numRemaining
 			for finalizer, numRemaining := range gvrDeletionMetadata.finalizersToNumRemaining {
@@ -597,10 +596,7 @@ func (d *namespacedResourcesDeleter) estimateGracefulTerminationForPods(ns strin
 			continue
 		}
 		if pod.Spec.TerminationGracePeriodSeconds != nil {
-			grace := *pod.Spec.TerminationGracePeriodSeconds
-			if grace > estimate {
-				estimate = grace
-			}
+			estimate = utilmath.MaxInt64(estimate, *pod.Spec.TerminationGracePeriodSeconds)
 		}
 	}
 	return estimate, nil

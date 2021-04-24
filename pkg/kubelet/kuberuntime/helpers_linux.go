@@ -18,6 +18,8 @@ limitations under the License.
 
 package kuberuntime
 
+import utilmath "k8s.io/kubernetes/pkg/util/math"
+
 const (
 	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 	minShares     = 2
@@ -36,11 +38,7 @@ func milliCPUToShares(milliCPU int64) int64 {
 		return minShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
-	shares := (milliCPU * sharesPerCPU) / milliCPUToCPU
-	if shares < minShares {
-		return minShares
-	}
-	return shares
+	return utilmath.MaxInt64((milliCPU*sharesPerCPU)/milliCPUToCPU, minShares)
 }
 
 // milliCPUToQuota converts milliCPU to CFS quota and period values
@@ -56,12 +54,6 @@ func milliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 	}
 
 	// we then convert your milliCPU to a value normalized over a period
-	quota = (milliCPU * period) / milliCPUToCPU
-
-	// quota needs to be a minimum of 1ms.
-	if quota < minQuotaPeriod {
-		quota = minQuotaPeriod
-	}
-
+	quota = utilmath.MaxInt64((milliCPU*period)/milliCPUToCPU, minQuotaPeriod)
 	return
 }

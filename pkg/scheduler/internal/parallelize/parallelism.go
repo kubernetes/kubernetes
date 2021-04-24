@@ -21,6 +21,7 @@ import (
 	"math"
 
 	"k8s.io/client-go/util/workqueue"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // DefaultParallelism is the default parallelism used in scheduler.
@@ -40,14 +41,7 @@ func NewParallelizer(p int) Parallelizer {
 // parallel work. The size aims to produce good CPU utilization.
 // returns max(1, min(sqrt(n), n/Parallelism))
 func chunkSizeFor(n, parallelism int) int {
-	s := int(math.Sqrt(float64(n)))
-
-	if r := n/parallelism + 1; s > r {
-		s = r
-	} else if s < 1 {
-		s = 1
-	}
-	return s
+	return utilmath.BoundedInt(int(math.Sqrt(float64(n))), 1, n/parallelism+1)
 }
 
 // Until is a wrapper around workqueue.ParallelizeUntil to use in scheduling algorithms.

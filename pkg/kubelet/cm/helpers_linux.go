@@ -35,6 +35,7 @@ import (
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/util"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 const (
@@ -68,13 +69,9 @@ func MilliCPUToQuota(milliCPU int64, period int64) (quota int64) {
 		period = QuotaPeriod
 	}
 
-	// we then convert your milliCPU to a value normalized over a period
-	quota = (milliCPU * period) / MilliCPUToCPU
-
-	// quota needs to be a minimum of 1ms.
-	if quota < MinQuotaPeriod {
-		quota = MinQuotaPeriod
-	}
+	// We then convert your milliCPU to a value normalized over a period,
+	// and quota needs to be a minimum of 1ms.
+	quota = utilmath.MaxInt64((milliCPU*period)/MilliCPUToCPU, MinQuotaPeriod)
 	return
 }
 
@@ -87,13 +84,7 @@ func MilliCPUToShares(milliCPU int64) uint64 {
 		return MinShares
 	}
 	// Conceptually (milliCPU / milliCPUToCPU) * sharesPerCPU, but factored to improve rounding.
-	shares := (milliCPU * SharesPerCPU) / MilliCPUToCPU
-	if shares < MinShares {
-		return MinShares
-	}
-	if shares > MaxShares {
-		return MaxShares
-	}
+	shares := utilmath.BoundedInt64((milliCPU*SharesPerCPU)/MilliCPUToCPU, MinShares, MaxShares)
 	return uint64(shares)
 }
 

@@ -30,6 +30,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // containerGC is the manager of garbage collection.
@@ -245,10 +246,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 	// Enforce max total number of containers.
 	if gcPolicy.MaxContainers >= 0 && evictUnits.NumContainers() > gcPolicy.MaxContainers {
 		// Leave an equal number of containers per evict unit (min: 1).
-		numContainersPerEvictUnit := gcPolicy.MaxContainers / evictUnits.NumEvictUnits()
-		if numContainersPerEvictUnit < 1 {
-			numContainersPerEvictUnit = 1
-		}
+		numContainersPerEvictUnit := utilmath.MaxInt(gcPolicy.MaxContainers/evictUnits.NumEvictUnits(), 1)
 		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
 
 		// If we still need to evict, evict oldest first.

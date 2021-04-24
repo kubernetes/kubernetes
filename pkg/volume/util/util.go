@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -28,6 +27,7 @@ import (
 	"strings"
 
 	"k8s.io/component-helpers/scheduling/corev1"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
 	utilexec "k8s.io/utils/exec"
@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -217,10 +218,7 @@ func CalculateTimeoutForVolume(minimumTimeout, timeoutIncrement int, pv *v1.Pers
 	giSize := giQty.Value()
 	pvSize := pvQty.Value()
 	timeout := (pvSize / giSize) * int64(timeoutIncrement)
-	if timeout < int64(minimumTimeout) {
-		return int64(minimumTimeout)
-	}
-	return timeout
+	return utilmath.MaxInt64(timeout, int64(minimumTimeout))
 }
 
 // GenerateVolumeName returns a PV name with clusterName prefix. The function

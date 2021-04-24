@@ -22,9 +22,10 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // preScoreStateKey is the key in CycleState to InterPodAffinity pre-computed data for Scoring.
@@ -267,12 +268,8 @@ func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, cycleState *fram
 	var maxCount int64 = -math.MaxInt64
 	for i := range scores {
 		score := scores[i].Score
-		if score > maxCount {
-			maxCount = score
-		}
-		if score < minCount {
-			minCount = score
-		}
+		maxCount = utilmath.MaxInt64(maxCount, score)
+		minCount = utilmath.MinInt64(minCount, score)
 	}
 
 	maxMinDiff := maxCount - minCount

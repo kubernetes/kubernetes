@@ -53,6 +53,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // DeletionTimeout sets maximum time from the moment a pod is added to DisruptedPods in PDB.Status
@@ -632,10 +633,7 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 		if err != nil {
 			return
 		}
-		desiredHealthy = expectedCount - int32(maxUnavailable)
-		if desiredHealthy < 0 {
-			desiredHealthy = 0
-		}
+		desiredHealthy = utilmath.MaxInt32(expectedCount-int32(maxUnavailable), 0)
 	} else if pdb.Spec.MinAvailable != nil {
 		if pdb.Spec.MinAvailable.Type == intstr.Int {
 			desiredHealthy = pdb.Spec.MinAvailable.IntVal

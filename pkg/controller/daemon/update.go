@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // rollingUpdate identifies the set of old pods to delete, or additional pods to create on nodes,
@@ -114,12 +115,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 		// use any of the candidates we can, including the allowedReplacemnntPods
 		klog.V(5).Infof("DaemonSet %s/%s allowing %d replacements, up to %d unavailable, %d new are unavailable, %d candidates", ds.Namespace, ds.Name, len(allowedReplacementPods), maxUnavailable, numUnavailable, len(candidatePodsToDelete))
 		remainingUnavailable := maxUnavailable - numUnavailable
-		if remainingUnavailable < 0 {
-			remainingUnavailable = 0
-		}
-		if max := len(candidatePodsToDelete); remainingUnavailable > max {
-			remainingUnavailable = max
-		}
+		remainingUnavailable = utilmath.BoundedInt(remainingUnavailable, 0, len(candidatePodsToDelete))
 		oldPodsToDelete := append(allowedReplacementPods, candidatePodsToDelete[:remainingUnavailable]...)
 
 		return dsc.syncNodes(ds, oldPodsToDelete, nil, hash)
@@ -192,12 +188,7 @@ func (dsc *DaemonSetsController) rollingUpdate(ds *apps.DaemonSet, nodeList []*v
 	// use any of the candidates we can, including the allowedNewNodes
 	klog.V(5).Infof("DaemonSet %s/%s allowing %d replacements, surge up to %d, %d are in progress, %d candidates", ds.Namespace, ds.Name, len(allowedNewNodes), maxSurge, numSurge, len(candidateNewNodes))
 	remainingSurge := maxSurge - numSurge
-	if remainingSurge < 0 {
-		remainingSurge = 0
-	}
-	if max := len(candidateNewNodes); remainingSurge > max {
-		remainingSurge = max
-	}
+	remainingSurge = utilmath.BoundedInt(remainingSurge, 0, len(candidateNewNodes))
 	newNodesToCreate := append(allowedNewNodes, candidateNewNodes[:remainingSurge]...)
 
 	return dsc.syncNodes(ds, oldPodsToDelete, newNodesToCreate, hash)
@@ -336,9 +327,7 @@ func (dsc *DaemonSetsController) cleanupHistory(ds *apps.DaemonSet, old []*apps.
 func maxRevision(histories []*apps.ControllerRevision) int64 {
 	max := int64(0)
 	for _, history := range histories {
-		if history.Revision > max {
-			max = history.Revision
-		}
+		max = utilmath.MaxInt64(max, history.Revision)
 	}
 	return max
 }

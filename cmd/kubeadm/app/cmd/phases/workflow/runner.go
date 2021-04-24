@@ -23,6 +23,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // phaseSeparator defines the separator to be used when concatenating nested
@@ -250,10 +252,7 @@ func (e *Runner) Help(cmdUse string) string {
 	maxLength := 0
 	e.visitAll(func(p *phaseRunner) error {
 		if !p.Hidden && !p.RunAllSiblings {
-			length := len(p.use)
-			if maxLength < length {
-				maxLength = length
-			}
+			maxLength = utilmath.MaxInt(maxLength, len(p.use))
 		}
 		return nil
 	})

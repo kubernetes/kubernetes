@@ -36,6 +36,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -184,16 +185,10 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 	adaptivePercentage := g.percentageOfNodesToScore
 	if adaptivePercentage <= 0 {
 		basePercentageOfNodesToScore := int32(50)
-		adaptivePercentage = basePercentageOfNodesToScore - numAllNodes/125
-		if adaptivePercentage < minFeasibleNodesPercentageToFind {
-			adaptivePercentage = minFeasibleNodesPercentageToFind
-		}
+		adaptivePercentage = utilmath.MaxInt32(basePercentageOfNodesToScore-numAllNodes/125, minFeasibleNodesPercentageToFind)
 	}
 
-	numNodes = numAllNodes * adaptivePercentage / 100
-	if numNodes < minFeasibleNodesToFind {
-		return minFeasibleNodesToFind
-	}
+	numNodes = utilmath.MaxInt32(numAllNodes*adaptivePercentage/100, minFeasibleNodesToFind)
 
 	return numNodes
 }

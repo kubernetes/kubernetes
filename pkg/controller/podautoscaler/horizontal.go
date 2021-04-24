@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	metricsclient "k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 var (
@@ -892,10 +893,10 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	// Calculate the upper and lower stabilization limits.
 	for i, rec := range a.recommendations[args.Key] {
 		if rec.timestamp.After(upCutoff) {
-			upRecommendation = min(rec.recommendation, upRecommendation)
+			upRecommendation = utilmath.MinInt32(upRecommendation, rec.recommendation)
 		}
 		if rec.timestamp.After(downCutoff) {
-			downRecommendation = max(rec.recommendation, downRecommendation)
+			downRecommendation = utilmath.MaxInt32(downRecommendation, rec.recommendation)
 		}
 		if rec.timestamp.Before(upCutoff) && rec.timestamp.Before(downCutoff) {
 			foundOldSample = true
@@ -904,13 +905,7 @@ func (a *HorizontalController) stabilizeRecommendationWithBehaviors(args Normali
 	}
 
 	// Bring the recommendation to within the upper and lower limits (stabilize).
-	recommendation := args.CurrentReplicas
-	if recommendation < upRecommendation {
-		recommendation = upRecommendation
-	}
-	if recommendation > downRecommendation {
-		recommendation = downRecommendation
-	}
+	recommendation := utilmath.BoundedInt32(args.CurrentReplicas, upRecommendation, downRecommendation)
 
 	// Record the unstabilized recommendation.
 	if foundOldSample {
@@ -938,10 +933,8 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 
 	if args.DesiredReplicas > args.CurrentReplicas {
 		scaleUpLimit := calculateScaleUpLimitWithScalingRules(args.CurrentReplicas, a.scaleUpEvents[args.Key], args.ScaleUpBehavior)
-		if scaleUpLimit < args.CurrentReplicas {
-			// We shouldn't scale up further until the scaleUpEvents will be cleaned up
-			scaleUpLimit = args.CurrentReplicas
-		}
+		// We shouldn't scale up further until the scaleUpEvents will be cleaned up
+		scaleUpLimit = utilmath.MaxInt32(scaleUpLimit, args.CurrentReplicas)
 		maximumAllowedReplicas := args.MaxReplicas
 		if maximumAllowedReplicas > scaleUpLimit {
 			maximumAllowedReplicas = scaleUpLimit
@@ -956,10 +949,8 @@ func (a *HorizontalController) convertDesiredReplicasWithBehaviorRate(args Norma
 		}
 	} else if args.DesiredReplicas < args.CurrentReplicas {
 		scaleDownLimit := calculateScaleDownLimitWithBehaviors(args.CurrentReplicas, a.scaleDownEvents[args.Key], args.ScaleDownBehavior)
-		if scaleDownLimit > args.CurrentReplicas {
-			// We shouldn't scale down further until the scaleDownEvents will be cleaned up
-			scaleDownLimit = args.CurrentReplicas
-		}
+		// We shouldn't scale down further until the scaleDownEvents will be cleaned up
+		scaleDownLimit = utilmath.MinInt32(scaleDownLimit, args.CurrentReplicas)
 		minimumAllowedReplicas := args.MinReplicas
 		if minimumAllowedReplicas < scaleDownLimit {
 			minimumAllowedReplicas = scaleDownLimit
@@ -1032,9 +1023,7 @@ func markScaleEventsOutdated(scaleEvents []timestampedScaleEvent, longestPolicyP
 func getLongestPolicyPeriod(scalingRules *autoscalingv2.HPAScalingRules) int32 {
 	var longestPolicyPeriod int32
 	for _, policy := range scalingRules.Policies {
-		if policy.PeriodSeconds > longestPolicyPeriod {
-			longestPolicyPeriod = policy.PeriodSeconds
-		}
+		longestPolicyPeriod = utilmath.MaxInt32(longestPolicyPeriod, policy.PeriodSeconds)
 	}
 	return longestPolicyPeriod
 }
@@ -1048,10 +1037,10 @@ func calculateScaleUpLimitWithScalingRules(currentReplicas int32, scaleEvents []
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
 		result = math.MaxInt32
-		selectPolicyFn = min // For scaling up, the lowest change ('min' policy) produces a minimum value
+		selectPolicyFn = utilmath.MinInt32 // For scaling up, the lowest change ('min' policy) produces a minimum value
 	} else {
 		result = math.MinInt32
-		selectPolicyFn = max // Use the default policy otherwise to produce a highest possible change
+		selectPolicyFn = utilmath.MaxInt32 // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
 		replicasAddedInCurrentPeriod := getReplicasChangePerPeriod(policy.PeriodSeconds, scaleEvents)
@@ -1076,10 +1065,10 @@ func calculateScaleDownLimitWithBehaviors(currentReplicas int32, scaleEvents []t
 		return currentReplicas // Scaling is disabled
 	} else if *scalingRules.SelectPolicy == autoscalingv2.MinPolicySelect {
 		result = math.MinInt32
-		selectPolicyFn = max // For scaling down, the lowest change ('min' policy) produces a maximum value
+		selectPolicyFn = utilmath.MaxInt32 // For scaling down, the lowest change ('max' policy) produces a maximum value
 	} else {
 		result = math.MaxInt32
-		selectPolicyFn = min // Use the default policy otherwise to produce a highest possible change
+		selectPolicyFn = utilmath.MinInt32 // Use the default policy otherwise to produce a highest possible change
 	}
 	for _, policy := range scalingRules.Policies {
 		replicasDeletedInCurrentPeriod := getReplicasChangePerPeriod(policy.PeriodSeconds, scaleEvents)
@@ -1228,18 +1217,4 @@ func setConditionInList(inputList []autoscalingv2.HorizontalPodAutoscalerConditi
 	existingCond.Message = fmt.Sprintf(message, args...)
 
 	return resList
-}
-
-func max(a, b int32) int32 {
-	if a >= b {
-		return a
-	}
-	return b
-}
-
-func min(a, b int32) int32 {
-	if a <= b {
-		return a
-	}
-	return b
 }

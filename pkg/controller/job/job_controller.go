@@ -27,7 +27,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -48,6 +48,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/utils/integer"
 )
 
@@ -773,15 +774,10 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		// Job specifies a specific number of completions.  Therefore, number
 		// active should not ever exceed number of remaining completions.
 		wantActive = *job.Spec.Completions - succeeded
-		if wantActive > parallelism {
-			wantActive = parallelism
-		}
+		wantActive = utilmath.MinInt32(wantActive, parallelism)
 	}
 
-	rmAtLeast := active - wantActive
-	if rmAtLeast < 0 {
-		rmAtLeast = 0
-	}
+	rmAtLeast := utilmath.MaxInt32(active-wantActive, 0)
 	podsToDelete := activePodsForRemoval(job, activePods, int(rmAtLeast))
 	if len(podsToDelete) > 0 {
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))

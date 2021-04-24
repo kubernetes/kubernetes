@@ -28,6 +28,7 @@ import (
 	utilnode "k8s.io/component-helpers/node/topology"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // SelectorSpread is a plugin that calculates selector spread priority.
@@ -118,9 +119,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 	maxCountByNodeName := int64(0)
 
 	for i := range scores {
-		if scores[i].Score > maxCountByNodeName {
-			maxCountByNodeName = scores[i].Score
-		}
+		maxCountByNodeName = utilmath.MaxInt64(maxCountByNodeName, scores[i].Score)
 		nodeInfo, err := pl.sharedLister.NodeInfos().Get(scores[i].Name)
 		if err != nil {
 			return framework.AsStatus(fmt.Errorf("getting node %q from Snapshot: %w", scores[i].Name, err))
@@ -133,9 +132,7 @@ func (pl *SelectorSpread) NormalizeScore(ctx context.Context, state *framework.C
 	}
 
 	for zoneID := range countsByZone {
-		if countsByZone[zoneID] > maxCountByZone {
-			maxCountByZone = countsByZone[zoneID]
-		}
+		maxCountByZone = utilmath.MaxInt64(maxCountByZone, countsByZone[zoneID])
 	}
 
 	haveZones := len(countsByZone) != 0

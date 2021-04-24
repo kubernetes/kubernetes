@@ -25,6 +25,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 
 	"k8s.io/klog/v2"
 )
@@ -82,11 +83,7 @@ func (m *kubeGenericRuntimeManager) generateWindowsContainerConfig(container *v1
 		cpuMaximum := 10000 * cpuLimit.MilliValue() / int64(runtime.NumCPU()) / 1000
 
 		// ensure cpuMaximum is in range [1, 10000].
-		if cpuMaximum < 1 {
-			cpuMaximum = 1
-		} else if cpuMaximum > 10000 {
-			cpuMaximum = 10000
-		}
+		cpuMaximum = utilmath.BoundedInt64(cpuMaximum, 1, 10000)
 
 		wc.Resources.CpuMaximum = cpuMaximum
 	}

@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -492,12 +493,8 @@ func EtcdSupportedVersion(supportedEtcdVersion map[uint8]string, versionString s
 			etcdStringVersion = v
 			break
 		}
-		if k < min {
-			min = k
-		}
-		if k > max {
-			max = k
-		}
+		min = utilmath.MinUint8(min, k)
+		max = utilmath.MaxUint8(max, k)
 	}
 
 	if len(etcdStringVersion) == 0 {

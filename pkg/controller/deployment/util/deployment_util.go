@@ -40,6 +40,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/utils/integer"
 )
 
@@ -438,10 +439,7 @@ func MaxUnavailable(deployment apps.Deployment) int32 {
 	}
 	// Error caught by validation
 	_, maxUnavailable, _ := ResolveFenceposts(deployment.Spec.Strategy.RollingUpdate.MaxSurge, deployment.Spec.Strategy.RollingUpdate.MaxUnavailable, *(deployment.Spec.Replicas))
-	if maxUnavailable > *deployment.Spec.Replicas {
-		return *deployment.Spec.Replicas
-	}
-	return maxUnavailable
+	return utilmath.MinInt32(maxUnavailable, *deployment.Spec.Replicas)
 }
 
 // MinAvailable returns the minimum available pods of a given deployment

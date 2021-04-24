@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // PolicyStatic is the name of the static policy
@@ -267,10 +268,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity bit
 			alignedCPUs = alignedCPUs.Union(allocatableCPUs.Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
 		}
 
-		numAlignedToAlloc := alignedCPUs.Size()
-		if numCPUs < numAlignedToAlloc {
-			numAlignedToAlloc = numCPUs
-		}
+		numAlignedToAlloc := utilmath.MinInt(alignedCPUs.Size(), numCPUs)
 
 		alignedCPUs, err := takeByTopology(p.topology, alignedCPUs, numAlignedToAlloc)
 		if err != nil {
@@ -315,10 +313,7 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 		if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
 			continue
 		}
-		requestedCPU := p.guaranteedCPUs(pod, &container)
-		if requestedCPU > requestedByInitContainers {
-			requestedByInitContainers = requestedCPU
-		}
+		requestedByInitContainers = utilmath.MaxInt(requestedByInitContainers, p.guaranteedCPUs(pod, &container))
 	}
 	// The sum of requested CPUs by app containers.
 	requestedByAppContainers := 0
@@ -329,10 +324,7 @@ func (p *staticPolicy) podGuaranteedCPUs(pod *v1.Pod) int {
 		requestedByAppContainers += p.guaranteedCPUs(pod, &container)
 	}
 
-	if requestedByInitContainers > requestedByAppContainers {
-		return requestedByInitContainers
-	}
-	return requestedByAppContainers
+	return utilmath.MaxInt(requestedByInitContainers, requestedByAppContainers)
 }
 
 func (p *staticPolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {

@@ -37,7 +37,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -59,6 +59,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/utils/integer"
 )
 
@@ -546,9 +547,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 	}
 	if diff < 0 {
 		diff *= -1
-		if diff > rsc.burstReplicas {
-			diff = rsc.burstReplicas
-		}
+		diff = utilmath.MinInt(diff, rsc.burstReplicas)
 		// TODO: Track UIDs of creates just like deletes. The problem currently
 		// is we'd need to wait on the result of a create to record the pod's
 		// UID, which would require locking *across* the create, which will turn
@@ -588,9 +587,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		}
 		return err
 	} else if diff > 0 {
-		if diff > rsc.burstReplicas {
-			diff = rsc.burstReplicas
-		}
+		diff = utilmath.MinInt(diff, rsc.burstReplicas)
 		klog.V(2).InfoS("Too many replicas", "replicaSet", klog.KObj(rs), "need", *(rs.Spec.Replicas), "deleting", diff)
 
 		relatedPods, err := rsc.getIndirectlyRelatedPods(rs)

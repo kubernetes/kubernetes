@@ -24,13 +24,14 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // syncStatusOnly only updates Deployments Status and doesn't take any mutating actions.
@@ -378,9 +379,7 @@ func (dc *DeploymentController) scale(deployment *apps.Deployment, newRS *apps.R
 			if i == 0 && deploymentReplicasToAdd != 0 {
 				leftover := deploymentReplicasToAdd - deploymentReplicasAdded
 				nameToSize[rs.Name] = nameToSize[rs.Name] + leftover
-				if nameToSize[rs.Name] < 0 {
-					nameToSize[rs.Name] = 0
-				}
+				nameToSize[rs.Name] = utilmath.MaxInt32(nameToSize[rs.Name], 0)
 			}
 
 			// TODO: Use transactions when we have them.
@@ -489,9 +488,7 @@ func calculateStatus(allRSs []*apps.ReplicaSet, newRS *apps.ReplicaSet, deployme
 	unavailableReplicas := totalReplicas - availableReplicas
 	// If unavailableReplicas is negative, then that means the Deployment has more available replicas running than
 	// desired, e.g. whenever it scales down. In such a case we should simply default unavailableReplicas to zero.
-	if unavailableReplicas < 0 {
-		unavailableReplicas = 0
-	}
+	unavailableReplicas = utilmath.MaxInt32(unavailableReplicas, 0)
 
 	status := apps.DeploymentStatus{
 		// TODO: Ensure that if we start retrying status updates, we won't pick up a new Generation value.

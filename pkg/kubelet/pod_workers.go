@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // OnCompleteFunc is a function that is invoked when an operation completes.
@@ -300,11 +301,8 @@ func killPodNow(podWorkers PodWorkers, recorder record.EventRecorder) eviction.K
 
 		// we timeout and return an error if we don't get a callback within a reasonable time.
 		// the default timeout is relative to the grace period (we settle on 10s to wait for kubelet->runtime traffic to complete in sigkill)
-		timeout := int64(gracePeriod + (gracePeriod / 2))
-		minTimeout := int64(10)
-		if timeout < minTimeout {
-			timeout = minTimeout
-		}
+		timeout := utilmath.MaxInt64(gracePeriod+(gracePeriod/2), 10)
+
 		timeoutDuration := time.Duration(timeout) * time.Second
 
 		// open a channel we block against until we get a result

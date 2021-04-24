@@ -11,6 +11,7 @@ rules:
   - selectorRegexp: k8s[.]io/kubernetes
     allowedPrefixes:
       - k8s.io/kubernetes/cmd/kubeadm
+      - k8s.io/kubernetes/pkg/util/math
   - selectorRegexp: gopkg[.]in
     allowedPrefixes:
       - gopkg.in/inf.v0

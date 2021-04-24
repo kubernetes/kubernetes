@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
 	"k8s.io/kubernetes/pkg/features"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -87,9 +88,7 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	daemonSet.Status = apps.DaemonSetStatus{}
 
 	daemonSet.Generation = 1
-	if daemonSet.Spec.TemplateGeneration < 1 {
-		daemonSet.Spec.TemplateGeneration = 1
-	}
+	daemonSet.Spec.TemplateGeneration = utilmath.MaxInt64(daemonSet.Spec.TemplateGeneration, 1)
 
 	dropDaemonSetDisabledFields(daemonSet, nil)
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)

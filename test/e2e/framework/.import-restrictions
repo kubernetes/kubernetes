@@ -219,6 +219,7 @@ rules:
       - k8s.io/kubernetes/pkg/util/iptables
       - k8s.io/kubernetes/pkg/util/ipvs
       - k8s.io/kubernetes/pkg/util/labels
+      - k8s.io/kubernetes/pkg/util/math
       - k8s.io/kubernetes/pkg/util/node
       - k8s.io/kubernetes/pkg/util/oom
       - k8s.io/kubernetes/pkg/util/parsers

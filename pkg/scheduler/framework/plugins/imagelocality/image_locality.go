@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 // The two thresholds are used as bounds for the image score range. They correspond to a reasonable size range for
@@ -81,11 +82,7 @@ func New(_ runtime.Object, h framework.Handle) (framework.Plugin, error) {
 // priority is obtained by scaling the maximum priority value with a ratio proportional to the sumScores.
 func calculatePriority(sumScores int64, numContainers int) int64 {
 	maxThreshold := maxContainerThreshold * int64(numContainers)
-	if sumScores < minThreshold {
-		sumScores = minThreshold
-	} else if sumScores > maxThreshold {
-		sumScores = maxThreshold
-	}
+	sumScores = utilmath.BoundedInt64(sumScores, minThreshold, maxThreshold)
 
 	return int64(framework.MaxNodeScore) * (sumScores - minThreshold) / (maxThreshold - minThreshold)
 }

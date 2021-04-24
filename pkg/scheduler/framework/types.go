@@ -25,7 +25,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +36,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 var generation int64
@@ -554,16 +555,16 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 	for rName, rQuantity := range rl {
 		switch rName {
 		case v1.ResourceMemory:
-			r.Memory = max(r.Memory, rQuantity.Value())
+			r.Memory = utilmath.MaxInt64(r.Memory, rQuantity.Value())
 		case v1.ResourceCPU:
-			r.MilliCPU = max(r.MilliCPU, rQuantity.MilliValue())
+			r.MilliCPU = utilmath.MaxInt64(r.MilliCPU, rQuantity.MilliValue())
 		case v1.ResourceEphemeralStorage:
 			if utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
+				r.EphemeralStorage = utilmath.MaxInt64(r.EphemeralStorage, rQuantity.Value())
 			}
 		default:
 			if schedutil.IsScalarResourceName(rName) {
-				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))
+				r.SetScalar(rName, utilmath.MaxInt64(r.ScalarResources[rName], rQuantity.Value()))
 			}
 		}
 	}
@@ -764,13 +765,6 @@ func (n *NodeInfo) resetSlicesIfEmpty() {
 	}
 }
 
-func max(a, b int64) int64 {
-	if a >= b {
-		return a
-	}
-	return b
-}
-
 // resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
 func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
@@ -785,8 +779,8 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	for _, ic := range pod.Spec.InitContainers {
 		resPtr.SetMaxResource(ic.Resources.Requests)
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
-		non0CPU = max(non0CPU, non0CPUReq)
-		non0Mem = max(non0Mem, non0MemReq)
+		non0CPU = utilmath.MaxInt64(non0CPU, non0CPUReq)
+		non0Mem = utilmath.MaxInt64(non0Mem, non0MemReq)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod

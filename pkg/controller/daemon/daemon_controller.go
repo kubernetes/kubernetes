@@ -53,6 +53,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/daemon/util"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 	"k8s.io/utils/integer"
 )
 
@@ -949,15 +950,8 @@ func (dsc *DaemonSetsController) syncNodes(ds *apps.DaemonSet, podsToDelete, nod
 		return fmt.Errorf("couldn't get key for object %#v: %v", ds, err)
 	}
 
-	createDiff := len(nodesNeedingDaemonPods)
-	deleteDiff := len(podsToDelete)
-
-	if createDiff > dsc.burstReplicas {
-		createDiff = dsc.burstReplicas
-	}
-	if deleteDiff > dsc.burstReplicas {
-		deleteDiff = dsc.burstReplicas
-	}
+	createDiff := utilmath.MinInt(len(nodesNeedingDaemonPods), dsc.burstReplicas)
+	deleteDiff := utilmath.MinInt(len(podsToDelete), dsc.burstReplicas)
 
 	dsc.expectations.SetExpectations(dsKey, createDiff, deleteDiff)
 

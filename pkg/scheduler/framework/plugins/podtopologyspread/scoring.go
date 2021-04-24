@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	utilmath "k8s.io/kubernetes/pkg/util/math"
 )
 
 const preScoreStateKey = "PreScore" + Name
@@ -227,12 +228,8 @@ func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, cycleState *fra
 			scores[i].Score = invalidScore
 			continue
 		}
-		if score.Score < minScore {
-			minScore = score.Score
-		}
-		if score.Score > maxScore {
-			maxScore = score.Score
-		}
+		minScore = utilmath.MinInt64(minScore, score.Score)
+		maxScore = utilmath.MaxInt64(maxScore, score.Score)
 	}
 
 	for i := range scores {
