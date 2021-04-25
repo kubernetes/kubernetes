@@ -99,7 +99,7 @@ func calculateResourceAllocatableRequest(nodeInfo *framework.NodeInfo, pod *v1.P
 	case v1.ResourceEphemeralStorage:
 		return nodeInfo.Allocatable.EphemeralStorage, (nodeInfo.Requested.EphemeralStorage + podRequest)
 	default:
-		if schedutil.IsScalarResourceName(resource) {
+		if _, exists := nodeInfo.Allocatable.ScalarResources[resource]; exists {
 			return nodeInfo.Allocatable.ScalarResources[resource], (nodeInfo.Requested.ScalarResources[resource] + podRequest)
 		}
 	}
