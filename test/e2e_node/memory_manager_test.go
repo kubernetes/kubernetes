@@ -383,6 +383,14 @@ var _ = SIGDescribe("Memory Manager [Serial] [Feature:MemoryManager][NodeAlphaFe
 
 		// update the kubelet config with old values
 		updateKubeletConfig(f, oldCfg)
+
+		// wait until the kubelet health check will pass and will continue to pass for specified period of time
+		gomega.Eventually(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
+		gomega.Consistently(func() bool {
+			return kubeletHealthCheck(kubeletHealthCheckURL)
+		}, time.Minute, 10*time.Second).Should(gomega.BeTrue())
 	})
 
 	ginkgo.Context("with static policy", func() {
