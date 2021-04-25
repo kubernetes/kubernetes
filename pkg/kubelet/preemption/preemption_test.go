@@ -279,7 +279,7 @@ func TestGetPodsToPreempt(t *testing.T) {
 			expectedOutput:        []*v1.Pod{allPods[burstable], allPods[highRequestBurstable]},
 		},
 		{
-			testName:              "evict guaranteed when we have to, and dont evict the extra burstable",
+			testName:              "evict guaranteed when we have to, and don't evict the extra burstable",
 			preemptor:             allPods[clusterCritical],
 			inputPods:             []*v1.Pod{allPods[bestEffort], allPods[burstable], allPods[highRequestBurstable], allPods[guaranteed], allPods[highRequestGuaranteed]},
 			insufficientResources: getAdmissionRequirementList(0, 550, 0),
