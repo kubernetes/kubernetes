@@ -27,7 +27,6 @@ import (
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -38,7 +37,7 @@ var (
 	extendedResourceB     = v1.ResourceName("example.com/bbb")
 	kubernetesIOResourceA = v1.ResourceName("kubernetes.io/something")
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
-	hugePageResourceA     = v1helper.HugePageResourceName(resource.MustParse("2Mi"))
+	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
@@ -68,8 +67,21 @@ func makeAllocatableResources(milliCPU, memory, pods, extendedA, storage, hugePa
 func newResourcePod(usage ...framework.Resource) *v1.Pod {
 	var containers []v1.Container
 	for _, req := range usage {
+		rl := v1.ResourceList{
+			v1.ResourceCPU:              *resource.NewMilliQuantity(req.MilliCPU, resource.DecimalSI),
+			v1.ResourceMemory:           *resource.NewQuantity(req.Memory, resource.BinarySI),
+			v1.ResourcePods:             *resource.NewQuantity(int64(req.AllowedPodNumber), resource.BinarySI),
+			v1.ResourceEphemeralStorage: *resource.NewQuantity(req.EphemeralStorage, resource.BinarySI),
+		}
+		for rName, rQuant := range req.ScalarResources {
+			if rName == hugePageResourceA {
+				rl[rName] = *resource.NewQuantity(rQuant, resource.BinarySI)
+			} else {
+				rl[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+			}
+		}
 		containers = append(containers, v1.Container{
-			Resources: v1.ResourceRequirements{Requests: req.ResourceList()},
+			Resources: v1.ResourceRequirements{Requests: rl},
 		})
 	}
 	return &v1.Pod{
