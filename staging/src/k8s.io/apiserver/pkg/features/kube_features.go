@@ -95,6 +95,7 @@ const (
 	// owner: @apelisse, @lavalamp
 	// alpha: v1.14
 	// beta: v1.16
+	// stable: v1.22
 	//
 	// Server-side apply. Merging happens on the server.
 	ServerSideApply featuregate.Feature = "ServerSideApply"
@@ -178,7 +179,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIListChunking:          {Default: true, PreRelease: featuregate.Beta},
 	DryRun:                   {Default: true, PreRelease: featuregate.GA},
 	RemainingItemCount:       {Default: true, PreRelease: featuregate.Beta},
-	ServerSideApply:          {Default: true, PreRelease: featuregate.Beta},
+	ServerSideApply:          {Default: true, PreRelease: featuregate.GA},
 	StorageVersionHash:       {Default: true, PreRelease: featuregate.Beta},
 	StorageVersionAPI:        {Default: false, PreRelease: featuregate.Alpha},
 	WatchBookmark:            {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
