@@ -1840,12 +1840,12 @@ properties:
 			// check that we got all violations
 			t.Logf("Got violations: %q", cond.Message)
 			for _, v := range tst.expectedViolations {
-				if strings.Index(cond.Message, v) == -1 {
+				if !strings.Contains(cond.Message, v) {
 					t.Errorf("expected violation %q, but didn't get it", v)
 				}
 			}
 			for _, v := range tst.unexpectedViolations {
-				if strings.Index(cond.Message, v) != -1 {
+				if strings.Contains(cond.Message, v) {
 					t.Errorf("unexpected violation %q", v)
 				}
 			}
