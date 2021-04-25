@@ -34,12 +34,18 @@ import (
 
 const (
 	// try to use a no common port so it doesn't conflict using hostNetwork
-	testPodPort    = "8085"
+	testPodPort = "8085"
+	// we have 2 tests that run in paralle with pods on hostNetwork
+	// each test needs a different port to avoid scheduling port conflicts
+	testPodPort2 = "8086"
+	// maximum number of nodes uses for this test
+	// limit the number of nodes to avoid duration issues on large clusters
+	maxNodes       = 4
 	noSNATTestName = "no-snat-test"
 )
 
-var (
-	testPod = v1.Pod{
+func createTestPod(port string, hostNetwork bool) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: noSNATTestName,
 			Labels: map[string]string{
@@ -54,16 +60,17 @@ var (
 					Args:  []string{"netexec", "--http-port", testPodPort},
 				},
 			},
+			HostNetwork: hostNetwork,
 		},
 	}
-)
+}
 
 // This test verifies that a Pod on each node in a cluster can talk to Pods on every other node without SNAT.
 // Kubernetes imposes the following fundamental requirements on any networking implementation
 // (barring any intentional network segmentation policies):
 //
 // pods on a node can communicate with all pods on all nodes without NAT
-// agents on a node (e.g. system daemons, kubelet) can communicate with all pods on that node
+// agents on a node (e.g. system daemons, kubelet) can communicate with all pods on that node without NAT
 // Note: For those platforms that support Pods running in the host network (e.g. Linux):
 // pods in the host network of a node can communicate with all pods on all nodes without NAT
 // xref: https://kubernetes.io/docs/concepts/cluster-administration/networking/
@@ -78,10 +85,10 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 		framework.ExpectNoError(err)
 		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
 
+		testPod := createTestPod(testPodPort, false)
 		var wg sync.WaitGroup
 		for i, node := range nodes.Items {
-			// limit the number of nodes to avoid duration issues on large clusters
-			if i == 10 {
+			if i == maxNodes {
 				break
 			}
 			// target Pod at Node
@@ -91,7 +98,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				f.PodClient().CreateSync(&testPod)
+				f.PodClient().CreateSync(testPod)
 				wg.Done()
 			}()
 		}
@@ -134,12 +141,15 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 		// use one node
 		node := nodes.Items[0]
 		// target Pod at Node
+
+		testPod := createTestPod(testPodPort2, false)
 		nodeSelection := e2epod.NodeSelection{Name: node.Name}
 		e2epod.SetNodeSelection(&testPod.Spec, nodeSelection)
-		f.PodClient().CreateSync(&testPod)
+		f.PodClient().CreateSync(testPod)
 		ginkgo.By("creating a hostnetwork test pod on the same Node")
-		testPod.Spec.HostNetwork = true
-		f.PodClient().CreateSync(&testPod)
+		testPodHost := createTestPod(testPodPort2, true)
+		f.PodClient().CreateSync(testPodHost)
+
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
 		pods, err := pc.List(context.TODO(), metav1.ListOptions{LabelSelector: noSNATTestName})
 		framework.ExpectNoError(err)
@@ -150,7 +160,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 				if targetPod.Name == sourcePod.Name {
 					continue
 				}
-				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort)
+				targetAddr := net.JoinHostPort(targetPod.Status.PodIP, testPodPort2)
 				ginkgo.By("testing from pod " + sourcePod.Name + " to pod " + targetPod.Name)
 
 				sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
@@ -172,16 +182,18 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		var wg sync.WaitGroup
 		// limit the number of nodes to avoid duration issues on large clusters
-		maxNodes := len(nodes.Items)
-		if maxNodes > 10 {
-			maxNodes = 10
+		numNodes := len(nodes.Items)
+		if numNodes > maxNodes {
+			numNodes = maxNodes
 		}
+
+		testPod := createTestPod(testPodPort, false)
 		for i, node := range nodes.Items {
 			// create the last pod with hostNetwork true
-			if i == maxNodes-1 {
-				testPod.Spec.HostNetwork = true
+			if i == numNodes-1 {
+				testPod = createTestPod(testPodPort, true)
 			}
-			if i == maxNodes {
+			if i == numNodes {
 				break
 			}
 			// target Pod at Node
@@ -191,7 +203,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
-				f.PodClient().CreateSync(&testPod)
+				f.PodClient().CreateSync(testPod)
 				wg.Done()
 			}()
 		}
