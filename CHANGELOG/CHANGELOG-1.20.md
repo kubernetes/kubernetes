@@ -704,7 +704,7 @@ filename | sha512 hash
 
 ### Other (Cleanup or Flake)
 
-- Kubeadm: change the default image repository for CI images from 'gcr.io/kubernetes-ci-images' to 'gcr.io/k8s-staging-ci-images' ([#97087](https://github.com/kubernetes/kubernetes/pull/97087), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
+- Kubeadm: change the default image repository for CI images from `gcr.io/kubernetes-ci-images` to `gcr.io/k8s-staging-ci-images` ([#97087](https://github.com/kubernetes/kubernetes/pull/97087), [@SataQiu](https://github.com/SataQiu)) [SIG Cluster Lifecycle]
 - Resolves flakes in the Ingress conformance tests due to conflicts with controllers updating the Ingress object ([#98430](https://github.com/kubernetes/kubernetes/pull/98430), [@liggitt](https://github.com/liggitt)) [SIG Network and Testing]
 
 ## Dependencies
@@ -1290,7 +1290,7 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
 - Azure armclient backoff step defaults to 1 (no retry). ([#94180](https://github.com/kubernetes/kubernetes/pull/94180), [@feiskyer](https://github.com/feiskyer))
 - Azure: fix a bug that kube-controller-manager would panic if wrong Azure VMSS name is configured ([#94306](https://github.com/kubernetes/kubernetes/pull/94306), [@knight42](https://github.com/knight42)) [SIG Cloud Provider]
 - Both apiserver_request_duration_seconds metrics and RequestReceivedTimestamp fields of an audit event now take into account the time a request spends in the apiserver request filters. ([#94903](https://github.com/kubernetes/kubernetes/pull/94903), [@tkashem](https://github.com/tkashem))
-- Build/lib/release: Explicitly use '--platform' in building server images
+- Build/lib/release: Explicitly use `--platform` in building server images
   
   When we switched to go-runner for building the apiserver,
   controller-manager, and scheduler server components, we no longer
@@ -1300,7 +1300,7 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
   As a result, server images for non-amd64 images copy in the go-runner
   amd64 binary instead of the go-runner that matches that architecture.
   
-  This commit explicitly sets the '--platform=linux/${arch}' to ensure
+  This commit explicitly sets the `--platform=linux/${arch}` to ensure
   we're pulling the correct go-runner arch from the manifest list.
   
   Before:
@@ -1447,7 +1447,7 @@ Currently, cadvisor_stats_provider provides AcceleratorStats but cri_stats_provi
 - Add the following metrics:
   - network_plugin_operations_total
   - network_plugin_operations_errors_total ([#93066](https://github.com/kubernetes/kubernetes/pull/93066), [@AnishShah](https://github.com/AnishShah))
-- Adds a bootstrapping ClusterRole, ClusterRoleBinding and group for /metrics, /livez/*, /readyz/*, & /healthz/- endpoints. ([#93311](https://github.com/kubernetes/kubernetes/pull/93311), [@logicalhan](https://github.com/logicalhan)) [SIG API Machinery, Auth, Cloud Provider and Instrumentation]
+- Adds a bootstrapping ClusterRole, ClusterRoleBinding and group for /metrics, /livez/*, /readyz/*, and /healthz/* endpoints. ([#93311](https://github.com/kubernetes/kubernetes/pull/93311), [@logicalhan](https://github.com/logicalhan)) [SIG API Machinery, Auth, Cloud Provider and Instrumentation]
 - AdmissionReview objects sent for the creation of Namespace API objects now populate the `namespace` attribute consistently (previously the `namespace` attribute was empty for Namespace creation via POST requests, and populated for Namespace creation via server-side-apply PATCH requests) ([#95012](https://github.com/kubernetes/kubernetes/pull/95012), [@nodo](https://github.com/nodo)) [SIG API Machinery and Testing]
 - Applies translations on all command descriptions ([#95439](https://github.com/kubernetes/kubernetes/pull/95439), [@HerrNaN](https://github.com/HerrNaN)) [SIG CLI]
 - Base-images: Update to debian-iptables:buster-v1.3.0
@@ -2660,7 +2660,7 @@ filename | sha512 hash
 - Azure: per VMSS VMSS VMs cache to prevent throttling on clusters having many attached VMSS ([#93107](https://github.com/kubernetes/kubernetes/pull/93107), [@bpineau](https://github.com/bpineau)) [SIG Cloud Provider]
 - Both apiserver_request_duration_seconds metrics and RequestReceivedTimestamp field of an audit event take 
   into account the time a request spends in the apiserver request filters. ([#94903](https://github.com/kubernetes/kubernetes/pull/94903), [@tkashem](https://github.com/tkashem)) [SIG API Machinery, Auth and Instrumentation]
-- Build/lib/release: Explicitly use '--platform' in building server images
+- Build/lib/release: Explicitly use `--platform` in building server images
   
   When we switched to go-runner for building the apiserver,
   controller-manager, and scheduler server components, we no longer
@@ -2670,7 +2670,7 @@ filename | sha512 hash
   As a result, server images for non-amd64 images copy in the go-runner
   amd64 binary instead of the go-runner that matches that architecture.
   
-  This commit explicitly sets the '--platform=linux/${arch}' to ensure
+  This commit explicitly sets the `--platform=linux/${arch}` to ensure
   we're pulling the correct go-runner arch from the manifest list.
   
   Before:
@@ -2780,7 +2780,7 @@ filename | sha512 hash
 ### Other (Cleanup or Flake)
 
 - --cache-dir sets cache directory for both http and discovery, defaults to $HOME/.kube/cache ([#92910](https://github.com/kubernetes/kubernetes/pull/92910), [@soltysh](https://github.com/soltysh)) [SIG API Machinery and CLI]
-- Adds a bootstrapping ClusterRole, ClusterRoleBinding and group for /metrics, /livez/*, /readyz/*, & /healthz/- endpoints. ([#93311](https://github.com/kubernetes/kubernetes/pull/93311), [@logicalhan](https://github.com/logicalhan)) [SIG API Machinery, Auth, Cloud Provider and Instrumentation]
+- Adds a bootstrapping ClusterRole, ClusterRoleBinding and group for /metrics, /livez/*, /readyz/*, and /healthz/* endpoints. ([#93311](https://github.com/kubernetes/kubernetes/pull/93311), [@logicalhan](https://github.com/logicalhan)) [SIG API Machinery, Auth, Cloud Provider and Instrumentation]
 - Base-images: Update to debian-iptables:buster-v1.3.0
   - Uses iptables 1.8.5
   - base-images: Update to debian-base:buster-v1.2.0
