@@ -24,6 +24,8 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
+	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -75,16 +77,30 @@ func createTestPod(port string, hostNetwork bool) *v1.Pod {
 // pods in the host network of a node can communicate with all pods on all nodes without NAT
 // xref: https://kubernetes.io/docs/concepts/cluster-administration/networking/
 var _ = common.SIGDescribe("NoSNAT", func() {
+	var (
+		cs    clientset.Interface
+		pc    v1core.PodInterface
+		nodes *v1.NodeList
+	)
+
 	f := framework.NewDefaultFramework("no-snat-test")
-	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
-		cs := f.ClientSet
-		pc := cs.CoreV1().Pods(f.Namespace.Name)
 
-		ginkgo.By("creating a test pod on each Node")
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, maxNodes)
+	ginkgo.BeforeEach(func() {
+		var err error
+		cs = f.ClientSet
+		pc = cs.CoreV1().Pods(f.Namespace.Name)
+		nodes = &v1.NodeList{}
+		nodes, err = e2enode.GetBoundedReadySchedulableNodes(cs, maxNodes)
 		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
+		if len(nodes.Items) < 2 {
+			ginkgo.Skip("At least 2 nodes are required to run the test")
+		}
 
+	})
+
+	ginkgo.It("Should be able to send traffic between Pods without SNAT", func() {
+		framework.Logf("nodes DEBUG %v", nodes)
+		ginkgo.By("creating a test pod on each Node")
 		testPod := createTestPod(testPodPort, false)
 		var wg sync.WaitGroup
 		for _, node := range nodes.Items {
@@ -128,14 +144,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 	})
 
 	ginkgo.It("Should be able to send traffic between Pods and an agent on that Node without SNAT", func() {
-		cs := f.ClientSet
-		pc := cs.CoreV1().Pods(f.Namespace.Name)
-
 		ginkgo.By("creating a test pod on one Node")
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
-		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
-
 		// use one node
 		node := nodes.Items[0]
 		// target Pod at Node
@@ -172,15 +181,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 	})
 
 	ginkgo.It("Should be able to send traffic between Pods and HostNetwork pods without SNAT [LinuxOnly]", func() {
-		cs := f.ClientSet
-		pc := cs.CoreV1().Pods(f.Namespace.Name)
-
 		ginkgo.By("creating a test pod on each Node")
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, maxNodes)
-		framework.ExpectNoError(err)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
-
-		var wg sync.WaitGroup
 		// create a hostNetwork pod in one of the nodes
 		testPodHost := createTestPod(testPodPort, true)
 		nodeSelection := e2epod.NodeSelection{Name: nodes.Items[0].Name}
@@ -189,6 +190,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		// create pods without hostNetwork in all nodes
 		testPod := createTestPod(testPodPort, false)
+		var wg sync.WaitGroup
 		for _, node := range nodes.Items {
 			// target Pod at Node
 			ginkgo.By("creating pod on node " + node.Name)
