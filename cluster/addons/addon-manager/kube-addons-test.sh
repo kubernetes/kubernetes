@@ -83,7 +83,7 @@ EOF
   if ! (kubectl get limits/limits -n "${TEST_NS}"); then
     error "failed to create limits w/ reconcile"
     return 1
-  elif ! (kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"); then
+  elif ! (kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"); then
     error "limits does not match applied config"
     return 1
   fi
@@ -92,10 +92,10 @@ EOF
   echo_blue "Changes to manifest should be reflected in the cluster"
   limitrange="${limitrange//100m/50m}"
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"; then
     error "failed to update resource, still has 100m"
     return 1
-  elif ! (kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "50m"); then
+  elif ! (kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "50m"); then
     error "failed to update resource, 50m limit was not reflected"
     return 1
   fi
@@ -103,12 +103,12 @@ EOF
   # Finally, the users configuration will not be respected.
   echo_blue "Changes the user makes should be overwritten by kube-addon-manager"
   EDITOR="sed -i 's/50m/600m/'" kubectl edit limits/limits -n ${TEST_NS}
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "50m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "50m"; then
     error "failed to edit resource with sed -- test is broken"
     return 1
   fi
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if ! ( kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "50m"); then
+  if ! ( kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "50m"); then
     error "failed to update resource, user config was respected when it should have been rewritten"
     return 1
   fi
@@ -137,7 +137,7 @@ EOF
   if ! (kubectl get limits/limits -n "${TEST_NS}"); then
     error "failed to create limits w/ EnsureExists"
     return 1
-  elif ! (kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"); then
+  elif ! (kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"); then
     error "limits does not match applied config"
     return 1
   fi
@@ -146,7 +146,7 @@ EOF
   echo_blue "Changes to the manifest should not be reconciled with the cluster"
   limitrange="${limitrange//100m/50m}"
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "50m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "50m"; then
     error "failed to respect existing resource, was overwritten despite EnsureExists"
     return 1
   fi
@@ -154,12 +154,12 @@ EOF
   # the users configuration must be respected
   echo_blue "User configuration will be persisted for EnsureExists"
   EDITOR="sed -i 's/100m/600m/'" kubectl edit limits/limits -n ${TEST_NS}
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"; then
     error "failed to edit resource with sed -- test is broken"
     return 1
   fi
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"; then
     error "failed to respect user changes to EnsureExists object"
     return 1
   fi
@@ -224,7 +224,7 @@ EOF
   echo_blue "Multi-resource manifest changes should apply to EnsureExists, not Reconcile"
   limitrange="${limitrange//100m/50m}"
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "50m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "50m"; then
     error "failed to respect existing resource, was overwritten despite EnsureExists"
     return 1
   elif kubectl get limits/limits2 -n ${TEST_NS} | grep --silent "100m"; then
@@ -235,12 +235,12 @@ EOF
   # the users configuration must be respected for EnsureExists
   echo_blue "Multi-resource manifest should not overwrite user config in EnsureExists"
   EDITOR="sed -i 's/100m/600m/'" kubectl edit limits/limits -n ${TEST_NS}
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"; then
     error "failed to edit resource with sed -- test is broken"
     return 1
   fi
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if kubectl get limits/limits -n ${TEST_NS} -oyaml | grep --silent "100m"; then
+  if kubectl get limits/limits -n ${TEST_NS} -o yaml | grep --silent "100m"; then
     error "failed to respect user changes to EnsureExists object"
     return 1
   fi
@@ -248,12 +248,12 @@ EOF
   # But not for Reconcile.
   echo_blue "Multi-resource manifest should overwrite user config in EnsureExists"
   EDITOR="sed -i 's/50m/600m/'" kubectl edit limits/limits2 -n ${TEST_NS}
-  if kubectl get limits/limits2 -n ${TEST_NS} -oyaml | grep --silent "50m"; then
+  if kubectl get limits/limits2 -n ${TEST_NS} -o yaml | grep --silent "50m"; then
     error "failed to edit resource with sed -- test is broken"
     return 1
   fi
   create_resource_from_string "${limitrange}" "10" "1" "limitrange.yaml" "${TEST_NS}"
-  if ! ( kubectl get limits/limits2 -n ${TEST_NS} -oyaml | grep --silent "50m"); then
+  if ! ( kubectl get limits/limits2 -n ${TEST_NS} -o yaml | grep --silent "50m"); then
     error "failed to update resource, user config was respected when it should have been rewritten"
     return 1
   fi
