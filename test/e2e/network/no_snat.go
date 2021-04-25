@@ -57,7 +57,7 @@ func createTestPod(port string, hostNetwork bool) *v1.Pod {
 				{
 					Name:  noSNATTestName,
 					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"netexec", "--http-port", testPodPort},
+					Args:  []string{"netexec", "--http-port", port},
 				},
 			},
 			HostNetwork: hostNetwork,
