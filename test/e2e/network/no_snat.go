@@ -95,8 +95,8 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
+				defer wg.Done()
 				f.PodClient().CreateSync(testPod)
-				wg.Done()
 			}()
 		}
 		wg.Wait()
@@ -117,10 +117,10 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 				wg.Add(1)
 				go func() {
 					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
 					sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
 					ginkgo.By("Verifying the preserved source ip")
 					framework.ExpectEqual(sourceIP, execPodIP)
-					wg.Done()
 				}()
 			}
 		}
@@ -197,8 +197,8 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 			wg.Add(1)
 			go func() {
 				defer ginkgo.GinkgoRecover()
+				defer wg.Done()
 				f.PodClient().CreateSync(testPod)
-				wg.Done()
 			}()
 		}
 		wg.Wait()
@@ -219,10 +219,10 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 				wg.Add(1)
 				go func() {
 					defer ginkgo.GinkgoRecover()
+					defer wg.Done()
 					sourceIP, execPodIP := execSourceIPTest(sourcePod, targetAddr)
 					ginkgo.By("Verifying the preserved source ip")
 					framework.ExpectEqual(sourceIP, execPodIP)
-					wg.Done()
 				}()
 			}
 		}
