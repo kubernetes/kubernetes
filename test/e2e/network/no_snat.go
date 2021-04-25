@@ -81,16 +81,13 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
 
 		ginkgo.By("creating a test pod on each Node")
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, maxNodes)
 		framework.ExpectNoError(err)
 		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
 
 		testPod := createTestPod(testPodPort, false)
 		var wg sync.WaitGroup
-		for i, node := range nodes.Items {
-			if i == maxNodes {
-				break
-			}
+		for _, node := range nodes.Items {
 			// target Pod at Node
 			ginkgo.By("creating pod on node " + node.Name)
 			nodeSelection := e2epod.NodeSelection{Name: node.Name}
@@ -179,26 +176,20 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 		pc := cs.CoreV1().Pods(f.Namespace.Name)
 
 		ginkgo.By("creating a test pod on each Node")
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, maxNodes)
 		framework.ExpectNoError(err)
 		framework.ExpectNotEqual(len(nodes.Items), 0, "no Nodes in the cluster")
 
 		var wg sync.WaitGroup
-		// limit the number of nodes to avoid duration issues on large clusters
-		numNodes := len(nodes.Items)
-		if numNodes > maxNodes {
-			numNodes = maxNodes
-		}
+		// create a hostNetwork pod in one of the nodes
+		testPodHost := createTestPod(testPodPort, true)
+		nodeSelection := e2epod.NodeSelection{Name: nodes.Items[0].Name}
+		e2epod.SetNodeSelection(&testPodHost.Spec, nodeSelection)
+		f.PodClient().CreateSync(testPodHost)
 
+		// create pods without hostNetwork in all nodes
 		testPod := createTestPod(testPodPort, false)
-		for i, node := range nodes.Items {
-			// create the last pod with hostNetwork true
-			if i == numNodes-1 {
-				testPod = createTestPod(testPodPort, true)
-			}
-			if i == numNodes {
-				break
-			}
+		for _, node := range nodes.Items {
 			// target Pod at Node
 			ginkgo.By("creating pod on node " + node.Name)
 			nodeSelection := e2epod.NodeSelection{Name: node.Name}
