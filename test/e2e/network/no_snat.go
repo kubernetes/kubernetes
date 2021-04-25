@@ -148,6 +148,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 		f.PodClient().CreateSync(testPod)
 		ginkgo.By("creating a hostnetwork test pod on the same Node")
 		testPodHost := createTestPod(testPodPort2, true)
+		e2epod.SetNodeSelection(&testPodHost.Spec, nodeSelection)
 		f.PodClient().CreateSync(testPodHost)
 
 		ginkgo.By("sending traffic from each pod to the others and checking that SNAT does not occur")
