@@ -110,6 +110,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
 		for _, sourcePod := range pods.Items {
+			sourcePod := sourcePod
 			for _, targetPod := range pods.Items {
 				if targetPod.Name == sourcePod.Name {
 					continue
@@ -157,6 +158,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
 		for _, sourcePod := range pods.Items {
+			sourcePod := sourcePod
 			for _, targetPod := range pods.Items {
 				if targetPod.Name == sourcePod.Name {
 					continue
@@ -216,6 +218,7 @@ var _ = common.SIGDescribe("NoSNAT", func() {
 
 		// hit the /clientip endpoint on every other Pods to check if source ip is preserved
 		for _, sourcePod := range pods.Items {
+			sourcePod := sourcePod
 			for _, targetPod := range pods.Items {
 				if targetPod.Name == sourcePod.Name {
 					continue
