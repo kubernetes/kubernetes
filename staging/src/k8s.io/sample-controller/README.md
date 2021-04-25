@@ -92,8 +92,8 @@ kubectl create -f artifacts/examples/crd.yaml
 # create a custom resource of type Foo
 kubectl create -f artifacts/examples/example-foo.yaml
 
-# check deployments created through the custom resource
-kubectl get deployments
+# check foos created through the custom resource
+kubectl get foos
 ```
 
 ## Use Cases
