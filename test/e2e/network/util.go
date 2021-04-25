@@ -115,7 +115,10 @@ func execSourceIPTest(sourcePod v1.Pod, targetAddr string) (string, string) {
 	)
 
 	framework.Logf("Waiting up to %v to get response from %s", timeout, targetAddr)
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 30 %s/clientip`, targetAddr)
+	// we should force the source IP or it will fail in pods with multiple IPs
+	// like pods with HostNetwork: true, because the kernel will choose the source IP
+	// and it can be different than the PodIP
+	cmd := fmt.Sprintf(`curl -q -s --interface %s --connect-timeout 30 %s/clientip`, sourcePod.Status.PodIP, targetAddr)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(2 * time.Second) {
 		stdout, err = framework.RunHostCmd(sourcePod.Namespace, sourcePod.Name, cmd)
 		if err != nil {
