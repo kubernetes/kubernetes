@@ -557,13 +557,6 @@ const (
 	// Enables usage of hugepages-<size> in downward API.
 	DownwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
 
-	// owner: @freehan
-	// GA: v1.18
-	//
-	// Enable ExternalTrafficPolicy for Service ExternalIPs.
-	// This is for bug fix #69811
-	ExternalPolicyForExternalIP featuregate.Feature = "ExternalPolicyForExternalIP"
-
 	// owner: @bswartz
 	// alpha: v1.18
 	//
@@ -832,8 +825,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	HugePageStorageMediumSize:                      {Default: true, PreRelease: featuregate.Beta},
-	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta},                   // on by default in 1.22
-	ExternalPolicyForExternalIP:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
+	DownwardAPIHugePages:                           {Default: false, PreRelease: featuregate.Beta}, // on by default in 1.22
 	AnyVolumeDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	DefaultPodTopologySpread:                       {Default: true, PreRelease: featuregate.Beta},
 	SetHostnameAsFQDN:                              {Default: true, PreRelease: featuregate.Beta},
