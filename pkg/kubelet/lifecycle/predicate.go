@@ -232,7 +232,7 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo, nodeC
 	}
 
 	// retry if ephemeral storage doesn't fit for not initialized
-	wait.PollImmediate(1*time.Second, 2*time.Minute, func() (bool, error) {
+	wait.PollImmediate(1*time.Second, 5*time.Minute, func() (bool, error) {
 		for _, r := range noderesources.Fits(pod, nodeInfo) {
 			if r.ResourceName == v1.ResourceEphemeralStorage {
 				zeroQuantity := resource.MustParse("0")
