@@ -195,9 +195,9 @@ type DelegatingAuthenticationOptions struct {
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
 	WebhookRetryBackoff *wait.Backoff
 
-	// ClientTimeout specifies a time limit for requests made by the authorization webhook client.
+	// TokenRequestTimeout specifies a time limit for requests made by the authorization webhook client.
 	// The default value is set to 10 seconds.
-	ClientTimeout time.Duration
+	TokenRequestTimeout time.Duration
 
 	// CustomRoundTripperFn allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
 	CustomRoundTripperFn transport.WrapperFunc
@@ -214,7 +214,7 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
 		},
 		WebhookRetryBackoff: DefaultAuthWebhookRetryBackoff(),
-		ClientTimeout:       10 * time.Second,
+		TokenRequestTimeout: 10 * time.Second,
 	}
 }
 
@@ -223,9 +223,9 @@ func (s *DelegatingAuthenticationOptions) WithCustomRetryBackoff(backoff wait.Ba
 	s.WebhookRetryBackoff = &backoff
 }
 
-// WithClientTimeout sets the given timeout for the authentication webhook client.
-func (s *DelegatingAuthenticationOptions) WithClientTimeout(timeout time.Duration) {
-	s.ClientTimeout = timeout
+// WithRequestTimeout sets the given timeout for requests made by the authentication webhook client.
+func (s *DelegatingAuthenticationOptions) WithRequestTimeout(timeout time.Duration) {
+	s.TokenRequestTimeout = timeout
 }
 
 // WithCustomRoundTripper allows for specifying a middleware function for custom HTTP behaviour for the authentication webhook client.
@@ -282,9 +282,10 @@ func (s *DelegatingAuthenticationOptions) ApplyTo(authenticationInfo *server.Aut
 	}
 
 	cfg := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:           true,
-		CacheTTL:            s.CacheTTL,
-		WebhookRetryBackoff: s.WebhookRetryBackoff,
+		Anonymous:                true,
+		CacheTTL:                 s.CacheTTL,
+		WebhookRetryBackoff:      s.WebhookRetryBackoff,
+		TokenAccessReviewTimeout: s.TokenRequestTimeout,
 	}
 
 	client, err := s.getClient()
@@ -427,7 +428,10 @@ func (s *DelegatingAuthenticationOptions) getClient() (kubernetes.Interface, err
 	// set high qps/burst limits since this will effectively limit API server responsiveness
 	clientConfig.QPS = 200
 	clientConfig.Burst = 400
-	clientConfig.Timeout = s.ClientTimeout
+	// do not set a timeout on the http client, instead use context for cancellation
+	// if multiple timeouts were set, the request will pick the smaller timeout to be applied, leaving other useless.
+	//
+	// see https://github.com/golang/go/blob/a937729c2c2f6950a32bc5cd0f5b88700882f078/src/net/http/client.go#L364
 	if s.CustomRoundTripperFn != nil {
 		clientConfig.Wrap(s.CustomRoundTripperFn)
 	}
