@@ -19,6 +19,7 @@ package generators
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 
 	"k8s.io/gengo/generator"
@@ -88,8 +89,8 @@ func (g *informerGenerator) GenerateType(c *generator.Context, t *types.Type, w 
 		"clientSetInterface":              clientSetInterface,
 		"group":                           namer.IC(g.groupGoName),
 		"informerFor":                     informerFor,
-		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
-		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "TweakListOptionsFunc"}),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "SharedInformerFactory"}),
 		"listOptions":                     c.Universe.Type(listOptions),
 		"lister":                          c.Universe.Type(types.Name{Package: listerPackage, Name: t.Name.Name + "Lister"}),
 		"namespaceAll":                    c.Universe.Type(metav1NamespaceAll),

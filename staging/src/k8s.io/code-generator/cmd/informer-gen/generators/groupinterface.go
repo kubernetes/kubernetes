@@ -70,7 +70,7 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 	versions := make([]versionData, 0, len(g.groupVersions.Versions))
 	for _, version := range g.groupVersions.Versions {
 		gv := clientgentypes.GroupVersion{Group: g.groupVersions.Group, Version: version.Version}
-		versionPackage := filepath.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty()))
+		versionPackage := filepath.ToSlash(filepath.Join(g.outputPackage, strings.ToLower(gv.Version.NonEmpty())))
 		iface := c.Universe.Type(types.Name{Package: versionPackage, Name: "Interface"})
 		versions = append(versions, versionData{
 			Name:      namer.IC(version.Version.NonEmpty()),
@@ -79,8 +79,8 @@ func (g *groupInterfaceGenerator) GenerateType(c *generator.Context, t *types.Ty
 		})
 	}
 	m := map[string]interface{}{
-		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
-		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "TweakListOptionsFunc"}),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "SharedInformerFactory"}),
 		"versions":                        versions,
 	}
 

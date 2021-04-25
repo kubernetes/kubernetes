@@ -19,6 +19,7 @@ package generators
 import (
 	"io"
 	"path"
+	"path/filepath"
 
 	clientgentypes "k8s.io/code-generator/cmd/client-gen/types"
 	"k8s.io/gengo/generator"
@@ -70,8 +71,8 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 	gvInterfaces := make(map[string]*types.Type)
 	gvNewFuncs := make(map[string]*types.Type)
 	for groupPkgName := range g.groupVersions {
-		gvInterfaces[groupPkgName] = c.Universe.Type(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "Interface"})
-		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: path.Join(g.outputPackage, groupPkgName), Name: "New"})
+		gvInterfaces[groupPkgName] = c.Universe.Type(types.Name{Package: filepath.ToSlash(path.Join(g.outputPackage, groupPkgName)), Name: "Interface"})
+		gvNewFuncs[groupPkgName] = c.Universe.Function(types.Name{Package: filepath.ToSlash(path.Join(g.outputPackage, groupPkgName)), Name: "New"})
 	}
 	m := map[string]interface{}{
 		"cacheSharedIndexInformer":       c.Universe.Type(cacheSharedIndexInformer),
@@ -79,9 +80,9 @@ func (g *factoryGenerator) GenerateType(c *generator.Context, t *types.Type, w i
 		"gvInterfaces":                   gvInterfaces,
 		"gvNewFuncs":                     gvNewFuncs,
 		"gvGoNames":                      g.gvGoNames,
-		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "NewInformerFunc"}),
-		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
-		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"interfacesNewInformerFunc":      c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "NewInformerFunc"}),
+		"interfacesTweakListOptionsFunc": c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "TweakListOptionsFunc"}),
+		"informerFactoryInterface":       c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "SharedInformerFactory"}),
 		"clientSetInterface":             c.Universe.Type(types.Name{Package: g.clientSetPackage, Name: "Interface"}),
 		"reflectType":                    c.Universe.Type(reflectType),
 		"runtimeObject":                  c.Universe.Type(runtimeObject),

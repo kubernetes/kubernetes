@@ -18,6 +18,7 @@ package generators
 
 import (
 	"io"
+	"path/filepath"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -61,8 +62,8 @@ func (g *versionInterfaceGenerator) GenerateType(c *generator.Context, t *types.
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 
 	m := map[string]interface{}{
-		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "TweakListOptionsFunc"}),
-		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: g.internalInterfacesPackage, Name: "SharedInformerFactory"}),
+		"interfacesTweakListOptionsFunc":  c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "TweakListOptionsFunc"}),
+		"interfacesSharedInformerFactory": c.Universe.Type(types.Name{Package: filepath.ToSlash(g.internalInterfacesPackage), Name: "SharedInformerFactory"}),
 		"types":                           g.types,
 	}
 

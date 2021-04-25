@@ -167,7 +167,7 @@ func (g *genClientForType) GenerateType(c *generator.Context, t *types.Type, w i
 		"ApplyPatchType":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/types", Name: "ApplyPatchType"}),
 		"watchInterface":       c.Universe.Type(types.Name{Package: "k8s.io/apimachinery/pkg/watch", Name: "Interface"}),
 		"RESTClientInterface":  c.Universe.Type(types.Name{Package: "k8s.io/client-go/rest", Name: "Interface"}),
-		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.Join(g.clientsetPackage, "scheme"), Name: "ParameterCodec"}),
+		"schemeParameterCodec": c.Universe.Variable(types.Name{Package: filepath.ToSlash(filepath.Join(g.clientsetPackage, "scheme")), Name: "ParameterCodec"}),
 		"jsonMarshal":          c.Universe.Type(types.Name{Package: "encoding/json", Name: "Marshal"}),
 	}
 
@@ -556,7 +556,7 @@ func (c *$.type|privatePlural$) DeleteCollection(ctx context.Context, opts $.Del
 `
 
 var createSubresourceTemplate = `
-// Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+// Create takes the representation of a $.inputType|private$ and creates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name string, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Post().
@@ -573,7 +573,7 @@ func (c *$.type|privatePlural$) Create(ctx context.Context, $.type|private$Name 
 `
 
 var createTemplate = `
-// Create takes the representation of a $.inputType|private$ and creates it.  Returns the server's representation of the $.resultType|private$, and an error, if there is any.
+// Create takes the representation of a $.inputType|private$ and creates it. Returns the server's representation of the $.resultType|private$, and an error, if there is any.
 func (c *$.type|privatePlural$) Create(ctx context.Context, $.inputType|private$ *$.inputType|raw$, opts $.CreateOptions|raw$) (result *$.resultType|raw$, err error) {
 	result = &$.resultType|raw${}
 	err = c.client.Post().
