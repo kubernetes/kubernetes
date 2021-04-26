@@ -218,8 +218,10 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 
 		ginkgo.By("Checking well known ports on master and nodes are not exposed externally")
 		nodeAddr := e2enode.FirstAddress(nodes, v1.NodeExternalIP)
-		if nodeAddr == "" {
-			framework.Failf("did not find any node addresses")
+		if nodeAddr != "" {
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
+			assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 		}
 
 		controlPlaneAddresses := framework.GetControlPlaneAddresses(cs)
@@ -227,9 +229,6 @@ var _ = common.SIGDescribe("Firewall rule", func() {
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", ports.KubeControllerManagerPort, firewallTestTCPTimeout, true)
 			assertNotReachableHTTPTimeout(instanceAddress, "/healthz", kubeschedulerconfig.DefaultKubeSchedulerPort, firewallTestTCPTimeout, true)
 		}
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletPort, firewallTestTCPTimeout, false)
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.KubeletReadOnlyPort, firewallTestTCPTimeout, false)
-		assertNotReachableHTTPTimeout(nodeAddr, "/", ports.ProxyStatusPort, firewallTestTCPTimeout, false)
 	})
 })
 
