@@ -79,6 +79,10 @@ func doCleanupMountPoint(mountPath string, mounter Interface, extensiveMountPoin
 		notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
 	}
 	if err != nil {
+		if os.IsNotExist(err) {
+			klog.V(4).Infof("%q does not exist", mountPath)
+			return nil
+		}
 		return err
 	}
 	if notMnt {
