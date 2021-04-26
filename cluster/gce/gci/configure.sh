@@ -87,9 +87,13 @@ function download-kube-env {
       -o "${tmp_kube_env}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
     # Convert the yaml format file into a shell-style file.
-    eval "$(python3 -c '''
+    eval "$(${PYTHON} -c '''
 import pipes,sys,yaml
-items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+# check version of python and call methods appropriate for that version
+if sys.version_info[0] < 3:
+    items = yaml.load(sys.stdin).iteritems()
+else:
+    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")"
@@ -127,9 +131,13 @@ function download-kube-master-certs {
       -o "${tmp_kube_master_certs}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
     # Convert the yaml format file into a shell-style file.
-    eval "$(python3 -c '''
+    eval "$(${PYTHON} -c '''
 import pipes,sys,yaml
-items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
+# check version of python and call methods appropriate for that version
+if sys.version_info[0] < 3:
+    items = yaml.load(sys.stdin).iteritems()
+else:
+    items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")"
@@ -152,7 +160,7 @@ function validate-hash {
 # Get default service account credentials of the VM.
 GCE_METADATA_INTERNAL="http://metadata.google.internal/computeMetadata/v1/instance"
 function get-credentials {
-  curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | python3 -c \
+  curl --fail --retry 5 --retry-delay 3 --retry-connrefused --silent --show-error "${GCE_METADATA_INTERNAL}/service-accounts/default/token" -H "Metadata-Flavor: Google" -s | ${PYTHON} -c \
     'import sys; import json; print(json.loads(sys.stdin.read())["access_token"])'
 }
 
@@ -853,6 +861,25 @@ log-wrap 'SetBrokenMotd' set-broken-motd
 
 KUBE_HOME="/home/kubernetes"
 KUBE_BIN="${KUBE_HOME}/bin"
+PYTHON="python"
+
+log-start 'SetPythonVersion'
+if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
+  # found python2, just use that
+  PYTHON="python"
+elif [[ -f "/usr/bin/python2.7" ]]; then
+  # System python not defaulted to python 2 but using 2.7 during migration
+  PYTHON="/usr/bin/python2.7"
+else
+  # No python2 either by default, let's see if we can find python3
+  PYTHON="python3"
+  if ! command -v ${PYTHON} >/dev/null 2>&1; then
+    echo "ERROR Python not found. Aborting."
+    exit 2
+  fi
+fi
+echo "Version :  $(${PYTHON} -V 2>&1)"
+log-end 'SetPythonVersion'
 
 # download and source kube-env
 log-wrap 'DownloadKubeEnv' retry-forever 30 download-kube-env
