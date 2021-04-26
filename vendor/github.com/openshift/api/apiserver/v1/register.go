@@ -32,8 +32,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(GroupVersion,
 		&APIRequestCount{},
 		&APIRequestCountList{},
-		&DeprecatedAPIRequest{},
-		&DeprecatedAPIRequestList{},
 	)
 	metav1.AddToGroupVersion(scheme, GroupVersion)
 	return nil
