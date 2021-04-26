@@ -215,12 +215,14 @@ func captureStdErr() (func() string, func(), error) {
 		<-readerClosedCh
 		return buf.String()
 	}
-	klog.LogToStderr(true)
 	cleanUp := func() {
-		os.Stderr = stderr
 		klog.LogToStderr(false)
+		os.Stderr = stderr
 		stopReadingStdErr()
+		klog.LogToStderr(true)
 	}
+
+	klog.LogToStderr(false)
 	os.Stderr = writer
 	go func() {
 		io.Copy(&buf, reader)
