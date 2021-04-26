@@ -18,7 +18,9 @@ package routes
 
 import (
 	"net/http"
+	"os"
 	"path"
+	"syscall"
 
 	"github.com/emicklei/go-restful"
 )
@@ -42,10 +44,28 @@ func (l Logs) Install(c *restful.Container) {
 func logFileHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
 	actual := path.Join(logdir, req.PathParameter("logpath"))
+
+	// check filename length first, return 404 if it's oversize.
+	if logFileNameIsTooLong(actual) {
+		http.Error(resp, "file not found", http.StatusNotFound)
+		return
+	}
 	http.ServeFile(resp.ResponseWriter, req.Request, actual)
 }
 
 func logFileListHandler(req *restful.Request, resp *restful.Response) {
 	logdir := "/var/log"
 	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
+}
+
+// logFileNameIsTooLong checks filename length, returns true if it's longer than 255.
+// cause http.ServeFile returns default error code 500 except for NotExist and Forbidden, but we need to separate the real 500 from oversize filename here.
+func logFileNameIsTooLong(filePath string) bool {
+	_, err := os.Stat(filePath)
+	if err != nil {
+		if e, ok := err.(*os.PathError); ok && e.Err == syscall.ENAMETOOLONG {
+			return true
+		}
+	}
+	return false
 }
