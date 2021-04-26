@@ -724,16 +724,14 @@ func getServiceIPAndRanges(serviceClusterIPRanges string) (net.IP, net.IPNet, ne
 		return apiServerServiceIP, primaryServiceIPRange, net.IPNet{}, nil
 	}
 
-	if len(serviceClusterIPRangeList) > 0 {
-		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
-		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
-		}
+	_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
+	if err != nil {
+		return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
+	}
 
-		primaryServiceIPRange, apiServerServiceIP, err = controlplane.ServiceIPRange(*(primaryServiceClusterCIDR))
-		if err != nil {
-			return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
-		}
+	primaryServiceIPRange, apiServerServiceIP, err = controlplane.ServiceIPRange(*(primaryServiceClusterCIDR))
+	if err != nil {
+		return net.IP{}, net.IPNet{}, net.IPNet{}, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
 	}
 
 	// user provided at least two entries
