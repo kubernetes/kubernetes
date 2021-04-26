@@ -1596,6 +1596,12 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
 	kl.HandlePodCleanups()
+	// The first time HandlePodCleanups() is run the pod is placed into the
+	// podKiller, and bypasses the pod directory cleanup. The pod is
+	// already killed in the second run to HandlePodCleanups() and will
+	// cleanup the directories.
+	time.Sleep(2 * time.Second)
+	kl.HandlePodCleanups()
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
 		assert.Equal(t, shouldExist, exist, "directory of pod %d", i)
