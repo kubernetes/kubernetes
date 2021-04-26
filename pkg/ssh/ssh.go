@@ -379,9 +379,9 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 func (l *SSHTunnelList) Dial(ctx context.Context, net, addr string) (net.Conn, error) {
 	start := time.Now()
 	id := mathrand.Int63() // So you can match begins/ends in the log.
-	klog.InfoS("[", id, ":", addr, "]", "Dialing...")
+	klog.InfoS("Dialing...", "id", id, "addr", addr)
 	defer func() {
-		klog.InfoS("[", id, ":", "]", " Dialed in .", time.Since(start))
+		klog.InfoS("Dialed in", "id", id, "addr", addr, "timeDuration", time.Since(start))
 	}()
 	tunnel, err := l.pickTunnel(strings.Split(addr, ":")[0])
 	if err != nil {
