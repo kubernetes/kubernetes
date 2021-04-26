@@ -292,7 +292,7 @@ func (g *GenericPLEG) relist() {
 					}
 				}
 				if containerID, ok := events[i].Data.(string); ok {
-					if exitCode, ok := containerExitCode[containerID]; ok {
+					if exitCode, ok := containerExitCode[containerID]; ok && pod != nil {
 						klog.V(2).InfoS("Generic (PLEG): container finished", "podID", pod.ID, "containerID", containerID, "exitCode", exitCode)
 					}
 				}
