@@ -475,14 +475,14 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(volumeHandle, at
 		clock         = &clock.RealClock{}
 	)
 	backoffMgr := wait.NewExponentialBackoffManager(initBackoff, maxBackoff, resetDuration, backoffFactor, jitter, clock)
-	defer backoffMgr.Backoff().Stop()
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	for {
+		t := backoffMgr.Backoff()
 		select {
-		case <-backoffMgr.Backoff().C():
+		case <-t.C():
 			successful, err := verifyStatus()
 			if err != nil {
 				return err
@@ -491,6 +491,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatusWithLister(volumeHandle, at
 				return nil
 			}
 		case <-ctx.Done():
+			t.Stop()
 			klog.Error(log("%s timeout after %v [volume=%v; attachment.ID=%v]", operation, timeout, volumeHandle, attachID))
 			return fmt.Errorf("%s timeout for volume %v", operation, volumeHandle)
 		}
