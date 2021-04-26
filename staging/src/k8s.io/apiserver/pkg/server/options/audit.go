@@ -297,7 +297,11 @@ func (o *AuditOptions) ApplyTo(
 
 	// 2. Build log backend
 	var logBackend audit.Backend
-	if w := o.LogOptions.getWriter(); w != nil {
+	w, err := o.LogOptions.getWriter()
+	if err != nil {
+		return err
+	}
+	if w != nil {
 		if checker == nil {
 			klog.V(2).Info("No audit policy file provided, no events will be recorded for log backend")
 		} else {
@@ -502,9 +506,13 @@ func (o *AuditLogOptions) enabled() bool {
 	return o != nil && o.Path != ""
 }
 
-func (o *AuditLogOptions) getWriter() io.Writer {
+func (o *AuditLogOptions) getWriter() (io.Writer, error) {
 	if !o.enabled() {
-		return nil
+		return nil, nil
+	}
+
+	if err := o.ensureLogFile(); err != nil {
+		return nil, err
 	}
 
 	var w io.Writer = os.Stdout
@@ -517,7 +525,16 @@ func (o *AuditLogOptions) getWriter() io.Writer {
 			Compress:   o.Compress,
 		}
 	}
-	return w
+	return w, nil
+}
+
+func (o *AuditLogOptions) ensureLogFile() error {
+	mode := os.FileMode(0600)
+	f, err := os.OpenFile(o.Path, os.O_CREATE|os.O_APPEND|os.O_RDWR, mode)
+	if err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 func (o *AuditLogOptions) newBackend(w io.Writer) audit.Backend {
