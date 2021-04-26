@@ -1156,7 +1156,7 @@ type PodKiller interface {
 	// PerformPodKillingWork performs the actual pod killing work via calling CRI
 	// It returns after its Close() func is called and all outstanding pod killing requests are served
 	PerformPodKillingWork()
-	// After Close() is called, this pod killer wouldn't accept any more pod killing requests
+	// Close ensures that after it's called, then this pod killer wouldn't accept any more pod killing requests
 	Close()
 	// IsPodPendingTerminationByPodName checks whether any pod for the given full pod name is pending termination (thread safe)
 	IsPodPendingTerminationByPodName(podFullname string) bool
@@ -1205,7 +1205,7 @@ func (pk *podKillerWithChannel) IsPodPendingTerminationByUID(uid types.UID) bool
 	return false
 }
 
-// IsMirrorPodPendingTerminationByPodName checks whether the given pod is in grace period of termination
+// IsPodPendingTerminationByPodName checks whether the given pod is in grace period of termination
 func (pk *podKillerWithChannel) IsPodPendingTerminationByPodName(podFullname string) bool {
 	pk.podKillingLock.RLock()
 	defer pk.podKillingLock.RUnlock()
