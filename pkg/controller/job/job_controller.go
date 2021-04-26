@@ -61,7 +61,8 @@ var (
 	// DefaultJobBackOff is the default backoff period, exported for the e2e test
 	DefaultJobBackOff = 10 * time.Second
 	// MaxJobBackOff is the max backoff period, exported for the e2e test
-	MaxJobBackOff = 360 * time.Second
+	MaxJobBackOff             = 360 * time.Second
+	maxPodCreateDeletePerSync = 500
 )
 
 // Controller ensures that all Job objects have corresponding pods to
@@ -803,6 +804,9 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		rmAtLeast = 0
 	}
 	podsToDelete := activePodsForRemoval(job, activePods, int(rmAtLeast))
+	if len(podsToDelete) > maxPodCreateDeletePerSync {
+		podsToDelete = podsToDelete[:maxPodCreateDeletePerSync]
+	}
 	if len(podsToDelete) > 0 {
 		jm.expectations.ExpectDeletions(jobKey, len(podsToDelete))
 		klog.V(4).InfoS("Too many pods running for job", "job", klog.KObj(job), "deleted", len(podsToDelete), "target", parallelism)
@@ -821,6 +825,10 @@ func (jm *Controller) manageJob(job *batch.Job, activePods []*v1.Pod, succeeded 
 		}
 		if diff == 0 {
 			return active, nil
+		}
+
+		if diff > int32(maxPodCreateDeletePerSync) {
+			diff = int32(maxPodCreateDeletePerSync)
 		}
 
 		jm.expectations.ExpectCreations(jobKey, int(diff))
