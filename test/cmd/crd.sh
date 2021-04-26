@@ -245,6 +245,7 @@ run_non_native_resource_tests() {
 
   # Test that we can create a new resource of type Foo
   kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo.yaml "${kube_flags[@]}"
+  kubectl "${kube_flags[@]}" create -f hack/testdata/CRD/foo-2.yaml "${kube_flags[@]}"
 
   # Test that we can list this new custom resource
   kube::test::get_object_assert foos "{{range.items}}{{$id_field}}:{{end}}" 'test:'
@@ -305,11 +306,19 @@ run_non_native_resource_tests() {
   kube::log::status "Testing CustomResource labeling"
   kubectl "${kube_flags[@]}" label foos --all listlabel=true
   kubectl "${kube_flags[@]}" label foo/test itemlabel=true
+  kubectl "${kube_flags[@]}" label --all --all-namespaces foo allnsLabel=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsLabel
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsLabel
 
   # Test annotating
   kube::log::status "Testing CustomResource annotating"
   kubectl "${kube_flags[@]}" annotate foos --all listannotation=true
   kubectl "${kube_flags[@]}" annotate foo/test itemannotation=true
+  kubectl "${kube_flags[@]}" annotate --all --all-namespaces foo allnsannotation=true
+  # make sure all instances in different namespaces got the annotation
+  kubectl "${kube_flags[@]}" get foo/test -oyaml | grep allnsannotation
+  kubectl "${kube_flags[@]}" get -n default foo -oyaml | grep allnsannotation
 
   # Test describing
   kube::log::status "Testing CustomResource describing"
