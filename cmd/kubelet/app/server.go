@@ -500,11 +500,11 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 
 	topo, err := topology.Discover(machineInfo)
 	if err != nil {
-		return emptyCPUSet, fmt.Errorf("Unable to discover CPU topology info: %s", err)
+		return emptyCPUSet, fmt.Errorf("unable to discover CPU topology info: %s", err)
 	}
 	reservedCPUSet, err := cpuset.Parse(cpus)
 	if err != nil {
-		return emptyCPUSet, fmt.Errorf("Unable to parse reserved-cpus list: %s", err)
+		return emptyCPUSet, fmt.Errorf("unable to parse reserved-cpus list: %s", err)
 	}
 	allCPUSet := topo.CPUDetails.CPUs()
 	if !reservedCPUSet.IsSubsetOf(allCPUSet) {
