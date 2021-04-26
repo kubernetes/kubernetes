@@ -953,6 +953,7 @@ github.com/openshift/apiserver-library-go/pkg/admission/imagepolicy/rules
 github.com/openshift/apiserver-library-go/pkg/admission/quota/clusterresourcequota
 github.com/openshift/apiserver-library-go/pkg/authorization/scope
 github.com/openshift/apiserver-library-go/pkg/configflags
+github.com/openshift/apiserver-library-go/pkg/labelselector
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/capabilities
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/group
 github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccadmission
