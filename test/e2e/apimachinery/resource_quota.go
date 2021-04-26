@@ -1419,7 +1419,7 @@ var _ = SIGDescribe("ResourceQuota [Feature:PodPriority]", func() {
 
 })
 
-var _ = SIGDescribe("ResourceQuota [Feature:CrossNamespacePodAffinity] [alpha]", func() {
+var _ = SIGDescribe("ResourceQuota", func() {
 	f := framework.NewDefaultFramework("cross-namespace-pod-affinity")
 	ginkgo.It("should verify ResourceQuota with cross namespace pod affinity scope using scope-selectors.", func() {
 		ginkgo.By("Creating a ResourceQuota with cross namespace pod affinity scope")

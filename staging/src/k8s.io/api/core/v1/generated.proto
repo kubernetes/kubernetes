@@ -3019,7 +3019,7 @@ message PodAffinityTerm {
   // and the ones listed in the namespaces field.
   // null selector and null or empty namespaces list means "this pod's namespace".
   // An empty selector ({}) matches all namespaces.
-  // This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+  // This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.LabelSelector namespaceSelector = 4;
 }
