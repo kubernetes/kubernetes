@@ -1781,7 +1781,7 @@ function start-kube-proxy {
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
   local host_name=${ETCD_HOSTNAME:-$(hostname -s)}
-  local -r host_ip=$(python3 -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
+  local -r host_ip=$(${PYTHON} -c "import socket;print(socket.gethostbyname(\"${host_name}\"))")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
@@ -3287,6 +3287,24 @@ function main() {
   KUBE_BIN=${KUBE_HOME}/bin
   CONTAINERIZED_MOUNTER_HOME="${KUBE_HOME}/containerized_mounter"
   PV_RECYCLER_OVERRIDE_TEMPLATE="${KUBE_HOME}/kube-manifests/kubernetes/pv-recycler-template.yaml"
+
+  log-start 'SetPythonVersion'
+  if [[ "$(python -V 2>&1)" =~ "Python 2" ]]; then
+    # found python2, just use that
+    PYTHON="python"
+  elif [[ -f "/usr/bin/python2.7" ]]; then
+    # System python not defaulted to python 2 but using 2.7 during migration
+    PYTHON="/usr/bin/python2.7"
+  else
+    # No python2 either by default, let's see if we can find python3
+    PYTHON="python3"
+    if ! command -v ${PYTHON} >/dev/null 2>&1; then
+      echo "ERROR Python not found. Aborting."
+      exit 2
+    fi
+  fi
+  echo "Version :  $(${PYTHON} -V 2>&1)"
+  log-end 'SetPythonVersion'
 
   log-start 'SourceKubeEnv'
   if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
