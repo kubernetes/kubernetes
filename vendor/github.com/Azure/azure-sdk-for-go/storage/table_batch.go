@@ -179,7 +179,7 @@ func (t *TableBatch) getFailedOperation(errorMessage string) string {
 		return msg
 	}
 
-	// cant parse the message, just return the original message to client
+	// Can't parse the message, just return the original message to client
 	return errorMessage
 }
 
@@ -228,7 +228,7 @@ func generateVerb(op Operation) (string, error) {
 	case MergeOp, InsertOrMergeOp:
 		return "MERGE", nil
 	default:
-		return "", errors.New("Unable to detect operation")
+		return "", errors.New("unable to detect operation")
 	}
 }
 
