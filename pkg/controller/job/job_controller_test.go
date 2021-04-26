@@ -149,7 +149,7 @@ func setPodsStatusesWithIndexes(podIndexer cache.Indexer, job *batch.Job, status
 		p.Status = v1.PodStatus{Phase: s.Phase}
 		if s.Index != noIndex {
 			p.Annotations = map[string]string{
-				batch.JobCompletionIndexAnnotationAlpha: s.Index,
+				batch.JobCompletionIndexAnnotation: s.Index,
 			}
 		}
 		podIndexer.Add(p)
@@ -2151,7 +2151,7 @@ func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
 			Name: "JOB_COMPLETION_INDEX",
 			ValueFrom: &v1.EnvVarSource{
 				FieldRef: &v1.ObjectFieldSelector{
-					FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotationAlpha),
+					FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
 				},
 			},
 		},

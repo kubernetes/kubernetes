@@ -569,9 +569,9 @@ func getCompletionIndex(p *v1.Pod) (int, error) {
 	if p.Annotations == nil {
 		return 0, errors.New("no annotations found")
 	}
-	v, ok := p.Annotations[batchv1.JobCompletionIndexAnnotationAlpha]
+	v, ok := p.Annotations[batchv1.JobCompletionIndexAnnotation]
 	if !ok {
-		return 0, fmt.Errorf("annotation %s not found", batchv1.JobCompletionIndexAnnotationAlpha)
+		return 0, fmt.Errorf("annotation %s not found", batchv1.JobCompletionIndexAnnotation)
 	}
 	return strconv.Atoi(v)
 }

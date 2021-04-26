@@ -160,7 +160,7 @@ func getCompletionIndex(annotations map[string]string) int {
 	if annotations == nil {
 		return unknownCompletionIndex
 	}
-	v, ok := annotations[batch.JobCompletionIndexAnnotationAlpha]
+	v, ok := annotations[batch.JobCompletionIndexAnnotation]
 	if !ok {
 		return unknownCompletionIndex
 	}
@@ -193,7 +193,7 @@ func addCompletionIndexEnvVariable(container *v1.Container) {
 		Name: completionIndexEnvName,
 		ValueFrom: &v1.EnvVarSource{
 			FieldRef: &v1.ObjectFieldSelector{
-				FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotationAlpha),
+				FieldPath: fmt.Sprintf("metadata.annotations['%s']", batch.JobCompletionIndexAnnotation),
 			},
 		},
 	})
@@ -203,7 +203,7 @@ func addCompletionIndexAnnotation(template *v1.PodTemplateSpec, index int) {
 	if template.Annotations == nil {
 		template.Annotations = make(map[string]string, 1)
 	}
-	template.Annotations[batch.JobCompletionIndexAnnotationAlpha] = strconv.Itoa(index)
+	template.Annotations[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
 }
 
 type byCompletionIndex []*v1.Pod
