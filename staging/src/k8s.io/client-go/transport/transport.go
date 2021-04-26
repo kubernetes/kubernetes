@@ -269,7 +269,7 @@ type certificateCacheEntry struct {
 
 // isStale returns true when this cache entry is too old to be usable
 func (c *certificateCacheEntry) isStale() bool {
-	return time.Now().Sub(c.birth) > time.Second
+	return time.Since(c.birth) > time.Second
 }
 
 func newCertificateCacheEntry(certFile, keyFile string) certificateCacheEntry {
