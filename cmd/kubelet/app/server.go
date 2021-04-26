@@ -1102,8 +1102,6 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		return err
 	}
 	hostnameOverridden := len(kubeServer.HostnameOverride) > 0
-	// Setup event recorder if required.
-	makeEventRecorder(kubeDeps, nodeName)
 
 	var nodeIPs []net.IP
 	if kubeServer.NodeIP != "" {
