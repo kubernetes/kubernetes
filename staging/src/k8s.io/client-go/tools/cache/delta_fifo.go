@@ -153,7 +153,7 @@ const (
 // change happened, and the object's state after* that change.
 //
 // [*] Unless the change is a deletion, and then you'll get the final
-//     state of the object before it was deleted.
+// state of the object before it was deleted.
 type Delta struct {
 	Type   DeltaType
 	Object interface{}
@@ -174,9 +174,10 @@ type Deltas []Delta
 // modifications.
 //
 // TODO: consider merging keyLister with this object, tracking a list of
-//       "known" keys when Pop() is called. Have to think about how that
-//       affects error retrying.
-// NOTE: It is possible to misuse this and cause a race when using an
+// "known" keys when Pop() is called. Have to think about how that
+// affects error retrying.
+//
+//       NOTE: It is possible to misuse this and cause a race when using an
 //       external known object source.
 //       Whether there is a potential race depends on how the consumer
 //       modifies knownObjects. In Pop(), process function is called under
@@ -185,8 +186,7 @@ type Deltas []Delta
 //
 //       Example:
 //       In case of sharedIndexInformer being a consumer
-//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/
-//       src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
+//       (https://github.com/kubernetes/kubernetes/blob/0cdd940f/staging/src/k8s.io/client-go/tools/cache/shared_informer.go#L192),
 //       there is no race as knownObjects (s.indexer) is modified safely
 //       under DeltaFIFO's lock. The only exceptions are GetStore() and
 //       GetIndexer() methods, which expose ways to modify the underlying
