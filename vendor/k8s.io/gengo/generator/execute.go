@@ -107,7 +107,7 @@ func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", friendlyName, err)
 	}
-	if bytes.Compare(formatted, existing) == 0 {
+	if bytes.Equal(formatted, existing) {
 		return nil
 	}
 	// Be nice and find the first place where they differ

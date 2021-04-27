@@ -68,7 +68,7 @@ func (a apiViolationFile) VerifyFile(f *generator.File, path string) error {
 	if err != nil {
 		return fmt.Errorf("unable to read file %q for comparison: %v", path, err)
 	}
-	if bytes.Compare(formatted, existing) == 0 {
+	if bytes.Equal(formatted, existing) {
 		return nil
 	}
 
