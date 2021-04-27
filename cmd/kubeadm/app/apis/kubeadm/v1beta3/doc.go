@@ -25,6 +25,8 @@ limitations under the License.
 // A list of changes since v1beta2:
 // - The deprecated "ClusterConfiguration.useHyperKubeImage" field has been removed.
 // Kubeadm no longer supports the hyperkube image.
+// - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
+// DNS server type by kubeadm.
 //
 // Migration from old kubeadm config versions
 //

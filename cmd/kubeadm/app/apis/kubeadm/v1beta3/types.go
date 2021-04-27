@@ -133,16 +133,8 @@ type APIServer struct {
 // DNSAddOnType defines string identifying DNS add-on types
 type DNSAddOnType string
 
-const (
-	// CoreDNS add-on type
-	CoreDNS DNSAddOnType = "CoreDNS"
-)
-
 // DNS defines the DNS addon that should be used in the cluster
 type DNS struct {
-	// Type defines the DNS add-on to be used
-	Type DNSAddOnType `json:"type"`
-
 	// ImageMeta allows to customize the image used for the DNS component
 	ImageMeta `json:",inline"`
 }

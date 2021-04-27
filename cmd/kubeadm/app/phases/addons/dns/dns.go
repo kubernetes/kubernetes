@@ -47,24 +47,23 @@ const (
 )
 
 // DeployedDNSAddon returns the type of DNS addon currently deployed
-func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, string, error) {
+func DeployedDNSAddon(client clientset.Interface) (string, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
 	deployments, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
 	if err != nil {
-		return "", "", errors.Wrap(err, "couldn't retrieve DNS addon deployments")
+		return "", errors.Wrap(err, "couldn't retrieve DNS addon deployments")
 	}
 
 	switch len(deployments.Items) {
 	case 0:
-		return "", "", nil
+		return "", nil
 	case 1:
-		addonType := kubeadmapi.CoreDNS
 		addonImage := deployments.Items[0].Spec.Template.Spec.Containers[0].Image
 		addonImageParts := strings.Split(addonImage, ":")
 		addonVersion := addonImageParts[len(addonImageParts)-1]
-		return addonType, addonVersion, nil
+		return addonVersion, nil
 	default:
-		return "", "", errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
+		return "", errors.Errorf("multiple DNS addon deployments found: %v", deployments.Items)
 	}
 }
 
@@ -333,7 +332,7 @@ func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, 
 		return nil, "", "", errors.New("unable to find the CoreDNS Corefile data")
 	}
 
-	_, currentCoreDNSversion, err := DeployedDNSAddon(client)
+	currentCoreDNSversion, err := DeployedDNSAddon(client)
 	if err != nil {
 		return nil, "", "", err
 	}

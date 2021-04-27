@@ -493,6 +493,7 @@ func getClusterNodeMask(c *kubeadm.ClusterConfiguration, isIPv6 bool) (int, erro
 }
 
 // ValidateDNS validates the DNS object and collects all encountered errors
+// TODO: Remove with v1beta2 https://github.com/kubernetes/kubeadm/issues/2459
 func ValidateDNS(dns *kubeadm.DNS, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	const kubeDNSType = "kube-dns"

@@ -47,7 +47,7 @@ func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration) string {
 		dnsImageRepository = cfg.DNS.ImageRepository
 	}
 	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
-	dnsImageTag := constants.GetDNSVersion(cfg.DNS.Type)
+	dnsImageTag := constants.CoreDNSVersion
 
 	// unless an override is specified
 	if cfg.DNS.ImageTag != "" {
@@ -99,9 +99,7 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	}
 
 	// Append the appropriate DNS images
-	if cfg.DNS.Type == kubeadmapi.CoreDNS {
-		imgs = append(imgs, GetDNSImage(cfg))
-	}
+	imgs = append(imgs, GetDNSImage(cfg))
 
 	return imgs
 }

@@ -97,7 +97,6 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ClusterName = DefaultClusterName
 	}
 
-	SetDefaults_DNS(obj)
 	SetDefaults_Etcd(obj)
 	SetDefaults_APIServer(&obj.APIServer)
 }
@@ -108,13 +107,6 @@ func SetDefaults_APIServer(obj *APIServer) {
 		obj.TimeoutForControlPlane = &metav1.Duration{
 			Duration: constants.DefaultControlPlaneTimeout,
 		}
-	}
-}
-
-// SetDefaults_DNS assigns default values for the DNS component
-func SetDefaults_DNS(obj *ClusterConfiguration) {
-	if obj.DNS.Type == "" {
-		obj.DNS.Type = CoreDNS
 	}
 }
 
