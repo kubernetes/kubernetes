@@ -38,14 +38,14 @@ func (c *csiPlugin) RequiresFSResize() bool {
 	// NodeExpand to do the right thing and return early if plugin does not have
 	// node expansion capability.
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandCSIVolumes) {
-		klog.V(4).Infof("Resizing is not enabled for CSI volume")
+		klog.V(4).InfoS("Resizing is not enabled for CSI volume")
 		return false
 	}
 	return true
 }
 
 func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, error) {
-	klog.V(4).Infof(log("Expander.NodeExpand(%s)", resizeOptions.DeviceMountPath))
+	klog.V(4).InfoS(log("Expander.NodeExpand"), "deviceMountPath", resizeOptions.DeviceMountPath)
 	csiSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
 		return false, errors.New(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
