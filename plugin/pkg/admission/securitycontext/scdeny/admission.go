@@ -58,7 +58,7 @@ func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admissi
 
 	pod, ok := a.GetObject().(*api.Pod)
 	if !ok {
-		return apierrors.NewBadRequest("Resource was marked with kind Pod but was unable to be converted")
+		return apierrors.NewBadRequest("resource was marked with kind Pod but was unable to be converted")
 	}
 
 	if pod.Spec.SecurityContext != nil {

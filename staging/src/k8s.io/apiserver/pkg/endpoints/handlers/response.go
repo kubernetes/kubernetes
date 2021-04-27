@@ -101,9 +101,9 @@ func optionsForTransform(mediaType negotiation.MediaTypeOptions, req *http.Reque
 		case 0:
 			return opts, nil
 		case 1:
-			return nil, errors.NewBadRequest(fmt.Sprintf("Unable to convert to Table as requested: %v", errs[0].Error()))
+			return nil, errors.NewBadRequest(fmt.Sprintf("unable to convert to Table as requested: %v", errs[0].Error()))
 		default:
-			return nil, errors.NewBadRequest(fmt.Sprintf("Unable to convert to Table as requested: %v", errs))
+			return nil, errors.NewBadRequest(fmt.Sprintf("unable to convert to Table as requested: %v", errs))
 		}
 	}
 	return nil, nil

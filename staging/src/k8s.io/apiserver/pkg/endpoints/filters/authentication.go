@@ -50,7 +50,7 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		defer recordAuthMetrics(req.Context(), resp, ok, err, apiAuds, authenticationStart)
 		if err != nil || !ok {
 			if err != nil {
-				klog.ErrorS(err, "Unable to authenticate the request")
+				klog.ErrorS(err, "unable to authenticate the request")
 			}
 			failed.ServeHTTP(w, req)
 			return

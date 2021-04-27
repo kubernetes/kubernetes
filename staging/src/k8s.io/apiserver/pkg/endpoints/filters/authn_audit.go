@@ -80,7 +80,7 @@ func getAuthMethods(req *http.Request) string {
 	}
 
 	if len(authMethods) > 0 {
-		return fmt.Sprintf("Authentication failed, attempted: %s", strings.Join(authMethods, ", "))
+		return fmt.Sprintf("authentication failed, attempted: %s", strings.Join(authMethods, ", "))
 	}
 	return "Authentication failed, no credentials provided"
 }
