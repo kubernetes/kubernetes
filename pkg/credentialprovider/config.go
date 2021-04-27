@@ -203,7 +203,7 @@ func ReadURL(url string, client *http.Client, header *http.Header) (body []byte,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		klog.V(2).InfoS("Body of failing HTTP response", "respBody", resp.Body)
+		klog.V(2).InfoS("Body of failing HTTP response", "responseBody", resp.Body)
 		return nil, &HTTPError{
 			StatusCode: resp.StatusCode,
 			URL:        url,

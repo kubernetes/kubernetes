@@ -209,7 +209,7 @@ func (g *ContainerRegistryProvider) Enabled() bool {
 		}
 	}
 	if !defaultServiceAccountExists {
-		klog.V(2).InfoS("'default' service account does not exist. Found service accounts", "serviceaccounts", string(value))
+		klog.V(2).InfoS("'default' service account does not exist. Found service accounts", "serviceAccounts", string(value))
 		return false
 	}
 	url := metadataScopes + "?alt=json"
