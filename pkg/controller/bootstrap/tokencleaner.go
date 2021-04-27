@@ -191,7 +191,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
 	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
 	if alreadyExpired {
-		klog.V(3).InfoS("Deleting expired Secret", "secretNamespace", secret.Namespace, "secret", secret.Name)
+		klog.V(3).InfoS("Deleting expired Secret", "secret", klog.KObj(secret))
 		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
 			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}

@@ -29,13 +29,13 @@ import (
 func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, ok bool) {
 	nameTokenID, ok := bootstrapsecretutil.ParseName(secret.Name)
 	if !ok {
-		klog.V(3).InfoS("Invalid Secret name. Must be of form <bootstrap-secret-prefix><secret-id>.", "secret", secret.Name, "secretPrefix", bootstrapapi.BootstrapTokenSecretPrefix)
+		klog.V(3).InfoS("Invalid Secret name. Must be of form <bootstrap-secret-prefix><secret-id>.", "secret", klog.KObj(secret), "secretPrefix", bootstrapapi.BootstrapTokenSecretPrefix)
 		return "", "", false
 	}
 
 	tokenID = bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenIDKey)
 	if len(tokenID) == 0 {
-		klog.V(3).InfoS("No key in Secret", "BootstrapTokenIDKey", bootstrapapi.BootstrapTokenIDKey, "secretNamespace", secret.Namespace, "secret", secret.Name)
+		klog.V(3).InfoS("No key in Secret", "BootstrapTokenIDKey", bootstrapapi.BootstrapTokenIDKey, "secret", klog.KObj(secret))
 		return "", "", false
 	}
 
@@ -46,7 +46,7 @@ func validateSecretForSigning(secret *v1.Secret) (tokenID, tokenSecret string, o
 
 	tokenSecret = bootstrapsecretutil.GetData(secret, bootstrapapi.BootstrapTokenSecretKey)
 	if len(tokenSecret) == 0 {
-		klog.V(3).InfoS("No key in Secret", "BootstrapTokenSecretKey", bootstrapapi.BootstrapTokenSecretKey, "secretNamespace", secret.Namespace, "secret", secret.Name)
+		klog.V(3).InfoS("No key in Secret", "BootstrapTokenSecretKey", bootstrapapi.BootstrapTokenSecretKey, "secret", klog.KObj(secret))
 		return "", "", false
 	}
 
