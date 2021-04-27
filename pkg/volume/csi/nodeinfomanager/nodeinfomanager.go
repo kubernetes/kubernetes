@@ -527,13 +527,26 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		topologyKeys.Insert(k)
 	}
 
+	var maxAllocatableCount int32
+	if maxAttachLimit > 0 {
+		if maxAttachLimit > math.MaxInt32 {
+			klog.Warningf("Exceeded max supported attach limit value, truncating it to %d", math.MaxInt32)
+			maxAttachLimit = math.MaxInt32
+		}
+		maxAllocatableCount = int32(maxAttachLimit)
+	} else {
+		klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
+	}
+
 	specModified := true
 	// Clone driver list, omitting the driver that matches the given driverName
 	newDriverSpecs := []storagev1.CSINodeDriver{}
 	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
 		if driverInfoSpec.Name == driverName {
 			if driverInfoSpec.NodeID == driverNodeID &&
-				sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys) {
+				sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys) &&
+				((maxAllocatableCount == 0 && (driverInfoSpec.Allocatable == nil || driverInfoSpec.Allocatable.Count == nil)) ||
+					(driverInfoSpec.Allocatable != nil && driverInfoSpec.Allocatable.Count != nil && *driverInfoSpec.Allocatable.Count == maxAllocatableCount)) {
 				specModified = false
 			}
 		} else {
@@ -541,7 +554,6 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 			newDriverSpecs = append(newDriverSpecs, driverInfoSpec)
 		}
 	}
-
 	annotationModified := setMigrationAnnotation(nim.migratedPlugins, nodeInfo)
 
 	if !specModified && !annotationModified {
@@ -555,15 +567,8 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 		TopologyKeys: topologyKeys.List(),
 	}
 
-	if maxAttachLimit > 0 {
-		if maxAttachLimit > math.MaxInt32 {
-			klog.Warningf("Exceeded max supported attach limit value, truncating it to %d", math.MaxInt32)
-			maxAttachLimit = math.MaxInt32
-		}
-		m := int32(maxAttachLimit)
-		driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &m}
-	} else {
-		klog.Errorf("Invalid attach limit value %d cannot be added to CSINode object for %q", maxAttachLimit, driverName)
+	if maxAllocatableCount > 0 {
+		driverSpec.Allocatable = &storagev1.VolumeNodeResources{Count: &maxAllocatableCount}
 	}
 
 	newDriverSpecs = append(newDriverSpecs, driverSpec)
