@@ -36,3 +36,9 @@ func Convert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	SetDefaults_ClusterConfiguration(clusterCfg)
 	return Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(clusterCfg, &out.ClusterConfiguration, s)
 }
+
+// Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration is required since UseHyperKubeImage
+// does not exist in the internal type.
+func Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	return autoConvert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
+}
