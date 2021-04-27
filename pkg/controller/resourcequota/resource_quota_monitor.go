@@ -241,7 +241,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		}
 	}
 
-	klog.V(4).InfoS("Quota synced monitors", added, "kept", kept, "toRemove", len(toRemove))
+	klog.V(4).InfoS("Quota synced monitors", "added", added, "kept", kept, "toRemove", len(toRemove))
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
 }
@@ -352,7 +352,7 @@ func (qm *QuotaMonitor) processResourceChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	klog.V(4).InfoS("QuotaMonitor processing object", "obj", event.gvr.String(), "namespace", accessor.GetNamespace(), accessor.GetName(), "UID", string(accessor.GetUID()), "eventType", event.eventType)
+	klog.V(4).InfoS("QuotaMonitor processing object", "eventGVR", event.gvr.String(), "obj", klog.KRef(accessor.GetName(), accessor.GetNamespace()), "objUID", string(accessor.GetUID()), "eventType", event.eventType)
 	qm.replenishmentFunc(event.gvr.GroupResource(), accessor.GetNamespace())
 	return true
 }
