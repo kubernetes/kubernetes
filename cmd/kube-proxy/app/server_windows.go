@@ -104,10 +104,10 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 
 	proxyMode := getProxyMode(string(config.Mode), winkernel.WindowsKernelCompatTester{})
 	if proxyMode == proxyModeKernelspace {
-		klog.V(0).Info("Using Kernelspace Proxier.")
+		klog.V(0).InfoS("Using Kernelspace Proxier.")
 		isIPv6DualStackEnabled := utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack)
 		if isIPv6DualStackEnabled {
-			klog.V(0).Info("creating dualStackProxier for Windows kernel.")
+			klog.V(0).InfoS("Creating dualStackProxier for Windows kernel.")
 
 			proxier, err = winkernel.NewDualStackProxier(
 				config.IPTables.SyncPeriod.Duration,
@@ -142,7 +142,7 @@ func newProxyServer(config *proxyconfigapi.KubeProxyConfiguration, cleanupAndExi
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	} else {
-		klog.V(0).Info("Using userspace Proxier.")
+		klog.V(0).InfoS("Using userspace Proxier.")
 		execer := exec.New()
 		var netshInterface utilnetsh.Interface
 		netshInterface = utilnetsh.New(execer)
@@ -201,14 +201,14 @@ func tryWinKernelSpaceProxy(kcompat winkernel.KernelCompatTester) string {
 	// guaranteed false on error, error only necessary for debugging
 	useWinKernelProxy, err := winkernel.CanUseWinKernelProxier(kcompat)
 	if err != nil {
-		klog.Errorf("Can't determine whether to use windows kernel proxy, using userspace proxier: %v", err)
+		klog.ErrorS(err, "Can't determine whether to use windows kernel proxy, using userspace proxier")
 		return proxyModeUserspace
 	}
 	if useWinKernelProxy {
 		return proxyModeKernelspace
 	}
 	// Fallback.
-	klog.V(1).Infof("Can't use winkernel proxy, using userspace proxier")
+	klog.V(1).InfoS("Can't use winkernel proxy, using userspace proxier")
 	return proxyModeUserspace
 }
 
