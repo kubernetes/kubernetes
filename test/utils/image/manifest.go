@@ -223,7 +223,7 @@ func initImageConfigs() (map[int]Config, map[int]Config) {
 	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
 	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
 	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.5.0"}
+	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.6.0"}
 	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
 	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
 	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
