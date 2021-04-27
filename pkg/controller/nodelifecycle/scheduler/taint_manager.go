@@ -22,6 +22,7 @@ import (
 	"hash/fnv"
 	"io"
 	"math"
+	"os"
 	"sync"
 	"time"
 
@@ -163,7 +164,8 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 		klog.V(0).InfoS("Sending events to the API Server")
 		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
 	} else {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
+		klog.ErrorS(nil, "KubeClient is nil when starting NodeController")
+		os.Exit(1)
 	}
 
 	tm := &NoExecuteTaintManager{

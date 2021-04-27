@@ -19,9 +19,10 @@ package ipam
 import (
 	"fmt"
 	"net"
+	"os"
 	"sync"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -73,7 +74,8 @@ type rangeAllocator struct {
 // can initialize its CIDR map. NodeList is only nil in testing.
 func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, allocatorParams CIDRAllocatorParams, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	if client == nil {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
+		klog.ErrorS(nil, "KubeClient is nil when starting NodeController")
+		os.Exit(1)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -122,7 +124,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 				klog.V(4).InfoS("Node has no CIDR, ignoring", "node", node.Name)
 				continue
 			}
-			klog.V(4).InfoS("Node has CIDR, occupying it in CIDR map", "node", node.Name, "CIRD", node.Spec.PodCIDR)
+			klog.V(4).InfoS("Node has CIDR, occupying it in CIDR map", "node", node.Name, "CIDR", node.Spec.PodCIDR)
 			if err := ra.occupyCIDRs(&node); err != nil {
 				// This will happen if:
 				// 1. We find garbage in the podCIDRs field. Retrying is useless.
@@ -351,14 +353,14 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 			}
 		}
 		if match {
-			klog.V(4).InfoS("Node already has allocated CIDR. It matches the proposed one.", "node", node.Name, "CIDR", data.allocatedCIDRs)
+			klog.V(4).InfoS("Node already has allocated CIDR. It matches the proposed one.", "node", klog.KObj(node), "CIDR", data.allocatedCIDRs)
 			return nil
 		}
 	}
 
 	// node has cidrs, release the reserved
 	if len(node.Spec.PodCIDRs) != 0 {
-		klog.ErrorS(nil, "Node already has a CIDR allocated. Releasing the new one.", "node", node.Name, "PodCIDR", "node.Spec.PodCIDRs")
+		klog.ErrorS(nil, "Node already has a CIDR allocated. Releasing the new one.", "node", klog.KObj(node), "PodCIDR", node.Spec.PodCIDRs)
 		for idx, cidr := range data.allocatedCIDRs {
 			if releaseErr := r.cidrSets[idx].Release(cidr); releaseErr != nil {
 				klog.ErrorS(releaseErr, "Error when releasing CIDR", "CIDRindex", idx, "CIDRvalue", cidr)
@@ -370,21 +372,21 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	// If we reached here, it means that the node has no CIDR currently assigned. So we set it.
 	for i := 0; i < cidrUpdateRetries; i++ {
 		if err = utilnode.PatchNodeCIDRs(r.client, types.NodeName(node.Name), cidrsString); err == nil {
-			klog.InfoS("Set Node PodCIDR", "node", node.Name, "CIDR", cidrsString)
+			klog.InfoS("Set Node PodCIDR", "node", klog.KObj(node), "CIDR", cidrsString)
 			return nil
 		}
 	}
 	// failed release back to the pool
-	klog.ErrorS(err, "Failed to update Node PodCIDR after multiple attempts", "node", node.Name, "CIDR", cidrsString)
+	klog.ErrorS(err, "Failed to update Node PodCIDR after multiple attempts", "node", klog.KObj(node), "CIDR", cidrsString)
 	nodeutil.RecordNodeStatusChange(r.recorder, node, "CIDRAssignmentFailed")
 	// We accept the fact that we may leak CIDRs here. This is safer than releasing
 	// them in case when we don't know if request went through.
 	// NodeController restart will return all falsely allocated CIDRs to the pool.
 	if !apierrors.IsServerTimeout(err) {
-		klog.ErrorS(err, "CIDR assignment for node failed: %v. Releasing allocated CIDR", "node", node.Name)
+		klog.ErrorS(err, "CIDR assignment for node failed: %v. Releasing allocated CIDR", "node", klog.KObj(node))
 		for idx, cidr := range data.allocatedCIDRs {
 			if releaseErr := r.cidrSets[idx].Release(cidr); releaseErr != nil {
-				klog.ErrorS(releaseErr, "Error releasing allocated CIDR for node", "node", node.Name)
+				klog.ErrorS(releaseErr, "Error releasing allocated CIDR for node", "node", klog.KObj(node))
 			}
 		}
 	}

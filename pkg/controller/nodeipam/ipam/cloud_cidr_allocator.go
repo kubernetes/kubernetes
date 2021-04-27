@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -85,7 +86,8 @@ var _ CIDRAllocator = (*cloudCIDRAllocator)(nil)
 // NewCloudCIDRAllocator creates a new cloud CIDR allocator.
 func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer) (CIDRAllocator, error) {
 	if client == nil {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
+		klog.ErrorS(nil, "KubeClient is nil when starting NodeController")
+		os.Exit(1)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -236,7 +238,7 @@ func (ca *cloudCIDRAllocator) AllocateOrOccupyCIDR(node *v1.Node) error {
 		return nil
 	}
 
-	klog.V(4).InfoS("Putting Node into the work queue", "node", node.Name)
+	klog.V(4).InfoS("Putting node into the work queue", "node", klog.KObj(node))
 	ca.nodeUpdateChannel <- node.Name
 	return nil
 }
@@ -354,6 +356,6 @@ func needPodCIDRsUpdate(node *v1.Node, podCIDRs []*net.IPNet) (bool, error) {
 
 func (ca *cloudCIDRAllocator) ReleaseCIDR(node *v1.Node) error {
 	klog.V(2).InfoS("Node PodCIDR will be released by external cloud provider (not managed by controller)",
-		"node", node.Name, "podCIDR", node.Spec.PodCIDR)
+		"node", klog.KObj(node), "podCIDR", node.Spec.PodCIDR)
 	return nil
 }

@@ -235,7 +235,7 @@ func (op *updateOp) validateRange(ctx context.Context, sync *NodeSync, node *v1.
 		// User intervention is required in this case, as this is most likely due
 		// to the user mucking around with their VM aliases on the side.
 	} else {
-		klog.V(4).InfoS("Node CIDR range matches cloud assignment", "node", "PodCIDR", node.Name, node.Spec.PodCIDR)
+		klog.V(4).InfoS("Node CIDR range matches cloud assignment", "node", klog.KObj(node), "PodCIDR", node.Spec.PodCIDR)
 	}
 	return nil
 }
@@ -257,18 +257,18 @@ func (op *updateOp) updateNodeFromAlias(ctx context.Context, sync *NodeSync, nod
 	}
 
 	if err := sync.kubeAPI.UpdateNodePodCIDR(ctx, node, aliasRange); err != nil {
-		klog.ErrorS(err, "Could not update Node PodCIDR", "node", node.Name, "range", aliasRange)
+		klog.ErrorS(err, "Could not update Node PodCIDR", "node", klog.KObj(node), "range", aliasRange)
 		return err
 	}
 
-	klog.V(2).InfoS("Node PodCIDR set", "node", node.Name, "range", aliasRange)
+	klog.V(2).InfoS("Node PodCIDR set", "node", klog.KObj(node), "range", aliasRange)
 
 	if err := sync.kubeAPI.UpdateNodeNetworkUnavailable(node.Name, false); err != nil {
 		klog.ErrorS(err, "Could not update Node NetworkUnavailable status to false")
 		return err
 	}
 
-	klog.V(2).InfoS("Updated Node PodCIDR from cloud alias", "node", node.Name, "range", aliasRange)
+	klog.V(2).InfoS("Updated Node PodCIDR from cloud alias", "node", klog.KObj(node), "range", aliasRange)
 
 	return nil
 }
@@ -284,7 +284,7 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 	_, aliasRange, err := net.ParseCIDR(node.Spec.PodCIDR)
 	if err != nil {
 		klog.ErrorS(err, "Could not parse PodCIDR for Node",
-			"PodCIDR", node.Spec.PodCIDR, "node", node.Name)
+			"PodCIDR", node.Spec.PodCIDR, "node", klog.KObj(node))
 		return err
 	}
 
@@ -294,7 +294,7 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 	}
 
 	if err := sync.cloudAlias.AddAlias(ctx, node, aliasRange); err != nil {
-		klog.ErrorS(err, "Could not add alias for Node", "range", aliasRange, "node", node.Name)
+		klog.ErrorS(err, "Could not add alias for Node", "range", aliasRange, "node", klog.KObj(node))
 		return err
 	}
 
@@ -304,7 +304,7 @@ func (op *updateOp) updateAliasFromNode(ctx context.Context, sync *NodeSync, nod
 	}
 
 	klog.V(2).InfoS("Updated Node cloud alias with node spec, node.PodCIDR",
-		"node", node.Name, "PodCIDR", node.Spec.PodCIDR)
+		"node", klog.KObj(node), "PodCIDR", node.Spec.PodCIDR)
 
 	return nil
 }
@@ -326,12 +326,12 @@ func (op *updateOp) allocateRange(ctx context.Context, sync *NodeSync, node *v1.
 	// is no durable record of the range. The missing space will be
 	// recovered on the next restart of the controller.
 	if err := sync.cloudAlias.AddAlias(ctx, node, cidrRange); err != nil {
-		klog.ErrorS(err, "Could not add alias for Node", "cidrRange", cidrRange, "node", node.Name)
+		klog.ErrorS(err, "Could not add alias for Node", "cidrRange", cidrRange, "node", klog.KObj(node))
 		return err
 	}
 
 	if err := sync.kubeAPI.UpdateNodePodCIDR(ctx, node, cidrRange); err != nil {
-		klog.ErrorS(err, "Could not update Node PodCIDR", "node", node.Name, "cidrRange", cidrRange)
+		klog.ErrorS(err, "Could not update Node PodCIDR", "node", klog.KObj(node), "cidrRange", cidrRange)
 		return err
 	}
 
@@ -340,7 +340,7 @@ func (op *updateOp) allocateRange(ctx context.Context, sync *NodeSync, node *v1.
 		return err
 	}
 
-	klog.V(2).InfoS("Allocated PodCIDR for node", "PodCIDR", cidrRange, "node", node.Name)
+	klog.V(2).InfoS("Allocated PodCIDR for node", "PodCIDR", cidrRange, "node", klog.KObj(node))
 
 	return nil
 }
