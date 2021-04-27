@@ -28,7 +28,7 @@ import (
 //    newCondition, LastTransitionTime is set to now if the new status differs from the old status)
 // 2. if a condition of the specified type does not exist (LastTransitionTime is set to now() if unset, and newCondition is appended)
 func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Condition) {
-	if conditions == nil {
+	if *conditions == nil {
 		return
 	}
 	existingCondition := FindStatusCondition(*conditions, newCondition.Type)
@@ -57,7 +57,7 @@ func SetStatusCondition(conditions *[]metav1.Condition, newCondition metav1.Cond
 // RemoveStatusCondition removes the corresponding conditionType from conditions.
 // conditions must be non-nil.
 func RemoveStatusCondition(conditions *[]metav1.Condition, conditionType string) {
-	if conditions == nil || len(*conditions) == 0 {
+	if len(*conditions) == 0 {
 		return
 	}
 	newConditions := make([]metav1.Condition, 0, len(*conditions)-1)

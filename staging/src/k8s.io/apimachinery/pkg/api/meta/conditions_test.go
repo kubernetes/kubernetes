@@ -75,6 +75,12 @@ func TestSetStatusCondition(t *testing.T) {
 				{Type: "third"},
 			},
 		},
+		{
+			name:       "should-not-add-for-nil-conditions",
+			conditions: nil,
+			toAdd:      metav1.Condition{Type: "second", Status: metav1.ConditionTrue, LastTransitionTime: metav1.Time{Time: oneHourBefore}, Reason: "reason", Message: "message"},
+			expected:   nil,
+		},
 	}
 
 	for _, test := range tests {
@@ -126,6 +132,12 @@ func TestRemoveStatusCondition(t *testing.T) {
 			conditions:    []metav1.Condition{},
 			conditionType: "Foo",
 			expected:      []metav1.Condition{},
+		},
+		{
+			name:          "nil-conditions",
+			conditions:    nil,
+			conditionType: "nil",
+			expected:      nil,
 		},
 	}
 
