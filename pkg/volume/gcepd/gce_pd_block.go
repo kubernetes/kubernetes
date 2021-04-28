@@ -108,7 +108,7 @@ func (plugin *gcePersistentDiskPlugin) newBlockVolumeMapperInternal(spec *volume
 		partition = strconv.Itoa(int(volumeSource.Partition))
 	}
 
-	return &gcePersistentDiskMapper{
+	mapper := &gcePersistentDiskMapper{
 		gcePersistentDisk: &gcePersistentDisk{
 			volName:   spec.Name(),
 			podUID:    podUID,
@@ -118,7 +118,16 @@ func (plugin *gcePersistentDiskPlugin) newBlockVolumeMapperInternal(spec *volume
 			mounter:   mounter,
 			plugin:    plugin,
 		},
-		readOnly: readOnly}, nil
+		readOnly: readOnly,
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *gcePersistentDiskPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {

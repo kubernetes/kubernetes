@@ -171,7 +171,7 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID t
 		return nil, fmt.Errorf("fc: no fc disk information found. failed to make a new mapper")
 	}
 
-	return &fcDiskMapper{
+	mapper := &fcDiskMapper{
 		fcDisk: &fcDisk{
 			podUID:  podUID,
 			volName: spec.Name(),
@@ -184,7 +184,15 @@ func (plugin *fcPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID t
 		readOnly:   readOnly,
 		mounter:    &mount.SafeFormatAndMount{Interface: mounter, Exec: exec},
 		deviceUtil: util.NewDeviceHandler(util.NewIOHandler()),
-	}, nil
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *fcPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
@@ -393,6 +401,7 @@ func (c *fcDiskUnmounter) TearDownAt(dir string) error {
 // Block Volumes Support
 type fcDiskMapper struct {
 	*fcDisk
+	volume.MetricsProvider
 	readOnly   bool
 	mounter    mount.Interface
 	deviceUtil util.DeviceUtil

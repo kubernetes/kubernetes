@@ -524,13 +524,21 @@ func (plugin *rbdPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID 
 		return nil, err
 	}
 
-	return &rbdDiskMapper{
+	mapper := &rbdDiskMapper{
 		rbd:     newRBD(podUID, spec.Name(), img, pool, ro, plugin, manager),
 		mon:     mon,
 		id:      id,
 		keyring: keyring,
 		secret:  secret,
-	}, nil
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *rbdPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {

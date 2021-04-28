@@ -104,10 +104,18 @@ func (plugin *azureDataDiskPlugin) newBlockVolumeMapperInternal(spec *volume.Spe
 
 	disk := makeDataDisk(spec.Name(), podUID, volumeSource.DiskName, plugin.host, plugin)
 
-	return &azureDataDiskMapper{
+	mapper := &azureDataDiskMapper{
 		dataDisk: disk,
 		readOnly: readOnly,
-	}, nil
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *azureDataDiskPlugin) NewBlockVolumeUnmapper(volName string, podUID types.UID) (volume.BlockVolumeUnmapper, error) {

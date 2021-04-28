@@ -161,7 +161,7 @@ func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1
 		return nil, err
 	}
 
-	return &localVolumeMapper{
+	mapper := &localVolumeMapper{
 		localVolume: &localVolume{
 			podUID:     pod.UID,
 			volName:    spec.Name(),
@@ -169,8 +169,15 @@ func (plugin *localVolumePlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1
 			plugin:     plugin,
 		},
 		readOnly: readOnly,
-	}, nil
+	}
 
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(pod.UID)))
+
+	return mapper, nil
 }
 
 func (plugin *localVolumePlugin) NewBlockVolumeUnmapper(volName string,
