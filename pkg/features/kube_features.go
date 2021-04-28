@@ -184,7 +184,6 @@ const (
 	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
 	// to the API server.
 	BoundServiceAccountTokenVolume featuregate.Feature = "BoundServiceAccountTokenVolume"
-	
 
 	// owner: @Random-Liu
 	// beta: v1.11
