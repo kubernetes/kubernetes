@@ -1165,3 +1165,46 @@ func TestSupportedServiceAddressType(t *testing.T) {
 		})
 	}
 }
+
+func Test_hintsEnabled(t *testing.T) {
+	testCases := []struct {
+		name          string
+		annotations   map[string]string
+		expectEnabled bool
+	}{{
+		name:          "empty annotations",
+		expectEnabled: false,
+	}, {
+		name:          "different annotations",
+		annotations:   map[string]string{"topology-hints": "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "annotation == enabled",
+		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "enabled"},
+		expectEnabled: false,
+	}, {
+		name:          "annotation == aUto",
+		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "aUto"},
+		expectEnabled: false,
+	}, {
+		name:          "annotation == auto",
+		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "auto"},
+		expectEnabled: true,
+	}, {
+		name:          "annotation == Auto",
+		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "Auto"},
+		expectEnabled: true,
+	}, {
+		name:          "annotation == disabled",
+		annotations:   map[string]string{v1.AnnotationTopologyAwareHints: "disabled"},
+		expectEnabled: false,
+	}}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			actualEnabled := hintsEnabled(tc.annotations)
+			if actualEnabled != tc.expectEnabled {
+				t.Errorf("Expected %t, got %t", tc.expectEnabled, actualEnabled)
+			}
+		})
+	}
+}

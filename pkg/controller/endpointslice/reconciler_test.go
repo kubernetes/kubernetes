@@ -1460,9 +1460,9 @@ func TestReconcileTopology(t *testing.T) {
 			slicesChangedPerSyncTopology: 0,
 		},
 	}, {
-		name:                 "topology enabled, hintsAnnotation==auto, more slices and endpoints",
+		name:                 "topology enabled, hintsAnnotation==Auto, more slices and endpoints",
 		topologyCacheEnabled: true,
-		hintsAnnotation:      "auto",
+		hintsAnnotation:      "Auto",
 		existingSlices:       []*discovery.EndpointSlice{slicesByName["zone-a-c"], slicesByName["zone-a-b"]},
 		pods:                 append(slicePods["zone-a-c"], slicePods["zone-a-b"]...),
 		nodes:                nodes,
@@ -1784,13 +1784,13 @@ func expectMetrics(t *testing.T, em expectedMetrics) {
 		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
 	}
 
-	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("disabled"))
+	actualSlicesChangedPerSync, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Disabled"))
 	handleErr(t, err, "slicesChangedPerSync")
 	if actualSlicesChangedPerSync != float64(em.slicesChangedPerSync) {
 		t.Errorf("Expected slicesChangedPerSync to be %d, got %v", em.slicesChangedPerSync, actualSlicesChangedPerSync)
 	}
 
-	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("auto"))
+	actualSlicesChangedPerSyncTopology, err := testutil.GetHistogramMetricValue(metrics.EndpointSlicesChangedPerSync.WithLabelValues("Auto"))
 	handleErr(t, err, "slicesChangedPerSyncTopology")
 	if actualSlicesChangedPerSyncTopology != float64(em.slicesChangedPerSyncTopology) {
 		t.Errorf("Expected slicesChangedPerSyncTopology to be %d, got %v", em.slicesChangedPerSyncTopology, actualSlicesChangedPerSyncTopology)
@@ -1825,8 +1825,8 @@ func setupMetrics() {
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
 	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "disabled"})
-	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "auto"})
+	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Disabled"})
+	metrics.EndpointSlicesChangedPerSync.Delete(map[string]string{"topology": "Auto"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "success"})
 	metrics.EndpointSliceSyncs.Delete(map[string]string{"result": "error"})
 }
