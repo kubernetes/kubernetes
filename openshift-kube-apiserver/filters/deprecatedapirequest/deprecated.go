@@ -18,10 +18,5 @@ var deprecatedApiRemovedRelease = map[schema.GroupVersionResource]string{
 
 // removedRelease of a specified resource.version.group.
 func removedRelease(resource schema.GroupVersionResource) string {
-	ret, ok := deprecatedApiRemovedRelease[resource]
-	if ok {
-		return ret
-	}
-	// return a non-empty default to get past validation for now.  Nothing is guaranteed for 2.0.
-	return "2.0"
+	return deprecatedApiRemovedRelease[resource]
 }

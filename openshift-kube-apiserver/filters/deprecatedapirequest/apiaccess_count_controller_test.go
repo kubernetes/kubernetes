@@ -617,11 +617,6 @@ func setRequestCountTotals(status *apiv1.APIRequestCountStatus) {
 		totalForCurrentHour += status.CurrentHour.ByNode[nodeIndex].RequestCount
 	}
 	status.CurrentHour.RequestCount = totalForCurrentHour
-
-	// set the default value until we fix the validator
-	if len(status.RemovedInRelease) == 0 {
-		status.RemovedInRelease = "2.0"
-	}
 }
 
 func deprecatedAPIRequestStatus(options ...func(*apiv1.APIRequestCountStatus)) *apiv1.APIRequestCountStatus {
