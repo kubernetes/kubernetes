@@ -178,9 +178,11 @@ type JobSpec struct {
 	// false to true), the Job controller will delete all active Pods associated
 	// with this Job. Users must design their workload to gracefully handle this.
 	// Suspending a Job will reset the StartTime field of the Job, effectively
-	// resetting the ActiveDeadlineSeconds timer too. This is an alpha field and
-	// requires the SuspendJob feature gate to be enabled; otherwise this field
-	// may not be set to true. Defaults to false.
+	// resetting the ActiveDeadlineSeconds timer too. Defaults to false.
+	//
+	// This field is beta-level, gated by SuspendJob feature flag (enabled by
+	// default).
+	//
 	// +optional
 	Suspend *bool `json:"suspend,omitempty" protobuf:"varint,10,opt,name=suspend"`
 }
