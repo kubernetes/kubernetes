@@ -34,6 +34,17 @@ import (
 // with removed data.  Do not use this just because you don't want to update your test to use v1.  Only use this
 // when it actually matters.
 func CreateCRDUsingRemovedAPI(etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface, dynamicClientSet dynamic.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
+	crd, err := CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient, etcdStoragePrefix, betaCRD, apiExtensionsClient)
+	if err != nil {
+		return nil, err
+	}
+	return waitForCRDReady(crd, apiExtensionsClient, dynamicClientSet)
+}
+
+// CreateCRDUsingRemovedAPIWatchUnsafe creates a CRD directly using etcd.  This is must *ONLY* be used for checks of compatibility
+// with removed data.  Do not use this just because you don't want to update your test to use v1.  Only use this
+// when it actually matters.
+func CreateCRDUsingRemovedAPIWatchUnsafe(etcdClient *clientv3.Client, etcdStoragePrefix string, betaCRD *apiextensionsv1beta1.CustomResourceDefinition, apiExtensionsClient clientset.Interface) (*apiextensionsv1.CustomResourceDefinition, error) {
 	// attempt defaulting, best effort
 	apiextensionsv1beta1.SetDefaults_CustomResourceDefinition(betaCRD)
 	betaCRD.Kind = "CustomResourceDefinition"
@@ -46,10 +57,5 @@ func CreateCRDUsingRemovedAPI(etcdClient *clientv3.Client, etcdStoragePrefix str
 		return nil, err
 	}
 
-	crd, err := apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), betaCRD.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	return waitForCRDReady(crd, apiExtensionsClient, dynamicClientSet)
+	return apiExtensionsClient.ApiextensionsV1().CustomResourceDefinitions().Get(context.TODO(), betaCRD.Name, metav1.GetOptions{})
 }

@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
@@ -53,9 +54,10 @@ const (
 	waitForHashes        = "wait-for-hashes"
 	waitForHashChange    = "wait-for-hash-change"
 	waitForPodsWithLabel = "wait-for-pods-with-label"
+)
 
-	testConfiguration = `
-apiVersion: kubeadm.k8s.io/v1beta3
+var testConfiguration = fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
 nodeRegistration:
   name: foo
@@ -67,26 +69,25 @@ bootstrapTokens:
 - token: ce3aa5.5ec8455bb76b379f
   ttl: 24h
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: %[1]s
 kind: ClusterConfiguration
 
 apiServer:
   certSANs: null
   extraArgs: null
-certificatesDir: %s
+certificatesDir: %%s
 etcd:
   local:
-    dataDir: %s
+    dataDir: %%s
     image: ""
 imageRepository: k8s.gcr.io
-kubernetesVersion: %s
+kubernetesVersion: %%s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
 useHyperKubeImage: false
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 // fakeWaiter is a fake apiclient.Waiter that returns errors it was initialized with
 type fakeWaiter struct {

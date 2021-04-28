@@ -17,11 +17,13 @@ limitations under the License.
 package upgrade
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"testing"
 
 	"github.com/pkg/errors"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -43,9 +45,9 @@ func TestRunDiff(t *testing.T) {
 	currentVersion := "v" + constants.CurrentKubernetesVersion.String()
 
 	// create a temporary file with valid ClusterConfiguration
-	testUpgradeDiffConfigContents := []byte("apiVersion: kubeadm.k8s.io/v1beta3\n" +
-		"kind: ClusterConfiguration\n" +
-		"kubernetesVersion: " + currentVersion)
+	testUpgradeDiffConfigContents := []byte(fmt.Sprintf("apiVersion: %s\n"+
+		"kind: ClusterConfiguration\n"+
+		"kubernetesVersion: %s", kubeadmapiv1.SchemeGroupVersion.String(), currentVersion))
 	testUpgradeDiffConfig, err := createTestRunDiffFile(testUpgradeDiffConfigContents)
 	if err != nil {
 		t.Fatal(err)

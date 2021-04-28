@@ -91,7 +91,8 @@ func (cc *ConformanceContainer) IsReady() (bool, error) {
 func (cc *ConformanceContainer) GetPhase() (v1.PodPhase, error) {
 	pod, err := cc.PodClient.Get(context.TODO(), cc.podName, metav1.GetOptions{})
 	if err != nil {
-		return v1.PodUnknown, err
+		// it doesn't matter what phase to return as error would not be nil
+		return v1.PodSucceeded, err
 	}
 	return pod.Status.Phase, nil
 }

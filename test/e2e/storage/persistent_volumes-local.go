@@ -605,8 +605,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				defer podsLock.Unlock()
 
 				for _, pod := range podsList.Items {
-					switch pod.Status.Phase {
-					case v1.PodSucceeded:
+					if pod.Status.Phase == v1.PodSucceeded {
 						// Delete pod and its PVCs
 						if err := deletePodAndPVCs(config, &pod); err != nil {
 							return false, err
@@ -614,9 +613,6 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						delete(pods, pod.Name)
 						numFinished++
 						framework.Logf("%v/%v pods finished", numFinished, totalPods)
-					case v1.PodUnknown:
-						return false, fmt.Errorf("pod %v is in %v phase", pod.Name, pod.Status.Phase)
-					case v1.PodFailed:
 					}
 				}
 
