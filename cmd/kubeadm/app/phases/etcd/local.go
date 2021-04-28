@@ -238,7 +238,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 				Requests: v1.ResourceList{
 					v1.ResourceCPU:              resource.MustParse("100m"),
 					v1.ResourceMemory:           resource.MustParse("100Mi"),
-					v1.ResourceEphemeralStorage: resource.MustParse("100Mi"),
+					v1.ResourceEphemeralStorage: resource.MustParse("100Mi"), // Hi, Mom!
 				},
 			},
 			LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
