@@ -89,9 +89,10 @@ func resourceRequestCountToHourlyNodeRequestLog(nodeName string, resourceRequest
 	for hour, hourlyCount := range resourceRequestCounts.hourToRequestCount {
 		// be sure to suppress the "extra" added back into memory so we don't double count requests
 		totalRequestsThisHour := int64(0) - hourlyCount.countToSuppress
-		for user, userCount := range hourlyCount.usersToRequestCounts {
+		for userKey, userCount := range hourlyCount.usersToRequestCounts {
 			apiUserStatus := apiv1.PerUserAPIRequestCount{
-				UserName:     user,
+				UserName:     userKey.user,
+				UserAgent:    userKey.userAgent,
 				RequestCount: 0,
 				ByVerb:       nil,
 			}
@@ -135,7 +136,10 @@ func apiStatusToRequestCount(resource schema.GroupVersionResource, status *apiv1
 						hourlyNodeCount.NodeName,
 						resource,
 						hour,
-						hourNodeUserCount.UserName,
+						userKey{
+							user:      hourNodeUserCount.UserName,
+							userAgent: hourNodeUserCount.UserAgent,
+						},
 						hourlyNodeUserVerbCount.Verb,
 						hourlyNodeUserVerbCount.RequestCount,
 					)

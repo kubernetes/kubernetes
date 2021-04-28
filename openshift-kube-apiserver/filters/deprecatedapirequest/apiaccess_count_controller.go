@@ -29,7 +29,7 @@ func NewController(client apiclientv1.APIRequestCountInterface, nodeName string)
 // APIRequestLogger support logging deprecated API requests.
 type APIRequestLogger interface {
 	IsDeprecated(resource, version, group string) bool
-	LogRequest(resource schema.GroupVersionResource, timestamp time.Time, user, verb string)
+	LogRequest(resource schema.GroupVersionResource, timestamp time.Time, user, userAgent, verb string)
 	Start(stop <-chan struct{})
 }
 
@@ -53,10 +53,14 @@ func (c *controller) IsDeprecated(resource, version, group string) bool {
 }
 
 // LogRequest queues an api request for logging
-func (c *controller) LogRequest(resource schema.GroupVersionResource, timestamp time.Time, user, verb string) {
+func (c *controller) LogRequest(resource schema.GroupVersionResource, timestamp time.Time, user, userAgent, verb string) {
 	c.requestCountLock.RLock()
 	defer c.requestCountLock.RUnlock()
-	c.requestCounts.IncrementRequestCount(resource, timestamp.Hour(), user, verb, 1)
+	userKey := userKey{
+		user:      user,
+		userAgent: userAgent,
+	}
+	c.requestCounts.IncrementRequestCount(resource, timestamp.Hour(), userKey, verb, 1)
 }
 
 // resetCount returns the current count and creates a new requestCount instance var
@@ -146,7 +150,11 @@ func removePersistedRequestCounts(nodeName string, currentHour int, persistedSta
 			continue
 		}
 		for _, peristedUserCount := range persistedNodeCount.ByUser {
-			localResourceCount.Hour(currentHour).RemoveUser(peristedUserCount.UserName)
+			userKey := userKey{
+				user:      peristedUserCount.UserName,
+				userAgent: peristedUserCount.UserAgent,
+			}
+			localResourceCount.Hour(currentHour).RemoveUser(userKey)
 		}
 	}
 

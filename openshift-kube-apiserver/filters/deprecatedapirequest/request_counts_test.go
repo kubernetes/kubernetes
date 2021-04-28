@@ -22,21 +22,36 @@ func gvr(resource string) schema.GroupVersionResource {
 	panic(s)
 }
 
+var (
+	bobKey = userKey{
+		user:      "bob",
+		userAgent: "some-agent",
+	}
+	sueKey = userKey{
+		user:      "sue",
+		userAgent: "some-agent",
+	}
+	genericUserKey = userKey{
+		user:      "user",
+		userAgent: "some-agent",
+	}
+)
+
 func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 	testCases := []struct {
 		resource schema.GroupVersionResource
 		ts       time.Time
-		user     string
+		user     userKey
 		verb     string
 		count    int64
 	}{
-		{gvr("test.v1.group"), testTime(0, 0), "bob", "get", 1},
-		{gvr("test.v1.group"), testTime(0, 1), "bob", "list", 2},
-		{gvr("test.v1.group"), testTime(1, 0), "bob", "get", 1},
-		{gvr("test.v2.group"), testTime(2, 0), "bob", "get", 1},
-		{gvr("test.v2.group"), testTime(2, 1), "sue", "list", 2},
-		{gvr("test.v2.group"), testTime(2, 2), "sue", "get", 1},
-		{gvr("test.v2.group"), testTime(2, 3), "sue", "get", 3},
+		{gvr("test.v1.group"), testTime(0, 0), bobKey, "get", 1},
+		{gvr("test.v1.group"), testTime(0, 1), bobKey, "list", 2},
+		{gvr("test.v1.group"), testTime(1, 0), bobKey, "get", 1},
+		{gvr("test.v2.group"), testTime(2, 0), bobKey, "get", 1},
+		{gvr("test.v2.group"), testTime(2, 1), sueKey, "list", 2},
+		{gvr("test.v2.group"), testTime(2, 2), sueKey, "get", 1},
+		{gvr("test.v2.group"), testTime(2, 3), sueKey, "get", 3},
 	}
 	actual := newAPIRequestCounts("nodeName")
 	for _, tc := range testCases {
@@ -49,12 +64,12 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 				resource: gvr("test.v1.group"),
 				hourToRequestCount: map[int]*hourlyRequestCounts{
 					0: {
-						usersToRequestCounts: map[string]*userRequestCounts{
-							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}, "list": {count: 2}}},
+						usersToRequestCounts: map[userKey]*userRequestCounts{
+							bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}, "list": {count: 2}}},
 						}},
 					1: {
-						usersToRequestCounts: map[string]*userRequestCounts{
-							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
+						usersToRequestCounts: map[userKey]*userRequestCounts{
+							bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
 						},
 					},
 				}},
@@ -62,9 +77,9 @@ func TestAPIRequestCounts_IncrementRequestCount(t *testing.T) {
 				resource: gvr("test.v2.group"),
 				hourToRequestCount: map[int]*hourlyRequestCounts{
 					2: {
-						usersToRequestCounts: map[string]*userRequestCounts{
-							"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
-							"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"list": {count: 2}, "get": {count: 4}}},
+						usersToRequestCounts: map[userKey]*userRequestCounts{
+							bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {count: 1}}},
+							sueKey: {user: sueKey, verbsToRequestCounts: map[string]*verbRequestCount{"list": {count: 2}, "get": {count: 4}}},
 						}},
 				}},
 		},
@@ -97,8 +112,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
 								},
 							},
 						}},
@@ -110,8 +125,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
 								},
 							},
 						}},
@@ -126,8 +141,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
 								},
 							},
 						}},
@@ -140,8 +155,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
 								},
 							},
 						}},
@@ -156,8 +171,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {1}}},
 								},
 							},
 						}},
@@ -169,8 +184,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {2}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {2}}},
 								},
 							},
 						}},
@@ -182,8 +197,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"verb": {3}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"verb": {3}}},
 								},
 							},
 						}},
@@ -198,8 +213,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
 								},
 							},
 						}},
@@ -211,14 +226,14 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {2}, "post": {1}}},
-									"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {2}, "post": {1}}},
+									sueKey: {user: sueKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
 								},
 							},
 							2: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
 								},
 							},
 						}},
@@ -226,8 +241,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource.v2"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
 								},
 							},
 						}},
@@ -239,14 +254,14 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource.v1"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {3}, "post": {1}}},
-									"sue": {user: "sue", verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {3}, "post": {1}}},
+									sueKey: {user: sueKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {5}}},
 								},
 							},
 							2: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"bob": {user: "bob", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									bobKey: {user: bobKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
 								},
 							},
 						}},
@@ -254,8 +269,8 @@ func TestAPIRequestCounts_IncrementRequestCounts(t *testing.T) {
 						resource: gvr("resource.v2"),
 						hourToRequestCount: map[int]*hourlyRequestCounts{
 							0: {
-								usersToRequestCounts: map[string]*userRequestCounts{
-									"user": {user: "user", verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
+								usersToRequestCounts: map[userKey]*userRequestCounts{
+									genericUserKey: {user: genericUserKey, verbsToRequestCounts: map[string]*verbRequestCount{"get": {1}}},
 								},
 							},
 						}},
