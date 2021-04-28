@@ -969,8 +969,12 @@ func (proxier *Proxier) OnNodeAdd(node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = node.Labels
+	proxier.nodeLabels = map[string]string{}
+	for k, v := range node.Labels {
+		proxier.nodeLabels[k] = v
+	}
 	proxier.mu.Unlock()
+	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.syncProxyRules()
 }
@@ -988,8 +992,12 @@ func (proxier *Proxier) OnNodeUpdate(oldNode, node *v1.Node) {
 	}
 
 	proxier.mu.Lock()
-	proxier.nodeLabels = node.Labels
+	proxier.nodeLabels = map[string]string{}
+	for k, v := range node.Labels {
+		proxier.nodeLabels[k] = v
+	}
 	proxier.mu.Unlock()
+	klog.V(4).InfoS("Updated proxier node labels", "labels", node.Labels)
 
 	proxier.syncProxyRules()
 }
