@@ -17,8 +17,6 @@ var (
 			// Their enablement is tracked via bz's targeted at 4.8.
 			`\[Feature:SCTPConnectivity\]`, // https://bugzilla.redhat.com/show_bug.cgi?id=1861606
 
-			`\[Feature:NetworkPolicy\]`,
-
 			`\[Feature:CrossNamespacePodAffinity\]`,
 
 			`\[Feature:DaemonSetUpdateSurge\]`,
@@ -208,7 +206,10 @@ var (
 			`NetworkPolicy.*[Ee]gress`,  // feature is not supported by openshift-sdn
 			`NetworkPolicy.*named port`, // feature is not supported by openshift-sdn
 
-			`NetworkPolicy between server and client should support a 'default-deny-all' policy`, // uses egress feature
+			`NetworkPolicy between server and client should support a 'default-deny-all' policy`,            // uses egress feature
+			`NetworkPolicy between server and client should stop enforcing policies after they are deleted`, // uses egress feature
+
+			`NetworkPolicy between server and client should enforce ingress policy allowing any port traffic to a server on a specific protocol`, // https://bugzilla.redhat.com/show_bug.cgi?id=1949105
 		},
 	}
 
