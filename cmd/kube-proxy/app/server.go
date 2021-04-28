@@ -640,7 +640,7 @@ func serveMetrics(bindAddress, proxyMode string, enableProfiling bool, errCh cha
 // TODO: At the moment, Run() cannot return a nil error, otherwise it's caller will never exit. Update callers of Run to handle nil errors.
 func (s *ProxyServer) Run() error {
 	// To help debugging, immediately log version
-	klog.InfoS("Version: %+v", version.Get())
+	klog.InfoS("Version", "version", version.Get())
 
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
