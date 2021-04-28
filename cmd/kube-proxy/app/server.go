@@ -592,7 +592,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 				<-blockCh
 			}
 		} else {
-			klog.ErrorS(err, "Healthz server returned without error")
+			klog.ErrorS(nil, "Healthz server returned without error")
 		}
 	}
 	go wait.Until(fn, 5*time.Second, wait.NeverStop)
