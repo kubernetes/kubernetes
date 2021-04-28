@@ -33,7 +33,7 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1alpha1.SchemeGroupVersion))
 
-	// v1alpha is in the k8s.io-suffixed API group
+	// v1beta is in the k8s.io-suffixed API group
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion))
 

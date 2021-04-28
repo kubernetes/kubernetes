@@ -16,6 +16,7 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package
 // +k8s:conversion-gen=k8s.io/apiserver/pkg/apis/apiserver
+// +k8s:prerelease-lifecycle-gen=true
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=apiserver.k8s.io
 

@@ -22,7 +22,13 @@ import (
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.6
+// +k8s:prerelease-lifecycle-gen:deprecated=1.17
+// +k8s:prerelease-lifecycle-gen:removed=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=apiserver.config.k8s.io,v1,AdmissionConfiguration
 
+// DEPRECATED - This group version of AdmissionConfiguration is deprecated by apiserver.config.k8s.io/v1/AdmissionConfiguration.
+// See the release notes for more information.
 // AdmissionConfiguration provides versioned configuration for admission controllers.
 type AdmissionConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
@@ -50,7 +56,13 @@ type AdmissionPluginConfiguration struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.16
+// +k8s:prerelease-lifecycle-gen:deprecated=1.18
+// +k8s:prerelease-lifecycle-gen:removed=1.23
+// +k8s:prerelease-lifecycle-gen:replacement=apiserver.k8s.io,v1beta1,EgressSelectorConfiguration
 
+// DEPRECATED - This group version of Policy is deprecated by apiserver.k8s.io/v1beta1/EgressSelectorConfiguration.
+// See the release notes for more information.
 // EgressSelectorConfiguration provides versioned configuration for egress selector clients.
 type EgressSelectorConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
