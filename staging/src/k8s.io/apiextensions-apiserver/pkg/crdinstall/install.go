@@ -12,14 +12,9 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
-	"time"
 )
 
 func Install(ctx context.Context, config *rest.Config) error {
-	// wait for Kind: CustomResourceDefinition to become available
-	// TODO: replace this wait with a more standard approach where Install is
-	// only called after CRDs are available
-	time.Sleep(20 * time.Second)
 	objs, err := getObjects()
 	if err != nil {
 		return err

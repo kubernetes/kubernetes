@@ -269,16 +269,17 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 
 	// Add a post startup hook here that installs all the objects (generally CRDs) that need to be installed as the api-server comes-up
 	// We will use the LoopbackClientConfig of the api server to create a client and use that client to patch objects
-	s.GenericAPIServer.AddPostStartHook("crd-installer", func(postStartHookContext genericapiserver.PostStartHookContext) error {
+	s.GenericAPIServer.AddPostStartHookOrDie("crd-installer", func(postStartHookContext genericapiserver.PostStartHookContext) error {
+		ctx := context.Background()
+
 		// wait for CRD type to become available
 		err := wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
+			return crdinstall.CRDReady(ctx, postStartHookContext.LoopbackClientConfig)
 		}, postStartHookContext.StopCh)
 		if err != nil {
 			return err
 		}
 
-		ctx := context.Background()
 		if err := crdinstall.Install(ctx, postStartHookContext.LoopbackClientConfig); err != nil {
 			return err
 		}
