@@ -584,7 +584,7 @@ func serveHealthz(hz healthcheck.ProxierHealthUpdater, errCh chan error) {
 	fn := func() {
 		err := hz.Run()
 		if err != nil {
-			klog.ErrorS("Healthz server failed: %v", err)
+			klog.ErrorS(err, "Healthz server failed")
 			if errCh != nil {
 				errCh <- fmt.Errorf("healthz server failed: %v", err)
 				// if in hardfail mode, never retry again
