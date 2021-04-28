@@ -461,12 +461,12 @@ func GetAvailableResources(clientBuilder clientbuilder.ControllerClientBuilder) 
 
 	allResources := map[schema.GroupVersionResource]bool{}
 	for _, apiResourceList := range resourceMap {
-		version, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
+		groupVersion, err := schema.ParseGroupVersion(apiResourceList.GroupVersion)
 		if err != nil {
 			return nil, err
 		}
 		for _, apiResource := range apiResourceList.APIResources {
-			allResources[version.WithResource(apiResource.Name)] = true
+			allResources[groupVersion.WithResource(apiResource.Name)] = true
 		}
 	}
 
