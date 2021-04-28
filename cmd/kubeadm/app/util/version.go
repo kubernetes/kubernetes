@@ -251,7 +251,7 @@ func validateStableVersion(remoteVersion, clientVersion string) (string, error) 
 	if verClient.Major() < verRemote.Major() ||
 		(verClient.Major() == verRemote.Major()) && verClient.Minor() < verRemote.Minor() {
 		estimatedRelease := fmt.Sprintf("stable-%d.%d", verClient.Major(), verClient.Minor())
-		klog.Infof("remote version is much newer: %s; falling back to: %s", remoteVersion, estimatedRelease)
+		klog.InfoS("Remote version is much newer, falling back", "remoteVersion", remoteVersion, "backToVersion", estimatedRelease)
 		return estimatedRelease, nil
 	}
 	return remoteVersion, nil
