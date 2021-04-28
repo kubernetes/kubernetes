@@ -30,9 +30,5 @@ func Convert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	if err != nil {
 		return err
 	}
-
-	// Keep the fuzzer test happy by setting out.ClusterConfiguration to defaults
-	clusterCfg := &ClusterConfiguration{}
-	SetDefaults_ClusterConfiguration(clusterCfg)
-	return Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(clusterCfg, &out.ClusterConfiguration, s)
+	return Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(&ClusterConfiguration{}, &out.ClusterConfiguration, s)
 }

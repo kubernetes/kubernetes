@@ -340,6 +340,13 @@ func documentMapToInitConfiguration(gvkmap kubeadmapi.DocumentMap, allowDeprecat
 	// If ClusterConfiguration was given, populate it in the InitConfiguration struct
 	if clustercfg != nil {
 		initcfg.ClusterConfiguration = *clustercfg
+	} else {
+		// Populate the internal InitConfiguration.ClusterConfiguration with defaults
+		extclustercfg := &kubeadmapiv1.ClusterConfiguration{}
+		kubeadmscheme.Scheme.Default(extclustercfg)
+		if err := kubeadmscheme.Scheme.Convert(extclustercfg, &initcfg.ClusterConfiguration, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	// Load any component configs
