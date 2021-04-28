@@ -34,7 +34,7 @@ KUBELET_AUTHENTICATION_WEBHOOK=${KUBELET_AUTHENTICATION_WEBHOOK:-""}
 POD_MANIFEST_PATH=${POD_MANIFEST_PATH:-"/var/run/kubernetes/static-pods"}
 KUBELET_FLAGS=${KUBELET_FLAGS:-""}
 KUBELET_IMAGE=${KUBELET_IMAGE:-""}
-# many dev environments run with swap on, so we don't fail in this env
+# Many dev environments run with swap on, so we don't fail in this env
 FAIL_SWAP_ON=${FAIL_SWAP_ON:-"false"}
 # Name of the network plugin, eg: "kubenet"
 NET_PLUGIN=${NET_PLUGIN:-""}
@@ -49,11 +49,11 @@ SERVICE_CLUSTER_IP_RANGE=${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/24}
 FIRST_SERVICE_CLUSTER_IP=${FIRST_SERVICE_CLUSTER_IP:-10.0.0.1}
 # if enabled, must set CGROUP_ROOT
 CGROUPS_PER_QOS=${CGROUPS_PER_QOS:-true}
-# name of the cgroup driver, i.e. cgroupfs or systemd
+# Name of the cgroup driver, i.e. cgroupfs or systemd
 CGROUP_DRIVER=${CGROUP_DRIVER:-""}
 # if cgroups per qos is enabled, optionally change cgroup root
 CGROUP_ROOT=${CGROUP_ROOT:-""}
-# owner of client certs, default to current user if not specified
+# Owner of client certs, default to current user if not specified
 USER=${USER:-$(whoami)}
 
 # enables testing eviction scenarios locally.
@@ -112,7 +112,7 @@ DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 KUBE_CACHE_MUTATION_DETECTOR="${KUBE_CACHE_MUTATION_DETECTOR:-false}"
 export KUBE_CACHE_MUTATION_DETECTOR
 
-# panic the server on watch decode errors since they are considered coder mistakes
+# Panic the server on watch decode errors since they are considered coder mistakes
 KUBE_PANIC_WATCH_DECODE_ERROR="${KUBE_PANIC_WATCH_DECODE_ERROR:-true}"
 export KUBE_PANIC_WATCH_DECODE_ERROR
 
@@ -131,7 +131,7 @@ KUBE_CONTROLLERS="${KUBE_CONTROLLERS:-"*"}"
 # Audit policy
 AUDIT_POLICY_FILE=${AUDIT_POLICY_FILE:-""}
 
-# sanity check for OpenStack provider
+# Sanity check for OpenStack provider
 if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
     if [ "${CLOUD_CONFIG}" == "" ]; then
         echo "Missing CLOUD_CONFIG env for OpenStack provider!"
@@ -248,11 +248,11 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
 
-# name of the cgroup driver, i.e. cgroupfs or systemd
+# Name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
-  # default cgroup driver to match what is reported by docker to simplify local development
+  # Default cgroup driver to match what is reported by docker to simplify local development
   if [[ -z ${CGROUP_DRIVER} ]]; then
-    # match driver with docker runtime reported value (they must match)
+    # Match driver with docker runtime reported value (they must match)
     CGROUP_DRIVER=$(docker info | grep "Cgroup Driver:" |  sed -e 's/^[[:space:]]*//'|cut -f3- -d' ')
     echo "Kubelet cgroup driver defaulted to use: ${CGROUP_DRIVER}"
   fi
@@ -269,7 +269,7 @@ CONTROLPLANE_SUDO=$(test -w "${CERT_DIR}" || echo "sudo -E")
 
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
-    # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
+    # This can happen if you run local-up-cluster.sh twice and kill etcd in between.
     if [[ "${API_PORT}" -gt "0" ]]; then
         if ! curl --silent -g "${API_HOST}:${API_PORT}" ; then
             echo "API SERVER insecure port is free, proceeding..."
@@ -342,7 +342,7 @@ function detect_binary {
 cleanup()
 {
   echo "Cleaning up..."
-  # delete running images
+  # Delete running images
   # if [[ "${ENABLE_CLUSTER_DNS}" == true ]]; then
   # Still need to figure why this commands throw an error: Error from server: client: etcd cluster is unavailable or misconfigured
   #     ${KUBECTL} --namespace=kube-system delete service kube-dns
@@ -463,7 +463,7 @@ function generate_certs {
     # Create auth proxy client ca
     kube::util::create_signing_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" request-header '"client auth"'
 
-    # serving cert for kube-apiserver
+    # Serving cert for kube-apiserver
     kube::util::create_serving_certkey "${CONTROLPLANE_SUDO}" "${CERT_DIR}" "server-ca" kube-apiserver kubernetes.default kubernetes.default.svc "localhost" "${API_HOST_IP}" "${API_HOST}" "${FIRST_SERVICE_CLUSTER_IP}"
 
     # Create client certs signed with client-ca, given id, given CN and a number of groups
@@ -694,7 +694,7 @@ function start_cloud_controller_manager {
 }
 
 function wait_node_ready(){
-  # check the nodes information after kubelet daemon start
+  # Check the nodes information after kubelet daemon start
   local nodes_stats="${KUBECTL} --kubeconfig '${CERT_DIR}/admin.kubeconfig' get nodes"
   local node_name=$HOSTNAME_OVERRIDE
   local system_node_wait_time=60
@@ -763,15 +763,15 @@ function start_kubelet {
       ${KUBELET_FLAGS}
     )
 
-    # warn if users are running with swap allowed
+    # Warn if users are running with swap allowed
     if [ "${FAIL_SWAP_ON}" == "false" ]; then
         echo "WARNING : The kubelet is configured to not fail even if swap is enabled; production deployments should disable swap."
     fi
 
     if [[ "${REUSE_CERTS}" != true ]]; then
-        # clear previous dynamic certs
+        # Clear previous dynamic certs
         sudo rm -fr "/var/lib/kubelet/pki" "${CERT_DIR}/kubelet-rotated.kubeconfig"
-        # create new certs
+        # Create new certs
         generate_kubelet_certs
     fi
 
@@ -862,7 +862,7 @@ function start_kubeproxy {
     PROXY_LOG=${LOG_DIR}/kube-proxy.log
 
     if [[ "${START_MODE}" != "nokubelet" ]]; then
-      # wait for kubelet collect node information
+      # Wait for kubelet collect node information
       echo "wait kubelet ready"
       wait_node_ready
     fi
@@ -928,7 +928,7 @@ function start_dns_addon {
         ${SED} -i -e "s/dns_server/${DNS_SERVER_IP}/g" dns.yaml
         ${SED} -i -e "s/dns_memory_limit/${DNS_MEMORY_LIMIT}/g" dns.yaml
         # TODO update to dns role once we have one.
-        # use kubectl to create dns addon
+        # Use kubectl to create dns addon
         if ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f dns.yaml ; then
             echo "${DNS_ADDON} addon successfully deployed."
         else
@@ -942,12 +942,12 @@ function start_dns_addon {
 
 function start_nodelocaldns {
   cp "${KUBE_ROOT}/cluster/addons/dns/nodelocaldns/nodelocaldns.yaml" nodelocaldns.yaml
-  # eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
+  # Eventually all the __PILLAR__ stuff will be gone, but theyre still in nodelocaldns for backward compat.
   ${SED} -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" nodelocaldns.yaml
   ${SED} -i -e "s/__PILLAR__LOCAL__DNS__/${LOCAL_DNS_IP}/g" nodelocaldns.yaml
 
-  # use kubectl to create nodelocaldns addon
+  # Use kubectl to create nodelocaldns addon
   ${KUBECTL} --kubeconfig="${CERT_DIR}/admin.kubeconfig" --namespace=kube-system create -f nodelocaldns.yaml
   echo "NodeLocalDNS addon successfully deployed."
   rm nodelocaldns.yaml
@@ -1085,14 +1085,14 @@ if [[ "${KUBETEST_IN_DOCKER:-}" == "true" ]]; then
   apt-get update && apt-get install -y sudo
   apt-get remove -y systemd
 
-  # configure shared mounts to prevent failure in DIND scenarios
+  # Configure shared mounts to prevent failure in DIND scenarios
   mount --make-rshared /
 
-  # kubekins has a special directory for docker root
+  # Kubekins has a special directory for docker root
   DOCKER_ROOT="/docker-graph"
 fi
 
-# validate that etcd is: not running, in path, and has minimum required version.
+# Validate that etcd is: not running, in path, and has minimum required version.
 if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
 fi
@@ -1101,7 +1101,7 @@ if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
   if ! kube::util::ensure_docker_daemon_connectivity; then
     exit 1
   else
-    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
+    # Docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
     # so we append a new rule on top of the docker one
     # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
     if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
@@ -1117,7 +1117,7 @@ fi
 kube::util::test_openssl_installed
 kube::util::ensure-cfssl
 
-### IF the user didn't supply an output/ for the build... Then we detect.
+### If the user didn't supply an output/ for the build... Then we detect.
 if [ "${GO_OUT}" == "" ]; then
   detect_binary
 fi
