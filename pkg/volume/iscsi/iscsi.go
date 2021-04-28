@@ -161,12 +161,20 @@ func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUI
 	if err != nil {
 		return nil, err
 	}
-	return &iscsiDiskMapper{
+	mapper := &iscsiDiskMapper{
 		iscsiDisk:  iscsiDisk,
 		readOnly:   readOnly,
 		exec:       exec,
 		deviceUtil: ioutil.NewDeviceHandler(ioutil.NewIOHandler()),
-	}, nil
+	}
+
+	blockPath, err := mapper.GetGlobalMapPath(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get device path: %v", err)
+	}
+	mapper.MetricsProvider = volume.NewMetricsBlock(filepath.Join(blockPath, string(podUID)))
+
+	return mapper, nil
 }
 
 func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volume.Unmounter, error) {
