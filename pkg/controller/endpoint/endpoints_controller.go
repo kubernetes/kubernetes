@@ -370,7 +370,7 @@ func (e *Controller) handleErr(err error, key interface{}) {
 		return
 	}
 
-	klog.Warningf("Dropping service %q out of the queue: %v", key, err)
+	klog.InfoS("Dropping service out of the queue", "key", key, "err", err)
 	e.queue.Forget(key)
 	utilruntime.HandleError(err)
 }
@@ -441,11 +441,11 @@ func (e *Controller) syncService(key string) error {
 
 	for _, pod := range pods {
 		if len(pod.Status.PodIP) == 0 {
-			klog.V(5).InfoS("Failed to find an IP for Pod", "podNamespace", pod.Namespace, "pod", pod.Name)
+			klog.V(5).InfoS("Failed to find an IP for Pod", "pod", klog.KObj(pod))
 			continue
 		}
 		if !tolerateUnreadyEndpoints && pod.DeletionTimestamp != nil {
-			klog.V(5).InfoS("Pod is being deleted", "podNamespace", pod.Namespace, "pod", pod.Name)
+			klog.V(5).InfoS("Pod is being deleted", "pod", klog.KObj(pod))
 			continue
 		}
 
@@ -453,7 +453,7 @@ func (e *Controller) syncService(key string) error {
 		if err != nil {
 			// this will happen, if the cluster runs with some nodes configured as dual stack and some as not
 			// such as the case of an upgrade..
-			klog.V(2).InfoS("Failed to find Endpoint for service with ClusterIP on Pod", "service", service.Name, "clusterIP", service.Spec.ClusterIP, "pod", pod.Name, "err", err)
+			klog.V(2).InfoS("Failed to find Endpoint for service with ClusterIP on Pod", "service", klog.KObj(service), "clusterIP", service.Spec.ClusterIP, "pod", klog.KObj(pod), "err", err)
 			continue
 		}
 
@@ -473,7 +473,7 @@ func (e *Controller) syncService(key string) error {
 				servicePort := &service.Spec.Ports[i]
 				portNum, err := podutil.FindPort(pod, servicePort)
 				if err != nil {
-					klog.V(4).InfoS("Failed to find port for Service", "serviceNamespace", service.Namespace, "service", service.Name, "err", err)
+					klog.V(4).InfoS("Failed to find port for Service", "service", klog.KObj(service), "err", err)
 					continue
 				}
 				epp := endpointPortFromServicePort(servicePort, portNum)
@@ -517,7 +517,7 @@ func (e *Controller) syncService(key string) error {
 		apiequality.Semantic.DeepEqual(currentEndpoints.Subsets, subsets) &&
 		apiequality.Semantic.DeepEqual(compareLabels, service.Labels) &&
 		capacityAnnotationSetCorrectly(currentEndpoints.Annotations, currentEndpoints.Subsets) {
-		klog.V(5).InfoS("Endpoints are equal, skipping update", "serviceNamespace", service.Namespace, "service", service.Name)
+		klog.V(5).InfoS("Endpoints are equal, skipping update", "service", klog.KObj(service))
 		return nil
 	}
 	newEndpoints := currentEndpoints.DeepCopy()
@@ -550,7 +550,7 @@ func (e *Controller) syncService(key string) error {
 		newEndpoints.Labels = utillabels.CloneAndRemoveLabel(newEndpoints.Labels, v1.IsHeadlessService)
 	}
 
-	klog.V(4).InfoS("Update Endpoints", "serviceNamespace", service.Namespace, "service", service.Name, "readyEndpoints", totalReadyEps, "notReadyEndpoints", totalNotReadyEps)
+	klog.V(4).InfoS("Update Endpoints", "service", klog.KObj(service), "readyEndpoints", totalReadyEps, "notReadyEndpoints", totalNotReadyEps)
 	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.CoreV1().Endpoints(service.Namespace).Create(context.TODO(), newEndpoints, metav1.CreateOptions{})
@@ -628,7 +628,7 @@ func addEndpointSubset(subsets []v1.EndpointSubset, pod *v1.Pod, epa v1.Endpoint
 		})
 		readyEps++
 	} else if shouldPodBeInEndpoints(pod) {
-		klog.V(5).InfoS("Pod is out of service", "podNamespace", pod.Namespace, "pod", pod.Name)
+		klog.V(5).InfoS("Pod is out of service", "pod", klog.KObj(pod))
 		subsets = append(subsets, v1.EndpointSubset{
 			NotReadyAddresses: []v1.EndpointAddress{epa},
 			Ports:             ports,

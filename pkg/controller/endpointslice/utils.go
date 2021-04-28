@@ -99,7 +99,7 @@ func getEndpointPorts(service *corev1.Service, pod *corev1.Pod) []discovery.Endp
 		portProto := servicePort.Protocol
 		portNum, err := podutil.FindPort(pod, servicePort)
 		if err != nil {
-			klog.V(4).InfoS("Failed to find port for Service", "serviceNamespace", service.Namespace, "service", service.Name, "err", err)
+			klog.V(4).InfoS("Failed to find port for Service", "service", klog.KObj(service), "err", err)
 			continue
 		}
 
@@ -352,7 +352,7 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 			addrType = discovery.AddressTypeIPv6
 		}
 		serviceSupportedAddresses[addrType] = struct{}{}
-		klog.V(2).InfoS("Couldn't find IPFamilies for Service. This could happen if controller manager is connected to an old API Server that does not support IPFamilies yet.", "serviceNamespace", service.Namespace, "service", service.Name, "IPFamily", addrType, "clusterIP", service.Spec.ClusterIP)
+		klog.V(2).InfoS("Couldn't find IPFamilies for Service. This could happen if controller manager is connected to an old API Server that does not support IPFamilies yet.", "service", klog.KObj(service), "IPFamily", addrType, "clusterIP", service.Spec.ClusterIP)
 		return serviceSupportedAddresses
 	}
 
@@ -363,7 +363,7 @@ func getAddressTypesForService(service *corev1.Service) map[discovery.AddressTyp
 	// since kubelet will need to restart in order to start patching pod status with multiple ips
 	serviceSupportedAddresses[discovery.AddressTypeIPv4] = struct{}{}
 	serviceSupportedAddresses[discovery.AddressTypeIPv6] = struct{}{}
-	klog.V(2).InfoS("Couldn't find IPFamilies for headless Service likely because the controller manager is connected to an old API Server that does not support IPFamilies yet. The service endpoint slice will use dual stack families until the API Server defaults correctly", "serviceNamespace", service.Namespace, "service", service.Name)
+	klog.V(2).InfoS("Couldn't find IPFamilies for headless Service likely because the controller manager is connected to an old API Server that does not support IPFamilies yet. The service endpoint slice will use dual stack families until the API Server defaults correctly", "service", klog.KObj(service))
 	return serviceSupportedAddresses
 }
 
