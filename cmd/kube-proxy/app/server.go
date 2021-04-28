@@ -647,7 +647,7 @@ func (s *ProxyServer) Run() error {
 	if s.OOMScoreAdj != nil {
 		oomAdjuster = oom.NewOOMAdjuster()
 		if err := oomAdjuster.ApplyOOMScoreAdj(0, int(*s.OOMScoreAdj)); err != nil {
-			klog.V(2).InfoS(err)
+			klog.V(2).InfoS("Error", "err", err)
 		}
 	}
 
