@@ -852,11 +852,14 @@ var _ = common.SIGDescribe("Services", func() {
 					TargetPort: intstr.FromString(svc2port),
 				},
 			}
+			service.Spec.Type = v1.ServiceTypeNodePort
+			service.Spec.Selector = jig.Labels
+			service.ObjectMeta.Labels = jig.Labels
 		})
 		framework.ExpectNoError(err)
 
-		port1 := 100
-		port2 := 101
+		port1 := 8080
+		port2 := 8081
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
 
 		names := map[string]bool{}
