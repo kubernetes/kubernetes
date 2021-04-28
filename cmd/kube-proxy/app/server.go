@@ -428,7 +428,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		}
 
 		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
-		klog.InfoS("Using lenient decoding as strict decoding failed: %v", err)
+		klog.InfoS("Using lenient decoding as strict decoding failed", "err",  err)
 	}
 
 	proxyConfig, ok := configObj.(*kubeproxyconfig.KubeProxyConfiguration)
