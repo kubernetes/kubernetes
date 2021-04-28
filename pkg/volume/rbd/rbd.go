@@ -698,7 +698,7 @@ func (r *rbdVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopologie
 		klog.Errorf("rbd: create volume failed, err: %v", err)
 		return nil, err
 	}
-	klog.InfoS("Successfully created rbd image", image)
+	klog.InfoS("Successfully created rbd image", "image", image)
 	pv := new(v1.PersistentVolume)
 	metav1.SetMetaDataAnnotation(&pv.ObjectMeta, volutil.VolumeDynamicallyCreatedByKey, "rbd-dynamic-provisioner")
 
