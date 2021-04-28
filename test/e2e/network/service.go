@@ -803,7 +803,6 @@ var _ = common.SIGDescribe("Services", func() {
 		name2 := "pod2"
 
 		createPodOrFail(f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
-		createPodOrFail(f, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{name1: {80}})
 
@@ -2681,19 +2680,18 @@ func createPodWithArgs(f *framework.Framework, ns, name string, labels map[strin
 	pod.ObjectMeta.Labels = labels
 	// Add a dummy environment variable to work around a docker issue.
 	// https://github.com/docker/docker/issues/14203
-	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
 	return f.PodClient().CreateSync(pod)
 }
 
 // createPodOrFail creates a pod with the specified containerPorts.
-func createPodOrFail(f *framework.Framework, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) *v1.Pod {
+func createPodOrFail(f *framework.Framework, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
 	pod := e2epod.NewAgnhostPod(ns, name, nil, nil, containerPorts)
 	pod.ObjectMeta.Labels = labels
 	// Add a dummy environment variable to work around a docker issue.
 	// https://github.com/docker/docker/issues/14203
 	pod.Spec.Containers[0].Env = []v1.EnvVar{{Name: "FOO", Value: " "}}
-	return f.PodClient().CreateSync(pod)
+	f.PodClient().CreateSync(pod)
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
