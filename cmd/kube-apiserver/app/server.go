@@ -573,24 +573,24 @@ type completedServerRunOptions struct {
 // Complete set default ServerRunOptions.
 // Should be called after kube-apiserver flags parsed.
 func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
-	var options completedServerRunOptions
+	var cmpltdSvrOptions completedServerRunOptions
 	// set defaults
 	if err := s.GenericServerRunOptions.DefaultAdvertiseAddress(s.SecureServing.SecureServingOptions); err != nil {
-		return options, err
+		return cmpltdSvrOptions, err
 	}
 
 	// process s.ServiceClusterIPRange from list to Primary and Secondary
 	// we process secondary only if provided by user
 	apiServerServiceIP, primaryServiceIPRange, secondaryServiceIPRange, err := getServiceIPAndRanges(s.ServiceClusterIPRanges)
 	if err != nil {
-		return options, err
+		return cmpltdSvrOptions, err
 	}
 	s.PrimaryServiceClusterIPRange = primaryServiceIPRange
 	s.SecondaryServiceClusterIPRange = secondaryServiceIPRange
 	s.APIServerServiceIP = apiServerServiceIP
 
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
-		return options, fmt.Errorf("error creating self-signed certificates: %v", err)
+		return cmpltdSvrOptions, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
 
 	if len(s.GenericServerRunOptions.ExternalHost) == 0 {
@@ -600,7 +600,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			if hostname, err := os.Hostname(); err == nil {
 				s.GenericServerRunOptions.ExternalHost = hostname
 			} else {
-				return options, fmt.Errorf("error finding host name: %v", err)
+				return cmpltdSvrOptions, fmt.Errorf("error finding host name: %v", err)
 			}
 		}
 		klog.Infof("external host was not specified, using %v", s.GenericServerRunOptions.ExternalHost)
@@ -627,14 +627,14 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	if s.ServiceAccountSigningKeyFile != "" && len(s.Authentication.ServiceAccounts.Issuers) != 0 && s.Authentication.ServiceAccounts.Issuers[0] != "" {
 		sk, err := keyutil.PrivateKeyFromFile(s.ServiceAccountSigningKeyFile)
 		if err != nil {
-			return options, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
+			return cmpltdSvrOptions, fmt.Errorf("failed to parse service-account-issuer-key-file: %v", err)
 		}
 		if s.Authentication.ServiceAccounts.MaxExpiration != 0 {
 			lowBound := time.Hour
 			upBound := time.Duration(1<<32) * time.Second
 			if s.Authentication.ServiceAccounts.MaxExpiration < lowBound ||
 				s.Authentication.ServiceAccounts.MaxExpiration > upBound {
-				return options, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
+				return cmpltdSvrOptions, fmt.Errorf("the service-account-max-token-expiration must be between 1 hour and 2^32 seconds")
 			}
 			if s.Authentication.ServiceAccounts.ExtendExpiration {
 				if s.Authentication.ServiceAccounts.MaxExpiration < serviceaccount.WarnOnlyBoundTokenExpirationSeconds*time.Second {
@@ -648,7 +648,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 
 		s.ServiceAccountIssuer, err = serviceaccount.JWTTokenGenerator(s.Authentication.ServiceAccounts.Issuers[0], sk)
 		if err != nil {
-			return options, fmt.Errorf("failed to build token generator: %v", err)
+			return cmpltdSvrOptions, fmt.Errorf("failed to build token generator: %v", err)
 		}
 		s.ServiceAccountTokenMaxExpiration = s.Authentication.ServiceAccounts.MaxExpiration
 	}
@@ -658,14 +658,14 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		// Ensure that overrides parse correctly.
 		userSpecified, err := serveroptions.ParseWatchCacheSizes(s.Etcd.WatchCacheSizes)
 		if err != nil {
-			return options, err
+			return cmpltdSvrOptions, err
 		}
 		for resource, size := range userSpecified {
 			sizes[resource] = size
 		}
 		s.Etcd.WatchCacheSizes, err = serveroptions.WriteWatchCacheSizes(sizes)
 		if err != nil {
-			return options, err
+			return cmpltdSvrOptions, err
 		}
 	}
 
@@ -681,8 +681,8 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			}
 		}
 	}
-	options.ServerRunOptions = s
-	return options, nil
+	cmpltdSvrOptions.ServerRunOptions = s
+	return cmpltdSvrOptions, nil
 }
 
 func buildServiceResolver(enabledAggregatorRouting bool, hostname string, informer clientgoinformers.SharedInformerFactory) webhook.ServiceResolver {
