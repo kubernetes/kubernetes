@@ -183,8 +183,7 @@ func cleanupFinishedJobs(cj *batchv1.CronJob, js []batchv1.Job, jc jobControlInt
 
 	// Update the CronJob, in case jobs were removed from the list.
 	if _, err := cjc.UpdateStatus(cj); err != nil {
-		nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
-		klog.InfoS("Unable to update status", "cronjob", nameForLog, "cronjobResourceVersion", cj.ResourceVersion, "err", err)
+		klog.InfoS("Unable to update status", "cronjob", klog.KObj(cj), "cronjobResourceVersion", cj.ResourceVersion, "err", err)
 	}
 }
 
@@ -195,12 +194,11 @@ func removeOldestJobs(cj *batchv1.CronJob, js []batchv1.Job, jc jobControlInterf
 		return
 	}
 
-	nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
-	klog.V(4).InfoS("Cleaning up jobs", "numToDelete", numToDelete, "jobCount", len(js), "cronjob", nameForLog)
+	klog.V(4).InfoS("Cleaning up jobs", "numToDelete", numToDelete, "jobCount", len(js), "cronjob", klog.KObj(cj))
 
 	sort.Sort(byJobStartTime(js))
 	for i := 0; i < numToDelete; i++ {
-		klog.V(4).InfoS("Removing job", "cronjobName", js[i].Name, "cronjob", nameForLog)
+		klog.V(4).InfoS("Removing job", "batchjobName", js[i].Name, "cronjob", klog.KObj(cj))
 		deleteJob(cj, &js[i], jc, recorder)
 	}
 }
@@ -210,8 +208,6 @@ func removeOldestJobs(cj *batchv1.CronJob, js []batchv1.Job, jc jobControlInterf
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
 func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControlInterface, cjc cjControlInterface, recorder record.EventRecorder) {
-	nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
-
 	childrenJobs := make(map[types.UID]bool)
 	for _, j := range js {
 		childrenJobs[j.ObjectMeta.UID] = true
@@ -247,7 +243,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 
 	updatedCJ, err := cjc.UpdateStatus(cj)
 	if err != nil {
-		klog.ErrorS(err, "Unable to update status", "cronjob", nameForLog, "cronjobResourceVersion", cj.ResourceVersion)
+		klog.ErrorS(err, "Unable to update status", "cronjob", klog.KObj(cj), "cronjobResourceVersion", cj.ResourceVersion)
 		return
 	}
 	*cj = *updatedCJ
@@ -259,23 +255,23 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 	}
 
 	if cj.Spec.Suspend != nil && *cj.Spec.Suspend {
-		klog.V(4).InfoS("Not starting job because it is suspended", "cronjob", nameForLog)
+		klog.V(4).InfoS("Not starting job because it is suspended", "cronjob", klog.KObj(cj))
 		return
 	}
 
 	times, err := getRecentUnmetScheduleTimes(*cj, now)
 	if err != nil {
 		recorder.Eventf(cj, v1.EventTypeWarning, "FailedNeedsStart", "Cannot determine if job needs to be started: %v", err)
-		klog.ErrorS(err, "Cannot determine if CronJob needs to be started", "cronjob", nameForLog)
+		klog.ErrorS(err, "Cannot determine if CronJob needs to be started", "cronjob", klog.KObj(cj))
 		return
 	}
 	// TODO: handle multiple unmet start times, from oldest to newest, updating status as needed.
 	if len(times) == 0 {
-		klog.V(4).InfoS("No unmet start times", "cronjob", nameForLog)
+		klog.V(4).InfoS("No unmet start times", "cronjob", klog.KObj(cj))
 		return
 	}
 	if len(times) > 1 {
-		klog.V(4).InfoS("Multiple unmet start times so only starting last one", "cronjob", nameForLog)
+		klog.V(4).InfoS("Multiple unmet start times so only starting last one", "cronjob", klog.KObj(cj))
 	}
 
 	scheduledTime := times[len(times)-1]
@@ -284,7 +280,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 		tooLate = scheduledTime.Add(time.Second * time.Duration(*cj.Spec.StartingDeadlineSeconds)).Before(now)
 	}
 	if tooLate {
-		klog.V(4).InfoS("Missed starting window", "cronjob", nameForLog)
+		klog.V(4).InfoS("Missed starting window", "cronjob", klog.KObj(cj))
 		recorder.Eventf(cj, v1.EventTypeWarning, "MissSchedule", "Missed scheduled time to start a job: %s", scheduledTime.UTC().Format(time.RFC1123Z))
 		// TODO: Since we don't set LastScheduleTime when not scheduling, we are going to keep noticing
 		// the miss every cycle.  In order to avoid sending multiple events, and to avoid processing
@@ -305,12 +301,12 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 		// TODO: for Forbid, we could use the same name for every execution, as a lock.
 		// With replace, we could use a name that is deterministic per execution time.
 		// But that would mean that you could not inspect prior successes or failures of Forbid jobs.
-		klog.V(4).InfoS("Not starting job because of prior execution still running and concurrency policy is Forbid", "cronjob", nameForLog)
+		klog.V(4).InfoS("Not starting job because of prior execution still running and concurrency policy is Forbid", "cronjob", klog.KObj(cj))
 		return
 	}
 	if cj.Spec.ConcurrencyPolicy == batchv1.ReplaceConcurrent {
 		for _, j := range cj.Status.Active {
-			klog.V(4).InfoS("Deleting job that was still running at next scheduled start time", "jobName", j.Name, "cronjob", nameForLog)
+			klog.V(4).InfoS("Deleting job that was still running at next scheduled start time", "jobName", j.Name, "cronjob", klog.KObj(cj))
 
 			job, err := jc.GetJob(j.Namespace, j.Name)
 			if err != nil {
@@ -325,7 +321,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 
 	jobReq, err := getJobFromTemplate(cj, scheduledTime)
 	if err != nil {
-		klog.ErrorS(err, "Unable to make Job from template", "cronjob", nameForLog)
+		klog.ErrorS(err, "Unable to make Job from template", "cronjob", klog.KObj(cj))
 		return
 	}
 	jobResp, err := jc.CreateJob(cj.Namespace, jobReq)
@@ -337,7 +333,7 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 		}
 		return
 	}
-	klog.V(4).InfoS("Created job", "jobRespName", jobResp.Name, "cronjob", nameForLog)
+	klog.V(4).InfoS("Created job", "jobRespName", jobResp.Name, "cronjob", klog.KObj(cj))
 	recorder.Eventf(cj, v1.EventTypeNormal, "SuccessfulCreate", "Created job %v", jobResp.Name)
 
 	// ------------------------------------------------------------------ //
@@ -353,13 +349,13 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 	// Add the just-started job to the status list.
 	ref, err := getRef(jobResp)
 	if err != nil {
-		klog.V(2).InfoS("Unable to make object reference for job", "cronjob", nameForLog)
+		klog.V(2).InfoS("Unable to make object reference for job", "cronjob", klog.KObj(cj))
 	} else {
 		cj.Status.Active = append(cj.Status.Active, *ref)
 	}
 	cj.Status.LastScheduleTime = &metav1.Time{Time: scheduledTime}
 	if _, err := cjc.UpdateStatus(cj); err != nil {
-		klog.InfoS("Unable to update status", "cronjob", nameForLog, "cronjobResourceVersion", cj.ResourceVersion, "err", err)
+		klog.InfoS("Unable to update status", "cronjob", klog.KObj(cj), "cronjobResourceVersion", cj.ResourceVersion, "err", err)
 	}
 
 	return
@@ -367,12 +363,10 @@ func syncOne(cj *batchv1.CronJob, js []batchv1.Job, now time.Time, jc jobControl
 
 // deleteJob reaps a job, deleting the job, the pods and the reference in the active list
 func deleteJob(cj *batchv1.CronJob, job *batchv1.Job, jc jobControlInterface, recorder record.EventRecorder) bool {
-	nameForLog := fmt.Sprintf("%s/%s", cj.Namespace, cj.Name)
-
 	// delete the job itself...
 	if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
 		recorder.Eventf(cj, v1.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
-		klog.Errorf("Error deleting job %s from %s: %v", job.Name, nameForLog, err)
+		klog.ErrorS(err, "Error deleting job", "job", klog.KObj(job), "cronjob", klog.KObj(cj))
 		return false
 	}
 	// ... and its reference from active list

@@ -65,7 +65,7 @@ func getParentUIDFromJob(j batchv1.Job) (types.UID, bool) {
 	}
 
 	if controllerRef.Kind != "CronJob" {
-		klog.V(4).InfoS("Job with non-CronJob parent", "jobName", j.Name, "jobNamespace", j.Namespace)
+		klog.V(4).InfoS("Job with non-CronJob parent", "job", klog.KRef(j.Namespace, j.Name))
 		return types.UID(""), false
 	}
 
@@ -79,7 +79,7 @@ func groupJobsByParent(js []batchv1.Job) map[types.UID][]batchv1.Job {
 	for _, job := range js {
 		parentUID, found := getParentUIDFromJob(job)
 		if !found {
-			klog.V(4).InfoS("Unable to get parent uid", "jobName", job.Name, "jobNamespace", job.Namespace)
+			klog.V(4).InfoS("Unable to get parent uid", "job", klog.KRef(job.Namespace, job.Name))
 			continue
 		}
 		jobsByCj[parentUID] = append(jobsByCj[parentUID], job)
