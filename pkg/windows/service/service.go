@@ -59,7 +59,7 @@ func InitService(serviceName string) error {
 	if err != nil {
 		return err
 	}
-	klog.Infof("Running %s as a Windows service!", serviceName)
+	klog.InfoS("Running as a Windows service!", "serviceName", serviceName)
 	return nil
 }
 
@@ -69,7 +69,7 @@ func (h *handler) Execute(_ []string, r <-chan svc.ChangeRequest, s chan<- svc.S
 	h.fromsvc <- nil
 
 	s <- svc.Status{State: svc.Running, Accepts: svc.AcceptStop | svc.AcceptShutdown | svc.Accepted(windows.SERVICE_ACCEPT_PARAMCHANGE)}
-	klog.Infof("Service running")
+	klog.InfoS("Service running")
 Loop:
 	for {
 		select {
@@ -82,7 +82,7 @@ Loop:
 			case svc.Interrogate:
 				s <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
-				klog.Infof("Service stopping")
+				klog.InfoS("Service stopping")
 				// We need to translate this request into a signal that can be handled by the signal handler
 				// handling shutdowns normally (currently apiserver/pkg/server/signal.go).
 				// If we do not do this, our main threads won't be notified of the upcoming shutdown.
