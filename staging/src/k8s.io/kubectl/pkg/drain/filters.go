@@ -179,7 +179,7 @@ func (d *Helper) daemonSetFilter(pod corev1.Pod) PodDeleteStatus {
 	// management resource - including DaemonSet - is not found).
 	// Such pods will be deleted if --force is used.
 	controllerRef := metav1.GetControllerOf(&pod)
-	if controllerRef == nil || controllerRef.Kind != appsv1.SchemeGroupVersion.WithKind("DaemonSet").Kind {
+	if controllerRef == nil || !isControllerRefDaemonSet(controllerRef) {
 		return MakePodDeleteStatusOkay()
 	}
 	// Any finished pod can be removed.
@@ -255,4 +255,10 @@ func (d *Helper) skipDeletedFilter(pod corev1.Pod) PodDeleteStatus {
 		return MakePodDeleteStatusSkip()
 	}
 	return MakePodDeleteStatusOkay()
+}
+
+func isControllerRefDaemonSet(workloadRef *metav1.OwnerReference) bool {
+	// find if workloadRef is daemonSet
+	daemonSetAPIVersion, daemonSetKind := appsv1.SchemeGroupVersion.WithKind("DaemonSet").ToAPIVersionAndKind()
+	return workloadRef.Kind == daemonSetKind && workloadRef.APIVersion == daemonSetAPIVersion
 }
