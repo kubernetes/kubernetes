@@ -76,7 +76,7 @@ func ProbeAttachableVolumePlugins() ([]volume.VolumePlugin, error) {
 
 // GetDynamicPluginProber gets the probers of dynamically discoverable plugins
 // for the attach/detach controller.
-// Currently only Flexvolume plugins are dynamically discoverable.
+// Currently only flex volume plugins are dynamically discoverable.
 func GetDynamicPluginProber(config persistentvolumeconfig.VolumeConfiguration) volume.DynamicPluginProber {
 	return flexvolume.GetDynamicPluginProber(config.FlexVolumePluginDir, exec.New() /*exec.Interface*/)
 }
