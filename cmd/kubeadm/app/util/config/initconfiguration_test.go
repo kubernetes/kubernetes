@@ -118,7 +118,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			desc: "Uninitialized nodeRegistration field produces a single taint (the master one)",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta3",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
 			},
@@ -128,7 +128,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			desc: "Uninitialized taints field produces a single taint (the master one)",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta3",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{},
@@ -139,7 +139,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			desc: "Forsing taints to an empty slice produces no taints",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta3",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
@@ -152,7 +152,7 @@ func TestDefaultTaintsMarshaling(t *testing.T) {
 			desc: "Custom taints are used",
 			cfg: kubeadmapiv1.InitConfiguration{
 				TypeMeta: metav1.TypeMeta{
-					APIVersion: "kubeadm.k8s.io/v1beta3",
+					APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 					Kind:       constants.InitConfigurationKind,
 				},
 				NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{

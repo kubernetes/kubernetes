@@ -18,9 +18,11 @@ package upgrade
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
 func TestEnforceRequirements(t *testing.T) {
@@ -89,9 +91,9 @@ func TestPrintConfiguration(t *testing.T) {
 					Type: kubeadmapi.CoreDNS,
 				},
 			},
-			expectedBytes: []byte(`[upgrade/config] Configuration used:
+			expectedBytes: []byte(fmt.Sprintf(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta3
+	apiVersion: %s
 	controllerManager: {}
 	dns:
 	  type: CoreDNS
@@ -102,7 +104,7 @@ func TestPrintConfiguration(t *testing.T) {
 	kubernetesVersion: v1.7.1
 	networking: {}
 	scheduler: {}
-`),
+`, kubeadmapiv1.SchemeGroupVersion.String())),
 		},
 		{
 			name: "cluster config with ServiceSubnet and external Etcd",
@@ -122,7 +124,7 @@ func TestPrintConfiguration(t *testing.T) {
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
 	apiServer: {}
-	apiVersion: kubeadm.k8s.io/v1beta3
+	apiVersion: ` + kubeadmapiv1.SchemeGroupVersion.String() + `
 	controllerManager: {}
 	dns:
 	  type: CoreDNS

@@ -39,7 +39,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	cfgPath := filepath.Join(dir, id)
 	initCfg := kubeadmapiv1.InitConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubeadm.k8s.io/v1beta3",
+			APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 			Kind:       "InitConfiguration",
 		},
 		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{
@@ -49,7 +49,7 @@ func generateTestKubeadmConfig(dir, id, certDir, clusterName string) (string, er
 	}
 	clusterCfg := kubeadmapiv1.ClusterConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "kubeadm.k8s.io/v1beta3",
+			APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 			Kind:       "ClusterConfiguration",
 		},
 		CertificatesDir:   certDir,

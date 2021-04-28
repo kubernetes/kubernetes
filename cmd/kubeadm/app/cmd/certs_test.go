@@ -378,18 +378,20 @@ func TestGenCSRConfig(t *testing.T) {
 
 	// A minimal kubeadm config with just enough values to avoid triggering
 	// auto-detection of config values at runtime.
-	var kubeadmConfig = `
-apiVersion: kubeadm.k8s.io/v1beta3
+	var kubeadmConfig = fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: 192.0.2.1
 nodeRegistration:
   criSocket: /path/to/dockershim.sock
 ---
-apiVersion: kubeadm.k8s.io/v1beta3
+apiVersion: %[1]s
 kind: ClusterConfiguration
 certificatesDir: /custom/config/certificates-dir
-kubernetesVersion: ` + kubeadmconstants.MinimumControlPlaneVersion.String()
+kubernetesVersion: %s`,
+		kubeadmapiv1.SchemeGroupVersion.String(),
+		kubeadmconstants.MinimumControlPlaneVersion.String())
 
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)

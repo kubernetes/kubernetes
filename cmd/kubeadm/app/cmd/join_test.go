@@ -17,18 +17,19 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-const (
-	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta3
+var testJoinConfig = fmt.Sprintf(`apiVersion: %s
 kind: JoinConfiguration
 discovery:
   bootstrapToken:
@@ -41,8 +42,7 @@ nodeRegistration:
   ignorePreflightErrors:
     - c
     - d
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
