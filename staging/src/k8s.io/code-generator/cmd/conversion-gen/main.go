@@ -106,6 +106,9 @@ func main() {
 	// TODO: move this out of conversion-gen
 	genericArgs.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), util.BoilerplatePath())
 
+	// Import generated source code for finding conversion functions by default
+	genericArgs.ImportBuildTag = ""
+
 	genericArgs.AddFlags(pflag.CommandLine)
 	customArgs.AddFlags(pflag.CommandLine)
 	flag.Set("logtostderr", "true")
