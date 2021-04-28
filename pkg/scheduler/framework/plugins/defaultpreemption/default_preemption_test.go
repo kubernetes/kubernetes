@@ -357,13 +357,9 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected: [][]Candidate{
-				{
-					&candidate{victims: &extenderv1.Victims{}, name: "node1"},
-					&candidate{victims: &extenderv1.Victims{}, name: "node2"},
-				},
-			},
-			expectedNumFilterCalled: []int32{4},
+			expected:                [][]Candidate{{}},
+			fakeFilterRC:            framework.Unschedulable,
+			expectedNumFilterCalled: []int32{2},
 		},
 		{
 			name: "a pod that fits on one node with no preemption",
@@ -379,12 +375,9 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected: [][]Candidate{
-				{
-					&candidate{victims: &extenderv1.Victims{}, name: "node1"},
-				},
-			},
-			expectedNumFilterCalled: []int32{3},
+			expected:                [][]Candidate{{}},
+			fakeFilterRC:            framework.Unschedulable,
+			expectedNumFilterCalled: []int32{2},
 		},
 		{
 			name: "a pod that fits on both nodes when lower priority pods are preempted",
@@ -1073,16 +1066,6 @@ func TestSelectBestCandidate(t *testing.T) {
 		expected       []string // any of the items is valid
 	}{
 		{
-			name:           "No node needs preemption",
-			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
-			nodeNames:      []string{"node1"},
-			pod:            st.MakePod().Name("p").UID("p").Priority(highPriority).Req(largeRes).Obj(),
-			pods: []*v1.Pod{
-				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Req(smallRes).StartTime(epochTime).Obj(),
-			},
-			expected: []string{"node1"},
-		},
-		{
 			name:           "a pod that fits on both nodes when lower priority pods are preempted",
 			registerPlugin: st.RegisterPluginAsExtensions(noderesources.FitName, noderesources.NewFit, "Filter", "PreFilter"),
 			nodeNames:      []string{"node1", "node2"},
@@ -1263,6 +1246,9 @@ func TestSelectBestCandidate(t *testing.T) {
 			offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
 			candidates, _ := dryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
 			s := SelectCandidate(candidates)
+			if s == nil || len(s.Name()) == 0 {
+				return
+			}
 			found := false
 			for _, nodeName := range tt.expected {
 				if nodeName == s.Name() {
