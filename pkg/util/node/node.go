@@ -169,7 +169,7 @@ func GetNodeIP(client clientset.Interface, name string) net.IP {
 		return true, nil
 	})
 	if err == nil {
-		klog.Infof("Successfully retrieved node IP: %v", nodeIP)
+		klog.InfoS("Successfully retrieved node IP", "nodeIP", nodeIP)
 	}
 	return nodeIP
 }
