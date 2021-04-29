@@ -111,7 +111,7 @@ func (tc *replicaCalcTestCase) prepareTestClientSet() *fake.Clientset {
 		obj := &v1.PodList{}
 		podsCount := int(tc.currentReplicas)
 		// Failed pods are not included in tc.currentReplicas
-		if tc.podPhase != nil && len(tc.podPhase) > podsCount {
+		if len(tc.podPhase) > podsCount {
 			podsCount = len(tc.podPhase)
 		}
 		for i := 0; i < podsCount; i++ {

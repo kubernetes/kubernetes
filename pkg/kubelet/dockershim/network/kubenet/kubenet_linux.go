@@ -530,7 +530,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	for _, ip := range iplist {
 		isV6 := netutils.IsIPv6String(ip)
 		klog.V(5).InfoS("Removing pod port mappings from the IP", "IP", ip)
-		if portMappings != nil && len(portMappings) > 0 {
+		if len(portMappings) > 0 {
 			if isV6 {
 				if err = plugin.hostportManagerv6.Remove(id.ID, &hostport.PodPortMapping{
 					Namespace:    namespace,

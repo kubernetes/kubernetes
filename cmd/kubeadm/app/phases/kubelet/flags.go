@@ -90,7 +90,7 @@ func buildKubeletArgMapCommon(opts kubeletFlagsOpts) map[string]string {
 		kubeletFlags["pod-infra-container-image"] = opts.pauseImage
 	}
 
-	if opts.registerTaintsUsingFlags && opts.nodeRegOpts.Taints != nil && len(opts.nodeRegOpts.Taints) > 0 {
+	if opts.registerTaintsUsingFlags && len(opts.nodeRegOpts.Taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range opts.nodeRegOpts.Taints {
 			taintStrs = append(taintStrs, taint.ToString())

@@ -439,7 +439,7 @@ func TestReconcile1Pod(t *testing.T) {
 				expectTrackedGeneration(t, r.endpointSliceTracker, &slice, 1)
 
 				expectSlicesChangedPerSync := 1
-				if testCase.service.Spec.IPFamilies != nil && len(testCase.service.Spec.IPFamilies) > 0 {
+				if len(testCase.service.Spec.IPFamilies) > 0 {
 					expectSlicesChangedPerSync = len(testCase.service.Spec.IPFamilies)
 				}
 				expectMetrics(t,

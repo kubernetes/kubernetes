@@ -39,7 +39,7 @@ func nilSafeLookup(key string, from map[string]interface{}) (interface{}, bool) 
 // boundsSafeLookup returns the value from the slice if the slice is non-nil and
 // the index is in bounds.
 func boundsSafeLookup(index int, from []interface{}) (interface{}, bool) {
-	if from != nil && len(from) > index {
+	if len(from) > index {
 		return from[index], true
 	}
 	return nil, false
