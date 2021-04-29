@@ -180,6 +180,9 @@ func (h conversionEventHandler) OnDelete(obj interface{}) {
 	h.handler.OnDelete(rs)
 }
 
+func (h conversionEventHandler) OnError(err error) {
+}
+
 type clientsetAdapter struct {
 	clientset.Interface
 }

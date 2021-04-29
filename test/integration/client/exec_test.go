@@ -430,6 +430,9 @@ func (es *informerSpy) OnDelete(obj interface{}) {
 	es.deletes = append(es.deletes, obj)
 }
 
+func (es *informerSpy) OnError(err error) {
+}
+
 // waitForEvents waits for adds, updates, and deletes to be filled with at least one event.
 func (es *informerSpy) waitForEvents(t *testing.T) {
 	if err := wait.PollImmediate(time.Millisecond*250, time.Second*20, func() (bool, error) {

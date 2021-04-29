@@ -376,6 +376,17 @@ type deleteNotification struct {
 	oldObj interface{}
 }
 
+type errorNotification struct {
+	err error
+}
+
+func (s *sharedIndexInformer) handleWatchError(r *Reflector, err error) {
+	if s.watchErrorHandler != nil {
+		s.watchErrorHandler(r, err)
+	}
+	s.processor.distribute(errorNotification{err}, false)
+}
+
 func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) error {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
@@ -405,7 +416,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		ShouldResync:     s.processor.shouldResync,
 
 		Process:           s.HandleDeltas,
-		WatchErrorHandler: s.watchErrorHandler,
+		WatchErrorHandler: s.handleWatchError,
 	}
 
 	func() {
@@ -880,6 +891,8 @@ func (p *processorListener) run() {
 				p.handler.OnAdd(notification.newObj)
 			case deleteNotification:
 				p.handler.OnDelete(notification.oldObj)
+			case errorNotification:
+				p.handler.OnError(notification.err)
 			default:
 				utilruntime.HandleError(fmt.Errorf("unrecognized notification: %T", next))
 			}
