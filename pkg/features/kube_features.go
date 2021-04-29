@@ -286,14 +286,6 @@ const (
 	// Enables the endPort field in NetworkPolicy to enable a Port Range behavior in Network Policies.
 	NetworkPolicyEndPort featuregate.Feature = "NetworkPolicyEndPort"
 
-	// owner: @xing-yang
-	// alpha: v1.12
-	// beta: v1.17
-	// GA: v1.20
-	//
-	// Enable volume snapshot data source support.
-	VolumeSnapshotDataSource featuregate.Feature = "VolumeSnapshotDataSource"
-
 	// owner: @jessfraz
 	// alpha: v1.12
 	//
@@ -802,7 +794,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RuntimeClass:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	NodeLease:                                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	NetworkPolicyEndPort:                           {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSnapshotDataSource:                       {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.21
 	ProcMountType:                                  {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                               {Default: true, PreRelease: featuregate.Beta},
 	IndexedJob:                                     {Default: false, PreRelease: featuregate.Alpha},
