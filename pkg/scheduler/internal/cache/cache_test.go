@@ -212,7 +212,7 @@ func TestAssumePodScheduled(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(time.Second, time.Second, nil)
+			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			for _, pod := range tt.pods {
 				if err := cache.AssumePod(pod); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
@@ -297,7 +297,7 @@ func TestExpirePod(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 
 			for _, pod := range tt.pods {
 				if err := cache.AssumePod(pod.pod); err != nil {
@@ -359,7 +359,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -399,7 +399,7 @@ func TestDump(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Errorf("assumePod failed: %v", err)
@@ -467,7 +467,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -524,7 +524,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			now := time.Now()
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			if err := assumeAndFinishBinding(cache, tt.pod, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
@@ -592,7 +592,7 @@ func TestUpdatePod(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			for _, podToAdd := range tt.podsToAdd {
 				if err := cache.AddPod(podToAdd); err != nil {
 					t.Fatalf("AddPod failed: %v", err)
@@ -654,7 +654,7 @@ func TestUpdatePodAndGet(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 
 			if err := tt.handler(cache, tt.pod); err != nil {
 				t.Fatalf("unexpected err: %v", err)
@@ -727,7 +727,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			now := time.Now()
-			cache := newSchedulerCache(ttl, time.Second, nil)
+			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -806,7 +806,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(time.Second, time.Second, nil)
+			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			if err := cache.AddPod(tt.pod); err != nil {
 				t.Fatalf("AddPod failed: %v", err)
 			}
@@ -862,7 +862,7 @@ func TestRemovePod(t *testing.T) {
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			nodeName := tt.pod.Spec.NodeName
-			cache := newSchedulerCache(time.Second, time.Second, nil)
+			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			// Add pod succeeds even before adding the nodes.
 			if err := cache.AddPod(tt.pod); err != nil {
 				t.Fatalf("AddPod failed: %v", err)
@@ -898,7 +898,7 @@ func TestForgetPod(t *testing.T) {
 	now := time.Now()
 	ttl := 10 * time.Second
 
-	cache := newSchedulerCache(ttl, time.Second, nil)
+	cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
 	for _, pod := range pods {
 		if err := assumeAndFinishBinding(cache, pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -1080,7 +1080,7 @@ func TestNodeOperators(t *testing.T) {
 			expected := buildNodeInfo(test.node, test.pods)
 			node := test.node
 
-			cache := newSchedulerCache(time.Second, time.Second, nil)
+			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			cache.AddNode(node)
 			for _, pod := range test.pods {
 				if err := cache.AddPod(pod); err != nil {
@@ -1465,7 +1465,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache = newSchedulerCache(time.Second, time.Second, nil)
+			cache = newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			snapshot = NewEmptySnapshot()
 
 			for _, op := range test.operations {
@@ -1680,7 +1680,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache = newSchedulerCache(time.Second, time.Second, nil)
+			cache = newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 			snapshot = NewEmptySnapshot()
 
 			test.operations(t)
@@ -1774,7 +1774,7 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 }
 
 func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
-	cache := newSchedulerCache(time.Second, time.Second, nil)
+	cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		for j := 0; j < 30; j++ {
@@ -1790,7 +1790,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 }
 
 func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *schedulerCache {
-	cache := newSchedulerCache(time.Second, time.Second, nil)
+	cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)

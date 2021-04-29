@@ -548,7 +548,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(100*time.Millisecond, stop)
+	scache := internalcache.New(100*time.Millisecond, stop, framework.NewNodeInfo, false)
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -615,7 +615,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -719,7 +719,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
 	var cpu = int64(4)
@@ -864,7 +864,7 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
 	queuedPodStore.Add(pod)
-	scache := internalcache.New(10*time.Minute, stop)
+	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
 	scache.AddNode(&testNode)
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
@@ -1176,7 +1176,7 @@ func TestSchedulerBinding(t *testing.T) {
 			}
 			stop := make(chan struct{})
 			defer close(stop)
-			scache := internalcache.New(100*time.Millisecond, stop)
+			scache := internalcache.New(100*time.Millisecond, stop, framework.NewNodeInfo, false)
 			algo := core.NewGenericScheduler(
 				scache,
 				nil,

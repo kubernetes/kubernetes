@@ -263,7 +263,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
 			}
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
 			for _, name := range test.nodes {
 				cache.AddNode(createNode(name))
 			}

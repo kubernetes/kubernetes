@@ -207,7 +207,7 @@ func TestUpdatePodInCache(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			schedulerCache := cache.New(ttl, ctx.Done())
+			schedulerCache := cache.New(ttl, ctx.Done(), framework.NewNodeInfo, false)
 			schedulerQueue := queue.NewTestQueue(ctx, nil)
 			sched := &Scheduler{
 				SchedulerCache:  schedulerCache,

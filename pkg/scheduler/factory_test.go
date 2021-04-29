@@ -472,7 +472,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
 
 			queue.Add(testPod)
 			queue.Pop()
@@ -546,7 +546,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
@@ -587,7 +587,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(&nodeFoo)

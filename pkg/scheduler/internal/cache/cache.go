@@ -24,9 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -39,8 +38,10 @@ var (
 // It automatically starts a go routine that manages expiration of assumed pods.
 // "ttl" is how long the assumed pod will get expired.
 // "stop" is the channel that would close the background goroutine.
-func New(ttl time.Duration, stop <-chan struct{}) Cache {
-	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
+// "newNodeInfo" is a function creating a NodeInfo object
+// "balancedVolumesEnabled" signals if BalanceAttachedNodeVolumes feature is enabled
+func New(ttl time.Duration, stop <-chan struct{}, newNodeInfo func() *framework.NodeInfo, balancedVolumesEnabled bool) Cache {
+	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop, newNodeInfo, balancedVolumesEnabled)
 	cache.run()
 	return cache
 }
@@ -55,9 +56,11 @@ type nodeInfoListItem struct {
 }
 
 type schedulerCache struct {
-	stop   <-chan struct{}
-	ttl    time.Duration
-	period time.Duration
+	stop                   <-chan struct{}
+	ttl                    time.Duration
+	period                 time.Duration
+	newNodeInfo            func() *framework.NodeInfo
+	balancedVolumesEnabled bool
 
 	// This mutex guards all fields within this cache struct.
 	mu sync.RWMutex
@@ -98,17 +101,19 @@ func (cache *schedulerCache) createImageStateSummary(state *imageState) *framewo
 	}
 }
 
-func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
+func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}, newNodeInfo func() *framework.NodeInfo, balancedVolumesEnabled bool) *schedulerCache {
 	return &schedulerCache{
-		ttl:    ttl,
-		period: period,
-		stop:   stop,
+		ttl:         ttl,
+		period:      period,
+		stop:        stop,
+		newNodeInfo: newNodeInfo,
 
-		nodes:       make(map[string]*nodeInfoListItem),
-		nodeTree:    newNodeTree(nil),
-		assumedPods: make(sets.String),
-		podStates:   make(map[string]*podState),
-		imageStates: make(map[string]*imageState),
+		nodes:                  make(map[string]*nodeInfoListItem),
+		nodeTree:               newNodeTree(nil),
+		assumedPods:            make(sets.String),
+		podStates:              make(map[string]*podState),
+		imageStates:            make(map[string]*imageState),
+		balancedVolumesEnabled: balancedVolumesEnabled,
 	}
 }
 
@@ -198,7 +203,6 @@ func (cache *schedulerCache) Dump() *Dump {
 func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
 	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.generation
@@ -222,7 +226,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			// all the nodes are updated before the existing snapshot. We are done.
 			break
 		}
-		if balancedVolumesEnabled && node.info.TransientInfo != nil {
+		if cache.balancedVolumesEnabled && node.info.TransientInfo != nil {
 			// Transient scheduler info is reset here.
 			node.info.TransientInfo.ResetTransientSchedulerInfo()
 		}
@@ -431,7 +435,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 func (cache *schedulerCache) addPod(pod *v1.Pod) {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[pod.Spec.NodeName] = n
 	}
 	n.info.AddPod(pod)
@@ -599,7 +603,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) *framework.NodeInfo {
 
 	n, ok := cache.nodes[node.Name]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
 		cache.removeNodeImageStates(n.info.Node())
@@ -618,7 +622,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) *framework.No
 
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(newNode)
 	} else {

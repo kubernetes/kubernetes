@@ -1613,7 +1613,7 @@ func TestPreempt(t *testing.T) {
 			stop := make(chan struct{})
 			defer close(stop)
 
-			cache := internalcache.New(time.Duration(0), stop)
+			cache := internalcache.New(time.Duration(0), stop, framework.NewNodeInfo, false)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}

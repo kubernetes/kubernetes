@@ -968,7 +968,7 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1033,7 +1033,7 @@ func TestGenericScheduler(t *testing.T) {
 
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(nodes []*v1.Node) *genericScheduler {
-	cache := internalcache.New(time.Duration(0), wait.NeverStop)
+	cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -1491,7 +1491,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := &clientsetfake.Clientset{}
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
 			for _, n := range nodes {
 				cache.AddNode(n)
 			}

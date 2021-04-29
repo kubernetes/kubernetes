@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/klog/v2"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
@@ -213,7 +215,7 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
-	schedulerCache := internalcache.New(30*time.Second, stopEverything)
+	schedulerCache := internalcache.New(30*time.Second, stopEverything, framework.NewNodeInfo, utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes))
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
