@@ -1499,7 +1499,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Prefer local ready endpoint chains, but fall back to ready terminating if none exist
 		localEndpointChains := localReadyEndpointChains
-		if len(localEndpointChains) == 0 {
+		if utilfeature.DefaultFeatureGate.Enabled(features.ProxyTerminatingEndpoints) && len(localEndpointChains) == 0 {
 			localEndpointChains = localServingTerminatingEndpointChains
 		}
 
