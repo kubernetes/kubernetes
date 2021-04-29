@@ -180,6 +180,7 @@ func TestSchedulerCreation(t *testing.T) {
 				client,
 				informerFactory,
 				profile.NewRecorderFactory(eventBroadcaster),
+				getFakeResourceNameQualifier(),
 				stopCh,
 				tc.opts...,
 			)
@@ -461,6 +462,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		client,
 		informerFactory,
 		profile.NewRecorderFactory(broadcaster),
+		getFakeResourceNameQualifier(),
 		ctx.Done(),
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",

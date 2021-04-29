@@ -202,6 +202,7 @@ var defaultSchedulerOptions = schedulerOptions{
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
+	resourceNameQualifier framework.ResourceNameQualifier,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
@@ -240,6 +241,7 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 		parallellism:             options.parallelism,
+		resourceNameQualifier:    resourceNameQualifier,
 	}
 
 	metrics.Register()

@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/util/resources"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
 	"sigs.k8s.io/yaml"
@@ -528,7 +529,7 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 		if err != nil {
 			b.Fatalf("error loading scheduler config file: %v", err)
 		}
-		if err = validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
+		if err = validation.ValidateKubeSchedulerConfiguration(cfg, resources.NewResourceNameQualifier()); err != nil {
 			b.Fatalf("validate scheduler config file failed: %v", err)
 		}
 	}

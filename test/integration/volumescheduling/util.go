@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/util/resources"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -124,6 +125,7 @@ func initTestSchedulerWithOptions(
 		testCtx.clientSet,
 		testCtx.informerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
+		resources.NewResourceNameQualifier(),
 		testCtx.ctx.Done())
 
 	if err != nil {

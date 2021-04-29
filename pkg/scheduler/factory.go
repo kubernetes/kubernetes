@@ -80,12 +80,13 @@ type Configurator struct {
 
 	podMaxBackoffSeconds int64
 
-	profiles          []schedulerapi.KubeSchedulerProfile
-	registry          frameworkruntime.Registry
-	nodeInfoSnapshot  *internalcache.Snapshot
-	extenders         []schedulerapi.Extender
-	frameworkCapturer FrameworkCapturer
-	parallellism      int32
+	profiles              []schedulerapi.KubeSchedulerProfile
+	registry              frameworkruntime.Registry
+	nodeInfoSnapshot      *internalcache.Snapshot
+	extenders             []schedulerapi.Extender
+	frameworkCapturer     FrameworkCapturer
+	parallellism          int32
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 // create a scheduler from a set of registered plugins.
@@ -220,7 +221,7 @@ func (c *Configurator) createFromConfig(policy schedulerapi.Policy) (*Scheduler,
 	klog.V(2).InfoS("Creating scheduler from configuration", "policy", policy)
 
 	// validate the policy configuration
-	if err := validation.ValidatePolicy(policy); err != nil {
+	if err := validation.ValidatePolicy(policy, c.resourceNameQualifier); err != nil {
 		return nil, err
 	}
 

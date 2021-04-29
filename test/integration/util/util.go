@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	schedulerapiv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	"k8s.io/kubernetes/pkg/util/resources"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -88,6 +89,7 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 		clientSet,
 		informerFactory,
 		profile.NewRecorderFactory(evtBroadcaster),
+		resources.NewResourceNameQualifier(),
 		ctx.Done(),
 		scheduler.WithKubeConfig(kubeConfig),
 		scheduler.WithProfiles(cfg.Profiles...),
@@ -410,6 +412,7 @@ func InitTestSchedulerWithOptions(
 		testCtx.ClientSet,
 		testCtx.InformerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
+		resources.NewResourceNameQualifier(),
 		testCtx.Ctx.Done(),
 		opts...,
 	)

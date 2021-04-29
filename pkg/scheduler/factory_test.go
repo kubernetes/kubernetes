@@ -38,6 +38,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -90,6 +91,10 @@ func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Inte
 			},
 		},
 	}
+}
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{}
 }
 
 // TestCreateFromConfig configures a scheduler from policies defined in a configMap.
@@ -404,6 +409,7 @@ func TestCreateFromConfig(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
+				getFakeResourceNameQualifier(),
 				make(chan struct{}),
 				WithAlgorithmSource(createAlgorithmSourceFromPolicy(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {

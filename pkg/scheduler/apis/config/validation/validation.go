@@ -28,12 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbasevalidation "k8s.io/component-base/config/validation"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
-func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) utilerrors.Aggregate {
+func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration, rnq framework.ResourceNameQualifier) utilerrors.Aggregate {
 	var errs []error
 	errs = append(errs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection")).ToAggregate())
 	errs = append(errs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection")).ToAggregate())
@@ -76,7 +76,7 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 			cc.PodMaxBackoffSeconds, "must be greater than or equal to PodInitialBackoffSeconds"))
 	}
 
-	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
+	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders, rnq)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))
 }
 
@@ -170,7 +170,7 @@ func validateCommonQueueSort(path *field.Path, profiles []config.KubeSchedulerPr
 
 // ValidatePolicy checks for errors in the Config
 // It does not return early so that it can find as many errors as possible
-func ValidatePolicy(policy config.Policy) error {
+func ValidatePolicy(policy config.Policy, rnq framework.ResourceNameQualifier) error {
 	var validationErrors []error
 
 	priorities := make(map[string]config.PriorityPolicy, len(policy.Priorities))
@@ -181,7 +181,7 @@ func ValidatePolicy(policy config.Policy) error {
 		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
 	}
 
-	if extenderErrs := validateExtenders(field.NewPath("extenders"), policy.Extenders); len(extenderErrs) > 0 {
+	if extenderErrs := validateExtenders(field.NewPath("extenders"), policy.Extenders, rnq); len(extenderErrs) > 0 {
 		validationErrors = append(validationErrors, extenderErrs...)
 	}
 
@@ -192,7 +192,7 @@ func ValidatePolicy(policy config.Policy) error {
 }
 
 // validateExtenders validates the configured extenders for the Scheduler
-func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error {
+func validateExtenders(fldPath *field.Path, extenders []config.Extender, rnq framework.ResourceNameQualifier) []error {
 	var errs []error
 	binders := 0
 	extenderManagedResources := sets.NewString()
@@ -207,7 +207,7 @@ func validateExtenders(fldPath *field.Path, extenders []config.Extender) []error
 		}
 		for j, resource := range extender.ManagedResources {
 			managedResourcesPath := path.Child("managedResources").Index(j)
-			validationErrors := validateExtendedResourceName(managedResourcesPath.Child("name"), v1.ResourceName(resource.Name))
+			validationErrors := validateExtendedResourceName(managedResourcesPath.Child("name"), v1.ResourceName(resource.Name), rnq)
 			errs = append(errs, validationErrors...)
 			if extenderManagedResources.Has(resource.Name) {
 				errs = append(errs, field.Invalid(managedResourcesPath.Child("name"),
@@ -265,7 +265,7 @@ func validateCustomPriorities(priorities map[string]config.PriorityPolicy, prior
 
 // validateExtendedResourceName checks whether the specified name is a valid
 // extended resource name.
-func validateExtendedResourceName(path *field.Path, name v1.ResourceName) []error {
+func validateExtendedResourceName(path *field.Path, name v1.ResourceName, rnq framework.ResourceNameQualifier) []error {
 	var validationErrors []error
 	for _, msg := range validation.IsQualifiedName(string(name)) {
 		validationErrors = append(validationErrors, field.Invalid(path, name, msg))
@@ -273,7 +273,7 @@ func validateExtendedResourceName(path *field.Path, name v1.ResourceName) []erro
 	if len(validationErrors) != 0 {
 		return validationErrors
 	}
-	if !v1helper.IsExtendedResourceName(name) {
+	if !rnq.IsExtended(name) {
 		validationErrors = append(validationErrors, field.Invalid(path, string(name), "is an invalid extended resource name"))
 	}
 	return validationErrors

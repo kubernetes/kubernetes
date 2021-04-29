@@ -40,6 +40,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
+	"k8s.io/kubernetes/pkg/util/resources"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/integration/util"
 )
@@ -281,6 +282,7 @@ priorities: []
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
 			profile.NewRecorderFactory(eventBroadcaster),
+			resources.NewResourceNameQualifier(),
 			nil,
 			scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -334,6 +336,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	_, err := scheduler.New(clientSet,
 		informerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
+		resources.NewResourceNameQualifier(),
 		nil,
 		scheduler.WithAlgorithmSource(kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
