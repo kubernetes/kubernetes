@@ -48,7 +48,6 @@ var localStorageCapacityIsolation featuregate.Feature = "LocalStorageCapacityIso
 
 var (
 	downwardAPIHugePages featuregate.Feature = "DownwardAPIHugePages"
-	execProbeTimeout     featuregate.Feature = "ExecProbeTimeout"
 )
 
 func skipInternalf(caller int, format string, args ...interface{}) {
@@ -145,12 +144,6 @@ func SkipUnlessLocalEphemeralStorageEnabled() {
 func SkipUnlessDownwardAPIHugePagesEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(downwardAPIHugePages) {
 		skipInternalf(1, "Only supported when %v feature is enabled", downwardAPIHugePages)
-	}
-}
-
-func SkipUnlessExecProbeTimeoutEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(execProbeTimeout) {
-		skipInternalf(1, "Only supported when %v feature is enabled", execProbeTimeout)
 	}
 }
 

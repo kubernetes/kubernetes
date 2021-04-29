@@ -19,8 +19,6 @@ package exec
 import (
 	"bytes"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
 	"k8s.io/kubernetes/pkg/probe"
 
@@ -71,11 +69,7 @@ func (pr execProber) Probe(e exec.Cmd) (probe.Result, string, error) {
 
 		timeoutErr, ok := err.(*TimeoutError)
 		if ok {
-			if utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
-				return probe.Failure, string(data), nil
-			}
-
-			klog.Warningf("Exec probe timed out after %s but ExecProbeTimeout feature gate was disabled", timeoutErr.Timeout())
+			return probe.Failure, string(data), nil
 		}
 
 		return probe.Unknown, "", err

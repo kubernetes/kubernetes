@@ -26,7 +26,6 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -108,7 +107,7 @@ func (*NativeExecHandler) ExecInContainer(ctx context.Context, client libdocker.
 		ExecStarted:  execStarted,
 	}
 
-	if timeout > 0 && utilfeature.DefaultFeatureGate.Enabled(features.ExecProbeTimeout) {
+	if timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()

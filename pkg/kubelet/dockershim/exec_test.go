@@ -29,10 +29,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/remotecommand"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	mockclient "k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker/testing"
 )
@@ -111,7 +108,7 @@ func TestExecInContainer(t *testing.T) {
 		execProbeTimeout:   true,
 		expectError:        context.DeadlineExceeded,
 	}, {
-		description:        "[ExecProbeTimeout=true] StartExec that takes longer than the probe timeout returns context.DeadlineExceeded",
+		description:        "StartExec that takes longer than the probe timeout returns context.DeadlineExceeded",
 		timeout:            1 * time.Second,
 		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
 		returnCreateExec2:  nil,
@@ -121,17 +118,6 @@ func TestExecInContainer(t *testing.T) {
 		returnInspectExec2: nil,
 		execProbeTimeout:   true,
 		expectError:        context.DeadlineExceeded,
-	}, {
-		description:        "[ExecProbeTimeout=false] StartExec that takes longer than the probe timeout returns a error",
-		timeout:            1 * time.Second,
-		returnCreateExec1:  &dockertypes.IDResponse{ID: "12345678"},
-		returnCreateExec2:  nil,
-		startExecDelay:     5 * time.Second,
-		returnStartExec:    fmt.Errorf("error in StartExec()"),
-		returnInspectExec1: nil,
-		returnInspectExec2: nil,
-		execProbeTimeout:   false,
-		expectError:        fmt.Errorf("error in StartExec()"),
 	}}
 
 	eh := &NativeExecHandler{}
@@ -146,7 +132,6 @@ func TestExecInContainer(t *testing.T) {
 		// these tests cannot be run in parallel due to the fact that they are feature gate dependent
 		tc := tc
 		t.Run(tc.description, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExecProbeTimeout, tc.execProbeTimeout)()
 
 			mockClient := mockclient.NewMockInterface(ctrl)
 			mockClient.EXPECT().CreateExec(gomock.Any(), gomock.Any()).Return(
