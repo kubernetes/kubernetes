@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/discovery"
@@ -83,7 +83,7 @@ var (
 		# Show metrics for the pods defined by label name=myLabel
 		kubectl top pod -l name=myLabel
 		
-		# Show pod metrics with more information (such as node name). Requires GET /pods access.
+		# Show pod metrics with more information (such as node name). Requires read access to Pods resource.
 		kubectl top pod -o wide`))
 )
 
@@ -214,10 +214,9 @@ func (o TopPodOptions) RunTopPod() error {
 	// check if user wants wide data, if so get pods to join metrics together
 	if o.Output == "wide" {
 		pods, err = getPods(o, selector)
-	}
-
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	return o.Printer.PrintPodMetrics(metrics.Items, o.PrintContainers, o.AllNamespaces, o.NoHeaders, o.SortBy, pods)
@@ -298,7 +297,7 @@ func getPods(o TopPodOptions, selector labels.Selector) (pods *v1.PodList, err e
 		LabelSelector: selector.String(),
 	})
 	if err != nil {
-		return pods, err
+		return nil, err
 	}
-	return pods, err
+	return pods, nil
 }
