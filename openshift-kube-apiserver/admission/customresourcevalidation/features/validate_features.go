@@ -51,7 +51,13 @@ func toFeatureGateV1(uncastObj runtime.Object) (*configv1.FeatureGate, field.Err
 type featureGateV1 struct {
 }
 
-var knownFeatureSets = sets.NewString("", string(configv1.TechPreviewNoUpgrade), string(configv1.CustomNoUpgrade))
+var knownFeatureSets = sets.NewString(
+	"",
+	string(configv1.TechPreviewNoUpgrade),
+	string(configv1.CustomNoUpgrade),
+	string(configv1.IPv6DualStackNoUpgrade),
+	string(configv1.LatencySensitive),
+)
 
 func validateFeatureGateSpecCreate(spec configv1.FeatureGateSpec) field.ErrorList {
 	allErrs := field.ErrorList{}
