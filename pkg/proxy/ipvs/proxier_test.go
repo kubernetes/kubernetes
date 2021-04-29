@@ -4684,6 +4684,7 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Name:       "",
+					Port:       80,
 					TargetPort: intstr.FromInt(80),
 					Protocol:   v1.ProtocolTCP,
 				},
@@ -4857,6 +4858,7 @@ func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
 			Ports: []v1.ServicePort{
 				{
 					Name:       "",
+					Port:       80,
 					TargetPort: intstr.FromInt(80),
 					Protocol:   v1.ProtocolTCP,
 				},
