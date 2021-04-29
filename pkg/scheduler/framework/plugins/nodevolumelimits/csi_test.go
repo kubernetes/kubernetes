@@ -579,7 +579,10 @@ func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeListe
 }
 
 func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
-	nodeInfo := framework.NewNodeInfo(pods...)
+	nodeInfo := framework.NewNodeInfo()
+	for _, pod := range pods {
+		nodeInfo.AddPod(pod)
+	}
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
 		Status: v1.NodeStatus{

@@ -84,7 +84,10 @@ func newNodeInfo(requestedResource *framework.Resource,
 	usedPorts framework.HostPortInfo,
 	imageStates map[string]*framework.ImageStateSummary,
 ) *framework.NodeInfo {
-	nodeInfo := framework.NewNodeInfo(pods...)
+	nodeInfo := framework.NewNodeInfo()
+	for _, pod := range pods {
+		nodeInfo.AddPod(pod)
+	}
 	nodeInfo.Requested = requestedResource
 	nodeInfo.NonZeroRequested = nonzeroRequest
 	nodeInfo.UsedPorts = usedPorts

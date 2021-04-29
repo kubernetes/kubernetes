@@ -339,7 +339,10 @@ func TestNewNodeInfo(t *testing.T) {
 	}
 
 	gen := generation
-	ni := NewNodeInfo(pods...)
+	ni := NewNodeInfo()
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
 	if ni.Generation <= gen {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
@@ -1035,7 +1038,10 @@ func TestNodeInfoRemovePod(t *testing.T) {
 }
 
 func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
-	ni := NewNodeInfo(pods...)
+	ni := NewNodeInfo()
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
 	ni.SetNode(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",

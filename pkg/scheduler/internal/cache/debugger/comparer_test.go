@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -177,7 +177,8 @@ func testComparePods(actual, cached, queued, missing, redundant []string, t *tes
 		pod.Namespace = "ns"
 		pod.Name = uid
 
-		nodeInfo[uid] = framework.NewNodeInfo(pod)
+		nodeInfo[uid] = framework.NewNodeInfo()
+		nodeInfo[uid].AddPod(pod)
 	}
 
 	m, r := compare.ComparePods(pods, queuedPods, nodeInfo)

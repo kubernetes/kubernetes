@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -319,7 +319,10 @@ func TestPreCheckForNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
+			nodeInfo := framework.NewNodeInfo()
+			for _, pod := range tt.existingPods {
+				nodeInfo.AddPod(pod)
+			}
 			nodeInfo.SetNode(tt.nodeFn())
 			preCheckFn := preCheckForNode(nodeInfo)
 
