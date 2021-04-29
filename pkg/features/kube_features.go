@@ -595,6 +595,13 @@ const (
 	// Enable Terminating condition in Endpoint Slices.
 	EndpointSliceTerminatingCondition featuregate.Feature = "EndpointSliceTerminatingCondition"
 
+	// owner: @andrewsykim
+	// kep: http://kep.k8s.io/1669
+	// alpha: v1.22
+	//
+	// Enable kube-proxy to handle terminating ednpoints when externalTrafficPolicy=Local
+	ProxyTerminatingEndpoints featuregate.Feature = "ProxyTerminatingEndpoints"
+
 	// owner: @robscott
 	// kep: http://kep.k8s.io/752
 	// alpha: v1.20
@@ -828,6 +835,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSlice:                                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	EndpointSliceProxying:                          {Default: true, PreRelease: featuregate.Beta},
 	EndpointSliceTerminatingCondition:              {Default: false, PreRelease: featuregate.Alpha},
+	ProxyTerminatingEndpoints:                      {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSliceNodeName:                          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, //remove in 1.25
 	WindowsEndpointSliceProxying:                   {Default: true, PreRelease: featuregate.Beta},
 	StartupProbe:                                   {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
