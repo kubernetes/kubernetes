@@ -32,24 +32,20 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/names"
-	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
-	"k8s.io/client-go/metadata/metadatainformer"
-	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/controller-manager/pkg/informerfactory"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
 	"k8s.io/kubernetes/test/integration"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/integration/util"
 	"k8s.io/utils/pointer"
 )
 
@@ -136,19 +132,6 @@ func newOwnerRC(name, namespace string) *v1.ReplicationController {
 	}
 }
 
-func newCRDInstance(definition *apiextensionsv1.CustomResourceDefinition, namespace, name string) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       definition.Spec.Names.Kind,
-			"apiVersion": definition.Spec.Group + "/" + definition.Spec.Versions[0].Name,
-			"metadata": map[string]interface{}{
-				"name":      name,
-				"namespace": namespace,
-			},
-		},
-	}
-}
-
 func newConfigMap(namespace, name string) *v1.ConfigMap {
 	return &v1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -176,28 +159,6 @@ func link(t *testing.T, owner, dependent metav1.Object) {
 	dependent.SetOwnerReferences(append(dependent.GetOwnerReferences(), ref))
 }
 
-func createRandomCustomResourceDefinition(
-	t *testing.T, apiExtensionClient apiextensionsclientset.Interface,
-	dynamicClient dynamic.Interface,
-	namespace string,
-) (*apiextensionsv1.CustomResourceDefinition, dynamic.ResourceInterface) {
-	// Create a random custom resource definition and ensure it's available for
-	// use.
-	definition := apiextensionstestserver.NewRandomNameV1CustomResourceDefinition(apiextensionsv1.NamespaceScoped)
-
-	definition, err := apiextensionstestserver.CreateNewV1CustomResourceDefinition(definition, apiExtensionClient, dynamicClient)
-	if err != nil {
-		t.Fatalf("failed to create CustomResourceDefinition: %v", err)
-	}
-
-	// Get a client for the custom resource.
-	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Versions[0].Name, Resource: definition.Spec.Names.Plural}
-
-	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-
-	return definition, resourceClient
-}
-
 type testContext struct {
 	tearDown           func()
 	gc                 *garbagecollector.GarbageCollector
@@ -206,6 +167,7 @@ type testContext struct {
 	dynamicClient      dynamic.Interface
 	metadataClient     metadata.Interface
 	startGC            func(workers int)
+	informers          informerfactory.InformerFactory
 	// syncPeriod is how often the GC started with startGC will be resynced.
 	syncPeriod time.Duration
 }
@@ -216,63 +178,32 @@ func setup(t *testing.T, workerCount int) *testContext {
 }
 
 func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, workerCount int) *testContext {
-	clientSet, err := clientset.NewForConfig(result.ClientConfig)
-	if err != nil {
-		t.Fatalf("error creating clientset: %v", err)
-	}
-
-	// Helpful stuff for testing CRD.
-	apiExtensionClient, err := apiextensionsclientset.NewForConfig(result.ClientConfig)
-	if err != nil {
-		t.Fatalf("error creating extension clientset: %v", err)
-	}
-	// CreateCRDUsingRemovedAPI wants to use this namespace for verifying
-	// namespace-scoped CRD creation.
-	createNamespaceOrDie("aval", clientSet, t)
-
-	discoveryClient := cacheddiscovery.NewMemCacheClient(clientSet.Discovery())
-	restMapper := restmapper.NewDeferredDiscoveryRESTMapper(discoveryClient)
-	restMapper.Reset()
-	config := *result.ClientConfig
-	metadataClient, err := metadata.NewForConfig(&config)
-	if err != nil {
-		t.Fatalf("failed to create metadataClient: %v", err)
-	}
-	dynamicClient, err := dynamic.NewForConfig(&config)
-	if err != nil {
-		t.Fatalf("failed to create dynamicClient: %v", err)
-	}
-	sharedInformers := informers.NewSharedInformerFactory(clientSet, 0)
-	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, 0)
+	ctx := util.ExtensionSetup(t, result, workerCount)
 	alwaysStarted := make(chan struct{})
 	close(alwaysStarted)
+	informers := informerfactory.NewInformerFactory(ctx.SharedInformers, ctx.MetadataInformers)
 	gc, err := garbagecollector.NewGarbageCollector(
-		clientSet,
-		metadataClient,
-		restMapper,
+		ctx.ClientSet,
+		ctx.MetadataClient,
+		ctx.RESTMapper,
 		garbagecollector.DefaultIgnoredResources(),
-		informerfactory.NewInformerFactory(sharedInformers, metadataInformers),
+		informers,
 		alwaysStarted,
 	)
 	if err != nil {
 		t.Fatalf("failed to create garbage collector: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	tearDown := func() {
-		close(stopCh)
-		result.TearDownFn()
-	}
 	syncPeriod := 5 * time.Second
 	startGC := func(workers int) {
 		go wait.Until(func() {
 			// Resetting the REST mapper will also invalidate the underlying discovery
 			// client. This is a leaky abstraction and assumes behavior about the REST
 			// mapper, but we'll deal with it for now.
-			restMapper.Reset()
-		}, syncPeriod, stopCh)
-		go gc.Run(workers, stopCh)
-		go gc.Sync(clientSet.Discovery(), syncPeriod, stopCh)
+			ctx.RESTMapper.Reset()
+		}, syncPeriod, ctx.StopCh)
+		go gc.Run(workers, ctx.StopCh)
+		go gc.Sync(ctx.ClientSet.Discovery(), syncPeriod, ctx.StopCh)
 	}
 
 	if workerCount > 0 {
@@ -280,39 +211,15 @@ func setupWithServer(t *testing.T, result *kubeapiservertesting.TestServer, work
 	}
 
 	return &testContext{
-		tearDown:           tearDown,
+		tearDown:           ctx.TearDown,
 		gc:                 gc,
-		clientSet:          clientSet,
-		apiExtensionClient: apiExtensionClient,
-		dynamicClient:      dynamicClient,
-		metadataClient:     metadataClient,
+		clientSet:          ctx.ClientSet,
+		apiExtensionClient: ctx.APIExtensionClient,
+		dynamicClient:      ctx.DynamicClient,
+		metadataClient:     ctx.MetadataClient,
 		startGC:            startGC,
+		informers:          informers,
 		syncPeriod:         syncPeriod,
-	}
-}
-
-func createNamespaceOrDie(name string, c clientset.Interface, t *testing.T) *v1.Namespace {
-	ns := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name}}
-	if _, err := c.CoreV1().Namespaces().Create(context.TODO(), ns, metav1.CreateOptions{}); err != nil {
-		t.Fatalf("failed to create namespace: %v", err)
-	}
-	falseVar := false
-	_, err := c.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &v1.ServiceAccount{
-		ObjectMeta:                   metav1.ObjectMeta{Name: "default"},
-		AutomountServiceAccountToken: &falseVar,
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatalf("failed to create service account: %v", err)
-	}
-	return ns
-}
-
-func deleteNamespaceOrDie(name string, c clientset.Interface, t *testing.T) {
-	zero := int64(0)
-	background := metav1.DeletePropagationBackground
-	err := c.CoreV1().Namespaces().Delete(context.TODO(), name, metav1.DeleteOptions{GracePeriodSeconds: &zero, PropagationPolicy: &background})
-	if err != nil {
-		t.Fatalf("failed to delete namespace %q: %v", name, err)
 	}
 }
 
@@ -343,7 +250,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 		t.Fatalf("error creating clientset: %v", err)
 	}
 
-	createNamespaceOrDie(namespaceB, clientSet, t)
+	util.CreateNamespaceOrDie(namespaceB, clientSet, t)
 	parent, err := clientSet.CoreV1().ConfigMaps(namespaceB).Create(context.TODO(), &v1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: "parent"}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -357,7 +264,7 @@ func testCrossNamespaceReferences(t *testing.T, watchCache bool) {
 		}
 	}
 
-	createNamespaceOrDie(namespaceA, clientSet, t)
+	util.CreateNamespaceOrDie(namespaceA, clientSet, t)
 
 	// Construct invalid owner references:
 	invalidOwnerReferences := []metav1.OwnerReference{}
@@ -458,8 +365,8 @@ func TestCascadingDeletion(t *testing.T) {
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-cascading-deletion", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-cascading-deletion", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
 	podClient := clientSet.CoreV1().Pods(ns.Name)
@@ -545,8 +452,8 @@ func TestCreateWithNonExistentOwner(t *testing.T) {
 
 	clientSet := ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-non-existing-owner", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-non-existing-owner", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 
@@ -668,8 +575,8 @@ func TestStressingCascadingDeletion(t *testing.T) {
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-stressing-cascading-deletion", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-stressing-cascading-deletion", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	const collections = 10
 	var wg sync.WaitGroup
@@ -732,8 +639,8 @@ func TestOrphaning(t *testing.T) {
 
 	gc, clientSet := ctx.gc, ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-orphaning", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-orphaning", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
@@ -812,8 +719,8 @@ func TestSolidOwnerDoesNotBlockWaitingOwner(t *testing.T) {
 
 	clientSet := ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-foreground1", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-foreground1", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
@@ -872,8 +779,8 @@ func TestNonBlockingOwnerRefDoesNotBlock(t *testing.T) {
 
 	clientSet := ctx.clientSet
 
-	ns := createNamespaceOrDie("gc-foreground2", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-foreground2", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
@@ -937,8 +844,8 @@ func TestDoubleDeletionWithFinalizer(t *testing.T) {
 	ctx := setup(t, 5)
 	defer ctx.tearDown()
 	clientSet := ctx.clientSet
-	ns := createNamespaceOrDie("gc-double-foreground", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("gc-double-foreground", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	// step 1: creates a pod with a custom finalizer and deletes it, then waits until gc removes its finalizer
 	podClient := clientSet.CoreV1().Pods(ns.Name)
@@ -1000,8 +907,8 @@ func TestBlockingOwnerRefDoesBlock(t *testing.T) {
 	defer ctx.tearDown()
 	gc, clientSet := ctx.gc, ctx.clientSet
 
-	ns := createNamespaceOrDie("foo", clientSet, t)
-	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
+	ns := util.CreateNamespaceOrDie("foo", clientSet, t)
+	defer util.DeleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	podClient := clientSet.CoreV1().Pods(ns.Name)
 	rcClient := clientSet.CoreV1().ReplicationControllers(ns.Name)
@@ -1059,12 +966,12 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
-	ns := createNamespaceOrDie("crd-cascading", clientSet, t)
+	ns := util.CreateNamespaceOrDie("crd-cascading", clientSet, t)
 
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	definition, resourceClient := util.CreateRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
-	owner := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner"))
+	owner := util.NewCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner"))
 	owner, err := resourceClient.Create(context.TODO(), owner, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner resource %q: %v", owner.GetName(), err)
@@ -1072,7 +979,7 @@ func TestCustomResourceCascadingDeletion(t *testing.T) {
 	t.Logf("created owner resource %q", owner.GetName())
 
 	// Create a custom dependent resource.
-	dependent := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
+	dependent := util.NewCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	link(t, owner, dependent)
 
 	dependent, err = resourceClient.Create(context.TODO(), dependent, metav1.CreateOptions{})
@@ -1119,14 +1026,14 @@ func TestMixedRelationships(t *testing.T) {
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
-	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
+	ns := util.CreateNamespaceOrDie("crd-mixed", clientSet, t)
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	definition, resourceClient := util.CreateRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 
 	// Create a custom owner resource.
-	customOwner, err := resourceClient.Create(context.TODO(), newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
+	customOwner, err := resourceClient.Create(context.TODO(), util.NewCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -1149,7 +1056,7 @@ func TestMixedRelationships(t *testing.T) {
 	t.Logf("created core owner %q: %#v", coreOwner.GetName(), coreOwner)
 
 	// Create a custom dependent resource.
-	customDependent := newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
+	customDependent := util.NewCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("dependent"))
 	coreOwner.TypeMeta.Kind = "ConfigMap"
 	coreOwner.TypeMeta.APIVersion = "v1"
 	link(t, coreOwner, customDependent)
@@ -1217,10 +1124,10 @@ func TestCRDDeletionCascading(t *testing.T) {
 
 	clientSet, apiExtensionClient, dynamicClient := ctx.clientSet, ctx.apiExtensionClient, ctx.dynamicClient
 
-	ns := createNamespaceOrDie("crd-mixed", clientSet, t)
+	ns := util.CreateNamespaceOrDie("crd-mixed", clientSet, t)
 
 	t.Logf("First pass CRD cascading deletion")
-	definition, resourceClient := createRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
+	definition, resourceClient := util.CreateRandomCustomResourceDefinition(t, apiExtensionClient, dynamicClient, ns.Name)
 	testCRDDeletion(t, ctx, ns, definition, resourceClient)
 
 	t.Logf("Second pass CRD cascading deletion")
@@ -1239,7 +1146,7 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 	configMapClient := clientSet.CoreV1().ConfigMaps(ns.Name)
 
 	// Create a custom owner resource.
-	owner, err := resourceClient.Create(context.TODO(), newCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
+	owner, err := resourceClient.Create(context.TODO(), util.NewCRDInstance(definition, ns.Name, names.SimpleNameGenerator.GenerateName("owner")), metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("failed to create owner: %v", err)
 	}
@@ -1256,9 +1163,26 @@ func testCRDDeletion(t *testing.T, ctx *testContext, ns *v1.Namespace, definitio
 
 	time.Sleep(ctx.syncPeriod + 5*time.Second)
 
+	// Retrieve the informer before deletion to check it's been stopped.
+	gvr := schema.GroupVersionResource{Group: definition.Spec.Group, Version: definition.Spec.Versions[0].Name, Resource: definition.Spec.Names.Plural}
+	informer, err := ctx.informers.ForResource(gvr)
+	if err != nil {
+		t.Fatalf("error getting informer for resource")
+	}
+	if informer.Informer().IsStopped() {
+		t.Fatalf("informer stopped unexpectedly prior to deletion")
+	}
+
 	// Delete the definition, which should cascade to the owner and ultimately its dependents.
 	if err := apiextensionstestserver.DeleteV1CustomResourceDefinition(definition, apiExtensionClient); err != nil {
 		t.Fatalf("failed to delete %q: %v", definition.Name, err)
+	}
+
+	// Ensure the informer is stopped upon CRD deletion
+	if err := wait.Poll(1*time.Second, 30*time.Second, func() (bool, error) {
+		return informer.Informer().IsStopped(), nil
+	}); err != nil {
+		t.Fatalf("CRD informer failed to stop upon deletion")
 	}
 
 	// Ensure the owner is deleted.

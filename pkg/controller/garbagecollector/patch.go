@@ -74,7 +74,7 @@ func (gc *GarbageCollector) getMetadata(apiVersion, kind, namespace, name string
 	if len(namespace) != 0 {
 		key = namespace + "/" + name
 	}
-	raw, exist, err := m.store.GetByKey(key)
+	raw, exist, err := m.informer.GetStore().GetByKey(key)
 	if err != nil {
 		return nil, err
 	}

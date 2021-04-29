@@ -113,26 +113,22 @@ type GraphBuilder struct {
 	ignoredResources map[schema.GroupResource]struct{}
 }
 
-// monitor runs a Controller with a local stop channel.
+// monitor runs an informer with access to the
+// event handlers in order to remove them
+// upon removal of the resource from discovery
 type monitor struct {
-	controller cache.Controller
-	store      cache.Store
-
-	// stopCh stops Controller. If stopCh is nil, the monitor is considered to be
-	// not yet started.
-	stopCh chan struct{}
+	informer cache.SharedIndexInformer
+	handlers cache.ResourceEventHandler
 }
 
-// Run is intended to be called in a goroutine. Multiple calls of this is an
-// error.
-func (m *monitor) Run() {
-	m.controller.Run(m.stopCh)
+func (m *monitor) removeEventHandler() error {
+	return m.informer.RemoveEventHandler(m.handlers)
 }
 
 type monitors map[schema.GroupVersionResource]*monitor
 
-func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.Controller, cache.Store, error) {
-	handlers := cache.ResourceEventHandlerFuncs{
+func (gb *GraphBuilder) informerFor(resource schema.GroupVersionResource, kind schema.GroupVersionKind) (cache.SharedIndexInformer, cache.ResourceEventHandler, error) {
+	handlers := &cache.ResourceEventHandlerFuncs{
 		// add the event to the dependencyGraphBuilder's graphChanges.
 		AddFunc: func(obj interface{}) {
 			event := &event{
@@ -174,7 +170,7 @@ func (gb *GraphBuilder) controllerFor(resource schema.GroupVersionResource, kind
 	klog.V(4).Infof("using a shared informer for resource %q, kind %q", resource.String(), kind.String())
 	// need to clone because it's from a shared cache
 	shared.Informer().AddEventHandlerWithResyncPeriod(handlers, ResourceResyncTime)
-	return shared.Informer().GetController(), shared.Informer().GetStore(), nil
+	return shared.Informer(), handlers, nil
 }
 
 // syncMonitors rebuilds the monitor set according to the supplied resources,
@@ -210,19 +206,19 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 			errs = append(errs, fmt.Errorf("couldn't look up resource %q: %v", resource, err))
 			continue
 		}
-		c, s, err := gb.controllerFor(resource, kind)
+		i, h, err := gb.informerFor(resource, kind)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("couldn't start monitor for resource %q: %v", resource, err))
 			continue
 		}
-		current[resource] = &monitor{store: s, controller: c}
+		current[resource] = &monitor{informer: i, handlers: h}
 		added++
 	}
 	gb.monitors = current
 
-	for _, monitor := range toRemove {
-		if monitor.stopCh != nil {
-			close(monitor.stopCh)
+	for resource, monitor := range toRemove {
+		if err := monitor.removeEventHandler(); err != nil {
+			errs = append(errs, fmt.Errorf("couldn't remove event handler for resource %q: %v", resource, err))
 		}
 	}
 
@@ -237,8 +233,8 @@ func (gb *GraphBuilder) syncMonitors(resources map[schema.GroupVersionResource]s
 // If called before Run, startMonitors does nothing (as there is no stop channel
 // to support monitor/informer execution).
 func (gb *GraphBuilder) startMonitors() {
-	gb.monitorLock.Lock()
-	defer gb.monitorLock.Unlock()
+	gb.monitorLock.RLock()
+	defer gb.monitorLock.RUnlock()
 
 	if !gb.running {
 		return
@@ -248,17 +244,8 @@ func (gb *GraphBuilder) startMonitors() {
 	// that they don't get unexpected events on their work queues.
 	<-gb.informersStarted
 
-	monitors := gb.monitors
-	started := 0
-	for _, monitor := range monitors {
-		if monitor.stopCh == nil {
-			monitor.stopCh = make(chan struct{})
-			gb.sharedInformers.Start(gb.stopCh)
-			go monitor.Run()
-			started++
-		}
-	}
-	klog.V(4).Infof("started %d new monitors, %d currently running", started, len(monitors))
+	gb.sharedInformers.Start(gb.stopCh)
+	klog.V(4).Infof("all %d monitors have been started", len(gb.monitors))
 }
 
 // IsSynced returns true if any monitors exist AND all those monitors'
@@ -275,7 +262,7 @@ func (gb *GraphBuilder) IsSynced() bool {
 	}
 
 	for resource, monitor := range gb.monitors {
-		if !monitor.controller.HasSynced() {
+		if !monitor.informer.HasSynced() {
 			klog.V(4).Infof("garbage controller monitor not yet synced: %+v", resource)
 			return false
 		}
@@ -300,21 +287,10 @@ func (gb *GraphBuilder) Run(stopCh <-chan struct{}) {
 	gb.startMonitors()
 	wait.Until(gb.runProcessGraphChanges, 1*time.Second, stopCh)
 
-	// Stop any running monitors.
+	// reset monitors so that the graph builder can be safely re-run/synced.
 	gb.monitorLock.Lock()
 	defer gb.monitorLock.Unlock()
-	monitors := gb.monitors
-	stopped := 0
-	for _, monitor := range monitors {
-		if monitor.stopCh != nil {
-			stopped++
-			close(monitor.stopCh)
-		}
-	}
-
-	// reset monitors so that the graph builder can be safely re-run/synced.
 	gb.monitors = nil
-	klog.Infof("stopped %d of %d monitors", stopped, len(monitors))
 }
 
 var ignoredResources = map[schema.GroupResource]struct{}{
