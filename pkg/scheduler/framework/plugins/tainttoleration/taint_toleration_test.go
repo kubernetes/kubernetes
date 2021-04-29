@@ -229,7 +229,7 @@ func TestTaintTolerationScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(nil, test.nodes)
+			snapshot := cache.NewSnapshot(nil, test.nodes, framework.NewNodeInfo)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)

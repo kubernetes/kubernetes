@@ -264,7 +264,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, err := NewMostAllocated(&test.args, fh)
 

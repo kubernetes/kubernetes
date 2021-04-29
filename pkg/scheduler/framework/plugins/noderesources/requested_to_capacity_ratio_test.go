@@ -68,7 +68,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(test.scheduledPods, test.nodes)
+			snapshot := cache.NewSnapshot(test.scheduledPods, test.nodes, framework.NewNodeInfo)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			args := config.RequestedToCapacityRatioArgs{
 				Shape: []config.UtilizationShapePoint{
@@ -322,7 +322,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			args := config.RequestedToCapacityRatioArgs{
 				Shape: []config.UtilizationShapePoint{
@@ -565,7 +565,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			args := config.RequestedToCapacityRatioArgs{
 				Shape: []config.UtilizationShapePoint{

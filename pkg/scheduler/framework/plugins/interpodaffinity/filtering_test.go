@@ -23,7 +23,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -1010,7 +1010,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node})
+			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node}, framework.NewNodeInfo)
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{
 					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
@@ -1904,7 +1904,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{})
 			}
@@ -2203,7 +2203,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			ctx := context.Background()
 			// getMeta creates predicate meta data given the list of pods.
 			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
-				snapshot := cache.NewSnapshot(pods, test.nodes)
+				snapshot := cache.NewSnapshot(pods, test.nodes, framework.NewNodeInfo)
 				n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return New(plArgs, fh, feature.Features{})
 				}
@@ -2488,7 +2488,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
 			l, _ := snapshot.NodeInfos().List()
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{})

@@ -370,7 +370,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)
 			ctx := context.Background()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
@@ -626,7 +626,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)
 			ctx := context.Background()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {

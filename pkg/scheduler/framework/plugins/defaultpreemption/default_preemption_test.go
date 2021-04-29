@@ -283,7 +283,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes, framework.NewNodeInfo)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -977,7 +977,7 @@ func TestDryRunPreemption(t *testing.T) {
 				nodes[i] = nodeWrapper.Obj()
 				fakeFilterRCMap[nodeName] = tt.fakeFilterRC
 			}
-			snapshot := internalcache.NewSnapshot(tt.initPods, nodes)
+			snapshot := internalcache.NewSnapshot(tt.initPods, nodes, framework.NewNodeInfo)
 
 			// For each test, register a FakeFilterPlugin along with essential plugins and tt.registerPlugins.
 			fakePlugin := st.FakeFilterPlugin{
@@ -1234,7 +1234,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 			}
-			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes, framework.NewNodeInfo)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
@@ -1326,7 +1326,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
 			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			snapshot := internalcache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)
 			if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
@@ -1653,7 +1653,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {

@@ -518,7 +518,7 @@ func TestPreFilterState(t *testing.T) {
 				DefaultConstraints: tt.defaultConstraints,
 				DefaultingType:     config.ListDefaulting,
 			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo), tt.objs)
 			cs := framework.NewCycleState()
 			if s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
 				t.Fatal(s.AsError())
@@ -822,7 +822,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
@@ -1026,7 +1026,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
@@ -1101,7 +1101,7 @@ func BenchmarkFilter(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			ctx := context.Background()
-			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes, framework.NewNodeInfo))
 			p := pl.(*PodTopologySpread)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -1403,7 +1403,7 @@ func TestSingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
@@ -1630,7 +1630,7 @@ func TestMultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()

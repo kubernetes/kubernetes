@@ -331,7 +331,7 @@ func TestImageLocalityPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(nil, test.nodes)
+			snapshot := cache.NewSnapshot(nil, test.nodes, framework.NewNodeInfo)
 
 			state := framework.NewCycleState()
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))

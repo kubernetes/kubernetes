@@ -990,7 +990,7 @@ func TestGenericScheduler(t *testing.T) {
 					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
 				}
 			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			snapshot := internalcache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
@@ -1306,7 +1306,7 @@ func TestZeroRequest(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			snapshot := internalcache.NewSnapshot(test.pods, test.nodes)
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
 
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1515,7 +1515,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			snapshot := internalcache.NewSnapshot(nil, nodes)
+			snapshot := internalcache.NewSnapshot(nil, nodes, framework.NewNodeInfo)
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,

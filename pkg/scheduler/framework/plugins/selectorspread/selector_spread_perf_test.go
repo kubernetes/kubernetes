@@ -54,7 +54,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			pod := st.MakePod().Name("p").Label("foo", "").Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
-			snapshot := cache.NewSnapshot(existingPods, allNodes)
+			snapshot := cache.NewSnapshot(existingPods, allNodes, framework.NewNodeInfo)
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)

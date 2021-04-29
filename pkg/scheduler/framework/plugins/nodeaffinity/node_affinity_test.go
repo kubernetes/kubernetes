@@ -1071,7 +1071,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes)))
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, test.nodes, framework.NewNodeInfo)))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Creating plugin: %v", err)
