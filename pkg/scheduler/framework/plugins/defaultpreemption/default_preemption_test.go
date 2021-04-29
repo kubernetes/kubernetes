@@ -291,7 +291,7 @@ func TestPostFilter(t *testing.T) {
 			p := DefaultPreemption{
 				fh:        f,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory),
+				pdbLister: getPDBLister(informerFactory, true),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
 
@@ -1670,7 +1670,7 @@ func TestPreempt(t *testing.T) {
 			pl := DefaultPreemption{
 				fh:        fwk,
 				podLister: informerFactory.Core().V1().Pods().Lister(),
-				pdbLister: getPDBLister(informerFactory),
+				pdbLister: getPDBLister(informerFactory, true),
 				args:      *getDefaultDefaultPreemptionArgs(),
 			}
 			node, status := pl.preempt(context.Background(), state, test.pod, make(framework.NodeToStatusMap))
