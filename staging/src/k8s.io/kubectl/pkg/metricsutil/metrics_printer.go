@@ -21,7 +21,7 @@ import (
 	"io"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/cli-runtime/pkg/printers"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
@@ -215,12 +215,12 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metricsapi.PodMetrics, p
 	sort.Sort(NewPodMetricsSorter(metrics, withNamespace, sortBy))
 	podMap := createPodMap(pods)
 	for _, m := range metrics {
-		pod := podMap[m.Name]
+		pod, ok := podMap[m.Name]
 		if printContainers {
 			sort.Sort(NewContainerMetricsSorter(m.Containers, sortBy))
-			printSinglePodContainerMetrics(w, &m, withNamespace, pod)
+			printSinglePodContainerMetrics(w, &m, withNamespace, pod, ok)
 		} else {
-			printSinglePodMetrics(w, &m, withNamespace, pod)
+			printSinglePodMetrics(w, &m, withNamespace, pod, ok)
 		}
 	}
 	return nil
@@ -241,12 +241,12 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod) {
+func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod, podExists bool) {
 	podMetrics := getPodMetrics(m)
 	if withNamespace {
 		printValue(out, m.Namespace)
 	}
-	if pod != nil {
+	if podExists {
 		printValue(out, pod.Spec.NodeName)
 		printValue(out, pod.Status.HostIP)
 	}
@@ -257,12 +257,12 @@ func printSinglePodMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespac
 	})
 }
 
-func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod) {
+func printSinglePodContainerMetrics(out io.Writer, m *metricsapi.PodMetrics, withNamespace bool, pod v1.Pod, podExists bool) {
 	for _, c := range m.Containers {
 		if withNamespace {
 			printValue(out, m.Namespace)
 		}
-		if pod != nil {
+		if podExists {
 			printValue(out, pod.Spec.NodeName)
 			printValue(out, pod.Status.HostIP)
 		}
