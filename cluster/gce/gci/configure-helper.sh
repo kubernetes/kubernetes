@@ -1634,6 +1634,10 @@ function start-node-problem-detector {
     local -r sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor.json"
     local -r ssm_config="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
 
+    # TODO(vteratipally): Remove this when updating the NPD version as with PR kubernetes/node-problem-detector#557, the config path can accept relative path.
+    # replace the known-modules.json file path in system-stats-monitor.json with the absolute path
+    sed -i "s|config/guestosconfig/known-modules.json|${KUBE_HOME}/node-problem-detector/config/guestosconfig/known-modules.json|g" "${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
+
     local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
     local -r custom_sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json"
 
