@@ -640,3 +640,12 @@ type PluginsRunner interface {
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured PreFilter plugins.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
 }
+
+// ResourceNameQualifier abstracts helpers qualifying
+// of what kind a resource name is.
+type ResourceNameQualifier interface {
+	IsExtended(name v1.ResourceName) bool
+	IsHugePage(name v1.ResourceName) bool
+	IsAttachableVolume(name v1.ResourceName) bool
+	IsPrefixedNativeResource(name v1.ResourceName) bool
+}
