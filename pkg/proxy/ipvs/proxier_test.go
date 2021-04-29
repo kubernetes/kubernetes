@@ -4657,6 +4657,8 @@ func TestTestInternalTrafficPolicyE2E(t *testing.T) {
 // Test_EndpointSliceReadyAndTerminatingLocal tests that when there are local ready and ready + terminating
 // endpoints, only the ready endpoints are used.
 func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
@@ -4831,6 +4833,8 @@ func Test_EndpointSliceReadyAndTerminatingLocal(t *testing.T) {
 // Test_EndpointSliceOnlyReadyTerminatingLocal tests that when there are only local ready terminating
 // endpoints, we fall back to those endpoints.
 func Test_EndpointSliceOnlyReadyAndTerminatingLocal(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ProxyTerminatingEndpoints, true)()
+
 	ipt := iptablestest.NewFake()
 	ipvs := ipvstest.NewFake()
 	ipset := ipsettest.NewFake(testIPSetVersion)
