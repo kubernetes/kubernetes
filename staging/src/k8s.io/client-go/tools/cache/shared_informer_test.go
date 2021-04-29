@@ -17,13 +17,14 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -438,7 +439,7 @@ func TestSharedInformerRemoveHandlerFailure(t *testing.T) {
 	if err := informer.RemoveEventHandler(handler1); err == nil {
 		t.Errorf("removing value handler did not fail")
 	} else {
-		if err.Error() != "Uncomparable handler {<nil> <nil> <nil>} is not removed" {
+		if err.Error() != "Uncomparable handler of type cache.ResourceEventHandlerFuncs is not removed" {
 			t.Errorf("unexpected remove error: %s", err)
 		}
 	}
@@ -545,5 +546,66 @@ func TestRemoveOnStoppedSharedInformer(t *testing.T) {
 	}
 	if !strings.HasSuffix(err.Error(), " is not removed from shared informer because it has stopped already") {
 		t.Errorf("unexpected error for removing handler on stopped informer: %q", err)
+	}
+}
+
+// TestSharedInformerRunWithStopOptions runs an informer with StopOnError
+// set to always return true. It tests that when the underlying reflector does reach a
+// list error (upon trying to add an object) that the informer stops running before a
+// given timout.
+func TestSharedInformerRunWithStopOptions(t *testing.T) {
+	// waitTime is how long to wait for the stopOnError=false case to pass.
+	// It needs to just be long enough for the underlying reflector to make
+	// its initial list call and error out.
+	waitTime := 5 * time.Second
+	table := []struct {
+		stopOptions StopOptions
+		shouldStop  bool
+	}{
+		{
+			stopOptions: StopOptions{
+				StopOnZeroEventHandlers: true,
+			},
+			shouldStop: true,
+		},
+		{
+			stopOptions: StopOptions{},
+			shouldStop:  false,
+		},
+	}
+	for _, item := range table {
+		source := fcache.NewFakeControllerSource()
+		source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}})
+		source.ListError = fmt.Errorf("Access Denied")
+
+		informer := NewSharedInformer(source, &v1.Pod{}, 1*time.Second).(*sharedIndexInformer)
+		handler := &ResourceEventHandlerFuncs{}
+		informer.AddEventHandler(handler)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		go func() {
+			// confirm the informer stops running when it hits a list error
+			defer cancel()
+			informer.RunWithStopOptions(ctx, item.stopOptions)
+
+		}()
+
+		go func() {
+			time.Sleep(time.Second)
+			if err := informer.RemoveEventHandler(handler); err != nil {
+				t.Errorf("unable to remove event handler: %v", err)
+			}
+		}()
+
+		select {
+		case <-ctx.Done():
+			if !item.shouldStop {
+				t.Errorf("shared informer should NOT have stopped when stopOnError is false")
+			}
+		case <-time.After(waitTime):
+			if item.shouldStop {
+				t.Errorf("shared informer SHOULD have stopped itself when stopOnError is true, waited %s", waitTime.String())
+			}
+		}
 	}
 }

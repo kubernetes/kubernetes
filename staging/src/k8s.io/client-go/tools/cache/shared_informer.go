@@ -17,6 +17,7 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -165,8 +166,11 @@ type SharedInformer interface {
 	GetStore() Store
 	// GetController is deprecated, it does nothing useful
 	GetController() Controller
-	// Run starts and runs the shared informer, returning after it stops.
-	// The informer will be stopped when stopCh is closed.
+	// RunWithStopOptions starts and runs the shared informer, returning after it stops.
+	// The informer will be stopped when a stopOptions condition is met.
+	RunWithStopOptions(ctx context.Context, stopOptions StopOptions)
+	// Run supports the legacy way interface for running shared index informers
+	// with just a stop channel.
 	Run(stopCh <-chan struct{})
 	// HasSynced returns true if the shared informer's store has been
 	// informed by at least one full LIST of the authoritative state
@@ -203,6 +207,13 @@ type SharedInformer interface {
 
 	// IsStarted reports whether the informer has already been started
 	IsStarted() bool
+}
+
+// StopOptions let the caller specify which conditions to stop the informer.
+type StopOptions struct {
+	// StopOnZeroEventHandlers, if true, stops the informer when it no longer has any
+	// event handlers registered for it.
+	StopOnZeroEventHandlers bool
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -341,6 +352,9 @@ type sharedIndexInformer struct {
 
 	// Called whenever the ListAndWatch drops the connection with an error.
 	watchErrorHandler WatchErrorHandler
+
+	// zeroHandlerCancelFunc allows for stopping the informer because no event handlers are registered.
+	zeroHandlerCancelFunc context.CancelFunc
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -353,6 +367,9 @@ type dummyController struct {
 }
 
 func (v *dummyController) Run(stopCh <-chan struct{}) {
+}
+
+func (v *dummyController) RunWithStopOptions(ctx context.Context, stopOptions StopOptions) {
 }
 
 func (v *dummyController) HasSynced() bool {
@@ -399,8 +416,12 @@ func (s *sharedIndexInformer) SetWatchErrorHandler(handler WatchErrorHandler) er
 	return nil
 }
 
-func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
+func (s *sharedIndexInformer) RunWithStopOptions(ctx context.Context, stopOptions StopOptions) {
 	defer utilruntime.HandleCrash()
+	zeroHandlerCtx, zeroHandlerCancel := context.WithCancel(ctx)
+	if stopOptions.StopOnZeroEventHandlers {
+		s.zeroHandlerCancelFunc = zeroHandlerCancel
+	}
 
 	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
 		KnownObjects:          s.indexer,
@@ -441,7 +462,22 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		defer s.startedLock.Unlock()
 		s.stopped = true // Don't want any new listeners
 	}()
-	s.controller.Run(stopCh)
+	s.controller.Run(zeroHandlerCtx.Done())
+	klog.Infof("shared informer has stopped for %v", s.objectType)
+
+}
+
+func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	go func() {
+		select {
+		case <-stopCh:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	s.RunWithStopOptions(ctx, StopOptions{})
 }
 
 func (s *sharedIndexInformer) HasSynced() bool {
@@ -638,7 +674,7 @@ func (s *sharedIndexInformer) RemoveEventHandler(handler ResourceEventHandler) e
 	}
 
 	if !reflect.ValueOf(handler).Type().Comparable() {
-		return fmt.Errorf("Uncomparable handler %v is not removed", handler)
+		return fmt.Errorf("Uncomparable handler of type %v is not removed", reflect.ValueOf(handler).Type())
 	}
 
 	// in order to safely remove, we have to
@@ -648,6 +684,11 @@ func (s *sharedIndexInformer) RemoveEventHandler(handler ResourceEventHandler) e
 	s.blockDeltas.Lock()
 	defer s.blockDeltas.Unlock()
 	s.processor.removeListenerFor(handler)
+	if len(s.processor.listeners) == 0 {
+		if s.zeroHandlerCancelFunc != nil {
+			s.zeroHandlerCancelFunc()
+		}
+	}
 	return nil
 }
 
