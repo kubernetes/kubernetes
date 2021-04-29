@@ -1348,6 +1348,9 @@ function Configure-Kubelet {
 
 function Configure-Antrea {
   $antrea_config = 'trafficEncapMode: noEncap
+featureGates:
+  AntreaPolicy: false
+  Traceflow: false
 clientConnection:
   kubeconfig: \etc\kubernetes\antrea.kubeconfig
   '
