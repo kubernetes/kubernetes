@@ -88,6 +88,8 @@ type Scheduler struct {
 	Profiles profile.Map
 
 	client clientset.Interface
+
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 type schedulerOptions struct {
@@ -200,6 +202,7 @@ var defaultSchedulerOptions = schedulerOptions{
 func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	recorderFactory profile.RecorderFactory,
+	resourceNameQualifier framework.ResourceNameQualifier,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
@@ -213,7 +216,13 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
-	schedulerCache := internalcache.New(30*time.Second, stopEverything)
+	schedulerCache := internalcache.New(
+		30*time.Second,
+		stopEverything,
+		func() *framework.NodeInfo {
+			return framework.NewNodeInfo(resourceNameQualifier)
+		},
+	)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
@@ -238,6 +247,7 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 		parallellism:             options.parallelism,
+		resourceNameQualifier:    resourceNameQualifier,
 	}
 
 	metrics.Register()
@@ -280,6 +290,7 @@ func New(client clientset.Interface,
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
+	sched.resourceNameQualifier = resourceNameQualifier
 
 	addAllEventHandlers(sched, informerFactory)
 	return sched, nil

@@ -27,6 +27,7 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	"k8s.io/kubernetes/pkg/util/resources"
 )
 
 var (
@@ -83,7 +84,7 @@ func TestRemoveMissingExtendedResources(t *testing.T) {
 			),
 		},
 	} {
-		nodeInfo := schedulerframework.NewNodeInfo()
+		nodeInfo := schedulerframework.NewNodeInfo(resources.NewResourceNameQualifier())
 		nodeInfo.SetNode(test.node)
 		pod := removeMissingExtendedResources(test.pod, nodeInfo)
 		if !reflect.DeepEqual(pod, test.expectedPod) {
@@ -174,7 +175,16 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 	}
 }
 
+func newNodeInfoWithPods(rnq schedulerframework.ResourceNameQualifier, pods ...*v1.Pod) *schedulerframework.NodeInfo {
+	ni := schedulerframework.NewNodeInfo(rnq)
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
+	return ni
+}
+
 func TestGeneralPredicates(t *testing.T) {
+	rnq := resources.NewResourceNameQualifier()
 	resourceTests := []struct {
 		pod      *v1.Pod
 		nodeInfo *schedulerframework.NodeInfo
@@ -186,7 +196,8 @@ func TestGeneralPredicates(t *testing.T) {
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(
+			nodeInfo: newNodeInfoWithPods(
+				rnq,
 				newResourcePod(v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
@@ -204,7 +215,8 @@ func TestGeneralPredicates(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewMilliQuantity(8, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
 			}),
-			nodeInfo: schedulerframework.NewNodeInfo(
+			nodeInfo: newNodeInfoWithPods(
+				rnq,
 				newResourcePod(v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
@@ -227,7 +239,7 @@ func TestGeneralPredicates(t *testing.T) {
 					NodeName: "machine2",
 				},
 			},
-			nodeInfo: schedulerframework.NewNodeInfo(),
+			nodeInfo: schedulerframework.NewNodeInfo(rnq),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
@@ -239,7 +251,7 @@ func TestGeneralPredicates(t *testing.T) {
 		},
 		{
 			pod:      newPodWithPort(123),
-			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
+			nodeInfo: newNodeInfoWithPods(rnq, newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},

@@ -34,6 +34,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -1346,6 +1347,14 @@ func TestPostFilterPlugins(t *testing.T) {
 	}
 }
 
+func newNodeInfoWithPods(pods ...*v1.Pod) *framework.NodeInfo {
+	ni := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
+	return ni
+}
+
 func TestFilterPluginsWithNominatedPods(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -1364,7 +1373,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			pod:             lowPriorityPod,
 			nominatedPod:    nil,
 			node:            node,
-			nodeInfo:        framework.NewNodeInfo(pod),
+			nodeInfo:        newNodeInfoWithPods(pod),
 			wantStatus:      nil,
 		},
 		{
@@ -1384,7 +1393,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			pod:          lowPriorityPod,
 			nominatedPod: highPriorityPod,
 			node:         node,
-			nodeInfo:     framework.NewNodeInfo(pod),
+			nodeInfo:     newNodeInfoWithPods(pod),
 			wantStatus:   nil,
 		},
 		{
@@ -1399,7 +1408,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			pod:          lowPriorityPod,
 			nominatedPod: highPriorityPod,
 			node:         node,
-			nodeInfo:     framework.NewNodeInfo(pod),
+			nodeInfo:     newNodeInfoWithPods(pod),
 			wantStatus:   framework.AsStatus(fmt.Errorf(`running AddPod on PreFilter plugin "TestPlugin1": %w`, errInjectedStatus)),
 		},
 		{
@@ -1419,7 +1428,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			pod:          lowPriorityPod,
 			nominatedPod: highPriorityPod,
 			node:         node,
-			nodeInfo:     framework.NewNodeInfo(pod),
+			nodeInfo:     newNodeInfoWithPods(pod),
 			wantStatus:   framework.AsStatus(fmt.Errorf(`running "TestPlugin2" filter plugin: %w`, errInjectedFilterStatus)).WithFailedPlugin("TestPlugin2"),
 		},
 		{
@@ -1439,7 +1448,7 @@ func TestFilterPluginsWithNominatedPods(t *testing.T) {
 			pod:          highPriorityPod,
 			nominatedPod: lowPriorityPod,
 			node:         node,
-			nodeInfo:     framework.NewNodeInfo(pod),
+			nodeInfo:     newNodeInfoWithPods(pod),
 			wantStatus:   nil,
 		},
 	}

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -283,7 +284,7 @@ func TestPostFilter(t *testing.T) {
 				frameworkruntime.WithInformerFactory(informerFactory),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
 				frameworkruntime.WithExtenders(extenders),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(tt.pods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)),
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -977,7 +978,7 @@ func TestDryRunPreemption(t *testing.T) {
 				nodes[i] = nodeWrapper.Obj()
 				fakeFilterRCMap[nodeName] = tt.fakeFilterRC
 			}
-			snapshot := internalcache.NewSnapshot(tt.initPods, nodes)
+			snapshot := internalcache.NewSnapshot(tt.initPods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 			// For each test, register a FakeFilterPlugin along with essential plugins and tt.registerPlugins.
 			fakePlugin := st.FakeFilterPlugin{
@@ -1234,7 +1235,7 @@ func TestSelectBestCandidate(t *testing.T) {
 			for i, nodeName := range tt.nodeNames {
 				nodes[i] = st.MakeNode().Name(nodeName).Capacity(veryLargeRes).Obj()
 			}
-			snapshot := internalcache.NewSnapshot(tt.pods, nodes)
+			snapshot := internalcache.NewSnapshot(tt.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			fwk, err := st.NewFramework(
 				[]st.RegisterPluginFunc{
 					tt.registerPlugin,
@@ -1326,7 +1327,7 @@ func TestPodEligibleToPreemptOthers(t *testing.T) {
 			for _, n := range test.nodes {
 				nodes = append(nodes, st.MakeNode().Name(n).Obj())
 			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+			snapshot := internalcache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
 				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
 			}
@@ -1434,7 +1435,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var nodeInfos []*framework.NodeInfo
 			for _, name := range nodeNames {
-				ni := framework.NewNodeInfo()
+				ni := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 				ni.SetNode(st.MakeNode().Name(name).Obj())
 				nodeInfos = append(nodeInfos, ni)
 			}
@@ -1613,7 +1614,7 @@ func TestPreempt(t *testing.T) {
 			stop := make(chan struct{})
 			defer close(stop)
 
-			cache := internalcache.New(time.Duration(0), stop)
+			cache := internalcache.New(time.Duration(0), stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -1632,7 +1633,7 @@ func TestPreempt(t *testing.T) {
 				nodes[i] = node
 
 				// Set nodeInfo to extenders to mock extenders' cache for preemption.
-				cachedNodeInfo := framework.NewNodeInfo()
+				cachedNodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 				cachedNodeInfo.SetNode(node)
 				cachedNodeInfoMap[node.Name] = cachedNodeInfo
 			}
@@ -1653,7 +1654,7 @@ func TestPreempt(t *testing.T) {
 				frameworkruntime.WithEventRecorder(&events.FakeRecorder{}),
 				frameworkruntime.WithExtenders(extenders),
 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
-				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes)),
+				frameworkruntime.WithSnapshotSharedLister(internalcache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)),
 				frameworkruntime.WithInformerFactory(informerFactory),
 			)
 			if err != nil {

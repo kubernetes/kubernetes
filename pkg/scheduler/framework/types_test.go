@@ -30,6 +30,45 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
+type resourceNameQualifier struct {
+	ExtendedResourceNames         []v1.ResourceName
+	HugePageResourceNames         []v1.ResourceName
+	AttachableVolumeResourceNames []v1.ResourceName
+	PrefixedNativeResourceNames   []v1.ResourceName
+}
+
+func (rnq *resourceNameQualifier) IsExtended(name v1.ResourceName) bool {
+	return inList(rnq.ExtendedResourceNames, name)
+}
+
+func (rnq *resourceNameQualifier) IsHugePage(name v1.ResourceName) bool {
+	return inList(rnq.HugePageResourceNames, name)
+}
+
+func (rnq *resourceNameQualifier) IsAttachableVolume(name v1.ResourceName) bool {
+	return inList(rnq.AttachableVolumeResourceNames, name)
+}
+
+func (rnq *resourceNameQualifier) IsPrefixedNativeResource(name v1.ResourceName) bool {
+	return inList(rnq.PrefixedNativeResourceNames, name)
+}
+
+func inList(list []v1.ResourceName, item v1.ResourceName) bool {
+	for i := range list {
+		if list[i] == item {
+			return true
+		}
+	}
+	return false
+}
+
+func getFakeResourceNameQualifier() ResourceNameQualifier {
+	return &resourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{"scalar.test/scalar1"},
+		HugePageResourceNames: []v1.ResourceName{"hugepages-test"},
+	}
+}
+
 func TestNewResource(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -63,7 +102,7 @@ func TestNewResource(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			r := NewResource(test.resourceList)
+			r := NewResource(test.resourceList, getFakeResourceNameQualifier())
 			if !reflect.DeepEqual(test.expected, r) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, r)
 			}
@@ -199,7 +238,7 @@ func TestSetMaxResource(t *testing.T) {
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			test.resource.SetMaxResource(test.resourceList)
+			test.resource.SetMaxResource(test.resourceList, getFakeResourceNameQualifier())
 			if !reflect.DeepEqual(test.expected, test.resource) {
 				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
 			}
@@ -250,6 +289,8 @@ func TestNewNodeInfo(t *testing.T) {
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
+
+	rqn := getFakeResourceNameQualifier()
 
 	expected := &NodeInfo{
 		Requested: &Resource{
@@ -336,10 +377,14 @@ func TestNewNodeInfo(t *testing.T) {
 				},
 			},
 		},
+		resourceNameQualifier: rqn,
 	}
 
 	gen := generation
-	ni := NewNodeInfo(pods...)
+	ni := NewNodeInfo(getFakeResourceNameQualifier())
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
 	if ni.Generation <= gen {
 		t.Errorf("Generation is not incremented. previous: %v, current: %v", gen, ni.Generation)
 	}
@@ -624,6 +669,7 @@ func TestNodeInfoAddPod(t *testing.T) {
 			},
 		},
 	}
+	rqn := getFakeResourceNameQualifier()
 	expected := &NodeInfo{
 		node: &v1.Node{
 			ObjectMeta: metav1.ObjectMeta{
@@ -762,9 +808,10 @@ func TestNodeInfoAddPod(t *testing.T) {
 				},
 			},
 		},
+		resourceNameQualifier: rqn,
 	}
 
-	ni := fakeNodeInfo()
+	ni := fakeNodeInfo(rqn)
 	gen := ni.Generation
 	for _, pod := range pods {
 		ni.AddPod(pod)
@@ -795,6 +842,8 @@ func TestNodeInfoRemovePod(t *testing.T) {
 			v1.ResourceMemory: resource.MustParse("500"),
 		}
 	}
+
+	rnq := getFakeResourceNameQualifier()
 
 	tests := []struct {
 		pod              *v1.Pod
@@ -902,6 +951,7 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						},
 					},
 				},
+				resourceNameQualifier: rnq,
 			},
 		},
 		{
@@ -1001,13 +1051,14 @@ func TestNodeInfoRemovePod(t *testing.T) {
 						},
 					},
 				},
+				resourceNameQualifier: rnq,
 			},
 		},
 	}
 
 	for i, test := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			ni := fakeNodeInfo(pods...)
+			ni := fakeNodeInfo(rnq, pods...)
 
 			gen := ni.Generation
 			err := ni.RemovePod(test.pod)
@@ -1034,8 +1085,11 @@ func TestNodeInfoRemovePod(t *testing.T) {
 	}
 }
 
-func fakeNodeInfo(pods ...*v1.Pod) *NodeInfo {
-	ni := NewNodeInfo(pods...)
+func fakeNodeInfo(rnq ResourceNameQualifier, pods ...*v1.Pod) *NodeInfo {
+	ni := NewNodeInfo(rnq)
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
 	ni.SetNode(&v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-node",

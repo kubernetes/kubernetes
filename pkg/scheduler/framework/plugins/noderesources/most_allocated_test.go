@@ -33,6 +33,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
 
+func newNodeInfoWithResourceNameQualifier() *framework.NodeInfo {
+	return framework.NewNodeInfo(getFakeResourceNameQualifier())
+}
+
 func TestNodeResourcesMostAllocated(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
@@ -264,7 +268,7 @@ func TestNodeResourcesMostAllocated(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, newNodeInfoWithResourceNameQualifier)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, err := NewMostAllocated(&test.args, fh)
 

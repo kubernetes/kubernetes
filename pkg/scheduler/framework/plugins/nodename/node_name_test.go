@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 func TestNodeName(t *testing.T) {
@@ -69,7 +70,7 @@ func TestNodeName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfo := framework.NewNodeInfo()
+			nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 			nodeInfo.SetNode(test.node)
 
 			p, _ := New(nil, nil)

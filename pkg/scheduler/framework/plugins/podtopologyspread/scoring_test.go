@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -240,7 +241,7 @@ func TestPreScoreStateEmptyNodes(t *testing.T) {
 			ctx := context.Background()
 			informerFactory := informers.NewSharedInformerFactory(fake.NewSimpleClientset(tt.objs...), 0)
 			f, err := frameworkruntime.NewFramework(nil, nil,
-				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes)),
+				frameworkruntime.WithSnapshotSharedLister(cache.NewSnapshot(nil, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)),
 				frameworkruntime.WithInformerFactory(informerFactory))
 			if err != nil {
 				t.Fatalf("Failed creating framework runtime: %v", err)
@@ -687,7 +688,7 @@ func TestPodTopologySpreadScore(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(tt.existingPods, allNodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier))
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, tt.nodes)
@@ -757,7 +758,7 @@ func BenchmarkTestPodTopologySpreadScore(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			state := framework.NewCycleState()
-			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier))
 			p := pl.(*PodTopologySpread)
 
 			status := p.PreScore(context.Background(), state, tt.pod, filteredNodes)
@@ -821,7 +822,7 @@ func BenchmarkTestDefaultEvenPodsSpreadPriority(b *testing.B) {
 			pod := st.MakePod().Name("p").Label("foo", "").Obj()
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.allNodesNum)
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(existingPods, allNodes)
+			snapshot := cache.NewSnapshot(existingPods, allNodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			client := fake.NewSimpleClientset(
 				&v1.Service{Spec: v1.ServiceSpec{Selector: map[string]string{"foo": ""}}},
 			)

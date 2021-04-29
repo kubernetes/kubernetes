@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/util/resources"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -70,7 +71,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := schedulerframework.NewNodeInfo(pods...)
+	nodeInfo := schedulerframework.NewNodeInfo(resources.NewResourceNameQualifier())
+	for _, pod := range pods {
+		nodeInfo.AddPod(pod)
+	}
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
@@ -226,7 +230,7 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 	}
 
 	var reasons []PredicateFailureReason
-	for _, r := range noderesources.Fits(pod, nodeInfo) {
+	for _, r := range noderesources.Fits(pod, nodeInfo, resources.NewResourceNameQualifier()) {
 		reasons = append(reasons, &InsufficientResourceError{
 			ResourceName: r.ResourceName,
 			Requested:    r.Requested,

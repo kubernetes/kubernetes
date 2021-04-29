@@ -226,6 +226,7 @@ rules:
       - k8s.io/kubernetes/pkg/util/procfs
       - k8s.io/kubernetes/pkg/util/removeall
       - k8s.io/kubernetes/pkg/util/resizefs
+      - k8s.io/kubernetes/pkg/util/resources
       - k8s.io/kubernetes/pkg/util/rlimit
       - k8s.io/kubernetes/pkg/util/selinux
       - k8s.io/kubernetes/pkg/util/slice

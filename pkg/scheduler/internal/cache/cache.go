@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -39,8 +40,9 @@ var (
 // It automatically starts a go routine that manages expiration of assumed pods.
 // "ttl" is how long the assumed pod will get expired.
 // "stop" is the channel that would close the background goroutine.
-func New(ttl time.Duration, stop <-chan struct{}) Cache {
-	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop)
+// "newNodeInfo" is a function creating a NodeInfo object
+func New(ttl time.Duration, stop <-chan struct{}, newNodeInfo func() *framework.NodeInfo) Cache {
+	cache := newSchedulerCache(ttl, cleanAssumedPeriod, stop, newNodeInfo)
 	cache.run()
 	return cache
 }
@@ -55,9 +57,10 @@ type nodeInfoListItem struct {
 }
 
 type schedulerCache struct {
-	stop   <-chan struct{}
-	ttl    time.Duration
-	period time.Duration
+	stop        <-chan struct{}
+	ttl         time.Duration
+	period      time.Duration
+	newNodeInfo func() *framework.NodeInfo
 
 	// This mutex guards all fields within this cache struct.
 	mu sync.RWMutex
@@ -98,11 +101,12 @@ func (cache *schedulerCache) createImageStateSummary(state *imageState) *framewo
 	}
 }
 
-func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}) *schedulerCache {
+func newSchedulerCache(ttl, period time.Duration, stop <-chan struct{}, newNodeInfo func() *framework.NodeInfo) *schedulerCache {
 	return &schedulerCache{
-		ttl:    ttl,
-		period: period,
-		stop:   stop,
+		ttl:         ttl,
+		period:      period,
+		stop:        stop,
+		newNodeInfo: newNodeInfo,
 
 		nodes:       make(map[string]*nodeInfoListItem),
 		nodeTree:    newNodeTree(nil),
@@ -230,7 +234,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
 				updateAllLists = true
-				existing = &framework.NodeInfo{}
+				existing = cache.newNodeInfo()
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
 			clone := node.info.Clone()
@@ -431,7 +435,7 @@ func (cache *schedulerCache) ForgetPod(pod *v1.Pod) error {
 func (cache *schedulerCache) addPod(pod *v1.Pod) {
 	n, ok := cache.nodes[pod.Spec.NodeName]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[pod.Spec.NodeName] = n
 	}
 	n.info.AddPod(pod)
@@ -599,7 +603,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) *framework.NodeInfo {
 
 	n, ok := cache.nodes[node.Name]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[node.Name] = n
 	} else {
 		cache.removeNodeImageStates(n.info.Node())
@@ -618,7 +622,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) *framework.No
 
 	n, ok := cache.nodes[newNode.Name]
 	if !ok {
-		n = newNodeInfoListItem(framework.NewNodeInfo())
+		n = newNodeInfoListItem(cache.newNodeInfo())
 		cache.nodes[newNode.Name] = n
 		cache.nodeTree.addNode(newNode)
 	} else {

@@ -46,10 +46,11 @@ type InTreeToCSITranslator interface {
 
 // CSILimits is a plugin that checks node volume limits.
 type CSILimits struct {
-	csiNodeLister storagelisters.CSINodeLister
-	pvLister      corelisters.PersistentVolumeLister
-	pvcLister     corelisters.PersistentVolumeClaimLister
-	scLister      storagelisters.StorageClassLister
+	csiNodeLister         storagelisters.CSINodeLister
+	pvLister              corelisters.PersistentVolumeLister
+	pvcLister             corelisters.PersistentVolumeClaimLister
+	scLister              storagelisters.StorageClassLister
+	resourceNameQualifier framework.ResourceNameQualifier
 
 	randomVolumeIDPrefix string
 
@@ -96,7 +97,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	}
 
 	// If the node doesn't have volume limits, the predicate will always be true
-	nodeVolumeLimits := getVolumeLimits(nodeInfo, csiNode)
+	nodeVolumeLimits := getVolumeLimits(nodeInfo, csiNode, pl.resourceNameQualifier)
 	if len(nodeVolumeLimits) == 0 {
 		return nil
 	}
@@ -272,20 +273,22 @@ func NewCSI(_ runtime.Object, handle framework.Handle) (framework.Plugin, error)
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
+	resourceNameQualifier := handle.ResourceNameQualifier()
 
 	return &CSILimits{
-		csiNodeLister:        csiNodesLister,
-		pvLister:             pvLister,
-		pvcLister:            pvcLister,
-		scLister:             scLister,
-		randomVolumeIDPrefix: rand.String(32),
-		translator:           csitrans.New(),
+		csiNodeLister:         csiNodesLister,
+		pvLister:              pvLister,
+		pvcLister:             pvcLister,
+		scLister:              scLister,
+		randomVolumeIDPrefix:  rand.String(32),
+		translator:            csitrans.New(),
+		resourceNameQualifier: resourceNameQualifier,
 	}, nil
 }
 
-func getVolumeLimits(nodeInfo *framework.NodeInfo, csiNode *storagev1.CSINode) map[v1.ResourceName]int64 {
+func getVolumeLimits(nodeInfo *framework.NodeInfo, csiNode *storagev1.CSINode, resourceNameQualifier framework.ResourceNameQualifier) map[v1.ResourceName]int64 {
 	// TODO: stop getting values from Node object in v1.18
-	nodeVolumeLimits := volumeLimits(nodeInfo)
+	nodeVolumeLimits := volumeLimits(resourceNameQualifier, nodeInfo)
 	if csiNode != nil {
 		for i := range csiNode.Spec.Drivers {
 			d := csiNode.Spec.Drivers[i]

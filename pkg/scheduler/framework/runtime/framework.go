@@ -104,6 +104,8 @@ type frameworkImpl struct {
 
 	parallelizer parallelize.Parallelizer
 
+	resourceNameQualifier framework.ResourceNameQualifier
+
 	// Indicates that RunFilterPlugins should accumulate all failed statuses and not return
 	// after the first failure.
 	runAllFilters bool
@@ -142,18 +144,19 @@ func (f *frameworkImpl) Extenders() []framework.Extender {
 }
 
 type frameworkOptions struct {
-	clientSet            clientset.Interface
-	kubeConfig           *restclient.Config
-	eventRecorder        events.EventRecorder
-	informerFactory      informers.SharedInformerFactory
-	snapshotSharedLister framework.SharedLister
-	metricsRecorder      *metricsRecorder
-	podNominator         framework.PodNominator
-	extenders            []framework.Extender
-	runAllFilters        bool
-	captureProfile       CaptureProfile
-	clusterEventMap      map[framework.ClusterEvent]sets.String
-	parallelizer         parallelize.Parallelizer
+	clientSet             clientset.Interface
+	kubeConfig            *restclient.Config
+	eventRecorder         events.EventRecorder
+	informerFactory       informers.SharedInformerFactory
+	snapshotSharedLister  framework.SharedLister
+	metricsRecorder       *metricsRecorder
+	podNominator          framework.PodNominator
+	extenders             []framework.Extender
+	runAllFilters         bool
+	captureProfile        CaptureProfile
+	clusterEventMap       map[framework.ClusterEvent]sets.String
+	parallelizer          parallelize.Parallelizer
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 // Option for the frameworkImpl.
@@ -248,6 +251,13 @@ func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
 	}
 }
 
+// WithResourceNameQualifier sets ResourceNameQualifier for qualifying resource names
+func WithResourceNameQualifier(rnq framework.ResourceNameQualifier) Option {
+	return func(o *frameworkOptions) {
+		o.resourceNameQualifier = rnq
+	}
+}
+
 var _ framework.Framework = &frameworkImpl{}
 
 // NewFramework initializes plugins given the configuration and the registry.
@@ -271,6 +281,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 		extenders:             options.extenders,
 		PodNominator:          options.podNominator,
 		parallelizer:          options.parallelizer,
+		resourceNameQualifier: options.resourceNameQualifier,
 	}
 
 	if profile == nil {
@@ -1200,4 +1211,9 @@ func (f *frameworkImpl) ProfileName() string {
 // Parallelizer returns a parallelizer holding parallelism for scheduler.
 func (f *frameworkImpl) Parallelizer() parallelize.Parallelizer {
 	return f.parallelizer
+}
+
+// ResourceNameQualifier returns resource name qualifier for qualifying resource names
+func (f *frameworkImpl) ResourceNameQualifier() framework.ResourceNameQualifier {
+	return f.resourceNameQualifier
 }

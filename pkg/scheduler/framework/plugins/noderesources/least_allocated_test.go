@@ -304,7 +304,7 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(test.pods, test.nodes)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, newNodeInfoWithResourceNameQualifier)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 			p, err := NewLeastAllocated(&test.args, fh)
 

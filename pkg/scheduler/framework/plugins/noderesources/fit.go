@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -49,6 +48,7 @@ const (
 type Fit struct {
 	ignoredResources      sets.String
 	ignoredResourceGroups sets.String
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -67,7 +67,7 @@ func (f *Fit) Name() string {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewFit(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
@@ -78,6 +78,7 @@ func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error)
 	return &Fit{
 		ignoredResources:      sets.NewString(args.IgnoredResources...),
 		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
+		resourceNameQualifier: h.ResourceNameQualifier(),
 	}, nil
 }
 
@@ -108,20 +109,20 @@ func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error)
 //       Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func computePodResourceRequest(pod *v1.Pod) *preFilterState {
+func computePodResourceRequest(pod *v1.Pod, rnq framework.ResourceNameQualifier) *preFilterState {
 	result := &preFilterState{}
 	for _, container := range pod.Spec.Containers {
-		result.Add(container.Resources.Requests)
+		result.Add(container.Resources.Requests, rnq)
 	}
 
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		result.SetMaxResource(container.Resources.Requests)
+		result.SetMaxResource(container.Resources.Requests, rnq)
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
-		result.Add(pod.Spec.Overhead)
+		result.Add(pod.Spec.Overhead, rnq)
 	}
 
 	return result
@@ -129,7 +130,7 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
+	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod, f.resourceNameQualifier))
 	return nil
 }
 
@@ -173,7 +174,7 @@ func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod 
 		return framework.AsStatus(err)
 	}
 
-	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups)
+	insufficientResources := fitsRequest(s, nodeInfo, f.ignoredResources, f.ignoredResourceGroups, f.resourceNameQualifier)
 
 	if len(insufficientResources) != 0 {
 		// We will keep all failure reasons.
@@ -198,11 +199,11 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, rnq framework.ResourceNameQualifier) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod, rnq), nodeInfo, nil, nil, rnq)
 }
 
-func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {
+func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String, rsq framework.ResourceNameQualifier) []InsufficientResource {
 	insufficientResources := make([]InsufficientResource, 0, 4)
 
 	allowedPodNumber := nodeInfo.Allocatable.AllowedPodNumber
@@ -252,7 +253,7 @@ func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignor
 	}
 
 	for rName, rQuant := range podRequest.ScalarResources {
-		if v1helper.IsExtendedResourceName(rName) {
+		if rsq.IsExtended(rName) {
 			// If this resource is one of the extended resources that should be ignored, we will skip checking it.
 			// rName is guaranteed to have a slash due to API validation.
 			var rNamePrefix string

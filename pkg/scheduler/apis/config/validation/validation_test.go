@@ -22,10 +22,21 @@ import (
 	"testing"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{
+			"foo.com/bar",
+		},
+	}
+}
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	podInitialBackoffSeconds := int64(1)
@@ -298,7 +309,7 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
-			errs := ValidateKubeSchedulerConfiguration(scenario.config)
+			errs := ValidateKubeSchedulerConfiguration(scenario.config, getFakeResourceNameQualifier())
 			if errs == nil && scenario.expectedToFail {
 				t.Error("Unexpected success")
 			}
@@ -434,7 +445,7 @@ func TestValidatePolicy(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actual := ValidatePolicy(test.policy)
+			actual := ValidatePolicy(test.policy, getFakeResourceNameQualifier())
 			if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
 				t.Errorf("expected: %s, actual: %s", test.expected, actual)
 			}

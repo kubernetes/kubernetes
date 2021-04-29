@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/utils/pointer"
 )
@@ -575,7 +576,7 @@ func TestVolumeBinding(t *testing.T) {
 			p := pl.(*VolumeBinding)
 			nodeInfos := make([]*framework.NodeInfo, 0)
 			for _, node := range item.nodes {
-				nodeInfo := framework.NewNodeInfo()
+				nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 				nodeInfo.SetNode(node)
 				nodeInfos = append(nodeInfos, nodeInfo)
 			}

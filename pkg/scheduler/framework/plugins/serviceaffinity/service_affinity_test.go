@@ -162,7 +162,7 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 			p := &ServiceAffinity{
 				sharedLister:  snapshot,
@@ -385,7 +385,7 @@ func TestServiceAffinityScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(test.nodes)
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			serviceLister := fakeframework.ServiceLister(test.services)
 
 			p := &ServiceAffinity{
@@ -497,7 +497,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
 			getState := func(pods []*v1.Pod) (*ServiceAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
-				snapshot := cache.NewSnapshot(pods, test.nodes)
+				snapshot := cache.NewSnapshot(pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 				p := &ServiceAffinity{
 					sharedLister:  snapshot,
@@ -608,7 +608,7 @@ func mustGetNodeInfo(t *testing.T, snapshot *cache.Snapshot, name string) *frame
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := &ServiceAffinity{

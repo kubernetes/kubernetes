@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -518,7 +519,7 @@ func TestPreFilterState(t *testing.T) {
 				DefaultConstraints: tt.defaultConstraints,
 				DefaultingType:     config.ListDefaulting,
 			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes), tt.objs)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, New, args, cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier), tt.objs)
 			cs := framework.NewCycleState()
 			if s := p.(*PodTopologySpread).PreFilter(ctx, cs, tt.pod); !s.IsSuccess() {
 				t.Fatal(s.AsError())
@@ -822,7 +823,7 @@ func TestPreFilterStateAddPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
@@ -1026,7 +1027,7 @@ func TestPreFilterStateRemovePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			cs := framework.NewCycleState()
@@ -1101,7 +1102,7 @@ func BenchmarkFilter(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod.Labels, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			ctx := context.Background()
-			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes))
+			pl := plugintesting.SetupPlugin(b, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewSnapshot(existingPods, allNodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier))
 			p := pl.(*PodTopologySpread)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
@@ -1403,7 +1404,7 @@ func TestSingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
@@ -1630,7 +1631,7 @@ func TestMultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			pl := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, snapshot)
 			p := pl.(*PodTopologySpread)
 			state := framework.NewCycleState()
@@ -1652,7 +1653,7 @@ func TestMultipleConstraints(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p := plugintesting.SetupPlugin(t, New, &config.PodTopologySpreadArgs{DefaultingType: config.ListDefaulting}, cache.NewEmptySnapshot())

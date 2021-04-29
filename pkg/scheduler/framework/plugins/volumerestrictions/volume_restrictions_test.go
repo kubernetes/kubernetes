@@ -23,7 +23,16 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
+
+func newNodeInfoWithPods(pods ...*v1.Pod) *framework.NodeInfo {
+	ni := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
+	return ni
+}
 
 func TestGCEDiskConflicts(t *testing.T) {
 	volState := v1.PodSpec{
@@ -56,10 +65,10 @@ func TestGCEDiskConflicts(t *testing.T) {
 		name       string
 		wantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier(), true, "nothing", nil},
+		{&v1.Pod{}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "one state", nil},
+		{&v1.Pod{Spec: volState}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), false, "same state", errStatus},
+		{&v1.Pod{Spec: volState2}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "different state", nil},
 	}
 
 	for _, test := range tests {
@@ -104,10 +113,10 @@ func TestAWSDiskConflicts(t *testing.T) {
 		name       string
 		wantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier(), true, "nothing", nil},
+		{&v1.Pod{}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "one state", nil},
+		{&v1.Pod{Spec: volState}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), false, "same state", errStatus},
+		{&v1.Pod{Spec: volState2}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "different state", nil},
 	}
 
 	for _, test := range tests {
@@ -158,10 +167,10 @@ func TestRBDDiskConflicts(t *testing.T) {
 		name       string
 		wantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier(), true, "nothing", nil},
+		{&v1.Pod{}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "one state", nil},
+		{&v1.Pod{Spec: volState}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), false, "same state", errStatus},
+		{&v1.Pod{Spec: volState2}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "different state", nil},
 	}
 
 	for _, test := range tests {
@@ -212,10 +221,10 @@ func TestISCSIDiskConflicts(t *testing.T) {
 		name       string
 		wantStatus *framework.Status
 	}{
-		{&v1.Pod{}, framework.NewNodeInfo(), true, "nothing", nil},
-		{&v1.Pod{}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "one state", nil},
-		{&v1.Pod{Spec: volState}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), false, "same state", errStatus},
-		{&v1.Pod{Spec: volState2}, framework.NewNodeInfo(&v1.Pod{Spec: volState}), true, "different state", nil},
+		{&v1.Pod{}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier(), true, "nothing", nil},
+		{&v1.Pod{}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "one state", nil},
+		{&v1.Pod{Spec: volState}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), false, "same state", errStatus},
+		{&v1.Pod{Spec: volState2}, newNodeInfoWithPods(&v1.Pod{Spec: volState}), true, "different state", nil},
 	}
 
 	for _, test := range tests {

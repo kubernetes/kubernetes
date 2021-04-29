@@ -32,6 +32,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/testutil"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 type fakePodLister struct {
@@ -44,6 +46,17 @@ func (l *fakePodLister) List(selector labels.Selector) (ret []*v1.Pod, err error
 
 func (l *fakePodLister) Pods(namespace string) corelisters.PodNamespaceLister {
 	panic("not implemented")
+}
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		HugePageResourceNames: []v1.ResourceName{
+			"hugepages-", "hugepages-x",
+		},
+		AttachableVolumeResourceNames: []v1.ResourceName{
+			"attachable-volumes-", "attachable-volumes-aws",
+		},
+	}
 }
 
 func Test_podResourceCollector_Handler(t *testing.T) {
@@ -83,7 +96,7 @@ func Test_podResourceCollector_Handler(t *testing.T) {
 				},
 			},
 		},
-	}})
+	}}, getFakeResourceNameQualifier())
 
 	r := httptest.NewRecorder()
 	req, err := http.NewRequest("GET", "/metrics/resources", nil)
@@ -169,7 +182,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					},
 				},
 			},
-			expected: `      
+			expected: `
 				# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_limit gauge
 				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 1
@@ -432,7 +445,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 					},
 				},
 			},
-			expected: `            
+			expected: `
 				# HELP kube_pod_resource_limit [ALPHA] Resources limit for workloads on the cluster, broken down by pod. This shows the resource usage the scheduler and kubelet expect per pod for resources along with the unit for the resource if any.
 				# TYPE kube_pod_resource_limit gauge
 				kube_pod_resource_limit{namespace="test",node="",pod="foo",priority="",resource="cpu",scheduler="",unit="cores"} 3.25
@@ -532,7 +545,7 @@ func Test_podResourceCollector_CollectWithStability(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewPodResourcesMetricsCollector(&fakePodLister{pods: tt.pods})
+			c := NewPodResourcesMetricsCollector(&fakePodLister{pods: tt.pods}, getFakeResourceNameQualifier())
 			registry := metrics.NewKubeRegistry()
 			registry.CustomMustRegister(c)
 			err := testutil.GatherAndCompare(registry, strings.NewReader(tt.expected))

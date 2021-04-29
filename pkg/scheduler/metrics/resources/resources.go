@@ -30,7 +30,7 @@ import (
 	"k8s.io/component-base/metrics"
 
 	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type resourceLifecycleDescriptors struct {
@@ -73,8 +73,8 @@ var podResourceDesc = resourceMetricsDescriptors{
 // Handler creates a collector from the provided podLister and returns an http.Handler that
 // will report the requested metrics in the prometheus format. It does not include any other
 // metrics.
-func Handler(podLister corelisters.PodLister) http.Handler {
-	collector := NewPodResourcesMetricsCollector(podLister)
+func Handler(podLister corelisters.PodLister, rnq framework.ResourceNameQualifier) http.Handler {
+	collector := NewPodResourcesMetricsCollector(podLister, rnq)
 	registry := metrics.NewKubeRegistry()
 	registry.CustomMustRegister(collector)
 	return metrics.HandlerWithReset(registry, metrics.HandlerOpts{})
@@ -90,15 +90,17 @@ var _ metrics.StableCollector = &podResourceCollector{}
 // their aggregate usage (required to schedule) and one for their phase specific
 // usage. This allows admins to assess the cost per resource at different phases
 // of startup and compare to actual resource usage.
-func NewPodResourcesMetricsCollector(podLister corelisters.PodLister) metrics.StableCollector {
+func NewPodResourcesMetricsCollector(podLister corelisters.PodLister, rnq framework.ResourceNameQualifier) metrics.StableCollector {
 	return &podResourceCollector{
-		lister: podLister,
+		lister:                podLister,
+		resourceNameQualifier: rnq,
 	}
 }
 
 type podResourceCollector struct {
 	metrics.BaseStableCollector
-	lister corelisters.PodLister
+	lister                corelisters.PodLister
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 func (c *podResourceCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
@@ -143,9 +145,9 @@ func (c *podResourceCollector) CollectWithStability(ch chan<- metrics.Metric) {
 					unitName = "bytes"
 				default:
 					switch {
-					case v1helper.IsHugePageResourceName(resourceName):
+					case c.resourceNameQualifier.IsHugePage(resourceName):
 						unitName = "bytes"
-					case v1helper.IsAttachableVolumeResourceName(resourceName):
+					case c.resourceNameQualifier.IsAttachableVolume(resourceName):
 						unitName = "integer"
 					}
 				}

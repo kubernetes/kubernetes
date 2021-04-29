@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -370,7 +371,7 @@ func TestSelectorSpreadScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			ctx := context.Background()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {
@@ -626,7 +627,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
-			snapshot := cache.NewSnapshot(test.pods, nodes)
+			snapshot := cache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			ctx := context.Background()
 			informerFactory, err := populateAndStartInformers(ctx, test.rcs, test.rss, test.services, test.sss)
 			if err != nil {

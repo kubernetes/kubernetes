@@ -605,6 +605,9 @@ type Handle interface {
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+
+	// ResourceNameQualifier returns resource name qualifier for qualifying resource names
+	ResourceNameQualifier() ResourceNameQualifier
 }
 
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.
@@ -639,4 +642,13 @@ type PluginsRunner interface {
 	RunPreFilterExtensionAddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToAdd *PodInfo, nodeInfo *NodeInfo) *Status
 	// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured PreFilter plugins.
 	RunPreFilterExtensionRemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod, podInfoToRemove *PodInfo, nodeInfo *NodeInfo) *Status
+}
+
+// ResourceNameQualifier abstracts helpers qualifying
+// of what kind a resource name is.
+type ResourceNameQualifier interface {
+	IsExtended(name v1.ResourceName) bool
+	IsHugePage(name v1.ResourceName) bool
+	IsAttachableVolume(name v1.ResourceName) bool
+	IsPrefixedNativeResource(name v1.ResourceName) bool
 }

@@ -23,6 +23,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 func TestNodeUnschedulable(t *testing.T) {
@@ -72,7 +73,7 @@ func TestNodeUnschedulable(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		nodeInfo := framework.NewNodeInfo()
+		nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 		nodeInfo.SetNode(test.node)
 
 		p, _ := New(nil, nil)

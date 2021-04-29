@@ -71,7 +71,8 @@ const AzureDiskName = "AzureDiskLimits"
 // NewAzureDisk returns function that initializes a new plugin and returns it.
 func NewAzureDisk(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(azureDiskVolumeFilterType, informerFactory), nil
+	resourceNameQualifier := handle.ResourceNameQualifier()
+	return newNonCSILimitsWithInformerFactory(azureDiskVolumeFilterType, informerFactory, resourceNameQualifier), nil
 }
 
 // CinderName is the name of the plugin used in the plugin registry and configurations.
@@ -80,7 +81,8 @@ const CinderName = "CinderLimits"
 // NewCinder returns function that initializes a new plugin and returns it.
 func NewCinder(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(cinderVolumeFilterType, informerFactory), nil
+	resourceNameQualifier := handle.ResourceNameQualifier()
+	return newNonCSILimitsWithInformerFactory(cinderVolumeFilterType, informerFactory, resourceNameQualifier), nil
 }
 
 // EBSName is the name of the plugin used in the plugin registry and configurations.
@@ -89,7 +91,8 @@ const EBSName = "EBSLimits"
 // NewEBS returns function that initializes a new plugin and returns it.
 func NewEBS(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(ebsVolumeFilterType, informerFactory), nil
+	resourceNameQualifier := handle.ResourceNameQualifier()
+	return newNonCSILimitsWithInformerFactory(ebsVolumeFilterType, informerFactory, resourceNameQualifier), nil
 }
 
 // GCEPDName is the name of the plugin used in the plugin registry and configurations.
@@ -98,19 +101,21 @@ const GCEPDName = "GCEPDLimits"
 // NewGCEPD returns function that initializes a new plugin and returns it.
 func NewGCEPD(_ runtime.Object, handle framework.Handle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	return newNonCSILimitsWithInformerFactory(gcePDVolumeFilterType, informerFactory), nil
+	resourceNameQualifier := handle.ResourceNameQualifier()
+	return newNonCSILimitsWithInformerFactory(gcePDVolumeFilterType, informerFactory, resourceNameQualifier), nil
 }
 
 // nonCSILimits contains information to check the max number of volumes for a plugin.
 type nonCSILimits struct {
-	name           string
-	filter         VolumeFilter
-	volumeLimitKey v1.ResourceName
-	maxVolumeFunc  func(node *v1.Node) int
-	csiNodeLister  storagelisters.CSINodeLister
-	pvLister       corelisters.PersistentVolumeLister
-	pvcLister      corelisters.PersistentVolumeClaimLister
-	scLister       storagelisters.StorageClassLister
+	name                  string
+	filter                VolumeFilter
+	volumeLimitKey        v1.ResourceName
+	maxVolumeFunc         func(node *v1.Node) int
+	csiNodeLister         storagelisters.CSINodeLister
+	pvLister              corelisters.PersistentVolumeLister
+	pvcLister             corelisters.PersistentVolumeClaimLister
+	scLister              storagelisters.StorageClassLister
+	resourceNameQualifier framework.ResourceNameQualifier
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -124,13 +129,14 @@ var _ framework.FilterPlugin = &nonCSILimits{}
 func newNonCSILimitsWithInformerFactory(
 	filterName string,
 	informerFactory informers.SharedInformerFactory,
+	resourceNameQualifier framework.ResourceNameQualifier,
 ) framework.Plugin {
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	csiNodesLister := informerFactory.Storage().V1().CSINodes().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
-	return newNonCSILimits(filterName, csiNodesLister, scLister, pvLister, pvcLister)
+	return newNonCSILimits(filterName, csiNodesLister, scLister, pvLister, pvcLister, resourceNameQualifier)
 }
 
 // newNonCSILimits creates a plugin which evaluates whether a pod can fit based on the
@@ -149,6 +155,7 @@ func newNonCSILimits(
 	scLister storagelisters.StorageClassLister,
 	pvLister corelisters.PersistentVolumeLister,
 	pvcLister corelisters.PersistentVolumeClaimLister,
+	resourceNameQualifier framework.ResourceNameQualifier,
 ) framework.Plugin {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
@@ -176,15 +183,16 @@ func newNonCSILimits(
 		return nil
 	}
 	pl := &nonCSILimits{
-		name:                 name,
-		filter:               filter,
-		volumeLimitKey:       volumeLimitKey,
-		maxVolumeFunc:        getMaxVolumeFunc(filterName),
-		csiNodeLister:        csiNodeLister,
-		pvLister:             pvLister,
-		pvcLister:            pvcLister,
-		scLister:             scLister,
-		randomVolumeIDPrefix: rand.String(32),
+		name:                  name,
+		filter:                filter,
+		volumeLimitKey:        volumeLimitKey,
+		maxVolumeFunc:         getMaxVolumeFunc(filterName),
+		csiNodeLister:         csiNodeLister,
+		pvLister:              pvLister,
+		pvcLister:             pvcLister,
+		scLister:              scLister,
+		randomVolumeIDPrefix:  rand.String(32),
+		resourceNameQualifier: resourceNameQualifier,
 	}
 
 	return pl
@@ -250,7 +258,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 
 	numNewVolumes := len(newVolumes)
 	maxAttachLimit := pl.maxVolumeFunc(node)
-	volumeLimits := volumeLimits(nodeInfo)
+	volumeLimits := volumeLimits(pl.resourceNameQualifier, nodeInfo)
 	if maxAttachLimitFromAllocatable, ok := volumeLimits[pl.volumeLimitKey]; ok {
 		maxAttachLimit = int(maxAttachLimitFromAllocatable)
 	}

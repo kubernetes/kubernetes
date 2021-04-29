@@ -47,6 +47,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	kubeschedulerscheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
+	"k8s.io/kubernetes/pkg/util/resources"
 )
 
 // Options has all the params needed to run a Scheduler
@@ -184,7 +185,7 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err != nil {
 			return err
 		}
-		if err := validation.ValidateKubeSchedulerConfiguration(cfg); err != nil {
+		if err := validation.ValidateKubeSchedulerConfiguration(cfg, resources.NewResourceNameQualifier()); err != nil {
 			return err
 		}
 
@@ -234,7 +235,7 @@ func emptySchedulerProfileConfig(profiles []kubeschedulerconfig.KubeSchedulerPro
 func (o *Options) Validate() []error {
 	var errs []error
 
-	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig); err != nil {
+	if err := validation.ValidateKubeSchedulerConfiguration(&o.ComponentConfig, resources.NewResourceNameQualifier()); err != nil {
 		errs = append(errs, err.Errors()...)
 	}
 	errs = append(errs, o.SecureServing.Validate()...)

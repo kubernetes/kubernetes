@@ -102,7 +102,7 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 
 	nodeInfo := sched.SchedulerCache.AddNode(node)
 	klog.V(3).InfoS("Add event for node", "node", klog.KObj(node))
-	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd, preCheckForNode(nodeInfo))
+	sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(queue.NodeAdd, preCheckForNode(nodeInfo, sched.resourceNameQualifier))
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -120,7 +120,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	nodeInfo := sched.SchedulerCache.UpdateNode(oldNode, newNode)
 	// Only requeue unschedulable pods if the node became more schedulable.
 	if event := nodeSchedulingPropertiesChange(newNode, oldNode); event != nil {
-		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo))
+		sched.SchedulingQueue.MoveAllToActiveOrBackoffQueue(*event, preCheckForNode(nodeInfo, sched.resourceNameQualifier))
 	}
 }
 
@@ -459,7 +459,7 @@ func nodeSpecUnschedulableChanged(newNode *v1.Node, oldNode *v1.Node) bool {
 	return newNode.Spec.Unschedulable != oldNode.Spec.Unschedulable && !newNode.Spec.Unschedulable
 }
 
-func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
+func preCheckForNode(nodeInfo *framework.NodeInfo, rnq framework.ResourceNameQualifier) queue.PreEnqueueCheck {
 	// In addition to the checks in kubelet (pkg/kubelet/lifecycle/predicate.go#GeneralPredicates),
 	// the following logic appends a taint/toleration check.
 	// TODO: verify if kubelet should also apply the taint/toleration check, and then unify the
@@ -469,7 +469,7 @@ func preCheckForNode(nodeInfo *framework.NodeInfo) queue.PreEnqueueCheck {
 	// cases (e.g., node resizing), "pod" may still fail a check but preemption helps. We deliberately
 	// chose to ignore those cases as unschedulable pods will be re-queued eventually.
 	return func(pod *v1.Pod) bool {
-		if len(noderesources.Fits(pod, nodeInfo)) != 0 {
+		if len(noderesources.Fits(pod, nodeInfo, rnq)) != 0 {
 			return false
 		}
 

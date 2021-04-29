@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
+	"k8s.io/kubernetes/pkg/util/resources"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -91,6 +92,7 @@ func setupScheduler(
 		cs,
 		informerFactory,
 		profile.NewRecorderFactory(eventBroadcaster),
+		resources.NewResourceNameQualifier(),
 		ctx.Done(),
 	)
 	if err != nil {

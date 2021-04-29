@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/metrics/resources"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
+	resourcenamequalifier "k8s.io/kubernetes/pkg/util/resources"
 )
 
 // Option configures a framework.Registry.
@@ -246,7 +247,7 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux, informers inform
 	configz.InstallHandler(pathRecorderMux)
 	pathRecorderMux.Handle("/metrics", legacyregistry.HandlerWithReset())
 
-	resourceMetricsHandler := resources.Handler(informers.Core().V1().Pods().Lister())
+	resourceMetricsHandler := resources.Handler(informers.Core().V1().Pods().Lister(), resourcenamequalifier.NewResourceNameQualifier())
 	pathRecorderMux.HandleFunc("/metrics/resources", func(w http.ResponseWriter, req *http.Request) {
 		if !isLeader() {
 			return
@@ -329,6 +330,7 @@ func Setup(ctx context.Context, opts *options.Options, outOfTreeRegistryOptions 
 	sched, err := scheduler.New(cc.Client,
 		cc.InformerFactory,
 		recorderFactory,
+		resourcenamequalifier.NewResourceNameQualifier(),
 		ctx.Done(),
 		scheduler.WithKubeConfig(cc.KubeConfig),
 		scheduler.WithProfiles(cc.ComponentConfig.Profiles...),

@@ -38,6 +38,7 @@ import (
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpreemption"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
@@ -404,6 +405,7 @@ func TestCreateFromConfig(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
+				fakeframework.EmptyResourceNameQualifier(),
 				make(chan struct{}),
 				WithAlgorithmSource(createAlgorithmSourceFromPolicy(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {
@@ -472,7 +474,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 			queue.Add(testPod)
 			queue.Pop()
@@ -546,7 +548,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
@@ -587,7 +589,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(&nodeFoo)

@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	schedulerfakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 const (
@@ -866,6 +867,15 @@ func TestInitContainerDeviceAllocation(t *testing.T) {
 	as.Equal(0, normalCont1Devices.Intersection(normalCont2Devices).Len())
 }
 
+func getFakeResourceNameQualifier() schedulerframework.ResourceNameQualifier {
+	return &schedulerfakeframework.ResourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{
+			"domain1.com/resource1",
+			"domain2.com/resource2",
+		},
+	}
+}
+
 func TestUpdatePluginResources(t *testing.T) {
 	pod := &v1.Pod{}
 	pod.UID = types.UID("testPod")
@@ -907,7 +917,7 @@ func TestUpdatePluginResources(t *testing.T) {
 			},
 		},
 	}
-	nodeInfo := &schedulerframework.NodeInfo{}
+	nodeInfo := schedulerframework.NewNodeInfo(getFakeResourceNameQualifier())
 	nodeInfo.SetNode(cachedNode)
 
 	testManager.UpdatePluginResources(nodeInfo, &lifecycle.PodAdmitAttributes{Pod: pod})

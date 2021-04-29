@@ -35,7 +35,17 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{
+			"example.com/foo",
+		},
+	}
+}
 
 type testCase struct {
 	name          string
@@ -1381,6 +1391,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
+				getFakeResourceNameQualifier(),
 				make(chan struct{}),
 				scheduler.WithAlgorithmSource(algorithmSrc),
 			)
@@ -1556,6 +1567,7 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
+				getFakeResourceNameQualifier(),
 				make(chan struct{}),
 				opts...,
 			)
@@ -2121,6 +2133,7 @@ func TestPluginsConfigurationCompatibility(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
+				getFakeResourceNameQualifier(),
 				make(chan struct{}),
 				scheduler.WithProfiles(config.KubeSchedulerProfile{
 					SchedulerName: v1.DefaultSchedulerName,
