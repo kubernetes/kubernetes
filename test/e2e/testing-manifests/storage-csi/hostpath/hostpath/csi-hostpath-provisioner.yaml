@@ -1,3 +1,17 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: csi-hostpath-provisioner 
+  labels:
+    app: csi-hostpath-provisioner 
+spec:
+  selector:
+    app: csi-hostpath-provisioner 
+  ports:
+    - name: dummy
+      port: 12345
+
+---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -26,7 +40,7 @@ spec:
       serviceAccountName: csi-provisioner
       containers:
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v2.1.1
+          image: k8s.gcr.io/sig-storage/csi-provisioner:v1.6.0
           args:
             - -v=5
             - --csi-address=/csi/csi.sock
