@@ -233,7 +233,7 @@ func installMetricHandler(pathRecorderMux *mux.PathRecorderMux, informers inform
 	configz.InstallHandler(pathRecorderMux)
 	pathRecorderMux.Handle("/metrics", legacyregistry.HandlerWithReset())
 
-	resourceMetricsHandler := resources.Handler(informers.Core().V1().Pods().Lister())
+	resourceMetricsHandler := resources.Handler(informers.Core().V1().Pods().Lister(), resourcenamequalifier.NewResourceNameQualifier())
 	pathRecorderMux.HandleFunc("/metrics/resources", func(w http.ResponseWriter, req *http.Request) {
 		if !isLeader() {
 			return
