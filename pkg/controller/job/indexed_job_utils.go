@@ -26,6 +26,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -214,6 +215,15 @@ func addCompletionIndexAnnotation(template *v1.PodTemplateSpec, index int) {
 		template.Annotations = make(map[string]string, 1)
 	}
 	template.Annotations[batch.JobCompletionIndexAnnotation] = strconv.Itoa(index)
+}
+
+func podGenerateNameWithIndex(jobName string, index int) string {
+	appendIndex := "-" + strconv.Itoa(index) + "-"
+	generateNamePrefix := jobName + appendIndex
+	if len(generateNamePrefix) > names.MaxGeneratedNameLength {
+		generateNamePrefix = generateNamePrefix[:names.MaxGeneratedNameLength-len(appendIndex)] + appendIndex
+	}
+	return generateNamePrefix
 }
 
 type byCompletionIndex []*v1.Pod
