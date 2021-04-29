@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	batchv1 "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -135,72 +134,6 @@ func TestCreateJob(t *testing.T) {
 	}
 }
 
-func TestCreateJobFromCronJobV1Beta1(t *testing.T) {
-	jobName := "test-job"
-	cronJob := &batchv1beta1.CronJob{
-		Spec: batchv1beta1.CronJobSpec{
-			JobTemplate: batchv1beta1.JobTemplateSpec{
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Image: "test-image"},
-							},
-							RestartPolicy: corev1.RestartPolicyNever,
-						},
-					},
-				},
-			},
-		},
-	}
-	tests := map[string]struct {
-		from     *batchv1beta1.CronJob
-		expected *batchv1.Job
-	}{
-		"from CronJob": {
-			from: cronJob,
-			expected: &batchv1.Job{
-				TypeMeta: metav1.TypeMeta{APIVersion: batchv1.SchemeGroupVersion.String(), Kind: "Job"},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        jobName,
-					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
-					OwnerReferences: []metav1.OwnerReference{
-						{
-							APIVersion: batchv1beta1.SchemeGroupVersion.String(),
-							Kind:       "CronJob",
-							Name:       cronJob.GetName(),
-							UID:        cronJob.GetUID(),
-						},
-					},
-				},
-				Spec: batchv1.JobSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{Image: "test-image"},
-							},
-							RestartPolicy: corev1.RestartPolicyNever,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			o := &CreateJobOptions{
-				Name: jobName,
-			}
-			job := o.createJobFromCronJobV1Beta1(tc.from)
-
-			if !apiequality.Semantic.DeepEqual(job, tc.expected) {
-				t.Errorf("expected:\n%#v\ngot:\n%#v", tc.expected, job)
-			}
-		})
-	}
-}
-
 func TestCreateJobFromCronJob(t *testing.T) {
 	jobName := "test-job"
 	cronJob := &batchv1.CronJob{
@@ -232,7 +165,7 @@ func TestCreateJobFromCronJob(t *testing.T) {
 					Annotations: map[string]string{"cronjob.kubernetes.io/instantiate": "manual"},
 					OwnerReferences: []metav1.OwnerReference{
 						{
-							APIVersion: batchv1beta1.SchemeGroupVersion.String(),
+							APIVersion: batchv1.SchemeGroupVersion.String(),
 							Kind:       "CronJob",
 							Name:       cronJob.GetName(),
 							UID:        cronJob.GetUID(),
