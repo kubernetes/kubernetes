@@ -993,6 +993,11 @@ func (proxier *Proxier) syncProxyRules() {
 	//   slice = append(slice[:0], ...)
 	endpoints := make([]*endpointsInfo, 0)
 	endpointChains := make([]utiliptables.Chain, 0)
+	readyEndpoints := make([]*endpointsInfo, 0)
+	readyEndpointChains := make([]utiliptables.Chain, 0)
+	localReadyEndpointChains := make([]utiliptables.Chain, 0)
+	localServingTerminatingEndpointChains := make([]utiliptables.Chain, 0)
+
 	// To avoid growing this slice, we arbitrarily set its size to 64,
 	// there is never more than that many arguments for a single line.
 	// Note that even if we go over 64, it will still be correct - it
@@ -1396,10 +1401,10 @@ func (proxier *Proxier) syncProxyRules() {
 		//   1. all endpoints that are ready and NOT terminating.
 		//   2. all endpoints that are local, ready and NOT terminating, and externalTrafficPolicy=Local
 		//   3. all endpoints that are local, serving and terminating, and externalTrafficPolicy=Local
-		readyEndpointChains := make([]utiliptables.Chain, 0, len(endpointChains))
-		readyEndpoints := make([]*endpointsInfo, 0, len(allEndpoints))
-		localReadyEndpointChains := make([]utiliptables.Chain, 0, len(endpointChains))
-		localServingTerminatingEndpointChains := make([]utiliptables.Chain, 0, len(endpointChains))
+		readyEndpointChains = readyEndpointChains[:0]
+		readyEndpoints := readyEndpoints[:0]
+		localReadyEndpointChains := localReadyEndpointChains[:0]
+		localServingTerminatingEndpointChains := localServingTerminatingEndpointChains[:0]
 		for i, endpointChain := range endpointChains {
 			if endpoints[i].Ready {
 				readyEndpointChains = append(readyEndpointChains, endpointChain)
