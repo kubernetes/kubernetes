@@ -59,6 +59,11 @@ var _ = SIGDescribe("GracefulNodeShutdown [Serial] [NodeAlphaFeature:GracefulNod
 			initialConfig.ShutdownGracePeriodCriticalPods = metav1.Duration{Duration: nodeShutdownGracePeriodCriticalPods}
 		})
 
+		ginkgo.BeforeEach(func() {
+			ginkgo.By("Wait for the node to be ready")
+			waitForNodeReady()
+		})
+
 		ginkgo.AfterEach(func() {
 			ginkgo.By("Emitting Shutdown false signal; cancelling the shutdown")
 			err := emitSignalPrepareForShutdown(false)
