@@ -23,7 +23,7 @@ func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName, func(config io.Reader) (admission.Interface, error) {
 		return customresourcevalidation.NewValidator(
 			map[schema.GroupResource]bool{
-				configv1.Resource("features"): true,
+				configv1.Resource("featuregates"): true,
 			},
 			map[schema.GroupVersionKind]customresourcevalidation.ObjectValidator{
 				configv1.GroupVersion.WithKind("FeatureGate"): featureGateV1{},
