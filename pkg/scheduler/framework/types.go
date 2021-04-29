@@ -550,10 +550,8 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
-// If any pods are given in arguments, their information will be aggregated in
-// the returned object.
-func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
-	ni := &NodeInfo{
+func NewNodeInfo() *NodeInfo {
+	return &NodeInfo{
 		Requested:        &Resource{},
 		NonZeroRequested: &Resource{},
 		Allocatable:      &Resource{},
@@ -562,10 +560,6 @@ func NewNodeInfo(pods ...*v1.Pod) *NodeInfo {
 		UsedPorts:        make(HostPortInfo),
 		ImageStates:      make(map[string]*ImageStateSummary),
 	}
-	for _, pod := range pods {
-		ni.AddPod(pod)
-	}
-	return ni
 }
 
 // Node returns overall information about this node.

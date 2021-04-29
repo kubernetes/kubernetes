@@ -71,7 +71,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	}
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
-	nodeInfo := schedulerframework.NewNodeInfo(pods...)
+	nodeInfo := schedulerframework.NewNodeInfo()
+	for _, pod := range pods {
+		nodeInfo.AddPod(pod)
+	}
 	nodeInfo.SetNode(node)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {

@@ -174,6 +174,14 @@ func newPodWithPort(hostPorts ...int) *v1.Pod {
 	}
 }
 
+func newNodeInfoWithPods(pods ...*v1.Pod) *schedulerframework.NodeInfo {
+	ni := schedulerframework.NewNodeInfo()
+	for _, pod := range pods {
+		ni.AddPod(pod)
+	}
+	return ni
+}
+
 func TestGeneralPredicates(t *testing.T) {
 	resourceTests := []struct {
 		pod      *v1.Pod
@@ -186,7 +194,7 @@ func TestGeneralPredicates(t *testing.T) {
 	}{
 		{
 			pod: &v1.Pod{},
-			nodeInfo: schedulerframework.NewNodeInfo(
+			nodeInfo: newNodeInfoWithPods(
 				newResourcePod(v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(9, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
@@ -204,7 +212,7 @@ func TestGeneralPredicates(t *testing.T) {
 				v1.ResourceCPU:    *resource.NewMilliQuantity(8, resource.DecimalSI),
 				v1.ResourceMemory: *resource.NewQuantity(10, resource.BinarySI),
 			}),
-			nodeInfo: schedulerframework.NewNodeInfo(
+			nodeInfo: newNodeInfoWithPods(
 				newResourcePod(v1.ResourceList{
 					v1.ResourceCPU:    *resource.NewMilliQuantity(5, resource.DecimalSI),
 					v1.ResourceMemory: *resource.NewQuantity(19, resource.BinarySI),
@@ -239,7 +247,7 @@ func TestGeneralPredicates(t *testing.T) {
 		},
 		{
 			pod:      newPodWithPort(123),
-			nodeInfo: schedulerframework.NewNodeInfo(newPodWithPort(123)),
+			nodeInfo: newNodeInfoWithPods(newPodWithPort(123)),
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{Name: "machine1"},
 				Status:     v1.NodeStatus{Capacity: makeResources(10, 20, 32, 0, 0, 0).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
