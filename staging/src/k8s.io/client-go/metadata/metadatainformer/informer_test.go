@@ -52,9 +52,9 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 		{
 			name: "scenario 1: test if adding an object triggers AddFunc",
 			ns:   "ns-foo",
-			gvr:  schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
+			gvr:  schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeMetadataClient, _ *metav1.PartialObjectMetadata) *metav1.PartialObjectMetadata {
-				testObject := newPartialObjectMetadata("extensions/v1beta1", "Deployment", "ns-foo", "name-foo")
+				testObject := newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", "name-foo")
 				createdObj, err := fakeClient.Resource(gvr).Namespace(ns).(fake.MetadataClient).CreateFake(testObject, metav1.CreateOptions{})
 				if err != nil {
 					t.Error(err)
@@ -74,8 +74,8 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 		{
 			name:        "scenario 2: tests if updating an object triggers UpdateFunc",
 			ns:          "ns-foo",
-			gvr:         schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
-			existingObj: newPartialObjectMetadata("extensions/v1beta1", "Deployment", "ns-foo", "name-foo"),
+			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			existingObj: newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", "name-foo"),
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeMetadataClient, testObject *metav1.PartialObjectMetadata) *metav1.PartialObjectMetadata {
 				if testObject.Annotations == nil {
 					testObject.Annotations = make(map[string]string)
@@ -100,8 +100,8 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 		{
 			name:        "scenario 3: test if deleting an object triggers DeleteFunc",
 			ns:          "ns-foo",
-			gvr:         schema.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "deployments"},
-			existingObj: newPartialObjectMetadata("extensions/v1beta1", "Deployment", "ns-foo", "name-foo"),
+			gvr:         schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"},
+			existingObj: newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", "name-foo"),
 			trigger: func(gvr schema.GroupVersionResource, ns string, fakeClient *fake.FakeMetadataClient, testObject *metav1.PartialObjectMetadata) *metav1.PartialObjectMetadata {
 				err := fakeClient.Resource(gvr).Namespace(ns).Delete(context.TODO(), testObject.GetName(), metav1.DeleteOptions{})
 				if err != nil {
@@ -153,6 +153,57 @@ func TestMetadataSharedInformerFactory(t *testing.T) {
 				t.Errorf("tested informer haven't received an object, waited %v", timeout)
 			}
 		})
+	}
+}
+
+// TestSpecificInformerStopOnZeroEventHandlers tests that when an informer
+// has all its event handlers removed, the informer itself will shut down.
+func TestSpecificInformerStopOnZeroEventHandlers(t *testing.T) {
+	scenarios := []struct {
+		stopOnZeroEventHandlers bool
+	}{
+		{
+			stopOnZeroEventHandlers: true,
+		},
+		{
+			stopOnZeroEventHandlers: false,
+		},
+	}
+
+	for _, ts := range scenarios {
+		timeout := time.Duration(5 * time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		testObject := newPartialObjectMetadata("apps/v1", "Deployment", "ns-foo", "name-foo")
+		scheme := runtime.NewScheme()
+		metav1.AddMetaToScheme(scheme)
+		fakeClient := fake.NewSimpleMetadataClient(scheme, []runtime.Object{testObject}...)
+		gvr := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
+		target := NewSharedInformerFactoryWithOptions(fakeClient, 0, WithStopOnZeroEventHandlers(ts.stopOnZeroEventHandlers))
+		handler := &cache.ResourceEventHandlerFuncs{}
+
+		// retrieve the informer for the resource forces the factory to create the informer.
+		informer := target.ForResource(gvr)
+		informer.Informer().AddEventHandler(handler)
+		target.Start(ctx.Done())
+
+		go func() {
+			time.Sleep(time.Second)
+			if err := informer.Informer().RemoveEventHandler(handler); err != nil {
+				t.Errorf("failed to remove event handler: %v", err)
+			}
+		}()
+
+		<-time.NewTimer(2 * time.Second).C
+		if informer.Informer().IsStopped() {
+			if !ts.stopOnZeroEventHandlers {
+				t.Errorf("informer should NOT have stopped when stopOnZeroEventHandlers is false")
+			}
+		} else {
+			if ts.stopOnZeroEventHandlers {
+				t.Errorf("informer SHOULD have stopped itself when stopOnZeroEventHandlers is true, waited 3s")
+			}
+		}
 	}
 }
 
