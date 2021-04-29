@@ -858,8 +858,8 @@ var _ = common.SIGDescribe("Services", func() {
 		})
 		framework.ExpectNoError(err)
 
-		port1 := 8080
-		port2 := 8081
+		port1 := 100
+		port2 := 101
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{})
 
 		names := map[string]bool{}
@@ -886,18 +886,21 @@ var _ = common.SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		args := []string{"nettest", "--port", fmt.Sprintf("%d", port1)}
-		pod := createPodWithArgs(f, ns, podname1, jig.Labels, containerPorts1, args...)
+		args1 := []string{"nettest", "--port", fmt.Sprintf("%d", port1)}
+		container1 := e2epod.NewAgnhostContainer("agnhost-container-1", nil, containerPorts1, args1...)
+
+		args2 := []string{"nettest", "--port", fmt.Sprintf("%d", port2)}
+		container2 := e2epod.NewAgnhostContainer("agnhost-container-2", nil, containerPorts2, args2...)
+
+		pod := createPodWithContainer(f, ns, podname1, jig.Labels, []v1.Container{container1, container2})
 		names[podname1] = true
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}})
 		err = jig.CheckServiceReachability(svc, pod)
 		framework.ExpectNoError(err)
 
-		args = []string{"nettest", "--port", fmt.Sprintf("%d", port2)}
-		pod = createPodWithArgs(f, ns, podname1, jig.Labels, containerPorts2, args...)
+		pod = createPodWithContainer(f, ns, podname2, jig.Labels, []v1.Container{container1, container2})
 		names[podname2] = true
 		validateEndpointsPortsOrFail(cs, ns, serviceName, portsByPodName{podname1: {port1}, podname2: {port2}})
-
 		err = jig.CheckServiceReachability(svc, pod)
 		framework.ExpectNoError(err)
 
@@ -2677,12 +2680,10 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	return deployment
 }
 
-func createPodWithArgs(f *framework.Framework, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort, args ...string) *v1.Pod {
+func createPodWithContainer(f *framework.Framework, ns, name string, labels map[string]string, cs []v1.Container) *v1.Pod {
 	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
-	pod := e2epod.NewAgnhostPod(ns, name, nil, nil, containerPorts, args...)
+	pod := e2epod.NewAgnhostPodWithContainer(ns, name, nil, cs)
 	pod.ObjectMeta.Labels = labels
-	// Add a dummy environment variable to work around a docker issue.
-	// https://github.com/docker/docker/issues/14203
 	return f.PodClient().CreateSync(pod)
 }
 
