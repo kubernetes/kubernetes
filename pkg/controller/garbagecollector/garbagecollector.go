@@ -205,7 +205,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			if attempt > 1 {
 				newResources = GetDeletableResources(discoveryClient)
 				if len(newResources) == 0 {
-					klog.V(2).Infof("no resources reported by discovery (attempt %d)", attempt)
+					klog.V(2).InfoS("no resources reported by discovery", "Attempt", attempt)
 					return false, nil
 				}
 			}
@@ -318,13 +318,13 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		if !existsInGraph {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime a deletion of the real object associated with that uid was observed
-			klog.V(5).Infof("item %s no longer in the graph, skipping attemptToDeleteItem", n)
+			klog.V(5).InfoS("item no longer in the graph, skipping attemptToDeleteItem", "item", n)
 			return true
 		}
 		if nodeFromGraph.isObserved() {
 			// this can happen if attemptToDelete loops on a requeued virtual node because attemptToDeleteItem returned an error,
 			// and in the meantime the real object associated with that uid was observed
-			klog.V(5).Infof("item %s no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", n)
+			klog.V(5).InfoS("item no longer virtual in the graph, skipping attemptToDeleteItem on virtual node", "item", n)
 			return true
 		}
 	}
@@ -345,7 +345,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 			//    have a way to distinguish this from a valid type we will recognize
 			//    after the next discovery sync.
 			// For now, record the error and retry.
-			klog.V(5).Infof("error syncing item %s: %v", n, err)
+			klog.V(5).InfoS("error syncing item", "item", n, "error", err)
 		} else {
 			utilruntime.HandleError(fmt.Errorf("error syncing item %s: %v", n, err))
 		}
@@ -355,7 +355,7 @@ func (gc *GarbageCollector) attemptToDeleteWorker() bool {
 		// requeue if item hasn't been observed via an informer event yet.
 		// otherwise a virtual node for an item added AND removed during watch reestablishment can get stuck in the graph and never removed.
 		// see https://issue.k8s.io/56121
-		klog.V(5).Infof("item %s hasn't been observed via informer yet", n.identity)
+		klog.V(5).InfoS("item hasn't been observed via informer yet", "item", n.identity)
 		gc.attemptToDelete.AddRateLimited(item)
 	}
 	return true
@@ -587,7 +587,7 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 func (gc *GarbageCollector) processDeletingDependentsItem(item *node) error {
 	blockingDependents := item.blockingDependents()
 	if len(blockingDependents) == 0 {
-		klog.V(2).Infof("remove DeleteDependents finalizer for item %s", item.identity)
+		klog.V(2).InfoS("remove DeleteDependents finalizer for item", "item", item.identity)
 		return gc.removeFinalizer(item, metav1.FinalizerDeleteDependents)
 	}
 	for _, dep := range blockingDependents {
