@@ -42,7 +42,8 @@ func (leaseStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate prepares Lease for creation.
-func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (leaseStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

@@ -58,9 +58,10 @@ func (resourcequotaStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpat
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (resourcequotaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (resourcequotaStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	resourcequota := obj.(*api.ResourceQuota)
 	resourcequota.Status = api.ResourceQuotaStatus{}
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

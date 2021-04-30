@@ -69,7 +69,8 @@ func (fischerStrategy) NamespaceScoped() bool {
 	return false
 }
 
-func (fischerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (fischerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	return nil
 }
 
 func (fischerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

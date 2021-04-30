@@ -44,10 +44,11 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	template := obj.(*api.PodTemplate)
 
 	pod.DropDisabledTemplateFields(&template.Template, nil)
+	return nil
 }
 
 // Validate validates a new pod template.

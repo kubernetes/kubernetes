@@ -57,13 +57,14 @@ func (strategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rc := obj.(*node.RuntimeClass)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) && rc != nil {
 		// Set Overhead to nil only if the feature is disabled and it is not used
 		rc.Overhead = nil
 	}
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

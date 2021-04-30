@@ -85,7 +85,7 @@ func (jobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate clears the status of a job before creation.
-func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
@@ -102,6 +102,7 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	}
 
 	pod.DropDisabledTemplateFields(&job.Spec.Template, nil)
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

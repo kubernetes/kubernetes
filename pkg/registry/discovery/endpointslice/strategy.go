@@ -49,12 +49,14 @@ func (endpointSliceStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an EndpointSlice before creation.
-func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (endpointSliceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	endpointSlice := obj.(*discovery.EndpointSlice)
 	endpointSlice.Generation = 1
 
 	dropDisabledFieldsOnCreate(endpointSlice)
 	dropTopologyOnV1(ctx, nil, endpointSlice)
+
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

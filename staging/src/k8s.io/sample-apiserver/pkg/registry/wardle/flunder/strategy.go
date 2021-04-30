@@ -70,7 +70,8 @@ func (flunderStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (flunderStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (flunderStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	return nil
 }
 
 func (flunderStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

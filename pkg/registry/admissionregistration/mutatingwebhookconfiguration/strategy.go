@@ -45,9 +45,10 @@ func (mutatingWebhookConfigurationStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an mutatingWebhookConfiguration before creation.
-func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ic := obj.(*admissionregistration.MutatingWebhookConfiguration)
 	ic.Generation = 1
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

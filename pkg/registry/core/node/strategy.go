@@ -77,9 +77,10 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	node := obj.(*api.Node)
 	dropDisabledFields(node, nil)
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

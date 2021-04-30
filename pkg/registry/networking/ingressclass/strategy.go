@@ -48,13 +48,14 @@ func (ingressClassStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate prepares an IngressClass for creation.
-func (ingressClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (ingressClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	ingressClass := obj.(*networking.IngressClass)
 	ingressClass.Generation = 1
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IngressClassNamespacedParams) {
 		dropIngressClassParametersReferenceScope(ingressClass)
 	}
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on

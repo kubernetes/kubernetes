@@ -62,7 +62,7 @@ func (namespaceStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Se
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
@@ -84,6 +84,7 @@ func (namespaceStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 			namespace.Spec.Finalizers = append(namespace.Spec.Finalizers, api.FinalizerKubernetes)
 		}
 	}
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

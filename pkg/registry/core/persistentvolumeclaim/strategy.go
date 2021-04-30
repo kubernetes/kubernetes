@@ -63,11 +63,12 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 }
 
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
 
 	pvcutil.DropDisabledFields(&pvc.Spec, nil)
+	return nil
 }
 
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

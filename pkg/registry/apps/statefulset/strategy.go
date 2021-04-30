@@ -78,7 +78,7 @@ func (statefulSetStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.
 }
 
 // PrepareForCreate clears the status of an StatefulSet before creation.
-func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	statefulSet := obj.(*apps.StatefulSet)
 	// create cannot set status
 	statefulSet.Status = apps.StatefulSetStatus{}
@@ -86,6 +86,7 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	statefulSet.Generation = 1
 
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

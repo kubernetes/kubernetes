@@ -57,10 +57,11 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	psp := obj.(*policy.PodSecurityPolicy)
 
 	psputil.DropDisabledFields(&psp.Spec, nil)
+	return nil
 }
 
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

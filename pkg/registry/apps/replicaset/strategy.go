@@ -87,13 +87,14 @@ func (rsStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
-func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
 	rs.Status = apps.ReplicaSetStatus{}
 
 	rs.Generation = 1
 
 	pod.DropDisabledTemplateFields(&rs.Spec.Template, nil)
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

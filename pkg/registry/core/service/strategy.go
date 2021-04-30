@@ -105,12 +105,13 @@ func (svcStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
 }
 
 // PrepareForCreate sets contextual defaults and clears fields that are not allowed to be set by end users on creation.
-func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (strategy svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 
 	NormalizeClusterIPs(nil, service)
 	dropServiceDisabledFields(service, nil)
+	return nil
 }
 
 // PrepareForUpdate sets contextual defaults and clears fields that are not allowed to be set by end users on update.

@@ -82,7 +82,7 @@ func (daemonSetStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Se
 }
 
 // PrepareForCreate clears the status of a daemon set before creation.
-func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	daemonSet := obj.(*apps.DaemonSet)
 	daemonSet.Status = apps.DaemonSetStatus{}
 
@@ -93,6 +93,8 @@ func (daemonSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 
 	dropDaemonSetDisabledFields(daemonSet, nil)
 	pod.DropDisabledTemplateFields(&daemonSet.Spec.Template, nil)
+
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

@@ -64,7 +64,7 @@ func (autoscalerStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.S
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)
 
 	// create cannot set status
@@ -73,6 +73,7 @@ func (autoscalerStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 	if !utilfeature.DefaultFeatureGate.Enabled(features.HPAContainerMetrics) {
 		dropContainerMetricSources(newHPA.Spec.Metrics)
 	}
+	return nil
 }
 
 // Validate validates a new autoscaler.

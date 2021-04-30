@@ -45,7 +45,7 @@ func (csiDriverStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the fields for which the corresponding feature is disabled.
-func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csiDriver := obj.(*storage.CSIDriver)
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		csiDriver.Spec.StorageCapacity = nil
@@ -60,6 +60,7 @@ func (csiDriverStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 		csiDriver.Spec.TokenRequests = nil
 		csiDriver.Spec.RequiresRepublish = nil
 	}
+	return nil
 }
 
 func (csiDriverStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {

@@ -43,10 +43,11 @@ func (priorityClassStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a PriorityClass before creation.
-func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pc := obj.(*scheduling.PriorityClass)
 	pc.Generation = 1
 	schedulingutil.DropDisabledFields(pc, nil)
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

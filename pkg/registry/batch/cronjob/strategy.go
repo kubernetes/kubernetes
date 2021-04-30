@@ -79,11 +79,13 @@ func (cronJobStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set 
 }
 
 // PrepareForCreate clears the status of a scheduled job before creation.
-func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	cronJob := obj.(*batch.CronJob)
 	cronJob.Status = batch.CronJobStatus{}
 
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
+
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.

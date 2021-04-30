@@ -43,7 +43,8 @@ func (endpointsStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (endpointsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	return nil
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
