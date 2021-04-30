@@ -164,40 +164,40 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			// - a pod was created with a PV that's supposed to have data
 			//
 			// However there's a caching issue that @jinxu97 explained and it's related with the pod & volume
-			// lifecycle in windows, to understand it we first analyze what the volumemanager does:
+			// lifecycle, to understand it we first analyze what the volumemanager does:
 			// - when a pod is delete the volumemanager will try to cleanup the volume mounts
 			//   - NodeUnpublishVolume: unbinds the bind mount from the container
-			//     - Linux: the data is flushed to disk
+			//     - Linux: the bind mount is removed, which does not flush any cache
 			//     - Windows: we delete a symlink, data's not flushed yet to disk
 			//   - NodeUnstageVolume: unmount the global mount
-			//     - Linux: disk is detached
+			//     - Linux: disk is unmounted and all caches flushed.
 			//     - Windows: data is flushed to disk and the disk is detached
 			//
 			// Pod deletion might not guarantee a data flush to disk, however NodeUnstageVolume adds the logic
-			// to flush the data to disk (see #81690 for details).
+			// to flush the data to disk (see #81690 for details). We need to wait for NodeUnstageVolume, as
+			// NodeUnpublishVolume only removes the bind mount, which doesn't force the caches to flush.
+			// It's possible to create empty snapshots if we don't wait (see #101279 for details).
 			//
 			// In the following code by checking if the PV is not in the node.Status.VolumesInUse field we
 			// ensure that the volume is not used by the node anymore (an indicator that NodeUnstageVolume has
 			// already finished)
-			if framework.NodeOSDistroIs("windows") {
-				nodeName := pod.Spec.NodeName
-				gomega.Expect(nodeName).NotTo(gomega.BeEmpty(), "pod.Spec.NodeName must not be empty")
+			nodeName := pod.Spec.NodeName
+			gomega.Expect(nodeName).NotTo(gomega.BeEmpty(), "pod.Spec.NodeName must not be empty")
 
-				ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, pv.Name))
-				success := storageutils.WaitUntil(framework.Poll, f.Timeouts.PVDelete, func() bool {
-					node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-					framework.ExpectNoError(err)
-					volumesInUse := node.Status.VolumesInUse
-					framework.Logf("current volumes in use: %+v", volumesInUse)
-					for i := 0; i < len(volumesInUse); i++ {
-						if strings.HasSuffix(string(volumesInUse[i]), pv.Name) {
-							return false
-						}
+			ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, pv.Name))
+			success := storageutils.WaitUntil(framework.Poll, f.Timeouts.PVDelete, func() bool {
+				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				volumesInUse := node.Status.VolumesInUse
+				framework.Logf("current volumes in use: %+v", volumesInUse)
+				for i := 0; i < len(volumesInUse); i++ {
+					if strings.HasSuffix(string(volumesInUse[i]), pv.Name) {
+						return false
 					}
-					return true
-				})
-				framework.ExpectEqual(success, true)
-			}
+				}
+				return true
+			})
+			framework.ExpectEqual(success, true)
 		}
 
 		cleanup := func() {
