@@ -266,6 +266,7 @@ aliases:
     - andrewsykim
     - mrunalp
     - SergeyKanzhelev
+    - bobbypage
   sig-network-driver-approvers:
     - dcbw
     - freehan
