@@ -65,12 +65,12 @@ func New(config *azclients.ClientConfig) *Client {
 	armClient := armclient.New(authorizer, baseURI, config.UserAgent, apiVersion, config.Location, config.Backoff)
 	rateLimiterReader, rateLimiterWriter := azclients.NewRateLimiter(config.RateLimitConfig)
 
-	klog.V(2).Infof("Azure StorageAccountClient (read ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPS,
-		config.RateLimitConfig.CloudProviderRateLimitBucket)
-	klog.V(2).Infof("Azure StorageAccountClient (write ops) using rate limit config: QPS=%g, bucket=%d",
-		config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
-		config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
+	klog.V(2).InfoS("Azure StorageAccountClient (read ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPS,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucket)
+	klog.V(2).InfoS("Azure StorageAccountClient (write ops) using rate limit config",
+		"QPS", config.RateLimitConfig.CloudProviderRateLimitQPSWrite,
+		"bucket", config.RateLimitConfig.CloudProviderRateLimitBucketWrite)
 
 	client := &Client{
 		armClient:         armClient,
@@ -126,7 +126,7 @@ func (c *Client) getStorageAccount(ctx context.Context, resourceGroupName string
 	response, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageaccount.get.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in storageaccount.get.request", "resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
@@ -135,7 +135,7 @@ func (c *Client) getStorageAccount(ctx context.Context, resourceGroupName string
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageaccount.get.respond", resourceID, err)
+		klog.V(5).Infof("Received error in storageaccount.get.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -187,7 +187,7 @@ func (c *Client) listStorageAccountKeys(ctx context.Context, resourceGroupName s
 	response, rerr := c.armClient.PostResource(ctx, resourceID, "listKeys", struct{}{})
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageaccount.listkeys.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in storageaccount.listkeys.request", "resourceID", resourceID, "error", rerr.Error())
 		return result, rerr
 	}
 
@@ -196,7 +196,7 @@ func (c *Client) listStorageAccountKeys(ctx context.Context, resourceGroupName s
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result))
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageaccount.listkeys.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in storageaccount.listkeys.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(response, err)
 	}
 
@@ -247,14 +247,14 @@ func (c *Client) createStorageAccount(ctx context.Context, resourceGroupName str
 	response, rerr := c.armClient.PutResource(ctx, resourceID, parameters)
 	defer c.armClient.CloseResponse(ctx, response)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageAccount.put.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in storageAccount.put.request", "resourceID", resourceID, "error", rerr.Error())
 		return rerr
 	}
 
 	if response != nil && response.StatusCode != http.StatusNoContent {
 		_, rerr = c.createResponder(response)
 		if rerr != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageAccount.put.respond", resourceID, rerr.Error())
+			klog.V(5).InfoS("Received error in storageAccount.put.respond", "resourceID", resourceID, "error", rerr.Error())
 			return rerr
 		}
 	}
@@ -358,14 +358,14 @@ func (c *Client) ListStorageAccountByResourceGroup(ctx context.Context, resource
 	resp, rerr := c.armClient.GetResource(ctx, resourceID, "")
 	defer c.armClient.CloseResponse(ctx, resp)
 	if rerr != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageAccount.list.request", resourceID, rerr.Error())
+		klog.V(5).InfoS("Received error in storageAccount.list.request", "resourceID", resourceID,"error",  rerr.Error())
 		return result, rerr
 	}
 
 	var err error
 	page.alr, err = c.listResponder(resp)
 	if err != nil {
-		klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageAccount.list.respond", resourceID, err)
+		klog.V(5).InfoS("Received error in storageAccount.list.respond", "resourceID", resourceID, "error", err)
 		return result, retry.GetError(resp, err)
 	}
 
@@ -378,7 +378,7 @@ func (c *Client) ListStorageAccountByResourceGroup(ctx context.Context, resource
 		}
 
 		if err = page.NextWithContext(ctx); err != nil {
-			klog.V(5).Infof("Received error in %s: resourceID: %s, error: %s", "storageAccount.list.next", resourceID, err)
+			klog.V(5).InfoS("Received error in storageAccount.list.next", "resourceID", resourceID, "error", err)
 			return result, retry.GetError(page.Response().Response.Response, err)
 		}
 	}
