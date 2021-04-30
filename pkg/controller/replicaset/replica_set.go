@@ -178,8 +178,8 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	defer rsc.queue.ShutDown()
 
 	controllerName := strings.ToLower(rsc.Kind)
-	klog.Infof("Starting %v controller", controllerName)
-	defer klog.Infof("Shutting down %v controller", controllerName)
+	klog.InfoS("Starting controller", "controllerName", controllerName)
+	defer klog.InfoS("Shutting down controller", "controllerName", controllerName)
 
 	if !cache.WaitForNamedCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
@@ -282,7 +282,7 @@ func (rsc *ReplicaSetController) enqueueRSAfter(rs *apps.ReplicaSet, duration ti
 
 func (rsc *ReplicaSetController) addRS(obj interface{}) {
 	rs := obj.(*apps.ReplicaSet)
-	klog.V(4).Infof("Adding %s %s/%s", rsc.Kind, rs.Namespace, rs.Name)
+	klog.V(4).InfoS("Adding ReplicaSetController", "Kind", rsc.Kind, "Namespace", rs.Namespace, "Name", rs.Name)
 	rsc.enqueueRS(rs)
 }
 
@@ -343,7 +343,7 @@ func (rsc *ReplicaSetController) deleteRS(obj interface{}) {
 		return
 	}
 
-	klog.V(4).Infof("Deleting %s %q", rsc.Kind, key)
+	klog.V(4).InfoS("Deleting ReplicaSetController", "Kind", rsc.Kind, "Key", key)
 
 	// Delete expectations for the ReplicaSet so if we create a new one with the same name it starts clean
 	rsc.expectations.DeleteExpectations(key)
@@ -372,7 +372,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 		if err != nil {
 			return
 		}
-		klog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
+		klog.V(4).Infof("Pod created", "pod", klog.KObj(pod))
 		rsc.expectations.CreationObserved(rsKey)
 		rsc.queue.Add(rsKey)
 		return
@@ -386,7 +386,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	if len(rss) == 0 {
 		return
 	}
-	klog.V(4).Infof("Orphan Pod %s created: %#v.", pod.Name, pod)
+	klog.V(4).Infof("Orphan Pod created.", "pod", klog.KObj(pod))
 	for _, rs := range rss {
 		rsc.enqueueRS(rs)
 	}
