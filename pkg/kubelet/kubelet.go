@@ -679,7 +679,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.runtimeCache,
 			kubeDeps.RemoteRuntimeService,
 			kubeDeps.RemoteImageService,
-			hostStatsProvider)
+			hostStatsProvider,
+			utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics))
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
