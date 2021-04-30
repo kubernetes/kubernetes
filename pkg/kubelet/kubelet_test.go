@@ -119,7 +119,9 @@ type TestKubelet struct {
 
 func (tk *TestKubelet) Cleanup() {
 	if tk.kubelet != nil {
+		tk.kubelet.podKiller.Close()
 		os.RemoveAll(tk.kubelet.rootDirectory)
+		tk.kubelet = nil
 	}
 }
 
@@ -292,6 +294,7 @@ func newTestKubeletWithImageList(
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKiller = NewPodKiller(kubelet)
+	go kubelet.podKiller.PerformPodKillingWork()
 	kubelet.resyncInterval = 10 * time.Second
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
@@ -420,9 +423,7 @@ func TestSyncPodsStartPod(t *testing.T) {
 
 func TestHandlePodCleanupsPerQOS(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
-	defer testKubelet.kubelet.podKiller.Close()
 
 	pod := &kubecontainer.Pod{
 		ID:        "12345678",
@@ -612,9 +613,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 
 func TestHandlePodCleanups(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
-	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 	defer testKubelet.Cleanup()
-	defer testKubelet.kubelet.podKiller.Close()
 
 	pod := &kubecontainer.Pod{
 		ID:        "12345678",
@@ -643,8 +642,6 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
-	defer testKubelet.kubelet.podKiller.Close()
 
 	fakePod := &kubecontainer.Pod{
 		ID:        "1",
@@ -683,8 +680,6 @@ func TestHandlePodRemovesWhenSourcesAreReady(t *testing.T) {
 func TestKillPodFollwedByIsPodPendingTermination(t *testing.T) {
 	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	defer testKubelet.Cleanup()
-	defer testKubelet.kubelet.podKiller.Close()
-	go testKubelet.kubelet.podKiller.PerformPodKillingWork()
 
 	pod := &kubecontainer.Pod{
 		ID:        "12345678",
@@ -1595,6 +1590,12 @@ func syncAndVerifyPodDir(t *testing.T, testKubelet *TestKubelet, pods []*v1.Pod,
 
 	kl.podManager.SetPods(pods)
 	kl.HandlePodSyncs(pods)
+	kl.HandlePodCleanups()
+	// The first time HandlePodCleanups() is run the pod is placed into the
+	// podKiller, and bypasses the pod directory cleanup. The pod is
+	// already killed in the second run to HandlePodCleanups() and will
+	// cleanup the directories.
+	time.Sleep(2 * time.Second)
 	kl.HandlePodCleanups()
 	for i, pod := range podsToCheck {
 		exist := dirExists(kl.getPodDir(pod.UID))
