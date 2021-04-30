@@ -163,7 +163,7 @@ func (tc *TokenCleaner) processNextWorkItem() bool {
 func (tc *TokenCleaner) syncFunc(key string) error {
 	startTime := time.Now()
 	defer func() {
-		klog.V(4).Infof("Finished syncing secret %q (%v)", key, time.Since(startTime))
+		klog.V(4).InfoS("Finished syncing secret", "keyName", key, "startTime", time.Since(startTime))
 	}()
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
@@ -173,7 +173,7 @@ func (tc *TokenCleaner) syncFunc(key string) error {
 
 	ret, err := tc.secretLister.Secrets(namespace).Get(name)
 	if apierrors.IsNotFound(err) {
-		klog.V(3).Infof("secret has been deleted: %v", key)
+		klog.V(3).InfoS("secret has been deleted", "keyName", key)
 		return nil
 	}
 
@@ -191,7 +191,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 	secret := o.(*v1.Secret)
 	ttl, alreadyExpired := bootstrapsecretutil.GetExpiration(secret, time.Now())
 	if alreadyExpired {
-		klog.V(3).Infof("Deleting expired secret %s/%s", secret.Namespace, secret.Name)
+		klog.V(3).InfoS("Deleting expired secret", "namespace", secret.Namespace, "secretName", secret.Name)
 		var options metav1.DeleteOptions
 		if len(secret.UID) > 0 {
 			options.Preconditions = &metav1.Preconditions{UID: &secret.UID}
@@ -200,7 +200,7 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 		// NotFound isn't a real error (it's already been deleted)
 		// Conflict isn't a real error (the UID precondition failed)
 		if err != nil && !apierrors.IsConflict(err) && !apierrors.IsNotFound(err) {
-			klog.V(3).Infof("Error deleting Secret: %v", err)
+			klog.V(3).InfoS("Error deleting Secret", "error", err)
 		}
 	} else if ttl > 0 {
 		key, err := controller.KeyFunc(o)
