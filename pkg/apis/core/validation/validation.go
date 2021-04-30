@@ -2345,8 +2345,10 @@ var validEnvDownwardAPIFieldPathExpressions = sets.NewString(
 	"spec.nodeName",
 	"spec.serviceAccountName",
 	"status.hostIP",
+	"status.hostIPs",
 	"status.podIP",
-	"status.podIPs")
+	"status.podIPs",
+)
 
 var validContainerResourceFieldPathExpressions = sets.NewString("limits.cpu", "limits.memory", "limits.ephemeral-storage", "requests.cpu", "requests.memory", "requests.ephemeral-storage")
 
