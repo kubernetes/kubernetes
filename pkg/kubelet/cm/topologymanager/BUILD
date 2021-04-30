@@ -17,6 +17,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/topologymanager",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
@@ -59,6 +60,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubelet/cm/containermap:go_default_library",
         "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
