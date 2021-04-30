@@ -98,7 +98,7 @@ func (s *OpenIDMetadataServer) serveConfiguration(w http.ResponseWriter, req *ht
 	w.Header().Set(restful.HEADER_ContentType, restful.MIME_JSON)
 	w.Header().Set(headerCacheControl, cacheControl)
 	if _, err := w.Write(s.configJSON); err != nil {
-		klog.Errorf("failed to write service account issuer metadata response: %v", err)
+		klog.ErrorS(err, "failed to write service account issuer metadata response")
 		return
 	}
 }
@@ -108,7 +108,7 @@ func (s *OpenIDMetadataServer) serveKeys(w http.ResponseWriter, req *http.Reques
 	w.Header().Set(restful.HEADER_ContentType, mimeJWKS)
 	w.Header().Set(headerCacheControl, cacheControl)
 	if _, err := w.Write(s.keysetJSON); err != nil {
-		klog.Errorf("failed to write service account issuer JWKS response: %v", err)
+		klog.ErrorS(err, "failed to write service account issuer JWKS response")
 		return
 	}
 }
