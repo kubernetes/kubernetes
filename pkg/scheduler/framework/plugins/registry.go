@@ -51,6 +51,7 @@ import (
 func NewInTreeRegistry() runtime.Registry {
 	fts := plfeature.Features{
 		EnablePodAffinityNamespaceSelector: utilfeature.DefaultFeatureGate.Enabled(features.PodAffinityNamespaceSelector),
+		EnablePodDisruptionBudget:          utilfeature.DefaultFeatureGate.Enabled(features.PodDisruptionBudget),
 	}
 
 	return runtime.Registry{
@@ -79,10 +80,12 @@ func NewInTreeRegistry() runtime.Registry {
 		interpodaffinity.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
 			return interpodaffinity.New(plArgs, fh, fts)
 		},
-		nodelabel.Name:         nodelabel.New,
-		serviceaffinity.Name:   serviceaffinity.New,
-		queuesort.Name:         queuesort.New,
-		defaultbinder.Name:     defaultbinder.New,
-		defaultpreemption.Name: defaultpreemption.New,
+		nodelabel.Name:       nodelabel.New,
+		serviceaffinity.Name: serviceaffinity.New,
+		queuesort.Name:       queuesort.New,
+		defaultbinder.Name:   defaultbinder.New,
+		defaultpreemption.Name: func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
+			return defaultpreemption.New(plArgs, fh, fts)
+		},
 	}
 }
