@@ -756,7 +756,6 @@ message Container {
   optional string imagePullPolicy = 14;
 
   // Security options the pod should run with.
-  // More info: https://kubernetes.io/docs/concepts/policy/security-context/
   // More info: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/
   // +optional
   optional SecurityContext securityContext = 15;
