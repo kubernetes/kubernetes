@@ -61,12 +61,17 @@ type request struct {
 	waitStarted bool
 
 	queueNoteFn fq.QueueNoteFn
+
+	// Removes this request from its queue. If the request is not put into a
+	// a queue it will be nil.
+	removeFromQueueFn removeFromFIFOFunc
 }
 
 // queue is an array of requests with additional metadata required for
 // the FQScheduler
 type queue struct {
-	requests []*request
+	// The requests are stored in a FIFO list.
+	requests fifo
 
 	// virtualStart is the virtual time (virtual seconds since process
 	// startup) when the oldest request in the queue (if there is any)
@@ -77,19 +82,16 @@ type queue struct {
 	index             int
 }
 
-// Enqueue enqueues a request into the queue
+// Enqueue enqueues a request into the queue and
+// sets the removeFromQueueFn of the request appropriately.
 func (q *queue) Enqueue(request *request) {
-	q.requests = append(q.requests, request)
+	request.removeFromQueueFn = q.requests.Enqueue(request)
 }
 
 // Dequeue dequeues a request from the queue
 func (q *queue) Dequeue() (*request, bool) {
-	if len(q.requests) == 0 {
-		return nil, false
-	}
-	request := q.requests[0]
-	q.requests = q.requests[1:]
-	return request, true
+	request, ok := q.requests.Dequeue()
+	return request, ok
 }
 
 // GetVirtualFinish returns the expected virtual finish time of the request at
@@ -104,8 +106,9 @@ func (q *queue) GetVirtualFinish(J int, G float64) float64 {
 }
 
 func (q *queue) dump(includeDetails bool) debug.QueueDump {
-	digest := make([]debug.RequestDump, len(q.requests))
-	for i, r := range q.requests {
+	digest := make([]debug.RequestDump, q.requests.Length())
+	i := 0
+	q.requests.Walk(func(r *request) bool {
 		// dump requests.
 		digest[i].MatchedFlowSchema = r.fsName
 		digest[i].FlowDistinguisher = r.flowDistinguisher
@@ -119,7 +122,9 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 				digest[i].RequestInfo = *requestInfo
 			}
 		}
-	}
+		i++
+		return true
+	})
 	return debug.QueueDump{
 		VirtualStart:      q.virtualStart,
 		Requests:          digest,
