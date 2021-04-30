@@ -325,7 +325,7 @@ func NewInformer(
 	return clientState, newInformer(lw, objType, resyncPeriod, h, clientState)
 }
 
-// NewIndexerInformer returns a Indexer and a controller for populating the index
+// NewIndexerInformer returns an Indexer and a Controller for populating the index
 // while also providing event notifications. You should only used the returned
 // Index for Get/List operations; Add/Modify/Deletes will cause the event
 // notifications to be faulty.
