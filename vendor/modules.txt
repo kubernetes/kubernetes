@@ -162,9 +162,6 @@ github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
-# github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
-## explicit
-github.com/clusterhq/flocker-go
 # github.com/container-storage-interface/spec v1.3.0 => github.com/container-storage-interface/spec v1.3.0
 ## explicit
 github.com/container-storage-interface/spec/lib/go/csi
@@ -2384,7 +2381,6 @@ sigs.k8s.io/yaml
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
 # github.com/chzyer/test => github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
 # github.com/cilium/ebpf => github.com/cilium/ebpf v0.2.0
-# github.com/clusterhq/flocker-go => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 # github.com/cockroachdb/datadriven => github.com/cockroachdb/datadriven v0.0.0-20190809214429-80d97fb3cbaa
 # github.com/container-storage-interface/spec => github.com/container-storage-interface/spec v1.3.0
 # github.com/containerd/cgroups => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
