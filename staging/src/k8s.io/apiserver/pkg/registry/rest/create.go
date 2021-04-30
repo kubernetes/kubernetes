@@ -53,7 +53,11 @@ type RESTCreateStrategy interface {
 	// status. Clear the status because status changes are internal. External
 	// callers of an api (users) should not be setting an initial status on
 	// newly created objects.
-	PrepareForCreate(ctx context.Context, obj runtime.Object)
+	//
+	// For APIs which have conditionally enabled field (alpha or beta features),
+	// an error must be returned indicating that the intent of a request cannot
+	// be fulfilled.
+	PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList
 	// Validate returns an ErrorList with validation errors or nil.  Validate
 	// is invoked after default fields in the object have been filled in
 	// before the object is persisted.  This method should not mutate the
@@ -86,7 +90,9 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx context.Context, obj runtime.
 	}
 	objectMeta.SetDeletionTimestamp(nil)
 	objectMeta.SetDeletionGracePeriodSeconds(nil)
-	strategy.PrepareForCreate(ctx, obj)
+	if errs := strategy.PrepareForCreate(ctx, obj); len(errs) > 0 {
+		return errors.NewInvalid(kind.GroupKind(), objectMeta.GetName(), errs)
+	}
 	FillObjectMetaSystemFields(objectMeta)
 	if len(objectMeta.GetGenerateName()) > 0 && len(objectMeta.GetName()) == 0 {
 		objectMeta.SetName(strategy.GenerateName(objectMeta.GetGenerateName()))

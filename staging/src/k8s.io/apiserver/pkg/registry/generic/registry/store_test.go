@@ -92,13 +92,14 @@ type testRESTStrategy struct {
 	namespaceScoped          bool
 	allowCreateOnUpdate      bool
 	allowUnconditionalUpdate bool
+	prepareForCreateErrors   field.ErrorList
 }
 
 func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceScoped }
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
-func (t *testRESTStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (t *testRESTStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		panic(err.Error())
@@ -109,6 +110,7 @@ func (t *testRESTStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	}
 	labels["prepare_create"] = "true"
 	metaObj.SetLabels(labels)
+	return t.prepareForCreateErrors
 }
 
 func (t *testRESTStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {}
@@ -308,7 +310,7 @@ func TestStoreCreate(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 	// re-define delete strategy to have graceful delete capability
-	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 
 	// create the object with denying admission
@@ -366,6 +368,35 @@ func TestStoreCreate(t *testing.T) {
 	}
 }
 
+func TestStoreCreateWithBeforeCreateFailures(t *testing.T) {
+	podA := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+
+	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
+	// re-define delete strategy to have graceful delete capability
+	registry.CreateStrategy = &testRESTStrategy{
+		scheme, names.SimpleNameGenerator, true, false, true,
+		field.ErrorList{
+			field.Forbidden(field.NewPath("spec", "newField"), "feature foo is disabled"),
+		},
+	}
+
+	// create the object
+	_, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err == nil {
+		t.Fatal("missing field errors")
+	}
+
+	expected := `Pod.example.apiserver.k8s.io "foo" is invalid: spec.newField: Forbidden: feature foo is disabled`
+	msg := &err.(*errors.StatusError).ErrStatus.Message
+	if !strings.Contains(*msg, expected) {
+		t.Errorf("Unexpected error without %v in message: %v", expected, err)
+	}
+}
 func TestNewCreateOptionsFromUpdateOptions(t *testing.T) {
 	f := fuzz.New().NilChance(0.0).NumElements(1, 1)
 
@@ -1240,7 +1271,7 @@ func TestStoreGracefulDeleteWithResourceVersion(t *testing.T) {
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
 
-	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 
 	// test failure condition
@@ -1308,7 +1339,7 @@ func TestGracefulStoreCanDeleteIfExistingGracePeriodZero(t *testing.T) {
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	registry.EnableGarbageCollection = false
-	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 
@@ -1333,7 +1364,7 @@ func TestGracefulStoreHandleFinalizers(t *testing.T) {
 
 	testContext := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	registry.DeleteStrategy = testGracefulStrategy{defaultDeleteStrategy}
 	defer destroyFunc()
 
@@ -1541,7 +1572,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	nilOrphanOptions := &metav1.DeleteOptions{}
 
 	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
-	defaultDeleteStrategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	// orphanDeleteStrategy indicates the default garbage collection policy is
 	// to orphan dependentes.
 	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
@@ -1784,7 +1815,7 @@ func TestStoreDeletionPropagation(t *testing.T) {
 	initialGeneration := int64(1)
 
 	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
-	defaultDeleteStrategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	defaultDeleteStrategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 	// orphanDeleteStrategy indicates the default garbage collection policy is
 	// to orphan dependentes.
 	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
@@ -2173,7 +2204,7 @@ func TestStoreWatch(t *testing.T) {
 func newTestGenericStoreRegistry(t *testing.T, scheme *runtime.Scheme, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
 	server, sc := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
-	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true}
+	strategy := &testRESTStrategy{scheme, names.SimpleNameGenerator, true, false, true, nil}
 
 	newFunc := func() runtime.Object { return &example.Pod{} }
 	newListFunc := func() runtime.Object { return &example.PodList{} }
