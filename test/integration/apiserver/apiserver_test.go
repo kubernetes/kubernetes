@@ -109,7 +109,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in sending req with verb: %s, URL: %s and body: %s", err, verb, URL, body)
 	}
 	transport := http.DefaultTransport
-	klog.Infof("Sending request: %v", req)
+	klog.InfoS("Sending request", "request", req)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
@@ -2230,7 +2230,7 @@ func TestDedupOwnerReferences(t *testing.T) {
 				gvr:    tc.gvr,
 				kind:   tc.kind,
 			}
-			klog.Infof("creating dependent with duplicate owner references")
+			klog.InfoS("Creating dependent with duplicate owner references")
 			dependent := c.createDependentWithOwners([]metav1.OwnerReference{fakeRefA, fakeRefA})
 			assertManagedFields(t, dependent)
 			expectedWarning := fmt.Sprintf(handlers.DuplicateOwnerReferencesWarningFormat, fakeRefA.UID)
@@ -2238,14 +2238,14 @@ func TestDedupOwnerReferences(t *testing.T) {
 			assertWarningCount(t, warningWriter, previousWarningCount+1)
 			assertWarningMessage(t, b, expectedWarning)
 
-			klog.Infof("updating dependent with duplicate owner references")
+			klog.InfoS("Updating dependent with duplicate owner references")
 			dependent = c.updateDependentWithOwners(dependent, []metav1.OwnerReference{fakeRefA, fakeRefA})
 			assertManagedFields(t, dependent)
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA})
 			assertWarningCount(t, warningWriter, previousWarningCount+2)
 			assertWarningMessage(t, b, expectedWarning)
 
-			klog.Infof("patching dependent with duplicate owner reference")
+			klog.InfoS("Patching dependent with duplicate owner reference")
 			dependent = c.patchDependentWithOwner(dependent, fakeRefA)
 			// TODO: currently a patch request that duplicates owner references can still
 			// wipe out managed fields. Note that this happens to built-in resources but
@@ -2257,19 +2257,19 @@ func TestDedupOwnerReferences(t *testing.T) {
 			assertWarningCount(t, warningWriter, previousWarningCount+3)
 			assertWarningMessage(t, b, expectedPatchWarning)
 
-			klog.Infof("updating dependent with different owner references")
+			klog.InfoS("Updating dependent with different owner references")
 			dependent = c.updateDependentWithOwners(dependent, []metav1.OwnerReference{fakeRefA, fakeRefB})
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA, fakeRefB})
 			assertWarningCount(t, warningWriter, previousWarningCount+3)
 			assertWarningMessage(t, b, "")
 
-			klog.Infof("patching dependent with different owner references")
+			klog.InfoS("Patching dependent with different owner references")
 			dependent = c.patchDependentWithOwner(dependent, fakeRefC)
 			assertOwnerReferences(t, dependent, []metav1.OwnerReference{fakeRefA, fakeRefB, fakeRefC})
 			assertWarningCount(t, warningWriter, previousWarningCount+3)
 			assertWarningMessage(t, b, "")
 
-			klog.Infof("deleting dependent")
+			klog.InfoS("Deleting dependent")
 			c.deleteDependent()
 			assertWarningCount(t, warningWriter, previousWarningCount+3)
 			assertWarningMessage(t, b, "")
