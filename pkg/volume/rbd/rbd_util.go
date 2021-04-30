@@ -627,7 +627,7 @@ func (util *rbdUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		return fmt.Errorf("error %v, rbd output: %v", err, rbdOutput)
 	}
 	if found {
-		klog.Infof("rbd %s is still being used ", p.rbdMounter.Image)
+		klog.InfoS("Rbd is still being used", "rbd", p.rbdMounter.Image)
 		return fmt.Errorf("rbd image %s/%s is still being used, rbd output: %v", p.rbdMounter.Pool, p.rbdMounter.Image, rbdOutput)
 	}
 	// rbd rm.
