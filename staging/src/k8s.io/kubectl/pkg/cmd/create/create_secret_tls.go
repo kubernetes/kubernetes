@@ -250,11 +250,11 @@ func (o *CreateSecretTLSOptions) createSecretTLS() (*corev1.Secret, error) {
 		for rest := tlsCertAuthority; len(rest) > 0; {
 			block, rest = pem.Decode(rest)
 			if block == nil || block.Type != "CERTIFICATE" {
-				return nil, fmt.Errorf("failed to decode PEM block containing certificate authority.")
+				return nil, fmt.Errorf("failed to decode PEM block containing certificate authority")
 			}
 			_, err := x509.ParseCertificate(block.Bytes)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse PEM block in certificate authority: %s.", err)
+				return nil, fmt.Errorf("failed to parse PEM block in certificate authority: %s", err)
 			}
 		}
 	}
