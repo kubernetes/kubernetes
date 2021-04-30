@@ -1810,7 +1810,7 @@ function Configure-LoggingAgent {
   $PARSERS_CONFIG | Out-File -FilePath $fluentbit_parser_file -Encoding ASCII
 
   # Create directory for all the log position files.
-  New-Item -Type Directory -Path "/var/run/google-fluentbit/pos-files/"
+  New-Item -Type Directory -Path "/var/run/google-fluentbit/pos-files/" -Force | Out-Null
 
   Log-Output "Wrote logging config to $fluentbit_parser_file"
 }
