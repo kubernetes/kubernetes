@@ -333,8 +333,8 @@ func (l *SSHTunnelList) delayedHealthCheck(e sshTunnelEntry, delay time.Duration
 		defer runtime.HandleCrash()
 		time.Sleep(delay)
 		if err := l.healthCheck(e); err != nil {
-			klog.Errorf("Healthcheck failed for tunnel to %q: %v", e.Address, err)
-			klog.Infof("Attempting once to re-establish tunnel to %q", e.Address)
+			klog.ErrorS(err, "Healthcheck failed for tunnel", "address", e.Address)
+			klog.InfoS("Attempting once to re-establish tunnel", "address", e.Address)
 			l.removeAndReAdd(e)
 		}
 	}()
@@ -371,7 +371,7 @@ func (l *SSHTunnelList) removeAndReAdd(e sshTunnelEntry) {
 	}
 	l.tunnelsLock.Unlock()
 	if err := e.Tunnel.Close(); err != nil {
-		klog.Infof("Failed to close removed tunnel: %v", err)
+		klog.InfoS("Failed to close removed tunnel", "error", err)
 	}
 	go l.createAndAddTunnel(e.Address)
 }
@@ -443,11 +443,11 @@ func (l *SSHTunnelList) Update(addrs []string) {
 		for i := range l.entries {
 			if _, ok := wantAddrsMap[l.entries[i].Address]; !ok {
 				tunnelEntry := l.entries[i]
-				klog.Infof("Removing tunnel to deleted node at %q", tunnelEntry.Address)
+				klog.InfoS("Removing tunnel to deleted node", "address", tunnelEntry.Address)
 				go func() {
 					defer runtime.HandleCrash()
 					if err := tunnelEntry.Tunnel.Close(); err != nil {
-						klog.Errorf("Failed to close tunnel to %q: %v", tunnelEntry.Address, err)
+						klog.ErrorS(err, "Failed to close tunnel", "address", tunnelEntry.Address)
 					}
 				}()
 			} else {
@@ -459,14 +459,14 @@ func (l *SSHTunnelList) Update(addrs []string) {
 }
 
 func (l *SSHTunnelList) createAndAddTunnel(addr string) {
-	klog.Infof("Trying to add tunnel to %q", addr)
+	klog.InfoS("Trying to add tunnel", "address", addr)
 	tunnel, err := l.tunnelCreator.newSSHTunnel(l.user, l.keyfile, addr)
 	if err != nil {
-		klog.Errorf("Failed to create tunnel for %q: %v", addr, err)
+		klog.ErrorS(err, "Failed to create tunnel", "address", addr)
 		return
 	}
 	if err := tunnel.Open(); err != nil {
-		klog.Errorf("Failed to open tunnel to %q: %v", addr, err)
+		klog.ErrorS(err, "Failed to open tunnel", "address", addr)
 		l.tunnelsLock.Lock()
 		delete(l.adding, addr)
 		l.tunnelsLock.Unlock()
@@ -476,7 +476,7 @@ func (l *SSHTunnelList) createAndAddTunnel(addr string) {
 	l.entries = append(l.entries, sshTunnelEntry{addr, tunnel})
 	delete(l.adding, addr)
 	l.tunnelsLock.Unlock()
-	klog.Infof("Successfully added tunnel for %q", addr)
+	klog.InfoS("Successfully added tunnel", "address", addr)
 }
 
 func EncodePrivateKey(private *rsa.PrivateKey) []byte {
