@@ -2525,7 +2525,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Dynamic Provisioning DynamicProvisioner [Slow] should test that deleting a claim before the volume is provisioned deletes the volume.": "should test that deleting a claim before the volume is provisioned deletes the volume. [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Dynamic Provisioning GlusterDynamicProvisioner should create and delete persistent volumes [fast]": "should create and delete persistent volumes [fast] [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Dynamic Provisioning GlusterDynamicProvisioner should create and delete persistent volumes [fast]": "should create and delete persistent volumes [fast] [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Dynamic Provisioning Invalid AWS KMS key should report an error and create no PV": "should report an error and create no PV [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -11343,7 +11343,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-storage] Volumes ConfigMap should be mountable": "should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-storage] Volumes GlusterFS should be mountable": "should be mountable [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-storage] Volumes GlusterFS should be mountable": "should be mountable [Disabled:Unsupported] [Suite:k8s]",
 
 	"[Top Level] [sig-storage] Volumes NFSv3 should be mountable for NFSv3": "should be mountable for NFSv3 [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
