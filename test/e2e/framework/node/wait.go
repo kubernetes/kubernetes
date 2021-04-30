@@ -215,7 +215,7 @@ func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowed
 		allNodes, err := c.CoreV1().Nodes().List(context.TODO(), opts)
 		if err != nil {
 			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			return false, err
+			return false, nil
 		}
 		for _, node := range allNodes.Items {
 			if !readyForTests(&node, nonblockingTaints) {
