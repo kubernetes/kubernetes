@@ -557,7 +557,7 @@ func TestSetRequestCountsForNode(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			currentHour := tc.expiredHour - 1
-			SetRequestCountsForNode(tc.nodeName, currentHour, tc.expiredHour, tc.countsToPersist)(tc.status)
+			SetRequestCountsForNode(tc.nodeName, currentHour, tc.expiredHour, tc.countsToPersist)(10, tc.status)
 			assert.Equal(t, tc.expected, tc.status)
 		})
 	}

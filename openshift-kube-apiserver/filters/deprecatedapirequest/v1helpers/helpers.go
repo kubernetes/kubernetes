@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-type UpdateStatusFunc func(status *apiv1.APIRequestCountStatus)
+type UpdateStatusFunc func(maxNumUsers int, status *apiv1.APIRequestCountStatus)
 
 func ApplyStatus(ctx context.Context, client apiclientv1.APIRequestCountInterface, name string, updateFuncs ...UpdateStatusFunc) (*apiv1.APIRequestCountStatus, bool, error) {
 	updated := false
@@ -35,7 +35,7 @@ func ApplyStatus(ctx context.Context, client apiclientv1.APIRequestCountInterfac
 		oldStatus := check.Status
 		newStatus := oldStatus.DeepCopy()
 		for _, update := range updateFuncs {
-			update(newStatus)
+			update(int(check.Spec.NumberOfUsersToReport), newStatus)
 		}
 		if equality.Semantic.DeepEqual(oldStatus, newStatus) {
 			updatedStatus = newStatus
