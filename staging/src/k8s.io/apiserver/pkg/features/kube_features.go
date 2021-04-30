@@ -38,7 +38,7 @@ const (
 	// StreamingProxyRedirects controls whether the apiserver should intercept (and follow)
 	// redirects from the backend (Kubelet) for streaming requests (exec/attach/port-forward).
 	//
-	// This feature is deprecated, and will be removed in v1.22.
+	// This feature is deprecated, and will be removed in v1.24.
 	StreamingProxyRedirects featuregate.Feature = "StreamingProxyRedirects"
 
 	// owner: @tallclair
@@ -172,7 +172,7 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
-	StreamingProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
+	StreamingProxyRedirects:  {Default: false, PreRelease: featuregate.Deprecated},
 	ValidateProxyRedirects:   {Default: true, PreRelease: featuregate.Beta},
 	AdvancedAuditing:         {Default: true, PreRelease: featuregate.GA},
 	APIResponseCompression:   {Default: true, PreRelease: featuregate.Beta},
