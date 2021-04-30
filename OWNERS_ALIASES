@@ -529,6 +529,8 @@ aliases:
     - thockin
     - sttts
     - soltysh
+  dep-reviewers:
+    - logicalhan
   feature-approvers:
     - andrewsykim     # Cloud Provider
     - brancz          # Instrumentation
