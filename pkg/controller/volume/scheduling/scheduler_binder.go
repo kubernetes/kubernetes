@@ -264,7 +264,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 
 	// Warning: Below log needs high verbosity as it can be printed several times (#60933).
 	klog.V(5).Infof("FindPodVolumes for pod %q, node %q", podName, node.Name)
-
+x
 	// Initialize to true for pods that don't have volumes. These
 	// booleans get translated into reason strings when the function
 	// returns without an error.
@@ -375,7 +375,7 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, boundClaims, claimsToBind []*
 func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, podVolumes *PodVolumes) (allFullyBound bool, err error) {
 	podName := getPodName(assumedPod)
 
-	klog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
+	klog.V(4).InfoS("AssumePodVolumes", "podName", podName, "nodeName", nodeName)
 	start := time.Now()
 	defer func() {
 		metrics.VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
@@ -385,7 +385,7 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string, pod
 	}()
 
 	if allBound := b.arePodVolumesBound(assumedPod); allBound {
-		klog.V(4).Infof("AssumePodVolumes for pod %q, node %q: all PVCs bound and nothing to do", podName, nodeName)
+		klog.V(4).InfoS("AssumePodVolumes for pod: all PVCs bound and nothing to do", "podName", podName, "nodeName", nodeName)
 		return true, nil
 	}
 
@@ -448,7 +448,7 @@ func (b *volumeBinder) RevertAssumedPodVolumes(podVolumes *PodVolumes) {
 // by the PV controller.
 func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod, podVolumes *PodVolumes) (err error) {
 	podName := getPodName(assumedPod)
-	klog.V(4).Infof("BindPodVolumes for pod %q, node %q", podName, assumedPod.Spec.NodeName)
+	klog.V(4).InfoS("BindPodVolumes for pod", "podName", podName, "nodeName", assumedPod.Spec.NodeName)
 
 	start := time.Now()
 	defer func() {
@@ -590,7 +590,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 		if apierrors.IsNotFound(err) {
 			return false, fmt.Errorf("pod does not exist any more: %w", err)
 		}
-		klog.Errorf("failed to get pod %s/%s from the lister: %v", pod.Namespace, pod.Name, err)
+		klog.ErrorS(err, "failed to get pod from the lister: %v", klog.KObj(pod))
 	}
 
 	for _, binding := range bindings {
@@ -686,7 +686,7 @@ func (b *volumeBinder) checkBindings(pod *v1.Pod, bindings []*BindingInfo, claim
 	}
 
 	// All pvs and pvcs that we operated on are bound
-	klog.V(4).Infof("All PVCs for pod %q are bound", podName)
+	klog.V(4).InfoS("All PVCs for pod are bound", "podName", podName)
 	return true, nil
 }
 
