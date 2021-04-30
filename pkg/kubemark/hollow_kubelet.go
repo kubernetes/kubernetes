@@ -153,7 +153,7 @@ type HollowKubletOptions struct {
 func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *kubeletconfig.KubeletConfiguration) {
 	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
 	podFilePath := utils.MakeTempDirOrDie("static-pods", testRootDir)
-	klog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
+	klog.InfoS("Using root dir for hollow-kubelet", "rootDir", testRootDir)
 
 	// Flags struct
 	f := options.NewKubeletFlags()
