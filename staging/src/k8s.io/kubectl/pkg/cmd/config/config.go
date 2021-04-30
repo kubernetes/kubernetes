@@ -56,7 +56,7 @@ func NewCmdConfig(f cmdutil.Factory, pathOptions *clientcmd.PathOptions, streams
 
 	// TODO(juanvallejo): update all subcommands to work with genericclioptions.IOStreams
 	cmd.AddCommand(NewCmdConfigView(f, streams, pathOptions))
-	cmd.AddCommand(NewCmdConfigSetCluster(streams.Out, pathOptions))
+	cmd.AddCommand(NewCmdConfigSetCluster(streams, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetAuthInfo(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSetContext(streams.Out, pathOptions))
 	cmd.AddCommand(NewCmdConfigSet(streams.Out, pathOptions))

@@ -19,14 +19,14 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	utilcert "k8s.io/client-go/util/cert"
 	cliflag "k8s.io/component-base/cli/flag"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -41,6 +41,11 @@ type createClusterOptions struct {
 	insecureSkipTLSVerify cliflag.Tristate
 	certificateAuthority  cliflag.StringFlag
 	embedCAData           cliflag.Tristate
+
+	// populated by the certificateAuthority flag
+	caData []byte
+
+	genericclioptions.IOStreams
 }
 
 var (
@@ -64,8 +69,11 @@ var (
 )
 
 // NewCmdConfigSetCluster returns a Command instance for 'config set-cluster' sub command
-func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
-	options := &createClusterOptions{configAccess: configAccess}
+func NewCmdConfigSetCluster(streams genericclioptions.IOStreams, configAccess clientcmd.ConfigAccess) *cobra.Command {
+	options := &createClusterOptions{
+		configAccess: configAccess,
+		IOStreams:    streams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=example.com]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
@@ -76,7 +84,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.complete(cmd))
 			cmdutil.CheckErr(options.run())
-			fmt.Fprintf(out, "Cluster %q set.\n", options.name)
+			fmt.Fprintf(options.Out, "Cluster %q set.\n", options.name)
 		},
 	}
 
@@ -143,7 +151,7 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 	if o.certificateAuthority.Provided() {
 		caPath := o.certificateAuthority.Value()
 		if o.embedCAData.Value() {
-			modifiedCluster.CertificateAuthorityData, _ = ioutil.ReadFile(caPath)
+			modifiedCluster.CertificateAuthorityData = o.caData
 			modifiedCluster.InsecureSkipTLSVerify = false
 			modifiedCluster.CertificateAuthority = ""
 		} else {
@@ -165,12 +173,11 @@ func (o *createClusterOptions) complete(cmd *cobra.Command) error {
 	if len(args) != 1 {
 		return helpErrorf(cmd, "Unexpected args: %v", args)
 	}
-
 	o.name = args[0]
 	return nil
 }
 
-func (o createClusterOptions) validate() error {
+func (o *createClusterOptions) validate() error {
 	if len(o.name) == 0 {
 		return errors.New("you must specify a non-empty cluster name")
 	}
@@ -182,10 +189,14 @@ func (o createClusterOptions) validate() error {
 		if caPath == "" {
 			return fmt.Errorf("you must specify a --%s to embed", clientcmd.FlagCAFile)
 		}
-		if _, err := os.Stat(caPath); err != nil {
-			return fmt.Errorf("could not stat %s file %s: %v", clientcmd.FlagCAFile, caPath, err)
+		caData, err := ioutil.ReadFile(caPath)
+		if err != nil {
+			return fmt.Errorf("could not read %s file %s: %v", clientcmd.FlagCAFile, caPath, err)
+		}
+		o.caData = caData
+		if _, err := utilcert.ParseCertsPEM(o.caData); err != nil {
+			fmt.Fprintf(o.ErrOut, "Warning: %s file %s contains invalid certificate data: %v\n", clientcmd.FlagCAFile, caPath, err)
 		}
 	}
-
 	return nil
 }
