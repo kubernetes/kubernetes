@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -1010,7 +1011,7 @@ func TestRequiredAffinitySingleNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node}, framework.NewNodeInfo)
+			snapshot := cache.NewSnapshot(test.pods, []*v1.Node{test.node}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{
 					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
@@ -1904,7 +1905,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := context.Background()
-			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{})
 			}
@@ -1930,7 +1931,7 @@ func TestRequiredAffinityMultipleNodes(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
@@ -2203,7 +2204,7 @@ func TestPreFilterStateAddRemovePod(t *testing.T) {
 			ctx := context.Background()
 			// getMeta creates predicate meta data given the list of pods.
 			getState := func(pods []*v1.Pod) (*InterPodAffinity, *framework.CycleState, *preFilterState, *cache.Snapshot) {
-				snapshot := cache.NewSnapshot(pods, test.nodes, framework.NewNodeInfo)
+				snapshot := cache.NewSnapshot(pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 				n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 					return New(plArgs, fh, feature.Features{})
 				}
@@ -2488,7 +2489,7 @@ func TestGetTPMapMatchingIncomingAffinityAntiAffinity(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, framework.NewNodeInfo)
+			snapshot := cache.NewSnapshot(tt.existingPods, tt.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			l, _ := snapshot.NodeInfos().List()
 			n := func(plArgs runtime.Object, fh framework.Handle) (framework.Plugin, error) {
 				return New(plArgs, fh, feature.Features{})

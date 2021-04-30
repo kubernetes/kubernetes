@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -120,7 +121,7 @@ func TestNodeLabelFilter(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			node := v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: label}}
-			nodeInfo := framework.NewNodeInfo()
+			nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 			nodeInfo.SetNode(&node)
 
 			p, err := New(&test.args, nil)
@@ -247,7 +248,7 @@ func TestNodeLabelScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{"foo": "", "bar": ""}}}
-			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, []*v1.Node{node}, framework.NewNodeInfo)))
+			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(cache.NewSnapshot(nil, []*v1.Node{node}, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)))
 			p, err := New(&test.args, fh)
 			if err != nil {
 				t.Fatalf("Failed to create plugin: %+v", err)
@@ -267,7 +268,7 @@ func TestNodeLabelScore(t *testing.T) {
 func TestNodeLabelFilterWithoutNode(t *testing.T) {
 	var pod *v1.Pod
 	t.Run("node does not exist", func(t *testing.T) {
-		nodeInfo := framework.NewNodeInfo()
+		nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 		p, err := New(&config.NodeLabelArgs{}, nil)
 		if err != nil {
 			t.Fatalf("Failed to create plugin: %v", err)

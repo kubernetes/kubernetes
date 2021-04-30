@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 func TestCompareNodes(t *testing.T) {
@@ -177,7 +178,7 @@ func testComparePods(actual, cached, queued, missing, redundant []string, t *tes
 		pod.Namespace = "ns"
 		pod.Name = uid
 
-		nodeInfo[uid] = framework.NewNodeInfo()
+		nodeInfo[uid] = fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 		nodeInfo[uid].AddPod(pod)
 	}
 

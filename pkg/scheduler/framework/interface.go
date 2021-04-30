@@ -605,6 +605,9 @@ type Handle interface {
 
 	// Parallelizer returns a parallelizer holding parallelism for scheduler.
 	Parallelizer() parallelize.Parallelizer
+
+	// ResourceNameQualifier returns resource name qualifier for qualifying resource names
+	ResourceNameQualifier() ResourceNameQualifier
 }
 
 // PostFilterResult wraps needed info for scheduler framework to act upon PostFilter phase.

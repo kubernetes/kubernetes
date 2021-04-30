@@ -28,6 +28,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -380,7 +381,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
+			snapshot := cache.NewSnapshot(test.pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			if len(test.pod.Spec.Volumes) > 0 {
 				maxVolumes := 5
 				nodeInfoList, _ := snapshot.NodeInfos().List()

@@ -93,10 +93,6 @@ func createAlgorithmSourceFromPolicy(configData []byte, clientSet clientset.Inte
 	}
 }
 
-func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
-	return &fakeframework.ResourceNameQualifier{}
-}
-
 // TestCreateFromConfig configures a scheduler from policies defined in a configMap.
 // It combines some configurable predicate/priorities with some pre-defined ones
 func TestCreateFromConfig(t *testing.T) {
@@ -409,7 +405,7 @@ func TestCreateFromConfig(t *testing.T) {
 				client,
 				informerFactory,
 				recorderFactory,
-				getFakeResourceNameQualifier(),
+				fakeframework.EmptyResourceNameQualifier(),
 				make(chan struct{}),
 				WithAlgorithmSource(createAlgorithmSourceFromPolicy(tc.configData, client)),
 				WithBuildFrameworkCapturer(func(p schedulerapi.KubeSchedulerProfile) {
@@ -478,7 +474,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 
 			queue.Add(testPod)
 			queue.Pop()
@@ -552,7 +548,7 @@ func TestDefaultErrorFunc_NodeNotFound(t *testing.T) {
 			podInformer.Informer().GetStore().Add(testPod)
 
 			queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-			schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
+			schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 
 			for i := range tt.nodes {
 				node := tt.nodes[i]
@@ -593,7 +589,7 @@ func TestDefaultErrorFunc_PodAlreadyBound(t *testing.T) {
 	podInformer.Informer().GetStore().Add(testPod)
 
 	queue := internalqueue.NewPriorityQueue(nil, informerFactory, internalqueue.WithClock(clock.NewFakeClock(time.Now())))
-	schedulerCache := internalcache.New(30*time.Second, stopCh, framework.NewNodeInfo, false)
+	schedulerCache := internalcache.New(30*time.Second, stopCh, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 
 	// Add node to schedulerCache no matter it's deleted in API server or not.
 	schedulerCache.AddNode(&nodeFoo)

@@ -90,6 +90,8 @@ type Scheduler struct {
 	Profiles profile.Map
 
 	client clientset.Interface
+
+	resourceNameQualifier framework.ResourceNameQualifier
 }
 
 type schedulerOptions struct {
@@ -216,7 +218,14 @@ func New(client clientset.Interface,
 		opt(&options)
 	}
 
-	schedulerCache := internalcache.New(30*time.Second, stopEverything, framework.NewNodeInfo, utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes))
+	schedulerCache := internalcache.New(
+		30*time.Second,
+		stopEverything,
+		func() *framework.NodeInfo {
+			return framework.NewNodeInfo(resourceNameQualifier)
+		},
+		utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes),
+	)
 
 	registry := frameworkplugins.NewInTreeRegistry()
 	if err := registry.Merge(options.frameworkOutOfTreeRegistry); err != nil {
@@ -284,6 +293,7 @@ func New(client clientset.Interface,
 	// Additional tweaks to the config produced by the configurator.
 	sched.StopEverything = stopEverything
 	sched.client = client
+	sched.resourceNameQualifier = resourceNameQualifier
 
 	addAllEventHandlers(sched, informerFactory)
 	return sched, nil

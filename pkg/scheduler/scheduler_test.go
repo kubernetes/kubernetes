@@ -50,6 +50,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
@@ -180,7 +181,7 @@ func TestSchedulerCreation(t *testing.T) {
 				client,
 				informerFactory,
 				profile.NewRecorderFactory(eventBroadcaster),
-				getFakeResourceNameQualifier(),
+				fakeframework.EmptyResourceNameQualifier(),
 				stopCh,
 				tc.opts...,
 			)
@@ -462,7 +463,7 @@ func TestSchedulerMultipleProfilesScheduling(t *testing.T) {
 		client,
 		informerFactory,
 		profile.NewRecorderFactory(broadcaster),
-		getFakeResourceNameQualifier(),
+		fakeframework.EmptyResourceNameQualifier(),
 		ctx.Done(),
 		WithProfiles(
 			schedulerapi.KubeSchedulerProfile{SchedulerName: "match-machine2",
@@ -550,7 +551,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(100*time.Millisecond, stop, framework.NewNodeInfo, false)
+	scache := internalcache.New(100*time.Millisecond, stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 	pod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -617,7 +618,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
+	scache := internalcache.New(10*time.Minute, stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 	firstPod := podWithPort("pod.Name", "", 8080)
 	node := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", UID: types.UID("machine1")}}
 	scache.AddNode(&node)
@@ -721,7 +722,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	stop := make(chan struct{})
 	defer close(stop)
 	queuedPodStore := clientcache.NewFIFO(clientcache.MetaNamespaceKeyFunc)
-	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
+	scache := internalcache.New(10*time.Minute, stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 
 	// Design the baseline for the pods, and we will make nodes that don't fit it later.
 	var cpu = int64(4)
@@ -866,7 +867,7 @@ func setupTestSchedulerWithVolumeBinding(volumeBinder scheduling.SchedulerVolume
 	pod.Spec.Volumes = append(pod.Spec.Volumes, v1.Volume{Name: "testVol",
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: "testPVC"}}})
 	queuedPodStore.Add(pod)
-	scache := internalcache.New(10*time.Minute, stop, framework.NewNodeInfo, false)
+	scache := internalcache.New(10*time.Minute, stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 	scache.AddNode(&testNode)
 	testPVC := v1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: "testPVC", Namespace: pod.Namespace, UID: types.UID("testPVC")}}
 	client := clientsetfake.NewSimpleClientset(&testNode, &testPVC)
@@ -1178,7 +1179,7 @@ func TestSchedulerBinding(t *testing.T) {
 			}
 			stop := make(chan struct{})
 			defer close(stop)
-			scache := internalcache.New(100*time.Millisecond, stop, framework.NewNodeInfo, false)
+			scache := internalcache.New(100*time.Millisecond, stop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 			algo := core.NewGenericScheduler(
 				scache,
 				nil,

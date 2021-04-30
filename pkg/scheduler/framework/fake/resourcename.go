@@ -63,3 +63,11 @@ func inList(list []v1.ResourceName, item v1.ResourceName) bool {
 }
 
 var _ framework.ResourceNameQualifier = &ResourceNameQualifier{}
+
+func NewNodeInfoWithEmptyResourceNameQualifier() *framework.NodeInfo {
+	return framework.NewNodeInfo(&ResourceNameQualifier{})
+}
+
+func EmptyResourceNameQualifier() framework.ResourceNameQualifier {
+	return &ResourceNameQualifier{}
+}

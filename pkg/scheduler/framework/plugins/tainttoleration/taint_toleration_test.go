@@ -24,6 +24,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 )
@@ -229,7 +230,7 @@ func TestTaintTolerationScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-			snapshot := cache.NewSnapshot(nil, test.nodes, framework.NewNodeInfo)
+			snapshot := cache.NewSnapshot(nil, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			fh, _ := runtime.NewFramework(nil, nil, runtime.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
@@ -330,7 +331,7 @@ func TestTaintTolerationFilter(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfo := framework.NewNodeInfo()
+			nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 			nodeInfo.SetNode(test.node)
 			p, _ := New(nil, nil)
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)

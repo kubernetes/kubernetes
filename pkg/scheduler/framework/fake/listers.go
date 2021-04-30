@@ -252,10 +252,10 @@ func (nodes NodeInfoLister) HavePodsWithRequiredAntiAffinityList() ([]*framework
 }
 
 // NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
-func NewNodeInfoLister(nodes []*v1.Node) framework.NodeInfoLister {
+func NewNodeInfoLister(nodes []*v1.Node, rnq framework.ResourceNameQualifier) framework.NodeInfoLister {
 	nodeInfoList := make([]*framework.NodeInfo, len(nodes))
 	for _, node := range nodes {
-		nodeInfo := framework.NewNodeInfo()
+		nodeInfo := framework.NewNodeInfo(rnq)
 		nodeInfo.SetNode(node)
 		nodeInfoList = append(nodeInfoList, nodeInfo)
 	}

@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -207,7 +207,7 @@ func TestUpdatePodInCache(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			schedulerCache := cache.New(ttl, ctx.Done(), framework.NewNodeInfo, false)
+			schedulerCache := cache.New(ttl, ctx.Done(), fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 			schedulerQueue := queue.NewTestQueue(ctx, nil)
 			sched := &Scheduler{
 				SchedulerCache:  schedulerCache,
@@ -319,12 +319,12 @@ func TestPreCheckForNode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfo := framework.NewNodeInfo()
+			nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 			for _, pod := range tt.existingPods {
 				nodeInfo.AddPod(pod)
 			}
 			nodeInfo.SetNode(tt.nodeFn())
-			preCheckFn := preCheckForNode(nodeInfo)
+			preCheckFn := preCheckForNode(nodeInfo, fakeframework.EmptyResourceNameQualifier())
 
 			var got []bool
 			for _, pod := range tt.pods {

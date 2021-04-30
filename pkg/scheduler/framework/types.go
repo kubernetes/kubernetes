@@ -396,6 +396,8 @@ type NodeInfo struct {
 	// Whenever NodeInfo changes, generation is bumped.
 	// This is used to avoid cloning it if the object didn't change.
 	Generation int64
+
+	resourceNameQualifier ResourceNameQualifier
 }
 
 //initializeNodeTransientInfo initializes transient information pertaining to node.
@@ -461,14 +463,14 @@ type Resource struct {
 }
 
 // NewResource creates a Resource from ResourceList
-func NewResource(rl v1.ResourceList) *Resource {
+func NewResource(rl v1.ResourceList, rnq ResourceNameQualifier) *Resource {
 	r := &Resource{}
-	r.Add(rl)
+	r.Add(rl, rnq)
 	return r
 }
 
 // Add adds ResourceList into Resource.
-func (r *Resource) Add(rl v1.ResourceList) {
+func (r *Resource) Add(rl v1.ResourceList, rnq ResourceNameQualifier) {
 	if r == nil {
 		return
 	}
@@ -487,11 +489,15 @@ func (r *Resource) Add(rl v1.ResourceList) {
 				r.EphemeralStorage += rQuant.Value()
 			}
 		default:
-			if schedutil.IsScalarResourceName(rName) {
+			if r.isScalarResourceName(rName, rnq) {
 				r.AddScalar(rName, rQuant.Value())
 			}
 		}
 	}
+}
+
+func (r *Resource) isScalarResourceName(name v1.ResourceName, rnq ResourceNameQualifier) bool {
+	return rnq.IsExtended(name) || rnq.IsHugePage(name) || rnq.IsPrefixedNativeResource(name) || rnq.IsAttachableVolume(name)
 }
 
 // Clone returns a copy of this resource.
@@ -526,7 +532,7 @@ func (r *Resource) SetScalar(name v1.ResourceName, quantity int64) {
 }
 
 // SetMaxResource compares with ResourceList and takes max value for each Resource.
-func (r *Resource) SetMaxResource(rl v1.ResourceList) {
+func (r *Resource) SetMaxResource(rl v1.ResourceList, rnq ResourceNameQualifier) {
 	if r == nil {
 		return
 	}
@@ -542,7 +548,7 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 				r.EphemeralStorage = max(r.EphemeralStorage, rQuantity.Value())
 			}
 		default:
-			if schedutil.IsScalarResourceName(rName) {
+			if r.isScalarResourceName(rName, rnq) {
 				r.SetScalar(rName, max(r.ScalarResources[rName], rQuantity.Value()))
 			}
 		}
@@ -550,15 +556,16 @@ func (r *Resource) SetMaxResource(rl v1.ResourceList) {
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
-func NewNodeInfo() *NodeInfo {
+func NewNodeInfo(rnq ResourceNameQualifier) *NodeInfo {
 	return &NodeInfo{
-		Requested:        &Resource{},
-		NonZeroRequested: &Resource{},
-		Allocatable:      &Resource{},
-		TransientInfo:    NewTransientSchedulerInfo(),
-		Generation:       nextGeneration(),
-		UsedPorts:        make(HostPortInfo),
-		ImageStates:      make(map[string]*ImageStateSummary),
+		Requested:             &Resource{},
+		NonZeroRequested:      &Resource{},
+		Allocatable:           &Resource{},
+		TransientInfo:         NewTransientSchedulerInfo(),
+		Generation:            nextGeneration(),
+		UsedPorts:             make(HostPortInfo),
+		ImageStates:           make(map[string]*ImageStateSummary),
+		resourceNameQualifier: rnq,
 	}
 }
 
@@ -573,14 +580,15 @@ func (n *NodeInfo) Node() *v1.Node {
 // Clone returns a copy of this node.
 func (n *NodeInfo) Clone() *NodeInfo {
 	clone := &NodeInfo{
-		node:             n.node,
-		Requested:        n.Requested.Clone(),
-		NonZeroRequested: n.NonZeroRequested.Clone(),
-		Allocatable:      n.Allocatable.Clone(),
-		TransientInfo:    n.TransientInfo,
-		UsedPorts:        make(HostPortInfo),
-		ImageStates:      n.ImageStates,
-		Generation:       n.Generation,
+		node:                  n.node,
+		Requested:             n.Requested.Clone(),
+		NonZeroRequested:      n.NonZeroRequested.Clone(),
+		Allocatable:           n.Allocatable.Clone(),
+		TransientInfo:         n.TransientInfo,
+		UsedPorts:             make(HostPortInfo),
+		ImageStates:           n.ImageStates,
+		Generation:            n.Generation,
+		resourceNameQualifier: n.resourceNameQualifier,
 	}
 	if len(n.Pods) > 0 {
 		clone.Pods = append([]*PodInfo(nil), n.Pods...)
@@ -617,7 +625,7 @@ func (n *NodeInfo) String() string {
 // AddPodInfo adds pod information to this NodeInfo.
 // Consider using this instead of AddPod if a PodInfo is already computed.
 func (n *NodeInfo) AddPodInfo(podInfo *PodInfo) {
-	res, non0CPU, non0Mem := calculateResource(podInfo.Pod)
+	res, non0CPU, non0Mem := calculateResource(podInfo.Pod, n.resourceNameQualifier)
 	n.Requested.MilliCPU += res.MilliCPU
 	n.Requested.Memory += res.Memory
 	n.Requested.EphemeralStorage += res.EphemeralStorage
@@ -700,7 +708,7 @@ func (n *NodeInfo) RemovePod(pod *v1.Pod) error {
 			n.Pods[i] = n.Pods[len(n.Pods)-1]
 			n.Pods = n.Pods[:len(n.Pods)-1]
 			// reduce the resource data
-			res, non0CPU, non0Mem := calculateResource(pod)
+			res, non0CPU, non0Mem := calculateResource(pod, n.resourceNameQualifier)
 
 			n.Requested.MilliCPU -= res.MilliCPU
 			n.Requested.Memory -= res.Memory
@@ -746,10 +754,10 @@ func max(a, b int64) int64 {
 }
 
 // resourceRequest = max(sum(podSpec.Containers), podSpec.InitContainers) + overHead
-func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64) {
+func calculateResource(pod *v1.Pod, rnq ResourceNameQualifier) (res Resource, non0CPU int64, non0Mem int64) {
 	resPtr := &res
 	for _, c := range pod.Spec.Containers {
-		resPtr.Add(c.Resources.Requests)
+		resPtr.Add(c.Resources.Requests, rnq)
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&c.Resources.Requests)
 		non0CPU += non0CPUReq
 		non0Mem += non0MemReq
@@ -757,7 +765,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 	}
 
 	for _, ic := range pod.Spec.InitContainers {
-		resPtr.SetMaxResource(ic.Resources.Requests)
+		resPtr.SetMaxResource(ic.Resources.Requests, rnq)
 		non0CPUReq, non0MemReq := schedutil.GetNonzeroRequests(&ic.Resources.Requests)
 		non0CPU = max(non0CPU, non0CPUReq)
 		non0Mem = max(non0Mem, non0MemReq)
@@ -765,7 +773,7 @@ func calculateResource(pod *v1.Pod) (res Resource, non0CPU int64, non0Mem int64)
 
 	// If Overhead is being utilized, add to the total requests for the pod
 	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
-		resPtr.Add(pod.Spec.Overhead)
+		resPtr.Add(pod.Spec.Overhead, rnq)
 		if _, found := pod.Spec.Overhead[v1.ResourceCPU]; found {
 			non0CPU += pod.Spec.Overhead.Cpu().MilliValue()
 		}
@@ -796,7 +804,7 @@ func (n *NodeInfo) updateUsedPorts(pod *v1.Pod, add bool) {
 // SetNode sets the overall node information.
 func (n *NodeInfo) SetNode(node *v1.Node) {
 	n.node = node
-	n.Allocatable = NewResource(node.Status.Allocatable)
+	n.Allocatable = NewResource(node.Status.Allocatable, n.resourceNameQualifier)
 	n.TransientInfo = NewTransientSchedulerInfo()
 	n.Generation = nextGeneration()
 }

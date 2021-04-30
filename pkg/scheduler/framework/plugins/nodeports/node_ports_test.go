@@ -27,10 +27,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 )
 
 func newNodeInfoWithPods(pods ...*v1.Pod) *framework.NodeInfo {
-	ni := framework.NewNodeInfo()
+	ni := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	for _, pod := range pods {
 		ni.AddPod(pod)
 	}
@@ -70,7 +71,7 @@ func TestNodePorts(t *testing.T) {
 	}{
 		{
 			pod:      &v1.Pod{},
-			nodeInfo: framework.NewNodeInfo(),
+			nodeInfo: fakeframework.NewNodeInfoWithEmptyResourceNameQualifier(),
 			name:     "nothing running",
 		},
 		{
@@ -173,7 +174,7 @@ func TestNodePorts(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
 	p, _ := New(nil, nil)

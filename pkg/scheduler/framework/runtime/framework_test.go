@@ -34,6 +34,7 @@ import (
 	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 )
@@ -1347,7 +1348,7 @@ func TestPostFilterPlugins(t *testing.T) {
 }
 
 func newNodeInfoWithPods(pods ...*v1.Pod) *framework.NodeInfo {
-	ni := framework.NewNodeInfo()
+	ni := fakeframework.NewNodeInfoWithEmptyResourceNameQualifier()
 	for _, pod := range pods {
 		ni.AddPod(pod)
 	}

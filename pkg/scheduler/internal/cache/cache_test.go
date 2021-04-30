@@ -32,8 +32,21 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{
+			"example.com/foo",
+		},
+	}
+}
+
+func newNodeInfoWithResourceNameQualifier() *framework.NodeInfo {
+	return framework.NewNodeInfo(getFakeResourceNameQualifier())
+}
 
 func deepEqualWithoutGeneration(actual *nodeInfoListItem, expected *framework.NodeInfo) error {
 	if (actual == nil) != (expected == nil) {
@@ -83,8 +96,9 @@ func newNodeInfo(requestedResource *framework.Resource,
 	pods []*v1.Pod,
 	usedPorts framework.HostPortInfo,
 	imageStates map[string]*framework.ImageStateSummary,
+	rnq framework.ResourceNameQualifier,
 ) *framework.NodeInfo {
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo(rnq)
 	for _, pod := range pods {
 		nodeInfo.AddPod(pod)
 	}
@@ -111,6 +125,8 @@ func TestAssumePodScheduled(t *testing.T) {
 		makeBasePod(t, nodeName, "test", "100m", "500", "random-invalid-extended-key:100", []v1.ContainerPort{{}}),
 	}
 
+	rnq := getFakeResourceNameQualifier()
+
 	tests := []struct {
 		pods []*v1.Pod
 
@@ -129,6 +145,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}, {
 		pods: []*v1.Pod{testPods[1], testPods[2]},
@@ -144,6 +161,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[1], testPods[2]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}, { // test non-zero request
 		pods: []*v1.Pod{testPods[3]},
@@ -159,6 +177,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[3]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}, {
 		pods: []*v1.Pod{testPods[4]},
@@ -175,6 +194,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[4]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}, {
 		pods: []*v1.Pod{testPods[4], testPods[5]},
@@ -191,6 +211,7 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[4], testPods[5]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}, {
 		pods: []*v1.Pod{testPods[6]},
@@ -206,13 +227,16 @@ func TestAssumePodScheduled(t *testing.T) {
 			[]*v1.Pod{testPods[6]},
 			newHostPortInfoBuilder().build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	},
 	}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(time.Second, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			for _, pod := range tt.pods {
 				if err := cache.AssumePod(pod); err != nil {
 					t.Fatalf("AssumePod failed: %v", err)
@@ -261,6 +285,7 @@ func TestExpirePod(t *testing.T) {
 	}
 	now := time.Now()
 	ttl := 10 * time.Second
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		pods        []*testExpirePodStruct
 		cleanupTime time.Time
@@ -292,12 +317,15 @@ func TestExpirePod(t *testing.T) {
 			[]*v1.Pod{testPods[2], testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 
 			for _, pod := range tt.pods {
 				if err := cache.AssumePod(pod.pod); err != nil {
@@ -334,6 +362,7 @@ func TestAddPodWillConfirm(t *testing.T) {
 		makeBasePod(t, nodeName, "test-1", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test-2", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		podsToAssume []*v1.Pod
 		podsToAdd    []*v1.Pod
@@ -354,12 +383,15 @@ func TestAddPodWillConfirm(t *testing.T) {
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -399,7 +431,7 @@ func TestDump(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Errorf("assumePod failed: %v", err)
@@ -436,6 +468,7 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 	assumedPod := makeBasePod(t, "assumed-node-1", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
 	addedPod := makeBasePod(t, "actual-node", "test-1", "100m", "500", "", []v1.ContainerPort{{HostPort: 80}})
 	updatedPod := makeBasePod(t, "actual-node", "test-1", "200m", "500", "", []v1.ContainerPort{{HostPort: 90}})
+	rnq := getFakeResourceNameQualifier()
 
 	tests := []struct {
 		podsToAssume []*v1.Pod
@@ -461,13 +494,16 @@ func TestAddPodWillReplaceAssumed(t *testing.T) {
 				[]*v1.Pod{updatedPod.DeepCopy()},
 				newHostPortInfoBuilder().add("TCP", "0.0.0.0", 90).build(),
 				make(map[string]*framework.ImageStateSummary),
+				rnq,
 			),
 		},
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -500,6 +536,7 @@ func TestAddPodAfterExpiration(t *testing.T) {
 	nodeName := "node"
 	ttl := 10 * time.Second
 	basePod := makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		pod *v1.Pod
 
@@ -518,13 +555,16 @@ func TestAddPodAfterExpiration(t *testing.T) {
 			[]*v1.Pod{basePod},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			now := time.Now()
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			if err := assumeAndFinishBinding(cache, tt.pod, now); err != nil {
 				t.Fatalf("assumePod failed: %v", err)
 			}
@@ -555,6 +595,7 @@ func TestUpdatePod(t *testing.T) {
 		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		podsToAdd    []*v1.Pod
 		podsToUpdate []*v1.Pod
@@ -575,6 +616,7 @@ func TestUpdatePod(t *testing.T) {
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		), newNodeInfo(
 			&framework.Resource{
 				MilliCPU: 100,
@@ -587,12 +629,15 @@ func TestUpdatePod(t *testing.T) {
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		)},
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			for _, podToAdd := range tt.podsToAdd {
 				if err := cache.AddPod(podToAdd); err != nil {
 					t.Fatalf("AddPod failed: %v", err)
@@ -654,7 +699,7 @@ func TestUpdatePodAndGet(t *testing.T) {
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 
 			if err := tt.handler(cache, tt.pod); err != nil {
 				t.Fatalf("unexpected err: %v", err)
@@ -687,6 +732,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 		makeBasePod(t, nodeName, "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}}),
 		makeBasePod(t, nodeName, "test", "200m", "1Ki", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 8080, Protocol: "TCP"}}),
 	}
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		podsToAssume []*v1.Pod
 		podsToAdd    []*v1.Pod
@@ -709,6 +755,7 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			[]*v1.Pod{testPods[1]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 8080).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		), newNodeInfo(
 			&framework.Resource{
 				MilliCPU: 100,
@@ -721,13 +768,16 @@ func TestExpireAddUpdatePod(t *testing.T) {
 			[]*v1.Pod{testPods[0]},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		)},
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			now := time.Now()
-			cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(ttl, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			for _, podToAssume := range tt.podsToAssume {
 				if err := assumeAndFinishBinding(cache, podToAssume, now); err != nil {
 					t.Fatalf("assumePod failed: %v", err)
@@ -784,6 +834,7 @@ func TestEphemeralStorageResource(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	nodeName := "node"
 	podE := makePodWithEphemeralStorage(nodeName, "500")
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		pod       *v1.Pod
 		wNodeInfo *framework.NodeInfo
@@ -801,12 +852,15 @@ func TestEphemeralStorageResource(t *testing.T) {
 				[]*v1.Pod{podE},
 				framework.HostPortInfo{},
 				make(map[string]*framework.ImageStateSummary),
+				rnq,
 			),
 		},
 	}
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
-			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(time.Second, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			if err := cache.AddPod(tt.pod); err != nil {
 				t.Fatalf("AddPod failed: %v", err)
 			}
@@ -830,6 +884,7 @@ func TestRemovePod(t *testing.T) {
 	// Enable volumesOnNodeForBalancing to do balanced resource allocation
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BalanceAttachedNodeVolumes, true)()
 	basePod := makeBasePod(t, "node-1", "test", "100m", "500", "", []v1.ContainerPort{{HostIP: "127.0.0.1", HostPort: 80, Protocol: "TCP"}})
+	rnq := getFakeResourceNameQualifier()
 	tests := []struct {
 		nodes     []*v1.Node
 		pod       *v1.Pod
@@ -856,13 +911,16 @@ func TestRemovePod(t *testing.T) {
 			[]*v1.Pod{basePod},
 			newHostPortInfoBuilder().add("TCP", "127.0.0.1", 80).build(),
 			make(map[string]*framework.ImageStateSummary),
+			rnq,
 		),
 	}}
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("case_%d", i), func(t *testing.T) {
 			nodeName := tt.pod.Spec.NodeName
-			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(time.Second, time.Second, nil, func() *framework.NodeInfo {
+				return framework.NewNodeInfo(rnq)
+			}, false)
 			// Add pod succeeds even before adding the nodes.
 			if err := cache.AddPod(tt.pod); err != nil {
 				t.Fatalf("AddPod failed: %v", err)
@@ -898,7 +956,7 @@ func TestForgetPod(t *testing.T) {
 	now := time.Now()
 	ttl := 10 * time.Second
 
-	cache := newSchedulerCache(ttl, time.Second, nil, framework.NewNodeInfo, false)
+	cache := newSchedulerCache(ttl, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 	for _, pod := range pods {
 		if err := assumeAndFinishBinding(cache, pod, now); err != nil {
 			t.Fatalf("assumePod failed: %v", err)
@@ -933,9 +991,9 @@ func TestForgetPod(t *testing.T) {
 
 // buildNodeInfo creates a NodeInfo by simulating node operations in cache.
 func buildNodeInfo(node *v1.Node, pods []*v1.Pod) *framework.NodeInfo {
-	expected := framework.NewNodeInfo()
+	expected := newNodeInfoWithResourceNameQualifier()
 	expected.SetNode(node)
-	expected.Allocatable = framework.NewResource(node.Status.Allocatable)
+	expected.Allocatable = framework.NewResource(node.Status.Allocatable, getFakeResourceNameQualifier())
 	expected.Generation++
 	for _, pod := range pods {
 		expected.AddPod(pod)
@@ -1080,7 +1138,7 @@ func TestNodeOperators(t *testing.T) {
 			expected := buildNodeInfo(test.node, test.pods)
 			node := test.node
 
-			cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache := newSchedulerCache(time.Second, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 			cache.AddNode(node)
 			for _, pod := range test.pods {
 				if err := cache.AddPod(pod); err != nil {
@@ -1465,7 +1523,7 @@ func TestSchedulerCache_UpdateSnapshot(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache = newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache = newSchedulerCache(time.Second, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 			snapshot = NewEmptySnapshot()
 
 			for _, op := range test.operations {
@@ -1680,7 +1738,7 @@ func TestSchedulerCache_updateNodeInfoSnapshotList(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache = newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+			cache = newSchedulerCache(time.Second, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 			snapshot = NewEmptySnapshot()
 
 			test.operations(t)
@@ -1774,7 +1832,7 @@ func makeBasePod(t testingMode, nodeName, objName, cpu, mem, extended string, po
 }
 
 func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
-	cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+	cache := newSchedulerCache(time.Second, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 	for i := 0; i < 1000; i++ {
 		nodeName := fmt.Sprintf("node-%d", i)
 		for j := 0; j < 30; j++ {
@@ -1790,7 +1848,7 @@ func setupCacheOf1kNodes30kPods(b *testing.B) Cache {
 }
 
 func setupCacheWithAssumedPods(b *testing.B, podNum int, assumedTime time.Time) *schedulerCache {
-	cache := newSchedulerCache(time.Second, time.Second, nil, framework.NewNodeInfo, false)
+	cache := newSchedulerCache(time.Second, time.Second, nil, newNodeInfoWithResourceNameQualifier, false)
 	for i := 0; i < podNum; i++ {
 		nodeName := fmt.Sprintf("node-%d", i/10)
 		objName := fmt.Sprintf("%s-pod-%d", nodeName, i%10)

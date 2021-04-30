@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
+	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 )
 
 var (
@@ -39,6 +41,22 @@ var (
 	kubernetesIOResourceB = v1.ResourceName("subdomain.kubernetes.io/something")
 	hugePageResourceA     = v1.ResourceName(v1.ResourceHugePagesPrefix + "2Mi")
 )
+
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		ExtendedResourceNames: []v1.ResourceName{
+			extendedResourceA,
+			extendedResourceB,
+			kubernetesIOResourceA,
+			kubernetesIOResourceB,
+			v1.ResourceName("intel.com/foo"),
+			v1.ResourceName("intel.com/bar"),
+		},
+		HugePageResourceNames: []v1.ResourceName{
+			hugePageResourceA,
+		},
+	}
+}
 
 func makeResources(milliCPU, memory, pods, extendedA, storage, hugePageA int64) v1.NodeResources {
 	return v1.NodeResources{
@@ -106,7 +124,7 @@ func getErrReason(rn v1.ResourceName) string {
 }
 
 func newNodeInfoWithPods(pods ...*v1.Pod) *framework.NodeInfo {
-	ni := framework.NewNodeInfo()
+	ni := framework.NewNodeInfo(getFakeResourceNameQualifier())
 	for _, pod := range pods {
 		ni.AddPod(pod)
 	}
@@ -422,7 +440,14 @@ func TestEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&test.args, nil)
+			f, err := frameworkruntime.NewFramework(nil, nil,
+				frameworkruntime.WithResourceNameQualifier(getFakeResourceNameQualifier()),
+			)
+			if err != nil {
+				t.Fatalf("Failed creating framework runtime: %v", err)
+			}
+
+			p, err := NewFit(&test.args, f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -437,7 +462,9 @@ func TestEnoughRequests(t *testing.T) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
 
-			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups)
+			rnq := getFakeResourceNameQualifier()
+
+			gotInsufficientResources := fitsRequest(computePodResourceRequest(test.pod, rnq), test.nodeInfo, p.(*Fit).ignoredResources, p.(*Fit).ignoredResourceGroups, rnq)
 			if !reflect.DeepEqual(gotInsufficientResources, test.wantInsufficientResources) {
 				t.Errorf("insufficient resources do not match: %+v, want: %v", gotInsufficientResources, test.wantInsufficientResources)
 			}
@@ -447,10 +474,18 @@ func TestEnoughRequests(t *testing.T) {
 
 func TestPreFilterDisabled(t *testing.T) {
 	pod := &v1.Pod{}
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo(getFakeResourceNameQualifier())
 	node := v1.Node{}
 	nodeInfo.SetNode(&node)
-	p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+
+	f, err := frameworkruntime.NewFramework(nil, nil,
+		frameworkruntime.WithResourceNameQualifier(getFakeResourceNameQualifier()),
+	)
+	if err != nil {
+		t.Fatalf("Failed creating framework runtime: %v", err)
+	}
+
+	p, err := NewFit(&config.NodeResourcesFitArgs{}, f)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -500,7 +535,14 @@ func TestNotEnoughRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: v1.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 1, 0, 0, 0)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			f, err := frameworkruntime.NewFramework(nil, nil,
+				frameworkruntime.WithResourceNameQualifier(getFakeResourceNameQualifier()),
+			)
+			if err != nil {
+				t.Fatalf("Failed creating framework runtime: %v", err)
+			}
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, f)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -572,7 +614,14 @@ func TestStorageRequests(t *testing.T) {
 			node := v1.Node{Status: v1.NodeStatus{Capacity: makeResources(10, 20, 32, 5, 20, 5).Capacity, Allocatable: makeAllocatableResources(10, 20, 32, 5, 20, 5)}}
 			test.nodeInfo.SetNode(&node)
 
-			p, err := NewFit(&config.NodeResourcesFitArgs{}, nil)
+			f, err := frameworkruntime.NewFramework(nil, nil,
+				frameworkruntime.WithResourceNameQualifier(getFakeResourceNameQualifier()),
+			)
+			if err != nil {
+				t.Fatalf("Failed creating framework runtime: %v", err)
+			}
+
+			p, err := NewFit(&config.NodeResourcesFitArgs{}, f)
 			if err != nil {
 				t.Fatal(err)
 			}

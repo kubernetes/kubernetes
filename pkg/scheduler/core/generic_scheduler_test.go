@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
@@ -968,7 +969,7 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 			for _, pod := range test.pods {
 				cache.AddPod(pod)
 			}
@@ -990,7 +991,7 @@ func TestGenericScheduler(t *testing.T) {
 					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
 				}
 			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes, framework.NewNodeInfo)
+			snapshot := internalcache.NewSnapshot(test.pods, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			fwk, err := st.NewFramework(
 				test.registerPlugins, "",
 				frameworkruntime.WithSnapshotSharedLister(snapshot),
@@ -1033,7 +1034,7 @@ func TestGenericScheduler(t *testing.T) {
 
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(nodes []*v1.Node) *genericScheduler {
-	cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
+	cache := internalcache.New(time.Duration(0), wait.NeverStop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
@@ -1306,7 +1307,7 @@ func TestZeroRequest(t *testing.T) {
 			client := clientsetfake.NewSimpleClientset()
 			informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-			snapshot := internalcache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo)
+			snapshot := internalcache.NewSnapshot(test.pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
@@ -1491,7 +1492,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			// create three nodes in the cluster.
 			nodes := makeNodeList([]string{"node1", "node2", "node3"})
 			client := &clientsetfake.Clientset{}
-			cache := internalcache.New(time.Duration(0), wait.NeverStop, framework.NewNodeInfo, false)
+			cache := internalcache.New(time.Duration(0), wait.NeverStop, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier, false)
 			for _, n := range nodes {
 				cache.AddNode(n)
 			}
@@ -1515,7 +1516,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			snapshot := internalcache.NewSnapshot(nil, nodes, framework.NewNodeInfo)
+			snapshot := internalcache.NewSnapshot(nil, nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier)
 			scheduler := NewGenericScheduler(
 				cache,
 				snapshot,

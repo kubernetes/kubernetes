@@ -47,6 +47,19 @@ const (
 	hostpathInTreePluginName = "kubernetes.io/hostpath"
 )
 
+func getFakeResourceNameQualifier() framework.ResourceNameQualifier {
+	return &fakeframework.ResourceNameQualifier{
+		AttachableVolumeResourceNames: []v1.ResourceName{
+			v1.ResourceName(volumeutil.EBSVolumeLimitKey),
+			v1.ResourceName(v1.ResourceAttachableVolumesPrefix + "csi-ebs.csi.aws.com"),
+			v1.ResourceName(v1.ResourceAttachableVolumesPrefix + "csi-pd.csi.storage.gke.io"),
+			v1.ResourceName(volumeutil.GCEVolumeLimitKey),
+			v1.ResourceName(volumeutil.AzureVolumeLimitKey),
+			v1.ResourceName(volumeutil.CinderVolumeLimitKey),
+		},
+	}
+}
+
 // getVolumeLimitKey returns a ResourceName by filter type
 func getVolumeLimitKey(filterType string) v1.ResourceName {
 	switch filterType {
@@ -459,12 +472,13 @@ func TestCSILimits(t *testing.T) {
 			}
 
 			p := &CSILimits{
-				csiNodeLister:        getFakeCSINodeLister(csiNode),
-				pvLister:             getFakeCSIPVLister(test.filterName, test.driverNames...),
-				pvcLister:            getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
-				scLister:             getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
-				randomVolumeIDPrefix: rand.String(32),
-				translator:           csitrans.New(),
+				csiNodeLister:         getFakeCSINodeLister(csiNode),
+				pvLister:              getFakeCSIPVLister(test.filterName, test.driverNames...),
+				pvcLister:             getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
+				scLister:              getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]),
+				randomVolumeIDPrefix:  rand.String(32),
+				translator:            csitrans.New(),
+				resourceNameQualifier: getFakeResourceNameQualifier(),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -579,7 +593,7 @@ func getFakeCSINodeLister(csiNode *storagev1.CSINode) fakeframework.CSINodeListe
 }
 
 func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*framework.NodeInfo, *storagev1.CSINode) {
-	nodeInfo := framework.NewNodeInfo()
+	nodeInfo := framework.NewNodeInfo(getFakeResourceNameQualifier())
 	for _, pod := range pods {
 		nodeInfo.AddPod(pod)
 	}

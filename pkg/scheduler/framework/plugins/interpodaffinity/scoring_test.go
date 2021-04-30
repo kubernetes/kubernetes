@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	fakeframework "k8s.io/kubernetes/pkg/scheduler/framework/fake"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	plugintesting "k8s.io/kubernetes/pkg/scheduler/framework/plugins/testing"
 	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -748,7 +749,7 @@ func TestPreferredAffinity(t *testing.T) {
 					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
 				})
 			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo), namespaces)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: 1}, cache.NewSnapshot(test.pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				if !strings.Contains(status.Message(), test.wantStatus.Message()) {
@@ -914,7 +915,7 @@ func TestPreferredAffinityWithHardPodAffinitySymmetricWeight(t *testing.T) {
 					EnablePodAffinityNamespaceSelector: !test.disableNSSelector,
 				})
 			}
-			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes, framework.NewNodeInfo), namespaces)
+			p := plugintesting.SetupPluginWithInformers(ctx, t, n, &config.InterPodAffinityArgs{HardPodAffinityWeight: test.hardPodAffinityWeight}, cache.NewSnapshot(test.pods, test.nodes, fakeframework.NewNodeInfoWithEmptyResourceNameQualifier), namespaces)
 			status := p.(framework.PreScorePlugin).PreScore(ctx, state, test.pod, test.nodes)
 			if !status.IsSuccess() {
 				t.Errorf("unexpected error: %v", status)
