@@ -126,7 +126,10 @@ func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (rsStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (rsStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newRS := obj.(*apps.ReplicaSet)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newRS.Spec.Template, nil)
+}
 
 // Canonicalize normalizes the object after validation.
 func (rsStrategy) Canonicalize(obj runtime.Object) {
@@ -166,7 +169,15 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 }
 
 // WarningsOnUpdate returns warnings for the given update.
-func (rsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string { return nil }
+func (rsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newReplicaSet := obj.(*apps.ReplicaSet)
+	oldReplicaSet := old.(*apps.ReplicaSet)
+	if newReplicaSet.Generation != oldReplicaSet.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
+	}
+	return warnings
+}
 
 func (rsStrategy) AllowUnconditionalUpdate() bool {
 	return true

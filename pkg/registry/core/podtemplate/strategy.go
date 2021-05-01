@@ -60,7 +60,8 @@ func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) fie
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (podTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newPodTemplate := obj.(*api.PodTemplate)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("template"), &newPodTemplate.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -99,7 +100,13 @@ func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 
 // WarningsOnUpdate returns warnings for the given update.
 func (podTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newTemplate := obj.(*api.PodTemplate)
+	oldTemplate := old.(*api.PodTemplate)
+	if newTemplate.Generation != oldTemplate.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("template"), &newTemplate.Template, &oldTemplate.Template)
+	}
+	return warnings
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {

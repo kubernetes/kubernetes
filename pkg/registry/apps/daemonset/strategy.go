@@ -168,7 +168,8 @@ func (daemonSetStrategy) Validate(ctx context.Context, obj runtime.Object) field
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (daemonSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newDaemonSet := obj.(*apps.DaemonSet)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDaemonSet.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -210,7 +211,13 @@ func (daemonSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 
 // WarningsOnUpdate returns warnings for the given update.
 func (daemonSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newDaemonSet := obj.(*apps.DaemonSet)
+	oldDaemonSet := old.(*apps.DaemonSet)
+	if newDaemonSet.Spec.TemplateGeneration != oldDaemonSet.Spec.TemplateGeneration {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDaemonSet.Spec.Template, &oldDaemonSet.Spec.Template)
+	}
+	return warnings
 }
 
 // AllowUnconditionalUpdate is the default update policy for daemon set objects.

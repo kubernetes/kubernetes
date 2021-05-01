@@ -152,7 +152,10 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newJob := obj.(*batch.Job)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, nil)
+}
 
 // generateSelector adds a selector to a job and labels to its template
 // which can be used to uniquely identify the pods created by that job,
@@ -230,7 +233,13 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 
 // WarningsOnUpdate returns warnings for the given update.
 func (jobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+	if newJob.Generation != oldJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, &oldJob.Spec.Template)
+	}
+	return warnings
 }
 
 type jobStatusStrategy struct {

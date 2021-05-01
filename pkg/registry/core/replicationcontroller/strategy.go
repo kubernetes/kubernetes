@@ -126,7 +126,10 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (rcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (rcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newRC := obj.(*api.ReplicationController)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("template"), newRC.Spec.Template, nil)
+}
 
 // Canonicalize normalizes the object after validation.
 func (rcStrategy) Canonicalize(obj runtime.Object) {
@@ -170,7 +173,13 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 
 // WarningsOnUpdate returns warnings for the given update.
 func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	oldRc := old.(*api.ReplicationController)
+	newRc := obj.(*api.ReplicationController)
+	if oldRc.Generation != newRc.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), oldRc.Spec.Template, newRc.Spec.Template)
+	}
+	return warnings
 }
 
 func (rcStrategy) AllowUnconditionalUpdate() bool {

@@ -98,7 +98,8 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (deploymentStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newDeployment := obj.(*apps.Deployment)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -156,7 +157,13 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 
 // WarningsOnUpdate returns warnings for the given update.
 func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newDeployment := obj.(*apps.Deployment)
+	oldDeployment := old.(*apps.Deployment)
+	if newDeployment.Generation != oldDeployment.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	}
+	return warnings
 }
 
 func (deploymentStrategy) AllowUnconditionalUpdate() bool {

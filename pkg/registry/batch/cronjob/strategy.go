@@ -112,7 +112,10 @@ func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 }
 
 // WarningsOnCreate returns warnings for the creation of the given object.
-func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newCronJob := obj.(*batch.CronJob)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, nil)
+}
 
 // Canonicalize normalizes the object after validation.
 func (cronJobStrategy) Canonicalize(obj runtime.Object) {
@@ -138,7 +141,13 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 // WarningsOnUpdate returns warnings for the given update.
 func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newCronJob := obj.(*batch.CronJob)
+	oldCronJob := old.(*batch.CronJob)
+	if newCronJob.Generation != oldCronJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "jobTemplate", "spec", "template"), &newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
+	}
+	return warnings
 }
 
 type cronJobStatusStrategy struct {

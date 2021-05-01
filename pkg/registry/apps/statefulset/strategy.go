@@ -115,7 +115,8 @@ func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) fie
 
 // WarningsOnCreate returns warnings for the creation of the given object.
 func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
-	return nil
+	newStatefulSet := obj.(*apps.StatefulSet)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -140,7 +141,13 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 
 // WarningsOnUpdate returns warnings for the given update.
 func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
-	return nil
+	var warnings []string
+	newStatefulSet := obj.(*apps.StatefulSet)
+	oldStatefulSet := old.(*apps.StatefulSet)
+	if newStatefulSet.Generation != oldStatefulSet.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newStatefulSet.Spec.Template, &oldStatefulSet.Spec.Template)
+	}
+	return warnings
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
