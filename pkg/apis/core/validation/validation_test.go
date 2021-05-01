@@ -1837,12 +1837,80 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 		},
 		VolumeName: "volume",
 	})
+	validClaimShrinkInitial := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceName(core.ResourceStorage): resource.MustParse("15G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	validClaimShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("13G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidShrinkToStatus := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("10G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
+
+	invalidClaimShrink := testVolumeClaimWithStatus("foo", "ns", core.PersistentVolumeClaimSpec{
+		AccessModes: []core.PersistentVolumeAccessMode{
+			core.ReadWriteOnce,
+			core.ReadOnlyMany,
+		},
+		Resources: core.ResourceRequirements{
+			Requests: core.ResourceList{
+				core.ResourceStorage: resource.MustParse("3G"),
+			},
+		},
+	}, core.PersistentVolumeClaimStatus{
+		Phase: core.ClaimBound,
+		Capacity: core.ResourceList{
+			core.ResourceStorage: resource.MustParse("10G"),
+		},
+	})
 
 	scenarios := map[string]struct {
-		isExpectedFailure bool
-		oldClaim          *core.PersistentVolumeClaim
-		newClaim          *core.PersistentVolumeClaim
-		enableResize      bool
+		isExpectedFailure          bool
+		oldClaim                   *core.PersistentVolumeClaim
+		newClaim                   *core.PersistentVolumeClaim
+		enableResize               bool
+		enableRecoverFromExpansion bool
 	}{
 		"valid-update-volumeName-only": {
 			isExpectedFailure: false,
@@ -2012,12 +2080,47 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 			newClaim:          validClaimRWOPAccessModeAddAnnotation,
 			enableResize:      false,
 		},
+		"valid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+		},
+		"invalid-expand-shrink-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   invalidClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-to-status-resize-enabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   invalidShrinkToStatus,
+			enableResize:               true,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-recover-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               true,
+			enableRecoverFromExpansion: false,
+			isExpectedFailure:          true,
+		},
+		"invalid-expand-shrink-resize-disabled": {
+			oldClaim:                   validClaimShrinkInitial,
+			newClaim:                   validClaimShrink,
+			enableResize:               false,
+			enableRecoverFromExpansion: true,
+			isExpectedFailure:          true,
+		},
 	}
 
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			// ensure we have a resource version specified for updates
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ExpandPersistentVolumes, scenario.enableResize)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RecoverVolumeExpansionFailure, scenario.enableRecoverFromExpansion)()
 			scenario.oldClaim.ResourceVersion = "1"
 			scenario.newClaim.ResourceVersion = "1"
 			opts := ValidationOptionsForPersistentVolumeClaim(scenario.newClaim, scenario.oldClaim)

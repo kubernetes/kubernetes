@@ -27,12 +27,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	pvcutil "k8s.io/kubernetes/pkg/api/persistentvolumeclaim"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/features"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
@@ -66,7 +64,7 @@ func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	pvc.Status = api.PersistentVolumeClaimStatus{}
-
+	pvcutil.SetAllocatedResources(pvc, nil)
 	pvcutil.DropDisabledFields(&pvc.Spec, nil)
 }
 
@@ -135,12 +133,10 @@ func (persistentvolumeclaimStatusStrategy) GetResetFields() map[fieldpath.APIVer
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newPv := obj.(*api.PersistentVolumeClaim)
-	oldPv := old.(*api.PersistentVolumeClaim)
-	newPv.Spec = oldPv.Spec
-	if !utilfeature.DefaultFeatureGate.Enabled(features.ExpandPersistentVolumes) && oldPv.Status.Conditions == nil {
-		newPv.Status.Conditions = nil
-	}
+	newPVC := obj.(*api.PersistentVolumeClaim)
+	oldPVC := old.(*api.PersistentVolumeClaim)
+	newPVC.Spec = oldPVC.Spec
+	pvcutil.DropDisabledFieldsFromStatus(newPVC, oldPVC)
 }
 
 func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {

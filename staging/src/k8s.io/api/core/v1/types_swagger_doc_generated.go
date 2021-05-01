@@ -1309,11 +1309,12 @@ func (PersistentVolumeClaimSpec) SwaggerDoc() map[string]string {
 }
 
 var map_PersistentVolumeClaimStatus = map[string]string{
-	"":            "PersistentVolumeClaimStatus is the current status of a persistent volume claim.",
-	"phase":       "Phase represents the current phase of PersistentVolumeClaim.",
-	"accessModes": "AccessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
-	"capacity":    "Represents the actual resources of the underlying volume.",
-	"conditions":  "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
+	"":                   "PersistentVolumeClaimStatus is the current status of a persistent volume claim.",
+	"phase":              "Phase represents the current phase of PersistentVolumeClaim.",
+	"accessModes":        "AccessModes contains the actual access modes the volume backing the PVC has. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+	"capacity":           "Represents the actual resources of the underlying volume.",
+	"conditions":         "Current Condition of persistent volume claim. If underlying persistent volume is being resized then the Condition will be set to 'ResizeStarted'.",
+	"allocatedResources": "The storage resource within AllocatedResources tracks the capacity allocated to a PVC. It may be larger than the actual capacity when a volume expansion operation is requested. For storage quota, the larger value from allocatedResources and PVC.spec.resources is used. If allocatedResources is not set, PVC.spec.resources alone is used for quota calculation. If a volume expansion capacity request is lowered, allocatedResources is only lowered if there are no expansion operations in progress and if the actual volume capacity is equal or lower than the requested capacity. This is an alpha field and requires enabling RecoverVolumeExpansionFailure feature.",
 }
 
 func (PersistentVolumeClaimStatus) SwaggerDoc() map[string]string {
