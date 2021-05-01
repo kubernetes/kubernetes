@@ -125,6 +125,9 @@ func (rcStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorL
 	return validation.ValidateReplicationController(controller, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (rcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (rcStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -163,6 +166,11 @@ func (rcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	}
 
 	return errs
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (rcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (rcStrategy) AllowUnconditionalUpdate() bool {
@@ -224,4 +232,9 @@ func (rcStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 
 func (rcStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicationControllerStatusUpdate(obj.(*api.ReplicationController), old.(*api.ReplicationController))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (rcStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

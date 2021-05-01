@@ -142,6 +142,9 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return validation.ValidateJob(job, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // generateSelector adds a selector to a job and labels to its template
 // which can be used to uniquely identify the pods created by that job,
 // if the user has requested this behavior.
@@ -216,6 +219,11 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	return append(validationErrorList, updateErrorList...)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 type jobStatusStrategy struct {
 	jobStrategy
 }
@@ -240,6 +248,11 @@ func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.

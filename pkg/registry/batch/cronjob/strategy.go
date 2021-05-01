@@ -102,6 +102,9 @@ func (cronJobStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return validation.ValidateCronJob(cronJob, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (cronJobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (cronJobStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -122,6 +125,11 @@ func (cronJobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 
 	opts := pod.GetValidationOptionsFromPodTemplate(&newCronJob.Spec.JobTemplate.Spec.Template, &oldCronJob.Spec.JobTemplate.Spec.Template)
 	return validation.ValidateCronJobUpdate(newCronJob, oldCronJob, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 type cronJobStatusStrategy struct {
@@ -152,4 +160,9 @@ func (cronJobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 
 func (cronJobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return field.ErrorList{}
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (cronJobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

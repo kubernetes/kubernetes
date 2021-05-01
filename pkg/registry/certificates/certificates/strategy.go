@@ -117,6 +117,9 @@ func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	return validation.ValidateCertificateSigningRequestCreate(csr, requestGroupVersion(ctx))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csrStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation (which includes a signature check).
 func (csrStrategy) Canonicalize(obj runtime.Object) {}
 
@@ -125,6 +128,11 @@ func (csrStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	return validation.ValidateCertificateSigningRequestUpdate(newCSR, oldCSR, requestGroupVersion(ctx))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csrStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // If AllowUnconditionalUpdate() is true and the object specified by
@@ -244,6 +252,11 @@ func (csrStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidateCertificateSigningRequestStatusUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (csrStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (csrStatusStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -289,6 +302,11 @@ func (csrApprovalStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 
 func (csrApprovalStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateCertificateSigningRequestApprovalUpdate(obj.(*certificates.CertificateSigningRequest), old.(*certificates.CertificateSigningRequest), requestGroupVersion(ctx))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csrApprovalStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

@@ -57,6 +57,11 @@ func (podTemplateStrategy) Validate(ctx context.Context, obj runtime.Object) fie
 	return corevalidation.ValidatePodTemplate(template, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (podTemplateStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (podTemplateStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -82,6 +87,11 @@ func (podTemplateStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	// Allow downward api usage of hugepages on pod update if feature is enabled or if the old pod already had used them.
 	opts := pod.GetValidationOptionsFromPodTemplate(&template.Template, &oldTemplate.Template)
 	return corevalidation.ValidatePodTemplateUpdate(template, oldTemplate, opts)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podTemplateStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (podTemplateStrategy) AllowUnconditionalUpdate() bool {

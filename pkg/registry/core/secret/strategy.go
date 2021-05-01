@@ -60,6 +60,9 @@ func (strategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorLis
 	return validation.ValidateSecret(obj.(*api.Secret))
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (strategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 
@@ -81,6 +84,11 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (strategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func dropDisabledFields(secret *api.Secret, oldSecret *api.Secret) {

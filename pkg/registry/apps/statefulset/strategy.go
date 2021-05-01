@@ -113,6 +113,11 @@ func (statefulSetStrategy) Validate(ctx context.Context, obj runtime.Object) fie
 	return validation.ValidateStatefulSet(statefulSet, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (statefulSetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (statefulSetStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -131,6 +136,11 @@ func (statefulSetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.
 	validationErrorList := validation.ValidateStatefulSet(newStatefulSet, opts)
 	updateErrorList := validation.ValidateStatefulSetUpdate(newStatefulSet, oldStatefulSet)
 	return append(validationErrorList, updateErrorList...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (statefulSetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for StatefulSet objects.
@@ -167,4 +177,9 @@ func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old 
 func (statefulSetStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	// TODO: Validate status updates.
 	return validation.ValidateStatefulSetStatusUpdate(obj.(*apps.StatefulSet), old.(*apps.StatefulSet))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (statefulSetStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
