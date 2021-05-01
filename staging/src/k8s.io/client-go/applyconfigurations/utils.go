@@ -1281,16 +1281,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		// Group=storage.k8s.io, Version=v1alpha1
 	case storagev1alpha1.SchemeGroupVersion.WithKind("CSIStorageCapacity"):
 		return &applyconfigurationsstoragev1alpha1.CSIStorageCapacityApplyConfiguration{}
-	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttachment"):
-		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentApplyConfiguration{}
-	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttachmentSource"):
-		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentSourceApplyConfiguration{}
-	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttachmentSpec"):
-		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentSpecApplyConfiguration{}
-	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeAttachmentStatus"):
-		return &applyconfigurationsstoragev1alpha1.VolumeAttachmentStatusApplyConfiguration{}
-	case storagev1alpha1.SchemeGroupVersion.WithKind("VolumeError"):
-		return &applyconfigurationsstoragev1alpha1.VolumeErrorApplyConfiguration{}
 
 		// Group=storage.k8s.io, Version=v1beta1
 	case storagev1beta1.SchemeGroupVersion.WithKind("CSIDriver"):
