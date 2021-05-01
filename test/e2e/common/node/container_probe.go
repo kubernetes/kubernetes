@@ -402,9 +402,7 @@ var _ = SIGDescribe("Probing container", func() {
 		readinessProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/health"}),
 			InitialDelaySeconds: 0,
-			// PeriodSeconds is set to a large value to make sure that the first execution of readiness probe
-			// will happen before the first period passed.
-			PeriodSeconds: 600,
+			PeriodSeconds:       60,
 		}
 		startupProbe := &v1.Probe{
 			Handler:             execHandler([]string{"/bin/cat", "/tmp/startup"}),
@@ -418,11 +416,13 @@ var _ = SIGDescribe("Probing container", func() {
 
 		err = e2epod.WaitForPodContainerStarted(f.ClientSet, f.Namespace.Name, p.Name, 0, framework.PodStartTimeout)
 		framework.ExpectNoError(err)
+		startedTime := time.Now()
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
 		err = e2epod.WaitTimeoutForPodReadyInNamespace(f.ClientSet, p.Name, f.Namespace.Name, framework.PodStartTimeout)
 		framework.ExpectNoError(err)
+		readyTime := time.Now()
 
 		p, err = podClient.Get(context.TODO(), p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -430,6 +430,15 @@ var _ = SIGDescribe("Probing container", func() {
 		isReady, err := testutils.PodRunningReady(p)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(isReady, true, "pod should be ready")
+
+		readyIn := readyTime.Sub(startedTime)
+		framework.Logf("Container started at %v, pod became ready at %v, %v after startupProbe succeeded", startedTime, readyTime, readyIn)
+		if readyIn < 0 {
+			framework.Failf("Pod became ready before startupProbe succeeded")
+		}
+		if readyIn > 5*time.Second {
+			framework.Failf("Pod became ready in %v, more than 5s after startupProbe succeeded. It means that the delay readiness probes were not initiated immediately after startup finished.", readyIn)
+		}
 	})
 
 	/*
