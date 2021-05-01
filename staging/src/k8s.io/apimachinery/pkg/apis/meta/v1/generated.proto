@@ -499,8 +499,6 @@ message ListOptions {
   // assume bookmarks are returned at any specific interval, nor may they
   // assume the server will send any BOOKMARK event during a session.
   // If this is not a watch, this field is ignored.
-  // If the feature gate WatchBookmarks is not enabled in apiserver,
-  // this field is ignored.
   // +optional
   optional bool allowWatchBookmarks = 9;
 
