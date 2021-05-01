@@ -1229,7 +1229,7 @@ rules:
         resources: ["tokenreviews"]
     omitStages:
       - "RequestReceived"
-  # Get repsonses can be large; skip them.
+  # Get responses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]
     resources: ${known_apis}
