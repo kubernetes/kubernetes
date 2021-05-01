@@ -19,6 +19,7 @@ package podtemplate
 import (
 	"context"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
@@ -46,7 +47,7 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (podTemplateStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	template := obj.(*api.PodTemplate)
-
+	template.Generation = 1
 	pod.DropDisabledTemplateFields(&template.Template, nil)
 }
 
@@ -77,6 +78,13 @@ func (podTemplateStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 	oldTemplate := old.(*api.PodTemplate)
 
 	pod.DropDisabledTemplateFields(&newTemplate.Template, &oldTemplate.Template)
+
+	// Any changes to the template increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newTemplate.Template, oldTemplate.Template) {
+		newTemplate.Generation = oldTemplate.Generation + 1
+	}
+
 }
 
 // ValidateUpdate is the default update validation for an end user.

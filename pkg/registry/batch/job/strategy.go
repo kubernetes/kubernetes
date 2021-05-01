@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,6 +90,8 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
+	job.Generation = 1
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
@@ -129,6 +132,12 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
+
+	// Any changes to the spec increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newJob.Spec, oldJob.Spec) {
+		newJob.Generation = oldJob.Generation + 1
+	}
 }
 
 // Validate validates a new job.
