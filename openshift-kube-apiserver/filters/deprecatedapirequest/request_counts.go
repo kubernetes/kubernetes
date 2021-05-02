@@ -2,6 +2,7 @@ package deprecatedapirequest
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,7 +38,7 @@ func (c *clusterRequestCounts) Node(nodeName string) *apiRequestCounts {
 	return c.nodeToRequestCount[nodeName]
 }
 
-func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
+func (c *clusterRequestCounts) IncrementRequestCount(node string, resource schema.GroupVersionResource, hour int, user userKey, verb string, count int64) {
 	c.Node(node).IncrementRequestCount(resource, hour, user, verb, count)
 }
 
@@ -87,7 +88,7 @@ func (c *apiRequestCounts) Add(requestCounts *apiRequestCounts) {
 	}
 }
 
-func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user, verb string, count int64) {
+func (c *apiRequestCounts) IncrementRequestCount(resource schema.GroupVersionResource, hour int, user userKey, verb string, count int64) {
 	c.Resource(resource).IncrementRequestCount(hour, user, verb, count)
 }
 
@@ -187,7 +188,7 @@ func (c *resourceRequestCounts) Add(requestCounts *resourceRequestCounts) {
 	}
 }
 
-func (c *resourceRequestCounts) IncrementRequestCount(hour int, user, verb string, count int64) {
+func (c *resourceRequestCounts) IncrementRequestCount(hour int, user userKey, verb string, count int64) {
 	c.Hour(hour).IncrementRequestCount(user, verb, count)
 }
 
@@ -239,16 +240,16 @@ type hourlyRequestCounts struct {
 	// countToSupress is the number of requests to remove from the count to avoid double counting in persistence
 	// TODO I think I'd like this in look-aside data, but I don't see an easy way to plumb it.
 	countToSuppress      int64
-	usersToRequestCounts map[string]*userRequestCounts
+	usersToRequestCounts map[userKey]*userRequestCounts
 }
 
 func newHourlyRequestCounts() *hourlyRequestCounts {
 	return &hourlyRequestCounts{
-		usersToRequestCounts: map[string]*userRequestCounts{},
+		usersToRequestCounts: map[userKey]*userRequestCounts{},
 	}
 }
 
-func (c *hourlyRequestCounts) User(user string) *userRequestCounts {
+func (c *hourlyRequestCounts) User(user userKey) *userRequestCounts {
 	c.lock.RLock()
 	ret, ok := c.usersToRequestCounts[user]
 	c.lock.RUnlock()
@@ -271,11 +272,11 @@ func (c *hourlyRequestCounts) Add(requestCounts *hourlyRequestCounts) {
 	c.countToSuppress += requestCounts.countToSuppress
 }
 
-func (c *hourlyRequestCounts) IncrementRequestCount(user, verb string, count int64) {
+func (c *hourlyRequestCounts) IncrementRequestCount(user userKey, verb string, count int64) {
 	c.User(user).IncrementRequestCount(verb, count)
 }
 
-func (c *hourlyRequestCounts) RemoveUser(user string) {
+func (c *hourlyRequestCounts) RemoveUser(user userKey) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.usersToRequestCounts, user)
@@ -311,20 +312,48 @@ func (c *hourlyRequestCounts) String() string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	keys := []userKey{}
+	for k := range c.usersToRequestCounts {
+		keys = append(keys, k)
+	}
+	sort.Sort(byUserKey(keys))
+
 	mapStrings := []string{}
-	for _, k := range sets.StringKeySet(c.usersToRequestCounts).List() {
+	for _, k := range keys {
 		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.usersToRequestCounts[k].String()))
 	}
 	return fmt.Sprintf("countToSuppress=%d usersToRequestCounts: {%v}", c.countToSuppress, strings.Join(mapStrings, ", "))
 }
 
+type userKey struct {
+	user      string
+	userAgent string
+}
+
+type byUserKey []userKey
+
+func (s byUserKey) Len() int {
+	return len(s)
+}
+func (s byUserKey) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s byUserKey) Less(i, j int) bool {
+	userEquals := strings.Compare(s[i].user, s[j].user)
+	if userEquals != 0 {
+		return userEquals < 0
+	}
+	return strings.Compare(s[i].userAgent, s[j].userAgent) < 0
+}
+
 type userRequestCounts struct {
 	lock                 sync.RWMutex
-	user                 string
+	user                 userKey
 	verbsToRequestCounts map[string]*verbRequestCount
 }
 
-func newUserRequestCounts(user string) *userRequestCounts {
+func newUserRequestCounts(user userKey) *userRequestCounts {
 	return &userRequestCounts{
 		user:                 user,
 		verbsToRequestCounts: map[string]*verbRequestCount{},
@@ -391,7 +420,7 @@ func (c *userRequestCounts) String() string {
 	for _, k := range sets.StringKeySet(c.verbsToRequestCounts).List() {
 		mapStrings = append(mapStrings, fmt.Sprintf("%q: %v", k, c.verbsToRequestCounts[k]))
 	}
-	return fmt.Sprintf("user: %q, verbsToRequestCounts: {%v}", c.user, strings.Join(mapStrings, ", "))
+	return fmt.Sprintf("user: %q, userAgent: %q, verbsToRequestCounts: {%v}", c.user.user, c.user.userAgent, strings.Join(mapStrings, ", "))
 }
 
 type verbRequestCount struct {

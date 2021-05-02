@@ -33,6 +33,7 @@ func WithDeprecatedApiRequestLogging(handler http.Handler, controller deprecated
 			},
 			timestamp,
 			user.GetName(),
+			req.UserAgent(),
 			info.Verb,
 		)
 	})
