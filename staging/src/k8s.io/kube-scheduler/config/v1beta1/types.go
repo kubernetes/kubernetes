@@ -84,6 +84,11 @@ type KubeSchedulerConfiguration struct {
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds,omitempty"`
 
+	// UnschedulableQTimeInterval is the maximum duration of a pod in unschedulableQ.
+	// If specified, it must be greater than 0. If this value is null, the default value (60s)
+	// will be used.
+	UnschedulableQTimeIntervalSeconds *int64 `json:"unschedulableQTimeIntervalSeconds,omitempty"`
+
 	// Profiles are scheduling profiles that kube-scheduler supports. Pods can
 	// choose to be scheduled under a particular profile by setting its associated
 	// scheduler name. Pods that don't specify any scheduler name are scheduled

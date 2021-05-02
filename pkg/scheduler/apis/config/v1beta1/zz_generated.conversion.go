@@ -367,6 +367,9 @@ func autoConvert_v1beta1_KubeSchedulerConfiguration_To_config_KubeSchedulerConfi
 	if err := v1.Convert_Pointer_int64_To_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_Pointer_int64_To_int64(&in.UnschedulableQTimeIntervalSeconds, &out.UnschedulableQTimeIntervalSeconds, s); err != nil {
+		return err
+	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = make([]config.KubeSchedulerProfile, len(*in))
@@ -409,6 +412,9 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1beta1_KubeSchedulerConfi
 		return err
 	}
 	if err := v1.Convert_int64_To_Pointer_int64(&in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_int64_To_Pointer_int64(&in.UnschedulableQTimeIntervalSeconds, &out.UnschedulableQTimeIntervalSeconds, s); err != nil {
 		return err
 	}
 	if in.Profiles != nil {

@@ -155,6 +155,11 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 		*out = new(int64)
 		**out = **in
 	}
+	if in.UnschedulableQTimeIntervalSeconds != nil {
+		in, out := &in.UnschedulableQTimeIntervalSeconds, &out.UnschedulableQTimeIntervalSeconds
+		*out = new(int64)
+		**out = **in
+	}
 	if in.Profiles != nil {
 		in, out := &in.Profiles, &out.Profiles
 		*out = make([]KubeSchedulerProfile, len(*in))

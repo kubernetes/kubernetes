@@ -29,7 +29,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -48,10 +48,6 @@ import (
 )
 
 const (
-	// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
-	// the pod will be moved from unschedulableQ to activeQ.
-	unschedulableQTimeInterval = 60 * time.Second
-
 	queueClosed = "scheduling queue is closed"
 )
 
@@ -64,6 +60,10 @@ const (
 	// for unschedulable pods. To change the default podMaxBackoffDurationSeconds used by the
 	// scheduler, update the ComponentConfig value in defaults.go
 	DefaultPodMaxBackoffDuration time.Duration = 10 * time.Second
+	// DefaultUnschedulableQTimeInterval is the default value for the max duration of a pod
+	// in unschedulableQ. To change the default unschedulableQTimeInterval used by the
+	// scheduler, update the ComponentConfig value in defaults.go
+	DefaultUnschedulableQTimeInterval = 60 * time.Second
 )
 
 // PreEnqueueCheck is a function type. It's used to build functions that
@@ -134,6 +134,10 @@ type PriorityQueue struct {
 	podInitialBackoffDuration time.Duration
 	// pod maximum backoff duration.
 	podMaxBackoffDuration time.Duration
+	// pod maximum duration in unschedulableQ.
+	// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
+	// the pod will be moved from unschedulableQ to activeQ.
+	unschedulableQTimeInterval time.Duration
 
 	lock sync.RWMutex
 	cond sync.Cond
@@ -165,11 +169,12 @@ type PriorityQueue struct {
 }
 
 type priorityQueueOptions struct {
-	clock                     util.Clock
-	podInitialBackoffDuration time.Duration
-	podMaxBackoffDuration     time.Duration
-	podNominator              framework.PodNominator
-	clusterEventMap           map[framework.ClusterEvent]sets.String
+	clock                      util.Clock
+	podInitialBackoffDuration  time.Duration
+	podMaxBackoffDuration      time.Duration
+	unschedulableQTimeInterval time.Duration
+	podNominator               framework.PodNominator
+	clusterEventMap            map[framework.ClusterEvent]sets.String
 }
 
 // Option configures a PriorityQueue
@@ -196,6 +201,13 @@ func WithPodMaxBackoffDuration(duration time.Duration) Option {
 	}
 }
 
+// WithUnschedulableQTimeInterval sets pod max duration in unschdulableQ.
+func WithUnschedulableQTimeInterval(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.unschedulableQTimeInterval = duration
+	}
+}
+
 // WithPodNominator sets pod nominator for PriorityQueue.
 func WithPodNominator(pn framework.PodNominator) Option {
 	return func(o *priorityQueueOptions) {
@@ -211,9 +223,10 @@ func WithClusterEventMap(m map[framework.ClusterEvent]sets.String) Option {
 }
 
 var defaultPriorityQueueOptions = priorityQueueOptions{
-	clock:                     util.RealClock{},
-	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
-	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+	clock:                      util.RealClock{},
+	podInitialBackoffDuration:  DefaultPodInitialBackoffDuration,
+	podMaxBackoffDuration:      DefaultPodMaxBackoffDuration,
+	unschedulableQTimeInterval: DefaultUnschedulableQTimeInterval,
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
@@ -388,7 +401,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	currentTime := p.clock.Now()
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		lastScheduleTime := pInfo.Timestamp
-		if currentTime.Sub(lastScheduleTime) > unschedulableQTimeInterval {
+		if currentTime.Sub(lastScheduleTime) > p.unschedulableQTimeInterval {
 			podsToMove = append(podsToMove, pInfo)
 		}
 	}

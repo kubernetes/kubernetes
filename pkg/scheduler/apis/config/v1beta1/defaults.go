@@ -147,6 +147,11 @@ func SetDefaults_KubeSchedulerConfiguration(obj *v1beta1.KubeSchedulerConfigurat
 		obj.PodMaxBackoffSeconds = &val
 	}
 
+	if obj.UnschedulableQTimeIntervalSeconds == nil {
+		val := int64(60)
+		obj.UnschedulableQTimeIntervalSeconds = &val
+	}
+
 	// Enable profiling by default in the scheduler
 	if obj.EnableProfiling == nil {
 		enableProfiling := true

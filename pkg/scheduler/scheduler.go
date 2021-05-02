@@ -91,11 +91,12 @@ type Scheduler struct {
 }
 
 type schedulerOptions struct {
-	kubeConfig               *restclient.Config
-	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource
-	percentageOfNodesToScore int32
-	podInitialBackoffSeconds int64
-	podMaxBackoffSeconds     int64
+	kubeConfig                        *restclient.Config
+	schedulerAlgorithmSource          schedulerapi.SchedulerAlgorithmSource
+	percentageOfNodesToScore          int32
+	podInitialBackoffSeconds          int64
+	podMaxBackoffSeconds              int64
+	unschedulableQTimeIntervalSeconds int64
 	// Contains out-of-tree plugins to be merged with the in-tree registry.
 	frameworkOutOfTreeRegistry frameworkruntime.Registry
 	profiles                   []schedulerapi.KubeSchedulerProfile
@@ -165,6 +166,13 @@ func WithPodMaxBackoffSeconds(podMaxBackoffSeconds int64) Option {
 	}
 }
 
+// WithUnschedulableQTimeIntervalSeconds sets unscheduleableQTimeIntervalSeconds for Scheduler, the default value is 60
+func WithUnschedulableQTimeIntervalSeconds(unschedulableQTimeIntervalSeconds int64) Option {
+	return func(o *schedulerOptions) {
+		o.unschedulableQTimeIntervalSeconds = unschedulableQTimeIntervalSeconds
+	}
+}
+
 // WithExtenders sets extenders for the Scheduler
 func WithExtenders(e ...schedulerapi.Extender) Option {
 	return func(o *schedulerOptions) {
@@ -190,10 +198,11 @@ var defaultSchedulerOptions = schedulerOptions{
 	schedulerAlgorithmSource: schedulerapi.SchedulerAlgorithmSource{
 		Provider: defaultAlgorithmSourceProviderName(),
 	},
-	percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-	podInitialBackoffSeconds: int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
-	podMaxBackoffSeconds:     int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	parallelism:              int32(parallelize.DefaultParallelism),
+	percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
+	podInitialBackoffSeconds:          int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
+	podMaxBackoffSeconds:              int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
+	unschedulableQTimeIntervalSeconds: int64(internalqueue.DefaultUnschedulableQTimeInterval.Seconds()),
+	parallelism:                       int32(parallelize.DefaultParallelism),
 }
 
 // New returns a Scheduler
@@ -223,21 +232,22 @@ func New(client clientset.Interface,
 	snapshot := internalcache.NewEmptySnapshot()
 
 	configurator := &Configurator{
-		client:                   client,
-		kubeConfig:               options.kubeConfig,
-		recorderFactory:          recorderFactory,
-		informerFactory:          informerFactory,
-		schedulerCache:           schedulerCache,
-		StopEverything:           stopEverything,
-		percentageOfNodesToScore: options.percentageOfNodesToScore,
-		podInitialBackoffSeconds: options.podInitialBackoffSeconds,
-		podMaxBackoffSeconds:     options.podMaxBackoffSeconds,
-		profiles:                 append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
-		registry:                 registry,
-		nodeInfoSnapshot:         snapshot,
-		extenders:                options.extenders,
-		frameworkCapturer:        options.frameworkCapturer,
-		parallellism:             options.parallelism,
+		client:                            client,
+		kubeConfig:                        options.kubeConfig,
+		recorderFactory:                   recorderFactory,
+		informerFactory:                   informerFactory,
+		schedulerCache:                    schedulerCache,
+		StopEverything:                    stopEverything,
+		percentageOfNodesToScore:          options.percentageOfNodesToScore,
+		podInitialBackoffSeconds:          options.podInitialBackoffSeconds,
+		podMaxBackoffSeconds:              options.podMaxBackoffSeconds,
+		unschedulableQTimeIntervalSeconds: options.unschedulableQTimeIntervalSeconds,
+		profiles:                          append([]schedulerapi.KubeSchedulerProfile(nil), options.profiles...),
+		registry:                          registry,
+		nodeInfoSnapshot:                  snapshot,
+		extenders:                         options.extenders,
+		frameworkCapturer:                 options.frameworkCapturer,
+		parallellism:                      options.parallelism,
 	}
 
 	metrics.Register()

@@ -75,6 +75,10 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) u
 		errs = append(errs, field.Invalid(field.NewPath("podMaxBackoffSeconds"),
 			cc.PodMaxBackoffSeconds, "must be greater than or equal to PodInitialBackoffSeconds"))
 	}
+	if cc.UnschedulableQTimeIntervalSeconds <= 0 {
+		errs = append(errs, field.Invalid(field.NewPath("unschedulableQTimeIntervalSeconds"),
+			cc.UnschedulableQTimeIntervalSeconds, "must be greater than 0"))
+	}
 
 	errs = append(errs, validateExtenders(field.NewPath("extenders"), cc.Extenders)...)
 	return utilerrors.Flatten(utilerrors.NewAggregate(errs))

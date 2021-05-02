@@ -27,7 +27,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -1189,7 +1189,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&highPod, "fakePlugin"), q.SchedulingCycle())
 	q.AddUnschedulableIfNotPresent(q.newQueuedPodInfo(&midPod, "fakePlugin"), q.SchedulingCycle())
-	c.Step(unschedulableQTimeInterval + time.Second)
+	c.Step(q.unschedulableQTimeInterval + time.Second)
 	q.flushUnschedulableQLeftover()
 
 	if p, err := q.Pop(); err != nil || p.Pod != &highPod {
@@ -1533,7 +1533,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
 	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(queue.unschedulableQTimeInterval + 1))
 	queue.flushUnschedulableQLeftover()
 	pInfo, err = queue.Pop()
 	if err != nil {
@@ -1553,7 +1553,7 @@ func TestPerPodSchedulingMetrics(t *testing.T) {
 	queue.AddUnschedulableIfNotPresent(pInfo, 1)
 	// Override clock to exceed the unschedulableQTimeInterval so that unschedulable pods
 	// will be moved to activeQ
-	c.SetTime(timestamp.Add(unschedulableQTimeInterval + 1))
+	c.SetTime(timestamp.Add(queue.unschedulableQTimeInterval + 1))
 	queue.flushUnschedulableQLeftover()
 	newPod := pod.DeepCopy()
 	newPod.Generation = 1

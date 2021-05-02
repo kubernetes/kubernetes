@@ -54,9 +54,10 @@ import (
 )
 
 const (
-	podInitialBackoffDurationSeconds = 1
-	podMaxBackoffDurationSeconds     = 10
-	testSchedulerName                = "test-scheduler"
+	podInitialBackoffDurationSeconds  = 1
+	podMaxBackoffDurationSeconds      = 10
+	unschedulableQTimeIntervalSeconds = 60
+	testSchedulerName                 = "test-scheduler"
 )
 
 func TestCreate(t *testing.T) {
@@ -636,13 +637,14 @@ func newConfigFactoryWithFrameworkRegistry(
 	snapshot := internalcache.NewEmptySnapshot()
 	recorderFactory := profile.NewRecorderFactory(events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1()}))
 	return &Configurator{
-		client:                   client,
-		informerFactory:          informerFactory,
-		percentageOfNodesToScore: schedulerapi.DefaultPercentageOfNodesToScore,
-		podInitialBackoffSeconds: podInitialBackoffDurationSeconds,
-		podMaxBackoffSeconds:     podMaxBackoffDurationSeconds,
-		StopEverything:           stopCh,
-		registry:                 registry,
+		client:                            client,
+		informerFactory:                   informerFactory,
+		percentageOfNodesToScore:          schedulerapi.DefaultPercentageOfNodesToScore,
+		podInitialBackoffSeconds:          podInitialBackoffDurationSeconds,
+		podMaxBackoffSeconds:              podMaxBackoffDurationSeconds,
+		unschedulableQTimeIntervalSeconds: unschedulableQTimeIntervalSeconds,
+		StopEverything:                    stopCh,
+		registry:                          registry,
 		profiles: []schedulerapi.KubeSchedulerProfile{
 			{SchedulerName: testSchedulerName},
 		},

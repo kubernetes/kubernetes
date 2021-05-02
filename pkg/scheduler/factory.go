@@ -80,6 +80,8 @@ type Configurator struct {
 
 	podMaxBackoffSeconds int64
 
+	unschedulableQTimeIntervalSeconds int64
+
 	profiles          []schedulerapi.KubeSchedulerProfile
 	registry          frameworkruntime.Registry
 	nodeInfoSnapshot  *internalcache.Snapshot
@@ -161,6 +163,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		c.informerFactory,
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
+		internalqueue.WithUnschedulableQTimeInterval(time.Duration(c.unschedulableQTimeIntervalSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
 		internalqueue.WithClusterEventMap(clusterEventMap),
 	)
