@@ -18,6 +18,7 @@ package nfs
 
 import (
 	"fmt"
+	netutil "k8s.io/utils/net"
 	"os"
 	"runtime"
 	"time"
@@ -121,7 +122,6 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 	if err != nil {
 		return nil, err
 	}
-
 	return &nfsMounter{
 		nfs: &nfs{
 			volName:         spec.Name(),
@@ -130,7 +130,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *v1.Pod, moun
 			plugin:          plugin,
 			MetricsProvider: volume.NewMetricsStatFS(getPath(pod.UID, spec.Name(), plugin.host)),
 		},
-		server:       source.Server,
+		server:       getServerFromSource(source),
 		exportPath:   source.Path,
 		readOnly:     readOnly,
 		mountOptions: util.MountOptionFromSpec(spec),
@@ -321,4 +321,11 @@ func getVolumeSource(spec *volume.Spec) (*v1.NFSVolumeSource, bool, error) {
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a NFS volume type")
+}
+
+func getServerFromSource(source *v1.NFSVolumeSource) string {
+	if netutil.IsIPv6String(source.Server) {
+		return fmt.Sprintf("[%s]", source.Server)
+	}
+	return source.Server
 }
