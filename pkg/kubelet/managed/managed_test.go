@@ -24,7 +24,7 @@ func TestStaticPodManaged(t *testing.T) {
 					UID:       "12345",
 					Namespace: "mynamespace",
 					Annotations: map[string]string{
-						"workload.openshift.io/management": "",
+						"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
 					},
 				},
 				Spec: v1.PodSpec{
@@ -47,8 +47,8 @@ func TestStaticPodManaged(t *testing.T) {
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"workload.openshift.io/management":                 "",
-				"io.openshift.workload.management.cpushares/nginx": "102",
+				"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/nginx":   `{"cpushares":102}`,
 			},
 		},
 		{
@@ -62,7 +62,7 @@ func TestStaticPodManaged(t *testing.T) {
 					UID:       "12345",
 					Namespace: "mynamespace",
 					Annotations: map[string]string{
-						"workload.openshift.io/management": "",
+						"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
 					},
 				},
 				Spec: v1.PodSpec{
@@ -105,21 +105,21 @@ func TestStaticPodManaged(t *testing.T) {
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"workload.openshift.io/management":               "",
-				"io.openshift.workload.management.cpushares/c1":  "102",
-				"io.openshift.workload.management.cpushares/c2":  "1024",
-				"io.openshift.workload.management.cpushares/c_3": "1024",
+				"target.workload.openshift.io/management": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/c1":      `{"cpushares":102}`,
+				"resources.workload.openshift.io/c2":      `{"cpushares":1024}`,
+				"resources.workload.openshift.io/c_3":     `{"cpushares":1024}`,
 			},
 		},
 	}
 
 	for _, tc := range testCases {
-		enabled, workloadName := ModifyStaticPodForPinnedManagement(tc.pod)
-		if !enabled {
-			t.Error("pod should be enabled")
+		pod, workloadName, err := ModifyStaticPodForPinnedManagement(tc.pod)
+		if err != nil {
+			t.Errorf("ModifyStaticPodForPinned should not error")
 		}
 		for expectedKey, expectedValue := range tc.expectedAnnotations {
-			value, exists := tc.pod.Annotations[expectedKey]
+			value, exists := pod.Annotations[expectedKey]
 			if !exists {
 				t.Errorf("%v key not found", expectedKey)
 			}
@@ -127,7 +127,7 @@ func TestStaticPodManaged(t *testing.T) {
 				t.Errorf("'%v' key's value does not equal '%v' and got '%v'", expectedKey, expectedValue, value)
 			}
 		}
-		for _, container := range tc.pod.Spec.Containers {
+		for _, container := range pod.Spec.Containers {
 			if container.Resources.Requests.Cpu().String() != "0" {
 				t.Errorf("cpu requests should be 0 got %v", container.Resources.Requests.Cpu().String())
 			}
@@ -136,6 +136,9 @@ func TestStaticPodManaged(t *testing.T) {
 			}
 			if _, exists := container.Resources.Requests[GenerateResourceName(workloadName)]; !exists {
 				t.Errorf("managed capacity label missing from pod %v and container %v", tc.pod.Name, container.Name)
+			}
+			if _, exists := container.Resources.Limits[GenerateResourceName(workloadName)]; !exists {
+				t.Errorf("managed capacity label missing from pod %v and container %v limits", tc.pod.Name, container.Name)
 			}
 		}
 	}
@@ -157,7 +160,7 @@ func TestStaticPodThrottle(t *testing.T) {
 					UID:       "12345",
 					Namespace: "mynamespace",
 					Annotations: map[string]string{
-						"workload.openshift.io/throttle": "",
+						"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
 					},
 				},
 				Spec: v1.PodSpec{
@@ -180,8 +183,8 @@ func TestStaticPodThrottle(t *testing.T) {
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"workload.openshift.io/throttle":                 "",
-				"io.openshift.workload.throttle.cpushares/nginx": "102",
+				"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/nginx": `{"cpushares":102}`,
 			},
 		},
 		{
@@ -195,7 +198,7 @@ func TestStaticPodThrottle(t *testing.T) {
 					UID:       "12345",
 					Namespace: "mynamespace",
 					Annotations: map[string]string{
-						"workload.openshift.io/throttle": "",
+						"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
 					},
 				},
 				Spec: v1.PodSpec{
@@ -238,21 +241,21 @@ func TestStaticPodThrottle(t *testing.T) {
 				},
 			},
 			expectedAnnotations: map[string]string{
-				"workload.openshift.io/throttle":               "",
-				"io.openshift.workload.throttle.cpushares/c1":  "102",
-				"io.openshift.workload.throttle.cpushares/c2":  "1024",
-				"io.openshift.workload.throttle.cpushares/c_3": "1024",
+				"target.workload.openshift.io/throttle": `{"effect": "PreferredDuringScheduling"}`,
+				"resources.workload.openshift.io/c1":    `{"cpushares":102}`,
+				"resources.workload.openshift.io/c2":    `{"cpushares":1024}`,
+				"resources.workload.openshift.io/c_3":   `{"cpushares":1024}`,
 			},
 		},
 	}
 
 	for _, tc := range testCases {
-		enabled, workloadName := ModifyStaticPodForPinnedManagement(tc.pod)
-		if !enabled {
-			t.Error("pod should be enabled")
+		pod, workloadName, err := ModifyStaticPodForPinnedManagement(tc.pod)
+		if err != nil {
+			t.Errorf("ModifyStaticPodForPinned should not error")
 		}
 		for expectedKey, expectedValue := range tc.expectedAnnotations {
-			value, exists := tc.pod.Annotations[expectedKey]
+			value, exists := pod.Annotations[expectedKey]
 			if !exists {
 				t.Errorf("%v key not found", expectedKey)
 			}
@@ -260,7 +263,7 @@ func TestStaticPodThrottle(t *testing.T) {
 				t.Errorf("'%v' key's value does not equal '%v' and got '%v'", expectedKey, expectedValue, value)
 			}
 		}
-		for _, container := range tc.pod.Spec.Containers {
+		for _, container := range pod.Spec.Containers {
 			if container.Resources.Requests.Cpu().String() != "0" {
 				t.Errorf("cpu requests should be 0 got %v", container.Resources.Requests.Cpu().String())
 			}
@@ -269,6 +272,9 @@ func TestStaticPodThrottle(t *testing.T) {
 			}
 			if _, exists := container.Resources.Requests[GenerateResourceName(workloadName)]; !exists {
 				t.Errorf("managed capacity label missing from pod %v and container %v", tc.pod.Name, container.Name)
+			}
+			if _, exists := container.Resources.Limits[GenerateResourceName(workloadName)]; !exists {
+				t.Errorf("managed limits capacity label missing from pod %v and container %v", tc.pod.Name, container.Name)
 			}
 		}
 	}

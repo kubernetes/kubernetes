@@ -171,7 +171,7 @@ func (m *qosContainerManagerImpl) setCPUCgroupConfig(configs map[v1.PodQOSClass]
 	burstablePodCPURequest := int64(0)
 	for i := range pods {
 		pod := pods[i]
-		if enabled, _ := managed.IsPodManaged(pod); enabled {
+		if enabled, _, _ := managed.IsPodManaged(pod); enabled {
 			continue
 		}
 		qosClass := v1qos.GetPodQOS(pod)
