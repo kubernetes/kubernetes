@@ -234,7 +234,7 @@ func (cache *schedulerCache) UpdateSnapshot(nodeSnapshot *Snapshot) error {
 			existing, ok := nodeSnapshot.nodeInfoMap[np.Name]
 			if !ok {
 				updateAllLists = true
-				existing = &framework.NodeInfo{}
+				existing = cache.newNodeInfo()
 				nodeSnapshot.nodeInfoMap[np.Name] = existing
 			}
 			clone := node.info.Clone()
