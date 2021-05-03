@@ -2166,7 +2166,7 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Completions:\t<unset>\n")
 		}
 		if job.Spec.CompletionMode != nil {
-			w.Write(LEVEL_0, "Completion Mode:\t%s\n", job.Spec.CompletionMode)
+			w.Write(LEVEL_0, "Completion Mode:\t%s\n", *job.Spec.CompletionMode)
 		}
 		if job.Status.StartTime != nil {
 			w.Write(LEVEL_0, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
