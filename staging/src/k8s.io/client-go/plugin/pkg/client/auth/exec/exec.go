@@ -479,7 +479,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 //
 // It must be called while holding the Authenticator's mutex.
 func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
-	switch err.(type) {
+	switch err := err.(type) {
 	case *exec.Error: // Binary does not exist (see exec.Error).
 		builder := strings.Builder{}
 		fmt.Fprintf(&builder, "exec: executable %s not found", a.cmd)
@@ -494,11 +494,10 @@ func (a *Authenticator) wrapCmdRunErrorLocked(err error) error {
 		return errors.New(builder.String())
 
 	case *exec.ExitError: // Binary execution failed (see exec.Cmd.Run()).
-		e := err.(*exec.ExitError)
 		return fmt.Errorf(
 			"exec: executable %s failed with exit code %d",
 			a.cmd,
-			e.ProcessState.ExitCode(),
+			err.ProcessState.ExitCode(),
 		)
 
 	default:

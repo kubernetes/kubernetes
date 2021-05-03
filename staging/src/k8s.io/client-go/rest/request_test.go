@@ -47,7 +47,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -924,13 +923,6 @@ func TestTransformUnstructuredError(t *testing.T) {
 	}
 }
 
-type errorReader struct {
-	err error
-}
-
-func (r errorReader) Read(data []byte) (int, error) { return 0, r.err }
-func (r errorReader) Close() error                  { return nil }
-
 func TestRequestWatch(t *testing.T) {
 	testCases := []struct {
 		Request *Request
@@ -1187,10 +1179,7 @@ func TestRequestStream(t *testing.T) {
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
-				if err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]" {
-					return true
-				}
-				return false
+				return err.Error() == "a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]"
 			},
 		},
 	}
@@ -1211,40 +1200,6 @@ func TestRequestStream(t *testing.T) {
 			}
 		}
 	}
-}
-
-type fakeUpgradeConnection struct{}
-
-func (c *fakeUpgradeConnection) CreateStream(headers http.Header) (httpstream.Stream, error) {
-	return nil, nil
-}
-func (c *fakeUpgradeConnection) Close() error {
-	return nil
-}
-func (c *fakeUpgradeConnection) CloseChan() <-chan bool {
-	return make(chan bool)
-}
-func (c *fakeUpgradeConnection) SetIdleTimeout(timeout time.Duration) {
-}
-
-type fakeUpgradeRoundTripper struct {
-	req  *http.Request
-	conn httpstream.Connection
-}
-
-func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	f.req = req
-	b := []byte{}
-	body := ioutil.NopCloser(bytes.NewReader(b))
-	resp := &http.Response{
-		StatusCode: http.StatusSwitchingProtocols,
-		Body:       body,
-	}
-	return resp, nil
-}
-
-func (f *fakeUpgradeRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
-	return f.conn, nil
 }
 
 func TestRequestDo(t *testing.T) {
@@ -1332,7 +1287,6 @@ func TestBackoffLifecycle(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusGatewayTimeout)
-		return
 	}))
 	defer testServer.Close()
 	c := testRESTClient(t, testServer)

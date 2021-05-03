@@ -277,10 +277,10 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 }
 
 var fakeDialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
-	return nil, fakeDialerError
+	return nil, errFakeDialer
 }
 
-var fakeDialerError = errors.New("fakedialer")
+var errFakeDialer = errors.New("fakedialer")
 
 func fakeProxyFunc(*http.Request) (*url.URL, error) {
 	return nil, errors.New("fakeproxy")
@@ -289,10 +289,10 @@ func fakeProxyFunc(*http.Request) (*url.URL, error) {
 type fakeAuthProviderConfigPersister struct{}
 
 func (fakeAuthProviderConfigPersister) Persist(map[string]string) error {
-	return fakeAuthProviderConfigPersisterError
+	return errorFakeAuthProviderConfigPersister
 }
 
-var fakeAuthProviderConfigPersisterError = errors.New("fakeAuthProviderConfigPersisterError")
+var errorFakeAuthProviderConfigPersister = errors.New("errorFakeAuthProviderConfigPersister")
 
 func TestAnonymousConfig(t *testing.T) {
 	f := fuzz.New().NilChance(0.0).NumElements(1, 1)

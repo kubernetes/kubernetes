@@ -352,7 +352,7 @@ Loop:
 		case eof, '\n':
 			return fmt.Errorf("unterminated filter")
 		case '"', '\'':
-			if begin == false {
+			if !begin {
 				//save the paired rune
 				begin = true
 				pair = r

@@ -257,17 +257,7 @@ func (c TLSClientConfig) GoString() string {
 // String implements fmt.Stringer and sanitizes sensitive fields of
 // TLSClientConfig to prevent accidental leaking via logs.
 func (c TLSClientConfig) String() string {
-	cc := sanitizedTLSClientConfig{
-		Insecure:   c.Insecure,
-		ServerName: c.ServerName,
-		CertFile:   c.CertFile,
-		KeyFile:    c.KeyFile,
-		CAFile:     c.CAFile,
-		CertData:   c.CertData,
-		KeyData:    c.KeyData,
-		CAData:     c.CAData,
-		NextProtos: c.NextProtos,
-	}
+	cc := sanitizedTLSClientConfig(c)
 	// Explicitly mark non-empty credential fields as redacted.
 	if len(cc.CertData) != 0 {
 		cc.CertData = []byte("--- TRUNCATED ---")

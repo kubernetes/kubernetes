@@ -446,7 +446,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		{
 			levels: []DebugLevel{DebugRequestHeaders},
 			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Request Headers:\n")}
+				lines := []string{"Request Headers:\n"}
 				for key, values := range req.Header {
 					for _, value := range values {
 						if key == "Authorization" {
@@ -461,7 +461,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		{
 			levels: []DebugLevel{DebugResponseHeaders},
 			expectedOutputLines: func() []string {
-				lines := []string{fmt.Sprintf("Response Headers:\n")}
+				lines := []string{"Response Headers:\n"}
 				for key, values := range res.Header {
 					for _, value := range values {
 						lines = append(lines, fmt.Sprintf("    %s: %s\n", key, value))
@@ -480,7 +480,7 @@ func TestDebuggingRoundTripper(t *testing.T) {
 		},
 		{
 			levels:              []DebugLevel{DebugCurlCommand},
-			expectedOutputLines: []string{fmt.Sprintf("curl -k -v -X")},
+			expectedOutputLines: []string{"curl -k -v -X"},
 		},
 	}
 

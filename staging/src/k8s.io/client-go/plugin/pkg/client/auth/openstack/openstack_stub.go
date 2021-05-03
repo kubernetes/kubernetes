@@ -25,7 +25,7 @@ import (
 
 func init() {
 	if err := rest.RegisterAuthProviderPlugin("openstack", newOpenstackAuthProvider); err != nil {
-		klog.Fatalf("Failed to register openstack auth plugin: %s", err)
+		klog.Fatalf("failed to register openstack auth plugin: %s", err)
 	}
 }
 

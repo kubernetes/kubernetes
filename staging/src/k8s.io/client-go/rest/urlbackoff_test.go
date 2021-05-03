@@ -66,9 +66,9 @@ func TestURLBackoffFunctionality(t *testing.T) {
 	}
 
 	for i, sec := range seconds {
-		backoffSec := myBackoff.CalculateBackoff(parse("http://1.2.3.4:100"))
-		if backoffSec < time.Duration(sec)*time.Second || backoffSec > time.Duration(sec+5)*time.Second {
-			t.Errorf("Backoff out of range %v: %v %v", i, sec, backoffSec)
+		backoffDuration := myBackoff.CalculateBackoff(parse("http://1.2.3.4:100"))
+		if backoffDuration < time.Duration(sec)*time.Second || backoffDuration > time.Duration(sec+5)*time.Second {
+			t.Errorf("Backoff out of range %v: %v %v", i, sec, backoffDuration)
 		}
 		myBackoff.UpdateBackoff(parse("http://1.2.3.4:100/responseCodeForFuncTest"), nil, returnCodes[i])
 	}
