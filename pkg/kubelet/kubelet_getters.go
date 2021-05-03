@@ -246,6 +246,28 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
 		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			// Confirmed that ephemeral-storage failure is not a result of an "initial node" object representation, e.g:
+			/*
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.637841    2453 plugin_manager.go:114] "Starting Kubelet Plugin Manager"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.722598    2453 kubelet_network_linux.go:56] "Initialized protocol iptables rules." protocol=IPv4
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.789541    2453 kubelet_network_linux.go:56] "Initialized protocol iptables rules." protocol=IPv6
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.789586    2453 status_manager.go:157] "Starting to sync pod status with apiserver"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.789607    2453 kubelet.go:1846] "Starting kubelet main sync loop"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: E0503 21:51:51.789662    2453 kubelet.go:1870] "Skipping pod synchronization" err="PLEG is not healthy: pleg has yet to be successful"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.889782    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.889829    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.889922    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.889942    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.889992    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890008    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890088    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890118    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890204    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890275    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890365    2453 topology_manager.go:187] "Topology Admit Handler"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890393    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
+			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890526    2453 predicate.go:113] "Failed to admit pod, unexpected error while attempting to recover from admission failure" pod="kube-system/etcd-capz-conf-ulw45w-control-plane-jfj9m" err="preemption: error finding a set of pods to preempt: no set of running pods found to reclaim resources: [(res: ephemeral-storage, q: 104857600), ]"
+			*/
 			klog.InfoS("Definitely got a real node", "node", n.Name)
 			return n, nil
 		}

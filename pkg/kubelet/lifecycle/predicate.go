@@ -71,7 +71,11 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	admitPod := attrs.Pod
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
+	klog.Infof("Requested Ephemeral Storage after creating nodeInfo object for fit: %s", nodeInfo.Requested.EphemeralStorage)
+	klog.Infof("Allocatable Ephemeral Storage after creating nodeInfo object: %s", nodeInfo.Allocatable.EphemeralStorage)
 	nodeInfo.SetNode(node)
+	klog.Infof("Requested Ephemeral Storage after invoking nodeinfo.SetNode(node): %s", nodeInfo.Requested.EphemeralStorage)
+	klog.Infof("Allocatable Ephemeral Storage after invoking nodeinfo.SetNode(node): %s", nodeInfo.Allocatable.EphemeralStorage)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
@@ -82,6 +86,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 			Message: message,
 		}
 	}
+	klog.Infof("Requested Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %s", nodeInfo.Requested.EphemeralStorage)
+	klog.Infof("Allocatable Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %s", nodeInfo.Allocatable.EphemeralStorage)
 
 	// Remove the requests of the extended resources that are missing in the
 	// node info. This is required to support cluster-level resources, which
@@ -95,6 +101,8 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 
 	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0 && err == nil
+	klog.Infof("Requested Ephemeral Storage after checking for fit: %s", nodeInfo.Requested.EphemeralStorage)
+	klog.Infof("Allocatable Ephemeral Storage after checking for fit: %s", nodeInfo.Allocatable.EphemeralStorage)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		klog.InfoS("Failed to admit pod, GeneralPredicates failed", "pod", klog.KObj(admitPod), "err", err)
@@ -109,6 +117,10 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		fit = len(reasons) == 0 && err == nil
 		if err != nil {
 			message := fmt.Sprintf("Unexpected error while attempting to recover from admission failure: %v", err)
+			// This is the error outcome we are debugging, e.g.:
+			/*
+				May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890526    2453 predicate.go:113] "Failed to admit pod, unexpected error while attempting to recover from admission failure" pod="kube-system/etcd-capz-conf-ulw45w-control-plane-jfj9m" err="preemption: error finding a set of pods to preempt: no set of running pods found to reclaim resources: [(res: ephemeral-storage, q: 104857600), ]"
+			*/
 			klog.InfoS("Failed to admit pod, unexpected error while attempting to recover from admission failure", "pod", klog.KObj(admitPod), "err", err)
 			return PodAdmitResult{
 				Admit:   fit,
