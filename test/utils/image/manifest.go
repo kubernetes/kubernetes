@@ -30,18 +30,19 @@ import (
 
 // RegistryList holds public and private image registries
 type RegistryList struct {
-	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
-	E2eRegistry             string `yaml:"e2eRegistry"`
-	PromoterE2eRegistry     string `yaml:"promoterE2eRegistry"`
-	BuildImageRegistry      string `yaml:"buildImageRegistry"`
-	InvalidRegistry         string `yaml:"invalidRegistry"`
-	GcEtcdRegistry          string `yaml:"gcEtcdRegistry"`
-	GcRegistry              string `yaml:"gcRegistry"`
-	SigStorageRegistry      string `yaml:"sigStorageRegistry"`
-	GcrReleaseRegistry      string `yaml:"gcrReleaseRegistry"`
-	PrivateRegistry         string `yaml:"privateRegistry"`
-	SampleRegistry          string `yaml:"sampleRegistry"`
-	MicrosoftRegistry       string `yaml:"microsoftRegistry"`
+	GcAuthenticatedRegistry  string `yaml:"gcAuthenticatedRegistry"`
+	E2eRegistry              string `yaml:"e2eRegistry"`
+	PromoterE2eRegistry      string `yaml:"promoterE2eRegistry"`
+	BuildImageRegistry       string `yaml:"buildImageRegistry"`
+	InvalidRegistry          string `yaml:"invalidRegistry"`
+	GcEtcdRegistry           string `yaml:"gcEtcdRegistry"`
+	GcRegistry               string `yaml:"gcRegistry"`
+	SigStorageRegistry       string `yaml:"sigStorageRegistry"`
+	SigStorageCanaryRegistry string `yaml:"sigStorageCanaryRegistry"`
+	GcrReleaseRegistry       string `yaml:"gcrReleaseRegistry"`
+	PrivateRegistry          string `yaml:"privateRegistry"`
+	SampleRegistry           string `yaml:"sampleRegistry"`
+	MicrosoftRegistry        string `yaml:"microsoftRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -68,18 +69,19 @@ func (i *Config) SetVersion(version string) {
 
 func initReg() RegistryList {
 	registry := RegistryList{
-		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:      "k8s.gcr.io/build-image",
-		InvalidRegistry:         "invalid.com/invalid",
-		GcEtcdRegistry:          "k8s.gcr.io",
-		GcRegistry:              "k8s.gcr.io",
-		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
-		SampleRegistry:          "gcr.io/google-samples",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
-		MicrosoftRegistry:       "mcr.microsoft.com",
+		GcAuthenticatedRegistry:  "gcr.io/authenticated-image-pulling",
+		E2eRegistry:              "gcr.io/kubernetes-e2e-test-images",
+		PromoterE2eRegistry:      "k8s.gcr.io/e2e-test-images",
+		BuildImageRegistry:       "k8s.gcr.io/build-image",
+		InvalidRegistry:          "invalid.com/invalid",
+		GcEtcdRegistry:           "k8s.gcr.io",
+		GcRegistry:               "k8s.gcr.io",
+		SigStorageRegistry:       "k8s.gcr.io/sig-storage",
+		SigStorageCanaryRegistry: "gcr.io/k8s-staging-sig-storage",
+		PrivateRegistry:          "gcr.io/k8s-authenticated-test",
+		SampleRegistry:           "gcr.io/google-samples",
+		GcrReleaseRegistry:       "gcr.io/gke-release",
+		MicrosoftRegistry:        "mcr.microsoft.com",
 	}
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
@@ -105,18 +107,19 @@ var (
 	PrivateRegistry = registry.PrivateRegistry
 
 	// Preconfigured image configs
-	dockerLibraryRegistry   = "docker.io/library"
-	e2eRegistry             = registry.E2eRegistry
-	promoterE2eRegistry     = registry.PromoterE2eRegistry
-	buildImageRegistry      = registry.BuildImageRegistry
-	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
-	gcEtcdRegistry          = registry.GcEtcdRegistry
-	gcRegistry              = registry.GcRegistry
-	sigStorageRegistry      = registry.SigStorageRegistry
-	gcrReleaseRegistry      = registry.GcrReleaseRegistry
-	invalidRegistry         = registry.InvalidRegistry
-	sampleRegistry          = registry.SampleRegistry
-	microsoftRegistry       = registry.MicrosoftRegistry
+	dockerLibraryRegistry    = "docker.io/library"
+	e2eRegistry              = registry.E2eRegistry
+	promoterE2eRegistry      = registry.PromoterE2eRegistry
+	buildImageRegistry       = registry.BuildImageRegistry
+	gcAuthenticatedRegistry  = registry.GcAuthenticatedRegistry
+	gcEtcdRegistry           = registry.GcEtcdRegistry
+	gcRegistry               = registry.GcRegistry
+	sigStorageRegistry       = registry.SigStorageRegistry
+	sigStorageCanaryRegistry = registry.SigStorageCanaryRegistry
+	gcrReleaseRegistry       = registry.GcrReleaseRegistry
+	invalidRegistry          = registry.InvalidRegistry
+	sampleRegistry           = registry.SampleRegistry
+	microsoftRegistry        = registry.MicrosoftRegistry
 
 	imageConfigs, originalImageConfigs = initImageConfigs()
 )
@@ -393,6 +396,8 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 		registryAndUser = gcRegistry
 	case "k8s.gcr.io/sig-storage":
 		registryAndUser = sigStorageRegistry
+	case "gcr.io/k8s-staging-sig-storage":
+		registryAndUser = sigStorageCanaryRegistry
 	case "gcr.io/k8s-authenticated-test":
 		registryAndUser = PrivateRegistry
 	case "gcr.io/google-samples":
