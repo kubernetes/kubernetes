@@ -332,6 +332,7 @@ func addCacheInfo(sysFs sysfs.SysFs, node *info.Node) error {
 
 		for _, cache := range caches {
 			c := info.Cache{
+				Id:    cache.Id,
 				Size:  cache.Size,
 				Level: cache.Level,
 				Type:  cache.Type,

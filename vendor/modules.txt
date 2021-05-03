@@ -153,15 +153,16 @@ github.com/chai2010/gettext-go/gettext
 github.com/chai2010/gettext-go/gettext/mo
 github.com/chai2010/gettext-go/gettext/plural
 github.com/chai2010/gettext-go/gettext/po
-# github.com/checkpoint-restore/go-criu/v4 v4.1.0 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
-github.com/checkpoint-restore/go-criu/v4
-github.com/checkpoint-restore/go-criu/v4/rpc
-# github.com/cilium/ebpf v0.2.0 => github.com/cilium/ebpf v0.2.0
+# github.com/checkpoint-restore/go-criu/v5 v5.0.0 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
+github.com/checkpoint-restore/go-criu/v5
+github.com/checkpoint-restore/go-criu/v5/rpc
+# github.com/cilium/ebpf v0.5.0 => github.com/cilium/ebpf v0.2.0
 github.com/cilium/ebpf
 github.com/cilium/ebpf/asm
 github.com/cilium/ebpf/internal
 github.com/cilium/ebpf/internal/btf
 github.com/cilium/ebpf/internal/unix
+github.com/cilium/ebpf/link
 # github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313 => github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 ## explicit
 github.com/clusterhq/flocker-go
@@ -170,7 +171,7 @@ github.com/clusterhq/flocker-go
 github.com/container-storage-interface/spec/lib/go/csi
 # github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59 => github.com/containerd/cgroups v0.0.0-20200531161412-0dbf7f05ba59
 github.com/containerd/cgroups/stats/v1
-# github.com/containerd/console v1.0.1 => github.com/containerd/console v1.0.1
+# github.com/containerd/console v1.0.2 => github.com/containerd/console v1.0.1
 github.com/containerd/console
 # github.com/containerd/containerd v1.4.4 => github.com/containerd/containerd v1.4.4
 github.com/containerd/containerd/api/services/containers/v1
@@ -210,7 +211,7 @@ github.com/coreos/go-semver/semver
 github.com/coreos/go-systemd/daemon
 github.com/coreos/go-systemd/journal
 github.com/coreos/go-systemd/util
-# github.com/coreos/go-systemd/v22 v22.1.0 => github.com/coreos/go-systemd/v22 v22.1.0
+# github.com/coreos/go-systemd/v22 v22.3.1 => github.com/coreos/go-systemd/v22 v22.3.1
 github.com/coreos/go-systemd/v22/dbus
 # github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 ## explicit
@@ -308,7 +309,7 @@ github.com/go-openapi/swag
 ## explicit
 github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
-# github.com/godbus/dbus/v5 v5.0.3 => github.com/godbus/dbus/v5 v5.0.3
+# github.com/godbus/dbus/v5 v5.0.4 => github.com/godbus/dbus/v5 v5.0.3
 ## explicit
 github.com/godbus/dbus/v5
 # github.com/gofrs/uuid v4.0.0+incompatible => github.com/gofrs/uuid v4.0.0+incompatible
@@ -363,7 +364,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
-# github.com/google/cadvisor v0.39.0 => github.com/google/cadvisor v0.39.0
+# github.com/google/cadvisor v0.39.1-0.20210428114308-7990be24366a => github.com/google/cadvisor v0.39.1-0.20210428114308-7990be24366a
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -563,7 +564,7 @@ github.com/moby/ipvs
 # github.com/moby/spdystream v0.2.0 => github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
-# github.com/moby/sys/mountinfo v0.4.0 => github.com/moby/sys/mountinfo v0.4.0
+# github.com/moby/sys/mountinfo v0.4.1 => github.com/moby/sys/mountinfo v0.4.0
 github.com/moby/sys/mountinfo
 # github.com/moby/term v0.0.0-20201216013528-df9cb8a40635 => github.com/moby/term v0.0.0-20201216013528-df9cb8a40635
 github.com/moby/term
@@ -639,7 +640,7 @@ github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1 => github.com/opencontainers/image-spec v1.0.1
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
-# github.com/opencontainers/runc v1.0.0-rc93 => github.com/opencontainers/runc v1.0.0-rc93
+# github.com/opencontainers/runc v1.0.0-rc93.0.20210501152339-d279ebd97d88 => github.com/opencontainers/runc v1.0.0-rc93.0.20210501152339-d279ebd97d88
 ## explicit
 github.com/opencontainers/runc/libcontainer
 github.com/opencontainers/runc/libcontainer/apparmor
@@ -663,9 +664,10 @@ github.com/opencontainers/runc/libcontainer/seccomp/patchbpf
 github.com/opencontainers/runc/libcontainer/stacktrace
 github.com/opencontainers/runc/libcontainer/system
 github.com/opencontainers/runc/libcontainer/user
+github.com/opencontainers/runc/libcontainer/userns
 github.com/opencontainers/runc/libcontainer/utils
 github.com/opencontainers/runc/types
-# github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d => github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
+# github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417 => github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 github.com/opencontainers/runtime-spec/specs-go
 # github.com/opencontainers/selinux v1.8.0 => github.com/opencontainers/selinux v1.8.0
 ## explicit
@@ -2379,6 +2381,7 @@ sigs.k8s.io/yaml
 # github.com/cespare/xxhash/v2 => github.com/cespare/xxhash/v2 v2.1.1
 # github.com/chai2010/gettext-go => github.com/chai2010/gettext-go v0.0.0-20160711120539-c6fed771bfd5
 # github.com/checkpoint-restore/go-criu/v4 => github.com/checkpoint-restore/go-criu/v4 v4.1.0
+# github.com/checkpoint-restore/go-criu/v5 => github.com/checkpoint-restore/go-criu/v5 v5.0.0
 # github.com/cheekybits/genny => github.com/cheekybits/genny v0.0.0-20170328200008-9127e812e1e9
 # github.com/chzyer/logex => github.com/chzyer/logex v1.1.10
 # github.com/chzyer/readline => github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
@@ -2402,7 +2405,7 @@ sigs.k8s.io/yaml
 # github.com/coreos/go-oidc => github.com/coreos/go-oidc v2.1.0+incompatible
 # github.com/coreos/go-semver => github.com/coreos/go-semver v0.3.0
 # github.com/coreos/go-systemd => github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
-# github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.1.0
+# github.com/coreos/go-systemd/v22 => github.com/coreos/go-systemd/v22 v22.3.1
 # github.com/coreos/pkg => github.com/coreos/pkg v0.0.0-20180928190104-399ea9e2e55f
 # github.com/cpuguy83/go-md2man/v2 => github.com/cpuguy83/go-md2man/v2 v2.0.0
 # github.com/creack/pty => github.com/creack/pty v1.1.11
@@ -2462,7 +2465,7 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.39.1-0.20210428114308-7990be24366a
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.2
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian => github.com/google/martian v2.1.0+incompatible
@@ -2572,7 +2575,7 @@ sigs.k8s.io/yaml
 # github.com/onsi/gomega => github.com/onsi/gomega v1.7.0
 # github.com/opencontainers/go-digest => github.com/opencontainers/go-digest v1.0.0
 # github.com/opencontainers/image-spec => github.com/opencontainers/image-spec v1.0.1
-# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc93
+# github.com/opencontainers/runc => github.com/opencontainers/runc v1.0.0-rc93.0.20210501152339-d279ebd97d88
 # github.com/opencontainers/runtime-spec => github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 # github.com/opencontainers/selinux => github.com/opencontainers/selinux v1.8.0
 # github.com/pascaldekloe/goe => github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c

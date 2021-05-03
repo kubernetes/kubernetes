@@ -24,7 +24,7 @@ func (s *NameGroup) Apply(path string, d *cgroupData) error {
 	return nil
 }
 
-func (s *NameGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *NameGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 

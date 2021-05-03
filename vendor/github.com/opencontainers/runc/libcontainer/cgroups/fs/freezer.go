@@ -12,6 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,9 +27,18 @@ func (s *FreezerGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
-	switch cgroup.Resources.Freezer {
+func (s *FreezerGroup) Set(path string, r *configs.Resources) (Err error) {
+	switch r.Freezer {
 	case configs.Frozen:
+		defer func() {
+			if Err != nil {
+				// Freezing failed, and it is bad and dangerous
+				// to leave the cgroup in FROZEN or FREEZING
+				// state, so (try to) thaw it back.
+				_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
+			}
+		}()
+
 		// As per older kernel docs (freezer-subsystem.txt before
 		// kernel commit ef9fe980c6fcc1821), if FREEZING is seen,
 		// userspace should either retry or thaw. While current
@@ -38,13 +48,19 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 		// (either via fork/clone or by writing new PIDs to
 		// cgroup.procs).
 		//
-		// The number of retries below is chosen to have a decent
-		// chance to succeed even in the worst case scenario (runc
-		// pause/unpause with parallel runc exec).
+		// The numbers below are chosen to have a decent chance to
+		// succeed even in the worst case scenario (runc pause/unpause
+		// with parallel runc exec).
 		//
 		// Adding any amount of sleep in between retries did not
 		// increase the chances of successful freeze.
 		for i := 0; i < 1000; i++ {
+			if i%50 == 49 {
+				// Briefly thawing the cgroup also helps.
+				_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
+				time.Sleep(10 * time.Millisecond)
+			}
+
 			if err := fscommon.WriteFile(path, "freezer.state", string(configs.Frozen)); err != nil {
 				return err
 			}
@@ -58,6 +74,9 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 			case "FREEZING":
 				continue
 			case string(configs.Frozen):
+				if i > 1 {
+					logrus.Debugf("frozen after %d retries", i)
+				}
 				return nil
 			default:
 				// should never happen
@@ -65,16 +84,13 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 			}
 		}
 		// Despite our best efforts, it got stuck in FREEZING.
-		// Leaving it in this state is bad and dangerous, so
-		// let's (try to) thaw it back and error out.
-		_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
 		return errors.New("unable to freeze")
 	case configs.Thawed:
 		return fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
 	case configs.Undefined:
 		return nil
 	default:
-		return fmt.Errorf("Invalid argument '%s' to freezer.state", string(cgroup.Resources.Freezer))
+		return fmt.Errorf("Invalid argument '%s' to freezer.state", string(r.Freezer))
 	}
 }
 

@@ -1,8 +1,10 @@
-[![master](https://travis-ci.org/checkpoint-restore/go-criu.svg?branch=master)](https://travis-ci.org/checkpoint-restore/go-criu)
+[![test](https://github.com/checkpoint-restore/go-criu/workflows/ci/badge.svg?branch=master)](https://github.com/checkpoint-restore/go-criu/actions?query=workflow%3Aci)
+[![verify](https://github.com/checkpoint-restore/go-criu/workflows/verify/badge.svg?branch=master)](https://github.com/checkpoint-restore/go-criu/actions?query=workflow%3Averify)
+[![Go Reference](https://pkg.go.dev/badge/github.com/checkpoint-restore/go-criu.svg)](https://pkg.go.dev/github.com/checkpoint-restore/go-criu)
 
-## go-criu -- Go bindings for [CRIU](https://criu.org/)
+## go-criu -- Go bindings for CRIU
 
-This repository provides Go bindings for CRIU. The code is based on the Go based PHaul
+This repository provides Go bindings for [CRIU](https://criu.org/). The code is based on the Go-based PHaul
 implementation from the CRIU repository. For easier inclusion into other Go projects the
 CRIU Go bindings have been moved to this repository.
 
@@ -10,13 +12,26 @@ The Go bindings provide an easy way to use the CRIU RPC calls from Go without th
 to set up all the infrastructure to make the actual RPC connection to CRIU.
 
 The following example would print the version of CRIU:
-```
+```go
+import (
+	"log"
+
+	"github.com/checkpoint/restore/go-criu/v5"
+)
+
+func main() {
 	c := criu.MakeCriu()
 	version, err := c.GetCriuVersion()
-	fmt.Println(version)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	log.Println(version)
+}
 ```
+
 or to just check if at least a certain CRIU version is installed:
-```
+
+```go
 	c := criu.MakeCriu()
 	result, err := c.IsCriuAtLeast(31100)
 ```
@@ -31,7 +46,12 @@ As go-criu is imported in other projects and as Go modules are expected
 to follow Semantic Versioning go-criu will also follow Semantic Versioning
 starting with the 4.0.0 release.
 
-4.0.0 is based on CRIU 3.14
+The following table shows the relation between go-criu and criu versions:
+
+| Major version  | Latest release | CRIU version |
+| -------------- | -------------- | ------------ |
+| v5             | 5.0.0          | 3.15         |
+| v4             | 4.1.0          | 3.14         |
 
 ## How to contribute
 

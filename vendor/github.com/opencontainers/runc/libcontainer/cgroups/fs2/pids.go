@@ -3,10 +3,8 @@
 package fs2
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -16,15 +14,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func isPidsSet(cgroup *configs.Cgroup) bool {
-	return cgroup.Resources.PidsLimit != 0
+func isPidsSet(r *configs.Resources) bool {
+	return r.PidsLimit != 0
 }
 
-func setPids(dirPath string, cgroup *configs.Cgroup) error {
-	if !isPidsSet(cgroup) {
+func setPids(dirPath string, r *configs.Resources) error {
+	if !isPidsSet(r) {
 		return nil
 	}
-	if val := numToStr(cgroup.Resources.PidsLimit); val != "" {
+	if val := numToStr(r.PidsLimit); val != "" {
 		if err := fscommon.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
@@ -33,7 +31,7 @@ func setPids(dirPath string, cgroup *configs.Cgroup) error {
 	return nil
 }
 
-func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
+func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
 	contents, err := fscommon.ReadFile(dirPath, "cgroup.procs")
@@ -43,43 +41,17 @@ func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 	if err != nil {
 		return err
 	}
-	pids := make(map[string]string)
-	for _, i := range strings.Split(contents, "\n") {
-		if i != "" {
-			pids[i] = i
-		}
-	}
-	stats.PidsStats.Current = uint64(len(pids))
+	pids := strings.Count(contents, "\n")
+	stats.PidsStats.Current = uint64(pids)
 	stats.PidsStats.Limit = 0
 	return nil
-}
-
-func readCurrentFromProc() (uint64, error) {
-	fi, err := ioutil.ReadDir("/proc")
-	if err != nil {
-		return 0, err
-	}
-	var ret uint64
-	for _, i := range fi {
-		if !i.IsDir() {
-			continue
-		}
-		if _, err := strconv.ParseInt(i.Name(), 10, 32); err == nil {
-			ret = ret + 1
-		}
-	}
-	return ret, nil
 }
 
 func statPids(dirPath string, stats *cgroups.Stats) error {
 	current, err := fscommon.GetCgroupParamUint(dirPath, "pids.current")
 	if err != nil {
-		if dirPath == UnifiedMountpoint && os.IsNotExist(err) {
-			if current, err = readCurrentFromProc(); err == nil {
-				stats.PidsStats.Current = current
-				stats.PidsStats.Limit = 0
-			}
-			return nil
+		if os.IsNotExist(err) {
+			return statPidsFromCgroupProcs(dirPath, stats)
 		}
 		return errors.Wrap(err, "failed to parse pids.current")
 	}

@@ -1,6 +1,6 @@
 package criu
 
-//Notify interface
+// Notify interface
 type Notify interface {
 	PreDump() error
 	PostDump() error
@@ -14,8 +14,7 @@ type Notify interface {
 }
 
 // NoNotify struct
-type NoNotify struct {
-}
+type NoNotify struct{}
 
 // PreDump NoNotify
 func (c NoNotify) PreDump() error {
