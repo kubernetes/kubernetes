@@ -7,8 +7,6 @@
 package simple
 
 import (
-	"math"
-
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 )
 
@@ -37,9 +35,3 @@ func (e Edge) Weight() float64 { return e.W }
 
 // maxInt is the maximum value of the machine-dependent int type.
 const maxInt int = int(^uint(0) >> 1)
-
-// isSame returns whether two float64 values are the same where NaN values
-// are equalable.
-func isSame(a, b float64) bool {
-	return a == b || (math.IsNaN(a) && math.IsNaN(b))
-}

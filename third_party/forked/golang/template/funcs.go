@@ -52,37 +52,6 @@ var builtins = FuncMap{
 	"ne": ne, // !=
 }
 
-var builtinFuncs = createValueFuncs(builtins)
-
-// createValueFuncs turns a FuncMap into a map[string]reflect.Value
-func createValueFuncs(funcMap FuncMap) map[string]reflect.Value {
-	m := make(map[string]reflect.Value)
-	addValueFuncs(m, funcMap)
-	return m
-}
-
-// addValueFuncs adds to values the functions in funcs, converting them to reflect.Values.
-func addValueFuncs(out map[string]reflect.Value, in FuncMap) {
-	for name, fn := range in {
-		v := reflect.ValueOf(fn)
-		if v.Kind() != reflect.Func {
-			panic("value for " + name + " not a function")
-		}
-		if !goodFunc(v.Type()) {
-			panic(fmt.Errorf("can't install method/function %q with %d results", name, v.Type().NumOut()))
-		}
-		out[name] = v
-	}
-}
-
-// AddFuncs adds to values the functions in funcs. It does no checking of the input -
-// call addValueFuncs first.
-func addFuncs(out, in FuncMap) {
-	for name, fn := range in {
-		out[name] = fn
-	}
-}
-
 // goodFunc checks that the function or method has the right result signature.
 func goodFunc(typ reflect.Type) bool {
 	// We allow functions with 1 result or 2 results where the second is an error.
@@ -93,14 +62,6 @@ func goodFunc(typ reflect.Type) bool {
 		return true
 	}
 	return false
-}
-
-// findFunction looks for a function in the template, and global map.
-func findFunction(name string) (reflect.Value, bool) {
-	if fn := builtinFuncs[name]; fn.IsValid() {
-		return fn, true
-	}
-	return reflect.Value{}, false
 }
 
 // Indexing.
