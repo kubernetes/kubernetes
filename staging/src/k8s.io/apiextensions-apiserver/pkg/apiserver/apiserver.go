@@ -19,6 +19,9 @@ package apiserver
 import (
 	"fmt"
 	"k8s.io/apiextensions-apiserver/pkg/crdinstall"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
 	"net/http"
 	"time"
 
@@ -269,6 +272,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// Add a post startup hook here that installs all the objects (generally CRDs) that need to be installed as the api-server comes-up
 	// We will use the LoopbackClientConfig of the api server to create a client and use that client to patch objects
 	s.GenericAPIServer.AddPostStartHookOrDie("crd-installer", func(postStartHookContext genericapiserver.PostStartHookContext) error {
+		if !utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.InstallCRDsAtStartup) {
+			klog.InfoS("Skipping installing bundled CRDs at startup since feature gate `InstallCRDsAtStartup` is disabled")
+			return nil
+		}
+
 		//	initialize readers
 		var readers crdinstall.Readers
 		readers = append(readers, crdinstall.GetInbuiltEmbeddedFSReader())

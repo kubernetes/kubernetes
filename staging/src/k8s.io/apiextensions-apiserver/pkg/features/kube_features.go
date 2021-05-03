@@ -22,11 +22,17 @@ import (
 )
 
 const (
-// Every feature gate should add method here following this template:
-//
-// // owner: @username
-// // alpha: v1.4
-// MyFeature() bool
+	// Every feature gate should add method here following this template:
+	//
+	// // owner: @username
+	// // alpha: v1.4
+	// MyFeature() bool
+
+	// owner: @palnabarun
+	// alpha: v1.21
+	//
+	// Enables the CRD Installer when apiextensions-apiserver starts up
+	InstallCRDsAtStartup featuregate.Feature = "InstallCRDsAtStartup"
 )
 
 func init() {
@@ -36,4 +42,6 @@ func init() {
 // defaultKubernetesFeatureGates consists of all known Kubernetes-specific feature keys.
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
-var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{}
+var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	InstallCRDsAtStartup: {Default: false, PreRelease: featuregate.Alpha},
+}
