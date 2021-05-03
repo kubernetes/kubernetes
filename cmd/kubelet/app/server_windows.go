@@ -29,12 +29,12 @@ func isAdmin() (bool, error) {
 	// Get current user
 	u, err := user.Current()
 	if err != nil {
-		return false, fmt.Errorf("Error retrieving current user: %s", err)
+		return false, fmt.Errorf("error retrieving current user: %s", err)
 	}
 	// Get IDs of group user is a member of
 	ids, err := u.GroupIds()
 	if err != nil {
-		return false, fmt.Errorf("Error retrieving group ids: %s", err)
+		return false, fmt.Errorf("error retrieving group ids: %s", err)
 	}
 
 	// Check for existence of BUILTIN\ADMINISTRATORS group id
@@ -61,7 +61,7 @@ func checkPermissions() error {
 		0, 0, 0, 0, 0, 0,
 		&sid)
 	if err != nil {
-		return fmt.Errorf("Error while checking for elevated permissions: %s", err)
+		return fmt.Errorf("error while checking for elevated permissions: %s", err)
 	}
 
 	//We must free the sid to prevent security token leaks
@@ -70,12 +70,12 @@ func checkPermissions() error {
 
 	userIsAdmin, err = isAdmin()
 	if err != nil {
-		return fmt.Errorf("Error while checking admin group membership: %s", err)
+		return fmt.Errorf("error while checking admin group membership: %s", err)
 	}
 
 	member, err := token.IsMember(sid)
 	if err != nil {
-		return fmt.Errorf("Error while checking for elevated permissions: %s", err)
+		return fmt.Errorf("error while checking for elevated permissions: %s", err)
 	}
 	if !member {
 		return fmt.Errorf("kubelet needs to run with administrator permissions. Run as admin is: %t, User in admin group: %t", member, userIsAdmin)

@@ -441,10 +441,10 @@ func Run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	// To help debugging, immediately log version
 	klog.InfoS("Kubelet version", "kubeletVersion", version.Get())
 	if err := initForOS(s.KubeletFlags.WindowsService, s.KubeletFlags.WindowsPriorityClass); err != nil {
-		return fmt.Errorf("failed OS init: %v", err)
+		return fmt.Errorf("failed OS init: %w", err)
 	}
 	if err := run(ctx, s, kubeDeps, featureGate); err != nil {
-		return fmt.Errorf("failed to run Kubelet: %v", err)
+		return fmt.Errorf("failed to run Kubelet: %w", err)
 	}
 	return nil
 }
@@ -500,11 +500,11 @@ func getReservedCPUs(machineInfo *cadvisorapi.MachineInfo, cpus string) (cpuset.
 
 	topo, err := topology.Discover(machineInfo)
 	if err != nil {
-		return emptyCPUSet, fmt.Errorf("Unable to discover CPU topology info: %s", err)
+		return emptyCPUSet, fmt.Errorf("unable to discover CPU topology info: %s", err)
 	}
 	reservedCPUSet, err := cpuset.Parse(cpus)
 	if err != nil {
-		return emptyCPUSet, fmt.Errorf("Unable to parse reserved-cpus list: %s", err)
+		return emptyCPUSet, fmt.Errorf("unable to parse reserved-cpus list: %s", err)
 	}
 	allCPUSet := topo.CPUDetails.CPUs()
 	if !reservedCPUSet.IsSubsetOf(allCPUSet) {
@@ -532,7 +532,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 	if s.LockFilePath != "" {
 		klog.InfoS("Acquiring file lock", "path", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
-			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
+			return fmt.Errorf("unable to acquire file lock on %q: %w", s.LockFilePath, err)
 		}
 		if s.ExitOnLockContention {
 			klog.InfoS("Watching for inotify events", "path", s.LockFilePath)
@@ -608,7 +608,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 
 		kubeDeps.KubeClient, err = clientset.NewForConfig(clientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet client: %w", err)
 		}
 
 		// make a separate client for events
@@ -617,7 +617,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		eventClientConfig.Burst = int(s.EventBurst)
 		kubeDeps.EventClient, err = v1core.NewForConfig(&eventClientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet event client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet event client: %w", err)
 		}
 
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
@@ -632,7 +632,7 @@ func run(ctx context.Context, s *options.KubeletServer, kubeDeps *kubelet.Depend
 		heartbeatClientConfig.QPS = float32(-1)
 		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {
-			return fmt.Errorf("failed to initialize kubelet heartbeat client: %v", err)
+			return fmt.Errorf("failed to initialize kubelet heartbeat client: %w", err)
 		}
 	}
 
@@ -912,7 +912,7 @@ func buildKubeletClientConfig(ctx context.Context, s *options.KubeletServer, nod
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid kubeconfig: %v", err)
+		return nil, nil, fmt.Errorf("invalid kubeconfig: %w", err)
 	}
 
 	kubeClientConfigOverrides(s, clientConfig)
@@ -986,7 +986,7 @@ func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName
 
 	nodeName, err := instances.CurrentNodeName(context.TODO(), hostname)
 	if err != nil {
-		return "", fmt.Errorf("error fetching current node name from cloud provider: %v", err)
+		return "", fmt.Errorf("error fetching current node name from cloud provider: %w", err)
 	}
 
 	klog.V(2).InfoS("Cloud provider determined current node", "nodeName", klog.KRef("", string(nodeName)))
@@ -1012,7 +1012,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 			}
 			cert, key, err := certutil.GenerateSelfSignedCertKey(hostName, nil, nil)
 			if err != nil {
-				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+				return nil, fmt.Errorf("unable to generate self signed cert: %w", err)
 			}
 
 			if err := certutil.WriteCert(kc.TLSCertFile, cert); err != nil {
@@ -1060,7 +1060,7 @@ func InitializeTLS(kf *options.KubeletFlags, kc *kubeletconfiginternal.KubeletCo
 	if len(kc.Authentication.X509.ClientCAFile) > 0 {
 		clientCAs, err := certutil.NewPool(kc.Authentication.X509.ClientCAFile)
 		if err != nil {
-			return nil, fmt.Errorf("unable to load client CA file %s: %v", kc.Authentication.X509.ClientCAFile, err)
+			return nil, fmt.Errorf("unable to load client CA file %s: %w", kc.Authentication.X509.ClientCAFile, err)
 		}
 		// Specify allowed CAs for client certificates
 		tlsOptions.Config.ClientCAs = clientCAs
@@ -1168,7 +1168,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.SeccompProfileRoot,
 		kubeServer.NodeStatusMaxImages)
 	if err != nil {
-		return fmt.Errorf("failed to create kubelet: %v", err)
+		return fmt.Errorf("failed to create kubelet: %w", err)
 	}
 
 	// NewMainKubelet should have set up a pod source config if one didn't exist
@@ -1185,7 +1185,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 	// process pods and exit.
 	if runOnce {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
-			return fmt.Errorf("runonce failed: %v", err)
+			return fmt.Errorf("runonce failed: %w", err)
 		}
 		klog.InfoS("Started kubelet as runonce")
 	} else {
@@ -1329,7 +1329,7 @@ func BootstrapKubeletConfigController(dynamicConfigDir string, transform dynamic
 	c := dynamickubeletconfig.NewController(dir, transform)
 	kc, err := c.Bootstrap()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %v", err)
+		return nil, nil, fmt.Errorf("failed to determine a valid configuration, error: %w", err)
 	}
 	return kc, c, nil
 }
