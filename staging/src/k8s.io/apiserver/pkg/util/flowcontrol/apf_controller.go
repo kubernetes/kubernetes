@@ -24,12 +24,11 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"net"
 	"sort"
-	"strconv"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -39,7 +38,6 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -214,6 +212,9 @@ type priorityLevelState struct {
 
 // NewTestableController is extra flexible to facilitate testing
 func newTestableController(config TestableConfig) *configController {
+	if config.ServerID == "" {
+		config.ServerID = uuid.New().String()
+	}
 	cfgCtlr := &configController{
 		name:                   config.Name,
 		clock:                  config.Clock,
@@ -224,7 +225,7 @@ func newTestableController(config TestableConfig) *configController {
 		serverConcurrencyLimit: config.ServerConcurrencyLimit,
 		requestWaitLimit:       config.RequestWaitLimit,
 		flowcontrolClient:      config.FlowcontrolClient,
-		id:                     makeID(config.IDHint),
+		id:                     config.ServerID,
 		fsProperDanglingStatus: make(map[string]flowcontrol.ConditionStatus),
 		priorityLevelStates:    make(map[string]*priorityLevelState),
 	}
@@ -342,19 +343,6 @@ func newTestableController(config TestableConfig) *configController {
 
 		}})
 	return cfgCtlr
-}
-
-// makeID computes the ID to use for this apiserver in
-// PriorityLevelConfigurationStatus::ConcurrencyLimits.
-func makeID(idHint net.IP) string {
-	if len(idHint) > 0 {
-		ip, err := utilnet.ResolveBindAddress(idHint)
-		if err == nil {
-			return ip.String()
-		}
-		klog.Infof("Will use timestamp because unable to resolve idHint address %s: %s", idHint, err.Error())
-	}
-	return strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
 // MaintainObservations keeps the observers from

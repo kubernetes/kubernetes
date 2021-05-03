@@ -131,7 +131,7 @@ func (o *RecommendedOptions) ApplyTo(config *server.RecommendedConfig) error {
 				kubernetes.NewForConfigOrDie(config.ClientConfig).FlowcontrolV1beta1(),
 				config.MaxRequestsInFlight+config.MaxMutatingRequestsInFlight,
 				config.RequestTimeout/4,
-				o.SecureServing.BindAddress,
+				config.APIServerID,
 			)
 		} else {
 			klog.Warningf("Neither kubeconfig is provided nor service-account is mounted, so APIPriorityAndFairness will be disabled")

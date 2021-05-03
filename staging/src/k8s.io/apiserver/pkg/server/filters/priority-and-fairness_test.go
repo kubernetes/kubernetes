@@ -743,7 +743,7 @@ func startAPFController(t *testing.T, stopCh <-chan struct{}, apfConfiguration [
 	clientset := newClientset(t, apfConfiguration...)
 	// this test does not rely on resync, so resync period is set to zero
 	factory := informers.NewSharedInformerFactory(clientset, 0)
-	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta1(), serverConcurrency, requestWaitLimit, nil)
+	controller := utilflowcontrol.New(factory, clientset.FlowcontrolV1beta1(), serverConcurrency, requestWaitLimit, "")
 
 	factory.Start(stopCh)
 

@@ -533,7 +533,7 @@ func buildGenericConfig(
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIPriorityAndFairness) && s.GenericServerRunOptions.EnablePriorityAndFairness {
-		genericConfig.FlowControl = BuildPriorityAndFairness(s, clientgoExternalClient, versionedInformers)
+		genericConfig.FlowControl = BuildPriorityAndFairness(s, genericConfig.APIServerID, clientgoExternalClient, versionedInformers)
 	}
 
 	return
@@ -555,13 +555,13 @@ func BuildAuthorizer(s *options.ServerRunOptions, EgressSelector *egressselector
 }
 
 // BuildPriorityAndFairness constructs the guts of the API Priority and Fairness filter
-func BuildPriorityAndFairness(s *options.ServerRunOptions, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
+func BuildPriorityAndFairness(s *options.ServerRunOptions, APIServerID string, extclient clientgoclientset.Interface, versionedInformer clientgoinformers.SharedInformerFactory) utilflowcontrol.Interface {
 	return utilflowcontrol.New(
 		versionedInformer,
 		extclient.FlowcontrolV1beta1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
 		s.GenericServerRunOptions.RequestTimeout/4,
-		s.SecureServing.BindAddress,
+		APIServerID,
 	)
 }
 

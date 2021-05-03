@@ -18,7 +18,6 @@ package flowcontrol
 
 import (
 	"context"
-	"net"
 	"strconv"
 	"time"
 
@@ -84,7 +83,7 @@ func New(
 	flowcontrolClient flowcontrolclient.FlowcontrolV1beta1Interface,
 	serverConcurrencyLimit int,
 	requestWaitLimit time.Duration,
-	idHint net.IP,
+	serverID string,
 ) Interface {
 	grc := counter.NoOp{}
 	clk := clock.RealClock{}
@@ -99,7 +98,7 @@ func New(
 		RequestWaitLimit:       requestWaitLimit,
 		ObsPairGenerator:       metrics.PriorityLevelConcurrencyObserverPairGenerator,
 		QueueSetFactory:        fqs.NewQueueSetFactory(clk, grc),
-		IDHint:                 idHint,
+		ServerID:               serverID,
 	})
 }
 
@@ -143,11 +142,10 @@ type TestableConfig struct {
 	// QueueSetFactory for the queuing implementation
 	QueueSetFactory fq.QueueSetFactory
 
-	// IDHint is used to form the ID used to post
-	// concurrency limits in PriorityLevelConfigurationStatus.  If that IP
-	// is unspecified (i.e., zero) or loopback then a distinctive address
-	// of the same family is chosen.
-	IDHint net.IP
+	// ServerID is the ID used to post
+	// concurrency limits in PriorityLevelConfigurationStatus.
+	// If the empty string, a random ID will be generated and used.
+	ServerID string
 }
 
 // NewTestable is extra flexible to facilitate testing
