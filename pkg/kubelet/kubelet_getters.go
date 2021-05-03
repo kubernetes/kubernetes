@@ -246,10 +246,16 @@ func (kl *Kubelet) GetNode() (*v1.Node, error) {
 func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if kl.kubeClient != nil {
 		if n, err := kl.nodeLister.Get(string(kl.nodeName)); err == nil {
+			klog.InfoS("Definitely got a real node", "node", n.Name)
 			return n, nil
 		}
 	}
-	return kl.initialNode(context.TODO())
+	n, err := kl.initialNode(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	klog.InfoS("Got an initial node", "node", n.Name)
+	return n, err
 }
 
 // GetNodeConfig returns the container manager node config.
