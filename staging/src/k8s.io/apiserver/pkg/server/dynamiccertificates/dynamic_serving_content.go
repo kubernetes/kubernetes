@@ -53,7 +53,7 @@ var _ ControllerRunner = &DynamicCertKeyPairContent{}
 // NewDynamicServingContentFromFiles returns a dynamic CertKeyContentProvider based on a cert and key filename
 func NewDynamicServingContentFromFiles(purpose, certFile, keyFile string) (*DynamicCertKeyPairContent, error) {
 	if len(certFile) == 0 || len(keyFile) == 0 {
-		return nil, fmt.Errorf("missing filename for serving cert")
+		return nil, fmt.Errorf("missing one of filename(--tls-cert-file\--tls-private-key-file) for serving cert")
 	}
 	name := fmt.Sprintf("%s::%s::%s", purpose, certFile, keyFile)
 
