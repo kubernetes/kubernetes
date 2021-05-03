@@ -110,7 +110,7 @@ func helpErrorf(cmd *cobra.Command, format string, args ...interface{}) error {
 
 // The completion function need the factory, so we initialize them once it is available
 func initCompletionFunctions(f cmdutil.Factory) {
-	CompListContextsInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+	CompListContextsInConfig = func(_ cmdutil.Factory, toComplete string) []string {
 		config, err := f.ToRawKubeConfigLoader().RawConfig()
 		if err != nil {
 			return nil
@@ -124,7 +124,7 @@ func initCompletionFunctions(f cmdutil.Factory) {
 		return ret
 	}
 
-	CompListClustersInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+	CompListClustersInConfig = func(_ cmdutil.Factory, toComplete string) []string {
 		config, err := f.ToRawKubeConfigLoader().RawConfig()
 		if err != nil {
 			return nil
@@ -138,7 +138,7 @@ func initCompletionFunctions(f cmdutil.Factory) {
 		return ret
 	}
 
-	CompListUsersInConfig = func(notused cmdutil.Factory, toComplete string) []string {
+	CompListUsersInConfig = func(_ cmdutil.Factory, toComplete string) []string {
 		config, err := f.ToRawKubeConfigLoader().RawConfig()
 		if err != nil {
 			return nil
