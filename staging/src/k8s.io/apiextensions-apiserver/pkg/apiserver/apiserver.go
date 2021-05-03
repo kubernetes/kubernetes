@@ -18,8 +18,8 @@ package apiserver
 
 import (
 	"fmt"
-	"k8s.io/apiextensions-apiserver/pkg/crdinstall"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
+	"k8s.io/apiextensions-apiserver/pkg/startupcrd"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"net/http"
@@ -278,8 +278,8 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 
 		//	initialize readers
-		var readers crdinstall.Readers
-		readers = append(readers, crdinstall.GetInbuiltEmbeddedFSReader())
+		var readers startupcrd.Readers
+		readers = append(readers, startupcrd.GetInbuiltEmbeddedFSReader())
 
 		// read objects
 		objs, err := readers.Read()
@@ -288,7 +288,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		}
 
 		// get a Startup CRD Installer
-		installer, err := crdinstall.NewInstallerFromHookContext(postStartHookContext)
+		installer, err := startupcrd.NewInstallerFromHookContext(postStartHookContext)
 		if err != nil {
 			return err
 		}
