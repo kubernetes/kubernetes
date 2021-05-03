@@ -17,7 +17,6 @@ limitations under the License.
 package apiserver
 
 import (
-	"context"
 	"fmt"
 	"k8s.io/apiextensions-apiserver/pkg/crdinstall"
 	"net/http"
@@ -270,29 +269,35 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	// Add a post startup hook here that installs all the objects (generally CRDs) that need to be installed as the api-server comes-up
 	// We will use the LoopbackClientConfig of the api server to create a client and use that client to patch objects
 	s.GenericAPIServer.AddPostStartHookOrDie("crd-installer", func(postStartHookContext genericapiserver.PostStartHookContext) error {
-		ctx := context.Background()
+		//	initialize readers
+		var readers crdinstall.Readers
+		readers = append(readers, crdinstall.GetInbuiltEmbeddedFSReader())
 
-		// wait for CRD type to become available
-		err := wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
-			return crdinstall.CRDReady(ctx, postStartHookContext.LoopbackClientConfig)
-		}, postStartHookContext.StopCh)
+		// read objects
+		objs, err := readers.Read()
 		if err != nil {
 			return err
 		}
 
-		if err := crdinstall.Install(ctx, postStartHookContext.LoopbackClientConfig); err != nil {
+		// get a Startup CRD Installer
+		installer, err := crdinstall.NewInstallerFromHookContext(postStartHookContext)
+		if err != nil {
 			return err
 		}
 
-		// wait for the newly installed crds to be available
-		err = wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
+		// install the bundled and specified CRDs
+		if err := installer.Install(objs); err != nil {
+			return err
+		}
+
+		// wait for the "newly" installed crds to be available
+		if err := wait.PollImmediateUntil(100*time.Millisecond, func() (bool, error) {
 			return s.Informers.Apiextensions().V1().CustomResourceDefinitions().Informer().HasSynced(), nil
-		}, postStartHookContext.StopCh)
-		if err != nil {
+		}, postStartHookContext.StopCh); err != nil {
 			return err
 		}
-		return nil
 
+		return nil
 	})
 
 	return s, nil
