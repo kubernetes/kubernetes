@@ -43,6 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )
 
+const LabelTokenControllerReconcile = "tokencontroller.kubernetes.io/reconcile"
+
 // RemoveTokenBackoff is the recommended (empirical) retry interval for removing
 // a secret reference from a service account when the secret is deleted. It is
 // exported for use by custom secret controllers.
@@ -71,7 +73,7 @@ type TokensControllerOptions struct {
 }
 
 // NewTokensController returns a new *TokensController.
-func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
+func NewTokensController(namespaces informers.NamespaceInformer, serviceAccounts informers.ServiceAccountInformer, secrets informers.SecretInformer, cl clientset.Interface, options TokensControllerOptions) (*TokensController, error) {
 	maxRetries := options.MaxRetries
 	if maxRetries == 0 {
 		maxRetries = 10
@@ -93,6 +95,8 @@ func NewTokensController(serviceAccounts informers.ServiceAccountInformer, secre
 		}
 	}
 
+	e.namespaces = namespaces.Lister()
+	e.namespacesSynced = namespaces.Informer().HasSynced
 	e.serviceAccounts = serviceAccounts.Lister()
 	e.serviceAccountSynced = serviceAccounts.Informer().HasSynced
 	serviceAccounts.Informer().AddEventHandlerWithResyncPeriod(
@@ -137,13 +141,15 @@ type TokensController struct {
 
 	rootCA []byte
 
+	namespaces      listersv1.NamespaceLister
 	serviceAccounts listersv1.ServiceAccountLister
 	// updatedSecrets is a wrapper around the shared cache which allows us to record
 	// and return our local mutations (since we're very likely to act on an updated
 	// secret before the watch reports it).
 	updatedSecrets cache.MutationCache
 
-	// Since we join two objects, we'll watch both of them with controllers.
+	// Since we join three objects, we'll watch all of them with controllers.
+	namespacesSynced     cache.InformerSynced
 	serviceAccountSynced cache.InformerSynced
 	secretSynced         cache.InformerSynced
 
@@ -170,7 +176,7 @@ func (e *TokensController) Run(workers int, stopCh <-chan struct{}) {
 	defer e.syncServiceAccountQueue.ShutDown()
 	defer e.syncSecretQueue.ShutDown()
 
-	if !cache.WaitForNamedCacheSync("tokens", stopCh, e.serviceAccountSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSync("tokens", stopCh, e.namespacesSynced, e.serviceAccountSynced, e.secretSynced) {
 		return
 	}
 
@@ -255,6 +261,9 @@ func (e *TokensController) syncServiceAccount() {
 		if err != nil {
 			klog.Errorf("error deleting serviceaccount tokens for %s/%s: %v", saInfo.namespace, saInfo.name, err)
 		}
+	case !e.needsReconcile(sa):
+		klog.V(4).Infof("syncServiceAccount(%s/%s), service account is opted out from token generation", saInfo.namespace, saInfo.name)
+		return
 	default:
 		// ensure a token exists and is referenced by this service account
 		retry, err = e.ensureReferencedToken(sa)
@@ -705,6 +714,16 @@ func (e *TokensController) listTokenSecrets(serviceAccount *v1.ServiceAccount) (
 		}
 	}
 	return items, nil
+}
+
+func (e *TokensController) needsReconcile(sa *v1.ServiceAccount) bool {
+	if sa.GetLabels()[LabelTokenControllerReconcile] == "false" {
+		return false
+	}
+	if n, err := e.namespaces.Get(sa.GetNamespace()); err == nil && n.GetLabels()[LabelTokenControllerReconcile] == "false" {
+		return false
+	}
+	return true
 }
 
 func getSecretReferences(serviceAccount *v1.ServiceAccount) sets.String {

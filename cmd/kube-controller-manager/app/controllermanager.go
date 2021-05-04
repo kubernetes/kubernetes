@@ -605,6 +605,7 @@ func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController
 		return nil, false, fmt.Errorf("failed to build token generator: %v", err)
 	}
 	controller, err := serviceaccountcontroller.NewTokensController(
+		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.InformerFactory.Core().V1().ServiceAccounts(),
 		ctx.InformerFactory.Core().V1().Secrets(),
 		c.rootClientBuilder.ClientOrDie("tokens-controller"),

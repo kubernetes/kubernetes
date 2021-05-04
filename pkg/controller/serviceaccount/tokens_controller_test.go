@@ -91,6 +91,20 @@ func serviceAccount(secretRefs []v1.ObjectReference) *v1.ServiceAccount {
 	}
 }
 
+// serviceAccount returns a service account with the given secret refs
+func serviceAccountReconcile(secretRefs []v1.ObjectReference, reconcile string) *v1.ServiceAccount {
+	return &v1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "default",
+			UID:             "12345",
+			Namespace:       "default",
+			ResourceVersion: "1",
+			Labels:          map[string]string{LabelTokenControllerReconcile: reconcile},
+		},
+		Secrets: secretRefs,
+	}
+}
+
 // updatedServiceAccount returns a service account with the resource version modified
 func updatedServiceAccount(secretRefs []v1.ObjectReference) *v1.ServiceAccount {
 	sa := serviceAccount(secretRefs)
@@ -212,6 +226,7 @@ func TestTokenCreation(t *testing.T) {
 
 		Reactors []reaction
 
+		ExistingNamespace      *v1.Namespace
 		ExistingServiceAccount *v1.ServiceAccount
 		ExistingSecrets        []*v1.Secret
 
@@ -226,14 +241,24 @@ func TestTokenCreation(t *testing.T) {
 		ExpectedActions []core.Action
 	}{
 		"new serviceaccount with no secrets": {
-			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences())},
-
+			ClientObjects:       []runtime.Object{serviceAccount(emptySecretReferences())},
 			AddedServiceAccount: serviceAccount(emptySecretReferences()),
 			ExpectedActions: []core.Action{
 				core.NewGetAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, "default"),
 				core.NewCreateAction(schema.GroupVersionResource{Version: "v1", Resource: "secrets"}, metav1.NamespaceDefault, createdTokenSecret()),
 				core.NewUpdateAction(schema.GroupVersionResource{Version: "v1", Resource: "serviceaccounts"}, metav1.NamespaceDefault, serviceAccount(addTokenSecretReference(emptySecretReferences()))),
 			},
+		},
+		"new serviceaccount with no secrets but has reconcile=false": {
+			ClientObjects:       []runtime.Object{serviceAccountReconcile(emptySecretReferences(), "false")},
+			AddedServiceAccount: serviceAccountReconcile(emptySecretReferences(), "false"),
+			ExpectedActions:     []core.Action{},
+		},
+		"new serviceaccount with no secrets but its namespace has reconcile=false": {
+			ClientObjects:       []runtime.Object{serviceAccount(emptySecretReferences())},
+			ExistingNamespace:   &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default", Labels: map[string]string{LabelTokenControllerReconcile: "false"}}},
+			AddedServiceAccount: serviceAccount(emptySecretReferences()),
+			ExpectedActions:     []core.Action{},
 		},
 		"new serviceaccount with no secrets encountering create error": {
 			ClientObjects: []runtime.Object{serviceAccount(emptySecretReferences())},
@@ -580,12 +605,21 @@ func TestTokenCreation(t *testing.T) {
 			client.Fake.PrependReactor(reactor.verb, reactor.resource, reactor.reactor(t))
 		}
 		informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		namesapces := informers.Core().V1().Namespaces().Informer().GetStore()
 		secretInformer := informers.Core().V1().Secrets().Informer()
 		secrets := secretInformer.GetStore()
 		serviceAccounts := informers.Core().V1().ServiceAccounts().Informer().GetStore()
-		controller, err := NewTokensController(informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
+		controller, err := NewTokensController(informers.Core().V1().Namespaces(), informers.Core().V1().ServiceAccounts(), informers.Core().V1().Secrets(), client, TokensControllerOptions{TokenGenerator: generator, RootCA: []byte("CA Data"), MaxRetries: tc.MaxRetries})
 		if err != nil {
 			t.Fatalf("error creating Tokens controller: %v", err)
+		}
+
+		if tc.ExistingNamespace != nil {
+			namesapces.Add(tc.ExistingNamespace)
+		}
+
+		if tc.ExistingServiceAccount != nil {
+			serviceAccounts.Add(tc.ExistingServiceAccount)
 		}
 
 		if tc.ExistingServiceAccount != nil {
