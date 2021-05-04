@@ -642,6 +642,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	cm.nodeInfo = node
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
+		klog.Infof("Gathering ephemeral storage from cadvisor rootfs")
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
 		if err != nil {
 			return fmt.Errorf("failed to get rootfs info: %v", err)
