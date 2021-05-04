@@ -46,6 +46,133 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+// CreateFlags directly reflect the information that CLI is gathering via flags. They will be converted to Options,
+// which reflect the runtime requirements for the command.
+type CreateFlags struct {
+	PrintFlags  *genericclioptions.PrintFlags
+	RecordFlags *genericclioptions.RecordFlags
+	Recorder    genericclioptions.Recorder
+
+	fieldManager string
+
+	FilenameOptions  resource.FilenameOptions
+	Selector         string
+	EditBeforeCreate bool
+	Raw              string
+
+	genericclioptions.IOStreams
+}
+
+// NewCreateFlags returns a default CreateFlags
+func NewCreateFlags(ioStreams genericclioptions.IOStreams) *CreateFlags {
+	return &CreateFlags{
+		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
+		RecordFlags: genericclioptions.NewRecordFlags(),
+
+		Recorder: genericclioptions.NoopRecorder{},
+
+		IOStreams: ioStreams,
+	}
+}
+
+// AddFlags registers flags for a cli
+func (flags *CreateFlags) AddFlags(cmd *cobra.Command) {
+	flags.PrintFlags.AddFlags(cmd)
+	flags.RecordFlags.AddFlags(cmd)
+
+	cmdutil.AddFilenameOptionFlags(cmd, &flags.FilenameOptions, "to use to create the resource")
+	cmdutil.AddValidateFlags(cmd)
+	cmdutil.AddApplyAnnotationFlags(cmd)
+	cmdutil.AddDryRunFlag(cmd)
+	cmdutil.AddFieldManagerFlagVar(cmd, &flags.fieldManager, "kubectl-create")
+
+	cmd.Flags().BoolVar(&flags.EditBeforeCreate, "edit", flags.EditBeforeCreate, "Edit the API resource before creating")
+	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows", "Only relevant if --edit=true. Defaults to the line ending native to your platform.")
+	cmd.Flags().StringVarP(&flags.Selector, "selector", "l", flags.Selector, "Selector (label query) to filter on, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2)")
+	cmd.Flags().StringVar(&flags.Raw, "raw", flags.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
+}
+
+// ToOptions converts from CLI inputs to runtime inputs
+func (flags *CreateFlags) ToOptions(f cmdutil.Factory, cmd *cobra.Command, args []string) (*CreateOptions, error) {
+	flags.RecordFlags.Complete(cmd)
+	recorder, err := flags.RecordFlags.ToRecorder()
+	if err != nil {
+		return nil, err
+	}
+	dryRunStrategy, err := cmdutil.GetDryRunStrategy(cmd)
+	if err != nil {
+		return nil, err
+	}
+	cmdutil.PrintFlagsWithDryRunStrategy(flags.PrintFlags, dryRunStrategy)
+	dynamicClient, err := f.DynamicClient()
+	if err != nil {
+		return nil, err
+	}
+	dryRunVerifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamDryRun)
+	fieldValidationVerifier := resource.NewQueryParamVerifier(dynamicClient, f.OpenAPIGetter(), resource.QueryParamFieldValidation)
+
+	validationDirective, err := cmdutil.GetValidationDirective(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	printer, err := flags.PrintFlags.ToPrinter()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(args) != 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+	if len(flags.Raw) > 0 {
+		if flags.EditBeforeCreate {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw and --edit are mutually exclusive")
+		}
+		if len(flags.FilenameOptions.Filenames) != 1 {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw can only use a single local file or stdin")
+		}
+		if strings.Index(flags.FilenameOptions.Filenames[0], "http://") == 0 || strings.Index(flags.FilenameOptions.Filenames[0], "https://") == 0 {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw cannot read from a url")
+		}
+		if flags.FilenameOptions.Recursive {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw and --recursive are mutually exclusive")
+		}
+		if len(flags.Selector) > 0 {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw and --selector (-l) are mutually exclusive")
+		}
+		if len(cmdutil.GetFlagString(cmd, "output")) > 0 {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw and --output are mutually exclusive")
+		}
+		if _, err := url.ParseRequestURI(flags.Raw); err != nil {
+			return nil, cmdutil.UsageErrorf(cmd, "--raw must be a valid URL path: %v", err)
+		}
+	}
+
+	o := &CreateOptions{
+		PrintFlags:  flags.PrintFlags,
+		RecordFlags: flags.RecordFlags,
+
+		DryRunStrategy:          dryRunStrategy,
+		DryRunVerifier:          dryRunVerifier,
+		FieldValidationVerifier: fieldValidationVerifier,
+
+		ValidationDirective: validationDirective,
+
+		fieldManager:     flags.fieldManager,
+		FilenameOptions:  flags.FilenameOptions,
+		Selector:         flags.Selector,
+		EditBeforeCreate: flags.EditBeforeCreate,
+		Raw:              flags.Raw,
+
+		Recorder: recorder,
+		Printer:  printer,
+
+		IOStreams: flags.IOStreams,
+	}
+
+	return o, nil
+}
+
 // CreateOptions is the commandline options for 'create' sub command
 type CreateOptions struct {
 	PrintFlags  *genericclioptions.PrintFlags
@@ -63,7 +190,7 @@ type CreateOptions struct {
 	Raw              string
 
 	Recorder genericclioptions.Recorder
-	PrintObj func(obj kruntime.Object) error
+	Printer  printers.ResourcePrinter
 
 	genericclioptions.IOStreams
 }
@@ -85,21 +212,9 @@ var (
 		kubectl create -f registry.yaml --edit -o json`))
 )
 
-// NewCreateOptions returns an initialized CreateOptions instance
-func NewCreateOptions(ioStreams genericclioptions.IOStreams) *CreateOptions {
-	return &CreateOptions{
-		PrintFlags:  genericclioptions.NewPrintFlags("created").WithTypeSetter(scheme.Scheme),
-		RecordFlags: genericclioptions.NewRecordFlags(),
-
-		Recorder: genericclioptions.NoopRecorder{},
-
-		IOStreams: ioStreams,
-	}
-}
-
 // NewCmdCreate returns new initialized instance of create sub command
 func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCreateOptions(ioStreams)
+	flags := NewCreateFlags(ioStreams)
 
 	cmd := &cobra.Command{
 		Use:                   "create -f FILENAME",
@@ -108,34 +223,20 @@ func NewCmdCreate(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cob
 		Long:                  createLong,
 		Example:               createExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdutil.IsFilenameSliceEmpty(o.FilenameOptions.Filenames, o.FilenameOptions.Kustomize) {
+			if cmdutil.IsFilenameSliceEmpty(flags.FilenameOptions.Filenames, flags.FilenameOptions.Kustomize) {
 				ioStreams.ErrOut.Write([]byte("Error: must specify one of -f and -k\n\n"))
 				defaultRunFunc := cmdutil.DefaultSubCommandRun(ioStreams.ErrOut)
 				defaultRunFunc(cmd, args)
 				return
 			}
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate())
+			o, err := flags.ToOptions(f, cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.RunCreate(f, cmd))
 		},
 	}
 
 	// bind flag structs
-	o.RecordFlags.AddFlags(cmd)
-
-	usage := "to use to create the resource"
-	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
-	cmdutil.AddValidateFlags(cmd)
-	cmd.Flags().BoolVar(&o.EditBeforeCreate, "edit", o.EditBeforeCreate, "Edit the API resource before creating")
-	cmd.Flags().Bool("windows-line-endings", runtime.GOOS == "windows",
-		"Only relevant if --edit=true. Defaults to the line ending native to your platform.")
-	cmdutil.AddApplyAnnotationFlags(cmd)
-	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddLabelSelectorFlagVar(cmd, &o.Selector)
-	cmd.Flags().StringVar(&o.Raw, "raw", o.Raw, "Raw URI to POST to the server.  Uses the transport specified by the kubeconfig file.")
-	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-create")
-
-	o.PrintFlags.AddFlags(cmd)
+	flags.AddFlags(cmd)
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, ioStreams))
@@ -182,41 +283,6 @@ func (o *CreateOptions) Validate() error {
 		if _, err := url.ParseRequestURI(o.Raw); err != nil {
 			return fmt.Errorf("--raw must be a valid URL path: %v", err)
 		}
-	}
-
-	return nil
-}
-
-// Complete completes all the required options
-func (o *CreateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	if len(args) != 0 {
-		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
-	}
-	var err error
-	o.RecordFlags.Complete(cmd)
-	o.Recorder, err = o.RecordFlags.ToRecorder()
-	if err != nil {
-		return err
-	}
-
-	o.DryRunStrategy, err = cmdutil.GetDryRunStrategy(cmd)
-	if err != nil {
-		return err
-	}
-	cmdutil.PrintFlagsWithDryRunStrategy(o.PrintFlags, o.DryRunStrategy)
-
-	o.ValidationDirective, err = cmdutil.GetValidationDirective(cmd)
-	if err != nil {
-		return err
-	}
-
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-
-	o.PrintObj = func(obj kruntime.Object) error {
-		return printer.PrintObj(obj, o.Out)
 	}
 
 	return nil
@@ -290,7 +356,7 @@ func (o *CreateOptions) RunCreate(f cmdutil.Factory, cmd *cobra.Command) error {
 
 		count++
 
-		return o.PrintObj(info.Object)
+		return o.Printer.PrintObj(info.Object, o.Out)
 	})
 	if err != nil {
 		return err

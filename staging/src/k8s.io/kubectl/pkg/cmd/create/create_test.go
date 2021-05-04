@@ -20,11 +20,13 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 )
 
@@ -35,11 +37,16 @@ func TestExtraArgsFail(t *testing.T) {
 	defer f.Cleanup()
 
 	c := NewCmdCreate(f, genericclioptions.NewTestIOStreamsDiscard())
-	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
-	options := NewCreateOptions(ioStreams)
-	if options.Complete(f, c, []string{"rc"}) == nil {
+	if validateCreateArgs(c, []string{"rc"}) == nil {
 		t.Errorf("unexpected non-error")
 	}
+}
+
+func validateCreateArgs(cmd *cobra.Command, args []string) error {
+	if len(args) != 0 {
+		return cmdutil.UsageErrorf(cmd, "Unexpected args: %v", args)
+	}
+	return nil
 }
 
 func TestCreateObject(t *testing.T) {
