@@ -83,6 +83,7 @@ func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Int
 	call := flexPlugin.NewDriverCall(initCmd)
 	ds, err := call.Run()
 	if err != nil {
+		klog.V(4).Info(logPrefix(flexPlugin), "Unable to initialize FlexVolume plugin")
 		return nil, err
 	}
 	flexPlugin.capabilities = *ds.Capabilities
