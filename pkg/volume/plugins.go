@@ -676,6 +676,7 @@ func (pm *VolumePluginMgr) FindPluginBySpec(spec *Spec) (VolumePlugin, error) {
 		}
 	}
 
+	klog.Infof("calling refreshProbedPlugins from FindPluginBySpec")
 	pm.refreshProbedPlugins()
 	for _, plugin := range pm.probedPlugins {
 		if plugin.CanSupport(spec) {
@@ -711,6 +712,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 		matches = append(matches, v)
 	}
 
+	klog.Infof("calling refreshProbedPlugins from FindPluginByName")
 	pm.refreshProbedPlugins()
 	if plugin, found := pm.probedPlugins[name]; found {
 		matches = append(matches, plugin)
