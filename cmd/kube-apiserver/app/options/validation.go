@@ -179,6 +179,7 @@ func (s *ServerRunOptions) Validate() []error {
 	errs = append(errs, s.Metrics.Validate()...)
 	errs = append(errs, s.Logs.Validate()...)
 	errs = append(errs, validateAPIServerIdentity(s)...)
+	errs = append(errs, s.StartupCRDs.Validate()...)
 
 	return errs
 }

@@ -88,6 +88,10 @@ type ExtraConfig struct {
 	ServiceResolver webhook.ServiceResolver
 	// AuthResolverWrapper is used in CR webhook converters
 	AuthResolverWrapper webhook.AuthenticationInfoResolverWrapper
+
+	// ExtraStartupCRDsDirectory is used to specify the location from which user provided
+	// startup CRDs will be installed
+	ExtraStartupCRDsDirectory string
 }
 
 type Config struct {
@@ -280,6 +284,11 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		//	initialize readers
 		var readers startupcrd.Readers
 		readers = append(readers, startupcrd.GetInbuiltEmbeddedFSReader())
+
+		// if a extra directory is specified, init a reader and add to the readers slice
+		if c.ExtraConfig.ExtraStartupCRDsDirectory != "" {
+			readers = append(readers, startupcrd.FSReader{ManifestDirectory: c.ExtraConfig.ExtraStartupCRDsDirectory})
+		}
 
 		// read objects
 		objs, err := readers.Read()

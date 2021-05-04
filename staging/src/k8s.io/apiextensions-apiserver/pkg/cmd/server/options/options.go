@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"io"
+	"k8s.io/apiextensions-apiserver/pkg/startupcrd"
 	"net"
 	"net/url"
 
@@ -45,6 +46,7 @@ type CustomResourceDefinitionsServerOptions struct {
 	ServerRunOptions   *options.ServerRunOptions
 	RecommendedOptions *genericoptions.RecommendedOptions
 	APIEnablement      *genericoptions.APIEnablementOptions
+	StartupCRDOptions  *startupcrd.Options
 
 	StdOut io.Writer
 	StdErr io.Writer
@@ -58,7 +60,8 @@ func NewCustomResourceDefinitionsServerOptions(out, errOut io.Writer) *CustomRes
 			defaultEtcdPathPrefix,
 			apiserver.Codecs.LegacyCodec(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion),
 		),
-		APIEnablement: genericoptions.NewAPIEnablementOptions(),
+		APIEnablement:     genericoptions.NewAPIEnablementOptions(),
+		StartupCRDOptions: startupcrd.NewOptions(),
 
 		StdOut: out,
 		StdErr: errOut,
@@ -72,6 +75,7 @@ func (o CustomResourceDefinitionsServerOptions) AddFlags(fs *pflag.FlagSet) {
 	o.ServerRunOptions.AddUniversalFlags(fs)
 	o.RecommendedOptions.AddFlags(fs)
 	o.APIEnablement.AddFlags(fs)
+	o.StartupCRDOptions.AddFlags(fs)
 }
 
 // Validate validates the apiextensions-apiserver options.
@@ -80,6 +84,7 @@ func (o CustomResourceDefinitionsServerOptions) Validate() error {
 	errors = append(errors, o.ServerRunOptions.Validate()...)
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	errors = append(errors, o.APIEnablement.Validate(apiserver.Scheme)...)
+	errors = append(errors, o.StartupCRDOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
 
@@ -109,9 +114,10 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
-			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
-			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig),
+			CRDRESTOptionsGetter:      NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			ServiceResolver:           &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
+			AuthResolverWrapper:       webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, nil, serverConfig.LoopbackClientConfig),
+			ExtraStartupCRDsDirectory: o.StartupCRDOptions.ExtraStartupCRDsDirectory,
 		},
 	}
 	return config, nil

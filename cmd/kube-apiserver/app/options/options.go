@@ -18,6 +18,7 @@ limitations under the License.
 package options
 
 import (
+	"k8s.io/apiextensions-apiserver/pkg/startupcrd"
 	"net"
 	"strings"
 	"time"
@@ -58,6 +59,7 @@ type ServerRunOptions struct {
 	EgressSelector          *genericoptions.EgressSelectorOptions
 	Metrics                 *metrics.Options
 	Logs                    *logs.Options
+	StartupCRDs             *startupcrd.Options
 
 	AllowPrivileged           bool
 	EnableLogsHandler         bool
@@ -112,6 +114,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		EgressSelector:          genericoptions.NewEgressSelectorOptions(),
 		Metrics:                 metrics.NewOptions(),
 		Logs:                    logs.NewOptions(),
+		StartupCRDs:             startupcrd.NewOptions(),
 
 		EnableLogsHandler:                 true,
 		EventTTL:                          1 * time.Hour,
@@ -182,6 +185,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	s.Admission.AddFlags(fss.FlagSet("admission"))
 	s.Metrics.AddFlags(fss.FlagSet("metrics"))
 	s.Logs.AddFlags(fss.FlagSet("logs"))
+	s.StartupCRDs.AddFlags(fss.FlagSet("Startup CRDs"))
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.

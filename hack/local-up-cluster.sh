@@ -248,6 +248,9 @@ CLUSTER_SIGNING_KEY_FILE=${CLUSTER_SIGNING_KEY_FILE:-"${CERT_DIR}/client-ca.key"
 # it's useful with PRESERVE_ETCD=true because new ca will make existed service account secrets invalided
 REUSE_CERTS=${REUSE_CERTS:-false}
 
+# optionally specify a directory to pick Startup CRD definitions from
+EXTRA_STARTUP_CRDS_DIRECTORY=${EXTRA_STARTUP_CRDS_DIRECTORY:-""}
+
 # name of the cgroup driver, i.e. cgroupfs or systemd
 if [[ ${CONTAINER_RUNTIME} == "docker" ]]; then
   # default cgroup driver to match what is reported by docker to simplify local development
@@ -596,6 +599,7 @@ EOF
       --requestheader-allowed-names=system:auth-proxy \
       --proxy-client-cert-file="${CERT_DIR}/client-auth-proxy.crt" \
       --proxy-client-key-file="${CERT_DIR}/client-auth-proxy.key" \
+      --extra-startup-crds-directory="${EXTRA_STARTUP_CRDS_DIRECTORY}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
