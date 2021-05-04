@@ -95,6 +95,90 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("Expected no error updating replacing MinAvailable with MaxUnavailable on poddisruptionbudgets.")
 	}
+
+	// Create invalid PDB? Forbidden
+	invalidSelector := []metav1.LabelSelectorRequirement{
+		{
+			Key:      "name",
+			Operator: metav1.LabelSelectorOpIn,
+			Values:   []string{"test", "bad#value"},
+		},
+	}
+
+	invalidPdb := &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: "invalid-pdb", Namespace: metav1.NamespaceDefault},
+		Spec: policy.PodDisruptionBudgetSpec{
+			MinAvailable: &minAvailable,
+			Selector: &metav1.LabelSelector{
+				MatchExpressions: invalidSelector,
+			},
+		},
+	}
+	Strategy.PrepareForCreate(ctx, invalidPdb)
+	errs = Strategy.Validate(ctx, invalidPdb)
+	if len(errs) == 0 {
+		t.Errorf("Expected error on validating")
+	}
+
+	// Update existing valid PDB with an invalid PDB? Forbidden
+	newPdb = &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: pdb.Name, Namespace: pdb.Namespace},
+		Spec:       invalidPdb.Spec,
+		Status: policy.PodDisruptionBudgetStatus{
+			DisruptionsAllowed: 1,
+			CurrentHealthy:     3,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
+		},
+	}
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
+	if len(errs) == 0 {
+		t.Errorf("Expected error updating existing valid pdb with an invalid pdb.")
+	}
+
+	// Update existing invalid PDB with an invalid PDB? OK
+	newPdb = &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: invalidPdb.Name, Namespace: invalidPdb.Namespace},
+		Spec:       invalidPdb.Spec,
+		Status: policy.PodDisruptionBudgetStatus{
+			DisruptionsAllowed: 1,
+			CurrentHealthy:     3,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
+		},
+	}
+	newPdb.Spec.Selector = &metav1.LabelSelector{
+		MatchExpressions: []metav1.LabelSelectorRequirement{
+			{
+				Key:      "name",
+				Operator: metav1.LabelSelectorOpIn,
+				Values:   []string{"bad#value"},
+			},
+		},
+	}
+	Strategy.PrepareForUpdate(ctx, newPdb, invalidPdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, invalidPdb)
+	if len(errs) != 0 {
+		t.Errorf("Expected no error updating existing invalid pdb with an invalid pdb.")
+	}
+
+	// Update existing invalid PDB with valid PDB? OK
+	newPdb = &policy.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{Name: invalidPdb.Name, Namespace: invalidPdb.Namespace},
+		Spec:       pdb.Spec,
+		Status: policy.PodDisruptionBudgetStatus{
+			DisruptionsAllowed: 1,
+			CurrentHealthy:     3,
+			DesiredHealthy:     3,
+			ExpectedPods:       3,
+		},
+	}
+	Strategy.PrepareForUpdate(ctx, newPdb, invalidPdb)
+	errs = Strategy.ValidateUpdate(ctx, newPdb, invalidPdb)
+	if len(errs) != 0 {
+		t.Errorf("Expected no error updating existing invalid pdb with valid pdb.")
+	}
 }
 
 func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {

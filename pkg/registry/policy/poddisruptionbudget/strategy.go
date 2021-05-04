@@ -87,7 +87,10 @@ func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx context.Context, obj, ol
 // Validate validates a new PodDisruptionBudget.
 func (podDisruptionBudgetStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
-	return validation.ValidatePodDisruptionBudget(podDisruptionBudget)
+	return validation.ValidatePodDisruptionBudget(
+		podDisruptionBudget,
+		validation.PodDisruptionBudgetValidationOptions{AllowInvalidSelector: false},
+	)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -101,7 +104,16 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 
 // ValidateUpdate is the default update validation for an end user.
 func (podDisruptionBudgetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
-	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget))
+	err := validation.ValidatePodDisruptionBudget(
+		old.(*policy.PodDisruptionBudget),
+		validation.PodDisruptionBudgetValidationOptions{AllowInvalidSelector: false},
+	)
+	// Apply tighter validation on update only if the existing object also passes the tighter validation
+	allowInvalidSelector := len(err) > 0
+	return validation.ValidatePodDisruptionBudget(
+		obj.(*policy.PodDisruptionBudget),
+		validation.PodDisruptionBudgetValidationOptions{AllowInvalidSelector: allowInvalidSelector},
+	)
 }
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should

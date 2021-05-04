@@ -22,15 +22,16 @@ import (
 	"regexp"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
-	core "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/security/apparmor"
@@ -38,10 +39,30 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
+// PodDisruptionBudgetValidationOptions indicates whether invalid selector in PDB spec is allowed.
+type PodDisruptionBudgetValidationOptions struct {
+	AllowInvalidSelector bool
+}
+
 // ValidatePodDisruptionBudget validates a PodDisruptionBudget and returns an ErrorList
 // with any errors.
-func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
-	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
+func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget, opt PodDisruptionBudgetValidationOptions) field.ErrorList {
+	specField := field.NewPath("spec")
+	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, specField)
+
+	if !opt.AllowInvalidSelector && pdb.Spec.Selector != nil {
+		exprPath := specField.Child("selector").Child("matchExpressions")
+		for i, expr := range pdb.Spec.Selector.MatchExpressions {
+			valPath := exprPath.Index(i).Child("values")
+			for j, value := range expr.Values {
+				errs := validation.IsValidLabelValue(value)
+				if len(errs) == 0 {
+					continue
+				}
+				allErrs = append(allErrs, field.Invalid(valPath.Index(j), value, strings.Join(errs, "; ")))
+			}
+		}
+	}
 	return allErrs
 }
 
