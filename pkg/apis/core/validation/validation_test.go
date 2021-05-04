@@ -16719,13 +16719,6 @@ func TestPodIPsValidation(t *testing.T) {
 				oldPod.Name = newPod.Name
 
 				errs := ValidatePodStatusUpdate(newPod, oldPod, PodValidationOptions{})
-				if oldTestCase.expectError {
-					// The old pod was invalid, tolerate invalid IPs in the new pod as well
-					if len(errs) > 0 {
-						t.Fatalf("expected success for update to pod with already-invalid IPs, got errors: %v", errs)
-					}
-					continue
-				}
 
 				if len(errs) == 0 && testCase.expectError {
 					t.Fatalf("expected failure for %s, but there were none", testCase.pod.Name)

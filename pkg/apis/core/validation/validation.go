@@ -4085,11 +4085,7 @@ func ValidatePodStatusUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions
 	allErrs = append(allErrs, ValidateContainerStateTransition(newPod.Status.InitContainerStatuses, oldPod.Status.InitContainerStatuses, fldPath.Child("initContainerStatuses"), oldPod.Spec.RestartPolicy)...)
 
 	if newIPErrs := validatePodIPs(newPod); len(newIPErrs) > 0 {
-		// Tolerate IP errors if IP errors already existed in the old pod. See http://issue.k8s.io/90625
-		// TODO(liggitt): Drop the check of oldPod in 1.20
-		if oldIPErrs := validatePodIPs(oldPod); len(oldIPErrs) == 0 {
-			allErrs = append(allErrs, newIPErrs...)
-		}
+		allErrs = append(allErrs, newIPErrs...)
 	}
 
 	return allErrs
