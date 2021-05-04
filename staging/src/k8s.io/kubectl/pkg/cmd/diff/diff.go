@@ -521,17 +521,11 @@ func (m *Masker) run() error {
 
 // From returns the masked version of the 'from' object.
 func (m *Masker) From() runtime.Object {
-	if m.from == nil {
-		return nil
-	}
 	return m.from
 }
 
 // To returns the masked version of the 'to' object.
 func (m *Masker) To() runtime.Object {
-	if m.to == nil {
-		return nil
-	}
 	return m.to
 }
 
@@ -569,11 +563,7 @@ func (d *Differ) Diff(obj Object, printer Printer) error {
 	}
 
 	// Mask secret values if object is V1Secret
-	o, err := obj.Merged()
-	if err != nil {
-		return err
-	}
-	if gvk := o.GetObjectKind().GroupVersionKind(); gvk.Version == "v1" && gvk.Kind == "Secret" {
+	if gvk := to.GetObjectKind().GroupVersionKind(); gvk.Version == "v1" && gvk.Kind == "Secret" {
 		m, err := NewMasker(from, to)
 		if err != nil {
 			return err

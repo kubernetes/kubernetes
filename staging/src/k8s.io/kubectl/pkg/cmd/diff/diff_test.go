@@ -544,11 +544,15 @@ func TestMasker(t *testing.T) {
 				t.Fatal(err)
 			}
 			from, to := m.From(), m.To()
-			if diff := cmp.Diff(from, tc.want.from); diff != "" {
-				t.Errorf("from: (-want +got):\n%s", diff)
+			if from != nil && tc.want.from != nil {
+				if diff := cmp.Diff(from, tc.want.from); diff != "" {
+					t.Errorf("from: (-want +got):\n%s", diff)
+				}
 			}
-			if diff := cmp.Diff(to, tc.want.to); diff != "" {
-				t.Errorf("to: (-want +got):\n%s", diff)
+			if to != nil && tc.want.to != nil {
+				if diff := cmp.Diff(to, tc.want.to); diff != "" {
+					t.Errorf("to: (-want +got):\n%s", diff)
+				}
 			}
 		})
 	}
