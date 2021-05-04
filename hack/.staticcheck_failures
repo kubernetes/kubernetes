@@ -17,7 +17,6 @@ vendor/k8s.io/apiserver/pkg/storage
 vendor/k8s.io/apiserver/pkg/storage/cacher
 vendor/k8s.io/apiserver/pkg/storage/tests
 vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope
-vendor/k8s.io/apiserver/pkg/util/webhook
 vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/client-go/rest
 vendor/k8s.io/client-go/rest/watch

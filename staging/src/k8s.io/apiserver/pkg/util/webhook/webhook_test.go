@@ -163,15 +163,41 @@ func TestKubeConfigFile(t *testing.T) {
 			errRegex: fmt.Sprintf(errMissingCertPath, "certificate-authority", badCAPath, "", badCAPath),
 		},
 		{
-			test: "cluster with invalid CA certificate ",
+			test: "cluster with invalid CA certificate",
 			cluster: &v1.NamedCluster{
 				Cluster: v1.Cluster{
 					Server:                   namedCluster.Cluster.Server,
-					CertificateAuthorityData: caKey,
+					CertificateAuthorityData: caKey, // pretend user put caKey here instead of caCert
 				},
 			},
 			user:     &defaultUser,
-			errRegex: "", // Not an error at parse time, only when using the webhook
+			errRegex: "unable to load root certificates: no valid certificate authority data seen",
+		},
+		{
+			test: "cluster with invalid CA certificate - no PEM",
+			cluster: &v1.NamedCluster{
+				Cluster: v1.Cluster{
+					Server:                   namedCluster.Cluster.Server,
+					CertificateAuthorityData: []byte(`not a cert`),
+				},
+			},
+			user:     &defaultUser,
+			errRegex: "unable to load root certificates: unable to parse bytes as PEM block",
+		},
+		{
+			test: "cluster with invalid CA certificate - parse error",
+			cluster: &v1.NamedCluster{
+				Cluster: v1.Cluster{
+					Server: namedCluster.Cluster.Server,
+					CertificateAuthorityData: []byte(`
+-----BEGIN CERTIFICATE-----
+MIIDGTCCAgGgAwIBAgIUOS2M
+-----END CERTIFICATE-----
+`),
+				},
+			},
+			user:     &defaultUser,
+			errRegex: "unable to load root certificates: failed to parse certificate: asn1: syntax error: data truncated",
 		},
 		{
 			test:    "user with invalid client certificate path",
@@ -242,46 +268,48 @@ func TestKubeConfigFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		// Use a closure so defer statements trigger between loop iterations.
-		err := func() error {
-			kubeConfig := v1.Config{}
+		t.Run(tt.test, func(t *testing.T) {
+			// Use a closure so defer statements trigger between loop iterations.
+			err := func() error {
+				kubeConfig := v1.Config{}
 
-			if tt.cluster != nil {
-				kubeConfig.Clusters = []v1.NamedCluster{*tt.cluster}
-			}
+				if tt.cluster != nil {
+					kubeConfig.Clusters = []v1.NamedCluster{*tt.cluster}
+				}
 
-			if tt.context != nil {
-				kubeConfig.Contexts = []v1.NamedContext{*tt.context}
-			}
+				if tt.context != nil {
+					kubeConfig.Contexts = []v1.NamedContext{*tt.context}
+				}
 
-			if tt.user != nil {
-				kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
-			}
+				if tt.user != nil {
+					kubeConfig.AuthInfos = []v1.NamedAuthInfo{*tt.user}
+				}
 
-			kubeConfig.CurrentContext = tt.currentContext
+				kubeConfig.CurrentContext = tt.currentContext
 
-			kubeConfigFile, err := newKubeConfigFile(kubeConfig)
+				kubeConfigFile, err := newKubeConfigFile(kubeConfig)
+
+				if err == nil {
+					defer os.Remove(kubeConfigFile)
+
+					_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, nil)
+				}
+
+				return err
+			}()
 
 			if err == nil {
-				defer os.Remove(kubeConfigFile)
-
-				_, err = NewGenericWebhook(runtime.NewScheme(), scheme.Codecs, kubeConfigFile, groupVersions, retryBackoff, nil)
+				if tt.errRegex != "" {
+					t.Errorf("%s: expected an error", tt.test)
+				}
+			} else {
+				if tt.errRegex == "" {
+					t.Errorf("%s: unexpected error: %v", tt.test, err)
+				} else if !regexp.MustCompile(tt.errRegex).MatchString(err.Error()) {
+					t.Errorf("%s: unexpected error message to match:\n  Expected: %s\n  Actual:   %s", tt.test, tt.errRegex, err.Error())
+				}
 			}
-
-			return err
-		}()
-
-		if err == nil {
-			if tt.errRegex != "" {
-				t.Errorf("%s: expected an error", tt.test)
-			}
-		} else {
-			if tt.errRegex == "" {
-				t.Errorf("%s: unexpected error: %v", tt.test, err)
-			} else if !regexp.MustCompile(tt.errRegex).MatchString(err.Error()) {
-				t.Errorf("%s: unexpected error message to match:\n  Expected: %s\n  Actual:   %s", tt.test, tt.errRegex, err.Error())
-			}
-		}
+		})
 	}
 }
 
