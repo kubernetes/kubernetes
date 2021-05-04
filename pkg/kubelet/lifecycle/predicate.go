@@ -93,7 +93,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	// In the erratic case we see the value of this as 0! <-- That is going to fail admittance of any pods that have a non-zero ephemeral-storage resource requirements value
 	klog.Infof("Allocatable Ephemeral Storage after invoking nodeinfo.SetNode(node): %d", nodeInfo.Allocatable.EphemeralStorage)
 	// ensure the node has enough plugin resources for that required in pods
-	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
+	if err := w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
 		klog.InfoS("Failed to admit pod", "pod", klog.KObj(admitPod), "message", message)
 		return PodAdmitResult{
