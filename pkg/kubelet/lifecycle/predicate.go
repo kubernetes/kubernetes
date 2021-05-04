@@ -65,11 +65,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	var getNodeAnyWayErr error
 	wait.PollImmediate(1*time.Second, 20*time.Minute, func() (bool, error) {
 		node, getNodeAnyWayErr = w.getNodeAnyWayFunc()
-		if allocatable := schedulerframework.NewResource(node.Status.Allocatable); allocatable.EphemeralStorage == 0 {
-			klog.Infof("Node does not yet have any allocatable storage")
-			return false, nil
-		}
-		return true, nil
+		return nodeHasAllocatableResources(node), nil
 	})
 	if getNodeAnyWayErr != nil {
 		klog.ErrorS(getNodeAnyWayErr, "Cannot get Node info")
@@ -280,4 +276,13 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 	}
 
 	return reasons, nil
+}
+
+func nodeHasAllocatableResources(node *v1.Node) bool {
+	if allocatable := schedulerframework.NewResource(node.Status.Allocatable); allocatable != nil {
+		klog.Infof("Node has allocatable resources")
+		return allocatable.EphemeralStorage != 0 && allocatable.Memory != 0 && allocatable.MilliCPU != 0
+	}
+	klog.Infof("Node does not yet have any allocatable storage")
+	return false
 }
