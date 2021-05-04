@@ -19,6 +19,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	flowcontrolv1beta1 "k8s.io/api/flowcontrol/v1beta1"
@@ -103,60 +104,70 @@ func (p RESTStorageProvider) GroupName() string {
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
 	return PostStartHookName, func(hookContext genericapiserver.PostStartHookContext) error {
 		flowcontrolClientSet := flowcontrolclient.NewForConfigOrDie(hookContext.LoopbackClientConfig)
-		go func() {
-			const retryCreatingSuggestedSettingsInterval = time.Second
-			err := wait.PollImmediateUntil(
-				retryCreatingSuggestedSettingsInterval,
-				func() (bool, error) {
-					should, err := shouldEnsureSuggested(flowcontrolClientSet)
-					if err != nil {
-						klog.Errorf("failed getting exempt flow-schema, will retry later: %v", err)
-						return false, nil
-					}
-					if !should {
-						return true, nil
-					}
-					err = ensure(
-						flowcontrolClientSet,
-						flowcontrolbootstrap.SuggestedFlowSchemas,
-						flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
-					if err != nil {
-						klog.Errorf("failed ensuring suggested settings, will retry later: %v", err)
-						return false, nil
-					}
-					return true, nil
-				},
-				hookContext.StopCh)
-			if err != nil {
-				klog.ErrorS(err, "Ensuring suggested configuration failed")
-
-				// We should not attempt creation of mandatory objects if ensuring the suggested
-				// configuration resulted in an error.
-				// This only happens when the stop channel is closed.
-				// We rely on the presence of the "exempt" priority level configuration object in the cluster
-				// to indicate whether we should ensure suggested configuration.
+		suggestedConfigCreatedOnce := sync.Once{}
+		createdSuggestedConfig := make(chan struct{})
+		const retryCreatingSuggestedSettingsInterval = time.Minute
+		go wait.Until(
+			func() {
+				should, err := shouldEnsureSuggested(flowcontrolClientSet)
+				if err != nil {
+					klog.Errorf("failed getting exempt flow-schema, will retry later: %v", err)
+					return
+				}
+				if !should {
+					return
+				}
+				err = ensure(
+					flowcontrolClientSet,
+					flowcontrolbootstrap.SuggestedFlowSchemas,
+					flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
+				if err != nil {
+					klog.Errorf("failed ensuring suggested settings, will retry later: %v", err)
+					return
+				}
+				suggestedConfigCreatedOnce.Do(func() {
+					close(createdSuggestedConfig)
+				})
 				return
-			}
+			},
+			retryCreatingSuggestedSettingsInterval,
+			hookContext.StopCh)
 
-			const retryCreatingMandatorySettingsInterval = time.Minute
-			_ = wait.PollImmediateUntil(
-				retryCreatingMandatorySettingsInterval,
-				func() (bool, error) {
-					if err := upgrade(
-						flowcontrolClientSet,
-						flowcontrolbootstrap.MandatoryFlowSchemas,
-						// Note: the "exempt" priority-level is supposed to be the last item in the pre-defined
-						// list, so that a crash in the midst of the first kube-apiserver startup does not prevent
-						// the full initial set of objects from being created.
-						flowcontrolbootstrap.MandatoryPriorityLevelConfigurations,
-					); err != nil {
-						klog.Errorf("failed creating mandatory flowcontrol settings: %v", err)
-						return false, nil
-					}
-					return false, nil // always retry
-				},
-				hookContext.StopCh)
-		}()
+		mandatoryConfigCreatedOnce := sync.Once{}
+		createdMandatoryConfig := make(chan struct{})
+		const retryCreatingMandatorySettingsInterval = time.Minute
+		go wait.Until(
+			func() {
+				if err := upgrade(
+					flowcontrolClientSet,
+					flowcontrolbootstrap.MandatoryFlowSchemas,
+					// Note: the "exempt" priority-level is supposed to be the last item in the pre-defined
+					// list, so that a crash in the midst of the first kube-apiserver startup does not prevent
+					// the full initial set of objects from being created.
+					flowcontrolbootstrap.MandatoryPriorityLevelConfigurations,
+				); err != nil {
+					klog.Errorf("failed creating mandatory flowcontrol settings: %v", err)
+					return
+				}
+				mandatoryConfigCreatedOnce.Do(func() {
+					close(createdMandatoryConfig)
+				})
+				return
+			},
+			retryCreatingMandatorySettingsInterval,
+			hookContext.StopCh)
+
+		// wait for both creations to finish
+		select {
+		case <-createdSuggestedConfig:
+		case <-hookContext.StopCh:
+			return fmt.Errorf("never created suggested config")
+		}
+		select {
+		case <-createdMandatoryConfig:
+		case <-hookContext.StopCh:
+			return fmt.Errorf("never created mandatory config")
+		}
 		return nil
 	}, nil
 
