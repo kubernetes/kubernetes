@@ -280,8 +280,10 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 
 func nodeHasAllocatableResources(node *v1.Node) bool {
 	if allocatable := schedulerframework.NewResource(node.Status.Allocatable); allocatable != nil {
-		klog.Infof("Node has allocatable resources")
-		return allocatable.EphemeralStorage != 0 && allocatable.Memory != 0 && allocatable.MilliCPU != 0
+		if allocatable.EphemeralStorage != 0 && allocatable.Memory != 0 && allocatable.MilliCPU != 0 {
+			klog.Infof("Node has allocatable resources")
+			return true
+		}
 	}
 	klog.Infof("Node does not yet have any allocatable storage")
 	return false
