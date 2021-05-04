@@ -1034,7 +1034,7 @@ func ensureSystemCgroups(rootCgroupPath string, manager cgroups.Manager) error {
 			return nil
 		}
 
-		klog.InfoS("Moving non-kernel processes", "pids", pids)
+		klog.V(3).InfoS("Moving non-kernel processes", "pids", pids)
 		for _, pid := range pids {
 			err := manager.Apply(pid)
 			if err != nil {
