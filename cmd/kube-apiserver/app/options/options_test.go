@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/pflag"
+	"k8s.io/apiextensions-apiserver/pkg/startupcrd"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -310,6 +311,7 @@ func TestAddFlags(t *testing.T) {
 		ProxyClientCertFile:               "/var/run/kubernetes/proxy.crt",
 		Metrics:                           &metrics.Options{},
 		Logs:                              logs.NewOptions(),
+		StartupCRDs:                       startupcrd.NewOptions(),
 		IdentityLeaseDurationSeconds:      3600,
 		IdentityLeaseRenewIntervalSeconds: 10,
 	}
