@@ -23,17 +23,17 @@ import (
 // ClientConnectionConfiguration contains details for constructing a client.
 type ClientConnectionConfiguration struct {
 	// kubeconfig is the path to a KubeConfig file.
-	Kubeconfig string
+	Kubeconfig string `flag:"kubeconfig"`
 	// acceptContentTypes defines the Accept header sent by clients when connecting to a server, overriding the
 	// default value of 'application/json'. This field will control all connections to the server used by a particular
 	// client.
 	AcceptContentTypes string
 	// contentType is the content type used when sending data to the server from this client.
-	ContentType string
+	ContentType string `flag:"kube-api-content-type"`
 	// qps controls the number of queries per second allowed for this connection.
-	QPS float32
+	QPS float32 `flag:"kube-api-qps"`
 	// burst allows extra queries to accumulate when a client is exceeding its rate.
-	Burst int32
+	Burst int32 `flag:"kube-api-burst"`
 }
 
 // LeaderElectionConfiguration defines the configuration of leader election

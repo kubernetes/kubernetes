@@ -30,15 +30,15 @@ import (
 type KubeProxyIPTablesConfiguration struct {
 	// masqueradeBit is the bit of the iptables fwmark space to use for SNAT if using
 	// the pure iptables proxy mode. Values must be within the range [0, 31].
-	MasqueradeBit *int32
+	MasqueradeBit *int32 `flag:"iptables-masquerade-bit"`
 	// masqueradeAll tells kube-proxy to SNAT everything if using the pure iptables proxy mode.
-	MasqueradeAll bool
+	MasqueradeAll bool `flag:"masquerade-all"`
 	// syncPeriod is the period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
-	SyncPeriod metav1.Duration
+	SyncPeriod metav1.Duration `flag:"iptables-sync-period"`
 	// minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
-	MinSyncPeriod metav1.Duration
+	MinSyncPeriod metav1.Duration `flag:"iptables-min-sync-period"`
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration
@@ -46,27 +46,27 @@ type KubeProxyIPTablesConfiguration struct {
 type KubeProxyIPVSConfiguration struct {
 	// syncPeriod is the period that ipvs rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').  Must be greater than 0.
-	SyncPeriod metav1.Duration
+	SyncPeriod metav1.Duration `flag:"ipvs-sync-period"`
 	// minSyncPeriod is the minimum period that ipvs rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
-	MinSyncPeriod metav1.Duration
+	MinSyncPeriod metav1.Duration `flag:"ipvs-min-sync-period"`
 	// ipvs scheduler
-	Scheduler string
+	Scheduler string `flag:"ipvs-scheduler"`
 	// excludeCIDRs is a list of CIDR's which the ipvs proxier should not touch
 	// when cleaning up ipvs services.
-	ExcludeCIDRs []string
+	ExcludeCIDRs []string `flag:"ipvs-exclude-cidrs"`
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
-	StrictARP bool
+	StrictARP bool `flag:"ipvs-strict-arp"`
 	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
 	// The default value is 0, which preserves the current timeout value on the system.
-	TCPTimeout metav1.Duration
+	TCPTimeout metav1.Duration `flag:"ipvs-tcp-timeout"`
 	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
 	// The default value is 0, which preserves the current timeout value on the system.
-	TCPFinTimeout metav1.Duration
+	TCPFinTimeout metav1.Duration `flag:"ipvs-tcpfin-timeout"`
 	// udpTimeout is the timeout value used for IPVS UDP packets.
 	// The default value is 0, which preserves the current timeout value on the system.
-	UDPTimeout metav1.Duration
+	UDPTimeout metav1.Duration `flag:"ipvs-udp-timeout"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
@@ -74,17 +74,17 @@ type KubeProxyIPVSConfiguration struct {
 type KubeProxyConntrackConfiguration struct {
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
-	MaxPerCore *int32
+	MaxPerCore *int32 `flag:"conntrack-max-per-core"`
 	// min is the minimum value of connect-tracking records to allocate,
 	// regardless of maxPerCore (set maxPerCore=0 to leave the limit as-is).
-	Min *int32
+	Min *int32 `flag:"conntrack-min"`
 	// tcpEstablishedTimeout is how long an idle TCP connection will be kept open
 	// (e.g. '2s').  Must be greater than 0 to set.
-	TCPEstablishedTimeout *metav1.Duration
+	TCPEstablishedTimeout *metav1.Duration `flag:"conntrack-tcp-timeout-established"`
 	// tcpCloseWaitTimeout is how long an idle conntrack entry
 	// in CLOSE_WAIT state will remain in the conntrack
 	// table. (e.g. '60s'). Must be greater than 0 to set.
-	TCPCloseWaitTimeout *metav1.Duration
+	TCPCloseWaitTimeout *metav1.Duration `flag:"conntrack-tcp-timeout-close-wait"`
 }
 
 // KubeProxyWinkernelConfiguration contains Windows/HNS settings for
@@ -109,26 +109,26 @@ type KubeProxyConfiguration struct {
 	metav1.TypeMeta
 
 	// featureGates is a map of feature names to bools that enable or disable alpha/experimental features.
-	FeatureGates map[string]bool
+	FeatureGates map[string]bool `flag:"feature-gates"`
 
 	// bindAddress is the IP address for the proxy server to serve on (set to 0.0.0.0
 	// for all interfaces)
-	BindAddress string
+	BindAddress string `flag:"bind-address"`
 	// healthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10256
-	HealthzBindAddress string
+	HealthzBindAddress string `flag:"healthz-bind-address"`
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
-	MetricsBindAddress string
+	MetricsBindAddress string `flag:"metrics-bind-address"`
 	// BindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
-	BindAddressHardFail bool
+	BindAddressHardFail bool `flag:"bind-address-hard-fail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
-	EnableProfiling bool
+	EnableProfiling bool `flag:"profiling"`
 	// clusterCIDR is the CIDR range of the pods in the cluster. It is used to
 	// bridge traffic coming from outside of the cluster. If not provided,
 	// no off-cluster bridging will be performed.
-	ClusterCIDR string
+	ClusterCIDR string `flag:"cluster-cidr"`
 	// hostnameOverride, if non-empty, will be used as the identity instead of the actual hostname.
 	HostnameOverride string
 	// clientConnection specifies the kubeconfig file and client connection settings for the proxy
@@ -140,20 +140,20 @@ type KubeProxyConfiguration struct {
 	IPVS KubeProxyIPVSConfiguration
 	// oomScoreAdj is the oom-score-adj value for kube-proxy process. Values must be within
 	// the range [-1000, 1000]
-	OOMScoreAdj *int32
+	OOMScoreAdj *int32 `flag:"oom-score-adj"`
 	// mode specifies which proxy mode to use.
-	Mode ProxyMode
+	Mode ProxyMode `flag:"proxy-mode"`
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
-	PortRange string
+	PortRange string `flag:"proxy-port-range"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
-	UDPIdleTimeout metav1.Duration
+	UDPIdleTimeout metav1.Duration `flag:"udp-timeout"`
 	// conntrack contains conntrack-related configuration options.
 	Conntrack KubeProxyConntrackConfiguration
 	// configSyncPeriod is how often configuration from the apiserver is refreshed. Must be greater
 	// than 0.
-	ConfigSyncPeriod metav1.Duration
+	ConfigSyncPeriod metav1.Duration `flag:"config-sync-period"`
 	// nodePortAddresses is the --nodeport-addresses value for kube-proxy process. Values must be valid
 	// IP blocks. These values are as a parameter to select the interfaces where nodeport works.
 	// In case someone would like to expose a service on localhost for local visit and some other interfaces for
@@ -161,13 +161,13 @@ type KubeProxyConfiguration struct {
 	// If set it to "127.0.0.0/8", kube-proxy will only select the loopback interface for NodePort.
 	// If set it to a non-zero IP block, kube-proxy will filter that down to just the IPs that applied to the node.
 	// An empty string slice is meant to select all network interfaces.
-	NodePortAddresses []string
+	NodePortAddresses []string `flag:"nodeport-addresses"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration
 	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
-	ShowHiddenMetricsForVersion string
+	ShowHiddenMetricsForVersion string `flag:"show-hidden-metrics-for-version"`
 	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
-	DetectLocalMode LocalMode
+	DetectLocalMode LocalMode `flag:"detect-local-mode"`
 }
 
 // ProxyMode represents modes used by the Kubernetes proxy server. Currently, three modes of proxy are available in

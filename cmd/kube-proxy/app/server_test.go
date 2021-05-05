@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/spf13/pflag"
 
 	"github.com/stretchr/testify/assert"
 
@@ -492,7 +493,7 @@ udpIdleTimeout: 250ms`)
 
 		opt := NewOptions()
 		opt.ConfigFile = file.Name()
-		err = opt.Complete()
+		err = opt.Complete(nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -626,8 +627,8 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 	}
 }
 
-func TestFlagOverwrites(t *testing.T) {
-	setUp := func(mode string) (*os.File, string, error) {
+func TestFlagConfigConflict(t *testing.T) {
+	setUp := func(value string) (*os.File, string, error) {
 		tempDir, err := ioutil.TempDir("", "kubeproxy-config-overwrite")
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
@@ -640,7 +641,7 @@ func TestFlagOverwrites(t *testing.T) {
 
 		_, err = file.WriteString(fmt.Sprintf(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
 kind: KubeProxyConfiguration
-mode: "%s"`, mode))
+clusterCIDR: "%s"`, value))
 		if err != nil {
 			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
 		}
@@ -656,44 +657,63 @@ mode: "%s"`, mode))
 	testCases := []struct {
 		name        string
 		proxyServer proxyRun
-		flagMode    kubeproxyconfig.ProxyMode
-		configMode  string
-		expectMode  kubeproxyconfig.ProxyMode
+		flagValue   string
+		configValue string
+		expectValue string
+		expectError error
 	}{
 		{
-			name:       "flag not set",
-			flagMode:   "",
-			configMode: "ipvs",
-			expectMode: "ipvs",
+			name:        "neither flag nor config is set, use default value from flag",
+			flagValue:   "",
+			configValue: "",
+			expectValue: "0.0.0.0/16",
+			expectError: nil,
 		},
 		{
-			name:       "flag overwrites empty proxy component config",
-			flagMode:   "ipvs",
-			configMode: "",
-			expectMode: "ipvs",
+			name:        "flag is not set",
+			flagValue:   "",
+			configValue: "1.1.0.0/16",
+			expectValue: "1.1.0.0/16",
+			expectError: nil,
 		},
 		{
-			name:       "flag take precedence on proxy component configs",
-			flagMode:   "iptables",
-			configMode: "ipvs",
-			expectMode: "iptables",
+			name:        "config is not set",
+			flagValue:   "2.2.0.0/16",
+			configValue: "",
+			expectValue: "2.2.0.0/16",
+			expectError: nil,
+		},
+		{
+			name:        "detect flag and config conflict",
+			flagValue:   "2.2.0.0/16",
+			configValue: "1.1.0.0/16",
+			expectValue: "",
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [cluster-cidr]"),
 		},
 	}
 
 	for _, tc := range testCases {
-		file, tempDir, err := setUp(tc.configMode)
+		file, tempDir, err := setUp(tc.configValue)
 		if err != nil {
 			t.Fatalf("unexpected error when setting up environment: %v", err)
 		}
 
 		opt := NewOptions()
 		opt.ConfigFile = file.Name()
-		opt.config.Mode = tc.flagMode
-		err = opt.Complete()
-		if err != nil {
-			t.Fatal(err)
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		fs.StringVar(&opt.config.ClusterCIDR, "cluster-cidr", "0.0.0.0/16", "usage")
+		args := []string{}
+		if tc.flagValue != "" {
+			args = append(args, "--cluster-cidr="+string(tc.flagValue))
 		}
-		assert.Equal(t, tc.expectMode, opt.config.Mode)
+		args = append(args, "extra-arg")
+		err = fs.Parse(args)
+		assert.Empty(t, err)
+		err = opt.Complete(fs)
+		assert.Equal(t, tc.expectError, err)
+		if err == nil {
+			assert.Equal(t, tc.expectValue, opt.config.ClusterCIDR, tc.name)
+		}
 
 		tearDown(file, tempDir)
 	}

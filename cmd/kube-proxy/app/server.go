@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -216,7 +217,7 @@ func NewOptions() *Options {
 }
 
 // Complete completes all the required options.
-func (o *Options) Complete() error {
+func (o *Options) Complete(fs *pflag.FlagSet) error {
 	if len(o.ConfigFile) == 0 && len(o.WriteConfigTo) == 0 {
 		klog.Warning("WARNING: all flags other than --config, --write-config-to, and --cleanup are deprecated. Please begin using a config file ASAP.")
 		o.config.HealthzBindAddress = addressFromDeprecatedFlags(o.config.HealthzBindAddress, o.healthzPort)
@@ -229,8 +230,14 @@ func (o *Options) Complete() error {
 		if err != nil {
 			return err
 		}
+
+		conflictFields := o.detectConfigConflict(c, fs)
+		if len(conflictFields) != 0 {
+			return fmt.Errorf("Kube-proxy flags conflict: %v", conflictFields)
+		}
+
 		// make flags take precedence
-		mergo.Merge(c, o.config, mergo.WithOverride)
+		mergo.Merge(c, o.config)
 		o.config = c
 
 		if err := o.initWatcher(); err != nil {
@@ -441,6 +448,43 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 	return proxyConfig, nil
 }
 
+// detectConfigConflict detects the conflict between KubeProxyConfiguration and the command flags
+// if a field is non-empty in KubeProxyConfiguration and is also set by user, then return an error
+func (o *Options) detectConfigConflict(config interface{}, fs *pflag.FlagSet) []string {
+	if fs == nil || config == nil {
+		return nil
+	}
+
+	var conflictFields []string
+	var configVal reflect.Value
+	var configType reflect.Type
+
+	if kind := reflect.ValueOf(config).Kind(); kind == reflect.Ptr || kind == reflect.UnsafePointer {
+		configVal = reflect.ValueOf(config).Elem()
+	} else {
+		configVal = reflect.ValueOf(config)
+	}
+	configType = configVal.Type()
+	fieldCnt := configVal.NumField()
+
+	for i := 0; i < fieldCnt; i++ {
+		field, fieldType := configVal.Field(i), configType.Field(i)
+
+		if !field.IsValid() || field.IsZero() {
+			continue
+		}
+		if tag, set := fieldType.Tag.Lookup("flag"); set {
+			flag := fs.Lookup(tag)
+			if flag != nil && flag.Changed {
+				conflictFields = append(conflictFields, tag)
+			}
+		} else if field.Kind() == reflect.Struct {
+			conflictFields = append(conflictFields, o.detectConfigConflict(field.Interface(), fs)...)
+		}
+	}
+	return conflictFields
+}
+
 // ApplyDefaults applies the default values to Options.
 func (o *Options) ApplyDefaults(in *kubeproxyconfig.KubeProxyConfiguration) (*kubeproxyconfig.KubeProxyConfiguration, error) {
 	external, err := proxyconfigscheme.Scheme.ConvertToVersion(in, v1alpha1.SchemeGroupVersion)
@@ -481,7 +525,7 @@ with the apiserver API to configure the proxy.`,
 				klog.Fatalf("failed OS init: %v", err)
 			}
 
-			if err := opts.Complete(); err != nil {
+			if err := opts.Complete(cmd.Flags()); err != nil {
 				klog.Fatalf("failed complete: %v", err)
 			}
 			if err := opts.Validate(); err != nil {
