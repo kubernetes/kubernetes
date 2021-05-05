@@ -236,6 +236,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 		Name:      podStatus.Name,
 		Namespace: podStatus.Namespace,
 	}
+	podStatus.ContainerStatusesLock.RLock()
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State != ContainerStateRunning {
 			continue
@@ -250,6 +251,7 @@ func ConvertPodStatusToRunningPod(runtimeName string, podStatus *PodStatus) Pod 
 		}
 		runningPod.Containers = append(runningPod.Containers, container)
 	}
+	podStatus.ContainerStatusesLock.RUnlock()
 
 	// Populate sandboxes in kubecontainer.Pod
 	for _, sandbox := range podStatus.SandboxStatuses {

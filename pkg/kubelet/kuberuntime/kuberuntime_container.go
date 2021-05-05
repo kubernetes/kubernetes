@@ -769,6 +769,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 	}
 	for name := range initContainerNames {
 		count := 0
+		podStatus.ContainerStatusesLock.RLock()
 		for _, status := range podStatus.ContainerStatuses {
 			if status.Name != name ||
 				(status.State != kubecontainer.ContainerStateExited &&
@@ -790,6 +791,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 				continue
 			}
 		}
+		podStatus.ContainerStatusesLock.RUnlock()
 	}
 }
 
@@ -803,6 +805,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 	}
 	for name := range initContainerNames {
 		count := 0
+		podStatus.ContainerStatusesLock.RLock()
 		for _, status := range podStatus.ContainerStatuses {
 			if status.Name != name {
 				continue
@@ -815,6 +818,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 				continue
 			}
 		}
+		podStatus.ContainerStatusesLock.RUnlock()
 	}
 }
 

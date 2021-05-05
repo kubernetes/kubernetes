@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -298,6 +299,8 @@ type PodStatus struct {
 	IPs []string
 	// Status of containers in the pod.
 	ContainerStatuses []*Status
+	// Lock for synchronisation on ContainerStatuses
+	ContainerStatusesLock sync.RWMutex
 	// Status of the pod sandbox.
 	// Only for kuberuntime now, other runtime may keep it nil.
 	SandboxStatuses []*runtimeapi.PodSandboxStatus
@@ -338,6 +341,9 @@ type Status struct {
 // FindContainerStatusByName returns container status in the pod status with the given name.
 // When there are multiple containers' statuses with the same name, the first match will be returned.
 func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Status {
+	podStatus.ContainerStatusesLock.RLock()
+	defer podStatus.ContainerStatusesLock.RUnlock()
+
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.Name == containerName {
 			return containerStatus
@@ -349,6 +355,10 @@ func (podStatus *PodStatus) FindContainerStatusByName(containerName string) *Sta
 // GetRunningContainerStatuses returns container status of all the running containers in a pod
 func (podStatus *PodStatus) GetRunningContainerStatuses() []*Status {
 	runningContainerStatuses := []*Status{}
+
+	podStatus.ContainerStatusesLock.RLock()
+	defer podStatus.ContainerStatusesLock.RUnlock()
+
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State == ContainerStateRunning {
 			runningContainerStatuses = append(runningContainerStatuses, containerStatus)

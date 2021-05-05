@@ -168,10 +168,12 @@ func (kl *Kubelet) getFailedContainers(pod *v1.Pod) ([]string, error) {
 		return nil, fmt.Errorf("unable to get status for pod %q: %v", format.Pod(pod), err)
 	}
 	var containerNames []string
+	status.ContainerStatusesLock.RLock()
 	for _, cs := range status.ContainerStatuses {
 		if cs.State != kubecontainer.ContainerStateRunning && cs.ExitCode != 0 {
 			containerNames = append(containerNames, cs.Name)
 		}
 	}
+	status.ContainerStatusesLock.RUnlock()
 	return containerNames, nil
 }

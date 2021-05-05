@@ -286,9 +286,11 @@ func (g *GenericPLEG) relist() {
 					// Get updated podStatus
 					status, err := g.cache.Get(pod.ID)
 					if err == nil {
+						status.ContainerStatusesLock.RLock()
 						for _, containerStatus := range status.ContainerStatuses {
 							containerExitCode[containerStatus.ID.ID] = containerStatus.ExitCode
 						}
+						status.ContainerStatusesLock.RUnlock()
 					}
 				}
 				if containerID, ok := events[i].Data.(string); ok {

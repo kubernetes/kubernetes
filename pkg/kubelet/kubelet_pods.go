@@ -975,9 +975,11 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 	}
 	if len(runtimeStatus.ContainerStatuses) > 0 {
 		var statusStr string
+		runtimeStatus.ContainerStatusesLock.RLock()
 		for _, status := range runtimeStatus.ContainerStatuses {
 			statusStr += fmt.Sprintf("%+v ", *status)
 		}
+		runtimeStatus.ContainerStatusesLock.RUnlock()
 		klog.V(3).InfoS("Pod is terminated, but some containers have not been cleaned up", "pod", klog.KObj(pod), "status", statusStr)
 		return false
 	}
@@ -1576,8 +1578,7 @@ func (kl *Kubelet) generateAPIPodStatus(pod *v1.Pod, podStatus *kubecontainer.Po
 }
 
 // convertStatusToAPIStatus creates an api PodStatus for the given pod from
-// the given internal pod status.  It is purely transformative and does not
-// alter the kubelet state at all.
+// the given internal pod status.
 func (kl *Kubelet) convertStatusToAPIStatus(pod *v1.Pod, podStatus *kubecontainer.PodStatus) *v1.PodStatus {
 	var apiPodStatus v1.PodStatus
 
@@ -1756,12 +1757,14 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 
 	for _, container := range containers {
 		found := false
+		podStatus.ContainerStatusesLock.RLock()
 		for _, cStatus := range podStatus.ContainerStatuses {
 			if container.Name == cStatus.Name {
 				found = true
 				break
 			}
 		}
+		podStatus.ContainerStatusesLock.RUnlock()
 		if found {
 			continue
 		}
@@ -1819,9 +1822,13 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	}
 
 	// Make the latest container status comes first.
+	podStatus.ContainerStatusesLock.Lock()
 	sort.Sort(sort.Reverse(kubecontainer.SortContainerStatusesByCreationTime(podStatus.ContainerStatuses)))
+	podStatus.ContainerStatusesLock.Unlock()
 	// Set container statuses according to the statuses seen in pod status
 	containerSeen := map[string]int{}
+
+	podStatus.ContainerStatusesLock.RLock()
 	for _, cStatus := range podStatus.ContainerStatuses {
 		cName := cStatus.Name
 		if _, ok := statuses[cName]; !ok {
@@ -1843,6 +1850,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		}
 		containerSeen[cName] = containerSeen[cName] + 1
 	}
+	podStatus.ContainerStatusesLock.RUnlock()
 
 	// Handle the containers failed to be started, which should be in Waiting state.
 	for _, container := range containers {

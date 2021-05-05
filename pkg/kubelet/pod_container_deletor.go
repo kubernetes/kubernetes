@@ -67,6 +67,8 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 		if filterContainerId == "" {
 			return nil
 		}
+		podStatus.ContainerStatusesLock.RLock()
+		defer podStatus.ContainerStatusesLock.RUnlock()
 		for _, containerStatus := range podStatus.ContainerStatuses {
 			if containerStatus.ID.ID == filterContainerId {
 				return containerStatus
@@ -82,6 +84,7 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 
 	// Find the exited containers whose name matches the name of the container with id being filterContainerId
 	var candidates containerStatusbyCreatedList
+	podStatus.ContainerStatusesLock.RLock()
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State != kubecontainer.ContainerStateExited {
 			continue
@@ -90,6 +93,7 @@ func getContainersToDeleteInPod(filterContainerID string, podStatus *kubecontain
 			candidates = append(candidates, containerStatus)
 		}
 	}
+	podStatus.ContainerStatusesLock.RUnlock()
 
 	if len(candidates) <= containersToKeep {
 		return containerStatusbyCreatedList{}

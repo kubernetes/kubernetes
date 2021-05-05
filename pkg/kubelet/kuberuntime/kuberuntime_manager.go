@@ -529,7 +529,10 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 	// If we need to (re-)create the pod sandbox, everything will need to be
 	// killed and recreated, and init containers should be purged.
 	if createPodSandbox {
-		if !shouldRestartOnFailure(pod) && attempt != 0 && len(podStatus.ContainerStatuses) != 0 {
+		podStatus.ContainerStatusesLock.RLock()
+		containerStatusesLength := len(podStatus.ContainerStatuses)
+		podStatus.ContainerStatusesLock.RUnlock()
+		if !shouldRestartOnFailure(pod) && attempt != 0 && containerStatusesLength != 0 {
 			// Should not restart the pod, just return.
 			// we should not create a sandbox for a pod if it is already done.
 			// if all containers are done and should not be started, there is no need to create a new sandbox.
@@ -902,12 +905,14 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 // a detailed error message.
 func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Container, podStatus *kubecontainer.PodStatus, backOff *flowcontrol.Backoff) (bool, string, error) {
 	var cStatus *kubecontainer.Status
+	podStatus.ContainerStatusesLock.RLock()
 	for _, c := range podStatus.ContainerStatuses {
 		if c.Name == container.Name && c.State == kubecontainer.ContainerStateExited {
 			cStatus = c
 			break
 		}
 	}
+	podStatus.ContainerStatusesLock.RUnlock()
 
 	if cStatus == nil {
 		return false, "", nil
