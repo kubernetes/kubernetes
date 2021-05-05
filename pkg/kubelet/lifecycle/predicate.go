@@ -64,7 +64,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	var node *v1.Node
 	var getNodeAnyWayErr error
 	err := wait.PollImmediate(3*time.Second, 20*time.Minute, func() (bool, error) {
+		// It does not appear that retrying this function invocation has any effect upon "refreshing" the node's Allocatable data
 		node, getNodeAnyWayErr = w.getNodeAnyWayFunc()
+		klog.Infof("node.Status.Allocatable: %+v", node.Status.Allocatable)
 		if getNodeAnyWayErr == nil {
 			return nodeHasAllocatableResources(node), nil
 		}

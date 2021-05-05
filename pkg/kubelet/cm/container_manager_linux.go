@@ -651,6 +651,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 			rootfs, rootFsInfoErr = cm.cadvisorInterface.RootFsInfo()
 			klog.Infof("rootfs.Capacity: %d:", rootfs.Capacity)
 			if rootFsInfoErr != nil || rootfs.Capacity == 0 {
+				// Am not able to produce a repro which is a result of cm.cadvisorInterface.RootFsInfo() getting a "zero" Capacity result
 				klog.Infof("Error getting root fs data")
 				return false, nil
 			}
