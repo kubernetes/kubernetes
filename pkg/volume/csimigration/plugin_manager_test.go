@@ -146,60 +146,20 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 		pluginFeature                featuregate.Feature
 		pluginFeatureEnabled         bool
 		csiMigrationEnabled          bool
-		pluginFeatureComplete        featuregate.Feature
-		pluginFeatureCompleteEnabled bool
 		pluginUnregsiterFeature      featuregate.Feature
 		pluginUnregsiterEnabled      bool
 		expectMigrationComplete      bool
 		expectErr                    bool
 	}{
 		{
-			name:                         "plugin specific feature flag enabled with migration flag disabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          false,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: false,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    false,
-		},
-		{
-			name:                         "plugin specific complete flag enabled but plugin specific feature flag disabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         false,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: true,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    false,
-		},
-		{
-			name:                         "plugin specific complete feature disabled but plugin specific migration feature and CSI migration flag enabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: false,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      false,
-			expectMigrationComplete:      false,
-			expectErr:                    true,
-		},
-		{
-			name:                         "all features enabled",
-			pluginFeature:                features.CSIMigrationvSphere,
-			pluginFeatureEnabled:         true,
-			csiMigrationEnabled:          true,
-			pluginFeatureComplete:        features.CSIMigrationvSphereComplete,
-			pluginFeatureCompleteEnabled: true,
-			pluginUnregsiterFeature:      features.InTreePluginvSphereUnregister,
-			pluginUnregsiterEnabled:      true,
-			expectMigrationComplete:      true,
-			expectErr:                    true,
+			name:                    "no plugin feature complete set",
+			pluginFeature:           features.CSIMigrationvSphere,
+			pluginFeatureEnabled:    true,
+			csiMigrationEnabled:     true,
+			pluginUnregsiterFeature: features.InTreePluginvSphereUnregister,
+			pluginUnregsiterEnabled: true,
+			expectMigrationComplete: true,
+			expectErr:               true,
 		},
 		{
 			name:                    "no plugin feature complete set",
@@ -217,10 +177,8 @@ func TestCheckMigrationFeatureFlags(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigration, test.csiMigrationEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureEnabled)()
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginUnregsiterFeature, test.pluginUnregsiterEnabled)()
-			if test.pluginFeatureComplete != "" {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, test.pluginFeatureComplete, test.pluginFeatureCompleteEnabled)()
-			}
-			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginFeatureComplete, test.pluginUnregsiterFeature)
+
+			migrationComplete, err := CheckMigrationFeatureFlags(utilfeature.DefaultFeatureGate, test.pluginFeature, test.pluginUnregsiterFeature)
 			if err != nil && test.expectErr == true {
 				t.Errorf("Unexpected error: %v", err)
 			}
@@ -330,6 +288,50 @@ func TestMigrationFeatureFlagStatus(t *testing.T) {
 			pluginFeatureEnabled:          true,
 			csiMigrationEnabled:           true,
 			inTreePluginUnregister:        features.InTreePluginAWSUnregister,
+			inTreePluginUnregisterEnabled: true,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    true,
+		},
+		{
+			name:                          "vsphere-volume migration flag disabled and migration-complete flag disabled with CSI migration flag disabled",
+			pluginName:                    "kubernetes.io/vsphere-volume",
+			pluginFeature:                 features.CSIMigrationvSphere,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           false,
+			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
+		},
+		{
+			name:                          "vsphere-volume migration flag disabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/vsphere-volume",
+			pluginFeature:                 features.CSIMigrationvSphere,
+			pluginFeatureEnabled:          false,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            false,
+			csiMigrationCompleteResult:    false,
+		},
+		{
+			name:                          "vsphere-volume migration flag enabled and migration-complete flag disabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/vsphere-volume",
+			pluginFeature:                 features.CSIMigrationvSphere,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
+			inTreePluginUnregisterEnabled: false,
+			csiMigrationResult:            true,
+			csiMigrationCompleteResult:    false,
+		},
+		{
+			name:                          "vsphere-volume migration flag enabled and migration-complete flag enabled with CSI migration flag enabled",
+			pluginName:                    "kubernetes.io/vsphere-volume",
+			pluginFeature:                 features.CSIMigrationvSphere,
+			pluginFeatureEnabled:          true,
+			csiMigrationEnabled:           true,
+			inTreePluginUnregister:        features.InTreePluginvSphereUnregister,
 			inTreePluginUnregisterEnabled: true,
 			csiMigrationResult:            true,
 			csiMigrationCompleteResult:    true,
