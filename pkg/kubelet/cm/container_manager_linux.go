@@ -647,8 +647,10 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		var rootFsInfoErr error
 		err := wait.PollImmediate(3*time.Second, 20*time.Minute, func() (bool, error) {
 			var rootfs cadvisorapiv2.FsInfo
+			klog.Infof("Introspecting root fs mount to determine allocatable ephemeral storage")
 			rootfs, rootFsInfoErr = cm.cadvisorInterface.RootFsInfo()
 			if rootFsInfoErr != nil || rootfs.Capacity == 0 {
+				klog.Infof("Error getting root fs data")
 				return false, nil
 			}
 			for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
