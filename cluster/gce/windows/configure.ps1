@@ -126,19 +126,25 @@ try {
     exit 0
   }
 
-  if (-not (Test-DockerIsInstalled)) {
-    Install-Docker
-  }
-  # For some reason the docker service may not be started automatically on the
-  # first reboot, although it seems to work fine on subsequent reboots.
-  Restart-Service docker
-  Start-Sleep 5
-  if (-not (Test-DockerIsRunning)) {
-      throw "docker service failed to start or stay running"
+  $kube_env = Fetch-KubeEnv
+  Set-EnvironmentVars
+
+  # Install Docker if the select CRI is not containerd and docker is not already
+  # installed.
+  if (${env:CONTAINER_RUNTIME} -ne "containerd") {
+    if (-not (Test-DockerIsInstalled)) {
+      Install-Docker
+    }
+    # For some reason the docker service may not be started automatically on the
+    # first reboot, although it seems to work fine on subsequent reboots.
+    Restart-Service docker
+    Start-Sleep 5
+    if (-not (Test-DockerIsRunning)) {
+        throw "docker service failed to start or stay running"
+    }
   }
 
   Set-PrerequisiteOptions
-  $kube_env = Fetch-KubeEnv
 
   if (Test-IsTestCluster $kube_env) {
     Log-Output 'Test cluster detected, installing OpenSSH.'
@@ -147,7 +153,6 @@ try {
     StartProcess-WriteSshKeys
   }
 
-  Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
 
