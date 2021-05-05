@@ -467,11 +467,13 @@ func (kl *Kubelet) updateNodeStatus() error {
 			if i > 0 && kl.onRepeatedHeartbeatFailure != nil {
 				kl.onRepeatedHeartbeatFailure()
 			}
+			// O.K., this is happening in the repro scenario!
 			klog.ErrorS(err, "Error updating node status, will retry")
 		} else {
 			return nil
 		}
 	}
+	// And this!
 	return fmt.Errorf("update node status exceeds retry count")
 }
 
@@ -581,6 +583,7 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
+		klog.Infof("Setting node status using function %v", f)
 		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
 		if err := f(node); err != nil {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
