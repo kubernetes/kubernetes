@@ -507,7 +507,7 @@ const (
 
 	// owner: @smarterclayton
 	// alpha: v1.21
-	//
+	// beta: v1.22
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
 
@@ -802,7 +802,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.Beta},
-	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
+	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
