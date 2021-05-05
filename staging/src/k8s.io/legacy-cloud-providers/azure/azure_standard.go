@@ -365,9 +365,13 @@ func (az *Cloud) serviceOwnsFrontendIP(fip network.FrontendIPConfiguration, serv
 			klog.Warningf("serviceOwnsFrontendIP: unexpected error when finding match public IP of the service %s with loadBalancerLP %s: %v", service.Name, loadBalancerIP, err)
 			return false, isPrimaryService, nil
 		}
-
-		if pip != nil && pip.ID != nil && pip.PublicIPAddressPropertiesFormat != nil && pip.IPAddress != nil {
-			if strings.EqualFold(*pip.ID, *fip.PublicIPAddress.ID) {
+		if pip != nil &&
+			pip.ID != nil &&
+			pip.PublicIPAddressPropertiesFormat != nil &&
+			pip.IPAddress != nil &&
+			fip.FrontendIPConfigurationPropertiesFormat != nil &&
+			fip.FrontendIPConfigurationPropertiesFormat.PublicIPAddress != nil {
+			if strings.EqualFold(to.String(pip.ID), to.String(fip.PublicIPAddress.ID)) {
 				klog.V(4).Infof("serviceOwnsFrontendIP: found secondary service %s of the frontend IP config %s", service.Name, *fip.Name)
 
 				return true, isPrimaryService, nil
