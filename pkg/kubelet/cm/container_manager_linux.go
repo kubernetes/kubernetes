@@ -649,7 +649,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 			var rootfs cadvisorapiv2.FsInfo
 			klog.Infof("Introspecting root fs mount to determine allocatable ephemeral storage")
 			rootfs, rootFsInfoErr = cm.cadvisorInterface.RootFsInfo()
-			klog.Infof("rootfs: %#v:", rootfs)
+			klog.Infof("rootfs.Capacity: %d:", rootfs.Capacity)
 			if rootFsInfoErr != nil || rootfs.Capacity == 0 {
 				klog.Infof("Error getting root fs data")
 				return false, nil
