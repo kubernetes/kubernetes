@@ -29,6 +29,7 @@ import (
 	"sync"
 	"time"
 
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
@@ -643,12 +644,25 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
 		klog.Infof("Gathering ephemeral storage from cadvisor rootfs")
-		rootfs, err := cm.cadvisorInterface.RootFsInfo()
+		var rootFsInfoErr error
+		err := wait.PollImmediate(3*time.Second, 20*time.Minute, func() (bool, error) {
+			var rootfs cadvisorapiv2.FsInfo
+			rootfs, rootFsInfoErr = cm.cadvisorInterface.RootFsInfo()
+			if rootFsInfoErr != nil || rootfs.Capacity == 0 {
+				return false, nil
+			}
+			for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
+				cm.capacity[rName] = rCap
+			}
+			return true, nil
+		})
 		if err != nil {
+			rootFsInfoErrString := ""
+			if rootFsInfoErr != nil {
+				rootFsInfoErrString = rootFsInfoErr.Error()
+			}
+			klog.ErrorS(err, "Cannot gather ephemeral storage data", "rootFsInfoErr", rootFsInfoErrString)
 			return fmt.Errorf("failed to get rootfs info: %v", err)
-		}
-		for rName, rCap := range cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs) {
-			cm.capacity[rName] = rCap
 		}
 	}
 
