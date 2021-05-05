@@ -627,9 +627,9 @@ func TestAddressFromDeprecatedFlags(t *testing.T) {
 	}
 }
 
-func TestFlagConfigConflict(t *testing.T) {
+func TestFlagConfigCombinations(t *testing.T) {
 	setUp := func(value string) (*os.File, string, error) {
-		tempDir, err := ioutil.TempDir("", "kubeproxy-config-overwrite")
+		tempDir, err := ioutil.TempDir("", "kubeproxy-config-flag-combination")
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
 		}
@@ -714,6 +714,297 @@ clusterCIDR: "%s"`, value))
 		if err == nil {
 			assert.Equal(t, tc.expectValue, opt.config.ClusterCIDR, tc.name)
 		}
+
+		tearDown(file, tempDir)
+	}
+}
+
+func TestFlagConfigConflict(t *testing.T) {
+	setUp := func(config string) (*os.File, string, error) {
+		tempDir, err := ioutil.TempDir("", "kubeproxy-config-conflict")
+		if err != nil {
+			return nil, "", fmt.Errorf("unable to create temporary directory: %v", err)
+		}
+		fullPath := filepath.Join(tempDir, "kube-proxy-config")
+		file, err := os.Create(fullPath)
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when creating temp file: %v", err)
+		}
+		_, err = file.WriteString(fmt.Sprintf(`apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+%s`, config))
+		if err != nil {
+			return nil, "", fmt.Errorf("unexpected error when writing content to temp kube-proxy config file: %v", err)
+		}
+
+		return file, tempDir, nil
+	}
+
+	tearDown := func(file *os.File, tempDir string) {
+		file.Close()
+		os.RemoveAll(tempDir)
+	}
+
+	testCases := []struct {
+		name        string
+		proxyServer proxyRun
+		args        []string
+		config      string
+		expectError error
+	}{
+		{
+			name: "kubeconfig conflict",
+			args: []string{"--kubeconfig=a"},
+			config: `clientConnection:
+  kubeconfig: "b"`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [kubeconfig]"),
+		},
+		{
+			name:        "clusterCIDR conflict",
+			args:        []string{"--cluster-cidr=2.2.0.0/16"},
+			config:      `clusterCIDR: 1.1.0.0/16`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [cluster-cidr]"),
+		},
+		{
+			name: "kube-api-content-type conflict",
+			args: []string{"--kube-api-content-type=a"},
+			config: `clientConnection:
+  contentType: "b"`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [kube-api-content-type]"),
+		},
+		{
+			name: "ipvs-scheduler conflict",
+			args: []string{"--ipvs-scheduler=a"},
+			config: `ipvs:
+  scheduler: b`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-scheduler]"),
+		},
+		{
+			name:        "show-hidden-metrics-for-version conflict",
+			args:        []string{"--show-hidden-metrics-for-version=a"},
+			config:      `showHiddenMetricsForVersion: b`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [show-hidden-metrics-for-version]"),
+		},
+		{
+			name: "ipvs-exclude-cidrs conflict",
+			args: []string{"--ipvs-exclude-cidrs=2.2.0.0/24"},
+			config: `ipvs:
+  excludeCIDRs:
+  - 1.1.0.0/24`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-exclude-cidrs]"),
+		},
+		{
+			name: "nodeport-addresses conflict",
+			args: []string{"--nodeport-addresses=2.2.0.1"},
+			config: `nodePortAddresses:
+  - 1.1.0.0/24`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [nodeport-addresses]"),
+		},
+		{
+			name:        "bind-address conflict",
+			args:        []string{"--bind-address=2.2.0.0"},
+			config:      `bindAddress: 1.1.0.0`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [bind-address]"),
+		},
+		{
+			name:        "healthz-bind-address conflict",
+			args:        []string{"--healthz-bind-address=2.2.0.0"},
+			config:      `healthzBindAddress: 1.1.0.0`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [healthz-bind-address]"),
+		},
+		{
+			name:        "metrics-bind-address conflict",
+			args:        []string{"--metrics-bind-address=2.2.0.0"},
+			config:      `metricsBindAddress: 1.1.0.0`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [metrics-bind-address]"),
+		},
+		{
+			name:        "bind-address-hard-fail conflict",
+			args:        []string{"--bind-address-hard-fail=false"},
+			config:      `bindAddressHardFail: true`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [bind-address-hard-fail]"),
+		},
+		{
+			name:        "proxy-port-range conflict",
+			args:        []string{"--proxy-port-range=9000-9080"},
+			config:      `portRange: 8000-8080`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [proxy-port-range]"),
+		},
+		{
+			name:        "proxy-mode conflict",
+			args:        []string{"--proxy-mode=iptables"},
+			config:      `mode: "ipvs"`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [proxy-mode]"),
+		},
+		{
+			name: "feature-gates conflict",
+			args: []string{"--feature-gates", "APIListChunking=false"},
+			config: `featureGates:
+  APIListChunking: true`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [feature-gates]"),
+		},
+		{
+			name:        "oom-score-adj conflict",
+			args:        []string{"--oom-score-adj=200"},
+			config:      `oomScoreAdj: 100`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [oom-score-adj]"),
+		},
+		{
+			name: "iptables-masquerade-bit conflict",
+			args: []string{"--iptables-masquerade-bit=20"},
+			config: `iptables:
+  iptables-masquerade-bit: 10`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [iptables-masquerade-bit]"),
+		},
+		{
+			name: "conntrack-max-per-core conflict",
+			args: []string{"--conntrack-max-per-core=20"},
+			config: `conntrack:
+  maxPerCore: 10`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [conntrack-max-per-core]"),
+		},
+		{
+			name: "conntrack-min conflict",
+			args: []string{"--conntrack-min=20"},
+			config: `conntrack:
+  min: 10`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [conntrack-min]"),
+		},
+		{
+			name: "kube-api-burst conflict",
+			args: []string{"--kube-api-burst=20"},
+			config: `clientConnection:
+  burst: 10`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [kube-api-burst]"),
+		},
+		{
+			name: "iptables-sync-period conflict",
+			args: []string{"--iptables-sync-period=10s"},
+			config: `iptables:
+  syncPeriod: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [iptables-sync-period]"),
+		},
+		{
+			name: "iptables-min-sync-period conflict",
+			args: []string{"--iptables-min-sync-period=10s"},
+			config: `iptables:
+  minSyncPeriod: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [iptables-min-sync-period]"),
+		},
+		{
+			name: "ipvs-sync-period conflict",
+			args: []string{"--ipvs-sync-period=10s"},
+			config: `ipvs:
+  syncPeriod: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-sync-period]"),
+		},
+		{
+			name: "ipvs-min-sync-period conflict",
+			args: []string{"--ipvs-min-sync-period=10s"},
+			config: `ipvs:
+  minSyncPeriod: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-min-sync-period]"),
+		},
+		{
+			name: "ipvs-tcp-timeout conflict",
+			args: []string{"--ipvs-tcp-timeout=10s"},
+			config: `ipvs:
+  tcpTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-tcp-timeout]"),
+		},
+		{
+			name: "ipvs-tcpfin-timeout conflict",
+			args: []string{"--ipvs-tcpfin-timeout=10s"},
+			config: `ipvs:
+  tcpFinTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-tcpfin-timeout]"),
+		},
+		{
+			name: "ipvs-udp-timeout conflict",
+			args: []string{"--ipvs-udp-timeout=10s"},
+			config: `ipvs:
+  udpTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-udp-timeout]"),
+		},
+		{
+			name: "conntrack-tcp-timeout-established conflict",
+			args: []string{"--conntrack-tcp-timeout-established=10s"},
+			config: `conntrack:
+  tcpEstablishedTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [conntrack-tcp-timeout-established]"),
+		},
+		{
+			name: "conntrack-tcp-timeout-close-wait conflict",
+			args: []string{"--conntrack-tcp-timeout-close-wait=10s"},
+			config: `conntrack:
+  tcpCloseWaitTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [conntrack-tcp-timeout-close-wait]"),
+		},
+		{
+			name:        "config-sync-period conflict",
+			args:        []string{"--config-sync-period=10s"},
+			config:      `configSyncPeriod: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [config-sync-period]"),
+		},
+		{
+			name:        "udp-timeout conflict",
+			args:        []string{"--udp-timeout=10s"},
+			config:      `udpIdleTimeout: 1m`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [udp-timeout]"),
+		},
+		{
+			name: "ipvs-strict-arp conflict",
+			args: []string{"--ipvs-strict-arp=false"},
+			config: `ipvs:
+  strictARP: true`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [ipvs-strict-arp]"),
+		},
+		{
+			name: "masquerade-all conflict",
+			args: []string{"--masquerade-all=false"},
+			config: `iptables:
+  masqueradeAll: true`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [masquerade-all]"),
+		},
+		{
+			name:        "profiling conflict",
+			args:        []string{"--profiling=false"},
+			config:      `enableProfiling: true`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [profiling]"),
+		},
+		{
+			name: "kube-api-qps conflict",
+			args: []string{"--kube-api-qps=1000.0"},
+			config: `clientConnection:
+  kube-api-qps: 1010.0`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [kube-api-qps]"),
+		},
+		{
+			name:        "detect-local-mode conflict",
+			args:        []string{"--detect-local-mode=ClusterCIDR"},
+			config:      `detectLocalMode: NodeCIDR`,
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [detect-local-mode]"),
+		},
+	}
+
+	for _, tc := range testCases {
+		file, tempDir, err := setUp(tc.config)
+		if err != nil {
+			t.Fatalf("unexpected error when setting up environment: %v", err)
+		}
+
+		opt := NewOptions()
+		opt.ConfigFile = file.Name()
+		fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
+		args := append(tc.args, "extra-arg")
+		opt.config, err = opt.ApplyDefaults(opt.config)
+		assert.Empty(t, err)
+		opt.AddFlags(fs)
+		err = fs.Parse(args)
+		assert.Empty(t, err)
+
+		err = opt.Complete(fs)
+		assert.Equal(t, tc.expectError, err, tc.name)
 
 		tearDown(file, tempDir)
 	}

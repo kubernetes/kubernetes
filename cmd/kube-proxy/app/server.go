@@ -236,7 +236,6 @@ func (o *Options) Complete(fs *pflag.FlagSet) error {
 			return fmt.Errorf("Kube-proxy flags conflict: %v", conflictFields)
 		}
 
-		// make flags take precedence
 		mergo.Merge(c, o.config)
 		o.config = c
 
