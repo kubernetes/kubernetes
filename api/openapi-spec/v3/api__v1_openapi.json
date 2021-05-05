@@ -3495,7 +3495,7 @@
         "description": "PersistentVolumeClaimSpec describes the common attributes of storage devices and allows a Source for provider-specific attributes",
         "properties": {
           "accessModes": {
-            "description": "accessModes contains the desired access modes the volume should have. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
+            "description": "accessModes contain the types of access modes the volume should have. Valid access modes include: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. In addition, storage plugins typically further restrict what access modes are allowed for a given type of volume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes-1",
             "items": {
               "default": "",
               "type": "string"
@@ -3513,22 +3513,22 @@
           "resources": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.ResourceRequirements",
             "default": {},
-            "description": "resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
+            "description": "resources represent the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled, users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources"
           },
           "selector": {
             "$ref": "#/components/schemas/io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector",
-            "description": "selector is a label query over volumes to consider for binding."
+            "description": "selector is a label query over volumes to consider for binding. This selector is ignored when volumeName is set. A claim with a non-empty selector can't have a PersistentVolume dynamically provisioned for it."
           },
           "storageClassName": {
-            "description": "storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
+            "description": "storageClassName is the name of the StorageClass required by the claim. If the value is \"\" (an empty string), the claim can only be bound to a PersistentVolume with no StorageClass (the storageClassName field is either unset or set to \"\"). If this field is not set, the behavior depends on whether the DefaultStorageClass admission plugin is turned on. * If it is turned on, the administrator may specify a default\n  StorageClass. This claim can be bound only to PersistentVolumes of that\n  default. If the administrator does not specify a default, the cluster\n  responds to PVC creation as if the admission plugin were turned off. If\n  more than one default is specified, the admission plugin forbids the\n  creation of all PVCs.\n* If it is turned off, there is no notion of a default StorageClass. This\n  claim can be bound only to PersistentVolumes that have no StorageClass\n  (the storageClassName field is either unset or set to \"\"), i.e. it is\n  treated the same way as a claim that has this field set to \"\".\nWhen a claim specifies a selector in addition to requesting a StorageClass, the requirements are ANDed together: only a PersistentVolume of the requested class and with the requested labels may be bound to the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1",
             "type": "string"
           },
           "volumeMode": {
-            "description": "volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.",
+            "description": "volumeMode defines what volume mode is required by the claim. Can be one of the following: * Filesystem - the volume contains a filesystem. If it doesn't,\n  the storage plugin creates a filesystem before mounting it for the\n  first time.\n* Block - the volume will not be formatted with a filesystem and will\n  remain a raw block device.\nValue of Filesystem is the default when not included in spec. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-modes",
             "type": "string"
           },
           "volumeName": {
-            "description": "volumeName is the binding reference to the PersistentVolume backing this claim.",
+            "description": "volumeName is the binding reference to the PersistentVolume backing this claim. When set to non-empty value, selector is not evaluated.",
             "type": "string"
           }
         },
@@ -3665,7 +3665,7 @@
         "description": "PersistentVolumeSpec is the specification of a persistent volume.",
         "properties": {
           "accessModes": {
-            "description": "accessModes contains all ways the volume can be mounted. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
+            "description": "accessModes describe the volume's access modes. Possible values are: * ReadWriteOnce - can be mounted read/write mode to exactly 1 node. * ReadOnlyMany - can be mounted in read-only mode to many nodes. * ReadWriteMany - can be mounted in read/write mode to many nodes. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#access-modes",
             "items": {
               "default": "",
               "type": "string"
@@ -3702,7 +3702,7 @@
           },
           "claimRef": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.ObjectReference",
-            "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding"
+            "description": "claimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. When set to non-nil value, PVC.Spec.Selector of the referenced PVC is ignored, i.e. labels of this PV do not need to match PVC selector. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#binding"
           },
           "csi": {
             "$ref": "#/components/schemas/io.k8s.api.core.v1.CSIPersistentVolumeSource",
@@ -3757,7 +3757,7 @@
             "description": "nodeAffinity defines constraints that limit what nodes this volume can be accessed from. This field influences the scheduling of pods that use this volume."
           },
           "persistentVolumeReclaimPolicy": {
-            "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are Retain (default for manually created PersistentVolumes), Delete (default for dynamically provisioned PersistentVolumes), and Recycle (deprecated). Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the volume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the volume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
+            "description": "persistentVolumeReclaimPolicy defines what happens to a persistent volume when released from its claim. Valid options are * Retain (default for manually created PersistentVolumes) * Delete (default for dynamically provisioned PersistentVolumes) * Recycle (deprecated) Recycle must be supported by the volume plugin underlying this PersistentVolume. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#reclaiming\n\nPossible enum values:\n - `\"Delete\"` means the volume will be deleted from Kubernetes on release from its claim. The volume plugin must support Deletion.\n - `\"Recycle\"` means the volume will be recycled back into the pool of unbound persistent volumes on release from its claim. The volume plugin must support Recycling.\n - `\"Retain\"` means the volume will be left in its current phase (Released) for manual reclamation by the administrator. The default policy is Retain.",
             "enum": [
               "Delete",
               "Recycle",
@@ -3794,7 +3794,7 @@
             "description": "storageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod More info: https://examples.k8s.io/volumes/storageos/README.md"
           },
           "volumeMode": {
-            "description": "volumeMode defines if a volume is intended to be used with a formatted filesystem or to remain in raw block state. Value of Filesystem is implied when not included in spec.",
+            "description": "Describes the volume mode. Can be one of the following: * Filesystem - the volume contains a filesystem. If it doesn't,\n  the storage plugin creates a filesystem before mounting it for the\n  first time.\n* Block - the volume will not be formatted with a filesystem and will\n  remain a raw block device.\nValue of Filesystem is the default when not included in spec. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#volume-mode",
             "type": "string"
           },
           "vsphereVolume": {
