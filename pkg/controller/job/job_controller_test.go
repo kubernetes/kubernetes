@@ -526,14 +526,17 @@ func TestControllerSyncJob(t *testing.T) {
 			podsWithIndexes: []indexPhase{
 				{"invalid", v1.PodRunning},
 				{"invalid", v1.PodSucceeded},
+				{"invalid", v1.PodFailed},
+				{"invalid", v1.PodPending},
 				{"0", v1.PodSucceeded},
 				{"1", v1.PodRunning},
 				{"2", v1.PodRunning},
 			},
 			jobKeyForget:          true,
-			expectedDeletions:     2,
+			expectedDeletions:     3,
 			expectedActive:        2,
 			expectedSucceeded:     1,
+			expectedFailed:        0,
 			expectedCompletedIdxs: "0",
 			indexedJobEnabled:     true,
 		},
@@ -558,6 +561,28 @@ func TestControllerSyncJob(t *testing.T) {
 			expectedSucceeded:      1,
 			expectedCompletedIdxs:  "0",
 			expectedCreatedIndexes: sets.NewInt(3, 4),
+			indexedJobEnabled:      true,
+		},
+		"indexed job with indexes outside of range": {
+			parallelism:    2,
+			completions:    5,
+			backoffLimit:   6,
+			completionMode: batch.IndexedCompletion,
+			podsWithIndexes: []indexPhase{
+				{"0", v1.PodSucceeded},
+				{"5", v1.PodRunning},
+				{"6", v1.PodSucceeded},
+				{"7", v1.PodPending},
+				{"8", v1.PodFailed},
+			},
+			jobKeyForget:           true,
+			expectedCreations:      2,
+			expectedSucceeded:      1,
+			expectedDeletions:      2,
+			expectedCompletedIdxs:  "0",
+			expectedCreatedIndexes: sets.NewInt(1, 2),
+			expectedActive:         2,
+			expectedFailed:         0,
 			indexedJobEnabled:      true,
 		},
 		"indexed job feature disabled": {
@@ -691,7 +716,7 @@ func TestControllerSyncJob(t *testing.T) {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error on podControl exception")
 				}
-			} else if tc.expectedCondition == nil && (hasFailingPods(tc.podsWithIndexes) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
+			} else if tc.expectedCondition == nil && (hasValidFailingPods(tc.podsWithIndexes, int(tc.completions)) || (tc.completionMode != batch.IndexedCompletion && tc.failedPods > 0)) {
 				if err == nil {
 					t.Error("Syncing jobs expected to return error when there are new failed pods and Job didn't finish")
 				}
@@ -2168,8 +2193,16 @@ func checkJobCompletionEnvVariable(t *testing.T, spec *v1.PodSpec) {
 	}
 }
 
-func hasFailingPods(status []indexPhase) bool {
+// hasValidFailingPods checks if there exists failed pods with valid index.
+func hasValidFailingPods(status []indexPhase, completions int) bool {
 	for _, s := range status {
+		ix, err := strconv.Atoi(s.Index)
+		if err != nil {
+			continue
+		}
+		if ix < 0 || ix >= completions {
+			continue
+		}
 		if s.Phase == v1.PodFailed {
 			return true
 		}

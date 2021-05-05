@@ -28,12 +28,14 @@ const noIndex = "-"
 
 func TestCalculateSucceededIndexes(t *testing.T) {
 	cases := map[string]struct {
-		pods      []indexPhase
-		wantCount int32
+		pods        []indexPhase
+		wantCount   int32
+		completions int32
 	}{
 		"1": {
-			pods:      []indexPhase{{"1", v1.PodSucceeded}},
-			wantCount: 1,
+			pods:        []indexPhase{{"1", v1.PodSucceeded}},
+			wantCount:   1,
+			completions: 2,
 		},
 		"5,10": {
 			pods: []indexPhase{
@@ -43,7 +45,8 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"10", v1.PodFailed},
 				{"10", v1.PodSucceeded},
 			},
-			wantCount: 2,
+			wantCount:   2,
+			completions: 11,
 		},
 		"2,3,5-7": {
 			pods: []indexPhase{
@@ -55,7 +58,8 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"6", v1.PodSucceeded},
 				{"7", v1.PodSucceeded},
 			},
-			wantCount: 5,
+			wantCount:   5,
+			completions: 8,
 		},
 		"0-2": {
 			pods: []indexPhase{
@@ -66,7 +70,8 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{"2", v1.PodSucceeded},
 				{"3", v1.PodFailed},
 			},
-			wantCount: 3,
+			wantCount:   3,
+			completions: 4,
 		},
 		"0,2-5": {
 			pods: []indexPhase{
@@ -79,13 +84,28 @@ func TestCalculateSucceededIndexes(t *testing.T) {
 				{noIndex, v1.PodSucceeded},
 				{"-2", v1.PodSucceeded},
 			},
-			wantCount: 5,
+			wantCount:   5,
+			completions: 6,
+		},
+		"0-2,4": {
+			pods: []indexPhase{
+				{"0", v1.PodSucceeded},
+				{"1", v1.PodSucceeded},
+				{"2", v1.PodSucceeded},
+				{"3", v1.PodFailed},
+				{"4", v1.PodSucceeded},
+				{"5", v1.PodSucceeded},
+				{noIndex, v1.PodSucceeded},
+				{"-2", v1.PodSucceeded},
+			},
+			wantCount:   4,
+			completions: 5,
 		},
 	}
 	for want, tc := range cases {
 		t.Run(want, func(t *testing.T) {
 			pods := hollowPodsWithIndexPhase(tc.pods)
-			gotStr, gotCnt := calculateSucceededIndexes(pods)
+			gotStr, gotCnt := calculateSucceededIndexes(pods, tc.completions)
 			if diff := cmp.Diff(want, gotStr); diff != "" {
 				t.Errorf("Unexpected completed indexes (-want,+got):\n%s", diff)
 			}
@@ -162,23 +182,27 @@ func TestFirstPendingIndexes(t *testing.T) {
 
 func TestAppendDuplicatedIndexPodsForRemoval(t *testing.T) {
 	cases := map[string]struct {
-		pods     []indexPhase
-		wantRm   []indexPhase
-		wantLeft []indexPhase
+		pods        []indexPhase
+		wantRm      []indexPhase
+		wantLeft    []indexPhase
+		completions int32
 	}{
 		"all unique": {
 			pods: []indexPhase{
 				{noIndex, v1.PodPending},
 				{"2", v1.PodPending},
 				{"5", v1.PodRunning},
+				{"6", v1.PodRunning},
 			},
 			wantRm: []indexPhase{
 				{noIndex, v1.PodPending},
+				{"6", v1.PodRunning},
 			},
 			wantLeft: []indexPhase{
 				{"2", v1.PodPending},
 				{"5", v1.PodRunning},
 			},
+			completions: 6,
 		},
 		"all with index": {
 			pods: []indexPhase{
@@ -188,17 +212,22 @@ func TestAppendDuplicatedIndexPodsForRemoval(t *testing.T) {
 				{"0", v1.PodRunning},
 				{"3", v1.PodRunning},
 				{"0", v1.PodPending},
+				{"6", v1.PodRunning},
+				{"6", v1.PodPending},
 			},
 			wantRm: []indexPhase{
 				{"0", v1.PodPending},
 				{"0", v1.PodRunning},
 				{"3", v1.PodPending},
+				{"6", v1.PodRunning},
+				{"6", v1.PodPending},
 			},
 			wantLeft: []indexPhase{
 				{"0", v1.PodRunning},
 				{"3", v1.PodRunning},
 				{"5", v1.PodPending},
 			},
+			completions: 6,
 		},
 		"mixed": {
 			pods: []indexPhase{
@@ -221,12 +250,13 @@ func TestAppendDuplicatedIndexPodsForRemoval(t *testing.T) {
 				{"0", v1.PodPending},
 				{"1", v1.PodRunning},
 			},
+			completions: 6,
 		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			pods := hollowPodsWithIndexPhase(tc.pods)
-			rm, left := appendDuplicatedIndexPodsForRemoval(nil, nil, pods)
+			rm, left := appendDuplicatedIndexPodsForRemoval(nil, nil, pods, int(tc.completions))
 			rmInt := toIndexPhases(rm)
 			leftInt := toIndexPhases(left)
 			if diff := cmp.Diff(tc.wantRm, rmInt); diff != "" {
