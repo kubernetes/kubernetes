@@ -86,9 +86,10 @@ func (c *CycleState) Clone() *CycleState {
 
 // Read retrieves data with the given "key" from CycleState. If the key is not
 // present an error is returned.
-// This function is not thread safe. In multi-threaded code, lock should be
-// acquired first.
+// This function is thread safe by acquiring an internal lock first.
 func (c *CycleState) Read(key StateKey) (StateData, error) {
+	c.mx.RLock()
+	defer c.mx.RUnlock()
 	if v, ok := c.storage[key]; ok {
 		return v, nil
 	}
@@ -96,35 +97,17 @@ func (c *CycleState) Read(key StateKey) (StateData, error) {
 }
 
 // Write stores the given "val" in CycleState with the given "key".
-// This function is not thread safe. In multi-threaded code, lock should be
-// acquired first.
+// This function is thread safe by acquiring an internal lock first.
 func (c *CycleState) Write(key StateKey, val StateData) {
-	c.storage[key] = val
-}
-
-// Delete deletes data with the given key from CycleState.
-// This function is not thread safe. In multi-threaded code, lock should be
-// acquired first.
-func (c *CycleState) Delete(key StateKey) {
-	delete(c.storage, key)
-}
-
-// Lock acquires CycleState lock.
-func (c *CycleState) Lock() {
 	c.mx.Lock()
-}
-
-// Unlock releases CycleState lock.
-func (c *CycleState) Unlock() {
+	c.storage[key] = val
 	c.mx.Unlock()
 }
 
-// RLock acquires CycleState read lock.
-func (c *CycleState) RLock() {
-	c.mx.RLock()
-}
-
-// RUnlock releases CycleState read lock.
-func (c *CycleState) RUnlock() {
-	c.mx.RUnlock()
+// Delete deletes data with the given key from CycleState.
+// This function is thread safe by acquiring an internal lock first.
+func (c *CycleState) Delete(key StateKey) {
+	c.mx.Lock()
+	delete(c.storage, key)
+	c.mx.Unlock()
 }
