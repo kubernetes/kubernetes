@@ -30,7 +30,7 @@ import (
 
 func main() {
 	if strings.Contains(os.Args[0], "run_e2e.sh") || strings.Contains(os.Args[0], "gorunner") {
-		log.Print("warn: calling test with e2e.test is deprecated, please rely on container manifest to invoke executable")
+		log.Print("warn: calling test with e2e.test is deprecated and will be removed in 1.25, please rely on container manifest to invoke executable")
 	}
 	env := envWithDefaults(map[string]string{
 		resultsDirEnvKey: defaultResultsDir,
