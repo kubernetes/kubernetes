@@ -70,13 +70,17 @@ func (kl *Kubelet) registerWithAPIServer() {
 		}
 
 		klog.InfoS("Attempting to register node", "node", klog.KObj(node))
+		allocatable := schedulerframework.NewResource(node.Status.Allocatable)
+		klog.Infof("Allocatable EphemeralStorage before registration: %d", allocatable.EphemeralStorage)
+		klog.Infof("Allocatable Memory before registration: %d", allocatable.Memory)
+		klog.Infof("Allocatable MilliCPU before registration: %d", allocatable.MilliCPU)
 		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
 			klog.InfoS("Successfully registered node", "node", klog.KObj(node))
-			allocatable := schedulerframework.NewResource(node.Status.Allocatable)
-			klog.Infof("Allocatable EphemeralStorage: %d", allocatable.EphemeralStorage)
-			klog.Infof("Allocatable Memory: %d", allocatable.Memory)
-			klog.Infof("Allocatable MilliCPU: %d", allocatable.MilliCPU)
+			allocatable = schedulerframework.NewResource(node.Status.Allocatable)
+			klog.Infof("Allocatable EphemeralStorage after registration: %d", allocatable.EphemeralStorage)
+			klog.Infof("Allocatable Memory after registration: %d", allocatable.Memory)
+			klog.Infof("Allocatable MilliCPU after registration: %d", allocatable.MilliCPU)
 			kl.registrationCompleted = true
 			return
 		}
