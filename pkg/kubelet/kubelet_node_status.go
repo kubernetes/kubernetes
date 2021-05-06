@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/nodestatus"
 	"k8s.io/kubernetes/pkg/kubelet/util"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	taintutil "k8s.io/kubernetes/pkg/util/taints"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
@@ -72,6 +73,10 @@ func (kl *Kubelet) registerWithAPIServer() {
 		registered := kl.tryRegisterWithAPIServer(node)
 		if registered {
 			klog.InfoS("Successfully registered node", "node", klog.KObj(node))
+			allocatable := schedulerframework.NewResource(node.Status.Allocatable)
+			klog.Infof("Allocatable EphemeralStorage: %d", allocatable.EphemeralStorage)
+			klog.Infof("Allocatable Memory: %d", allocatable.Memory)
+			klog.Infof("Allocatable MilliCPU: %d", allocatable.MilliCPU)
 			kl.registrationCompleted = true
 			return
 		}
