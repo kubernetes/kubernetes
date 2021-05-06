@@ -187,7 +187,7 @@ github.com/containerd/containerd/pkg/dialer
 github.com/containerd/containerd/platforms
 # github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.2
 github.com/containerd/ttrpc
-# github.com/containernetworking/cni v0.8.0 => github.com/containernetworking/cni v0.8.0
+# github.com/containernetworking/cni v0.8.1 => github.com/containernetworking/cni v0.8.1
 ## explicit
 github.com/containernetworking/cni/libcni
 github.com/containernetworking/cni/pkg/invoke
@@ -2395,7 +2395,7 @@ sigs.k8s.io/yaml
 # github.com/containerd/go-runc => github.com/containerd/go-runc v0.0.0-20180907222934-5a6d9f37cfa3
 # github.com/containerd/ttrpc => github.com/containerd/ttrpc v1.0.2
 # github.com/containerd/typeurl => github.com/containerd/typeurl v1.0.1
-# github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.0
+# github.com/containernetworking/cni => github.com/containernetworking/cni v0.8.1
 # github.com/coredns/corefile-migration => github.com/coredns/corefile-migration v1.0.11
 # github.com/coreos/bbolt => github.com/coreos/bbolt v1.3.2
 # github.com/coreos/etcd => github.com/coreos/etcd v3.3.13+incompatible
