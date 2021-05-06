@@ -278,7 +278,7 @@ function start-kube-apiserver {
     params+=" --advertise-address=${MASTER_ADVERTISE_ADDRESS}"
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" ]]; then
-        chown "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy
+        chown -R "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy/
       fi
       params+=" --ssh-user=${PROXY_SSH_USER}"
       params+=" --ssh-keyfile=/etc/srv/sshproxy/.sshkeyfile"
@@ -287,7 +287,7 @@ function start-kube-apiserver {
     local -r vm_external_ip=$(get-metadata-value "instance/network-interfaces/0/access-configs/0/external-ip")
     if [[ -n "${PROXY_SSH_USER:-}" ]]; then
       if [[ -n "${KUBE_API_SERVER_RUNASUSER:-}" && -n "${KUBE_API_SERVER_RUNASGROUP:-}" ]]; then
-        chown "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy
+        chown -R "${KUBE_API_SERVER_RUNASUSER}":"${KUBE_API_SERVER_RUNASGROUP}" /etc/srv/sshproxy/
       fi
       params+=" --advertise-address=${vm_external_ip}"
       params+=" --ssh-user=${PROXY_SSH_USER}"
