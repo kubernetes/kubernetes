@@ -362,6 +362,10 @@ func (p *criStatsProvider) getFsInfo(fsID *runtimeapi.FilesystemIdentifier) *cad
 	mountpoint := fsID.GetMountpoint()
 	fsInfo, err := p.cadvisor.GetDirFsInfo(mountpoint)
 	if err != nil {
+		// This failure happened in one repro, e.g.:
+		/*
+			May 06 20:43:54 capz-conf-vmqe6j-control-plane-6hqfc kubelet[2426]: E0506 20:43:54.668859    2426 cri_stats_provider.go:369] "Failed to get the info of the filesystem with mountpoint" err="unable to find data in memory cache" mountpoint="/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs"
+		*/
 		msg := "Failed to get the info of the filesystem with mountpoint"
 		if err == cadvisorfs.ErrNoSuchDevice {
 			klog.V(2).InfoS(msg, "mountpoint", mountpoint, "err", err)

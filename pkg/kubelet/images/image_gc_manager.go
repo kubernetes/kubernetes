@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -292,6 +292,10 @@ func (im *realImageGCManager) GarbageCollect() error {
 
 	// Check valid capacity.
 	if capacity == 0 {
+		// This happened on one repro, e.g.:
+		/*
+			May 06 20:43:54 capz-conf-vmqe6j-control-plane-6hqfc kubelet[2426]: E0506 20:43:54.669153    2426 kubelet.go:1306] "Image garbage collection failed once. Stats initialization may not have completed yet" err="invalid capacity 0 on image filesystem"
+		*/
 		err := goerrors.New("invalid capacity 0 on image filesystem")
 		im.recorder.Eventf(im.nodeRef, v1.EventTypeWarning, events.InvalidDiskCapacity, err.Error())
 		return err

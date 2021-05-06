@@ -1303,6 +1303,10 @@ func (kl *Kubelet) StartGarbageCollection() {
 				// Only create an event for repeated failures
 				kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ImageGCFailed, err.Error())
 			} else {
+				// This happened on one repro, e.g.:
+				/*
+					May 06 20:43:54 capz-conf-vmqe6j-control-plane-6hqfc kubelet[2426]: E0506 20:43:54.669153    2426 kubelet.go:1306] "Image garbage collection failed once. Stats initialization may not have completed yet" err="invalid capacity 0 on image filesystem"
+				*/
 				klog.ErrorS(err, "Image garbage collection failed once. Stats initialization may not have completed yet")
 			}
 			prevImageGCFailed = true
