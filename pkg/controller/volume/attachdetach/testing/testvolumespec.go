@@ -158,6 +158,16 @@ func CreateTestClient() *fake.Clientset {
 		}
 		attachVolumeToNode("lostVolumeName", nodeName)
 	}
+	fakeClient.AddReactor("update", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		updateAction := action.(core.UpdateAction)
+		node := updateAction.GetObject().(*v1.Node)
+		for index, n := range nodes.Items {
+			if n.Name == node.Name {
+				nodes.Items[index] = *node
+			}
+		}
+		return true, updateAction.GetObject(), nil
+	})
 	fakeClient.AddReactor("list", "nodes", func(action core.Action) (handled bool, ret runtime.Object, err error) {
 		obj := &v1.NodeList{}
 		obj.Items = append(obj.Items, nodes.Items...)
