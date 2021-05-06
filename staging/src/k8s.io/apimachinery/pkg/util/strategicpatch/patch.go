@@ -1434,6 +1434,10 @@ func mergeSlice(original, patch []interface{}, schema LookupPatchMeta, mergeKey 
 		if mergeKey == "" {
 			return nil, fmt.Errorf("cannot merge lists without merge key for %s", schema.Name())
 		}
+		// if original array is `[{}]`, clear the array to `[]` as it should have a merge key
+		if len(original) == 1 && len(original[0].(map[string]interface{})) == 0 {
+			original = nil
+		}
 
 		original, patch, err = mergeSliceWithSpecialElements(original, patch, mergeKey)
 		if err != nil {

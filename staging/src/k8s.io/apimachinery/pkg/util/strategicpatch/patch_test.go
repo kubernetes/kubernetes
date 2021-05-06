@@ -669,6 +669,25 @@ mergingList:
 			ExpectedError: "does not contain declared merge key",
 		},
 	},
+	{
+		Description: "merge a list to an empty map",
+		StrategicMergePatchRawTestCaseData: StrategicMergePatchRawTestCaseData{
+			Original: []byte(`
+mergingList:
+  - {}
+`),
+			TwoWay: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+			Modified: []byte(`
+mergingList:
+  - name: 1
+    value: a
+`),
+		},
+	},
 }
 
 func TestCustomStrategicMergePatch(t *testing.T) {
