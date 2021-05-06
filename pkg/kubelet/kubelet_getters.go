@@ -268,7 +268,7 @@ func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890393    2453 kubelet_getters.go:249] "Definitely got a real node" node="capz-conf-ulw45w-control-plane-jfj9m"
 			   May 03 21:51:51 capz-conf-ulw45w-control-plane-jfj9m kubelet[2453]: I0503 21:51:51.890526    2453 predicate.go:113] "Failed to admit pod, unexpected error while attempting to recover from admission failure" pod="kube-system/etcd-capz-conf-ulw45w-control-plane-jfj9m" err="preemption: error finding a set of pods to preempt: no set of running pods found to reclaim resources: [(res: ephemeral-storage, q: 104857600), ]"
 			*/
-			klog.InfoS("Definitely got a real node", "node", n.Name)
+			//klog.InfoS("Definitely got a real node", "node", n.Name)
 			return n, nil
 		}
 	}
@@ -276,7 +276,7 @@ func (kl *Kubelet) getNodeAnyWay() (*v1.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.InfoS("Got an initial node", "node", n.Name)
+	//klog.InfoS("Got an initial node", "node", n.Name)
 	return n, err
 }
 

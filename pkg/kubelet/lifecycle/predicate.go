@@ -63,8 +63,8 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
 	var node *v1.Node
 	var getNodeAnyWayErr error
+	// This might be the most important change
 	err := wait.PollImmediate(3*time.Second, 20*time.Minute, func() (bool, error) {
-		// It does not appear that retrying this function invocation has any effect upon "refreshing" the node's Allocatable data
 		node, getNodeAnyWayErr = w.getNodeAnyWayFunc()
 		klog.Infof("node.Status.Allocatable: %+v", node.Status.Allocatable)
 		if getNodeAnyWayErr == nil {
@@ -72,6 +72,7 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 		return false, nil
 	})
+	// This new timeout error condition is not occurring with regularity
 	if err != nil {
 		getNodeAnyWayErrString := ""
 		if getNodeAnyWayErr != nil {
@@ -88,15 +89,15 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	pods := attrs.OtherPods
 	nodeInfo := schedulerframework.NewNodeInfo(pods...)
 	// The nomimal value of Requested.EphemeralStorage at the phase is 0, which makes sense as we're still simply scaffolding the node object type representation
-	klog.Infof("Requested Ephemeral Storage after creating nodeInfo object for fit: %d", nodeInfo.Requested.EphemeralStorage)
+	// klog.Infof("Requested Ephemeral Storage after creating nodeInfo object for fit: %d", nodeInfo.Requested.EphemeralStorage)
 	// The nomimal value of Allocatable.EphemeralStorage at the phase is 0, which makes sense as we're still simply scaffolding the node object type representation
-	klog.Infof("Allocatable Ephemeral Storage after creating nodeInfo object: %d", nodeInfo.Allocatable.EphemeralStorage)
+	// klog.Infof("Allocatable Ephemeral Storage after creating nodeInfo object: %d", nodeInfo.Allocatable.EphemeralStorage)
 	nodeInfo.SetNode(node)
 	// The nomimal value of Requested.EphemeralStorage at this phase may be 0, or it may be non-zero, depending on whether or not any other concurrent ephemeral-storage-requiring pods are in a state of being scheduled
-	klog.Infof("Requested Ephemeral Storage after invoking nodeinfo.SetNode(node): %d", nodeInfo.Requested.EphemeralStorage)
+	// klog.Infof("Requested Ephemeral Storage after invoking nodeinfo.SetNode(node): %d", nodeInfo.Requested.EphemeralStorage)
 	// The nomimal value of Allocatable.EphemeralStorage at this phase should be non-zero, and roughly equivalent to the available storage on the host OS
 	// In the erratic case we see the value of this as 0! <-- That is going to fail admittance of any pods that have a non-zero ephemeral-storage resource requirements value
-	klog.Infof("Allocatable Ephemeral Storage after invoking nodeinfo.SetNode(node): %d", nodeInfo.Allocatable.EphemeralStorage)
+	// klog.Infof("Allocatable Ephemeral Storage after invoking nodeinfo.SetNode(node): %d", nodeInfo.Allocatable.EphemeralStorage)
 	// ensure the node has enough plugin resources for that required in pods
 	if err = w.pluginResourceUpdateFunc(nodeInfo, attrs); err != nil {
 		message := fmt.Sprintf("Update plugin resources failed due to %v, which is unexpected.", err)
@@ -108,9 +109,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 		}
 	}
 	// The nomimal value of Requested.EphemeralStorage should not have been changed by any side-effects of w.pluginResourceUpdateFunc
-	klog.Infof("Requested Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %d", nodeInfo.Requested.EphemeralStorage)
+	// klog.Infof("Requested Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %d", nodeInfo.Requested.EphemeralStorage)
 	// The nomimal value of Allocatable.EphemeralStorage should not have been changed by any side-effects of w.pluginResourceUpdateFunc
-	klog.Infof("Allocatable Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %d", nodeInfo.Allocatable.EphemeralStorage)
+	// klog.Infof("Allocatable Ephemeral Storage after invoking w.pluginResourceUpdateFunc(nodeInfo, attrs): %d", nodeInfo.Allocatable.EphemeralStorage)
 
 	// Remove the requests of the extended resources that are missing in the
 	// node info. This is required to support cluster-level resources, which
@@ -125,9 +126,9 @@ func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult 
 	reasons, err := GeneralPredicates(podWithoutMissingExtendedResources, nodeInfo)
 	fit := len(reasons) == 0 && err == nil
 	// The nomimal value of Requested.EphemeralStorage should not have been changed by any side-effects of removeMissingExtendedResources or GeneralPredicates
-	klog.Infof("Requested Ephemeral Storage after checking for fit: %d", nodeInfo.Requested.EphemeralStorage)
+	// klog.Infof("Requested Ephemeral Storage after checking for fit: %d", nodeInfo.Requested.EphemeralStorage)
 	// The nomimal value of Allocatable.EphemeralStorage should not have been changed by any side-effects of removeMissingExtendedResources or GeneralPredicates
-	klog.Infof("Allocatable Ephemeral Storage after checking for fit: %d", nodeInfo.Allocatable.EphemeralStorage)
+	// klog.Infof("Allocatable Ephemeral Storage after checking for fit: %d", nodeInfo.Allocatable.EphemeralStorage)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		klog.InfoS("Failed to admit pod, GeneralPredicates failed", "pod", klog.KObj(admitPod), "err", err)
@@ -294,6 +295,7 @@ func nodeHasAllocatableResources(node *v1.Node) bool {
 			return true
 		}
 	}
+	// This condition is reached regularly
 	klog.Infof("Node does not yet have any allocatable storage")
 	return false
 }
