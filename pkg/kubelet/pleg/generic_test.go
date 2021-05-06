@@ -641,7 +641,14 @@ func TestRelistIPChange(t *testing.T) {
 		actualStatus, actualErr = pleg.cache.Get(pod.ID)
 		// Must copy status to compare since its pointer gets passed through all
 		// the way to the event
-		statusCopy := *status
+		statusCopy := kubecontainer.PodStatus{
+			ID:                status.ID,
+			Name:              status.Name,
+			Namespace:         status.Namespace,
+			IPs:               status.IPs,
+			ContainerStatuses: status.ContainerStatuses,
+			SandboxStatuses:   status.SandboxStatuses,
+		}
 		statusCopy.IPs = tc.podIPs
 		assert.Equal(t, &statusCopy, actualStatus, tc.name)
 		assert.Nil(t, actualErr, tc.name)

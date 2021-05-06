@@ -285,7 +285,14 @@ func (f *FakeRuntime) GetPodStatus(uid types.UID, name, namespace string) (*kube
 	defer f.Unlock()
 
 	f.CalledFunctions = append(f.CalledFunctions, "GetPodStatus")
-	status := f.PodStatus
+	status := kubecontainer.PodStatus{
+		ID:                f.PodStatus.ID,
+		Name:              f.PodStatus.Name,
+		Namespace:         f.PodStatus.Namespace,
+		IPs:               f.PodStatus.IPs,
+		ContainerStatuses: f.PodStatus.ContainerStatuses,
+		SandboxStatuses:   f.PodStatus.SandboxStatuses,
+	}
 	return &status, f.Err
 }
 
