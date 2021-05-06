@@ -798,28 +798,25 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 		needIndividualVerifyVolumes := []AttachedVolume{}
 		for _, volumeAttached := range nodeAttachedVolumes {
 			if volumeAttached.VolumeSpec == nil {
-				klog.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName)
+				klog.ErrorS(fmt.Errorf("VerifyVolumesAreAttached: nil spec for volume %s", volumeAttached.VolumeName), "")
 				continue
 			}
 
 			volumePlugin, err :=
 				oe.operationGenerator.GetVolumePluginMgr().FindPluginBySpec(volumeAttached.VolumeSpec)
 			if err != nil {
-				klog.Errorf(
-					"VolumesAreAttached.FindPluginBySpec failed for volume %q (spec.Name: %q) on node %q with error: %v",
-					volumeAttached.VolumeName,
-					volumeAttached.VolumeSpec.Name(),
-					volumeAttached.NodeName,
-					err)
+				klog.ErrorS(err, "VolumesAreAttached.FindPluginBySpec failed",
+					"volume", volumeAttached.VolumeName,
+					"spec.Name", volumeAttached.VolumeSpec.Name(),
+					"node", volumeAttached.NodeName)
 				continue
 			}
 			if volumePlugin == nil {
 				// should never happen since FindPluginBySpec always returns error if volumePlugin = nil
-				klog.Errorf(
-					"Failed to find volume plugin for volume %q (spec.Name: %q) on node %q",
-					volumeAttached.VolumeName,
-					volumeAttached.VolumeSpec.Name(),
-					volumeAttached.NodeName)
+				klog.ErrorS(nil, "Failed to find volume plugin for volume, volumePlugin is nil",
+					"volume", volumeAttached.VolumeName,
+					"spec.Name", volumeAttached.VolumeSpec.Name(),
+					"node", volumeAttached.NodeName)
 				continue
 			}
 
@@ -854,7 +851,9 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 		}
 		nodeError := oe.VerifyVolumesAreAttachedPerNode(needIndividualVerifyVolumes, node, actualStateOfWorld)
 		if nodeError != nil {
-			klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", needIndividualVerifyVolumes, node, nodeError)
+			klog.ErrorS(nodeError, "VerifyVolumesAreAttached failed",
+				"volumes", needIndividualVerifyVolumes,
+				"node", node)
 		}
 	}
 
@@ -865,14 +864,16 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			volumeSpecMapByPlugin[pluginName],
 			actualStateOfWorld)
 		if err != nil {
-			klog.Errorf("BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes for plugin %q with  %v", pluginName, err)
+			klog.ErrorS(err, "BulkVerifyVolumes.GenerateBulkVolumeVerifyFunc error bulk verifying volumes",
+				"volumePlugin", pluginName)
 		}
 
 		// Ugly hack to ensure - we don't do parallel bulk polling of same volume plugin
 		uniquePluginName := v1.UniqueVolumeName(pluginName)
 		err = oe.pendingOperations.Run(uniquePluginName, "" /* Pod Name */, "" /* nodeName */, generatedOperations)
 		if err != nil {
-			klog.Errorf("BulkVerifyVolumes.Run Error bulk volume verification for plugin %q  with %v", pluginName, err)
+			klog.ErrorS(err, "BulkVerifyVolumes.Run Error bulk volume verification",
+				"volumePlugin", pluginName)
 		}
 	}
 }
@@ -1030,7 +1031,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 	// Filesystem Volume case
 	if volumeMode == v1.PersistentVolumeFilesystem {
 		// Create volumeSpec from mount path
-		klog.V(5).Infof("Starting operationExecutor.ReconstructVolumepodName")
+		klog.V(5).InfoS("Starting operationExecutor.ReconstructVolumepodName")
 		volumeSpec, err := plugin.ConstructVolumeSpec(volumeSpecName, volumePath)
 		if err != nil {
 			return nil, err
@@ -1040,7 +1041,7 @@ func (oe *operationExecutor) ReconstructVolumeOperation(
 
 	// Block Volume case
 	// Create volumeSpec from mount path
-	klog.V(5).Infof("Starting operationExecutor.ReconstructVolume")
+	klog.V(5).InfoS("Starting operationExecutor.ReconstructVolume")
 
 	// volumePath contains volumeName on the path. In the case of block volume, {volumeName} is symbolic link
 	// corresponding to raw block device.
