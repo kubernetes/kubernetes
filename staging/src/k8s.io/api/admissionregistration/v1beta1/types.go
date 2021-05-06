@@ -26,11 +26,13 @@ type Rule struct {
 	// APIGroups is the API groups the resources belong to. '*' is all groups.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
+	// +listType=atomic
 	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,1,rep,name=apiGroups"`
 
 	// APIVersions is the API versions the resources belong to. '*' is all versions.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
+	// +listType=atomic
 	APIVersions []string `json:"apiVersions,omitempty" protobuf:"bytes,2,rep,name=apiVersions"`
 
 	// Resources is a list of resources this rule applies to.
@@ -48,6 +50,7 @@ type Rule struct {
 	//
 	// Depending on the enclosing object, subresources might not be allowed.
 	// Required.
+	// +listType=atomic
 	Resources []string `json:"resources,omitempty" protobuf:"bytes,3,rep,name=resources"`
 
 	// scope specifies the scope of this rule.
@@ -132,6 +135,8 @@ type ValidatingWebhookConfiguration struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Webhooks []ValidatingWebhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
 }
 
@@ -171,6 +176,8 @@ type MutatingWebhookConfiguration struct {
 	// +optional
 	// +patchMergeKey=name
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=name
 	Webhooks []MutatingWebhook `json:"webhooks,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=Webhooks"`
 }
 
@@ -210,6 +217,7 @@ type ValidatingWebhook struct {
 	// from putting the cluster in a state which cannot be recovered from without completely
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+	// +listType=atomic
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -320,6 +328,7 @@ type ValidatingWebhook struct {
 	// and be subject to the failure policy.
 	// Default to `['v1beta1']`.
 	// +optional
+	// +listType=atomic
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 }
 
@@ -342,6 +351,7 @@ type MutatingWebhook struct {
 	// from putting the cluster in a state which cannot be recovered from without completely
 	// disabling the plugin, ValidatingAdmissionWebhooks and MutatingAdmissionWebhooks are never called
 	// on admission requests for ValidatingWebhookConfiguration and MutatingWebhookConfiguration objects.
+	// +listType=atomic
 	Rules []RuleWithOperations `json:"rules,omitempty" protobuf:"bytes,3,rep,name=rules"`
 
 	// FailurePolicy defines how unrecognized errors from the admission endpoint are handled -
@@ -452,6 +462,7 @@ type MutatingWebhook struct {
 	// and be subject to the failure policy.
 	// Default to `['v1beta1']`.
 	// +optional
+	// +listType=atomic
 	AdmissionReviewVersions []string `json:"admissionReviewVersions,omitempty" protobuf:"bytes,8,rep,name=admissionReviewVersions"`
 
 	// reinvocationPolicy indicates whether this webhook should be called multiple times as part of a single admission evaluation.
@@ -493,6 +504,7 @@ type RuleWithOperations struct {
 	// for all of those operations and any future admission operations that are added.
 	// If '*' is present, the length of the slice must be one.
 	// Required.
+	// +listType=atomic
 	Operations []OperationType `json:"operations,omitempty" protobuf:"bytes,1,rep,name=operations,casttype=OperationType"`
 	// Rule is embedded, it describes other criteria of the rule, like
 	// APIGroups, APIVersions, Resources, etc.
@@ -554,6 +566,7 @@ type WebhookClientConfig struct {
 	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
+	// +listType=atomic
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
 }
 

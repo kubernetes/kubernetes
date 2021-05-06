@@ -47,7 +47,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: atomic
+          elementRelationship: associative
     - name: clientConfig
       type:
         namedType: io.k8s.api.admissionregistration.v1.WebhookClientConfig
@@ -159,7 +159,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: atomic
+          elementRelationship: associative
     - name: clientConfig
       type:
         namedType: io.k8s.api.admissionregistration.v1.WebhookClientConfig
@@ -233,7 +233,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: atomic
+          elementRelationship: associative
     - name: clientConfig
       type:
         namedType: io.k8s.api.admissionregistration.v1beta1.WebhookClientConfig
@@ -345,7 +345,7 @@ var schemaYAML = typed.YAMLObject(`types:
         list:
           elementType:
             scalar: string
-          elementRelationship: atomic
+          elementRelationship: associative
     - name: clientConfig
       type:
         namedType: io.k8s.api.admissionregistration.v1beta1.WebhookClientConfig
