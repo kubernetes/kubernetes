@@ -55,6 +55,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/csimigration"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
@@ -741,6 +742,21 @@ func (adc *attachDetachController) processVolumeAttachments() error {
 				nodeName,
 				err)
 			continue
+		}
+		pluginName := plugin.GetPluginName()
+		if adc.csiMigratedPluginManager.IsMigrationEnabledForPlugin(pluginName) {
+			plugin, _ = adc.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
+			volumeSpec, err = csimigration.TranslateInTreeSpecToCSI(volumeSpec, adc.intreeToCSITranslator)
+			if err != nil {
+				klog.Errorf(
+					"Failed to translate intree volumeSpec to CSI volumeSpec for volume:%q, va.Name:%q, nodeName:%q: %v. Error: %v",
+					*pvName,
+					va.Name,
+					nodeName,
+					pluginName,
+					err)
+				continue
+			}
 		}
 		volumeName, err := volumeutil.GetUniqueVolumeNameFromSpec(plugin, volumeSpec)
 		if err != nil {
