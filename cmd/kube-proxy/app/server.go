@@ -473,8 +473,7 @@ func (o *Options) detectConfigConflict(config interface{}, fs *pflag.FlagSet) []
 			continue
 		}
 		if tag, set := fieldType.Tag.Lookup("flag"); set {
-			flag := fs.Lookup(tag)
-			if flag != nil && flag.Changed {
+			if fs.Changed(tag) {
 				conflictFields = append(conflictFields, tag)
 			}
 		} else if field.Kind() == reflect.Struct {

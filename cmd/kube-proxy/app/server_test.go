@@ -656,7 +656,6 @@ clusterCIDR: "%s"`, value))
 
 	testCases := []struct {
 		name        string
-		proxyServer proxyRun
 		flagValue   string
 		configValue string
 		expectValue string
@@ -686,6 +685,13 @@ clusterCIDR: "%s"`, value))
 		{
 			name:        "detect flag and config conflict",
 			flagValue:   "2.2.0.0/16",
+			configValue: "1.1.0.0/16",
+			expectValue: "",
+			expectError: fmt.Errorf("Kube-proxy flags conflict: [cluster-cidr]"),
+		},
+		{
+			name:        "detect flag and config conflict with same value",
+			flagValue:   "1.1.0.0/16",
 			configValue: "1.1.0.0/16",
 			expectValue: "",
 			expectError: fmt.Errorf("Kube-proxy flags conflict: [cluster-cidr]"),
@@ -747,7 +753,6 @@ kind: KubeProxyConfiguration
 
 	testCases := []struct {
 		name        string
-		proxyServer proxyRun
 		args        []string
 		config      string
 		expectError error
