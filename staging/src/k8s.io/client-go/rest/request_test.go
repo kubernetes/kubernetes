@@ -2227,33 +2227,52 @@ func TestRequestPreflightCheck(t *testing.T) {
 }
 
 func TestThrottledLogger(t *testing.T) {
-	now := time.Now()
-	oldClock := globalThrottledLogger.clock
-	defer func() {
-		globalThrottledLogger.clock = oldClock
-	}()
-	clock := clock.NewFakeClock(now)
-	globalThrottledLogger.clock = clock
-
-	logMessages := 0
-	for i := 0; i < 1000; i++ {
-		var wg sync.WaitGroup
-		wg.Add(10)
-		for j := 0; j < 10; j++ {
-			go func() {
-				if _, ok := globalThrottledLogger.attemptToLog(); ok {
-					logMessages++
-				}
-				wg.Done()
-			}()
-		}
-		wg.Wait()
-		now = now.Add(1 * time.Second)
-		clock.SetTime(now)
+	tests := []struct {
+		level string
+		want  int
+	}{
+		{
+			level: "2",
+			want:  1000,
+		},
+		{
+			level: "0",
+			want:  100,
+		},
 	}
 
-	if a, e := logMessages, 100; a != e {
-		t.Fatalf("expected %v log messages, but got %v", e, a)
+	oldClock := globalThrottledLogger.clock
+	oldLevel := flag.Lookup("v").Value.(flag.Getter).Get().(klog.Level)
+	defer func() {
+		globalThrottledLogger.clock = oldClock
+		flag.Set("v", oldLevel.String())
+	}()
+
+	for _, test := range tests {
+		flag.Set("v", test.level)
+		now := time.Now()
+		clock := clock.NewFakeClock(now)
+		globalThrottledLogger.clock = clock
+		logMessages := 0
+		for i := 0; i < 1000; i++ {
+			var wg sync.WaitGroup
+			wg.Add(10)
+			for j := 0; j < 10; j++ {
+				go func() {
+					if _, ok := globalThrottledLogger.attemptToLog(); ok {
+						logMessages++
+					}
+					wg.Done()
+				}()
+			}
+			wg.Wait()
+			now = now.Add(1 * time.Second)
+			clock.SetTime(now)
+		}
+
+		if logMessages != test.want {
+			t.Fatalf("log level %v: expected %v log messages, but got %v", test.level, test.want, logMessages)
+		}
 	}
 }
 
