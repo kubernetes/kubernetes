@@ -258,10 +258,10 @@ func (c *hourlyRequestCounts) User(user userKey) *userRequestCounts {
 	}
 
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	if _, ok := c.usersToRequestCounts[user]; !ok {
 		c.usersToRequestCounts[user] = newUserRequestCounts(user)
 	}
-	c.lock.Unlock()
 	return c.usersToRequestCounts[user]
 }
 
@@ -369,10 +369,10 @@ func (c *userRequestCounts) Verb(verb string) *verbRequestCount {
 	}
 
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	if _, ok := c.verbsToRequestCounts[verb]; !ok {
 		c.verbsToRequestCounts[verb] = &verbRequestCount{}
 	}
-	c.lock.Unlock()
 	return c.verbsToRequestCounts[verb]
 }
 
