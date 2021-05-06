@@ -196,13 +196,6 @@ const (
 	// intended to be used for service account token verification.
 	ServiceAccountIssuerDiscovery featuregate.Feature = "ServiceAccountIssuerDiscovery"
 
-	// owner: @Random-Liu
-	// beta: v1.11
-	// ga:   v1.21
-	//
-	// Enable container log rotation for cri container runtime
-	CRIContainerLogRotation featuregate.Feature = "CRIContainerLogRotation"
-
 	// owner: @krmayankk
 	// beta:  v1.14
 	// ga:    v1.21
@@ -759,7 +752,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	ServiceAccountIssuerDiscovery:                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
-	CRIContainerLogRotation:                        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
 	InTreePluginGCEUnregister:                      {Default: false, PreRelease: featuregate.Alpha},
