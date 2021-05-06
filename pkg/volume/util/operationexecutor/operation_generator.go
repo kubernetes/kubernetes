@@ -1664,7 +1664,7 @@ func (og *operationGenerator) GenerateExpandVolumeFunc(
 				return volumetypes.NewOperationContext(detailedErr, detailedErr, migrated)
 			}
 
-			klog.InfoS("ExpandVolume succeeded for volume %s", util.GetPersistentVolumeClaimQualifiedName(pvc))
+			klog.InfoS("ExpandVolume succeeded for volume",  "volume", util.GetPersistentVolumeClaimQualifiedName(pvc))
 
 			newSize = updatedSize
 			// k8s doesn't have transactions, we can't guarantee that after updating PV - updating PVC will be
