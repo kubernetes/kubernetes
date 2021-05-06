@@ -589,11 +589,11 @@ func createSecretMap(spec *volume.Spec, plugin *iscsiPlugin, namespace string) (
 			// if secret is provideded, retrieve it
 			kubeClient := plugin.host.GetKubeClient()
 			if kubeClient == nil {
-				return nil, fmt.Errorf("Cannot get kube client")
+				return nil, fmt.Errorf("cannot get kube client")
 			}
 			secretObj, err := kubeClient.CoreV1().Secrets(secretNamespace).Get(context.TODO(), secretName, metav1.GetOptions{})
 			if err != nil {
-				err = fmt.Errorf("Couldn't get secret %v/%v error: %v", secretNamespace, secretName, err)
+				err = fmt.Errorf("couldn't get secret %v/%v error: %w", secretNamespace, secretName, err)
 				return nil, err
 			}
 			secret = make(map[string]string)

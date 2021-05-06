@@ -88,9 +88,9 @@ func TestAttachDetach(t *testing.T) {
 	diskName := "[local] volumes/test"
 	nodeName := types.NodeName("host")
 	spec := createVolSpec(diskName)
-	attachError := errors.New("Fake attach error")
-	detachError := errors.New("Fake detach error")
-	diskCheckError := errors.New("Fake DiskIsAttached error")
+	attachError := errors.New("fake attach error")
+	detachError := errors.New("fake detach error")
+	diskCheckError := errors.New("fake DiskIsAttached error")
 	tests := []testcase{
 		// Successful Attach call
 		{
@@ -250,17 +250,17 @@ func (testcase *testcase) AttachDisk(diskName string, storagePolicyName string, 
 		// testcase.attach looks uninitialized, test did not expect to call
 		// AttachDisk
 		testcase.t.Errorf("Unexpected AttachDisk call!")
-		return "", errors.New("Unexpected AttachDisk call!")
+		return "", errors.New("unexpected AttachDisk call")
 	}
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return "", fmt.Errorf(`Unexpected AttachDisk call: %w`, diskNameErr)
+		return "", fmt.Errorf(`unexpected AttachDisk call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected AttachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return "", fmt.Errorf(`Unexpected AttachDisk call: %w`, nodeNameErr)
+		return "", fmt.Errorf(`unexpected AttachDisk call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("AttachDisk call: %s, %s, returning %q, %v", diskName, nodeName, expected.retDeviceUUID, expected.ret)
@@ -275,17 +275,17 @@ func (testcase *testcase) DetachDisk(diskName string, nodeName types.NodeName) e
 		// testcase.detach looks uninitialized, test did not expect to call
 		// DetachDisk
 		testcase.t.Errorf("Unexpected DetachDisk call!")
-		return errors.New("Unexpected DetachDisk call!")
+		return errors.New("unexpected DetachDisk call")
 	}
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected diskName %s, got %s", expected.diskName, diskName)
-		return fmt.Errorf(`Unexpected DetachDisk call: %w`, diskNameErr)
+		return fmt.Errorf(`unexpected DetachDisk call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DetachDisk call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return fmt.Errorf(`Unexpected DetachDisk call: %w`, nodeNameErr)
+		return fmt.Errorf(`unexpected DetachDisk call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("DetachDisk call: %s, %s, returning %v", diskName, nodeName, expected.ret)
@@ -300,17 +300,17 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 		// testcase.diskIsAttached looks uninitialized, test did not expect to
 		// call DiskIsAttached
 		testcase.t.Errorf("Unexpected DiskIsAttached call!")
-		return false, diskName, errors.New("Unexpected DiskIsAttached call!")
+		return false, diskName, errors.New("unexpected DiskIsAttached call")
 	}
 
 	if expected.diskName != diskName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected diskName %s, got %s", expected.diskName, diskName)
-		return false, diskName, fmt.Errorf(`Unexpected DiskIsAttached call: %w`, diskNameErr)
+		return false, diskName, fmt.Errorf(`unexpected DiskIsAttached call: %w`, diskNameErr)
 	}
 
 	if expected.nodeName != nodeName {
 		testcase.t.Errorf("Unexpected DiskIsAttached call: expected nodeName %s, got %s", expected.nodeName, nodeName)
-		return false, diskName, fmt.Errorf(`Unexpected DiskIsAttached call: %w`, nodeNameErr)
+		return false, diskName, fmt.Errorf(`unexpected DiskIsAttached call: %w`, nodeNameErr)
 	}
 
 	klog.V(4).Infof("DiskIsAttached call: %s, %s, returning %v, %v", diskName, nodeName, expected.isAttached, expected.ret)
@@ -319,13 +319,13 @@ func (testcase *testcase) DiskIsAttached(diskName string, nodeName types.NodeNam
 }
 
 func (testcase *testcase) DisksAreAttached(nodeVolumes map[types.NodeName][]string) (map[types.NodeName]map[string]bool, error) {
-	return nil, errors.New("Not implemented")
+	return nil, errors.New("not implemented")
 }
 
 func (testcase *testcase) CreateVolume(volumeOptions *vclib.VolumeOptions) (volumePath string, err error) {
-	return "", errors.New("Not implemented")
+	return "", errors.New("not implemented")
 }
 
 func (testcase *testcase) DeleteVolume(vmDiskPath string) error {
-	return errors.New("Not implemented")
+	return errors.New("not implemented")
 }

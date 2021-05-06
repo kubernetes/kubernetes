@@ -135,11 +135,11 @@ func (plugin *cinderPlugin) GetVolumeLimits() (map[string]int64, error) {
 	// default values from here will mean, no one can
 	// override them.
 	if cloud == nil {
-		return nil, fmt.Errorf("No cloudprovider present")
+		return nil, fmt.Errorf("no cloudprovider present")
 	}
 
 	if cloud.ProviderName() != openstack.ProviderName {
-		return nil, fmt.Errorf("Expected Openstack cloud, found %s", cloud.ProviderName())
+		return nil, fmt.Errorf("expected Openstack cloud, found %s", cloud.ProviderName())
 	}
 
 	openstackCloud, ok := cloud.(*openstack.OpenStack)
@@ -477,9 +477,9 @@ func (c *cinderVolumeUnmounter) TearDown() error {
 // resource was the last reference to that disk on the kubelet.
 func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	if pathExists, pathErr := mount.PathExists(dir); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return fmt.Errorf("error checking if path exists: %v", pathErr)
 	} else if !pathExists {
-		klog.Warningf("Warning: Unmount skipped because path does not exist: %v", dir)
+		klog.Warningf("Warning: Unmount skipped because path does not exist: %w", dir)
 		return nil
 	}
 

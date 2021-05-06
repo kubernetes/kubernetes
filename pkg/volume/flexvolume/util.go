@@ -40,12 +40,12 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 
 	kubeClient := host.GetKubeClient()
 	if kubeClient == nil {
-		return fmt.Errorf("Cannot get kube client")
+		return fmt.Errorf("cannot get kube client")
 	}
 
 	secrets, err := util.GetSecretForPV(secretNamespace, secretName, driverName, host.GetKubeClient())
 	if err != nil {
-		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", secretNamespace, secretName, err)
+		err = fmt.Errorf("couldn't get secret %v/%v err: %w", secretNamespace, secretName, err)
 		return err
 	}
 	for name, data := range secrets {

@@ -777,7 +777,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 		{
 			name:    "no default mode",
 			path:    "token",
-			wantErr: fmt.Errorf("No defaultMode used, not even the default value for it"),
+			wantErr: fmt.Errorf("no defaultMode used, not even the default value for it"),
 		},
 		{
 			name:        "fsUser != nil",
