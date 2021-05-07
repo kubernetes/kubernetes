@@ -432,7 +432,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	coversAll := false
 	for i, s := range sysctls {
 		if len(s) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("empty sysctl not allowed")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], "empty sysctl not allowed"))
 		} else if !IsValidSysctlPattern(string(s)) {
 			allErrs = append(
 				allErrs,
@@ -447,7 +447,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	}
 
 	if coversAll && len(sysctls) > 1 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), fmt.Sprintf("if '*' is present, must not specify other sysctls")))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "if '*' is present, must not specify other sysctls"))
 	}
 
 	return allErrs
