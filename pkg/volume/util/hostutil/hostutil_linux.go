@@ -84,7 +84,7 @@ func ExclusiveOpenFailsOnDevice(pathname string) (bool, error) {
 	}
 
 	if !isDevice {
-		klog.Errorf("Path %q is not referring to a device.", pathname)
+		klog.ErrorS(nil, "Path is not referring to a device.", "path", pathname)
 		return false, nil
 	}
 	fd, errno := unix.Open(pathname, unix.O_RDONLY|unix.O_EXCL|unix.O_CLOEXEC, 0)
@@ -113,18 +113,18 @@ func (hu *HostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, p
 func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
-		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		klog.V(4).InfoS("GetMountRefs failed", "mountPath", mountPath, "error", err)
 		return "", err
 	}
 	if len(refs) == 0 {
-		klog.V(4).Infof("Directory %s is not mounted", mountPath)
+		klog.V(4).InfoS("Directory is not mounted", "mountPath", mountPath)
 		return "", fmt.Errorf("directory %s is not mounted", mountPath)
 	}
 	for _, ref := range refs {
 		if strings.HasPrefix(ref, pluginMountDir) {
 			volumeID, err := filepath.Rel(pluginMountDir, ref)
 			if err != nil {
-				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				klog.ErrorS(err, "Failed to get volume id", "mountPath", mountPath)
 				return "", err
 			}
 			return volumeID, nil
@@ -211,11 +211,11 @@ func DoMakeRShared(path string, mountInfoFilename string) error {
 		return err
 	}
 	if shared {
-		klog.V(4).Infof("Directory %s is already on a shared mount", path)
+		klog.V(4).InfoS("Directory is already on a shared mount", "path", path)
 		return nil
 	}
 
-	klog.V(2).Infof("Bind-mounting %q with shared mount propagation", path)
+	klog.V(2).InfoS("Bind-mounting with shared mount propagation", "path", path)
 	// mount --bind /var/lib/kubelet /var/lib/kubelet
 	if err := syscall.Mount(path, path, "" /*fstype*/, syscall.MS_BIND, "" /*data*/); err != nil {
 		return fmt.Errorf("failed to bind-mount %s: %v", path, err)

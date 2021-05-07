@@ -38,13 +38,13 @@ import (
 
 const (
 	// EmptyUniquePodName is a UniquePodName for empty string.
-	EmptyUniquePodName volumetypes.UniquePodName = volumetypes.UniquePodName("")
+	EmptyUniquePodName = volumetypes.UniquePodName("")
 
 	// EmptyUniqueVolumeName is a UniqueVolumeName for empty string
-	EmptyUniqueVolumeName v1.UniqueVolumeName = v1.UniqueVolumeName("")
+	EmptyUniqueVolumeName = v1.UniqueVolumeName("")
 
 	// EmptyNodeName is a NodeName for empty string
-	EmptyNodeName types.NodeName = types.NodeName("")
+	EmptyNodeName = types.NodeName("")
 )
 
 // NestedPendingOperations defines the supported set of operations.
@@ -279,7 +279,7 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 		grm.deleteOperation(key)
 		if *err != nil {
 			// Log error
-			klog.Errorf("operation %+v failed with: %v", key, *err)
+			klog.ErrorS(*err, "Operation failed", "operation", key)
 		}
 		return
 	}
@@ -288,9 +288,7 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 	existingOpIndex, getOpErr := grm.getOperation(key)
 	if getOpErr != nil {
 		// Failed to find existing operation
-		klog.Errorf("Operation %+v completed. error: %v. exponentialBackOffOnError is enabled, but failed to get operation to update.",
-			key,
-			*err)
+		klog.ErrorS(*err, "Operation completed, exponentialBackOffOnError is enabled, but failed to get operation to update.", "operation", key)
 		return
 	}
 
@@ -298,7 +296,7 @@ func (grm *nestedPendingOperations) operationComplete(key operationKey, err *err
 	grm.operations[existingOpIndex].operationPending = false
 
 	// Log error
-	klog.Errorf("%v", grm.operations[existingOpIndex].expBackoff.
+	klog.ErrorS(nil, grm.operations[existingOpIndex].expBackoff.
 		GenerateNoRetriesPermittedMsg(fmt.Sprintf("%+v", key)))
 }
 

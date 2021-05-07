@@ -91,7 +91,7 @@ func isLinkPath(path string) (bool, error) {
 func evalSymlink(path string) (string, error) {
 	path = mount.NormalizeWindowsPath(path)
 	if isDeviceOrUncPath(path) || isDriveLetterorEmptyPath(path) {
-		klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+		klog.V(4).InfoS("Path is not a symlink, return its original form.", "path", path)
 		return path, nil
 	}
 	upperpath := path
@@ -108,7 +108,7 @@ func evalSymlink(path string) (string, error) {
 		base = filepath.Join(filepath.Base(upperpath), base)
 		upperpath = getUpperPath(upperpath)
 		if isDriveLetterorEmptyPath(upperpath) {
-			klog.V(4).Infof("Path '%s' is not a symlink, return its original form.", path)
+			klog.V(4).InfoS("Path is not a symlink, return its original form.", "path", path)
 			return path, nil
 		}
 	}
@@ -118,10 +118,10 @@ func evalSymlink(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).Infof("evaluate path %s: symlink from %s to %s", path, upperpath, string(output))
+	klog.V(4).InfoS("", "evaluatePath", path, " symlinkFrom", upperpath, "symlinkTo", string(output))
 	linkedPath := strings.TrimSpace(string(output))
 	if linkedPath == "" || isDeviceOrUncPath(linkedPath) {
-		klog.V(4).Infof("Path '%s' has a target %s. Return its original form.", path, linkedPath)
+		klog.V(4).InfoS("Path has a target. Return its original form.", "originalPath", path, "targetPath", linkedPath)
 		return path, nil
 	}
 	// If the target is not an absoluate path, join iit with the current upperpath
@@ -265,7 +265,7 @@ func (sp *subpath) SafeMakeDir(subdir string, base string, perm os.FileMode) err
 }
 
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	klog.V(4).Infof("Creating directory %q within base %q", pathname, base)
+	klog.V(4).InfoS("Creating directory within base", "path", pathname, "base", base)
 
 	if !mount.PathWithinBase(pathname, base) {
 		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
@@ -278,7 +278,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		if s.IsDir() {
 			// The directory already exists. It can be outside of the parent,
 			// but there is no race-proof check.
-			klog.V(4).Infof("Directory %s already exists", pathname)
+			klog.V(4).InfoS("Directory already exists", "path", pathname)
 			return nil
 		}
 		return &os.PathError{Op: "mkdir", Path: pathname, Err: syscall.ENOTDIR}
@@ -313,13 +313,13 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return err
 	}
 
-	klog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
+	klog.V(4).InfoS("", "existingPath", fullExistingPath, "tobeCreatedPaths", filepath.Join(toCreate...))
 	currentPath := fullExistingPath
 	// create the directories one by one, making sure nobody can change
 	// created directory into symlink by lock that directory immediately
 	for _, dir := range toCreate {
 		currentPath = filepath.Join(currentPath, dir)
-		klog.V(4).Infof("Creating %s", dir)
+		klog.V(4).InfoS("Creating directory", "path", dir)
 		if err := os.Mkdir(currentPath, perm); err != nil {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
 		}

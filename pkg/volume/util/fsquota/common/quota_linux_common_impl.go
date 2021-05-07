@@ -109,7 +109,7 @@ func getXFSQuotaCmd() (string, error) {
 	for _, program := range quotaCmds {
 		fileinfo, err := os.Stat(program)
 		if err == nil && ((fileinfo.Mode().Perm() & (1 << 6)) != 0) {
-			klog.V(3).Infof("Found xfs_quota program %s", program)
+			klog.V(3).InfoS("Found xfs_quota program", "program", program)
 			quotaCmd = program
 			quotaCmdInitialized = true
 			return quotaCmd, nil
@@ -126,14 +126,14 @@ func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string
 	}
 	// We're using numeric project IDs directly; no need to scan
 	// /etc/projects or /etc/projid
-	klog.V(4).Infof("runXFSQuotaCommand %s -t %s -P/dev/null -D/dev/null -x -f %s -c %s", quotaCmd, mountsFile, mountpoint, command)
 	cmd := exec.Command(quotaCmd, "-t", mountsFile, "-P/dev/null", "-D/dev/null", "-x", "-f", mountpoint, "-c", command)
+	klog.V(4).InfoS("RunXFSQuotaCommand", "command", cmd.String())
 
 	data, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).Infof("runXFSQuotaCommand output %q", string(data))
+	klog.V(4).InfoS("runXFSQuotaCommand", "output", string(data))
 	return string(data), nil
 }
 
@@ -192,7 +192,7 @@ func isFilesystemOfType(mountpoint string, backingDev string, typeMagic int64) b
 	var buf syscall.Statfs_t
 	err := syscall.Statfs(mountpoint, &buf)
 	if err != nil {
-		klog.Warningf("Warning: Unable to statfs %s: %v", mountpoint, err)
+		klog.InfoS("Warning: Unable to statfs", "mountpoint", mountpoint, "error", err.Error())
 		return false
 	}
 	if int64(buf.Type) != typeMagic {
@@ -257,7 +257,8 @@ func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier i
 	if err != nil {
 		return 0, fmt.Errorf("unable to parse data size '%s' from '%s': %v", match[1], data, err)
 	}
-	klog.V(4).Infof("getQuantity %s %d %s %d => %d %v", mountpoint, id, xfsQuotaArg, multiplier, size, err)
+	klog.V(4).InfoS("Get quantity",
+		"mountpoint", mountpoint, "quotaID", id, "xfsQuotaArg", xfsQuotaArg, "multiplier", multiplier, "size", size, "error", err.Error())
 	return size * multiplier, nil
 }
 

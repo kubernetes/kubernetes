@@ -49,7 +49,7 @@ func (hu *HostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, p
 func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	refs, err := mounter.GetMountRefs(mountPath)
 	if err != nil {
-		klog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		klog.V(4).InfoS("GetMountRefs failed", "mountPath", mountPath, "error", err.Error())
 		return "", err
 	}
 	if len(refs) == 0 {
@@ -60,7 +60,7 @@ func getDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir s
 		if strings.Contains(ref, basemountPath) {
 			volumeID, err := filepath.Rel(mount.NormalizeWindowsPath(basemountPath), ref)
 			if err != nil {
-				klog.Errorf("Failed to get volume id from mount %s - %v", mountPath, err)
+				klog.ErrorS(err, "Failed to get volume id", "mountPath", mountPath)
 				return "", err
 			}
 			return volumeID, nil

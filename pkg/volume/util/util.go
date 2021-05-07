@@ -85,7 +85,7 @@ func IsReady(dir string) bool {
 	}
 
 	if !s.Mode().IsRegular() {
-		klog.Errorf("ready-file is not a file: %s", readyFile)
+		klog.ErrorS(nil, "Ready-file is not a regular file", "path", readyFile)
 		return false
 	}
 
@@ -97,14 +97,14 @@ func IsReady(dir string) bool {
 // created.
 func SetReady(dir string) {
 	if err := os.MkdirAll(dir, 0750); err != nil && !os.IsExist(err) {
-		klog.Errorf("Can't mkdir %s: %v", dir, err)
+		klog.ErrorS(err, "Failed to mkdir", "path", dir)
 		return
 	}
 
 	readyFile := filepath.Join(dir, readyFileName)
 	file, err := os.Create(readyFile)
 	if err != nil {
-		klog.Errorf("Can't touch %s: %v", readyFile, err)
+		klog.ErrorS(err, "Failed to touch ready-file", "path", readyFile)
 		return
 	}
 	file.Close()
@@ -175,7 +175,7 @@ func checkVolumeNodeAffinity(pv *v1.PersistentVolume, node *v1.Node) error {
 
 	if pv.Spec.NodeAffinity.Required != nil {
 		terms := pv.Spec.NodeAffinity.Required
-		klog.V(10).Infof("Match for Required node selector terms %+v", terms)
+		klog.V(10).InfoS("Match for Required node selector", "terms", terms.String())
 		if matches, err := corev1.MatchNodeSelectorTerms(node, terms); err != nil {
 			return err
 		} else if !matches {
@@ -251,7 +251,7 @@ func GetPath(mounter volume.Mounter) (string, error) {
 // UnmountViaEmptyDir delegates the tear down operation for secret, configmap, git_repo and downwardapi
 // to empty_dir
 func UnmountViaEmptyDir(dir string, host volume.VolumeHost, volName string, volSpec volume.Spec, podUID utypes.UID) error {
-	klog.V(3).Infof("Tearing down volume %v for pod %v at %v", volName, podUID, dir)
+	klog.V(3).InfoS("Tearing down volume", "volumeName", volName, "podName", podUID, "path", dir)
 
 	// Wrap EmptyDir, let it do the teardown.
 	wrapped, err := host.NewWrapperUnmounter(volName, volSpec, podUID)
@@ -657,7 +657,7 @@ func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	if runtime.GOOS == "windows" {
 		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
 		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
-		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
+		klog.InfoS("Command executed", "command", cmd, "error", err, "output", string(output))
 		if err != nil {
 			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
 		}

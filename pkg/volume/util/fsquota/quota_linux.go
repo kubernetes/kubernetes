@@ -224,12 +224,12 @@ func getQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 func clearQuotaOnDir(m mount.Interface, path string) error {
 	// Since we may be called without path being in the map,
 	// we explicitly have to check in this case.
-	klog.V(4).Infof("clearQuotaOnDir %s", path)
+	klog.V(4).InfoS("Clear quota on dir", "path", path)
 	supportsQuotas, err := SupportsQuotas(m, path)
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
-		klog.V(3).Infof("Attempt to check for quota support failed: %v", err)
+		klog.V(3).InfoS("Attempt to check for quota support failed", "error", err.Error())
 	}
 	if !supportsQuotas {
 		return nil
@@ -240,13 +240,13 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 		// we can't clear it.  That's not good.
 		err = setQuotaOnDir(path, projid, 0)
 		if err != nil {
-			klog.V(3).Infof("Attempt to clear quota failed: %v", err)
+			klog.V(3).InfoS("Attempt to clear quota failed", "error", err.Error())
 		}
 		// Even if clearing the quota failed, we still need to
 		// try to remove the project ID, or that may be left dangling.
 		err1 := removeProjectID(path, projid)
 		if err1 != nil {
-			klog.V(3).Infof("Attempt to remove quota ID from system files failed: %v", err1)
+			klog.V(3).InfoS("Attempt to remove quota ID from system files failed", "error", err1.Error())
 		}
 		clearFSInfo(path)
 		if err != nil {
@@ -256,7 +256,7 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 	}
 	// If we couldn't get a quota, that's fine -- there may
 	// never have been one, and we have no way to know otherwise
-	klog.V(3).Infof("clearQuotaOnDir fails %v", err)
+	klog.V(3).InfoS("Clear quota on dir fails", "error", err.Error())
 	return nil
 }
 
@@ -267,7 +267,7 @@ func clearQuotaOnDir(m mount.Interface, path string) error {
 // is bounded.
 func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 	if !enabledQuotasForMonitoring() {
-		klog.V(3).Info("SupportsQuotas called, but quotas disabled")
+		klog.V(3).InfoS("SupportsQuotas called, but quotas disabled")
 		return false, nil
 	}
 	supportsQuotasLock.Lock()
@@ -348,7 +348,7 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 			dirQuotaMap[path] = id
 			dirPodMap[path] = poduid
 			podDirCountMap[poduid]++
-			klog.V(4).Infof("Assigning quota ID %d (%d) to %s", id, ibytes, path)
+			klog.V(4).InfoS("Assigning quota to path", "quotaID", id, "ibytes", ibytes, "path", path)
 			return nil
 		}
 		removeProjectID(path, id)
@@ -394,7 +394,7 @@ func GetInodes(path string) (*resource.Quantity, error) {
 
 // ClearQuota -- remove the quota assigned to a directory
 func ClearQuota(m mount.Interface, path string) error {
-	klog.V(3).Infof("ClearQuota %s", path)
+	klog.V(3).InfoS("Clear quota", "path", path)
 	if !enabledQuotasForMonitoring() {
 		return fmt.Errorf("clearQuota called, but quotas disabled")
 	}
@@ -419,7 +419,8 @@ func ClearQuota(m mount.Interface, path string) error {
 	if err != nil {
 		// Log-and-continue instead of returning an error for now
 		// due to unspecified backwards compatibility concerns (a subject to revise)
-		klog.V(3).Infof("Attempt to check quota ID %v on dir %s failed: %v", dirQuotaMap[path], path, err)
+		klog.V(3).InfoS("Attempt to check quota on directory failed",
+			"quotaID", dirQuotaMap[path], "path", path, "error", err.Error())
 	}
 	if projid != dirQuotaMap[path] {
 		return fmt.Errorf("expected quota ID %v on dir %s does not match actual %v", dirQuotaMap[path], path, projid)
@@ -430,7 +431,7 @@ func ClearQuota(m mount.Interface, path string) error {
 		// This error should be noted; we still need to clean up
 		// and otherwise handle in the same way.
 		if err != nil {
-			klog.V(3).Infof("Unable to clear quota %v %s: %v", dirQuotaMap[path], path, err)
+			klog.V(3).InfoS("Unable to clear quota", "quotaID", dirQuotaMap[path], "path", path, "error", err.Error())
 		}
 		delete(quotaSizeMap, podQuotaMap[poduid])
 		delete(quotaPodMap, podQuotaMap[poduid])
@@ -439,7 +440,7 @@ func ClearQuota(m mount.Interface, path string) error {
 	} else {
 		err = removeProjectID(path, projid)
 		podDirCountMap[poduid]--
-		klog.V(4).Infof("Not clearing quota for pod %s; still %v dirs outstanding", poduid, podDirCountMap[poduid])
+		klog.V(4).InfoS("Not clearing quota for pod; still has dirs outstanding", "podUID", poduid, "outstandingDirCount", podDirCountMap[poduid])
 	}
 	delete(dirPodMap, path)
 	delete(dirQuotaMap, path)

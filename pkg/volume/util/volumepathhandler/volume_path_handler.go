@@ -89,9 +89,9 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	if !filepath.IsAbs(mapPath) {
 		return fmt.Errorf("the map path should be absolute: map path: %s", mapPath)
 	}
-	klog.V(5).Infof("MapDevice: devicePath %s", devicePath)
-	klog.V(5).Infof("MapDevice: mapPath %s", mapPath)
-	klog.V(5).Infof("MapDevice: linkName %s", linkName)
+	klog.V(5).InfoS("MapDevice", "devicePath", devicePath)
+	klog.V(5).InfoS("MapDevice", "mapPath", mapPath)
+	klog.V(5).InfoS("MapDevice", "linkName", linkName)
 
 	// Check and create mapPath
 	_, err := os.Stat(mapPath)
@@ -130,11 +130,11 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 		// Check if device file
 		// TODO: Need to check if this device file is actually the expected bind mount
 		if file.Mode()&os.ModeDevice == os.ModeDevice {
-			klog.Warningf("Warning: Map skipped because bind mount already exist on the path: %v", linkPath)
+			klog.InfoS("Warning: Map skipped because bind mount already exist on the path", "linkPath", linkPath)
 			return nil
 		}
 
-		klog.Warningf("Warning: file %s is already exist but not mounted, skip creating file", linkPath)
+		klog.InfoS("Warning: file is already exist but not mounted, skip creating file", "linkPath", linkPath)
 	}
 
 	// Bind mount file
@@ -162,8 +162,8 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string, bindMoun
 	if len(mapPath) == 0 {
 		return fmt.Errorf("failed to unmap device from map path. mapPath is empty")
 	}
-	klog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
-	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
+	klog.V(5).InfoS("UnmapDevice", "mapPath", mapPath)
+	klog.V(5).InfoS("UnmapDevice", "linkName", linkName)
 
 	if bindMount {
 		return unmapBindMountDevice(v, mapPath, linkName)
@@ -177,7 +177,7 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 	if isMountExist, checkErr := v.IsDeviceBindMountExist(linkPath); checkErr != nil {
 		return checkErr
 	} else if !isMountExist {
-		klog.Warningf("Warning: Unmap skipped because bind mount does not exist on the path: %v", linkPath)
+		klog.InfoS("Warning: Unmap skipped because bind mount does not exist", "linkPath", linkPath)
 
 		// Check if linkPath still exists
 		if _, err := os.Stat(linkPath); err != nil {
@@ -225,7 +225,7 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	if len(mapPath) == 0 {
 		return fmt.Errorf("failed to remove map path. mapPath is empty")
 	}
-	klog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
+	klog.V(5).InfoS("RemoveMapPath", "mapPath", mapPath)
 	err := os.RemoveAll(mapPath)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove directory %s: %v", mapPath, err)
@@ -291,6 +291,6 @@ func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string
 		// TODO: Might need to check if the file is actually linked to devPath
 		refs = append(refs, filepath.Join(mapPath, filename))
 	}
-	klog.V(5).Infof("GetDeviceBindMountRefs: refs %v", refs)
+	klog.V(5).InfoS("GetDeviceBindMountRefs", "refs", refs)
 	return refs, nil
 }

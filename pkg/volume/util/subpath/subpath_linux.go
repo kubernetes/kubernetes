@@ -121,7 +121,7 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 			}
 		} else {
 			// It's already mounted
-			klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+			klog.V(5).InfoS("Skipping bind-mounting subpath: already mounted", "subpath", bindPathTarget)
 			return true, bindPathTarget, nil
 		}
 	}
@@ -175,7 +175,8 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	if err != nil {
 		return "", fmt.Errorf("error resolving symlinks in %q: %v", subpath.Path, err)
 	}
-	klog.V(5).Infof("doBindSubPath %q (%q) for volumepath %q", subpath.Path, newPath, subpath.VolumePath)
+	klog.V(5).InfoS("DoBindSubPath for volumepath",
+		"subpath", subpath.Path, "newPath", newPath, "volumePath", subpath.VolumePath)
 	subpath.VolumePath = newVolumePath
 	subpath.Path = newPath
 
@@ -197,9 +198,9 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	defer func() {
 		// Cleanup subpath on error
 		if !success {
-			klog.V(4).Infof("doBindSubPath() failed for %q, cleaning up subpath", bindPathTarget)
+			klog.V(4).InfoS("DoBindSubPath() failed, cleaning up subpath", "bindPathTarget", bindPathTarget)
 			if cleanErr := cleanSubPath(mounter, subpath); cleanErr != nil {
-				klog.Errorf("Failed to clean subpath %q: %v", bindPathTarget, cleanErr)
+				klog.ErrorS(cleanErr, "Failed to clean subpath", "bindPathTarget", bindPathTarget)
 			}
 		}
 	}()
@@ -209,13 +210,13 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 
 	// Do the bind mount
 	options := []string{"bind"}
-	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
+	klog.V(5).InfoS("Bind mounting", "mountSource", mountSource, "bindPathTarget", bindPathTarget)
 	if err = mounter.MountSensitiveWithoutSystemd(mountSource, bindPathTarget, "" /*fstype*/, options, nil); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true
 
-	klog.V(3).Infof("Bound SubPath %s into %s", subpath.Path, bindPathTarget)
+	klog.V(3).InfoS("Bound SubPath", "subPath", subpath.Path, "bindPathTarget", bindPathTarget)
 	return bindPathTarget, nil
 }
 
@@ -223,7 +224,7 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) error {
 	// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/*
 	subPathDir := filepath.Join(podDir, containerSubPathDirectoryName, volumeName)
-	klog.V(4).Infof("Cleaning up subpath mounts for %s", subPathDir)
+	klog.V(4).InfoS("Cleaning up subpath mounts", "subPath", subPathDir)
 
 	containerDirs, err := ioutil.ReadDir(subPathDir)
 	if err != nil {
@@ -235,10 +236,10 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 	for _, containerDir := range containerDirs {
 		if !containerDir.IsDir() {
-			klog.V(4).Infof("Container file is not a directory: %s", containerDir.Name())
+			klog.V(4).InfoS("Container file is not a directory", "containerDir", containerDir.Name())
 			continue
 		}
-		klog.V(4).Infof("Cleaning up subpath mounts for container %s", containerDir.Name())
+		klog.V(4).InfoS("Cleaning up subpath mounts for container", "containerDir", containerDir.Name())
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
@@ -269,34 +270,34 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 		if err := os.Remove(fullContainerDirPath); err != nil {
 			return fmt.Errorf("error deleting %s: %s", fullContainerDirPath, err)
 		}
-		klog.V(5).Infof("Removed %s", fullContainerDirPath)
+		klog.V(5).InfoS("Removed fullContainerDirPath", "path", fullContainerDirPath)
 	}
 	// Whole pod volume subpaths have been cleaned up, remove its subpath directory.
 	if err := os.Remove(subPathDir); err != nil {
 		return fmt.Errorf("error deleting %s: %s", subPathDir, err)
 	}
-	klog.V(5).Infof("Removed %s", subPathDir)
+	klog.V(5).InfoS("Removed subPathDir", "path", subPathDir)
 
 	// Remove entire subpath directory if it's the last one
 	podSubPathDir := filepath.Join(podDir, containerSubPathDirectoryName)
 	if err := os.Remove(podSubPathDir); err != nil && !os.IsExist(err) {
 		return fmt.Errorf("error deleting %s: %s", podSubPathDir, err)
 	}
-	klog.V(5).Infof("Removed %s", podSubPathDir)
+	klog.V(5).InfoS("Removed podSubPathDir", "path", podSubPathDir)
 	return nil
 }
 
 // doCleanSubPath tears down the single subpath bind mount
 func doCleanSubPath(mounter mount.Interface, fullContainerDirPath, subPathIndex string) error {
 	// process /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/<subPathName>
-	klog.V(4).Infof("Cleaning up subpath mounts for subpath %v", subPathIndex)
+	klog.V(4).InfoS("Cleaning up subpath mounts for subpath", "subpath", subPathIndex)
 	fullSubPath := filepath.Join(fullContainerDirPath, subPathIndex)
 
 	if err := mount.CleanupMountPoint(fullSubPath, mounter, true); err != nil {
 		return fmt.Errorf("error cleaning subpath mount %s: %s", fullSubPath, err)
 	}
 
-	klog.V(4).Infof("Successfully cleaned subpath directory %s", fullSubPath)
+	klog.V(4).InfoS("Successfully cleaned fullSubPath directory", "path", fullSubPath)
 	return nil
 }
 
@@ -328,7 +329,7 @@ func removeEmptyDirs(baseDir, endDir string) error {
 		s, err := os.Stat(curDir)
 		if err != nil {
 			if os.IsNotExist(err) {
-				klog.V(5).Infof("curDir %q doesn't exist, skipping", curDir)
+				klog.V(5).InfoS("DurDir doesn't exist, skipping", "path", curDir)
 				continue
 			}
 			return fmt.Errorf("error stat %q: %v", curDir, err)
@@ -339,12 +340,12 @@ func removeEmptyDirs(baseDir, endDir string) error {
 
 		err = os.Remove(curDir)
 		if os.IsExist(err) {
-			klog.V(5).Infof("Directory %q not empty, not removing", curDir)
+			klog.V(5).InfoS("Directory not empty, not removing", "path", curDir)
 			break
 		} else if err != nil {
 			return fmt.Errorf("error removing directory %q: %v", curDir, err)
 		}
-		klog.V(5).Infof("Removed directory %q", curDir)
+		klog.V(5).InfoS("Removed directory", "path", curDir)
 	}
 	return nil
 }
@@ -353,7 +354,7 @@ func removeEmptyDirs(baseDir, endDir string) error {
 // and base must be either already resolved symlinks or thet will be resolved in
 // kubelet's mount namespace (in case it runs containerized).
 func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
-	klog.V(4).Infof("Creating directory %q within base %q", pathname, base)
+	klog.V(4).InfoS("Creating directory within base", "path", pathname, "base", base)
 
 	if !mount.PathWithinBase(pathname, base) {
 		return fmt.Errorf("path %s is outside of allowed base %s", pathname, base)
@@ -366,7 +367,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		if s.IsDir() {
 			// The directory already exists. It can be outside of the parent,
 			// but there is no race-proof check.
-			klog.V(4).Infof("Directory %s already exists", pathname)
+			klog.V(4).InfoS("Directory already exists", "path", pathname)
 			return nil
 		}
 		return &os.PathError{Op: "mkdir", Path: pathname, Err: syscall.ENOTDIR}
@@ -386,7 +387,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		return fmt.Errorf("path %s is outside of allowed base %s", fullExistingPath, err)
 	}
 
-	klog.V(4).Infof("%q already exists, %q to create", fullExistingPath, filepath.Join(toCreate...))
+	klog.V(4).InfoS("FullSubPath already exists", "fullSubPath", fullExistingPath, "toCreate", filepath.Join(toCreate...))
 	parentFD, err := doSafeOpen(fullExistingPath, base)
 	if err != nil {
 		return fmt.Errorf("cannot open directory %s: %s", existingPath, err)
@@ -395,12 +396,12 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "error", err.Error())
 			}
 		}
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", childFD, pathname, err)
+				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "error", err.Error())
 			}
 		}
 	}()
@@ -410,7 +411,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	// created directory into symlink.
 	for _, dir := range toCreate {
 		currentPath = filepath.Join(currentPath, dir)
-		klog.V(4).Infof("Creating %s", dir)
+		klog.V(4).InfoS("Creating directory", "path", dir)
 		err = syscall.Mkdirat(parentFD, currentPath, uint32(perm))
 		if err != nil {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
@@ -429,7 +430,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		//   and user either gets error or the file that it can already access.
 
 		if err = syscall.Close(parentFD); err != nil {
-			klog.V(4).Infof("Closing FD %v failed for safemkdir(%v): %v", parentFD, pathname, err)
+			klog.V(4).InfoS("Closing FD failed for safemkdi", "FD", parentFD, "path", pathname, "error", err.Error())
 		}
 		parentFD = childFD
 		childFD = -1
@@ -478,7 +479,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	}
 	defer func() {
 		if err = syscall.Close(fd); err != nil {
-			klog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "error", err.Error())
 		}
 	}()
 	for i, dir := range dirs {
@@ -492,7 +493,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 			return base, nil, err
 		}
 		if err = syscall.Close(fd); err != nil {
-			klog.V(4).Infof("Closing FD %v failed for findExistingPrefix(%v): %v", fd, pathname, err)
+			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "error", err.Error())
 		}
 		fd = childFD
 		currentPath = filepath.Join(currentPath, dir)
@@ -524,7 +525,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				klog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", parentFD, pathname, err)
+				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", parentFD, "path", pathname, "error", err.Error())
 			}
 		}
 	}()
@@ -533,7 +534,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				klog.V(4).Infof("Closing FD %v failed for safeopen(%v): %v", childFD, pathname, err)
+				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", childFD, "path", pathname, "error", err.Error())
 			}
 		}
 	}()
@@ -548,7 +549,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 			return -1, fmt.Errorf("path %s is outside of allowed base %s", currentPath, base)
 		}
 
-		klog.V(5).Infof("Opening path %s", currentPath)
+		klog.V(5).InfoS("Opening path", "path", currentPath)
 		childFD, err = syscall.Openat(parentFD, seg, openFDFlags|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)

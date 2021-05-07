@@ -43,7 +43,7 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 
 	// If no existing loop device for the path, create one
 	if blockDevicePath == "" {
-		klog.V(4).Infof("Creating device for path: %s", path)
+		klog.V(4).InfoS("Creating device", "path", path)
 		blockDevicePath, err = makeLoopDevice(path)
 		if err != nil {
 			return "", fmt.Errorf("makeLoopDevice failed for path %s: %v", path, err)
@@ -58,7 +58,7 @@ func (v VolumePathHandler) DetachFileDevice(path string) error {
 	loopPath, err := v.GetLoopDevice(path)
 	if err != nil {
 		if err.Error() == ErrDeviceNotFound {
-			klog.Warningf("couldn't find loopback device which takes file descriptor lock. Skip detaching device. device path: %q", path)
+			klog.InfoS("Couldn't find loopback device which takes file descriptor lock. Skip detaching device.", "devicePath", path)
 		} else {
 			return fmt.Errorf("GetLoopDevice failed for path %s: %v", path, err)
 		}
@@ -92,7 +92,7 @@ func makeLoopDevice(path string) (string, error) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		klog.V(2).Infof("Failed device create command for path: %s %v %s", path, err, out)
+		klog.V(2).InfoS("Failed device create command", "path", path, "err", err.Error(), "output", out)
 		return "", fmt.Errorf("losetup %s failed: %v", strings.Join(args, " "), err)
 	}
 
@@ -108,7 +108,7 @@ func removeLoopDevice(device string) error {
 		if _, err := os.Stat(device); os.IsNotExist(err) {
 			return nil
 		}
-		klog.V(2).Infof("Failed to remove loopback device: %s: %v %s", device, err, out)
+		klog.V(2).InfoS("Failed to remove loopback device", "device", device, "error", err, "output", out)
 		return fmt.Errorf("losetup -d %s failed: %v", device, err)
 	}
 	return nil
@@ -160,7 +160,7 @@ func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath strin
 			return err
 		}
 		if (fi.Mode()&os.ModeDevice == os.ModeDevice) && (fi.Name() == string(podUID)) {
-			klog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
+			klog.V(5).InfoS("FindGlobalMapPathFromPod", "path", path, "mapPath", mapPath)
 			if res, err := compareBindMountAndSymlinks(path, mapPath); err == nil && res {
 				globalMapPathUUID = path
 			}
@@ -170,7 +170,7 @@ func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath strin
 	if err != nil {
 		return "", fmt.Errorf("FindGlobalMapPathUUIDFromPod failed: %v", err)
 	}
-	klog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
+	klog.V(5).InfoS("FindGlobalMapPathFromPod", "globalMapPathUUID", globalMapPathUUID)
 	// Return path contains global map path + {pod uuid}
 	return globalMapPathUUID, nil
 }
@@ -198,7 +198,8 @@ func compareBindMountAndSymlinks(global, pod string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("getDeviceMajorMinor failed for path %s: %v", devPod, err)
 	}
-	klog.V(5).Infof("CompareBindMountAndSymlinks: devNumGlobal %s, devNumPod %s", devNumGlobal, devNumPod)
+	klog.V(5).InfoS("CompareBindMountAndSymlinks",
+		"devNumGlobal", devNumGlobal, "devNumPod", devNumPod)
 
 	// Check if the major/minor number are the same
 	if devNumGlobal == devNumPod {
