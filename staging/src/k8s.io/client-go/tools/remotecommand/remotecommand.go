@@ -17,13 +17,16 @@ limitations under the License.
 package remotecommand
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sync"
 
 	"k8s.io/klog/v2"
 
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/remotecommand"
 	restclient "k8s.io/client-go/rest"
@@ -68,6 +71,45 @@ type streamExecutor struct {
 	protocols []string
 }
 
+// upgraderWithTerminateFunc wraps an upgrader with a terminate func.
+type upgraderWithTerminateFunc struct {
+	mutex      sync.Mutex
+	terminated bool
+	upgrader   spdy.Upgrader
+	conns      []httpstream.Connection
+}
+
+func (upgrader *upgraderWithTerminateFunc) NewConnection(resp *http.Response) (httpstream.Connection, error) {
+	upgrader.mutex.Lock()
+	defer upgrader.mutex.Unlock()
+
+	if upgrader.terminated {
+		return nil, errors.New("the upgrader is terminated")
+	}
+	conn, err := upgrader.upgrader.NewConnection(resp)
+	if err != nil {
+		return nil, err
+	}
+	upgrader.conns = append(upgrader.conns, conn)
+
+	return conn, nil
+}
+
+func (upgrader *upgraderWithTerminateFunc) terminate() error {
+	upgrader.mutex.Lock()
+	defer upgrader.mutex.Unlock()
+
+	upgrader.terminated = true
+	// close all conns opened by this upgrader/tripper
+	var errs []error
+	for _, conn := range upgrader.conns {
+		if err := conn.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return utilerrors.NewAggregate(errs)
+}
+
 // NewSPDYExecutor connects to the provided server and upgrades the connection to
 // multiplexed bidirectional streams.
 func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, error) {
@@ -76,6 +118,23 @@ func NewSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Ex
 		return nil, err
 	}
 	return NewSPDYExecutorForTransports(wrapper, upgradeRoundTripper, method, url)
+}
+
+// NewTerminableSPDYExecutor connects to the provided server and upgrades the connection to
+// multiplexed bidirectional streams with a terminate func exposed.
+func NewTerminableSPDYExecutor(config *restclient.Config, method string, url *url.URL) (Executor, func() error, error) {
+	wrapper, upgradeRoundTripper, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	upgrader := &upgraderWithTerminateFunc{
+		upgrader:   upgradeRoundTripper,
+		conns:      nil,
+		terminated: false,
+	}
+
+	executor, err := NewSPDYExecutorForTransports(wrapper, upgrader, method, url)
+	return executor, upgrader.terminate, err
 }
 
 // NewSPDYExecutorForTransports connects to the provided server using the given transport,

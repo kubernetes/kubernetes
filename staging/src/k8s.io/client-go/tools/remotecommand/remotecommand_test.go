@@ -63,6 +63,12 @@ func (s *fakeMassiveDataPty) Write(p []byte) (int, error) {
 	return len(p), errors.New("return err")
 }
 
+type fakePty struct{}
+
+func (*fakePty) Read(p []byte) (int, error) { return len(p), nil }
+
+func (*fakePty) Write(p []byte) (int, error) { return len(p), nil }
+
 func fakeMassiveDataAttacher(stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan TerminalSize) error {
 
 	copyDone := make(chan struct{}, 3)
@@ -150,6 +156,22 @@ func TestSPDYExecutorStream(t *testing.T) {
 
 }
 
+func TestTerminableSPDYExecutorStream(t *testing.T) {
+	options := StreamOptions{
+		Stdin:  &fakePty{},
+		Stdout: &fakePty{},
+		Stderr: &fakePty{},
+	}
+	server := newTestHTTPServer(fakeMassiveDataAttacher, &options)
+
+	err := attach2ServerForAWhile(server.URL, options)
+	if err != nil {
+		t.Errorf("unexpected err [%v]", err.Error())
+	}
+
+	server.Close()
+}
+
 func newTestHTTPServer(f AttachFunc, options *StreamOptions) *httptest.Server {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		ctx, err := createHTTPStreams(writer, request, options)
@@ -181,6 +203,33 @@ func attach2Server(rawURL string, options StreamOptions) error {
 	e := make(chan error)
 	go func(e chan error) {
 		e <- exec.Stream(options)
+	}(e)
+	select {
+	case err := <-e:
+		return err
+	case <-time.After(wait.ForeverTestTimeout):
+		return errors.New("execute timeout")
+	}
+}
+
+func attach2ServerForAWhile(rawURL string, options StreamOptions) error {
+	uri, _ := url.Parse(rawURL)
+	exec, terminate, err := NewTerminableSPDYExecutor(&rest.Config{Host: uri.Host}, "POST", uri)
+	if err != nil {
+		return err
+	}
+
+	e := make(chan error)
+	go func(e chan error) {
+		e <- exec.Stream(options)
+	}(e)
+	go func(e chan error) {
+		// terminate the connection after a while
+		time.Sleep(time.Second)
+		err := terminate()
+		if err != nil {
+			e <- err
+		}
 	}(e)
 	select {
 	case err := <-e:
