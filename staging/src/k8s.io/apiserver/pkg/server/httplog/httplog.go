@@ -66,6 +66,9 @@ type respLogger struct {
 // Simple logger that logs immediately when Addf is called
 type passthroughLogger struct{}
 
+//lint:ignore SA1019 Interface implementation check to make sure we don't drop CloseNotifier again
+var _ http.CloseNotifier = &respLogger{}
+
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
 	klog.V(2).Info(fmt.Sprintf(format, data...))
@@ -239,6 +242,7 @@ func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 // CloseNotify implements http.CloseNotifier
 func (rl *respLogger) CloseNotify() <-chan bool {
+	//lint:ignore SA1019 There are places in the code base requiring the CloseNotifier interface to be implemented.
 	return rl.w.(http.CloseNotifier).CloseNotify()
 }
 
