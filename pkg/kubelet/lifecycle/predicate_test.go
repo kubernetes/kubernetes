@@ -267,3 +267,68 @@ func TestGeneralPredicates(t *testing.T) {
 		})
 	}
 }
+
+func TestNodeHasAllocatableResources(t *testing.T) {
+	cases := []struct {
+		name                    string
+		node                    *v1.Node
+		hasAllocatableResources bool
+	}{
+		{
+			name: "allocatable resources",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(10, 20, 32, 0, 100000000, 0)},
+			},
+			hasAllocatableResources: true,
+		},
+		{
+			name: "no allocatable cpu",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(0, 20, 32, 0, 100000000, 0)},
+			},
+			hasAllocatableResources: false,
+		},
+		{
+			name: "no allocatable memory",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(10, 0, 32, 0, 100000000, 0)},
+			},
+			hasAllocatableResources: false,
+		},
+		{
+			name: "no allocatable pods",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(10, 20, 0, 0, 100000000, 0)},
+			},
+			hasAllocatableResources: false,
+		},
+		{
+			name: "no allocatable storage",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(10, 20, 32, 0, 0, 0)},
+			},
+			hasAllocatableResources: false,
+		},
+		{
+			name: "no allocatable resources",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
+				Status:     v1.NodeStatus{Allocatable: makeAllocatableResources(0, 0, 0, 0, 0, 0)},
+			},
+			hasAllocatableResources: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			allocatable := nodeHasAllocatableResources(c.node)
+			if allocatable != c.hasAllocatableResources {
+				t.Errorf("expected: %v got %v", c.hasAllocatableResources, allocatable)
+			}
+		})
+	}
+}

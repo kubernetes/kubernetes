@@ -18,8 +18,10 @@ package lifecycle
 
 import (
 	"fmt"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	v1affinityhelper "k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -28,6 +30,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+)
+
+const (
+	nodeAllocatableResourcesAdmissionRetryTimeout  time.Duration = 5 * time.Minute
+	nodeAllocatableResourcesAdmissionRetryInterval time.Duration = 3 * time.Second
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -59,7 +66,14 @@ func NewPredicateAdmitHandler(getNodeAnyWayFunc getNodeAnyWayFuncType, admission
 }
 
 func (w *predicateAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
-	node, err := w.getNodeAnyWayFunc()
+	var node *v1.Node
+	err := wait.PollImmediate(nodeAllocatableResourcesAdmissionRetryInterval, nodeAllocatableResourcesAdmissionRetryTimeout, func() (bool, error) {
+		var getNodeAnyWayErr error
+		if node, getNodeAnyWayErr = w.getNodeAnyWayFunc(); getNodeAnyWayErr == nil {
+			return nodeHasAllocatableResources(node), nil
+		}
+		return false, nil
+	})
 	if err != nil {
 		klog.ErrorS(err, "Cannot get Node info")
 		return PodAdmitResult{
@@ -248,4 +262,13 @@ func GeneralPredicates(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) ([]Pr
 	}
 
 	return reasons, nil
+}
+
+func nodeHasAllocatableResources(node *v1.Node) bool {
+	if allocatable := schedulerframework.NewResource(node.Status.Allocatable); allocatable != nil {
+		// TODO make this V(5)
+		klog.InfoS("Node allocatable resources:", "EphemeralStorage", allocatable.EphemeralStorage, "Memory", allocatable.Memory, "MilliCPU", allocatable.MilliCPU, "AllowedPodNumber", allocatable.AllowedPodNumber)
+		return allocatable.EphemeralStorage != 0 && allocatable.Memory != 0 && allocatable.MilliCPU != 0 && allocatable.AllowedPodNumber != 0
+	}
+	return false
 }
