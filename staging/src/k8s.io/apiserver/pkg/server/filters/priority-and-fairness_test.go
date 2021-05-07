@@ -138,16 +138,21 @@ func newApfServerWithSingleRequest(decision mockDecision, t *testing.T) *httptes
 }
 
 func newApfServerWithHooks(decision mockDecision, onExecute, postExecute, postEnqueue, postDequeue func(), t *testing.T) *httptest.Server {
+	fakeFilter := fakeApfFilter{
+		mockDecision: decision,
+		postEnqueue:  postEnqueue,
+		postDequeue:  postDequeue,
+	}
+	return newApfServerWithFilter(fakeFilter, onExecute, postExecute, t)
+}
+
+func newApfServerWithFilter(flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func(), t *testing.T) *httptest.Server {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
 	apfHandler := WithPriorityAndFairness(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		onExecute()
-	}), longRunningRequestCheck, fakeApfFilter{
-		mockDecision: decision,
-		postEnqueue:  postEnqueue,
-		postDequeue:  postDequeue,
-	})
+	}), longRunningRequestCheck, flowControlFilter)
 
 	handler := apifilters.WithRequestInfo(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r = r.WithContext(apirequest.WithUser(r.Context(), &user.DefaultInfo{
@@ -175,7 +180,7 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	// send a watch request to test skipping long running request
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces?watch=true", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/foos/foo/proxy", server.URL), http.StatusOK); err != nil {
 		// request should not be rejected
 		t.Error(err)
 	}
@@ -332,6 +337,136 @@ func TestApfExecuteMultipleRequests(t *testing.T) {
 		"apiserver_flowcontrol_read_vs_write_request_count_watermarks",
 		"apiserver_flowcontrol_read_vs_write_request_count_samples",
 	})
+}
+
+type fakeWatchApfFilter struct {
+	lock     sync.Mutex
+	inflight int
+	capacity int
+}
+
+func (f *fakeWatchApfFilter) Handle(ctx context.Context,
+	requestDigest utilflowcontrol.RequestDigest,
+	_ func(fs *flowcontrol.FlowSchema, pl *flowcontrol.PriorityLevelConfiguration),
+	_ fq.QueueNoteFn,
+	execFn func(),
+) {
+	canExecute := false
+	func() {
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		if f.inflight < f.capacity {
+			f.inflight++
+			canExecute = true
+		}
+	}()
+	if !canExecute {
+		return
+	}
+
+	execFn()
+
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.inflight--
+}
+
+func (f *fakeWatchApfFilter) MaintainObservations(stopCh <-chan struct{}) {
+}
+
+func (f *fakeWatchApfFilter) Run(stopCh <-chan struct{}) error {
+	return nil
+}
+
+func (t *fakeWatchApfFilter) Install(c *mux.PathRecorderMux) {
+}
+
+func (f *fakeWatchApfFilter) wait() error {
+	return wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		return f.inflight == 0, nil
+	})
+}
+
+func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
+	signalsLock := sync.Mutex{}
+	signals := []utilflowcontrol.InitializationSignal{}
+	sendSignals := func() {
+		signalsLock.Lock()
+		defer signalsLock.Unlock()
+		for i := range signals {
+			signals[i].Signal()
+		}
+		signals = signals[:0]
+	}
+
+	newInitializationSignal = func() utilflowcontrol.InitializationSignal {
+		signalsLock.Lock()
+		defer signalsLock.Unlock()
+		signal := utilflowcontrol.NewInitializationSignal()
+		signals = append(signals, signal)
+		return signal
+	}
+	defer func() {
+		newInitializationSignal = utilflowcontrol.NewInitializationSignal
+	}()
+
+	// We test if initialization after receiving initialization signal the
+	// new requests will be allowed to run by:
+	// - sending N requests that will occupy the whole capacity
+	// - sending initialiation signals for them
+	// - ensuring that number of inflight requests will get to zero
+	concurrentRequests := 5
+	firstRunning := sync.WaitGroup{}
+	firstRunning.Add(concurrentRequests)
+	allRunning := sync.WaitGroup{}
+	allRunning.Add(2 * concurrentRequests)
+
+	fakeFilter := &fakeWatchApfFilter{
+		capacity: concurrentRequests,
+	}
+
+	onExecuteFunc := func() {
+		firstRunning.Done()
+		firstRunning.Wait()
+
+		sendSignals()
+		fakeFilter.wait()
+
+		allRunning.Done()
+		allRunning.Wait()
+	}
+
+	postExecuteFunc := func() {}
+
+	server := newApfServerWithFilter(fakeFilter, onExecuteFunc, postExecuteFunc, t)
+	defer server.Close()
+
+	var wg sync.WaitGroup
+	wg.Add(2 * concurrentRequests)
+	for i := 0; i < concurrentRequests; i++ {
+		go func() {
+			defer wg.Done()
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+
+	firstRunning.Wait()
+	fakeFilter.wait()
+
+	firstRunning.Add(concurrentRequests)
+	for i := 0; i < concurrentRequests; i++ {
+		go func() {
+			defer wg.Done()
+			if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
 }
 
 func TestApfCancelWaitRequest(t *testing.T) {

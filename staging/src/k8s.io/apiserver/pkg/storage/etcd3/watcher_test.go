@@ -38,6 +38,7 @@ import (
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/storage"
+	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 )
 
 func TestWatch(t *testing.T) {
@@ -311,6 +312,23 @@ func TestWatchDeleteEventObjectHaveLatestRV(t *testing.T) {
 		t.Errorf("Object from delete event have version: %v, should be the same as etcd delete's mod rev: %d",
 			watchedDeleteRev, wres.Events[0].Kv.ModRevision)
 	}
+}
+
+func TestWatchInitializationSignal(t *testing.T) {
+	_, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	initSignal := utilflowcontrol.NewInitializationSignal()
+	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
+
+	key, storedObj := testPropogateStore(ctx, t, store, &example.Pod{ObjectMeta: metav1.ObjectMeta{Name: "foo"}})
+	_, err := store.Watch(ctx, key, storage.ListOptions{ResourceVersion: storedObj.ResourceVersion, Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Watch failed: %v", err)
+	}
+
+	initSignal.Wait()
 }
 
 func TestProgressNotify(t *testing.T) {

@@ -17,23 +17,20 @@ limitations under the License.
 package filters
 
 import (
-	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
 	fcmetrics "k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/klog/v2"
 )
-
-type priorityAndFairnessKeyType int
-
-const priorityAndFairnessKey priorityAndFairnessKeyType = iota
 
 // PriorityAndFairnessClassification identifies the results of
 // classification for API Priority and Fairness
@@ -42,12 +39,6 @@ type PriorityAndFairnessClassification struct {
 	FlowSchemaUID     apitypes.UID
 	PriorityLevelName string
 	PriorityLevelUID  apitypes.UID
-}
-
-// GetClassification returns the classification associated with the
-// given context, if any, otherwise nil
-func GetClassification(ctx context.Context) *PriorityAndFairnessClassification {
-	return ctx.Value(priorityAndFairnessKey).(*PriorityAndFairnessClassification)
 }
 
 // waitingMark tracks requests waiting rather than being executed
@@ -59,6 +50,9 @@ var waitingMark = &requestWatermark{
 
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
 var atomicMutatingWaiting, atomicReadOnlyWaiting int32
+
+// newInitializationSignal is defined for testing purposes.
+var newInitializationSignal = utilflowcontrol.NewInitializationSignal
 
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
@@ -84,8 +78,10 @@ func WithPriorityAndFairness(
 			return
 		}
 
-		// Skip tracking long running requests.
-		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
+		isWatchRequest := watchVerbs.Has(requestInfo.Verb)
+
+		// Skip tracking long running non-watch requests.
+		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) && !isWatchRequest {
 			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
 			handler.ServeHTTP(w, r)
 			return
@@ -116,15 +112,40 @@ func WithPriorityAndFairness(
 				waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
 			}
 		}
+		wg := sync.WaitGroup{}
 		execute := func() {
 			noteExecutingDelta(1)
 			defer noteExecutingDelta(-1)
 			served = true
-			innerCtx := context.WithValue(ctx, priorityAndFairnessKey, classification)
-			innerReq := r.Clone(innerCtx)
+
+			innerCtx := ctx
+			innerReq := r
+
+			var watchInitializationSignal utilflowcontrol.InitializationSignal
+			if isWatchRequest {
+				watchInitializationSignal = newInitializationSignal()
+				innerCtx = utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
+				innerReq = r.Clone(innerCtx)
+			}
 			setResponseHeaders(classification, w)
 
-			handler.ServeHTTP(w, innerReq)
+			if isWatchRequest {
+				wg.Add(1)
+				go func() {
+					defer utilruntime.HandleCrash()
+
+					defer wg.Done()
+					// Protect from the situations when request will not reach storage layer
+					// and the initialization signal will not be send.
+					defer watchInitializationSignal.Signal()
+
+					handler.ServeHTTP(w, innerReq)
+				}()
+
+				watchInitializationSignal.Wait()
+			} else {
+				handler.ServeHTTP(w, innerReq)
+			}
 		}
 		digest := utilflowcontrol.RequestDigest{RequestInfo: requestInfo, User: user}
 		fcIfc.Handle(ctx, digest, note, func(inQueue bool) {
@@ -143,9 +164,13 @@ func WithPriorityAndFairness(
 				epmetrics.DroppedRequests.WithContext(ctx).WithLabelValues(epmetrics.ReadOnlyKind).Inc()
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
+			if isWatchRequest {
+				wg.Done()
+			}
 			tooManyRequests(r, w)
 		}
-
+		// In case of watch, from P&F POV it already finished, but we need to wait until the request itself finishes.
+		wg.Wait()
 	})
 }
 
