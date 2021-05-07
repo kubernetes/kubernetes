@@ -174,11 +174,11 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 	}
 	shared, err := qm.informerFactory.ForResource(resource)
 	if err == nil {
-		klog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
+		klog.V(4).InfoS("QuotaMonitor using a shared informer for resource", "resource", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
 		return shared.Informer().GetController(), nil
 	}
-	klog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
+	klog.V(4).InfoS("QuotaMonitor unable to use a shared informer for resource", "resource", resource.String(), "error", err)
 
 	// TODO: if we can share storage with garbage collector, it may make sense to support other resources
 	// until that time, aggregated api servers will have to run their own controller to reconcile their own quota.
@@ -226,7 +226,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 			listResourceFunc := generic.ListResourceUsingListerFunc(listerFunc, resource)
 			evaluator = generic.NewObjectCountEvaluator(resource.GroupResource(), listResourceFunc, "")
 			qm.registry.Add(evaluator)
-			klog.Infof("QuotaMonitor created object count evaluator for %s", resource.GroupResource())
+			klog.InfoS("QuotaMonitor created object count evaluator for groupResource", "groupResource", resource.GroupResource())
 		}
 
 		// track the monitor
@@ -241,7 +241,7 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 		}
 	}
 
-	klog.V(4).Infof("quota synced monitors; added %d, kept %d, removed %d", added, kept, len(toRemove))
+	klog.V(4).InfoS("Quota synced monitors", "numAdded", added, "numKept", kept, "numRemoved", len(toRemove))
 	// NewAggregate returns nil if errs is 0-length
 	return utilerrors.NewAggregate(errs)
 }
@@ -273,7 +273,7 @@ func (qm *QuotaMonitor) StartMonitors() {
 			started++
 		}
 	}
-	klog.V(4).Infof("QuotaMonitor started %d new monitors, %d currently running", started, len(monitors))
+	klog.V(4).InfoS("QuotaMonitor started new monitors, currently running", "numStarted", started, "numRunning", len(monitors))
 }
 
 // IsSynced returns true if any monitors exist AND all those monitors'
@@ -285,13 +285,13 @@ func (qm *QuotaMonitor) IsSynced() bool {
 	defer qm.monitorLock.RUnlock()
 
 	if len(qm.monitors) == 0 {
-		klog.V(4).Info("quota monitor not synced: no monitors")
+		klog.V(4).InfoS("Quota monitor not synced: no monitors")
 		return false
 	}
 
 	for resource, monitor := range qm.monitors {
 		if !monitor.controller.HasSynced() {
-			klog.V(4).Infof("quota monitor not synced: %v", resource)
+			klog.V(4).InfoS("Quota monitor not synced", "groupVersionResource", resource)
 			return false
 		}
 	}
@@ -301,8 +301,8 @@ func (qm *QuotaMonitor) IsSynced() bool {
 // Run sets the stop channel and starts monitor execution until stopCh is
 // closed. Any running monitors will be stopped before Run returns.
 func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
-	klog.Infof("QuotaMonitor running")
-	defer klog.Infof("QuotaMonitor stopping")
+	klog.InfoS("QuotaMonitor running")
+	defer klog.InfoS("QuotaMonitor stopping")
 
 	// Set up the stop channel.
 	qm.monitorLock.Lock()
@@ -326,7 +326,7 @@ func (qm *QuotaMonitor) Run(stopCh <-chan struct{}) {
 			close(monitor.stopCh)
 		}
 	}
-	klog.Infof("QuotaMonitor stopped %d of %d monitors", stopped, len(monitors))
+	klog.InfoS("QuotaMonitor stopped of monitors", "numStopped", stopped, "numMonitors", len(monitors))
 }
 
 func (qm *QuotaMonitor) runProcessResourceChanges() {
@@ -352,7 +352,12 @@ func (qm *QuotaMonitor) processResourceChanges() bool {
 		utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
 		return true
 	}
-	klog.V(4).Infof("QuotaMonitor process object: %s, namespace %s, name %s, uid %s, event type %v", event.gvr.String(), accessor.GetNamespace(), accessor.GetName(), string(accessor.GetUID()), event.eventType)
+	klog.V(4).InfoS("QuotaMonitor process object",
+		"groupVersionResource", event.gvr.String(),
+		"namespace", accessor.GetNamespace(),
+		"name", accessor.GetName(),
+		"uid", string(accessor.GetUID()),
+		"event type", event.eventType)
 	qm.replenishmentFunc(event.gvr.GroupResource(), accessor.GetNamespace())
 	return true
 }
