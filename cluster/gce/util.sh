@@ -1911,7 +1911,7 @@ function update-or-verify-gcloud() {
   else
     local version
     version=$(gcloud version --format=json)
-    python -c"
+    python3 -c"
 import json,sys
 from distutils import version
 
