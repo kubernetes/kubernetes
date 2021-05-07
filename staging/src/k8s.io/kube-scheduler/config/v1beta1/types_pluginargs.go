@@ -85,15 +85,19 @@ type NodeResourcesFitArgs struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// IgnoredResources is the list of resources that NodeResources fit filter
-	// should ignore.
+	// should ignore. This doesn't apply to scoring.
 	// +listType=atomic
 	IgnoredResources []string `json:"ignoredResources,omitempty"`
 	// IgnoredResourceGroups defines the list of resource groups that NodeResources fit filter should ignore.
 	// e.g. if group is ["example.com"], it will ignore all resource names that begin
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
-	// A resource group name can't contain '/'.
+	// A resource group name can't contain '/'. This doesn't apply to scoring.
 	// +listType=atomic
 	IgnoredResourceGroups []string `json:"ignoredResourceGroups,omitempty"`
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	// The default strategy is LeastAllocated with an equal "cpu" and "memory" weight.
+	ScoringStrategy *ScoringStrategy `json:"scoringStrategy,omitempty"`
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -238,4 +242,41 @@ type NodeAffinityArgs struct {
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	// +optional
 	AddedAffinity *corev1.NodeAffinity `json:"addedAffinity,omitempty"`
+}
+
+// ScoringStrategyType the type of scoring strategy used in NodeResourcesFit plugin.
+type ScoringStrategyType string
+
+const (
+	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// RequestedToCapacityRatio strategy allows specifying a custom shape function
+	// to score nodes based on the request to capacity ratio.
+	RequestedToCapacityRatio ScoringStrategyType = "RequestedToCapacityRatio"
+)
+
+// ScoringStrategy define ScoringStrategyType for node resource plugin
+type ScoringStrategy struct {
+	// Type selects which strategy to run.
+	Type ScoringStrategyType `json:"type,omitempty"`
+
+	// Resources to consider when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	// Weight defaults to 1 if not specified or explicitly set to 0.
+	// +listType=map
+	// +listMapKey=name
+	Resources []ResourceSpec `json:"resources,omitempty"`
+
+	// Arguments specific to RequestedToCapacityRatio strategy.
+	RequestedToCapacityRatio *RequestedToCapacityRatioParam `json:"requestedToCapacityRatio,omitempty"`
+}
+
+// RequestedToCapacityRatioParam define RequestedToCapacityRatio parameters
+type RequestedToCapacityRatioParam struct {
+	// Shape is a list of points defining the scoring function shape.
+	// +listType=atomic
+	Shape []UtilizationShapePoint `json:"shape,omitempty"`
 }

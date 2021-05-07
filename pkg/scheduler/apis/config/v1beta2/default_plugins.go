@@ -81,11 +81,11 @@ func getDefaultPlugins() *v1beta2.Plugins {
 				{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
 				{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
 				{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-				{Name: names.NodeResourcesLeastAllocated, Weight: pointer.Int32Ptr(1)},
+				{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
 				{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
 				// Weight is doubled because:
 				// - This is a score coming from user preference.
-				// - It makes its signal comparable to NodeResourcesLeastAllocated.
+				// - It makes its signal comparable to NodeResourcesFit.LeastAllocated.
 				{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
 				{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
 			},

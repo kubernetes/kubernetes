@@ -88,6 +88,9 @@ type NodeResourcesFitArgs struct {
 	// with "example.com", such as "example.com/aaa" and "example.com/bbb".
 	// A resource group name can't contain '/'.
 	IgnoredResourceGroups []string
+
+	// ScoringStrategy selects the node resource scoring strategy.
+	ScoringStrategy *ScoringStrategy
 }
 
 // PodTopologySpreadConstraintsDefaulting defines how to set default constraints
@@ -226,4 +229,38 @@ type NodeAffinityArgs struct {
 	// When AddedAffinity is used, some Pods with affinity requirements that match
 	// a specific Node (such as Daemonset Pods) might remain unschedulable.
 	AddedAffinity *v1.NodeAffinity
+}
+
+// ScoringStrategyType the type of scoring strategy used in NodeResourcesFit plugin.
+type ScoringStrategyType string
+
+const (
+	// LeastAllocated strategy prioritizes nodes with least allcoated resources.
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+	// MostAllocated strategy prioritizes nodes with most allcoated resources.
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// RequestedToCapacityRatio strategy allows specifying a custom shape function
+	// to score nodes based on the request to capacity ratio.
+	RequestedToCapacityRatio ScoringStrategyType = "RequestedToCapacityRatio"
+)
+
+// ScoringStrategy define ScoringStrategyType for node resource plugin
+type ScoringStrategy struct {
+	// Type selects which strategy to run.
+	Type ScoringStrategyType
+
+	// Resources to consider when scoring.
+	// The default resource set includes "cpu" and "memory" with an equal weight.
+	// Allowed weights go from 1 to 100.
+	// Weight defaults to 1 if not specified or explicitly set to 0.
+	Resources []ResourceSpec
+
+	// Arguments specific to RequestedToCapacityRatio strategy.
+	RequestedToCapacityRatio *RequestedToCapacityRatioParam
+}
+
+// RequestedToCapacityRatioParam define RequestedToCapacityRatio parameters
+type RequestedToCapacityRatioParam struct {
+	// Shape is a list of points defining the scoring function shape.
+	Shape []UtilizationShapePoint
 }
