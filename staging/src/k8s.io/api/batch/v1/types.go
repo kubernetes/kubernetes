@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const JobCompletionIndexAnnotationAlpha = "batch.kubernetes.io/job-completion-index"
+const JobCompletionIndexAnnotation = "batch.kubernetes.io/job-completion-index"
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -162,9 +162,11 @@ type JobSpec struct {
 	// for each index.
 	// When value is `Indexed`, .spec.completions must be specified and
 	// `.spec.parallelism` must be less than or equal to 10^5.
+	// In addition, The Pod name takes the form
+	// `$(job-name)-$(index)-$(random-string)`,
+	// the Pod hostname takes the form `$(job-name)-$(index)`.
 	//
-	// This field is alpha-level and is only honored by servers that enable the
-	// IndexedJob feature gate. More completion modes can be added in the future.
+	// This field is beta-level. More completion modes can be added in the future.
 	// If the Job controller observes a mode that it doesn't recognize, the
 	// controller skips updates for the Job.
 	// +optional

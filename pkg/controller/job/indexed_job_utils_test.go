@@ -279,7 +279,7 @@ func hollowPodsWithIndexPhase(descs []indexPhase) []*v1.Pod {
 		}
 		if desc.Index != noIndex {
 			p.Annotations = map[string]string{
-				batch.JobCompletionIndexAnnotationAlpha: desc.Index,
+				batch.JobCompletionIndexAnnotation: desc.Index,
 			}
 		}
 		pods = append(pods, p)
@@ -297,7 +297,7 @@ func toIndexPhases(pods []*v1.Pod) []indexPhase {
 	for i, p := range pods {
 		index := noIndex
 		if p.Annotations != nil {
-			index = p.Annotations[batch.JobCompletionIndexAnnotationAlpha]
+			index = p.Annotations[batch.JobCompletionIndexAnnotation]
 		}
 		result[i] = indexPhase{index, p.Status.Phase}
 	}
