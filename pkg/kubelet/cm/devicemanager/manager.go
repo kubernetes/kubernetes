@@ -526,6 +526,9 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 	deletedResources := sets.NewString()
 	m.mutex.Lock()
 	for resourceName, devices := range m.healthyDevices {
+		for _, d := range devices.List() {
+			klog.InfoS("device is healthy", resourceName, d)
+		}
 		eI, ok := m.endpoints[resourceName]
 		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			// The resources contained in endpoints and (un)healthyDevices
@@ -544,6 +547,9 @@ func (m *ManagerImpl) GetCapacity() (v1.ResourceList, v1.ResourceList, []string)
 		}
 	}
 	for resourceName, devices := range m.unhealthyDevices {
+		for _, d := range devices.List() {
+			klog.InfoS("device is unhealthy", resourceName, d)
+		}
 		eI, ok := m.endpoints[resourceName]
 		if (ok && eI.e.stopGracePeriodExpired()) || !ok {
 			if !ok {
