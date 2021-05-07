@@ -57,10 +57,17 @@ type LogOutput struct {
 // Matches harmless errors from pkg/kubelet/kubelet_pods.go.
 var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|waiting to start|not available)|the server could not find the requested resource`)
 
-// CopyAllLogs follows the logs of all containers in all pods,
+// CopyPodLogs is basically CopyPodLogs for all current or future pods in the given namespace ns
+func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
+	return CopyPodLogs(ctx, cs, ns, "", to)
+}
+
+// CopyPodLogs follows the logs of all containers in pod with the given podName,
 // including those that get created in the future, and writes each log
 // line as configured in the output options. It does that until the
 // context is done or until an error occurs.
+//
+// If podName is empty, it will follow all pods in the given namespace ns.
 //
 // Beware that there is currently no way to force log collection
 // before removing pods, which means that there is a known race
@@ -79,8 +86,15 @@ var expectedErrors = regexp.MustCompile(`container .* in pod .* is (terminated|w
 // But it turned out to be rather confusing, so now a heuristic is used: if
 // log output of a container was already captured, then capturing does not
 // resume if the pod is marked for deletion.
-func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogOutput) error {
-	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), meta.ListOptions{})
+func CopyPodLogs(ctx context.Context, cs clientset.Interface, ns, podName string, to LogOutput) error {
+	options := meta.ListOptions{}
+	if podName != "" {
+		options = meta.ListOptions{
+			FieldSelector: fmt.Sprintf("metadata.name=%s", podName),
+		}
+	}
+	watcher, err := cs.CoreV1().Pods(ns).Watch(context.TODO(), options)
+
 	if err != nil {
 		return errors.Wrap(err, "cannot create Pod event watcher")
 	}
@@ -96,7 +110,7 @@ func CopyAllLogs(ctx context.Context, cs clientset.Interface, ns string, to LogO
 			m.Lock()
 			defer m.Unlock()
 
-			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), meta.ListOptions{})
+			pods, err := cs.CoreV1().Pods(ns).List(context.TODO(), options)
 			if err != nil {
 				if to.StatusWriter != nil {
 					fmt.Fprintf(to.StatusWriter, "ERROR: get pod list in %s: %s\n", ns, err)
