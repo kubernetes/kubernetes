@@ -115,11 +115,14 @@ type dynamicResourceClient struct {
 	listKind  string
 }
 
+var (
+	_ dynamic.Interface  = &FakeDynamicClient{}
+	_ testing.FakeClient = &FakeDynamicClient{}
+)
+
 func (c *FakeDynamicClient) Tracker() testing.ObjectTracker {
 	return c.tracker
 }
-
-var _ dynamic.Interface = &FakeDynamicClient{}
 
 func (c *FakeDynamicClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
 	return &dynamicResourceClient{client: c, resource: resource, listKind: c.gvrToListKind[resource]}
