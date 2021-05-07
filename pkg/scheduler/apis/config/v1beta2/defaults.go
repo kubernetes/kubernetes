@@ -241,27 +241,6 @@ func SetDefaults_InterPodAffinityArgs(obj *v1beta2.InterPodAffinityArgs) {
 	}
 }
 
-func SetDefaults_NodeResourcesLeastAllocatedArgs(obj *v1beta2.NodeResourcesLeastAllocatedArgs) {
-	if len(obj.Resources) == 0 {
-		// If no resources specified, used the default set.
-		obj.Resources = append(obj.Resources, defaultResourceSpec...)
-	}
-}
-
-func SetDefaults_NodeResourcesMostAllocatedArgs(obj *v1beta2.NodeResourcesMostAllocatedArgs) {
-	if len(obj.Resources) == 0 {
-		// If no resources specified, used the default set.
-		obj.Resources = append(obj.Resources, defaultResourceSpec...)
-	}
-}
-
-func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta2.RequestedToCapacityRatioArgs) {
-	if len(obj.Resources) == 0 {
-		// If no resources specified, used the default set.
-		obj.Resources = append(obj.Resources, defaultResourceSpec...)
-	}
-}
-
 func SetDefaults_VolumeBindingArgs(obj *v1beta2.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
@@ -277,5 +256,23 @@ func SetDefaults_PodTopologySpreadArgs(obj *v1beta2.PodTopologySpreadArgs) {
 	}
 	if obj.DefaultingType == "" {
 		obj.DefaultingType = v1beta2.ListDefaulting
+	}
+}
+
+func SetDefaults_NodeResourcesFitArgs(obj *v1beta2.NodeResourcesFitArgs) {
+	if obj.ScoringStrategy == nil {
+		obj.ScoringStrategy = &v1beta2.ScoringStrategy{
+			Type:      v1beta2.ScoringStrategyType(config.LeastAllocated),
+			Resources: defaultResourceSpec,
+		}
+	}
+	if len(obj.ScoringStrategy.Resources) == 0 {
+		// If no resources specified, use the default set.
+		obj.ScoringStrategy.Resources = append(obj.ScoringStrategy.Resources, defaultResourceSpec...)
+	}
+	for i := range obj.ScoringStrategy.Resources {
+		if obj.ScoringStrategy.Resources[i].Weight == 0 {
+			obj.ScoringStrategy.Resources[i].Weight = 1
+		}
 	}
 }

@@ -76,16 +76,10 @@ var pluginConfigs = []v1beta2.PluginConfig{
 				Kind:       "NodeResourcesFitArgs",
 				APIVersion: "kubescheduler.config.k8s.io/v1beta2",
 			},
-		}},
-	},
-	{
-		Name: "NodeResourcesLeastAllocated",
-		Args: runtime.RawExtension{Object: &v1beta2.NodeResourcesLeastAllocatedArgs{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "NodeResourcesLeastAllocatedArgs",
-				APIVersion: "kubescheduler.config.k8s.io/v1beta2",
+			ScoringStrategy: &v1beta2.ScoringStrategy{
+				Type:      v1beta2.LeastAllocated,
+				Resources: []v1beta2.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 			},
-			Resources: []v1beta2.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 		}},
 	},
 	{
@@ -286,16 +280,10 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "NodeResourcesFitArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta2",
 									},
-								}},
-							},
-							{
-								Name: "NodeResourcesLeastAllocated",
-								Args: runtime.RawExtension{Object: &v1beta2.NodeResourcesLeastAllocatedArgs{
-									TypeMeta: metav1.TypeMeta{
-										Kind:       "NodeResourcesLeastAllocatedArgs",
-										APIVersion: "kubescheduler.config.k8s.io/v1beta2",
+									ScoringStrategy: &v1beta2.ScoringStrategy{
+										Type:      v1beta2.LeastAllocated,
+										Resources: []v1beta2.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 									},
-									Resources: []v1beta2.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 								}},
 							},
 							{
@@ -375,7 +363,7 @@ func TestSchedulerDefaults(t *testing.T) {
 									{Name: names.NodeResourcesBalancedAllocation, Weight: pointer.Int32Ptr(1)},
 									{Name: names.ImageLocality, Weight: pointer.Int32Ptr(1)},
 									{Name: names.InterPodAffinity, Weight: pointer.Int32Ptr(1)},
-									{Name: names.NodeResourcesLeastAllocated, Weight: pointer.Int32Ptr(1)},
+									{Name: names.NodeResourcesFit, Weight: pointer.Int32Ptr(1)},
 									{Name: names.NodeAffinity, Weight: pointer.Int32Ptr(1)},
 									{Name: names.PodTopologySpread, Weight: pointer.Int32Ptr(2)},
 									{Name: names.TaintToleration, Weight: pointer.Int32Ptr(1)},
@@ -624,75 +612,6 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "NodeResourcesLeastAllocatedArgs resources empty",
-			in:   &v1beta2.NodeResourcesLeastAllocatedArgs{},
-			want: &v1beta2.NodeResourcesLeastAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "cpu", Weight: 1},
-					{Name: "memory", Weight: 1},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesLeastAllocatedArgs resources with value",
-			in: &v1beta2.NodeResourcesLeastAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-			want: &v1beta2.NodeResourcesLeastAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesMostAllocatedArgs resources empty",
-			in:   &v1beta2.NodeResourcesMostAllocatedArgs{},
-			want: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "cpu", Weight: 1},
-					{Name: "memory", Weight: 1},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesMostAllocatedArgs resources with value",
-			in: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-			want: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesMostAllocatedArgs resources empty",
-			in:   &v1beta2.NodeResourcesMostAllocatedArgs{},
-			want: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "cpu", Weight: 1},
-					{Name: "memory", Weight: 1},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesMostAllocatedArgs resources with value",
-			in: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-			want: &v1beta2.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta2.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-		},
-		{
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta2.PodTopologySpreadArgs{},
 			want: &v1beta2.PodTopologySpreadArgs{
@@ -729,6 +648,30 @@ func TestPluginArgsDefaults(t *testing.T) {
 			in: &v1beta2.PodTopologySpreadArgs{},
 			want: &v1beta2.PodTopologySpreadArgs{
 				DefaultingType: v1beta2.ListDefaulting,
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs not set",
+			in:   &v1beta2.NodeResourcesFitArgs{},
+			want: &v1beta2.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta2.ScoringStrategy{
+					Type:      v1beta2.LeastAllocated,
+					Resources: defaultResourceSpec,
+				},
+			},
+		},
+		{
+			name: "NodeResourcesFitArgs Resources empty",
+			in: &v1beta2.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta2.ScoringStrategy{
+					Type: v1beta2.MostAllocated,
+				},
+			},
+			want: &v1beta2.NodeResourcesFitArgs{
+				ScoringStrategy: &v1beta2.ScoringStrategy{
+					Type:      v1beta2.MostAllocated,
+					Resources: defaultResourceSpec,
+				},
 			},
 		},
 	}

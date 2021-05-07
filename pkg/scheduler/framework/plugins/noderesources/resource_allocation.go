@@ -19,12 +19,16 @@ package noderesources
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 // resourceToWeightMap contains resource name and weight.
 type resourceToWeightMap map[v1.ResourceName]int64
+
+// scorer is decorator for resourceAllocationScorer
+type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
 
 // defaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
 var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
@@ -123,4 +127,13 @@ func calculatePodResourceRequest(pod *v1.Pod, resource v1.ResourceName, enablePo
 	}
 
 	return podRequest
+}
+
+// resourcesToWeightMap make weightmap from resources spec
+func resourcesToWeightMap(resources []config.ResourceSpec) resourceToWeightMap {
+	resourceToWeightMap := make(resourceToWeightMap)
+	for _, resource := range resources {
+		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
+	}
+	return resourceToWeightMap
 }

@@ -988,6 +988,13 @@ func TestValidateVolumeBindingArgs(t *testing.T) {
 }
 
 func TestValidateFitArgs(t *testing.T) {
+	defaultScoringStrategy := &config.ScoringStrategy{
+		Type: config.LeastAllocated,
+		Resources: []config.ResourceSpec{
+			{Name: "cpu", Weight: 1},
+			{Name: "memory", Weight: 1},
+		},
+	}
 	argsTest := []struct {
 		name   string
 		args   config.NodeResourcesFitArgs
@@ -997,6 +1004,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: too long value",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{fmt.Sprintf("longvalue%s", strings.Repeat("a", 64))},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "name part must be no more than 63 characters",
 		},
@@ -1004,6 +1012,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: name is empty",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com/"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "name part must be non-empty",
 		},
@@ -1011,6 +1020,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: name has too many slash",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com/aaa/bbb"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 			expect: "a qualified name must consist of alphanumeric characters",
 		},
@@ -1018,18 +1028,21 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResources: valid args",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResources: []string{"example.com"},
+				ScoringStrategy:  defaultScoringStrategy,
 			},
 		},
 		{
 			name: "IgnoredResourceGroups: valid args ",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 		},
 		{
 			name: "IgnoredResourceGroups: illegal args",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com/"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "name part must be non-empty",
 		},
@@ -1037,6 +1050,7 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResourceGroups: name is too long",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{strings.Repeat("a", 64)},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "name part must be no more than 63 characters",
 		},
@@ -1044,14 +1058,20 @@ func TestValidateFitArgs(t *testing.T) {
 			name: "IgnoredResourceGroups: name cannot be contain slash",
 			args: config.NodeResourcesFitArgs{
 				IgnoredResourceGroups: []string{"example.com/aa"},
+				ScoringStrategy:       defaultScoringStrategy,
 			},
 			expect: "resource group name can't contain '/'",
+		},
+		{
+			name:   "ScoringStrategy: field is required",
+			args:   config.NodeResourcesFitArgs{},
+			expect: "ScoringStrategy field is required",
 		},
 	}
 
 	for _, test := range argsTest {
 		t.Run(test.name, func(t *testing.T) {
-			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && !strings.Contains(err.Error(), test.expect) {
+			if err := ValidateNodeResourcesFitArgs(nil, &test.args); err != nil && (!strings.Contains(err.Error(), test.expect)) {
 				t.Errorf("case[%v]: error details do not include %v", test.name, err)
 			}
 		})

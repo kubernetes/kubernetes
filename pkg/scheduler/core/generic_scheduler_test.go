@@ -1308,9 +1308,9 @@ func TestZeroRequest(t *testing.T) {
 
 			pluginRegistrations := []st.RegisterPluginFunc{
 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterScorePlugin(noderesources.LeastAllocatedName,
+				st.RegisterScorePlugin(noderesources.FitName,
 					func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {
-						return noderesources.NewLeastAllocated(plArgs, fh, feature.Features{})
+						return noderesources.NewFit(plArgs, fh, feature.Features{})
 					},
 					1),
 				st.RegisterScorePlugin(noderesources.BalancedAllocationName, func(plArgs apiruntime.Object, fh framework.Handle) (framework.Plugin, error) {

@@ -267,6 +267,13 @@ func SetDefaults_RequestedToCapacityRatioArgs(obj *v1beta1.RequestedToCapacityRa
 		// If no resources specified, used the default set.
 		obj.Resources = append(obj.Resources, defaultResourceSpec...)
 	}
+
+	// If resource weight is 0, use default weight(1) instead.
+	for i := range obj.Resources {
+		if obj.Resources[i].Weight == 0 {
+			obj.Resources[i].Weight = 1
+		}
+	}
 }
 
 func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
@@ -288,5 +295,23 @@ func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
 	}
 	if obj.DefaultingType == "" {
 		obj.DefaultingType = v1beta1.ListDefaulting
+	}
+}
+
+func SetDefaults_NodeResourcesFitArgs(obj *v1beta1.NodeResourcesFitArgs) {
+	if obj.ScoringStrategy == nil {
+		obj.ScoringStrategy = &v1beta1.ScoringStrategy{
+			Type:      v1beta1.ScoringStrategyType(config.LeastAllocated),
+			Resources: defaultResourceSpec,
+		}
+	}
+	if len(obj.ScoringStrategy.Resources) == 0 {
+		// If no resources specified, use the default set.
+		obj.ScoringStrategy.Resources = append(obj.ScoringStrategy.Resources, defaultResourceSpec...)
+	}
+	for i := range obj.ScoringStrategy.Resources {
+		if obj.ScoringStrategy.Resources[i].Weight == 0 {
+			obj.ScoringStrategy.Resources[i].Weight = 1
+		}
 	}
 }

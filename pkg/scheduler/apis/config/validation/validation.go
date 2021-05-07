@@ -97,8 +97,48 @@ var removedPluginsByVersion = []removedPlugins{
 	},
 	{
 		schemeGroupVersion: v1beta2.SchemeGroupVersion.String(),
-		plugins:            []string{"NodeLabel", "ServiceAffinity", "NodePreferAvoidPods"},
+		plugins: []string{
+			"NodeLabel",
+			"ServiceAffinity",
+			"NodePreferAvoidPods",
+			"NodeResourcesLeastAllocated",
+			"NodeResourcesMostAllocated",
+			"RequestedToCapacityRatio",
+		},
 	},
+}
+
+// conflictScorePluginsByVersion maintains a map of conflict plugins in each version.
+// Remember to add an entry to that list when creating a new component config
+// version (even if the list of conflict plugins is empty).
+var conflictScorePluginsByVersion = map[string]map[string]sets.String{
+	v1beta1.SchemeGroupVersion.String(): {
+		"NodeResourcesFit": sets.NewString(
+			"NodeResourcesLeastAllocated",
+			"NodeResourcesMostAllocated",
+			"RequestedToCapacityRatio"),
+	},
+	v1beta2.SchemeGroupVersion.String(): nil,
+}
+
+// isScorePluginConflict checks if a given plugin was conflict with other plugin in the given component
+// config version or earlier.
+func isScorePluginConflict(apiVersion string, name string, profile *config.KubeSchedulerProfile) []string {
+	var conflictPlugins []string
+	cp, ok := conflictScorePluginsByVersion[apiVersion]
+	if !ok {
+		return nil
+	}
+	plugin, ok := cp[name]
+	if !ok {
+		return nil
+	}
+	for _, p := range profile.Plugins.Score.Enabled {
+		if plugin.Has(p.Name) {
+			conflictPlugins = append(conflictPlugins, p.Name)
+		}
+	}
+	return conflictPlugins
 }
 
 // isPluginRemoved checks if a given plugin was removed in the given component
@@ -122,6 +162,16 @@ func validatePluginSetForRemovedPlugins(path *field.Path, apiVersion string, ps 
 	for i, plugin := range ps.Enabled {
 		if removed, removedVersion := isPluginRemoved(apiVersion, plugin.Name); removed {
 			errs = append(errs, field.Invalid(path.Child("enabled").Index(i), plugin.Name, fmt.Sprintf("was removed in version %q (KubeSchedulerConfiguration is version %q)", removedVersion, apiVersion)))
+		}
+	}
+	return errs
+}
+
+func validateScorePluginSetForConflictPlugins(path *field.Path, apiVersion string, profile *config.KubeSchedulerProfile) []error {
+	var errs []error
+	for i, plugin := range profile.Plugins.Score.Enabled {
+		if cp := isScorePluginConflict(apiVersion, plugin.Name, profile); len(cp) > 0 {
+			errs = append(errs, field.Invalid(path.Child("enabled").Index(i), plugin.Name, fmt.Sprintf("was conflict with %q in version %q (KubeSchedulerConfiguration is version %q)", cp, apiVersion, apiVersion)))
 		}
 	}
 	return errs
@@ -175,30 +225,29 @@ func validatePluginConfig(path *field.Path, apiVersion string, profile *config.K
 			}
 		}
 	}
+
 	if profile.Plugins != nil {
+		stagesToPluginSet := map[string]config.PluginSet{
+			"queueSort":  profile.Plugins.QueueSort,
+			"preFilter":  profile.Plugins.PreFilter,
+			"filter":     profile.Plugins.Filter,
+			"postFilter": profile.Plugins.PostFilter,
+			"preScore":   profile.Plugins.PreScore,
+			"score":      profile.Plugins.Score,
+			"reserve":    profile.Plugins.Reserve,
+			"permit":     profile.Plugins.Permit,
+			"preBind":    profile.Plugins.PreBind,
+			"bind":       profile.Plugins.Bind,
+			"postBind":   profile.Plugins.PostBind,
+		}
+
 		pluginsPath := path.Child("plugins")
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("queueSort"), apiVersion, profile.Plugins.QueueSort)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("preFilter"), apiVersion, profile.Plugins.PreFilter)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("filter"), apiVersion, profile.Plugins.Filter)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("postFilter"), apiVersion, profile.Plugins.PostFilter)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("preScore"), apiVersion, profile.Plugins.PreScore)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("score"), apiVersion, profile.Plugins.Score)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("reserve"), apiVersion, profile.Plugins.Reserve)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("permit"), apiVersion, profile.Plugins.Permit)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("preBind"), apiVersion, profile.Plugins.PreBind)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("bind"), apiVersion, profile.Plugins.Bind)...)
-		errs = append(errs, validatePluginSetForRemovedPlugins(
-			pluginsPath.Child("postBind"), apiVersion, profile.Plugins.PostBind)...)
+		for s, p := range stagesToPluginSet {
+			errs = append(errs, validatePluginSetForRemovedPlugins(
+				pluginsPath.Child(s), apiVersion, p)...)
+		}
+		errs = append(errs, validateScorePluginSetForConflictPlugins(
+			pluginsPath.Child("score"), apiVersion, profile)...)
 	}
 	return errs
 }
