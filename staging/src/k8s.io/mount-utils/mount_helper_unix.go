@@ -32,7 +32,10 @@ const (
 	// At least number of fields per line in /proc/<pid>/mountinfo.
 	expectedAtLeastNumFieldsPerMountInfo = 10
 	// How many times to retry for a consistent read of /proc/mounts.
-	maxListTries = 3
+	// Failed consistent read is not retried in case of volume reconstruction after kubelet restart,
+	// which may potentially leave volumes mounted and abandoned by kubelet.
+	// We should try really hard not to fail here.
+	maxListTries = 999
 )
 
 // IsCorruptedMnt return true if err is about corrupted mount point
