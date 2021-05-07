@@ -184,6 +184,30 @@ func TestEndpointSliceTrackerStaleSlices(t *testing.T) {
 		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
 		slicesParam:  []*discovery.EndpointSlice{epSlice1NewerGen},
 		expectNewer:  false,
+	}, {
+		name: "slice in params is expected to be deleted",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: deletionExpected,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{epSlice1},
+		expectNewer:  true,
+	}, {
+		name: "slice in tracker but not in params",
+		tracker: &endpointSliceTracker{
+			generationsByService: map[types.NamespacedName]generationsBySlice{
+				{Name: "svc1", Namespace: "ns1"}: {
+					epSlice1.UID: epSlice1.Generation,
+				},
+			},
+		},
+		serviceParam: &v1.Service{ObjectMeta: metav1.ObjectMeta{Name: "svc1", Namespace: "ns1"}},
+		slicesParam:  []*discovery.EndpointSlice{},
+		expectNewer:  true,
 	}}
 
 	for _, tc := range testCases {
