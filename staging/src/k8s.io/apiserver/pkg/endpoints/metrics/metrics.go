@@ -211,6 +211,26 @@ var (
 		[]string{"verb", "group", "version", "resource", "subresource", "scope"},
 	)
 
+	// requestPostTimeoutTotal tracks the activity of the executing request handler after the associated request
+	// has been timed out by the apiserver.
+	// source: the name of the handler that is recording this metric. Currently, we have two:
+	//  - timeout-handler: the "executing" handler returns after the timeout filter times out the request.
+	//  - rest-handler: the "executing" handler returns after the rest layer times out the request.
+	// status: whether the handler panicked or threw an error, possible values:
+	//  - 'panic': the handler panicked
+	//  - 'error': the handler return an error
+	//  - 'ok': the handler returned a result (no error and no panic)
+	//  - 'pending': the handler is still running in the background and it did not return
+	//    within the wait threshold.
+	requestPostTimeoutTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_post_timeout_total",
+			Help:           "Tracks the activity of the request handlers after the associated requests have been timed out by the apiserver",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"source", "status"},
+	)
+
 	metrics = []resettableCollector{
 		deprecatedRequestGauge,
 		requestCounter,
@@ -228,6 +248,7 @@ var (
 		apiSelfRequestCounter,
 		requestFilterDuration,
 		requestAbortsTotal,
+		requestPostTimeoutTotal,
 	}
 
 	// these are the valid request methods which we report in our metrics. Any other request methods
@@ -271,6 +292,36 @@ const (
 	removedReleaseAnnotationKey = "k8s.io/removed-release"
 )
 
+const (
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the timeout filter times out the request.
+	PostTimeoutSourceTimeoutHandler = "timeout-handler"
+
+	// The source that is recording the apiserver_request_post_timeout_total metric.
+	// The "executing" request handler returns after the rest layer times out the request.
+	PostTimeoutSourceRestHandler = "rest-handler"
+)
+
+const (
+	// The executing request handler panicked after the request had
+	// been timed out by the apiserver.
+	PostTimeoutHandlerPanic = "panic"
+
+	// The executing request handler has returned an error to the post-timeout
+	// receiver after the request had been timed out by the apiserver.
+	PostTimeoutHandlerError = "error"
+
+	// The executing request handler has returned a result to the post-timeout
+	// receiver after the request had been timed out by the apiserver.
+	PostTimeoutHandlerOK = "ok"
+
+	// The executing request handler has not panicked or returned any error/result to
+	// the post-timeout receiver yet after the request had been timed out by the apiserver.
+	// The post-timeout receiver gives up after waiting for certain threshold and if the
+	// executing request handler has not returned yet we use the following label.
+	PostTimeoutHandlerPending = "pending"
+)
+
 var registerMetrics sync.Once
 
 // Register all metrics.
@@ -306,6 +357,10 @@ func UpdateInflightRequestMetrics(phase string, nonmutating, mutating int) {
 
 func RecordFilterLatency(ctx context.Context, name string, elapsed time.Duration) {
 	requestFilterDuration.WithContext(ctx).WithLabelValues(name).Observe(elapsed.Seconds())
+}
+
+func RecordRequestPostTimeout(source string, status string) {
+	requestPostTimeoutTotal.WithLabelValues(source, status).Inc()
 }
 
 // RecordRequestAbort records that the request was aborted possibly due to a timeout.

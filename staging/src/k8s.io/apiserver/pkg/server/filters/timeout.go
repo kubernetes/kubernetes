@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"runtime"
 	"sync"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -119,15 +120,19 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			// the work needs to send to it. This is defer'd to ensure it runs
 			// ever if the post timeout work itself panics.
 			go func() {
+				timedOutAt := time.Now()
 				res := <-resultCh
+
+				status := metrics.PostTimeoutHandlerOK
 				if res != nil {
-					switch t := res.(type) {
-					case error:
-						utilruntime.HandleError(t)
-					default:
-						utilruntime.HandleError(fmt.Errorf("%v", res))
-					}
+					// a non nil res indicates that there was a panic.
+					status = metrics.PostTimeoutHandlerPanic
 				}
+
+				metrics.RecordRequestPostTimeout(metrics.PostTimeoutSourceTimeoutHandler, status)
+				err := fmt.Errorf("post-timeout activity - time-elapsed: %s, %v %q result: %v",
+					time.Since(timedOutAt), r.Method, r.URL.Path, res)
+				utilruntime.HandleError(err)
 			}()
 		}()
 
