@@ -19,7 +19,6 @@ package pod
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -167,11 +166,12 @@ func MakeSecPod(podConfig *Config) (*v1.Pod, error) {
 	if podConfig.NS == "" {
 		return nil, fmt.Errorf("Cannot create pod with empty namespace")
 	}
-	if len(podConfig.Command) == 0 {
+	if len(podConfig.Command) == 0 && !NodeOSDistroIs("windows") {
 		podConfig.Command = "trap exit TERM; while true; do sleep 1; done"
 	}
+
 	podName := "pod-" + string(uuid.NewUUID())
-	if podConfig.FsGroup == nil && runtime.GOOS != "windows" {
+	if podConfig.FsGroup == nil && !NodeOSDistroIs("windows") {
 		podConfig.FsGroup = func(i int64) *int64 {
 			return &i
 		}(1000)
