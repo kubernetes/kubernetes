@@ -71,8 +71,10 @@ const (
 
 var (
 	deprecatedVolumeProviders = map[string]string{
-		"kubernetes.io/cinder":  "The Cinder volume provider is deprecated and will be removed in a future release",
-		"kubernetes.io/scaleio": "The ScaleIO volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/cinder":    "The Cinder volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/storageos": "The StorageOS volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/quobyte":   "The Quobyte volume provider is deprecated and will be removed in a future release",
+		"kubernetes.io/flocker":   "The Flocker volume provider is deprecated and will be removed in a future release",
 	}
 )
 
