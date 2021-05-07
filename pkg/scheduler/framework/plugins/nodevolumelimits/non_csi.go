@@ -284,7 +284,7 @@ func (pl *nonCSILimits) filterVolumes(volumes []v1.Volume, namespace string, fil
 			pvID := fmt.Sprintf("%s-%s/%s", pl.randomVolumeIDPrefix, namespace, pvcName)
 
 			pvc, err := pl.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
-			if err != nil || pvc == nil {
+			if err != nil {
 				// If the PVC is invalid, we don't count the volume because
 				// there's no guarantee that it belongs to the running predicate.
 				klog.V(4).InfoS("Unable to look up PVC info, assuming PVC doesn't match predicate when counting limits", "PVC", fmt.Sprintf("%s/%s", namespace, pvcName), "err", err)
@@ -305,7 +305,7 @@ func (pl *nonCSILimits) filterVolumes(volumes []v1.Volume, namespace string, fil
 			}
 
 			pv, err := pl.pvLister.Get(pvName)
-			if err != nil || pv == nil {
+			if err != nil {
 				// If the PV is invalid and PVC belongs to the running predicate,
 				// log the error and count the PV towards the PV limit.
 				if pl.matchProvisioner(pvc) {
