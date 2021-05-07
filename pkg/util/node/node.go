@@ -201,7 +201,7 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
 	patch, err := generatePatch(condition)
 	if err != nil {
-		return nil
+		return err
 	}
 	_, err = c.CoreV1().Nodes().PatchStatus(context.TODO(), string(node), patch)
 	return err
