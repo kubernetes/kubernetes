@@ -17,6 +17,9 @@ limitations under the License.
 package create
 
 import (
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	restclient "k8s.io/client-go/rest"
+	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -265,5 +268,24 @@ func TestCreateServices(t *testing.T) {
 				t.Errorf("%s: expected:\n%#v\ngot:\n%#v", tc.name, tc.expected, service)
 			}
 		})
+	}
+}
+
+func TestCreateServiceWithNamespace(t *testing.T) {
+	svcName := "test-service"
+	ns := "test"
+	tf := cmdtesting.NewTestFactory().WithNamespace(ns)
+	defer tf.Cleanup()
+
+	tf.ClientConfigVal = &restclient.Config{}
+
+	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
+	cmd := NewCmdCreateServiceClusterIP(tf, ioStreams)
+	cmd.Flags().Set("dry-run", "client")
+	cmd.Flags().Set("output", "jsonpath={.metadata.namespace}")
+	cmd.Flags().Set("clusterip", "None")
+	cmd.Run(cmd, []string{svcName})
+	if buf.String() != ns {
+		t.Errorf("expected output: %s, but got: %s", ns, buf.String())
 	}
 }
