@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -61,7 +63,11 @@ kubeConfigFile: /foo
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			kubeconfig, err := LoadConfig(bytes.NewBufferString(tc.input))
+			config, err := LoadConfig(bytes.NewBufferString(tc.input), webhookadmission.WebhookType("any-type"))
+			var kubeconfig string
+			if err == nil {
+				kubeconfig, err = GetKubeConfigFile(config)
+			}
 			if len(tc.expectErr) > 0 {
 				if err == nil {
 					t.Fatal("expected err, got none")

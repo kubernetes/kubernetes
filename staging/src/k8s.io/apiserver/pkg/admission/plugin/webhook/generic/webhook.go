@@ -19,7 +19,6 @@ package generic
 import (
 	"context"
 	"fmt"
-	"io"
 
 	admissionv1 "k8s.io/api/admission/v1"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
@@ -30,6 +29,7 @@ import (
 	genericadmissioninit "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/namespace"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/object"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/rules"
@@ -49,6 +49,9 @@ type Webhook struct {
 	namespaceMatcher *namespace.Matcher
 	objectMatcher    *object.Matcher
 	dispatcher       Dispatcher
+	// webhookInterceptingWebhooksConfig contains config data for
+	// webhooks that could intercept other webhooks
+	webhookInterceptingWebhooksConfig *webhookInterceptingWebhooksPrecomputedConfig
 }
 
 var (
@@ -60,8 +63,8 @@ type sourceFactory func(f informers.SharedInformerFactory) Source
 type dispatcherFactory func(cm *webhookutil.ClientManager) Dispatcher
 
 // NewWebhook creates a new generic admission webhook.
-func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
-	kubeconfigFile, err := config.LoadConfig(configFile)
+func NewWebhook(handler *admission.Handler, webhookConfig *webhookadmission.WebhookAdmission, sourceFactory sourceFactory, dispatcherFactory dispatcherFactory) (*Webhook, error) {
+	kubeconfigFile, err := config.GetKubeConfigFile(webhookConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +95,8 @@ func NewWebhook(handler *admission.Handler, configFile io.Reader, sourceFactory 
 		namespaceMatcher: &namespace.Matcher{},
 		objectMatcher:    &object.Matcher{},
 		dispatcher:       dispatcherFactory(&cm),
+
+		webhookInterceptingWebhooksConfig: precomputeWebhookInterceptingWebhooksConfig(webhookConfig),
 	}, nil
 }
 
@@ -219,12 +224,19 @@ func (a *attrWithResourceOverride) GetResource() schema.GroupVersionResource { r
 
 // Dispatch is called by the downstream Validate or Admit methods.
 func (a *Webhook) Dispatch(ctx context.Context, attr admission.Attributes, o admission.ObjectInterfaces) error {
+	hookSelector := func(input []webhook.WebhookAccessor) []webhook.WebhookAccessor { return input }
 	if rules.IsWebhookConfigurationResource(attr) {
-		return nil
+		hookSelector = a.selectWebhookInterceptingWebhooks(attr)
+		if hookSelector == nil {
+			return nil
+		}
 	}
 	if !a.WaitForReady() {
 		return admission.NewForbidden(attr, fmt.Errorf("not yet ready to handle request"))
 	}
-	hooks := a.hookSource.Webhooks()
+	hooks := hookSelector(a.hookSource.Webhooks())
+	if len(hooks) == 0 {
+		return nil
+	}
 	return a.dispatcher.Dispatch(ctx, attr, o, hooks)
 }

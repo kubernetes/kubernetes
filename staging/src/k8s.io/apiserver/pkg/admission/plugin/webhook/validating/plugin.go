@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
@@ -54,7 +56,12 @@ func NewValidatingAdmissionWebhook(configFile io.Reader) (*Plugin, error) {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 	p := &Plugin{}
 	var err error
-	p.Webhook, err = generic.NewWebhook(handler, configFile, configuration.NewValidatingWebhookConfigurationManager, newValidatingDispatcher(p))
+	webhookConfig, err := config.LoadConfig(configFile, webhookadmission.Validating)
+	if err != nil {
+		return nil, err
+	}
+
+	p.Webhook, err = generic.NewWebhook(handler, webhookConfig, configuration.NewValidatingWebhookConfigurationManager, newValidatingDispatcher(p))
 	if err != nil {
 		return nil, err
 	}

@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/admission/configuration"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config"
+	"k8s.io/apiserver/pkg/admission/plugin/webhook/config/apis/webhookadmission"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 )
 
@@ -54,7 +56,12 @@ func NewMutatingWebhook(configFile io.Reader) (*Plugin, error) {
 	handler := admission.NewHandler(admission.Connect, admission.Create, admission.Delete, admission.Update)
 	p := &Plugin{}
 	var err error
-	p.Webhook, err = generic.NewWebhook(handler, configFile, configuration.NewMutatingWebhookConfigurationManager, newMutatingDispatcher(p))
+	webhookConfig, err := config.LoadConfig(configFile, webhookadmission.Mutating)
+	if err != nil {
+		return nil, err
+	}
+
+	p.Webhook, err = generic.NewWebhook(handler, webhookConfig, configuration.NewMutatingWebhookConfigurationManager, newMutatingDispatcher(p))
 	if err != nil {
 		return nil, err
 	}

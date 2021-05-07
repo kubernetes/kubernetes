@@ -18,12 +18,58 @@ package webhookadmission
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+type WebhookType string
+
+const (
+	Mutating   WebhookType = "Mutating"
+	Validating WebhookType = "Validating"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // WebhookAdmission provides configuration for the webhook admission controller.
 type WebhookAdmission struct {
 	metav1.TypeMeta
 
+	// WebhookInterceptingWebhooks specifies the webhooks that could intercept
+	// other webhooks.
+	WebhookInterceptingWebhooks *WebhookInterceptingWebhooks
+
 	// KubeConfigFile is the path to the kubeconfig file.
 	KubeConfigFile string
+}
+
+type WebhookInterceptingWebhooks struct {
+	// Identifiers specify the webhook intercepting webhooks
+	Identifiers []WebhookIdentifier
+	// Maintainers consist of identities which maintain (i.e. could
+	// add/delete/modify) the webhook intercepting webhooks (WIWs). Normally
+	// webhook admission requests are intercepted by WIWs, and could potentially
+	// be denied (for instance when the webhook is misconfigured). However,
+	// webhook admission requests made by maintainers will *not* be intercepted
+	// by WIWs, enabling them to maintain these webhooks. A request is
+	// considered to be made by a maintainer if either its username is in Users,
+	// or one of its groups is in Groups.
+	Maintainers WebhookMaintainers
+}
+
+// WebhookIdentifier uniquely identifies a webhook across all
+// registered webhooks. A webhook's name by itself is not enough to do so, as
+// webhookconfigurations with different names could have webhooks with
+// the same name.
+type WebhookIdentifier struct {
+	// ConfigurationName is the name of the webhook configuration (e.g.
+	// foo-config)
+	ConfigurationName string
+	// Name specifies the name of the webhook (e.g. foo.bar.com).
+	Name string
+	// Type specifies the type of the webhook. It is set internally to the type
+	// of the webhook admission plugin that the configuration belongs.
+	Type WebhookType
+}
+
+// WebhookMaintainers is a list of users and groups.
+type WebhookMaintainers struct {
+	Users  []string
+	Groups []string
 }

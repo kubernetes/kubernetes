@@ -42,30 +42,45 @@ func init() {
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
 }
 
-// LoadConfig extract the KubeConfigFile from configFile
-func LoadConfig(configFile io.Reader) (string, error) {
-	var kubeconfigFile string
-	if configFile != nil {
-		// we have a config so parse it.
-		data, err := ioutil.ReadAll(configFile)
-		if err != nil {
-			return "", err
-		}
-		decoder := codecs.UniversalDecoder()
-		decodedObj, err := runtime.Decode(decoder, data)
-		if err != nil {
-			return "", err
-		}
-		config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
-		if !ok {
-			return "", fmt.Errorf("unexpected type: %T", decodedObj)
-		}
-
-		if !path.IsAbs(config.KubeConfigFile) {
-			return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
-		}
-
-		kubeconfigFile = config.KubeConfigFile
+// GetKubeConfigFile extract the KubeConfigFile from configFile
+func GetKubeConfigFile(config *webhookadmission.WebhookAdmission) (string, error) {
+	if config == nil {
+		return "", nil
 	}
-	return kubeconfigFile, nil
+
+	if !path.IsAbs(config.KubeConfigFile) {
+		return "", field.Invalid(field.NewPath("kubeConfigFile"), config.KubeConfigFile, "must be an absolute file path")
+	}
+
+	return config.KubeConfigFile, nil
+}
+
+// LoadConfig extract the WebhookAdmission from configFile
+func LoadConfig(configFile io.Reader, webhookType webhookadmission.WebhookType) (*webhookadmission.WebhookAdmission, error) {
+	if configFile == nil {
+		return nil, nil
+	}
+	// we have a config so parse it.
+	data, err := ioutil.ReadAll(configFile)
+	if err != nil {
+		return nil, err
+	}
+	decoder := codecs.UniversalDecoder()
+	decodedObj, err := runtime.Decode(decoder, data)
+	if err != nil {
+		return nil, err
+	}
+	config, ok := decodedObj.(*webhookadmission.WebhookAdmission)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type: %T", decodedObj)
+	}
+
+	// set the type of webhook intercepting webhooks
+	if config != nil && config.WebhookInterceptingWebhooks != nil {
+		for _, identifier := range config.WebhookInterceptingWebhooks.Identifiers {
+			identifier.Type = webhookType
+		}
+	}
+
+	return config, nil
 }
