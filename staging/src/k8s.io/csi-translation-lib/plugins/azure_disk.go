@@ -93,7 +93,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.St
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with AzureDisk set from in-tree
 // and converts the AzureDisk source to a CSIPersistentVolumeSource
-func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.AzureDisk == nil {
 		return nil, fmt.Errorf("volume is nil or Azure Disk not defined on volume")
 	}

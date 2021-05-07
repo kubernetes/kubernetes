@@ -324,7 +324,7 @@ func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 			}
 			pv1, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
 				VolumeSource: vs1,
-			})
+			}, "")
 			if err != nil {
 				t.Fatalf("Error when translating to CSI: %v", err)
 			}
@@ -334,7 +334,7 @@ func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
 			}
 			pv2, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
 				VolumeSource: vs2,
-			})
+			}, "")
 			if err != nil {
 				t.Fatalf("Error when translating to CSI: %v", err)
 			}
