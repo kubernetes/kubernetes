@@ -175,7 +175,7 @@ func TestApfSkipLongRunningRequest(t *testing.T) {
 	StartPriorityAndFairnessWatermarkMaintenance(ctx.Done())
 
 	// send a watch request to test skipping long running request
-	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces?watch=true", server.URL), http.StatusOK); err != nil {
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/foos/foo/proxy", server.URL), http.StatusOK); err != nil {
 		// request should not be rejected
 		t.Error(err)
 	}
