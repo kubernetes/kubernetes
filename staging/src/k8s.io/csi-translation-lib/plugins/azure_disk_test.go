@@ -145,7 +145,7 @@ func TestTranslateAzureDiskInTreeStorageClassToCSI(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Logf("Testing %v", tc.name)
-		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume)
+		got, err := translator.TranslateInTreeInlineVolumeToCSI(tc.volume, "")
 		if err != nil && !tc.expErr {
 			t.Errorf("Did not expect error but got: %v", err)
 		}
