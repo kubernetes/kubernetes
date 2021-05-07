@@ -455,8 +455,14 @@ var (
 
 func newPriorityLevelConfiguration(name string, spec flowcontrol.PriorityLevelConfigurationSpec) *flowcontrol.PriorityLevelConfiguration {
 	return &flowcontrol.PriorityLevelConfiguration{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Spec:       spec}
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				flowcontrol.AutoUpdateAnnotationKey: "true",
+			},
+		},
+		Spec: spec,
+	}
 }
 
 func newFlowSchema(name, plName string, matchingPrecedence int32, dmType flowcontrol.FlowDistinguisherMethodType, rules ...flowcontrol.PolicyRulesWithSubjects) *flowcontrol.FlowSchema {
@@ -465,7 +471,12 @@ func newFlowSchema(name, plName string, matchingPrecedence int32, dmType flowcon
 		dm = &flowcontrol.FlowDistinguisherMethod{Type: dmType}
 	}
 	return &flowcontrol.FlowSchema{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Annotations: map[string]string{
+				flowcontrol.AutoUpdateAnnotationKey: "true",
+			},
+		},
 		Spec: flowcontrol.FlowSchemaSpec{
 			PriorityLevelConfiguration: flowcontrol.PriorityLevelConfigurationReference{
 				Name: plName,
