@@ -240,6 +240,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	}
 
 	var internalCapacity = v1.ResourceList{}
+	// Confirmed that the below is true. We cannot fetch ImagesFsInfo here
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -1061,7 +1062,11 @@ func isKernelPid(pid int) bool {
 }
 
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
-	return cm.capacity
+	rootfs, err := cm.cadvisorInterface.RootFsInfo()
+	if err == nil {
+		return cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs)
+	}
+	return nil
 }
 
 func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
