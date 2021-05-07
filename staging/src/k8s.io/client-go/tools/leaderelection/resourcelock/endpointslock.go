@@ -40,10 +40,11 @@ type EndpointsLock struct {
 func (el *EndpointsLock) Get(ctx context.Context) (*LeaderElectionRecord, []byte, error) {
 	var record LeaderElectionRecord
 	var err error
-	el.e, err = el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(ctx, el.EndpointsMeta.Name, metav1.GetOptions{})
+	e, err := el.Client.Endpoints(el.EndpointsMeta.Namespace).Get(ctx, el.EndpointsMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, err
 	}
+	el.e = e
 	if el.e.Annotations == nil {
 		el.e.Annotations = make(map[string]string)
 	}
