@@ -687,7 +687,8 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, container.Name)
 			if err := m.killContainer(pod, container.ID, container.Name, "", reasonUnknown, gracePeriodOverride); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				klog.ErrorS(err, "Kill container failed", "pod", klog.KObj(pod), "podUID", pod.UID,
+				// Use runningPod for logging as the pod passed in could be *nil*.
+				klog.ErrorS(err, "Kill container failed", "pod", klog.KRef(runningPod.Namespace, runningPod.Name), "podUID", runningPod.ID,
 					"containerName", container.Name, "containerID", container.ID)
 			}
 			containerResults <- killContainerResult
