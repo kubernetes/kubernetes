@@ -32,7 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/controller/testutil"
-	"k8s.io/legacy-cloud-providers/gce"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce"
 	netutils "k8s.io/utils/net"
 )
 

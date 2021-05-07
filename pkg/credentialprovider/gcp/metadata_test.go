@@ -31,7 +31,7 @@ import (
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/legacy-cloud-providers/gce/gcpcredential"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce/gcpcredential"
 )
 
 func createProductNameFile() (string, error) {

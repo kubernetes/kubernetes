@@ -45,7 +45,7 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utiltaints "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/legacy-cloud-providers/gce"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce"
 	netutils "k8s.io/utils/net"
 )
 

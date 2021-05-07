@@ -31,7 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	gcecloud "k8s.io/kubernetes/third_party/cloudproviders/gce"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eingress "k8s.io/kubernetes/test/e2e/framework/ingress"

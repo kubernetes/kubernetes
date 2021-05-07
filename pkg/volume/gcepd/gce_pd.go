@@ -37,7 +37,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	gcecloud "k8s.io/kubernetes/third_party/cloudproviders/gce"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.

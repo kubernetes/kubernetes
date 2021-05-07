@@ -29,7 +29,7 @@ import (
 	"k8s.io/cloud-provider/credentialconfig"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	"k8s.io/legacy-cloud-providers/gce/gcpcredential"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce/gcpcredential"
 )
 
 const (

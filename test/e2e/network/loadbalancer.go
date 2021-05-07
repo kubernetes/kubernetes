@@ -43,7 +43,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	"k8s.io/kubernetes/test/e2e/network/common"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	gcecloud "k8s.io/kubernetes/third_party/cloudproviders/gce"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"

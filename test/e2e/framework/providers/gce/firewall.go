@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	gcecloud "k8s.io/kubernetes/third_party/cloudproviders/gce"
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.

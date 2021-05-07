@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodesync "k8s.io/kubernetes/pkg/controller/nodeipam/ipam/sync"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/legacy-cloud-providers/gce"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce"
 )
 
 // Config for the IPAM controller.

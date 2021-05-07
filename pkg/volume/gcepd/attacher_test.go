@@ -30,7 +30,7 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
-	"k8s.io/legacy-cloud-providers/gce"
+	"k8s.io/kubernetes/third_party/cloudproviders/gce"
 
 	"strings"
 

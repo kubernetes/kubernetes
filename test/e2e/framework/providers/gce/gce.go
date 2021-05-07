@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	gcecloud "k8s.io/kubernetes/third_party/cloudproviders/gce"
 )
 
 func init() {
