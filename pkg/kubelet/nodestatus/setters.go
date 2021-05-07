@@ -332,7 +332,10 @@ func MachineInfo(nodeName string,
 				initialCapacity := capacityFunc()
 				if initialCapacity != nil {
 					if v, exists := initialCapacity[v1.ResourceEphemeralStorage]; exists {
+						klog.InfoS("Initial ephemeral storage capacity exists", "ephemeral-storage", fmt.Sprintf("%d", v.Value()))
 						node.Status.Capacity[v1.ResourceEphemeralStorage] = v
+					} else {
+						klog.Infof("Initial ephemeral storage capacity does not exist")
 					}
 				}
 			}
