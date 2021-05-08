@@ -89,7 +89,7 @@ func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Po
 	klog.V(2).InfoS("Deleting recycler", "pod", klog.KRef(pod.Namespace, pod.Name))
 	deleteErr := recyclerClient.DeletePod(pod.Name, pod.Namespace)
 	if deleteErr != nil {
-		klog.ErrorS(err, "failed to delete recycler", "pod", klog.KRef(pod.Namespace, pod.Name))
+		klog.ErrorS(err, "Failed to delete recycler", "pod", klog.KRef(pod.Namespace, pod.Name))
 	}
 
 	// Returning recycler error is preferred, the pod will be deleted again on
