@@ -53,7 +53,7 @@ func RecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, kubeC
 // same as above func comments, except 'recyclerClient' is a narrower pod API
 // interface to ease testing
 func internalRecycleVolumeByWatchingPodUntilCompletion(pvName string, pod *v1.Pod, recyclerClient recyclerClient) error {
-	klog.V(5).InfoS("creating recycler pod for volume %s\n", pod.Name)
+	klog.V(5).InfoS("Creating recycler pod for volume", "podName", pod.Name)
 
 	// Generate unique name for the recycler pod - we need to get "already
 	// exists" error when a previous controller has already started recycling
