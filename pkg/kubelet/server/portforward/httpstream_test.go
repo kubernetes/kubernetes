@@ -92,11 +92,23 @@ func TestHTTPStreamReceived(t *testing.T) {
 	}
 }
 
+type fakeConn struct {
+	removeStreamsCalled bool
+}
+
+func (*fakeConn) CreateStream(headers http.Header) (httpstream.Stream, error) { return nil, nil }
+func (*fakeConn) Close() error                                                { return nil }
+func (*fakeConn) CloseChan() <-chan bool                                      { return nil }
+func (*fakeConn) SetIdleTimeout(timeout time.Duration)                        {}
+func (f *fakeConn) RemoveStreams(streams ...httpstream.Stream)                { f.removeStreamsCalled = true }
+
 func TestGetStreamPair(t *testing.T) {
 	timeout := make(chan time.Time)
 
+	conn := &fakeConn{}
 	h := &httpStreamHandler{
 		streamPairs: make(map[string]*httpStreamPair),
+		conn:        conn,
 	}
 
 	// test adding a new entry
@@ -158,6 +170,11 @@ func TestGetStreamPair(t *testing.T) {
 	// make sure monitorStreamPair completed
 	<-monitorDone
 
+	if !conn.removeStreamsCalled {
+		t.Fatalf("connection remove stream not called")
+	}
+	conn.removeStreamsCalled = false
+
 	// make sure the pair was removed
 	if h.hasStreamPair("1") {
 		t.Fatal("expected removal of pair after both data and error streams received")
@@ -171,6 +188,7 @@ func TestGetStreamPair(t *testing.T) {
 	if p == nil {
 		t.Fatal("expected p not to be nil")
 	}
+
 	monitorDone = make(chan struct{})
 	go func() {
 		h.monitorStreamPair(p, timeout)
@@ -182,6 +200,9 @@ func TestGetStreamPair(t *testing.T) {
 	<-monitorDone
 	if h.hasStreamPair("2") {
 		t.Fatal("expected stream pair to be removed")
+	}
+	if !conn.removeStreamsCalled {
+		t.Fatalf("connection remove stream not called")
 	}
 }
 
