@@ -114,7 +114,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			klog.ErrorS(nil, "Could not get number from iSCSI host", "host", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 
@@ -140,7 +140,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 			targetNamePath := sessionPath + "/iscsi_session/" + sessionName + "/targetname"
 			targetName, err := io.ReadFile(targetNamePath)
 			if err != nil {
-				klog.InfoS("Failed to process session, assuming this session is unavailable", "sessionName", sessionName, "reason", err.Error())
+				klog.Infof("Failed to process session %s, assuming this session is unavailable: %s", sessionName, err)
 				continue
 			}
 
@@ -153,7 +153,7 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 			// for the iSCSI connection.
 			dirs2, err := io.ReadDir(sessionPath)
 			if err != nil {
-				klog.InfoS("Failed to process session, assuming this session is unavailable", "sessionName", sessionName, "reason", err.Error())
+				klog.Infof("Failed to process session %s, assuming this session is unavailable: %s", sessionName, err)
 				continue
 			}
 			for _, dir2 := range dirs2 {
@@ -171,28 +171,28 @@ func (handler *deviceHandler) GetISCSIPortalHostMapForTarget(targetIqn string) (
 				addrPath := connectionPath + "/address"
 				addr, err := io.ReadFile(addrPath)
 				if err != nil {
-					klog.InfoS("Failed to process connection, assuming this connection is unavailable", "connection", dirName, "reason", err.Error())
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
 					continue
 				}
 
 				portPath := connectionPath + "/port"
 				port, err := io.ReadFile(portPath)
 				if err != nil {
-					klog.InfoS("Failed to process connection, assuming this connection is unavailable", "connection", dirName, "reason", err.Error())
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
 					continue
 				}
 
 				persistentAddrPath := connectionPath + "/persistent_address"
 				persistentAddr, err := io.ReadFile(persistentAddrPath)
 				if err != nil {
-					klog.InfoS("Failed to process connection, assuming this connection is unavailable", "connection", dirName, "reason", err.Error())
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
 					continue
 				}
 
 				persistentPortPath := connectionPath + "/persistent_port"
 				persistentPort, err := io.ReadFile(persistentPortPath)
 				if err != nil {
-					klog.InfoS("Failed to process connection, assuming this connection is unavailable", "connection", dirName, "reason", err.Error())
+					klog.Infof("Failed to process connection %s, assuming this connection is unavailable: %s", dirName, err)
 					continue
 				}
 
@@ -233,7 +233,7 @@ func (handler *deviceHandler) FindDevicesForISCSILun(targetIqn string, lun int) 
 		}
 		hostNumber, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 		if err != nil {
-			klog.ErrorS(nil, "Could not get number from iSCSI host", "host", hostName)
+			klog.Errorf("Could not get number from iSCSI host: %s", hostName)
 			continue
 		}
 

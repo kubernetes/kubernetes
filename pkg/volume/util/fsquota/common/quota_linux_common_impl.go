@@ -192,7 +192,7 @@ func isFilesystemOfType(mountpoint string, backingDev string, typeMagic int64) b
 	var buf syscall.Statfs_t
 	err := syscall.Statfs(mountpoint, &buf)
 	if err != nil {
-		klog.InfoS("Warning: Unable to statfs", "mountpoint", mountpoint, "error", err.Error())
+		klog.InfoS("Warning: Unable to statfs", "mountpoint", mountpoint, "err", err)
 		return false
 	}
 	if int64(buf.Type) != typeMagic {
@@ -258,7 +258,7 @@ func getQuantity(mountpoint string, id QuotaID, xfsQuotaArg string, multiplier i
 		return 0, fmt.Errorf("unable to parse data size '%s' from '%s': %v", match[1], data, err)
 	}
 	klog.V(4).InfoS("Get quantity",
-		"mountpoint", mountpoint, "quotaID", id, "xfsQuotaArg", xfsQuotaArg, "multiplier", multiplier, "size", size, "error", err.Error())
+		"mountpoint", mountpoint, "quotaID", id, "xfsQuotaArg", xfsQuotaArg, "multiplier", multiplier, "size", size, "err", err)
 	return size * multiplier, nil
 }
 

@@ -396,12 +396,12 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "error", err.Error())
+				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "err", err)
 			}
 		}
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "error", err.Error())
+				klog.V(4).InfoS("Closing FD failed for safemkdir", "FD", parentFD, "path", pathname, "err", err)
 			}
 		}
 	}()
@@ -430,7 +430,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		//   and user either gets error or the file that it can already access.
 
 		if err = syscall.Close(parentFD); err != nil {
-			klog.V(4).InfoS("Closing FD failed for safemkdi", "FD", parentFD, "path", pathname, "error", err.Error())
+			klog.V(4).InfoS("Closing FD failed for safemkdi", "FD", parentFD, "path", pathname, "err", err)
 		}
 		parentFD = childFD
 		childFD = -1
@@ -479,7 +479,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	}
 	defer func() {
 		if err = syscall.Close(fd); err != nil {
-			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "error", err.Error())
+			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "err", err)
 		}
 	}()
 	for i, dir := range dirs {
@@ -493,7 +493,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 			return base, nil, err
 		}
 		if err = syscall.Close(fd); err != nil {
-			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "error", err.Error())
+			klog.V(4).InfoS("Closing FD failed for findExistingPrefix", "FD", fd, "path", pathname, "err", err)
 		}
 		fd = childFD
 		currentPath = filepath.Join(currentPath, dir)
@@ -525,7 +525,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if parentFD != -1 {
 			if err = syscall.Close(parentFD); err != nil {
-				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", parentFD, "path", pathname, "error", err.Error())
+				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", parentFD, "path", pathname, "err", err)
 			}
 		}
 	}()
@@ -534,7 +534,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 	defer func() {
 		if childFD != -1 {
 			if err = syscall.Close(childFD); err != nil {
-				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", childFD, "path", pathname, "error", err.Error())
+				klog.V(4).InfoS("Closing FD failed for safeopen", "FD", childFD, "path", pathname, "err", err)
 			}
 		}
 	}()

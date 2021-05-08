@@ -108,7 +108,7 @@ func removeLoopDevice(device string) error {
 		if _, err := os.Stat(device); os.IsNotExist(err) {
 			return nil
 		}
-		klog.V(2).InfoS("Failed to remove loopback device", "device", device, "error", err, "output", out)
+		klog.V(2).InfoS("Failed to remove loopback device", "device", device, "err", err, "output", out)
 		return fmt.Errorf("losetup -d %s failed: %v", device, err)
 	}
 	return nil

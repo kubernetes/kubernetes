@@ -611,7 +611,7 @@ func TestCleanSubPaths(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		klog.V(4).InfoS("test", "testCaseName", test.name)
+		klog.V(4).InfoS("Test", "testCaseName", test.name)
 		base, err := ioutil.TempDir("", "clean-subpaths-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -1092,7 +1092,7 @@ func TestSafeOpen(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			klog.InfoS("Got error", "error", err.Error())
+			klog.InfoS("Got error", "err", err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)
@@ -1238,7 +1238,7 @@ func TestFindExistingPrefix(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			klog.InfoS("Got error", "error", err.Error())
+			klog.InfoS("Got error", "err", err)
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)
