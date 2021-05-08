@@ -75,7 +75,7 @@ func (t *osCinderCSITranslator) TranslateInTreeStorageClassToCSI(sc *storage.Sto
 
 // TranslateInTreeInlineVolumeToCSI takes a Volume with Cinder set from in-tree
 // and converts the Cinder source to a CSIPersistentVolumeSource
-func (t *osCinderCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error) {
+func (t *osCinderCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error) {
 	if volume == nil || volume.Cinder == nil {
 		return nil, fmt.Errorf("volume is nil or Cinder not defined on volume")
 	}
