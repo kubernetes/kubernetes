@@ -21,7 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -45,42 +44,16 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 
-	// Since ClusterConfiguration never get serialized in the external variant of InitConfiguration,
-	// it is necessary to apply external api defaults here to get the round trip internal->external->internal working.
-	// More specifically:
-	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
-	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
-		APIServer: kubeadm.APIServer{
-			TimeoutForControlPlane: &metav1.Duration{
-				Duration: constants.DefaultControlPlaneTimeout,
-			},
-		},
-		DNS: kubeadm.DNS{
-			Type: kubeadm.CoreDNS,
-		},
-		CertificatesDir: kubeadmapiv1.DefaultCertificatesDir,
-		ClusterName:     kubeadmapiv1.DefaultClusterName,
-		Etcd: kubeadm.Etcd{
-			Local: &kubeadm.LocalEtcd{
-				DataDir: kubeadmapiv1.DefaultEtcdDataDir,
-			},
-		},
-		ImageRepository:   kubeadmapiv1.DefaultImageRepository,
-		KubernetesVersion: kubeadmapiv1.DefaultKubernetesVersion,
-		Networking: kubeadm.Networking{
-			ServiceSubnet: kubeadmapiv1.DefaultServicesSubnet,
-			DNSDomain:     kubeadmapiv1.DefaultServiceDNSDomain,
-		},
-	}
-	// Adds the default bootstrap token to get the round working
+	// Avoid round tripping the ClusterConfiguration embedded in the InitConfiguration, since it is
+	// only present in the internal version and not in public versions
+	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{}
+
+	// Adds the default bootstrap token to get the round trip working
 	obj.BootstrapTokens = []kubeadm.BootstrapToken{
 		{
-			// Description
-			// Expires
 			Groups: []string{"foo"},
-			// Token
-			TTL:    &metav1.Duration{Duration: 1234},
 			Usages: []string{"foo"},
+			TTL:    &metav1.Duration{Duration: 1234},
 		},
 	}
 }
