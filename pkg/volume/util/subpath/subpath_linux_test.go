@@ -381,7 +381,7 @@ func TestRemoveEmptyDirs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		klog.V(4).InfoS("test", "testCaseName", test.name)
+		klog.V(4).InfoS("Test", "testCaseName", test.name)
 		base, err := ioutil.TempDir("", "remove-empty-dirs-"+test.name+"-")
 		if err != nil {
 			t.Fatalf(err.Error())
