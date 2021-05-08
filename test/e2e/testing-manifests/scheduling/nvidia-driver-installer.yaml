@@ -53,7 +53,7 @@ spec:
         # and the COS release notes (https://cloud.google.com/container-optimized-os/docs/release-notes) to determine version COS GPU installer for a given version of COS.
 
         # Maps to gcr.io/cos-cloud/cos-gpu-installer:v2.0.3 - suitable for COS M85 as per https://cloud.google.com/container-optimized-os/docs/release-notes#cos-85-13310-1209-3
-      - image: gcr.io/cos-cloud/cos-gpu-installer@sha256:1cf2701dc2c3944a93fd06cb6c9eedfabf323425483ba3af294510621bb37d0e
+      - image: gcr.io/cos-cloud/cos-gpu-installer:v2.0.5
         name: nvidia-driver-installer
         resources:
           requests:
