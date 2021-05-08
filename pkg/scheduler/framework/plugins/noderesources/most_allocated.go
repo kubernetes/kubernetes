@@ -95,6 +95,9 @@ func mostResourceScorer(resToWeightMap resourceToWeightMap) func(requested, allo
 			nodeScore += resourceScore * weight
 			weightSum += weight
 		}
+		if weightSum == 0 {
+			return 0
+		}
 		return (nodeScore / weightSum)
 	}
 }
