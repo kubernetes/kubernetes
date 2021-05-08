@@ -44,9 +44,9 @@ func (d *CacheDumper) DumpAll() {
 // dumpNodes writes NodeInfo to the scheduler logs.
 func (d *CacheDumper) dumpNodes() {
 	dump := d.cache.Dump()
-	klog.Info("Dump of cached NodeInfo")
+	klog.InfoS("Dump of cached NodeInfo")
 	for name, nodeInfo := range dump.Nodes {
-		klog.Info(d.printNodeInfo(name, nodeInfo))
+		klog.InfoS(d.printNodeInfo(name, nodeInfo))
 	}
 }
 
@@ -57,7 +57,7 @@ func (d *CacheDumper) dumpSchedulingQueue() {
 	for _, p := range pendingPods {
 		podData.WriteString(printPod(p))
 	}
-	klog.Infof("Dump of scheduling queue:\n%s", podData.String())
+	klog.InfoS("Dump of scheduling queue", "podData", podData.String())
 }
 
 // printNodeInfo writes parts of NodeInfo to a string.
