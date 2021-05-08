@@ -91,7 +91,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
-	klog.V(4).Infof("reactor got operation %q on %q", action.GetVerb(), action.GetResource())
+	klog.V(4).InfoS("Reactor got operation Verb on Resource", "verb", action.GetVerb(), "resource", action.GetResource())
 
 	// Inject error when requested
 	err = r.injectReactError(action)
@@ -124,7 +124,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("created volume %s", volume.Name)
+		klog.V(4).InfoS("Created volume", "volumeName", volume.Name)
 		return true, volume, nil
 
 	case action.Matches("create", "persistentvolumeclaims"):
@@ -144,7 +144,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		}
 		r.changedObjects = append(r.changedObjects, claim)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("created claim %s", claim.Name)
+		klog.V(4).InfoS("Created claim", "claimName", claim.Name)
 		return true, claim, nil
 
 	case action.Matches("update", "persistentvolumes"):
@@ -160,7 +160,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedVolume, volume) {
-				klog.V(4).Infof("nothing updated volume %s", volume.Name)
+				klog.V(4).InfoS("Nothing updated volume", "volumeName", volume.Name)
 				return true, volume, nil
 			}
 			// Don't modify the existing object
@@ -177,7 +177,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		r.volumes[volume.Name] = volume
 		r.changedObjects = append(r.changedObjects, volume)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("saved updated volume %s", volume.Name)
+		klog.V(4).InfoS("Saved updated volume", "volumeName", volume.Name)
 		return true, volume, nil
 
 	case action.Matches("update", "persistentvolumeclaims"):
@@ -193,7 +193,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 				return true, obj, ErrVersionConflict
 			}
 			if reflect.DeepEqual(storedClaim, claim) {
-				klog.V(4).Infof("nothing updated claim %s", claim.Name)
+				klog.V(4).InfoS("Nothing updated claim", "claimName", claim.Name)
 				return true, claim, nil
 			}
 			// Don't modify the existing object
@@ -210,32 +210,32 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 		r.claims[claim.Name] = claim
 		r.changedObjects = append(r.changedObjects, claim)
 		r.changedSinceLastSync++
-		klog.V(4).Infof("saved updated claim %s", claim.Name)
+		klog.V(4).InfoS("Saved updated claim", "claimName", claim.Name)
 		return true, claim, nil
 
 	case action.Matches("get", "persistentvolumes"):
 		name := action.(core.GetAction).GetName()
 		volume, found := r.volumes[name]
 		if found {
-			klog.V(4).Infof("GetVolume: found %s", volume.Name)
+			klog.V(4).InfoS("GetVolume: volume found", "volumeName", volume.Name)
 			return true, volume.DeepCopy(), nil
 		}
-		klog.V(4).Infof("GetVolume: volume %s not found", name)
+		klog.V(4).InfoS("GetVolume: volume not found", "volumeName", name)
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("get", "persistentvolumeclaims"):
 		name := action.(core.GetAction).GetName()
 		claim, found := r.claims[name]
 		if found {
-			klog.V(4).Infof("GetClaim: found %s", claim.Name)
+			klog.V(4).InfoS("GetClaim: claim found", "claimName", claim.Name)
 			return true, claim.DeepCopy(), nil
 		}
-		klog.V(4).Infof("GetClaim: claim %s not found", name)
+		klog.V(4).InfoS("GetClaim: claim not found", "claimName", name)
 		return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), name)
 
 	case action.Matches("delete", "persistentvolumes"):
 		name := action.(core.DeleteAction).GetName()
-		klog.V(4).Infof("deleted volume %s", name)
+		klog.V(4).InfoS("Deleted volume", "volumeName", name)
 		obj, found := r.volumes[name]
 		if found {
 			delete(r.volumes, name)
@@ -249,7 +249,7 @@ func (r *VolumeReactor) React(action core.Action) (handled bool, ret runtime.Obj
 
 	case action.Matches("delete", "persistentvolumeclaims"):
 		name := action.(core.DeleteAction).GetName()
-		klog.V(4).Infof("deleted claim %s", name)
+		klog.V(4).InfoS("Deleted claim", "claimName", name)
 		obj, found := r.claims[name]
 		if found {
 			delete(r.claims, name)
@@ -304,11 +304,19 @@ func (r *VolumeReactor) injectReactError(action core.Action) error {
 	}
 
 	for i, expected := range r.errors {
-		klog.V(4).Infof("trying to match %q %q with %q %q", expected.Verb, expected.Resource, action.GetVerb(), action.GetResource())
+		klog.V(4).InfoS("Trying to match expected with action",
+			"expectedVerb", expected.Verb,
+			"expectedResource", expected.Resource,
+			"actionVerb", action.GetVerb(),
+			"actionResource", action.GetResource())
 		if action.Matches(expected.Verb, expected.Resource) {
 			// That's the action we're waiting for, remove it from injectedErrors
 			r.errors = append(r.errors[:i], r.errors[i+1:]...)
-			klog.V(4).Infof("reactor found matching error at index %d: %q %q, returning %v", i, expected.Verb, expected.Resource, expected.Error)
+			klog.V(4).InfoS("Reactor found matching error",
+				"index", i,
+				"verb", expected.Verb,
+				"resource", expected.Resource,
+				"returning", expected.Error)
 			return expected.Error
 		}
 	}
@@ -395,10 +403,10 @@ func (r *VolumeReactor) PopChange() interface{} {
 		switch obj.(type) {
 		case *v1.PersistentVolume:
 			vol, _ := obj.(*v1.PersistentVolume)
-			klog.V(4).Infof("reactor queue: %s", vol.Name)
+			klog.V(4).InfoS("Reactor queue", "volumeName", vol.Name)
 		case *v1.PersistentVolumeClaim:
 			claim, _ := obj.(*v1.PersistentVolumeClaim)
-			klog.V(4).Infof("reactor queue: %s", claim.Name)
+			klog.V(4).InfoS("Reactor queue", "claimName", claim.Name)
 		}
 	}
 
