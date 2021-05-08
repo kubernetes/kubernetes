@@ -1092,7 +1092,7 @@ func TestSafeOpen(t *testing.T) {
 			t.Errorf("test %q: %s", test.name, err)
 		}
 		if err != nil {
-			klog.InfoS("got error", "error", err.Error())
+			klog.InfoS("Got error", "error", err.Error())
 		}
 		if err == nil && test.expectError {
 			t.Errorf("test %q: expected error, got none", test.name)
