@@ -63,7 +63,7 @@ func (d *DockerValidator) Validate(spec SysSpec) ([]error, []error) {
 
 	// Run 'docker info' with a JSON output and unmarshal it into a dockerInfo object
 	info := dockerInfo{}
-	out, err := exec.Command("docker", "info", "--format", "{{json .}}").CombinedOutput()
+	out, err := exec.Command("docker", "info", "--format", "{{json .}}").Output()
 	if err != nil {
 		return nil, []error{errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nerror: %v`, string(out), err)}
 	}
