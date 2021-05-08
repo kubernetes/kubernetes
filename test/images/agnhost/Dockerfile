@@ -17,6 +17,10 @@ FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
+# Switch to Apline Linux Mirror of Clarkson University, the mirror system is incredibly flaky:
+# https://mirror.clarkson.edu/distributions.html#alpine
+RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/http\:\/\/mirror.clarkson.edu/g' /etc/apk/repositories
+
 # from dnsutils image
 # install necessary packages:
 # - bind-tools: contains dig, which can used in DNS tests.
