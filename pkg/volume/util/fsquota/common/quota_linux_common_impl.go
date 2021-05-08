@@ -133,7 +133,7 @@ func doRunXFSQuotaCommand(mountpoint string, mountsFile, command string) (string
 	if err != nil {
 		return "", err
 	}
-	klog.V(4).InfoS("runXFSQuotaCommand", "output", string(data))
+	klog.V(4).InfoS("RunXFSQuotaCommand", "output", string(data))
 	return string(data), nil
 }
 
