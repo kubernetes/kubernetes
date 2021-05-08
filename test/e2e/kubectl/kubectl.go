@@ -1831,6 +1831,14 @@ metadata:
 			}
 		})
 	})
+
+	ginkgo.Describe("kubectl wait", func() {
+		ginkgo.It("should ignore not found error with --for=delete", func() {
+			ginkgo.By("calling kubectl wait --for=delete")
+			framework.RunKubectlOrDie(ns, "wait", "--for=delete", "pod/doesnotexist")
+			framework.RunKubectlOrDie(ns, "wait", "--for=delete", "pod", "--selector=app.kubernetes.io/name=noexist")
+		})
+	})
 })
 
 // Checks whether the output split by line contains the required elements.

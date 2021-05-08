@@ -249,7 +249,8 @@ func (o *WaitOptions) RunWait() error {
 		return err
 	}
 	visitor := o.ResourceFinder.Do()
-	if visitor, ok := visitor.(*resource.Result); ok && strings.ToLower(o.ForCondition) == "delete" {
+	isForDelete := strings.ToLower(o.ForCondition) == "delete"
+	if visitor, ok := visitor.(*resource.Result); ok && isForDelete {
 		visitor.IgnoreErrors(apierrors.IsNotFound)
 	}
 
@@ -257,7 +258,7 @@ func (o *WaitOptions) RunWait() error {
 	if err != nil {
 		return err
 	}
-	if visitCount == 0 {
+	if visitCount == 0 && !isForDelete {
 		return errNoMatchingResources
 	}
 	return err
