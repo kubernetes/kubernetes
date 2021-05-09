@@ -31,7 +31,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -59,7 +58,7 @@ var (
 
 func makeTestAttachment(attachID, nodeName, pvName string) *storage.VolumeAttachment {
 	return &storage.VolumeAttachment{
-		ObjectMeta: meta.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: attachID,
 		},
 		Spec: storage.VolumeAttachmentSpec{
@@ -84,7 +83,7 @@ func markVolumeAttached(t *testing.T, client clientset.Interface, watch *watch.R
 	defer ticker.Stop()
 	// wait for attachment to be saved
 	for i := 0; i < 100; i++ {
-		attach, err = client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+		attach, err = client.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				<-ticker.C
@@ -551,7 +550,7 @@ func TestAttacherWaitForAttach(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to create VolumeAttachment: %v", err)
 				}
-				gotAttachment, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachment.Name, meta.GetOptions{})
+				gotAttachment, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachment.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("failed to get created VolumeAttachment: %v", err)
 				}
@@ -635,7 +634,7 @@ func TestAttacherWaitForAttachWithInline(t *testing.T) {
 				if err != nil {
 					t.Fatalf("failed to create VolumeAttachment: %v", err)
 				}
-				gotAttachment, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachment.Name, meta.GetOptions{})
+				gotAttachment, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachment.Name, metav1.GetOptions{})
 				if err != nil {
 					t.Fatalf("failed to get created VolumeAttachment: %v", err)
 				}
@@ -996,7 +995,7 @@ func TestAttacherDetach(t *testing.T) {
 			if !tc.shouldFail && err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
-			attach, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), tc.attachID, meta.GetOptions{})
+			attach, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), tc.attachID, metav1.GetOptions{})
 			if err != nil {
 				if !apierrors.IsNotFound(err) {
 					t.Fatalf("unexpected err: %v", err)

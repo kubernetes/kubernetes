@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -106,7 +105,7 @@ func (c *csiAttacher) Attach(spec *volume.Spec, nodeName types.NodeName) (string
 		}
 
 		attachment := &storage.VolumeAttachment{
-			ObjectMeta: meta.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name: attachID,
 			},
 			Spec: storage.VolumeAttachmentSpec{
@@ -162,7 +161,7 @@ func (c *csiAttacher) waitForVolumeAttachment(volumeHandle, attachID string, tim
 func (c *csiAttacher) waitForVolumeAttachmentInternal(volumeHandle, attachID string, timer *time.Timer, timeout time.Duration) (string, error) {
 
 	klog.V(4).Info(log("probing VolumeAttachment [id=%v]", attachID))
-	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+	attach, err := c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 	if err != nil {
 		klog.Error(log("attacher.WaitForAttach failed for volume [%s] (will continue to try): %v", volumeHandle, err))
 		return "", fmt.Errorf("volume %v has GET error for volume attachment %v: %v", volumeHandle, attachID, err)
@@ -243,7 +242,7 @@ func (c *csiAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.No
 		// The cache lookup is not setup or the object is not found in the cache.
 		// Get the object from the API server.
 		klog.V(4).Info(log("probing attachment status for VolumeAttachment %v", attachID))
-		attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, meta.GetOptions{})
+		attach, err = c.k8s.StorageV1().VolumeAttachments().Get(context.TODO(), attachID, metav1.GetOptions{})
 		if err != nil {
 			attached[spec] = false
 			klog.Error(log("attacher.VolumesAreAttached failed for attach.ID=%v: %v", attachID, err))
@@ -511,7 +510,7 @@ func (c *csiAttacher) waitForVolumeAttachDetachStatus(attach *storage.VolumeAtta
 		return nil
 	}
 
-	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(context.TODO(), meta.SingleObject(meta.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
+	watcher, err := c.k8s.StorageV1().VolumeAttachments().Watch(context.TODO(), metav1.SingleObject(metav1.ObjectMeta{Name: attachID, ResourceVersion: attach.ResourceVersion}))
 	if err != nil {
 		return fmt.Errorf("watch error:%v for volume %v", err, volumeHandle)
 	}
@@ -651,7 +650,7 @@ func getDriverAndVolNameFromDeviceMountPath(k8s kubernetes.Interface, deviceMoun
 	pvName := filepath.Base(dir)
 
 	// Get PV and check for errors
-	pv, err := k8s.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, meta.GetOptions{})
+	pv, err := k8s.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 	if err != nil {
 		return "", "", err
 	}
