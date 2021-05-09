@@ -444,7 +444,7 @@ func benchmarkScheduling(numExistingPods, minPods int,
 	finalFunc, podInformer, clientset, _ := mustSetupScheduler(nil)
 	defer finalFunc()
 
-	nodePreparer := framework.NewIntegrationTestNodePreparer(
+	nodePreparer := framework.NewIntegrationTestNodeManager(
 		clientset,
 		nodeStrategies,
 		"scheduler-perf-")

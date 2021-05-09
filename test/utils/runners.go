@@ -945,8 +945,11 @@ type CountToStrategy struct {
 	Strategy PrepareNodeStrategy
 }
 
-type TestNodePreparer interface {
+type TestNodeManager interface {
 	PrepareNodes(nextNodeIndex int) error
+	// DeleteNodes deletes a specified number of Nodes created by this TestNodeManager.
+	// If the specified number is more than the number of existing Nodes, all Nodes will be deleted.
+	DeleteNodes(count int) error
 	CleanupNodes() error
 }
 

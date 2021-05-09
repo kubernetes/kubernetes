@@ -55,6 +55,7 @@ import (
 const (
 	configFile               = "config/performance-config.yaml"
 	createNodesOpcode        = "createNodes"
+	deleteNodesOpcode        = "deleteNodes"
 	createNamespacesOpcode   = "createNamespaces"
 	createPodsOpcode         = "createPods"
 	createPodSetsOpcode      = "createPodSets"
@@ -203,13 +204,13 @@ type op struct {
 func (op *op) UnmarshalJSON(b []byte) error {
 	possibleOps := []realOp{
 		&createNodesOp{},
+		&deleteNodesOp{},
 		&createNamespacesOp{},
 		&createPodsOp{},
 		&createPodSetsOp{},
 		&churnOp{},
 		&barrierOp{},
 		// TODO(#93793): add a sleep timer op to simulate waiting?
-		// TODO(#94601): add a delete nodes op to simulate scaling behaviour?
 	}
 	var firstError error
 	for _, possibleOp := range possibleOps {
@@ -258,6 +259,9 @@ type createNodesOp struct {
 	CountParam string
 	// Path to spec file describing the nodes to create. Optional.
 	NodeTemplatePath *string
+	// Name of these nodes. Optional.
+	// This name is used to specify nodes to be deleted when deleting a node.
+	Name *string
 	// At most one of the following strategies can be defined. Optional, defaults
 	// to TrivialNodePrepareStrategy if unspecified.
 	NodeAllocatableStrategy  *testutils.NodeAllocatableStrategy
@@ -290,6 +294,39 @@ func (cno createNodesOp) patchParams(w *workload) (realOp, error) {
 		}
 	}
 	return &cno, (&cno).isValid(false)
+}
+
+// deleteNodesOp defines an op .
+type deleteNodesOp struct {
+	// Must be "deleteNodes".
+	Opcode string
+	// Name of nodes to delete. This should be the name specified in createNodesOp.Name.
+	Name string
+	// Number of nodes to delete. Parameterizable through CountParam.
+	Count int
+	// Template parameter for Count.
+	CountParam string
+}
+
+func (dno *deleteNodesOp) isValid(_ bool) error {
+	if dno.Opcode != deleteNodesOpcode {
+		return fmt.Errorf("invalid opcode %q", dno.Opcode)
+	}
+	return nil
+}
+
+func (dno *deleteNodesOp) collectsMetrics() bool {
+	return false
+}
+
+func (dno deleteNodesOp) patchParams(w *workload) (realOp, error) {
+	if dno.CountParam != "" {
+		var ok bool
+		if dno.Count, ok = w.Params[dno.CountParam[1:]]; !ok {
+			return nil, fmt.Errorf("parameter %s is undefined", dno.CountParam)
+		}
+	}
+	return &dno, (&dno).isValid(false)
 }
 
 // createNamespacesOp defines an op for creating namespaces
@@ -603,6 +640,8 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 	numPodsScheduledPerNamespace := make(map[string]int)
 	nextNodeIndex := 0
 
+	nodeManagers := map[string]testutils.TestNodeManager{}
+
 	for opIndex, op := range unrollWorkloadTemplate(b, tc.WorkloadTemplate, w) {
 		realOp, err := op.realOp.patchParams(w)
 		if err != nil {
@@ -615,17 +654,29 @@ func runWorkload(b *testing.B, tc *testCase, w *workload) []DataItem {
 		}
 		switch concreteOp := realOp.(type) {
 		case *createNodesOp:
-			nodePreparer, err := getNodePreparer(fmt.Sprintf("node-%d-", opIndex), concreteOp, client)
+			nodeManager, err := getNodeManager(fmt.Sprintf("node-%d-", opIndex), concreteOp, client)
 			if err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
-			if err := nodePreparer.PrepareNodes(nextNodeIndex); err != nil {
+			if err := nodeManager.PrepareNodes(nextNodeIndex); err != nil {
 				b.Fatalf("op %d: %v", opIndex, err)
 			}
 			b.Cleanup(func() {
-				nodePreparer.CleanupNodes()
+				nodeManager.CleanupNodes()
 			})
 			nextNodeIndex += concreteOp.Count
+			if concreteOp.Name != nil {
+				nodeManagers[*concreteOp.Name] = nodeManager
+			}
+
+		case *deleteNodesOp:
+			nodeManager, ok := nodeManagers[concreteOp.Name]
+			if !ok {
+				b.Fatalf("op %d: cannot get node manager. Make sure that the name, %s, is correct", opIndex, concreteOp.Name)
+			}
+			if err := nodeManager.DeleteNodes(concreteOp.Count); err != nil {
+				b.Fatalf("op %d: %v", opIndex, err)
+			}
 
 		case *createNamespacesOp:
 			nsPreparer, err := newNamespacePreparer(concreteOp, client)
@@ -840,7 +891,7 @@ func getTestDataCollectors(podInformer coreinformers.PodInformer, name, namespac
 	}
 }
 
-func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Interface) (testutils.TestNodePreparer, error) {
+func getNodeManager(prefix string, cno *createNodesOp, clientset clientset.Interface) (testutils.TestNodeManager, error) {
 	var nodeStrategy testutils.PrepareNodeStrategy = &testutils.TrivialNodePrepareStrategy{}
 	if cno.NodeAllocatableStrategy != nil {
 		nodeStrategy = cno.NodeAllocatableStrategy
@@ -855,13 +906,13 @@ func getNodePreparer(prefix string, cno *createNodesOp, clientset clientset.Inte
 		if err != nil {
 			return nil, err
 		}
-		return framework.NewIntegrationTestNodePreparerWithNodeSpec(
+		return framework.NewIntegrationTestNodeManagerWithNodeSpec(
 			clientset,
 			[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
 			node,
 		), nil
 	}
-	return framework.NewIntegrationTestNodePreparer(
+	return framework.NewIntegrationTestNodeManager(
 		clientset,
 		[]testutils.CountToStrategy{{Count: cno.Count, Strategy: nodeStrategy}},
 		prefix,

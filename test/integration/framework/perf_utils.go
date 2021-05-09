@@ -31,26 +31,28 @@ const (
 	retries = 5
 )
 
-// IntegrationTestNodePreparer holds configuration information for the test node preparer.
-type IntegrationTestNodePreparer struct {
+// IntegrationTestNodeManager holds configuration information for the test node preparer.
+type IntegrationTestNodeManager struct {
 	client          clientset.Interface
 	countToStrategy []testutils.CountToStrategy
 	nodeNamePrefix  string
 	nodeSpec        *v1.Node
+	// nodeStore stores the name of nodes created by this IntegrationTestNodeManager.
+	nodeStore []string
 }
 
-// NewIntegrationTestNodePreparer creates an IntegrationTestNodePreparer configured with defaults.
-func NewIntegrationTestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodePreparer {
-	return &IntegrationTestNodePreparer{
+// NewIntegrationTestNodeManager creates an IntegrationTestNodeManager configured with defaults.
+func NewIntegrationTestNodeManager(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeNamePrefix string) testutils.TestNodeManager {
+	return &IntegrationTestNodeManager{
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeNamePrefix:  nodeNamePrefix,
 	}
 }
 
-// NewIntegrationTestNodePreparerWithNodeSpec creates an IntegrationTestNodePreparer configured with nodespec.
-func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeSpec *v1.Node) testutils.TestNodePreparer {
-	return &IntegrationTestNodePreparer{
+// NewIntegrationTestNodeManagerWithNodeSpec creates an IntegrationTestNodeManager configured with nodespec.
+func NewIntegrationTestNodeManagerWithNodeSpec(client clientset.Interface, countToStrategy []testutils.CountToStrategy, nodeSpec *v1.Node) testutils.TestNodeManager {
+	return &IntegrationTestNodeManager{
 		client:          client,
 		countToStrategy: countToStrategy,
 		nodeSpec:        nodeSpec,
@@ -58,7 +60,7 @@ func NewIntegrationTestNodePreparerWithNodeSpec(client clientset.Interface, coun
 }
 
 // PrepareNodes prepares countToStrategy test nodes.
-func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
+func (p *IntegrationTestNodeManager) PrepareNodes(nextNodeIndex int) error {
 	numNodes := 0
 	for _, v := range p.countToStrategy {
 		numNodes += v.Count
@@ -87,16 +89,19 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	}
 
 	for i := 0; i < numNodes; i++ {
+		var node *v1.Node
 		var err error
 		for retry := 0; retry < retries; retry++ {
-			_, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
+			node, err = p.client.CoreV1().Nodes().Create(context.TODO(), baseNode, metav1.CreateOptions{})
 			if err == nil {
 				break
 			}
 		}
 		if err != nil {
-			klog.Fatalf("Error creating node: %v", err)
+			klog.Errorf("Error creating node: %v", err)
+			return err
 		}
+		p.nodeStore = append(p.nodeStore, node.Name)
 	}
 
 	nodes, err := GetReadySchedulableNodes(p.client)
@@ -115,10 +120,34 @@ func (p *IntegrationTestNodePreparer) PrepareNodes(nextNodeIndex int) error {
 	return nil
 }
 
+func (p *IntegrationTestNodeManager) DeleteNodes(count int) error {
+	for i := 0; i < count; i++ {
+		if len(p.nodeStore) == 0 {
+			// There's no node left.
+			break
+		}
+
+		name := p.nodeStore[0]
+		var err error
+		for retry := 0; retry < retries; retry++ {
+			err = p.client.CoreV1().Nodes().Delete(context.TODO(), name, metav1.DeleteOptions{})
+			if err == nil {
+				break
+			}
+		}
+		if err != nil {
+			klog.Errorf("Error deleting node: %v", err)
+			return err
+		}
+		p.nodeStore = p.nodeStore[1:]
+	}
+	return nil
+}
+
 // CleanupNodes deletes existing test nodes.
-func (p *IntegrationTestNodePreparer) CleanupNodes() error {
+func (p *IntegrationTestNodeManager) CleanupNodes() error {
 	// TODO(#93794): make CleanupNodes only clean up the nodes created by this
-	// IntegrationTestNodePreparer to make this more intuitive.
+	// IntegrationTestNodeManager to make this more intuitive.
 	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		klog.Fatalf("Error listing nodes: %v", err)
