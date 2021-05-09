@@ -102,15 +102,15 @@ _DEBIAN_IPTABLES_DIGEST = {
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/go-runner:v2.3.1-go1.15.11-buster.0
-# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/go-runner:v2.3.1-go1.15.11-buster.0
+# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/go-runner:v2.3.1-go1.15.12-buster.0
+# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/go-runner:v2.3.1-go1.15.12-buster.0
 _GO_RUNNER_DIGEST = {
-    "manifest": "sha256:90c2f48c26fbbf1406450e8ba1e80a4bd15d53a2a4daacb63ff8d242413c2128",
-    "amd64": "sha256:64b82491bd6809429b2a65da771d7d46e2d6b018d1d68f89ffaee1154e46f7a3",
-    "arm": "sha256:c4dc079e4e19f193d94647c54410a68a4c2344cf5ced165231eaf01697a41353",
-    "arm64": "sha256:6ca69811c32bbf0a055bef1f4a92e3bf454a96352bd5a22ef98b36df6562fe86",
-    "ppc64le": "sha256:356f6eff717454cdd5cb07b835a448abfc35c3f9674bcbb39fa75f47397edcf2",
-    "s390x": "sha256:6f9c2680c0516345270825ac702f0f53dbfe08a05e11674c175e872da445c468",
+    "manifest": "sha256:d3d705c7de100a7cf49df13c4198d156078d6273032de503f723ba1534a6170f",
+    "amd64": "sha256:1c220d5a4755398fe10d90f14c94d0a4e1f444cff54b27a53a3d1e66b1eca0b9",
+    "arm": "sha256:e8e8f55970c493fd3a40f06ec7a3eae8bff3ac3163217ea9bc3c4fdcca1ad150",
+    "arm64": "sha256:0d403be4b772296bac0fddc8d5aa1024e1149c8ea8f773708395352ea385f93d",
+    "ppc64le": "sha256:c2d7228164f6e6b4a965fa4e44479c3eed0a91a9aa8bb10334d898361ca4251a",
+    "s390x": "sha256:a45c19002eecddf80aebc0f119c4a04969a2ed274a53993f17c6303d7f71de47",
 }
 
 def _digest(d, arch):
@@ -127,7 +127,7 @@ def image_dependencies():
             digest = _digest(_GO_RUNNER_DIGEST, arch),
             registry = "k8s.gcr.io/build-image",
             repository = "go-runner",
-            tag = "v2.3.1-go1.15.11-buster.0",  # ignored, but kept here for documentation
+            tag = "v2.3.1-go1.15.12-buster.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
