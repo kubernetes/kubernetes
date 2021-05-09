@@ -5,10 +5,10 @@ load("//build:workspace_mirror.bzl", "mirror")
 
 http_archive(
     name = "io_k8s_repo_infra",
-    strip_prefix = "repo-infra-0.1.6",
-    sha256 = "a51e1a20d9a286042bd5d171fdbc941b90779f71b1bf7f960935e91f5048a73b",
+    strip_prefix = "repo-infra-0.1.7",
+    sha256 = "8947a185f5af08472786c1ebb80c9b72cfa16cb7fc2b33d55e5b50db69d909c9",
     urls = [
-        "https://github.com/kubernetes/repo-infra/archive/v0.1.6.tar.gz",
+        "https://github.com/kubernetes/repo-infra/archive/v0.1.7.tar.gz",
     ],
 )
 
