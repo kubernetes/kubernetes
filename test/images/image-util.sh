@@ -165,7 +165,7 @@ build() {
             if [[ $(id -u) -ne 0 ]]; then
 	            sudo="sudo"
             fi
-            ${sudo} "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset -p yes
+            ${sudo} docker run --rm --privileged tonistiigi/binfmt:latest --install all
             curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/"${QEMUVERSION}"/x86_64_qemu-"${QEMUARCHS[$arch]}"-static.tar.gz | tar -xz -C "${temp_dir}"
             # Ensure we don't get surprised by umask settings
             chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
