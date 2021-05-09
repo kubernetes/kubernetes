@@ -81,12 +81,12 @@ func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, node
 		}
 	}
 
-	if len(filteredEndpoints) > 0 {
+	if len(filteredEndpoints) == 0 {
 		klog.Warningf("Skipping topology aware endpoint filtering since no hints were provided for zone %s", zone)
-		return filteredEndpoints
+		return endpoints
 	}
 
-	return endpoints
+	return filteredEndpoints
 }
 
 // deprecatedTopologyFilter returns the appropriate endpoints based on the
