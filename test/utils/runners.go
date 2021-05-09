@@ -1220,7 +1220,8 @@ func DoPrepareNode(client clientset.Interface, node *v1.Node, strategy PrepareNo
 func DoCleanupNode(client clientset.Interface, nodeName string, strategy PrepareNodeStrategy) error {
 	var err error
 	for attempt := 0; attempt < retries; attempt++ {
-		node, err := client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
+		var node *v1.Node
+		node, err = client.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("Skipping cleanup of Node: failed to get Node %v: %v", nodeName, err)
 		}
