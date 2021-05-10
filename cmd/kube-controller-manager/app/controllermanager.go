@@ -501,6 +501,7 @@ func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc 
 	register("pv-protection", startPVProtectionController)
 	register("ttl-after-finished", startTTLAfterFinishedController)
 	register("root-ca-cert-publisher", startRootCACertPublisher)
+	register("service-ca-cert-publisher", startServiceCACertPublisher)
 	register("ephemeral-volume", startEphemeralVolumeController)
 	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.APIServerIdentity) &&
 		utilfeature.DefaultFeatureGate.Enabled(genericfeatures.StorageVersionAPI) {
