@@ -411,6 +411,84 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: url
       type:
         scalar: string
+- name: io.k8s.api.allocation.v1alpha1.ServiceIP
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.allocation.v1alpha1.ServiceIPSpec
+      default: {}
+- name: io.k8s.api.allocation.v1alpha1.ServiceIPRange
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+      default: {}
+    - name: spec
+      type:
+        namedType: io.k8s.api.allocation.v1alpha1.ServiceIPRangeSpec
+      default: {}
+    - name: status
+      type:
+        namedType: io.k8s.api.allocation.v1alpha1.ServiceIPRangeStatus
+      default: {}
+- name: io.k8s.api.allocation.v1alpha1.ServiceIPRangeRef
+  map:
+    fields:
+    - name: apiGroup
+      type:
+        scalar: string
+      default: ""
+    - name: kind
+      type:
+        scalar: string
+      default: ""
+    - name: name
+      type:
+        scalar: string
+      default: ""
+- name: io.k8s.api.allocation.v1alpha1.ServiceIPRangeSpec
+  map:
+    fields:
+    - name: primary
+      type:
+        scalar: boolean
+    - name: range
+      type:
+        scalar: string
+- name: io.k8s.api.allocation.v1alpha1.ServiceIPRangeStatus
+  map:
+    fields:
+    - name: message
+      type:
+        scalar: string
+    - name: ready
+      type:
+        scalar: boolean
+- name: io.k8s.api.allocation.v1alpha1.ServiceIPSpec
+  map:
+    fields:
+    - name: serviceIPRangeRef
+      type:
+        namedType: io.k8s.api.allocation.v1alpha1.ServiceIPRangeRef
+      default: {}
 - name: io.k8s.api.apiserverinternal.v1alpha1.ServerStorageVersion
   map:
     fields:
