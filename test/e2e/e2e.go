@@ -168,7 +168,7 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 // This unequivocally identifies the default IP family because services are single family
 // TODO: dual-stack may support multiple families per service
 // but we can detect if a cluster is dual stack because pods have two addresses (one per family)
-func getDefaultClusterIPFamily(c clientset.Interface) string {
+func GetDefaultClusterIPFamily(c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
 	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get(context.TODO(), "kubernetes", metav1.GetOptions{})
 	if err != nil {
@@ -430,6 +430,6 @@ func setupSuitePerGinkgoNode() {
 	if err != nil {
 		klog.Fatal("Error loading client: ", err)
 	}
-	framework.TestContext.IPFamily = getDefaultClusterIPFamily(c)
+	framework.TestContext.IPFamily = GetDefaultClusterIPFamily(c)
 	framework.Logf("Cluster IP family: %s", framework.TestContext.IPFamily)
 }
