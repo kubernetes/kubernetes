@@ -25,7 +25,6 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
@@ -34,9 +33,6 @@ import (
 )
 
 func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "daemonsets"}] {
-		return nil, false, nil
-	}
 	dsc, err := daemon.NewDaemonSetsController(
 		ctx.InformerFactory.Apps().V1().DaemonSets(),
 		ctx.InformerFactory.Apps().V1().ControllerRevisions(),
@@ -53,9 +49,6 @@ func startDaemonSetController(ctx ControllerContext) (http.Handler, bool, error)
 }
 
 func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}] {
-		return nil, false, nil
-	}
 	go statefulset.NewStatefulSetController(
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Apps().V1().StatefulSets(),
@@ -67,9 +60,6 @@ func startStatefulSetController(ctx ControllerContext) (http.Handler, bool, erro
 }
 
 func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}] {
-		return nil, false, nil
-	}
 	go replicaset.NewReplicaSetController(
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
 		ctx.InformerFactory.Core().V1().Pods(),
@@ -80,9 +70,6 @@ func startReplicaSetController(ctx ControllerContext) (http.Handler, bool, error
 }
 
 func startDeploymentController(ctx ControllerContext) (http.Handler, bool, error) {
-	if !ctx.AvailableResources[schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}] {
-		return nil, false, nil
-	}
 	dc, err := deployment.NewDeploymentController(
 		ctx.InformerFactory.Apps().V1().Deployments(),
 		ctx.InformerFactory.Apps().V1().ReplicaSets(),
