@@ -302,8 +302,6 @@ const (
 	KubeScheduler = "kube-scheduler"
 	// KubeProxy defines variable used internally when referring to kube-proxy component
 	KubeProxy = "kube-proxy"
-	// HyperKube defines variable used internally when referring to the hyperkube image
-	HyperKube = "hyperkube"
 	// CoreDNS defines variable used internally when referring to the CoreDNS component
 	CoreDNS = "CoreDNS"
 	// Kubelet defines variable used internally when referring to the Kubelet

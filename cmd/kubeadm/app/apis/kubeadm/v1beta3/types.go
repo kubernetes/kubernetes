@@ -101,11 +101,6 @@ type ClusterConfiguration struct {
 	// will be used for all the other images.
 	ImageRepository string `json:"imageRepository,omitempty"`
 
-	// UseHyperKubeImage controls if hyperkube should be used for Kubernetes components instead of their respective separate images
-	// DEPRECATED: As hyperkube is itself deprecated, this fields is too. It will be removed in future kubeadm config versions, kubeadm
-	// will print multiple warnings when set to true, and at some point it may become ignored.
-	UseHyperKubeImage bool `json:"useHyperKubeImage,omitempty"`
-
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 

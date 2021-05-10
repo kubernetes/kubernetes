@@ -51,14 +51,6 @@ func TestGetKubernetesImage(t *testing.T) {
 		cfg      *kubeadmapi.ClusterConfiguration
 	}{
 		{
-			expected: GetGenericImage(gcrPrefix, constants.HyperKube, expected),
-			cfg: &kubeadmapi.ClusterConfiguration{
-				ImageRepository:   gcrPrefix,
-				KubernetesVersion: testversion,
-				UseHyperKubeImage: true,
-			},
-		},
-		{
 			image:    constants.KubeAPIServer,
 			expected: GetGenericImage(gcrPrefix, "kube-apiserver", expected),
 			cfg: &kubeadmapi.ClusterConfiguration{

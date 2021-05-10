@@ -25,20 +25,14 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
-const extraHyperKubeNote = ` The "useHyperKubeImage" field will be removed from future kubeadm config versions and possibly ignored in future releases.`
-
 // GetGenericImage generates and returns a platform agnostic image (backed by manifest list)
 func GetGenericImage(prefix, image, tag string) string {
 	return fmt.Sprintf("%s/%s:%s", prefix, image, tag)
 }
 
 // GetKubernetesImage generates and returns the image for the components managed in the Kubernetes main repository,
-// including the control-plane components and kube-proxy. If specified, the HyperKube image will be used.
+// including the control-plane components and kube-proxy.
 func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) string {
-	if cfg.UseHyperKubeImage && image != constants.HyperKube {
-		klog.Warningf(`WARNING: DEPRECATED use of the "hyperkube" image in place of %q.`+extraHyperKubeNote, image)
-		image = constants.HyperKube
-	}
 	repoPrefix := cfg.GetControlPlaneImageRepository()
 	kubernetesImageTag := kubeadmutil.KubernetesVersionToImageTag(cfg.KubernetesVersion)
 	return GetGenericImage(repoPrefix, image, kubernetesImageTag)
@@ -91,15 +85,10 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 	imgs := []string{}
 
 	// start with core kubernetes images
-	if cfg.UseHyperKubeImage {
-		klog.Warningln(`WARNING: DEPRECATED use of the "hyperkube" image for the Kubernetes control plane.` + extraHyperKubeNote)
-		imgs = append(imgs, GetKubernetesImage(constants.HyperKube, cfg))
-	} else {
-		imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
-		imgs = append(imgs, GetKubernetesImage(constants.KubeControllerManager, cfg))
-		imgs = append(imgs, GetKubernetesImage(constants.KubeScheduler, cfg))
-		imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
-	}
+	imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
+	imgs = append(imgs, GetKubernetesImage(constants.KubeControllerManager, cfg))
+	imgs = append(imgs, GetKubernetesImage(constants.KubeScheduler, cfg))
+	imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
 
 	// pause is not available on the ci image repository so use the default image repository.
 	imgs = append(imgs, GetPauseImage(cfg))
