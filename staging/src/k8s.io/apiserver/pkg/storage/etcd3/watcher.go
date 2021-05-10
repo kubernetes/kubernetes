@@ -283,7 +283,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 				continue
 			}
 			if len(wc.resultChan) == outgoingBufSize {
-				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize)
+				klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow dispatching events to watchers", "outgoingEvents", outgoingBufSize, "objectType", wc.watcher.objectType)
 			}
 			// If user couldn't receive results fast enough, we also block incoming events from watcher.
 			// Because storing events in local will cause more memory usage.
@@ -402,7 +402,7 @@ func (wc *watchChan) sendError(err error) {
 
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
-		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize)
+		klog.V(3).InfoS("Fast watcher, slow processing. Probably caused by slow decoding, user not receiving fast, or other processing logic", "incomingEvents", incomingBufSize, "objectType", wc.watcher.objectType)
 	}
 	select {
 	case wc.incomingEventChan <- e:
