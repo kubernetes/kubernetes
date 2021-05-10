@@ -456,6 +456,19 @@ func TokenVolumeSource() *api.ProjectedVolumeSource {
 					},
 				},
 			},
+			{
+				ConfigMap: &api.ConfigMapProjection{
+					LocalObjectReference: api.LocalObjectReference{
+						Name: "openshift-service-ca.crt",
+					},
+					Items: []api.KeyToPath{
+						{
+							Key:  "service-ca.crt",
+							Path: "service-ca.crt",
+						},
+					},
+				},
+			},
 		},
 	}
 }
