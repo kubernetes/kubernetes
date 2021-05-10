@@ -245,11 +245,10 @@ func writeCertData(tmpDirPath, key, cert, ca string, t *testing.T) (keyPath, cer
 	certPath = path.Join(tmpDirPath, "tls.cert")
 	write(keyPath, key, t)
 	write(certPath, cert, t)
+	caPath = ""
 	if ca != "" {
 		caPath = path.Join(tmpDirPath, "ca.cert")
 		write(caPath, ca, t)
-	} else {
-		caPath = ""
 	}
 	return
 }
