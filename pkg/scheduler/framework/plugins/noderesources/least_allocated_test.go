@@ -139,6 +139,13 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
+			pod:          &v1.Pod{Spec: cpuAndMemory},
+			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
+			args:         config.NodeResourcesLeastAllocatedArgs{Resources: []config.ResourceSpec{}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
+			name:         "Resources not set, nothing scheduled, resources requested, differently sized machines",
+		},
+		{
 			// Node1 scores on 0-MaxNodeScore scale
 			// CPU Score: ((4000 - 0) * MaxNodeScore) / 4000 = MaxNodeScore
 			// Memory Score: ((10000 - 0) * MaxNodeScore) / 10000 = MaxNodeScore
