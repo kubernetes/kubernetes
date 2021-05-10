@@ -88,6 +88,7 @@ func TestControllerNamesDeclaration(t *testing.T) {
 		names.PersistentVolumeProtectionController,
 		names.TTLAfterFinishedController,
 		names.RootCACertificatePublisherController,
+		names.ServiceCACertificatePublisherController,
 		names.EphemeralVolumeController,
 		names.StorageVersionGarbageCollectorController,
 		names.ResourceClaimController,

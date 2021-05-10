@@ -77,6 +77,7 @@ const (
 	PersistentVolumeProtectionController         = "persistentvolume-protection-controller"
 	TTLAfterFinishedController                   = "ttl-after-finished-controller"
 	RootCACertificatePublisherController         = "root-ca-certificate-publisher-controller"
+	ServiceCACertificatePublisherController      = "service-ca-certificate-publisher-controller"
 	EphemeralVolumeController                    = "ephemeral-volume-controller"
 	StorageVersionGarbageCollectorController     = "storageversion-garbage-collector-controller"
 	ResourceClaimController                      = "resourceclaim-controller"
