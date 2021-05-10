@@ -1060,7 +1060,36 @@ func isKernelPid(pid int) bool {
 	return err != nil && os.IsNotExist(err)
 }
 
+// GetCapacity returns node capacity data for "cpu", "memory", "ephemeral-storage", and "huge-pages*"
+// At present this method is only invoked when introspecting ephemeral storage
 func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
+	// We store allocatable ephemeral-storage in the capacity property once we Start() the container manager
+	if _, ok := cm.capacity[v1.ResourceEphemeralStorage]; !ok {
+		// If we haven't yet stored the capacity for ephemeral-storage, we can fetch it directly from cAdvisor,
+		// with some retry tolerance in case it hasn't yet started
+		ret := v1.ResourceList{}
+		err := wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+			if cm.cadvisorInterface != nil {
+				rootfs, err := cm.cadvisorInterface.RootFsInfo()
+				if err != nil {
+					klog.ErrorS(err, "Unable to get rootfs data from cAdvisor interface")
+					return false, nil
+				}
+				// We don't want to mutate cm.capacity here so we'll manually construct a v1.ResourceList from it,
+				// and add ephemeral-storage
+				for rName, rQuant := range cm.capacity {
+					ret[rName] = rQuant
+				}
+				ret[v1.ResourceEphemeralStorage] = cadvisor.EphemeralStorageCapacityFromFsInfo(rootfs)[v1.ResourceEphemeralStorage]
+				return true, nil
+			}
+			return false, nil
+		})
+		if err == nil {
+			return ret
+		}
+		klog.InfoS("Unable to get ephemeral-storage data from cAdvisor", "capacity", cm.capacity)
+	}
 	return cm.capacity
 }
 
