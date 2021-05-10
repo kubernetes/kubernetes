@@ -99,7 +99,7 @@ spec:
           - --threshold=5
           - --deployment=metrics-server-v0.4.4
           - --container=metrics-server
-          - --poll-period=300000
+          - --poll-period=30000
           - --estimator=exponential
           # Specifies the smallest cluster (defined in number of nodes)
           # resources will be scaled to.
