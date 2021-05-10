@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	allocationv1alpha1 "k8s.io/api/allocation/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/kubernetes/pkg/apis/allocation"
 	"k8s.io/kubernetes/pkg/apis/apiserverinternal"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -501,6 +503,20 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSlice)
 	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSliceList)
+
+	serviceIPRangeColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Range", Type: "string", Description: allocationv1alpha1.ServiceIPRangeSpec{}.SwaggerDoc()["range"]},
+	}
+	h.TableHandler(serviceIPRangeColumnDefinitions, printServiceIPRange)
+	h.TableHandler(serviceIPRangeColumnDefinitions, printServiceIPRangeList)
+
+	serviceIPColumnDefinitions := []metav1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "IP", Type: "string", Description: allocationv1alpha1.ServiceIPSpec{}.SwaggerDoc()["address"]},
+	}
+	h.TableHandler(serviceIPColumnDefinitions, printServiceIP)
+	h.TableHandler(serviceIPColumnDefinitions, printServiceIPList)
 
 	csiNodeColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
@@ -1344,6 +1360,46 @@ func printEndpointSliceList(list *discovery.EndpointSliceList, options printers.
 	rows := make([]metav1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEndpointSlice(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printServiceIPRange(obj *allocation.ServiceIPRange, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Range)
+	return []metav1.TableRow{row}, nil
+}
+
+func printServiceIPRangeList(list *allocation.ServiceIPRangeList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printServiceIPRange(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printServiceIP(obj *allocation.ServiceIP, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	row := metav1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.Address, obj.Spec.ServiceIPRangeRef.Name)
+	return []metav1.TableRow{row}, nil
+}
+
+func printServiceIPList(list *allocation.ServiceIPList, options printers.GenerateOptions) ([]metav1.TableRow, error) {
+	rows := make([]metav1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printServiceIP(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}
