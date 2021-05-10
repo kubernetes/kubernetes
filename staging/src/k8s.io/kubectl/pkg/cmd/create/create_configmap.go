@@ -215,7 +215,7 @@ func (o *ConfigMapOptions) Validate() error {
 func (o *ConfigMapOptions) Run() error {
 	configMap, err := o.createConfigMap()
 	if err != nil {
-		return nil
+		return err
 	}
 	if err := util.CreateOrUpdateAnnotation(o.CreateAnnotation, configMap, scheme.DefaultJSONEncoder()); err != nil {
 		return err
