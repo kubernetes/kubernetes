@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/openshift-kube-controller-manager/servicecacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
@@ -211,6 +212,19 @@ func startRootCACertPublisher(ctx ControllerContext) (http.Handler, bool, error)
 	)
 	if err != nil {
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
+	}
+	go sac.Run(1, ctx.Stop)
+	return nil, true, nil
+}
+
+func startServiceCACertPublisher(ctx ControllerContext) (http.Handler, bool, error) {
+	sac, err := servicecacertpublisher.NewPublisher(
+		ctx.InformerFactory.Core().V1().ConfigMaps(),
+		ctx.InformerFactory.Core().V1().Namespaces(),
+		ctx.ClientBuilder.ClientOrDie("service-ca-cert-publisher"),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating service CA certificate publisher: %v", err)
 	}
 	go sac.Run(1, ctx.Stop)
 	return nil, true, nil
