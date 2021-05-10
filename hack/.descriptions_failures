@@ -10,5 +10,3 @@
 ./staging/src/k8s.io/api/flowcontrol/v1beta1/types.go
 ./staging/src/k8s.io/api/networking/v1/types.go
 ./staging/src/k8s.io/api/networking/v1beta1/types.go
-./staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/types.go
-./staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1/types.go
