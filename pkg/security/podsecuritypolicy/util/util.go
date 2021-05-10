@@ -260,7 +260,8 @@ func IsOnlyServiceAccountTokenSources(v *api.ProjectedVolumeSource) bool {
 			return false
 		}
 
-		if s.ConfigMap != nil && s.ConfigMap.LocalObjectReference.Name != "kube-root-ca.crt" {
+		// Permit mounting of service ca from a local configmap
+		if s.ConfigMap != nil && !(s.ConfigMap.LocalObjectReference.Name == "kube-root-ca.crt" || s.ConfigMap.LocalObjectReference.Name == "openshift-service-ca.crt") {
 			return false
 		}
 
