@@ -25,7 +25,6 @@ import (
 	"strings"
 	"time"
 
-	allocationv1alpha1 "k8s.io/api/allocation/v1alpha1"
 	apiserverinternalv1alpha1 "k8s.io/api/apiserverinternal/v1alpha1"
 	appsv1beta1 "k8s.io/api/apps/v1beta1"
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
@@ -506,14 +505,12 @@ func AddHandlers(h printers.PrintHandler) {
 
 	serviceIPRangeColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "Range", Type: "string", Description: allocationv1alpha1.ServiceIPRangeSpec{}.SwaggerDoc()["range"]},
 	}
 	h.TableHandler(serviceIPRangeColumnDefinitions, printServiceIPRange)
 	h.TableHandler(serviceIPRangeColumnDefinitions, printServiceIPRangeList)
 
 	serviceIPColumnDefinitions := []metav1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-		{Name: "IP", Type: "string", Description: allocationv1alpha1.ServiceIPSpec{}.SwaggerDoc()["address"]},
 	}
 	h.TableHandler(serviceIPColumnDefinitions, printServiceIP)
 	h.TableHandler(serviceIPColumnDefinitions, printServiceIPList)
@@ -1392,7 +1389,7 @@ func printServiceIP(obj *allocation.ServiceIP, options printers.GenerateOptions)
 	row := metav1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Spec.Address, obj.Spec.ServiceIPRangeRef.Name)
+	row.Cells = append(row.Cells, obj.Name, obj.Spec.ServiceIPRangeRef.Name)
 	return []metav1.TableRow{row}, nil
 }
 
