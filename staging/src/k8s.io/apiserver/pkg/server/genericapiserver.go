@@ -305,7 +305,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 	s.installLivez()
 	err := s.addReadyzShutdownCheck(s.readinessStopCh)
 	if err != nil {
-		klog.Errorf("Failed to install readyz shutdown check %s", err)
+		klog.ErrorS(err, "Failed to install readyz shutdown check")
 	}
 	s.installReadyz()
 
@@ -316,7 +316,7 @@ func (s *GenericAPIServer) PrepareRun() preparedGenericAPIServer {
 			return nil
 		})
 		if err != nil {
-			klog.Errorf("Failed to add pre-shutdown hook for audit-backend %s", err)
+			klog.ErrorS(err, "Failed to add pre-shutdown hook for audit-backend")
 		}
 	}
 
@@ -411,7 +411,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) (<-chan
 	s.RunPostStartHooks(stopCh)
 
 	if _, err := systemd.SdNotify(true, "READY=1\n"); err != nil {
-		klog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
+		klog.ErrorS(err, "Unable to send systemd daemon successful start message")
 	}
 
 	return stoppedCh, nil
@@ -422,7 +422,7 @@ func (s *GenericAPIServer) installAPIResources(apiPrefix string, apiGroupInfo *A
 	var resourceInfos []*storageversion.ResourceInfo
 	for _, groupVersion := range apiGroupInfo.PrioritizedVersions {
 		if len(apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version]) == 0 {
-			klog.Warningf("Skipping API %v because it has no resources.", groupVersion)
+			klog.InfoS("Skipping API because it has no resources.", "group", groupVersion.Group, "version", groupVersion.Version)
 			continue
 		}
 

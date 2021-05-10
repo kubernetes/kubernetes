@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	goruntime "runtime"
 	"runtime/debug"
 	"sort"
@@ -423,7 +424,7 @@ func (c *Config) AddPostStartHook(name string, hook PostStartHookFunc) error {
 		return fmt.Errorf("hook func may not be nil: %q", name)
 	}
 	if c.DisabledPostStartHooks.Has(name) {
-		klog.V(1).Infof("skipping %q because it was explicitly disabled", name)
+		klog.V(1).InfoS("Skipping PostStartHook because it was explicitly disabled", "hookName", name)
 		return nil
 	}
 
@@ -439,7 +440,8 @@ func (c *Config) AddPostStartHook(name string, hook PostStartHookFunc) error {
 // AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure.
 func (c *Config) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	if err := c.AddPostStartHook(name, hook); err != nil {
-		klog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+		klog.ErrorS(err, "Error registering PostStartHook", "hookName", name)
+		os.Exit(1)
 	}
 }
 
@@ -453,11 +455,13 @@ func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedCo
 	// if there is no port, and we listen on one securely, use that one
 	if _, _, err := net.SplitHostPort(c.ExternalAddress); err != nil {
 		if c.SecureServing == nil {
-			klog.Fatalf("cannot derive external address port without listening on a secure port.")
+			klog.ErrorS(nil, "Cannot derive external address port without listening on a secure port")
+			os.Exit(1)
 		}
 		_, port, err := c.SecureServing.HostPort()
 		if err != nil {
-			klog.Fatalf("cannot derive external address from the secure port: %v", err)
+			klog.ErrorS(err, "Cannot derive external address from the secure port")
+			os.Exit(1)
 		}
 		c.ExternalAddress = net.JoinHostPort(c.ExternalAddress, strconv.Itoa(port))
 	}
@@ -655,7 +659,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 		// TODO(yue9944882): plumb pre-shutdown-hook for request-management system?
 	} else {
-		klog.V(3).Infof("Not requested to run hook %s", priorityAndFairnessConfigConsumerHookName)
+		klog.V(3).InfoS("Not requested to run hook", "hookName", priorityAndFairnessConfigConsumerHookName)
 	}
 
 	// Add PostStartHooks for maintaining the watermarks for the Priority-and-Fairness and the Max-in-Flight filters.

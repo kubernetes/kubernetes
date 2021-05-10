@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"runtime/debug"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -86,7 +87,7 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 		return fmt.Errorf("hook func may not be nil: %q", name)
 	}
 	if s.disabledPostStartHooks.Has(name) {
-		klog.V(1).Infof("skipping %q because it was explicitly disabled", name)
+		klog.V(1).InfoS("Skipping PostStartHook because it was explicitly disabled", "hookName", name)
 		return nil
 	}
 
@@ -115,7 +116,8 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 // AddPostStartHookOrDie allows you to add a PostStartHook, but dies on failure
 func (s *GenericAPIServer) AddPostStartHookOrDie(name string, hook PostStartHookFunc) {
 	if err := s.AddPostStartHook(name, hook); err != nil {
-		klog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+		klog.ErrorS(err, "Error registering PostStartHook", "hookName", name)
+		os.Exit(1)
 	}
 }
 
@@ -146,7 +148,8 @@ func (s *GenericAPIServer) AddPreShutdownHook(name string, hook PreShutdownHookF
 // AddPreShutdownHookOrDie allows you to add a PostStartHook, but dies on failure
 func (s *GenericAPIServer) AddPreShutdownHookOrDie(name string, hook PreShutdownHookFunc) {
 	if err := s.AddPreShutdownHook(name, hook); err != nil {
-		klog.Fatalf("Error registering PreShutdownHook %q: %v", name, err)
+		klog.ErrorS(err, "Error registering PreShutdownHook", "hookName", name)
+		os.Exit(1)
 	}
 }
 
@@ -199,7 +202,8 @@ func runPostStartHook(name string, entry postStartHookEntry, context PostStartHo
 	}()
 	// if the hook intentionally wants to kill server, let it.
 	if err != nil {
-		klog.Fatalf("PostStartHook %q failed: %v", name, err)
+		klog.ErrorS(err, "PostStartHook failed", "hookName", name)
+		os.Exit(1)
 	}
 	close(entry.done)
 }

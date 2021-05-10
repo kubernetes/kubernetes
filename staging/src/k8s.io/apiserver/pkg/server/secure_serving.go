@@ -54,7 +54,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 
 	// these are static aspects of the tls.Config
 	if s.DisableHTTP2 {
-		klog.Info("Forcing use of http/1.1 only")
+		klog.InfoS("Forcing use of http/1.1 only")
 		tlsConfig.NextProtos = []string{"http/1.1"}
 	}
 	if s.MinTLSVersion > 0 {
@@ -66,7 +66,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		for i := 0; i < len(s.CipherSuites); i++ {
 			for cipherName, cipherID := range insecureCiphers {
 				if s.CipherSuites[i] == cipherID {
-					klog.Warningf("Use of insecure cipher '%s' detected.", cipherName)
+					klog.InfoS("Use of insecure cipher detected.", "cipherName", cipherName)
 				}
 			}
 		}
@@ -99,7 +99,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
 			if err := controller.RunOnce(); err != nil {
-				klog.Warningf("Initial population of client CA failed: %v", err)
+				klog.InfoS("Initial population of client CA failed", "err", err.Error())
 			}
 
 			go controller.Run(1, stopCh)
@@ -108,7 +108,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 			// Files are required to be populated already, so this is for convenience.
 			if err := controller.RunOnce(); err != nil {
-				klog.Warningf("Initial population of default serving certificate failed: %v", err)
+				klog.InfoS("Initial population of default serving certificate failed", "err", err.Error())
 			}
 
 			go controller.Run(1, stopCh)
@@ -119,7 +119,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 				// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 				// Files are required to be populated already, so this is for convenience.
 				if err := controller.RunOnce(); err != nil {
-					klog.Warningf("Initial population of SNI serving certificate failed: %v", err)
+					klog.InfoS("Initial population of SNI serving certificate failed", "err", err.Error())
 				}
 
 				go controller.Run(1, stopCh)
@@ -129,7 +129,7 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		// runonce to try to prime data.  If this fails, it's ok because we fail closed.
 		// Files are required to be populated already, so this is for convenience.
 		if err := dynamicCertificateController.RunOnce(); err != nil {
-			klog.Warningf("Initial population of dynamic certificates failed: %v", err)
+			klog.InfoS("Initial population of dynamic certificates failed", "err", err.Error())
 		}
 		go dynamicCertificateController.Run(1, stopCh)
 
@@ -192,7 +192,7 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 	tlsErrorLogger := log.New(tlsErrorWriter, "", 0)
 	secureServer.ErrorLog = tlsErrorLogger
 
-	klog.Infof("Serving securely on %s", secureServer.Addr)
+	klog.InfoS("Serving securely", "address", secureServer.Addr)
 	return RunServer(secureServer, s.Listener, shutdownTimeout, stopCh)
 }
 
@@ -236,7 +236,7 @@ func RunServer(
 		msg := fmt.Sprintf("Stopped listening on %s", ln.Addr().String())
 		select {
 		case <-stopCh:
-			klog.Info(msg)
+			klog.InfoS(msg)
 		default:
 			panic(fmt.Sprintf("%s due to error: %v", msg, err))
 		}
@@ -277,7 +277,7 @@ const tlsHandshakeErrorPrefix = "http: TLS handshake error"
 
 func (w *tlsHandshakeErrorWriter) Write(p []byte) (int, error) {
 	if strings.Contains(string(p), tlsHandshakeErrorPrefix) {
-		klog.V(5).Info(string(p))
+		klog.V(5).InfoS(string(p))
 		metrics.TLSHandshakeErrors.Inc()
 		return len(p), nil
 	}

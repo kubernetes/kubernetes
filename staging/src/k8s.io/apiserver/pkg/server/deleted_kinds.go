@@ -167,7 +167,10 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 				continue
 			}
 
-			klog.V(1).Infof("Removing resource %v.%v.%v because it is time to stop serving it per APILifecycle.", resourceName, apiVersion, groupName)
+			klog.V(1).InfoS("Removing resource, because it is time to stop serving it per APILifecycle",
+				"resourceName", resourceName,
+				"apiVersion", apiVersion,
+				"group", groupName)
 			delete(versionToResource, resourceName)
 		}
 		versionedResourcesStorageMap[apiVersion] = versionToResource
@@ -178,7 +181,9 @@ func (e *resourceExpirationEvaluator) RemoveDeletedKinds(groupName string, versi
 	}
 
 	for _, apiVersion := range versionsToRemove.List() {
-		klog.V(1).Infof("Removing version %v.%v because it is time to stop serving it because it has no resources per APILifecycle.", apiVersion, groupName)
+		klog.V(1).InfoS("Removing version because it is time to stop serving it because it has no resources per APILifecycle",
+			"apiVersion", apiVersion,
+			"group", groupName)
 		delete(versionedResourcesStorageMap, apiVersion)
 	}
 }
