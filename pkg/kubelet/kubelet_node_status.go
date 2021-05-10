@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudproviderapi "k8s.io/cloud-provider/api"
 	"k8s.io/klog/v2"
@@ -64,25 +63,9 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		var node *v1.Node
-		// Observed that the initialNode() constructor has inconsistent results deriving allocatable resources
-		err := wait.PollImmediate(3*time.Second, 20*time.Minute, func() (bool, error) {
-			var initialNodeErr error
-			node, initialNodeErr = kl.initialNode(context.TODO())
-			if initialNodeErr != nil {
-				klog.ErrorS(initialNodeErr, "Unable to construct v1.Node object for kubelet")
-				return false, nil
-			}
-			if allocatable := schedulerframework.NewResource(node.Status.Allocatable); allocatable != nil {
-				if allocatable.EphemeralStorage != 0 && allocatable.Memory != 0 && allocatable.MilliCPU != 0 {
-					klog.InfoS("Node has allocatable resources", "node", klog.KObj(node))
-					return true, nil
-				}
-			}
-			return false, nil
-		})
+		node, err := kl.initialNode(context.TODO())
 		if err != nil {
-			klog.ErrorS(err, "Unable to determine allocatable resources before constructing v1.Node object")
+			klog.ErrorS(err, "Unable to construct v1.Node object for kubelet")
 			continue
 		}
 
@@ -609,7 +592,6 @@ func (kl *Kubelet) recordNodeSchedulableEvent(node *v1.Node) error {
 // refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
-		//klog.Infof("Setting node status using function %v", f)
 		klog.V(5).InfoS("Setting node status condition code", "position", i, "node", klog.KObj(node))
 		if err := f(node); err != nil {
 			klog.ErrorS(err, "Failed to set some node status fields", "node", klog.KObj(node))
