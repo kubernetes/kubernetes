@@ -27,6 +27,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -69,6 +70,21 @@ var (
 	startServices = flag.Bool("start-services", true, "If true, start local node services")
 	stopServices  = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 )
+
+// getGPUDevicePluginImage returns the image of GPU device plugin.
+func getGPUDevicePluginImage() (string, error) {
+	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
+	}
+	if ds == nil {
+		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
+	}
+	if len(ds.Spec.Template.Spec.Containers) < 1 {
+		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
+	}
+	return ds.Spec.Template.Spec.Containers[0].Image, nil
+}
 
 // updateImageAllowList updates the framework.ImagePrePullList with
 // 1. the hard coded lists

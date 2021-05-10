@@ -32,8 +32,6 @@ import (
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2egpu "k8s.io/kubernetes/test/e2e/framework/gpu"
-	e2emanifest "k8s.io/kubernetes/test/e2e/framework/manifest"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -187,21 +185,6 @@ func PrePullAllImages() error {
 
 	wg.Wait()
 	return utilerrors.NewAggregate(pullErrs)
-}
-
-// getGPUDevicePluginImage returns the image of GPU device plugin.
-func getGPUDevicePluginImage() (string, error) {
-	ds, err := e2emanifest.DaemonSetFromURL(e2egpu.GPUDevicePluginDSYAML)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse the device plugin image: %w", err)
-	}
-	if ds == nil {
-		return "", fmt.Errorf("failed to parse the device plugin image: the extracted DaemonSet is nil")
-	}
-	if len(ds.Spec.Template.Spec.Containers) < 1 {
-		return "", fmt.Errorf("failed to parse the device plugin image: cannot extract the container from YAML")
-	}
-	return ds.Spec.Template.Spec.Containers[0].Image, nil
 }
 
 // Shared code across linux and cgo build tags within e2e. Requires lint ignores.
