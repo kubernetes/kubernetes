@@ -67,6 +67,11 @@ func ComponentPod(container v1.Container, volumes map[string]v1.Volume, annotati
 			PriorityClassName: "system-node-critical",
 			HostNetwork:       true,
 			Volumes:           VolumeMapToSlice(volumes),
+			SecurityContext: &v1.PodSecurityContext{
+				SeccompProfile: &v1.SeccompProfile{
+					Type: v1.SeccompProfileTypeRuntimeDefault,
+				},
+			},
 		},
 	}
 }
