@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -70,17 +71,6 @@ func TestPodAndContainerAttach(t *testing.T) {
 		expectOut             string
 		obj                   *corev1.Pod
 	}{
-		{
-			name:        "empty",
-			options:     &AttachOptions{GetPodTimeout: 1},
-			expectError: "at least 1 argument is required",
-		},
-		{
-			name:        "too many args",
-			options:     &AttachOptions{GetPodTimeout: 2},
-			args:        []string{"one", "two", "three"},
-			expectError: "at most 2 arguments",
-		},
 		{
 			name:                  "no container, no flags",
 			options:               &AttachOptions{GetPodTimeout: defaultPodLogsTimeout},
@@ -148,15 +138,6 @@ func TestPodAndContainerAttach(t *testing.T) {
 			expectedContainerName: "bar",
 			obj:                   attachPod(),
 		},
-		{
-			name:                  "invalid get pod timeout value",
-			options:               &AttachOptions{GetPodTimeout: 0},
-			args:                  []string{"pod/foo"},
-			expectedPodName:       "foo",
-			expectedContainerName: "bar",
-			obj:                   attachPod(),
-			expectError:           "must be higher than zero",
-		},
 	}
 
 	for _, test := range tests {
@@ -164,13 +145,6 @@ func TestPodAndContainerAttach(t *testing.T) {
 			// setup opts to fetch our test pod
 			test.options.AttachablePodFn = fakeAttachablePodFn(test.obj)
 			test.options.Resources = test.args
-
-			if err := test.options.Validate(); err != nil {
-				if test.expectError == "" || !strings.Contains(err.Error(), test.expectError) {
-					t.Errorf("unexpected error: expected %q, got %q", test.expectError, err)
-				}
-				return
-			}
 
 			pod, err := test.options.findAttachablePod(&corev1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "test"},
@@ -233,6 +207,50 @@ func TestPodAndContainerAttach(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToOptions(t *testing.T) {
+	var (
+		testCmd          = &cobra.Command{}
+		testFactory      = cmdtesting.NewTestFactory().WithNamespace("test")
+		streams, _, _, _ = genericclioptions.NewTestIOStreams()
+	)
+
+	t.Run("validate arguments", func(t *testing.T) {
+		var testCases = []struct {
+			name        string
+			args        []string
+			podTimeout  time.Duration
+			expectError string
+		}{
+			{
+				name:        "empty",
+				expectError: "at least 1 argument is required",
+			},
+			{
+				name:        "too many args",
+				args:        []string{"one", "two", "three"},
+				expectError: "at most 2 arguments",
+			},
+			{
+				name:        "invalid get pod timeout value",
+				args:        []string{"--pod-running-timeout=0"},
+				expectError: "must be higher than zero",
+			},
+		}
+		testCmd.Flags().Duration("pod-running-timeout", time.Second*1, "")
+
+		for _, tc := range testCases {
+			testCmd.Flags().Parse(tc.args)
+			flags := NewAttachFlags(testFactory, streams)
+			if _, err := flags.ToOptions(testCmd, testCmd.Flags().Args()); err != nil {
+				if tc.expectError != "" && strings.Contains(err.Error(), tc.expectError) {
+					continue
+				}
+				t.Error("unexpected error: ", err)
+			}
+		}
+	})
 }
 
 func TestAttach(t *testing.T) {

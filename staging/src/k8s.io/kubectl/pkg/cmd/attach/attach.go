@@ -55,12 +55,97 @@ var (
 		# Get output from the first pod of a ReplicaSet named nginx
 		kubectl attach rs/nginx
 		`))
+
+	defaultAttachResourceBuilderFlags = genericclioptions.NewResourceBuilderFlags().
+						WithLabelSelector("").
+						WithFieldSelector("").
+						WithAll(false).
+						WithAllNamespaces(false).
+						WithLocal(false).
+						WithLatest()
 )
 
 const (
 	defaultPodAttachTimeout = 60 * time.Second
 	defaultPodLogsTimeout   = 20 * time.Second
 )
+
+// AttachFlags directly reflect the information that CLI is gathering via
+// flags. They will be converted to Options, which reflect the runtime
+// requirements for the command.
+type AttachFlags struct {
+	builder              func() *resource.Builder
+	resourceBuilderFlags *genericclioptions.ResourceBuilderFlags
+	restClientGetter     genericclioptions.RESTClientGetter
+	exec.StreamOptions
+}
+
+// NewAttachFlags returns a default AttachFlags.
+func NewAttachFlags(
+	f cmdutil.Factory,
+	streams genericclioptions.IOStreams) *AttachFlags {
+
+	return &AttachFlags{
+		builder:              f.NewBuilder,
+		resourceBuilderFlags: defaultAttachResourceBuilderFlags,
+		restClientGetter:     f,
+		StreamOptions: exec.StreamOptions{
+			IOStreams: streams,
+		},
+	}
+}
+
+// ToOptions convert the attach flags to options.
+func (flags *AttachFlags) ToOptions(
+	cmd *cobra.Command,
+	args []string) (*AttachOptions, error) {
+
+	ns, _, err := flags.restClientGetter.ToRawKubeConfigLoader().Namespace()
+	if err != nil {
+		return nil, err
+	}
+
+	getPodTimeout, err := cmdutil.GetPodRunningTimeoutFlag(cmd)
+	if err != nil {
+		return nil, err
+	}
+	if getPodTimeout <= 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "--pod-running-timeout must be higher than zero")
+	}
+
+	config, err := flags.restClientGetter.ToRESTConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if len(args) == 0 {
+		return nil, cmdutil.UsageErrorf(cmd, "at least 1 argument is required for attach")
+	}
+
+	if len(args) > 2 {
+		return nil, cmdutil.UsageErrorf(cmd, "expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(args), args)
+	}
+
+	return &AttachOptions{
+		Attach:           &DefaultRemoteAttach{},
+		AttachFunc:       DefaultAttachFunc,
+		AttachablePodFn:  polymorphichelpers.AttachablePodForObjectFn,
+		Builder:          flags.builder,
+		CommandName:      cmd.CommandPath(),
+		Config:           config,
+		GetPodTimeout:    getPodTimeout,
+		Resources:        args,
+		restClientGetter: flags.restClientGetter,
+		StreamOptions: exec.StreamOptions{
+			Namespace:     ns,
+			ContainerName: flags.ContainerName,
+			Quiet:         flags.Quiet,
+			Stdin:         flags.Stdin,
+			TTY:           flags.TTY,
+			IOStreams:     flags.IOStreams,
+		},
+	}, nil
+}
 
 // AttachOptions declare the arguments accepted by the Attach command
 type AttachOptions struct {
@@ -84,20 +169,9 @@ type AttachOptions struct {
 	Config        *restclient.Config
 }
 
-// NewAttachOptions creates the options for attach
-func NewAttachOptions(streams genericclioptions.IOStreams) *AttachOptions {
-	return &AttachOptions{
-		StreamOptions: exec.StreamOptions{
-			IOStreams: streams,
-		},
-		Attach:     &DefaultRemoteAttach{},
-		AttachFunc: DefaultAttachFunc,
-	}
-}
-
 // NewCmdAttach returns the attach Cobra command
 func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
-	o := NewAttachOptions(streams)
+	flags := NewAttachFlags(f, streams)
 	cmd := &cobra.Command{
 		Use:                   "attach (POD | TYPE/NAME) -c CONTAINER",
 		DisableFlagsInUseLine: true,
@@ -105,16 +179,17 @@ func NewCmdAttach(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		Long:                  i18n.T("Attach to a process that is already running inside an existing container."),
 		Example:               attachExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmdutil.CheckErr(o.Complete(f, cmd, args))
-			cmdutil.CheckErr(o.Validate())
+			o, err := flags.ToOptions(cmd, args)
+			cmdutil.CheckErr(err)
 			cmdutil.CheckErr(o.Run())
 		},
 	}
+
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodAttachTimeout)
-	cmdutil.AddContainerVarFlags(cmd, &o.ContainerName, o.ContainerName)
-	cmd.Flags().BoolVarP(&o.Stdin, "stdin", "i", o.Stdin, "Pass stdin to the container")
-	cmd.Flags().BoolVarP(&o.TTY, "tty", "t", o.TTY, "Stdin is a TTY")
-	cmd.Flags().BoolVarP(&o.Quiet, "quiet", "q", o.Quiet, "Only print output from the remote session")
+	cmdutil.AddContainerVarFlags(cmd, &flags.ContainerName, flags.ContainerName)
+	cmd.Flags().BoolVarP(&flags.Stdin, "stdin", "i", flags.Stdin, "Pass stdin to the container")
+	cmd.Flags().BoolVarP(&flags.TTY, "tty", "t", flags.TTY, "Stdin is a TTY")
+	cmd.Flags().BoolVarP(&flags.Quiet, "quiet", "q", flags.Quiet, "Only print output from the remote session")
 	return cmd
 }
 
@@ -163,53 +238,6 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 		Tty:               tty,
 		TerminalSizeQueue: terminalSizeQueue,
 	})
-}
-
-// Complete verifies command line arguments and loads data from the command environment
-func (o *AttachOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
-	var err error
-	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
-	if err != nil {
-		return err
-	}
-
-	o.AttachablePodFn = polymorphichelpers.AttachablePodForObjectFn
-
-	o.GetPodTimeout, err = cmdutil.GetPodRunningTimeoutFlag(cmd)
-	if err != nil {
-		return cmdutil.UsageErrorf(cmd, err.Error())
-	}
-
-	o.Builder = f.NewBuilder
-	o.Resources = args
-	o.restClientGetter = f
-
-	config, err := f.ToRESTConfig()
-	if err != nil {
-		return err
-	}
-	o.Config = config
-
-	if o.CommandName == "" {
-		o.CommandName = cmd.CommandPath()
-	}
-
-	return nil
-}
-
-// Validate checks that the provided attach options are specified.
-func (o *AttachOptions) Validate() error {
-	if len(o.Resources) == 0 {
-		return fmt.Errorf("at least 1 argument is required for attach")
-	}
-	if len(o.Resources) > 2 {
-		return fmt.Errorf("expected POD, TYPE/NAME, or TYPE NAME, (at most 2 arguments) saw %d: %v", len(o.Resources), o.Resources)
-	}
-	if o.GetPodTimeout <= 0 {
-		return fmt.Errorf("--pod-running-timeout must be higher than zero")
-	}
-
-	return nil
 }
 
 // Run executes a validated remote execution against a pod.
