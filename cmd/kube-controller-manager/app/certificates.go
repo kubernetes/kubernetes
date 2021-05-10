@@ -26,6 +26,7 @@ import (
 	"k8s.io/controller-manager/controller"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/names"
+	"k8s.io/kubernetes/openshift-kube-controller-manager/servicecacertpublisher"
 	"k8s.io/kubernetes/pkg/controller/certificates/approver"
 	"k8s.io/kubernetes/pkg/controller/certificates/cleaner"
 	"k8s.io/kubernetes/pkg/controller/certificates/rootcacertpublisher"
@@ -222,5 +223,26 @@ func startRootCACertificatePublisherController(ctx context.Context, controllerCo
 		return nil, true, fmt.Errorf("error creating root CA certificate publisher: %v", err)
 	}
 	go sac.Run(ctx, 1)
+	return nil, true, nil
+}
+
+func newServiceCACertPublisher() *ControllerDescriptor {
+	return &ControllerDescriptor{
+		name:     names.ServiceCACertificatePublisherController,
+		aliases:  []string{"service-ca-cert-publisher"},
+		initFunc: startServiceCACertPublisher,
+	}
+}
+
+func startServiceCACertPublisher(ctx context.Context, controllerContext ControllerContext, controllerName string) (controller.Interface, bool, error) {
+	sac, err := servicecacertpublisher.NewPublisher(
+		controllerContext.InformerFactory.Core().V1().ConfigMaps(),
+		controllerContext.InformerFactory.Core().V1().Namespaces(),
+		controllerContext.ClientBuilder.ClientOrDie("service-ca-cert-publisher"),
+	)
+	if err != nil {
+		return nil, true, fmt.Errorf("error creating service CA certificate publisher: %v", err)
+	}
+	go sac.Run(1, ctx.Done())
 	return nil, true, nil
 }
