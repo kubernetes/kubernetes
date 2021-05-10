@@ -259,7 +259,7 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			Path:              "token",
 			ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
 		}}
-	configMap := api.VolumeProjection{
+	rootConfigMap := api.VolumeProjection{
 		ConfigMap: &api.ConfigMapProjection{
 			LocalObjectReference: api.LocalObjectReference{
 				Name: "kube-root-ca.crt",
@@ -268,6 +268,19 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 				{
 					Key:  "ca.crt",
 					Path: "ca.crt",
+				},
+			},
+		},
+	}
+	serviceCAConfigMap := api.VolumeProjection{
+		ConfigMap: &api.ConfigMapProjection{
+			LocalObjectReference: api.LocalObjectReference{
+				Name: "openshift-service-ca.crt",
+			},
+			Items: []api.KeyToPath{
+				{
+					Key:  "service-ca.crt",
+					Path: "service-ca.crt",
 				},
 			},
 		},
@@ -299,7 +312,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 						Path:              "notatoken",
 						ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
 					}},
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					downwardAPI,
 				},
 			},
@@ -313,7 +327,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 						Audience:          "not api server",
 						ExpirationSeconds: serviceaccount.WarnOnlyBoundTokenExpirationSeconds,
 					}},
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					downwardAPI,
 				},
 			},
@@ -336,6 +351,7 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 							},
 						},
 					},
+					serviceCAConfigMap,
 					downwardAPI,
 				},
 			},
@@ -345,7 +361,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			volume: &api.ProjectedVolumeSource{
 				Sources: []api.VolumeProjection{
 					serviceAccountToken,
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					{
 						DownwardAPI: &api.DownwardAPIProjection{
 							Items: []api.DownwardAPIVolumeFile{
@@ -367,7 +384,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			volume: &api.ProjectedVolumeSource{
 				Sources: []api.VolumeProjection{
 					serviceAccountToken,
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					{
 						DownwardAPI: &api.DownwardAPIProjection{
 							Items: []api.DownwardAPIVolumeFile{
@@ -385,7 +403,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			volume: &api.ProjectedVolumeSource{
 				Sources: []api.VolumeProjection{
 					serviceAccountToken,
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					{
 						DownwardAPI: &api.DownwardAPIProjection{
 							Items: []api.DownwardAPIVolumeFile{
@@ -407,7 +426,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			volume: &api.ProjectedVolumeSource{
 				Sources: []api.VolumeProjection{
 					serviceAccountToken,
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					{
 						DownwardAPI: &api.DownwardAPIProjection{
 							Items: []api.DownwardAPIVolumeFile{
@@ -431,7 +451,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 					{
 						Secret: &api.SecretProjection{},
 					},
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					downwardAPI,
 					serviceAccountToken,
 				},
@@ -449,7 +470,8 @@ func TestIsOnlyServiceAccountTokenSources(t *testing.T) {
 			desc: "allow if any of ServiceAccountToken, ConfigMap and DownwardAPI matches",
 			volume: &api.ProjectedVolumeSource{
 				Sources: []api.VolumeProjection{
-					configMap,
+					rootConfigMap,
+					serviceCAConfigMap,
 					downwardAPI,
 					serviceAccountToken,
 				},
