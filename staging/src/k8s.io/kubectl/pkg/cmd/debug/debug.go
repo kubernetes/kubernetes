@@ -113,6 +113,7 @@ type DebugOptions struct {
 	Interactive     bool
 	Namespace       string
 	TargetNames     []string
+	Privileged      bool
 	PullPolicy      corev1.PullPolicy
 	Quiet           bool
 	SameNode        bool
@@ -168,6 +169,7 @@ func addDebugFlags(cmd *cobra.Command, opt *DebugOptions) {
 	cmd.Flags().BoolVar(&opt.Replace, "replace", opt.Replace, i18n.T("When used with '--copy-to', delete the original Pod."))
 	cmd.Flags().StringToString("env", nil, i18n.T("Environment variables to set in the container."))
 	cmd.Flags().StringVar(&opt.Image, "image", opt.Image, i18n.T("Container image to use for debug container."))
+	cmd.Flags().BoolVar(&opt.Privileged, "privileged", opt.Privileged, i18n.T("If true, run the container for the node target in privileged mode."))
 	cmd.Flags().StringToStringVar(&opt.SetImages, "set-image", opt.SetImages, i18n.T("When used with '--copy-to', a list of name=image pairs for changing container images, similar to how 'kubectl set image' works."))
 	cmd.Flags().String("image-pull-policy", "", i18n.T("The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server."))
 	cmd.Flags().BoolVarP(&opt.Interactive, "stdin", "i", opt.Interactive, i18n.T("Keep stdin open on the container(s) in the pod, even if nothing is attached."))
@@ -494,6 +496,7 @@ func (o *DebugOptions) generateNodeDebugPod(node string) *corev1.Pod {
 					Env:                      o.Env,
 					Image:                    o.Image,
 					ImagePullPolicy:          o.PullPolicy,
+					SecurityContext:          &corev1.SecurityContext{Privileged: &o.Privileged},
 					Stdin:                    o.Interactive,
 					TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 					TTY:                      o.TTY,

@@ -1045,9 +1045,12 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:                     "debugger",
-							Image:                    "busybox",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.BoolPtr(false),
+							},
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -1089,10 +1092,13 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:                     "custom-debugger",
-							Command:                  []string{"/bin/echo", "one", "two", "three"},
-							Image:                    "busybox",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							Name:            "custom-debugger",
+							Command:         []string{"/bin/echo", "one", "two", "three"},
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.BoolPtr(false),
+							},
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -1135,10 +1141,59 @@ func TestGenerateNodeDebugPod(t *testing.T) {
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:                     "custom-debugger",
-							Args:                     []string{"echo", "one", "two", "three"},
-							Image:                    "busybox",
-							ImagePullPolicy:          corev1.PullIfNotPresent,
+							Name:            "custom-debugger",
+							Args:            []string{"echo", "one", "two", "three"},
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.BoolPtr(false),
+							},
+							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									MountPath: "/host",
+									Name:      "host-root",
+								},
+							},
+						},
+					},
+					HostIPC:       true,
+					HostNetwork:   true,
+					HostPID:       true,
+					NodeName:      "node-XXX",
+					RestartPolicy: corev1.RestartPolicyNever,
+					Volumes: []corev1.Volume{
+						{
+							Name: "host-root",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{Path: "/"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:     "with privileged option",
+			nodeName: "node-XXX",
+			opts: &DebugOptions{
+				Image:      "busybox",
+				PullPolicy: corev1.PullIfNotPresent,
+				Privileged: true,
+			},
+			expected: &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node-debugger-node-XXX-1",
+				},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:            "debugger",
+							Image:           "busybox",
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: pointer.BoolPtr(true),
+							},
 							TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 							VolumeMounts: []corev1.VolumeMount{
 								{
