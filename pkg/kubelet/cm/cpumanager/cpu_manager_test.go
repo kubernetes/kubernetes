@@ -265,6 +265,7 @@ func TestCPUManagerAdd(t *testing.T) {
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4),
 			},
+			lastUpdateState: state.NewMemoryState(),
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
@@ -488,6 +489,7 @@ func TestCPUManagerAddWithInitContainers(t *testing.T) {
 		mgr := &manager{
 			policy:            policy,
 			state:             mockState,
+			lastUpdateState:   state.NewMemoryState(),
 			containerRuntime:  mockRuntimeService{},
 			containerMap:      containermap.NewContainerMap(),
 			podStatusProvider: mockPodStatusProvider{},
@@ -670,6 +672,7 @@ func TestCPUManagerRemove(t *testing.T) {
 			assignments:   state.ContainerCPUAssignments{},
 			defaultCPUSet: cpuset.NewCPUSet(),
 		},
+		lastUpdateState:   state.NewMemoryState(),
 		containerRuntime:  mockRuntimeService{},
 		containerMap:      containerMap,
 		activePods:        func() []*v1.Pod { return nil },
@@ -936,6 +939,7 @@ func TestReconcileState(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			},
+			lastUpdateState: state.NewMemoryState(),
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
@@ -1026,6 +1030,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 				assignments:   state.ContainerCPUAssignments{},
 				defaultCPUSet: cpuset.NewCPUSet(0, 1, 2, 3),
 			},
+			lastUpdateState: state.NewMemoryState(),
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
