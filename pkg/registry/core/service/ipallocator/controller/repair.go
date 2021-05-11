@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -140,22 +142,38 @@ func (c *Repair) runOnce() error {
 	storedByFamily := make(map[v1.IPFamily]ipallocator.Interface)
 
 	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
-		for family, allocator := range c.allocatorByFamily {
+		for _, allocator := range c.allocatorByFamily {
 			// get snapshot if it is not there
-			if _, ok := snapshotByFamily[family]; !ok {
-				snapshot, err := allocator.Get()
-				if err != nil {
-					return false, err
-				}
-
-				snapshotByFamily[family] = snapshot
+			_, err := allocator.Get()
+			if err != nil {
+				return false, err
 			}
+
 		}
 		return true, nil
 	})
 
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
+	}
+
+	// before we go through snapshots, we fix "PreferDualStack" services
+	// if needed
+	if err = c.fixPreferDualStackServices(); err != nil {
+		return err
+	}
+	// by now we know that snapshots are ready because we poll-ed for them
+	// early on
+	for family, allocator := range c.allocatorByFamily {
+		// get snapshot if it is not there
+		if _, ok := snapshotByFamily[family]; !ok {
+			snapshot, err := allocator.Get()
+			if err != nil {
+				return err
+			}
+
+			snapshotByFamily[family] = snapshot
+		}
 	}
 
 	// ensure that ranges are assigned
@@ -312,4 +330,79 @@ func (c *Repair) checkLeaked(leaks map[string]int, stored ipallocator.Interface,
 			runtime.HandleError(fmt.Errorf("the cluster IP %s appears to have leaked: cleaning up", ip))
 		}
 	})
+}
+
+// used to generate empty patch bytes
+type emptyType struct {
+}
+
+// Services with "PreferDualStack" would be
+// -- set to dual-stack on a dual-stack cluster.
+// -- set to single stack on a single stack cluster.
+// Because the way allocator work (on Create/Update) they won't be upgraded
+// downgraded (from/to dual-stack) as cluster config change. More over
+// they will be arbitrary upgraded/downgraded if the user tried to
+// update them (e.g. setting a label).
+// This func ensures that all services of policy "PreferDualStack" is aligned
+// to cluster config without the user needing to update them
+func (c *Repair) fixPreferDualStackServices() error {
+	isClusterDualStack := len(c.allocatorByFamily) == 2
+
+	svcList, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("preferDualStackFixer: unable to get list of services with err: %v", err)
+	}
+
+	for _, svc := range svcList.Items {
+		// filter out types that we don't operate on
+		if svc.Spec.Type == v1.ServiceTypeExternalName {
+			continue
+		}
+
+		if svc.Spec.IPFamilyPolicy == nil {
+			continue
+		}
+
+		if svc.Spec.ClusterIP == v1.ClusterIPNone {
+			continue
+		}
+
+		if *(svc.Spec.IPFamilyPolicy) != v1.IPFamilyPolicyPreferDualStack {
+			continue
+		}
+
+		bShouldChange := false
+		title := ""
+		message := ""
+		// should upgrade or dwongrade
+		if len(svc.Spec.ClusterIPs) == 1 && isClusterDualStack {
+			bShouldChange = true
+			title = "DualStackUpgrade"
+			message = fmt.Sprintf("service %v/%v with policy:PreferDualStack has a single assigned ClusterIP. The service was upgraded", svc.Namespace, svc.Name)
+		}
+		if len(svc.Spec.ClusterIPs) == 2 && !isClusterDualStack {
+			bShouldChange = true
+			title = "DualStackDowngrade"
+			message = fmt.Sprintf("service %v/%v with policy:PreferDualStack has two assigned ClusterIPs. The service was downgraded", svc.Namespace, svc.Name)
+
+		}
+
+		if bShouldChange {
+			// generate empty patch bytes
+			empty := emptyType{}
+			patchBytes, err := json.Marshal(&empty)
+			if err != nil {
+				return fmt.Errorf("preferDualStackFixer: failed to generate patch bytes for service %v/%v with err:%v", svc.Namespace, svc.Name, err)
+			}
+
+			if _, err = c.serviceClient.Services(svc.Namespace).Patch(context.TODO(), svc.Name, types.StrategicMergePatchType, patchBytes, metav1.PatchOptions{}); err != nil {
+				c.recorder.Eventf(&svc, v1.EventTypeWarning, "preferDualStackFixer: failed to patch service:%v/%v to comply with IPFamilyPolicy/PreferDualStack policy with err:%v. Will try again", svc.Namespace, svc.Name, err)
+				return nil // we don't report error, we just broadcast an event and try again later
+			}
+
+			c.recorder.Eventf(&svc, v1.EventTypeNormal, title, message)
+		}
+	}
+
+	return nil
 }
