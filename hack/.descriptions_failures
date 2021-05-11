@@ -5,7 +5,6 @@
 ./staging/src/k8s.io/api/certificates/v1/types.go
 ./staging/src/k8s.io/api/certificates/v1beta1/types.go
 ./staging/src/k8s.io/api/core/v1/types.go
-./staging/src/k8s.io/api/extensions/v1beta1/types.go
 ./staging/src/k8s.io/api/flowcontrol/v1alpha1/types.go
 ./staging/src/k8s.io/api/flowcontrol/v1beta1/types.go
 ./staging/src/k8s.io/api/networking/v1/types.go
