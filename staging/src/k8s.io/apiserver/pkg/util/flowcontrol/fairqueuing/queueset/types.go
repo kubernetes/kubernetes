@@ -43,6 +43,9 @@ type request struct {
 	// startTime is the real time when the request began executing
 	startTime time.Time
 
+	// width of the request
+	width float64
+
 	// decision gets set to a `requestDecision` indicating what to do
 	// with this request.  It gets set exactly once, when the request
 	// is removed from its queue.  The value will be decisionReject,
@@ -80,6 +83,10 @@ type queue struct {
 
 	requestsExecuting int
 	index             int
+
+	// seatsInUse is the total number of "seats" currently occupied
+	// by all the requests that are currently executing in this queue.
+	seatsInUse int
 }
 
 // Enqueue enqueues a request into the queue and
@@ -129,5 +136,6 @@ func (q *queue) dump(includeDetails bool) debug.QueueDump {
 		VirtualStart:      q.virtualStart,
 		Requests:          digest,
 		ExecutingRequests: q.requestsExecuting,
+		SeatsInUse:        q.seatsInUse,
 	}
 }
