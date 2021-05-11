@@ -37,7 +37,7 @@ const (
 
 // Auth defines the behaviour of an authentication mechanism.
 type Auth interface {
-	// Return the name of the mechnism, the argument to the first AUTH command
+	// Return the name of the mechanism, the argument to the first AUTH command
 	// and the next status.
 	FirstData() (name, resp []byte, status AuthStatus)
 

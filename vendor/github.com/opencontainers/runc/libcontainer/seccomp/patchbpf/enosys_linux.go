@@ -3,6 +3,7 @@
 package patchbpf
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"os"
@@ -114,14 +115,26 @@ func disassembleFilter(filter *libseccomp.ScmpFilter) ([]bpf.Instruction, error)
 	defer wtr.Close()
 	defer rdr.Close()
 
+	readerBuffer := new(bytes.Buffer)
+	errChan := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(readerBuffer, rdr)
+		errChan <- err
+		close(errChan)
+	}()
+
 	if err := filter.ExportBPF(wtr); err != nil {
 		return nil, errors.Wrap(err, "exporting BPF")
 	}
 	// Close so that the reader actually gets EOF.
 	_ = wtr.Close()
 
+	if copyErr := <-errChan; copyErr != nil {
+		return nil, errors.Wrap(copyErr, "reading from ExportBPF pipe")
+	}
+
 	// Parse the instructions.
-	rawProgram, err := parseProgram(rdr)
+	rawProgram, err := parseProgram(readerBuffer)
 	if err != nil {
 		return nil, errors.Wrap(err, "parsing generated BPF filter")
 	}
@@ -584,9 +597,12 @@ func sysSeccompSetFilter(flags uint, filter []unix.SockFilter) (err error) {
 			unix.SECCOMP_MODE_FILTER,
 			uintptr(unsafe.Pointer(&fprog)), 0, 0)
 	} else {
-		_, _, err = unix.RawSyscall(unix.SYS_SECCOMP,
+		_, _, errno := unix.RawSyscall(unix.SYS_SECCOMP,
 			uintptr(C.C_SET_MODE_FILTER),
 			uintptr(flags), uintptr(unsafe.Pointer(&fprog)))
+		if errno != 0 {
+			err = errno
+		}
 	}
 	runtime.KeepAlive(filter)
 	runtime.KeepAlive(fprog)

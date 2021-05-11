@@ -1,6 +1,6 @@
 package libcontainer
 
-import criu "github.com/checkpoint-restore/go-criu/v4/rpc"
+import criu "github.com/checkpoint-restore/go-criu/v5/rpc"
 
 type CriuPageServerInfo struct {
 	Address string // IP address of CRIU page server

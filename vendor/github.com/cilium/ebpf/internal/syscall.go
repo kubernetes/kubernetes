@@ -91,6 +91,19 @@ func BPFProgDetach(attr *BPFProgDetachAttr) error {
 	return err
 }
 
+type BPFEnableStatsAttr struct {
+	StatsType uint32
+}
+
+func BPFEnableStats(attr *BPFEnableStatsAttr) (*FD, error) {
+	ptr, err := BPF(BPF_ENABLE_STATS, unsafe.Pointer(attr), unsafe.Sizeof(*attr))
+	if err != nil {
+		return nil, fmt.Errorf("enable stats: %w", err)
+	}
+	return NewFD(uint32(ptr)), nil
+
+}
+
 type bpfObjAttr struct {
 	fileName  Pointer
 	fd        uint32
@@ -127,9 +140,10 @@ func BPFObjPin(fileName string, fd *FD) error {
 }
 
 // BPFObjGet wraps BPF_OBJ_GET.
-func BPFObjGet(fileName string) (*FD, error) {
+func BPFObjGet(fileName string, flags uint32) (*FD, error) {
 	attr := bpfObjAttr{
-		fileName: NewStringPointer(fileName),
+		fileName:  NewStringPointer(fileName),
+		fileFlags: flags,
 	}
 	ptr, err := BPF(BPF_OBJ_GET, unsafe.Pointer(&attr), unsafe.Sizeof(attr))
 	if err != nil {
