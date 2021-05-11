@@ -53,8 +53,10 @@ type ResourceExpirationEvaluator interface {
 	ShouldServeForVersion(majorRemoved, minorRemoved int) bool
 }
 
-func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (ResourceExpirationEvaluator, error) {
-	ret := &resourceExpirationEvaluator{}
+func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info, serveRemovedAPIsOneMoreRelease bool) (ResourceExpirationEvaluator, error) {
+	ret := &resourceExpirationEvaluator{
+		serveRemovedAPIsOneMoreRelease: serveRemovedAPIsOneMoreRelease,
+	}
 	if len(currentVersion.Major) > 0 {
 		currentMajor64, err := strconv.ParseInt(currentVersion.Major, 10, 32)
 		if err != nil {
@@ -83,7 +85,10 @@ func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (Re
 	} else {
 		ret.strictRemovedHandlingInAlpha = envBool
 	}
-	if envString, ok := os.LookupEnv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE"); !ok {
+
+	if ret.serveRemovedAPIsOneMoreRelease {
+		// the value is already set, do nothing
+	} else if envString, ok := os.LookupEnv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE"); !ok {
 		// do nothing
 	} else if envBool, err := strconv.ParseBool(envString); err != nil {
 		return nil, err

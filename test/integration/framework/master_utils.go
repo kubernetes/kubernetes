@@ -271,7 +271,8 @@ func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *contr
 
 // MasterConfigOptions are the configurable options for a new integration test master config.
 type MasterConfigOptions struct {
-	EtcdOptions *options.EtcdOptions
+	EtcdOptions                    *options.EtcdOptions
+	ServeRemovedAPIsOneMoreRelease bool
 }
 
 // DefaultEtcdOptions are the default EtcdOptions for use with integration tests.
@@ -309,8 +310,17 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config 
 
 	genericConfig := genericapiserver.NewConfig(legacyscheme.Codecs)
 	kubeVersion := version.Get()
+	if len(kubeVersion.Major) == 0 {
+		kubeVersion.Major = "1"
+	}
+	if len(kubeVersion.Minor) == 0 {
+		kubeVersion.Minor = "22"
+	}
 	genericConfig.Version = &kubeVersion
 	genericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
+	if opts.ServeRemovedAPIsOneMoreRelease {
+		genericConfig.ServeRemovedAPIsOneMoreRelease = true
+	}
 
 	// TODO: get rid of these tests or port them to secure serving
 	genericConfig.SecureServing = &genericapiserver.SecureServingInfo{Listener: fakeLocalhost443Listener{}}

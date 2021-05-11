@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/version"
 	utilwaitgroup "k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/audit"
@@ -209,6 +210,13 @@ type GenericAPIServer struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// Version will enable the /version endpoint if non-nil
+	Version *version.Info
+	// ServeRemovedAPIsOneMoreRelease re-enables deleted APIs for one more release. This is exposed to allow modification
+	// per instance in cases like integration tests that need to check behavior.
+	ServeRemovedAPIsOneMoreRelease bool
+
 }
 
 // DelegationTarget is an interface which allows for composition of API servers with top level handling that works

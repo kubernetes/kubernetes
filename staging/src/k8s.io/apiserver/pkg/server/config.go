@@ -233,6 +233,10 @@ type Config struct {
 
 	// StorageVersionManager holds the storage versions of the API resources installed by this server.
 	StorageVersionManager storageversion.Manager
+
+	// ServeRemovedAPIsOneMoreRelease re-enables deleted APIs for one more release. This is exposed to allow modification
+	// per instance in cases like integration tests that need to check behavior.
+	ServeRemovedAPIsOneMoreRelease bool
 }
 
 type RecommendedConfig struct {
@@ -593,6 +597,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
+
+		Version: c.Version,
+		ServeRemovedAPIsOneMoreRelease: c.ServeRemovedAPIsOneMoreRelease,
 	}
 
 	for {
