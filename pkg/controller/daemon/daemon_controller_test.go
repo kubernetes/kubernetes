@@ -847,33 +847,37 @@ func TestDaemonSetPodCreateExpectationsError(t *testing.T) {
 }
 
 func TestSimpleDaemonSetUpdatesStatusAfterLaunchingPods(t *testing.T) {
-	for _, strategy := range updateStrategies() {
-		ds := newDaemonSet("foo")
-		ds.Spec.UpdateStrategy = *strategy
-		manager, podControl, clientset, err := newTestController(ds)
-		if err != nil {
-			t.Fatalf("error creating DaemonSets controller: %v", err)
-		}
+	dsMaxSurgeFeatureFlags := []bool{false, true}
+	for _, isEnabled := range dsMaxSurgeFeatureFlags {
+		defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, isEnabled)()
+		for _, strategy := range updateStrategies() {
+			ds := newDaemonSet("foo")
+			ds.Spec.UpdateStrategy = *strategy
+			manager, podControl, clientset, err := newTestController(ds)
+			if err != nil {
+				t.Fatalf("error creating DaemonSets controller: %v", err)
+			}
 
-		var updated *apps.DaemonSet
-		clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
-			if action.GetSubresource() != "status" {
+			var updated *apps.DaemonSet
+			clientset.PrependReactor("update", "daemonsets", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				if action.GetSubresource() != "status" {
+					return false, nil, nil
+				}
+				if u, ok := action.(core.UpdateAction); ok {
+					updated = u.GetObject().(*apps.DaemonSet)
+				}
 				return false, nil, nil
-			}
-			if u, ok := action.(core.UpdateAction); ok {
-				updated = u.GetObject().(*apps.DaemonSet)
-			}
-			return false, nil, nil
-		})
+			})
 
-		manager.dsStore.Add(ds)
-		addNodes(manager.nodeStore, 0, 5, nil)
-		expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
+			manager.dsStore.Add(ds)
+			addNodes(manager.nodeStore, 0, 5, nil)
+			expectSyncDaemonSets(t, manager, ds, podControl, 5, 0, 0)
 
-		// Make sure the single sync() updated Status already for the change made
-		// during the manage() phase.
-		if got, want := updated.Status.CurrentNumberScheduled, int32(5); got != want {
-			t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
+			// Make sure the single sync() updated Status already for the change made
+			// during the manage() phase.
+			if got, want := updated.Status.CurrentNumberScheduled, int32(5); got != want {
+				t.Errorf("Status.CurrentNumberScheduled = %v, want %v", got, want)
+			}
 		}
 	}
 }
