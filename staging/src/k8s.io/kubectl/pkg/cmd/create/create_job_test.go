@@ -42,11 +42,6 @@ func TestCreateJobValidation(t *testing.T) {
 			from:     "cronjob/xyz",
 			expected: "--image or --from must be specified",
 		},
-		"from and command specified": {
-			from:     "cronjob/xyz",
-			command:  []string{"test", "command"},
-			expected: "cannot specify --from and command",
-		},
 	}
 
 	for name, tc := range tests {
@@ -58,6 +53,9 @@ func TestCreateJobValidation(t *testing.T) {
 			}
 
 			err := o.Validate()
+			if err == nil && len(tc.expected) != 0 {
+				t.Errorf("expected:\n%v\ngot:\n nil", tc.expected)
+			}
 			if err != nil && !strings.Contains(err.Error(), tc.expected) {
 				t.Errorf("unexpected error: %v", err)
 			}

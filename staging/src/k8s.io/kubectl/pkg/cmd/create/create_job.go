@@ -164,9 +164,6 @@ func (o *CreateJobOptions) Validate() error {
 	if (len(o.Image) == 0 && len(o.From) == 0) || (len(o.Image) != 0 && len(o.From) != 0) {
 		return fmt.Errorf("either --image or --from must be specified")
 	}
-	if o.Command != nil && len(o.Command) != 0 && len(o.From) != 0 {
-		return fmt.Errorf("cannot specify --from and command")
-	}
 	return nil
 }
 
@@ -198,6 +195,17 @@ func (o *CreateJobOptions) Run() error {
 			job = o.createJobFromCronJobV1Beta1(obj)
 		default:
 			return fmt.Errorf("unknown object type %T", obj)
+		}
+
+		if o.Command != nil {
+			if len(job.Spec.Template.Spec.Containers) == 1 {
+				job.Spec.Template.Spec.Containers[0].Command = o.Command
+				// The new args will be in the Command, so clear any old ones
+				// out.
+				job.Spec.Template.Spec.Containers[0].Args = []string{}
+			}
+		} else {
+			return fmt.Errorf("cannot specify --from and command when job has multiple containers")
 		}
 	}
 
