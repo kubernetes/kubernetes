@@ -65,7 +65,7 @@ var (
 		&compbasemetrics.GaugeOpts{
 			Name:           "apiserver_requested_deprecated_apis",
 			Help:           "Gauge of deprecated APIs that have been requested, broken out by API group, version, resource, subresource, and removed_release.",
-			StabilityLevel: compbasemetrics.ALPHA,
+			StabilityLevel: compbasemetrics.STABLE,
 		},
 		[]string{"group", "version", "resource", "subresource", "removed_release"},
 	)
