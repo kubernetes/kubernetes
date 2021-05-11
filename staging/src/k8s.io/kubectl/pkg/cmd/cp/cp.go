@@ -297,6 +297,22 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		return errFileCannotBeEmpty
 	}
 
+	var (
+		prefix string
+		Command []string
+	)
+	if strings.HasPrefix(src.File, "."){
+		prefix = getPrefix(src.File)
+		prefix = path.Clean(prefix)
+		// remove extraneous path shortcuts - these could occur if a path contained extra "../"
+		// and attempted to navigate beyond "/" in a remote filesystem
+		prefix = stripPathShortcuts(prefix)
+		Command = []string{"tar", "cf", "-", prefix}
+	} else {
+		prefix = src.File
+		Command = []string{"tar", "cPf", "-", src.File}
+	}
+
 	reader, outStream := io.Pipe()
 	options := &exec.ExecOptions{
 		StreamOptions: exec.StreamOptions{
@@ -305,13 +321,12 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 				Out:    outStream,
 				ErrOut: o.Out,
 			},
-
 			Namespace: src.PodNamespace,
 			PodName:   src.PodName,
 		},
 
 		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
+		Command:  Command,
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
 
@@ -319,11 +334,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 		defer outStream.Close()
 		cmdutil.CheckErr(o.execute(options))
 	}()
-	prefix := getPrefix(src.File)
-	prefix = path.Clean(prefix)
-	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
-	// and attempted to navigate beyond "/" in a remote filesystem
-	prefix = stripPathShortcuts(prefix)
+
 	return o.untarAll(src, reader, dest.File, prefix)
 }
 
