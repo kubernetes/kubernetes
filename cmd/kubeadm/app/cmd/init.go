@@ -192,7 +192,15 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newInitData(cmd, args, initOptions, out)
+		data, err := newInitData(cmd, args, initOptions, out)
+		if err != nil {
+			return nil, err
+		}
+		// If the flag for skipping phases was empty, use the values from config
+		if len(initRunner.Options.SkipPhases) == 0 {
+			initRunner.Options.SkipPhases = data.cfg.SkipPhases
+		}
+		return data, nil
 	})
 
 	// binds the Runner to kubeadm init command by altering
