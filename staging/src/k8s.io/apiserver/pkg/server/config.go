@@ -593,6 +593,8 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 
 		APIServerID:           c.APIServerID,
 		StorageVersionManager: c.StorageVersionManager,
+
+		Version: c.Version,
 	}
 
 	for {

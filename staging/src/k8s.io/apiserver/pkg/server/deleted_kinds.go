@@ -83,6 +83,7 @@ func NewResourceExpirationEvaluator(currentVersion apimachineryversion.Info) (Re
 	} else {
 		ret.strictRemovedHandlingInAlpha = envBool
 	}
+
 	if envString, ok := os.LookupEnv("KUBE_APISERVER_SERVE_REMOVED_APIS_FOR_ONE_RELEASE"); !ok {
 		// do nothing
 	} else if envBool, err := strconv.ParseBool(envString); err != nil {
