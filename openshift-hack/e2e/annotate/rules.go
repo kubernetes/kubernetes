@@ -65,7 +65,6 @@ var (
 			`unchanging, static URL paths for kubernetes api services`,  // the test needs to exclude URLs that are not part of conformance (/logs)
 			`Services should be able to up and down services`,           // we don't have wget installed on nodes
 			`KubeProxy should set TCP CLOSE_WAIT timeout`,               // the test require communication to port 11302 in the cluster nodes
-			`\[NodeFeature:Sysctls\]`,                                   // needs SCC support
 			`should check kube-proxy urls`,                              // previously this test was skipped b/c we reported -1 as the number of nodes, now we report proper number and test fails
 			`SSH`,                                                       // TRIAGE
 			`should implement service.kubernetes.io/service-proxy-name`, // this is an optional test that requires SSH. sig-network
