@@ -59,6 +59,7 @@ type Grabber struct {
 	grabFromScheduler                 bool
 	grabFromClusterAutoscaler         bool
 	kubeScheduler                     string
+	waitForSchedulerReadyOnce         sync.Once
 	kubeControllerManager             string
 	waitForControllerManagerReadyOnce sync.Once
 }
@@ -149,7 +150,19 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	if g.kubeScheduler == "" {
 		return SchedulerMetrics{}, fmt.Errorf("kube-scheduler pod is not registered. Skipping Scheduler's metrics gathering")
 	}
-	output, err := g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeSchedulerPort)
+
+	var err error
+	var output string
+	g.waitForSchedulerReadyOnce.Do(func() {
+		var lastMetricsFetchErr error
+		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+			output, lastMetricsFetchErr = g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeSchedulerPort)
+			return lastMetricsFetchErr == nil, nil
+		}); metricsWaitErr != nil {
+			err = fmt.Errorf("error waiting for scheduler pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
+			return
+		}
+	})
 	if err != nil {
 		return SchedulerMetrics{}, err
 	}
@@ -184,6 +197,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 	}
 
 	var err error
+	var output string
 	podName := g.kubeControllerManager
 	g.waitForControllerManagerReadyOnce.Do(func() {
 		if readyErr := e2epod.WaitForPodsReady(g.client, metav1.NamespaceSystem, podName, 0); readyErr != nil {
@@ -193,18 +207,13 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 
 		var lastMetricsFetchErr error
 		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeControllerManagerPort)
+			output, lastMetricsFetchErr = g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeControllerManagerPort)
 			return lastMetricsFetchErr == nil, nil
 		}); metricsWaitErr != nil {
 			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
 			return
 		}
 	})
-	if err != nil {
-		return ControllerManagerMetrics{}, err
-	}
-
-	output, err := g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}
