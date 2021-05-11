@@ -150,7 +150,7 @@ func (dc *DriverCall) Run() (*DriverStatus, error) {
 			/*
 				May 04 18:16:10 capz-conf-k7lhlr-control-plane-bqgth kubelet[2403]: W0504 18:16:10.698850    2403 driver-call.go:149] FlexVolume: driver call failed: executable: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds/uds, args: [init], error: fork/exec /usr/libexec/kubernetes/kubelet-plugins/volume/exec/nodeagent~uds/uds: no such file or directory, output: ""
 			*/
-			klog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %q", execPath, dc.args, execErr.Error(), output)
+			//klog.Warningf("FlexVolume: driver call failed: executable: %s, args: %s, error: %s, output: %q", execPath, dc.args, execErr.Error(), output)
 
 		}
 		return nil, err
@@ -268,7 +268,7 @@ func handleCmdResponse(cmd string, output []byte) (*DriverStatus, error) {
 		Capabilities: defaultCapabilities(),
 	}
 	if err := json.Unmarshal(output, &status); err != nil {
-		klog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
+		//klog.Errorf("Failed to unmarshal output for command: %s, output: %q, error: %s", cmd, string(output), err.Error())
 		return nil, err
 	} else if status.Status == StatusNotSupported {
 		klog.V(5).Infof("%s command is not supported by the driver", cmd)
