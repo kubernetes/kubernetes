@@ -63,6 +63,8 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
+		// One key problem is that kubelet registers the node by using the "initialNode" object,
+		// but "initialNode" may or may not have allocatable ephemeral storage data
 		node, err := kl.initialNode(context.TODO())
 		if err != nil {
 			klog.ErrorS(err, "Unable to construct v1.Node object for kubelet")
