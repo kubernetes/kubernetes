@@ -28,7 +28,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
-	uploadconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -87,8 +86,7 @@ func newUpdateStatusSubphase() workflow.Phase {
 	return workflow.Phase{
 		Name: "update-status",
 		Short: fmt.Sprintf(
-			"Register the new control-plane node into the %s maintained in the %s ConfigMap",
-			kubeadmconstants.ClusterStatusConfigMapKey,
+			"Register the new control-plane node into the ClusterStatus maintained in the %s ConfigMap (DEPRECATED)",
 			kubeadmconstants.KubeadmConfigConfigMap,
 		),
 		Run:           runUpdateStatusPhase,
@@ -160,24 +158,10 @@ func runUpdateStatusPhase(c workflow.RunData) error {
 		return errors.New("control-plane-join phase invoked with an invalid data struct")
 	}
 
-	if data.Cfg().ControlPlane == nil {
-		return nil
+	if data.Cfg().ControlPlane != nil {
+		fmt.Println("The 'update-status' phase is deprecated and will be removed in a future release. " +
+			"Currently it performs no operation")
 	}
-
-	// gets access to the cluster using the identity defined in admin.conf
-	client, err := data.ClientSet()
-	if err != nil {
-		return errors.Wrap(err, "couldn't create Kubernetes client")
-	}
-	cfg, err := data.InitCfg()
-	if err != nil {
-		return err
-	}
-
-	if err := uploadconfigphase.UploadConfiguration(cfg, client); err != nil {
-		return errors.Wrap(err, "error uploading configuration")
-	}
-
 	return nil
 }
 

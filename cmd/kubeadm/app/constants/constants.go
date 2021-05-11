@@ -248,9 +248,6 @@ const (
 	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
 	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
 
-	// ClusterStatusConfigMapKey specifies in what ConfigMap key the cluster status should be stored
-	ClusterStatusConfigMapKey = "ClusterStatus"
-
 	// KubeProxyConfigMap specifies in what ConfigMap in the kube-system namespace the kube-proxy configuration should be stored
 	KubeProxyConfigMap = "kube-proxy"
 

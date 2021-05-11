@@ -364,17 +364,16 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 		name             string
 		nodeName         string
 		staticPod        *testresources.FakeStaticPod
-		configMap        *testresources.FakeConfigMap
 		expectedEndpoint *kubeadmapi.APIEndpoint
 		expectedErr      bool
 	}{
 		{
-			name:        "no pod annotations; no ClusterStatus",
+			name:        "no pod annotations",
 			nodeName:    nodeName,
 			expectedErr: true,
 		},
 		{
-			name:     "valid ipv4 endpoint in pod annotation; no ClusterStatus",
+			name:     "valid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -385,7 +384,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedEndpoint: &kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
 		},
 		{
-			name:     "invalid ipv4 endpoint in pod annotation; no ClusterStatus",
+			name:     "invalid ipv4 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -396,7 +395,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:     "invalid negative port with ipv4 address in pod annotation; no ClusterStatus",
+			name:     "invalid negative port with ipv4 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -407,7 +406,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:     "invalid high port with ipv4 address in pod annotation; no ClusterStatus",
+			name:     "invalid high port with ipv4 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -418,7 +417,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:     "valid ipv6 endpoint in pod annotation; no ClusterStatus",
+			name:     "valid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -429,7 +428,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedEndpoint: &kubeadmapi.APIEndpoint{AdvertiseAddress: "::1", BindPort: 1234},
 		},
 		{
-			name:     "invalid ipv6 endpoint in pod annotation; no ClusterStatus",
+			name:     "invalid ipv6 endpoint in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -440,7 +439,7 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			expectedErr: true,
 		},
 		{
-			name:     "invalid negative port with ipv6 address in pod annotation; no ClusterStatus",
+			name:     "invalid negative port with ipv6 address in pod annotation",
 			nodeName: nodeName,
 			staticPod: &testresources.FakeStaticPod{
 				Component: kubeadmconstants.KubeAPIServer,
@@ -461,24 +460,6 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 			},
 			expectedErr: true,
 		},
-		{
-			name:             "no pod annotations; ClusterStatus with valid ipv4 endpoint",
-			nodeName:         nodeName,
-			configMap:        testresources.ClusterStatusWithAPIEndpoint(nodeName, kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234}),
-			expectedEndpoint: &kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-		},
-		{
-			name:     "invalid ipv4 endpoint in pod annotation; ClusterStatus with valid ipv4 endpoint",
-			nodeName: nodeName,
-			staticPod: &testresources.FakeStaticPod{
-				Component: kubeadmconstants.KubeAPIServer,
-				Annotations: map[string]string{
-					kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: "1.2.3::1234",
-				},
-			},
-			configMap:        testresources.ClusterStatusWithAPIEndpoint(nodeName, kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234}),
-			expectedEndpoint: &kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234},
-		},
 	}
 
 	for _, rt := range tests {
@@ -488,12 +469,6 @@ func TestGetAPIEndpointWithBackoff(t *testing.T) {
 				rt.staticPod.NodeName = rt.nodeName
 				if err := rt.staticPod.Create(client); err != nil {
 					t.Error("could not create static pod")
-					return
-				}
-			}
-			if rt.configMap != nil {
-				if err := rt.configMap.Create(client); err != nil {
-					t.Error("could not create ConfigMap")
 					return
 				}
 			}
@@ -545,7 +520,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			name: "valid v1beta2 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
+			name: "valid v1beta2 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information
 			staticPods: []testresources.FakeStaticPod{
 				{
 					NodeName:  nodeName,
@@ -622,7 +597,7 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			newControlPlane: true,
 		},
 		{
-			name: "valid v1beta3 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information from ClusterStatus and node
+			name: "valid v1beta3 - new control plane == false", // InitConfiguration composed with data from different places, with also node specific information
 			staticPods: []testresources.FakeStaticPod{
 				{
 					NodeName:  nodeName,
@@ -762,85 +737,6 @@ func TestGetInitConfigurationFromCluster(t *testing.T) {
 			}
 			if _, ok := cfg.ComponentConfigs[componentconfigs.KubeProxyGroup]; !ok {
 				t.Errorf("no cfg.ComponentConfigs[%q]", componentconfigs.KubeProxyGroup)
-			}
-		})
-	}
-}
-
-func TestGetGetClusterStatus(t *testing.T) {
-	var tests = []struct {
-		name          string
-		configMaps    []testresources.FakeConfigMap
-		expectedError bool
-	}{
-		{
-			name: "invalid missing config map",
-		},
-		{
-			name: "valid v1beta2",
-			configMaps: []testresources.FakeConfigMap{
-				{
-					Name: kubeadmconstants.KubeadmConfigConfigMap,
-					Data: map[string]string{
-						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1beta2"]),
-					},
-				},
-			},
-		},
-		{
-			name: "valid v1beta3",
-			configMaps: []testresources.FakeConfigMap{
-				{
-					Name: kubeadmconstants.KubeadmConfigConfigMap,
-					Data: map[string]string{
-						kubeadmconstants.ClusterStatusConfigMapKey: string(cfgFiles["ClusterStatus_v1beta3"]),
-					},
-				},
-			},
-		},
-		{
-			name: "invalid missing ClusterStatusConfigMapKey in the config map",
-			configMaps: []testresources.FakeConfigMap{
-				{
-					Name: kubeadmconstants.KubeadmConfigConfigMap,
-					Data: map[string]string{},
-				},
-			},
-			expectedError: true,
-		},
-		{
-			name: "invalid wrong value in the config map",
-			configMaps: []testresources.FakeConfigMap{
-				{
-					Name: kubeadmconstants.KubeadmConfigConfigMap,
-					Data: map[string]string{
-						kubeadmconstants.ClusterStatusConfigMapKey: "not a kubeadm type",
-					},
-				},
-			},
-			expectedError: true,
-		},
-	}
-
-	for _, rt := range tests {
-		t.Run(rt.name, func(t *testing.T) {
-			client := clientsetfake.NewSimpleClientset()
-
-			for _, c := range rt.configMaps {
-				err := c.Create(client)
-				if err != nil {
-					t.Errorf("couldn't create ConfigMap %s", c.Name)
-					return
-				}
-			}
-
-			_, err := GetClusterStatus(client)
-			if rt.expectedError != (err != nil) {
-				t.Errorf("unexpected return err from GetClusterStatus: %v", err)
-				return
-			}
-			if rt.expectedError {
-				return
 			}
 		})
 	}
