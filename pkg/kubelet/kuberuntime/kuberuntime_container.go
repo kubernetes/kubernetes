@@ -39,6 +39,7 @@ import (
 	"github.com/armon/circbuf"
 	"k8s.io/klog/v2"
 
+	pkgerrs "github.com/pkg/errors"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
@@ -484,6 +485,9 @@ func (m *kubeGenericRuntimeManager) readLastStringFromContainerLogs(path string)
 	value := int64(kubecontainer.MaxContainerTerminationMessageLogLines)
 	buf, _ := circbuf.NewBuffer(kubecontainer.MaxContainerTerminationMessageLogLength)
 	if err := m.ReadLogs(context.Background(), path, "", &v1.PodLogOptions{TailLines: &value}, buf, buf); err != nil {
+		if os.IsNotExist(pkgerrs.Cause(err)) {
+			return ""
+		}
 		return fmt.Sprintf("Error on reading termination message from logs: %v", err)
 	}
 	return buf.String()
