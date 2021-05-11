@@ -368,6 +368,11 @@ func (in *InitConfiguration) DeepCopyInto(out *InitConfiguration) {
 	}
 	in.NodeRegistration.DeepCopyInto(&out.NodeRegistration)
 	out.LocalAPIEndpoint = in.LocalAPIEndpoint
+	if in.SkipPhases != nil {
+		in, out := &in.SkipPhases, &out.SkipPhases
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
@@ -399,6 +404,11 @@ func (in *JoinConfiguration) DeepCopyInto(out *JoinConfiguration) {
 		in, out := &in.ControlPlane, &out.ControlPlane
 		*out = new(JoinControlPlane)
 		**out = **in
+	}
+	if in.SkipPhases != nil {
+		in, out := &in.SkipPhases, &out.SkipPhases
+		*out = make([]string, len(*in))
+		copy(*out, *in)
 	}
 	return
 }
