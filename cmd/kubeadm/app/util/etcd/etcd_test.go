@@ -119,16 +119,16 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 	var tests = []struct {
 		name              string
 		pods              []testresources.FakeStaticPod
-		configMap         *testresources.FakeConfigMap
 		expectedEndpoints []string
 		expectedErr       bool
 	}{
 		{
-			name:              "no pod annotations; no ClusterStatus",
+			name:              "no pod annotations",
 			expectedEndpoints: []string{},
+			expectedErr:       true,
 		},
 		{
-			name: "ipv4 endpoint in pod annotation; no ClusterStatus; port is preserved",
+			name: "ipv4 endpoint in pod annotation; port is preserved",
 			pods: []testresources.FakeStaticPod{
 				{
 					Component: constants.Etcd,
@@ -139,11 +139,6 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 			},
 			expectedEndpoints: []string{"https://1.2.3.4:1234"},
 		},
-		{
-			name:              "no pod annotations; ClusterStatus with valid ipv4 endpoint; port is inferred",
-			configMap:         testresources.ClusterStatusWithAPIEndpoint("cp-0", kubeadmapi.APIEndpoint{AdvertiseAddress: "1.2.3.4", BindPort: 1234}),
-			expectedEndpoints: []string{"https://1.2.3.4:2379"},
-		},
 	}
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
@@ -151,11 +146,6 @@ func TestGetEtcdEndpointsWithBackoff(t *testing.T) {
 			for _, pod := range rt.pods {
 				if err := pod.Create(client); err != nil {
 					t.Errorf("error setting up test creating pod for node %q", pod.NodeName)
-				}
-			}
-			if rt.configMap != nil {
-				if err := rt.configMap.Create(client); err != nil {
-					t.Error("could not create ConfigMap")
 				}
 			}
 			endpoints, err := getEtcdEndpointsWithBackoff(client, wait.Backoff{Duration: 0, Jitter: 0, Steps: 1})
@@ -194,6 +184,22 @@ func TestGetRawEtcdEndpointsFromPodAnnotation(t *testing.T) {
 				},
 			},
 			expectedEndpoints: []string{"https://1.2.3.4:2379"},
+		},
+		{
+			name: "two pods; one is missing annotation",
+			pods: []testresources.FakeStaticPod{
+				{
+					NodeName:    "cp-0",
+					Component:   constants.Etcd,
+					Annotations: map[string]string{constants.EtcdAdvertiseClientUrlsAnnotationKey: "https://1.2.3.4:2379"},
+				},
+				{
+					NodeName:  "cp-1",
+					Component: constants.Etcd,
+				},
+			},
+			expectedEndpoints: []string{"https://1.2.3.4:2379"},
+			expectedErr:       true,
 		},
 		{
 			name:        "no pods with annotation",
@@ -263,6 +269,21 @@ func TestGetRawEtcdEndpointsFromPodAnnotationWithoutRetry(t *testing.T) {
 					NodeName:    "cp-0",
 					Component:   constants.Etcd,
 					Annotations: map[string]string{constants.EtcdAdvertiseClientUrlsAnnotationKey: "https://1.2.3.4:2379"},
+				},
+			},
+			expectedEndpoints: []string{"https://1.2.3.4:2379"},
+		},
+		{
+			name: "two pods; one is missing annotation",
+			pods: []testresources.FakeStaticPod{
+				{
+					NodeName:    "cp-0",
+					Component:   constants.Etcd,
+					Annotations: map[string]string{constants.EtcdAdvertiseClientUrlsAnnotationKey: "https://1.2.3.4:2379"},
+				},
+				{
+					NodeName:  "cp-1",
+					Component: constants.Etcd,
 				},
 			},
 			expectedEndpoints: []string{"https://1.2.3.4:2379"},
