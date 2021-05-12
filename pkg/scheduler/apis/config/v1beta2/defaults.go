@@ -20,7 +20,6 @@ import (
 	"net"
 	"strconv"
 
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -33,8 +32,8 @@ import (
 )
 
 var defaultResourceSpec = []v1beta2.ResourceSpec{
-	{Name: string(corev1.ResourceCPU), Weight: 1},
-	{Name: string(corev1.ResourceMemory), Weight: 1},
+	{Name: string(v1.ResourceCPU), Weight: 1},
+	{Name: string(v1.ResourceMemory), Weight: 1},
 }
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
@@ -244,6 +243,21 @@ func SetDefaults_InterPodAffinityArgs(obj *v1beta2.InterPodAffinityArgs) {
 func SetDefaults_VolumeBindingArgs(obj *v1beta2.VolumeBindingArgs) {
 	if obj.BindTimeoutSeconds == nil {
 		obj.BindTimeoutSeconds = pointer.Int64Ptr(600)
+	}
+}
+
+func SetDefaults_NodeResourcesBalancedAllocationArgs(obj *v1beta2.NodeResourcesBalancedAllocationArgs) {
+	if len(obj.Resources) == 0 {
+		obj.Resources = append(obj.Resources,
+			v1beta2.ResourceSpec{Name: string(v1.ResourceCPU), Weight: 1},
+			v1beta2.ResourceSpec{Name: string(v1.ResourceMemory), Weight: 1},
+		)
+	}
+	// If the weight is not set or it is explicitly set to 0, then apply the default weight(1) instead.
+	for i := range obj.Resources {
+		if obj.Resources[i].Weight == 0 {
+			obj.Resources[i].Weight = 1
+		}
 	}
 }
 

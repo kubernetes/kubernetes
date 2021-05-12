@@ -30,9 +30,6 @@ type resourceToWeightMap map[v1.ResourceName]int64
 // scorer is decorator for resourceAllocationScorer
 type scorer func(args *config.NodeResourcesFitArgs) *resourceAllocationScorer
 
-// defaultRequestedRatioResources is used to set default requestToWeight map for CPU and memory
-var defaultRequestedRatioResources = resourceToWeightMap{v1.ResourceMemory: 1, v1.ResourceCPU: 1}
-
 // resourceAllocationScorer contains information to calculate resource allocation score.
 type resourceAllocationScorer struct {
 	Name                string
@@ -42,7 +39,7 @@ type resourceAllocationScorer struct {
 	enablePodOverhead bool
 }
 
-// resourceToValueMap contains resource name and score.
+// resourceToValueMap is keyed with resource name and valued with quantity.
 type resourceToValueMap map[v1.ResourceName]int64
 
 // score will use `scorer` function to calculate the score.

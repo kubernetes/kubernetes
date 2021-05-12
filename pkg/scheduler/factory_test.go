@@ -125,6 +125,12 @@ func TestCreateFromConfig(t *testing.T) {
 					Args: &schedulerapi.NodeAffinityArgs{},
 				},
 				{
+					Name: noderesources.BalancedAllocationName,
+					Args: &schedulerapi.NodeResourcesBalancedAllocationArgs{
+						Resources: []schedulerapi.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+					},
+				},
+				{
 					Name: noderesources.FitName,
 					Args: &schedulerapi.NodeResourcesFitArgs{
 						ScoringStrategy: &schedulerapi.ScoringStrategy{

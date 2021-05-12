@@ -748,6 +748,12 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
 								Name: "NodeResourcesFit",
 								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
 									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
@@ -863,6 +869,12 @@ profiles:
 							{
 								Name: "NodeAffinity",
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
 							},
 							{
 								Name: "NodeResourcesFit",
@@ -987,6 +999,12 @@ profiles:
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
 							},
 							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
+							},
+							{
 								Name: "NodeResourcesFit",
 								Args: &kubeschedulerconfig.NodeResourcesFitArgs{
 									ScoringStrategy: &kubeschedulerconfig.ScoringStrategy{
@@ -1101,6 +1119,12 @@ profiles:
 							{
 								Name: "NodeAffinity",
 								Args: &kubeschedulerconfig.NodeAffinityArgs{},
+							},
+							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: &kubeschedulerconfig.NodeResourcesBalancedAllocationArgs{
+									Resources: []kubeschedulerconfig.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+								},
 							},
 							{
 								Name: "NodeResourcesFit",

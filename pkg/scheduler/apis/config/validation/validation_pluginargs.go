@@ -269,6 +269,23 @@ func validateResources(resources []config.ResourceSpec, p *field.Path) field.Err
 	return allErrs
 }
 
+// ValidateNodeResourcesBalancedAllocationArgs validates that NodeResourcesBalancedAllocationArgs are set correctly.
+func ValidateNodeResourcesBalancedAllocationArgs(path *field.Path, args *config.NodeResourcesBalancedAllocationArgs) error {
+	var allErrs field.ErrorList
+	seenResources := sets.NewString()
+	for i, resource := range args.Resources {
+		if seenResources.Has(resource.Name) {
+			allErrs = append(allErrs, field.Duplicate(path.Child("resources").Index(i).Child("name"), resource.Name))
+		} else {
+			seenResources.Insert(resource.Name)
+		}
+		if resource.Weight != 1 {
+			allErrs = append(allErrs, field.Invalid(path.Child("resources").Index(i).Child("weight"), resource.Weight, "must be 1"))
+		}
+	}
+	return allErrs.ToAggregate()
+}
+
 // ValidateNodeAffinityArgs validates that NodeAffinityArgs are correct.
 func ValidateNodeAffinityArgs(path *field.Path, args *config.NodeAffinityArgs) error {
 	if args.AddedAffinity == nil {

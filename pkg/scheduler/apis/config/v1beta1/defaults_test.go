@@ -69,6 +69,16 @@ var pluginConfigs = []v1beta1.PluginConfig{
 		}},
 	},
 	{
+		Name: "NodeResourcesBalancedAllocation",
+		Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesBalancedAllocationArgs{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "NodeResourcesBalancedAllocationArgs",
+				APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+			},
+			Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
+		}},
+	},
+	{
 		Name: "NodeResourcesFit",
 		Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesFitArgs{
 			TypeMeta: metav1.TypeMeta{
@@ -278,6 +288,16 @@ func TestSchedulerDefaults(t *testing.T) {
 										Kind:       "NodeAffinityArgs",
 										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
 									},
+								}},
+							},
+							{
+								Name: "NodeResourcesBalancedAllocation",
+								Args: runtime.RawExtension{Object: &v1beta1.NodeResourcesBalancedAllocationArgs{
+									TypeMeta: metav1.TypeMeta{
+										Kind:       "NodeResourcesBalancedAllocationArgs",
+										APIVersion: "kubescheduler.config.k8s.io/v1beta1",
+									},
+									Resources: []v1beta1.ResourceSpec{{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1}},
 								}},
 							},
 							{
@@ -633,6 +653,60 @@ func TestPluginArgsDefaults(t *testing.T) {
 			want: &v1beta1.NodeResourcesMostAllocatedArgs{
 				Resources: []v1beta1.ResourceSpec{
 					{Name: "resource", Weight: 2},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs resources empty",
+			in:   &v1beta1.NodeResourcesBalancedAllocationArgs{},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "cpu", Weight: 1}, {Name: "memory", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs with scalar resource",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs with mixed resources",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+		},
+		{
+			name: "NodeResourcesBalancedAllocationArgs have resource no weight",
+			in: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU)},
+					{Name: "scalar.io/scalar0"},
+					{Name: "scalar.io/scalar1", Weight: 1},
+				},
+			},
+			want: &v1beta1.NodeResourcesBalancedAllocationArgs{
+				Resources: []v1beta1.ResourceSpec{
+					{Name: string(v1.ResourceCPU), Weight: 1},
+					{Name: "scalar.io/scalar0", Weight: 1},
+					{Name: "scalar.io/scalar1", Weight: 1},
 				},
 			},
 		},

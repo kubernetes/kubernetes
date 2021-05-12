@@ -850,6 +850,77 @@ func TestValidateNodeResourcesMostAllocatedArgs(t *testing.T) {
 	}
 }
 
+func TestValidateNodeResourcesBalancedAllocationArgs(t *testing.T) {
+	cases := map[string]struct {
+		args     *config.NodeResourcesBalancedAllocationArgs
+		wantErrs field.ErrorList
+	}{
+		"valid config": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "memory",
+						Weight: 1,
+					},
+				},
+			},
+		},
+		"invalid config": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 2,
+					},
+					{
+						Name:   "memory",
+						Weight: 1,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeInvalid,
+					Field: "resources[0].weight",
+				},
+			},
+		},
+		"repeated resources": {
+			args: &config.NodeResourcesBalancedAllocationArgs{
+				Resources: []config.ResourceSpec{
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+					{
+						Name:   "cpu",
+						Weight: 1,
+					},
+				},
+			},
+			wantErrs: field.ErrorList{
+				&field.Error{
+					Type:  field.ErrorTypeDuplicate,
+					Field: "resources[1].name",
+				},
+			},
+		},
+	}
+
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateNodeResourcesBalancedAllocationArgs(nil, tc.args)
+			if diff := cmp.Diff(tc.wantErrs.ToAggregate(), err, ignoreBadValueDetail); diff != "" {
+				t.Errorf("ValidateNodeResourcesBalancedAllocationArgs returned err (-want,+got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func TestValidateNodeAffinityArgs(t *testing.T) {
 	cases := []struct {
 		name    string

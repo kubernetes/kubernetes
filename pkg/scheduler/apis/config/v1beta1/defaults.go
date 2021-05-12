@@ -282,6 +282,21 @@ func SetDefaults_VolumeBindingArgs(obj *v1beta1.VolumeBindingArgs) {
 	}
 }
 
+func SetDefaults_NodeResourcesBalancedAllocationArgs(obj *v1beta1.NodeResourcesBalancedAllocationArgs) {
+	if len(obj.Resources) == 0 {
+		obj.Resources = append(obj.Resources,
+			v1beta1.ResourceSpec{Name: string(corev1.ResourceCPU), Weight: 1},
+			v1beta1.ResourceSpec{Name: string(corev1.ResourceMemory), Weight: 1},
+		)
+	}
+	// If the weight is not set or it is explicitly set to 0, then apply the default weight(1) instead.
+	for i := range obj.Resources {
+		if obj.Resources[i].Weight == 0 {
+			obj.Resources[i].Weight = 1
+		}
+	}
+}
+
 func SetDefaults_PodTopologySpreadArgs(obj *v1beta1.PodTopologySpreadArgs) {
 	if feature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		if obj.DefaultingType == "" {
