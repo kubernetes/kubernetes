@@ -152,7 +152,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(specPath.Child("signerName"), "", `validating label "": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
+				field.Invalid(specPath.Child("signerName"), "", `validating label "": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$')`),
 			},
 		},
 		"signerName path component ends with a symbol": {
@@ -165,7 +165,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(specPath.Child("signerName"), "something-", `validating label "something-": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
+				field.Invalid(specPath.Child("signerName"), "something-", `validating label "something-": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$')`),
 			},
 		},
 		"signerName path component is a symbol": {
@@ -178,7 +178,7 @@ func TestValidateCertificateSigningRequestCreate(t *testing.T) {
 				},
 			},
 			errs: field.ErrorList{
-				field.Invalid(specPath.Child("signerName"), "-", `validating label "-": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*')`),
+				field.Invalid(specPath.Child("signerName"), "-", `validating label "-": a lowercase RFC 1123 subdomain must consist of lower case alphanumeric characters, '-' or '.', and must start and end with an alphanumeric character (e.g. 'example.com', regex used for validation is '^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$')`),
 			},
 		},
 		"signerName path component contains no '.' but is valid": {

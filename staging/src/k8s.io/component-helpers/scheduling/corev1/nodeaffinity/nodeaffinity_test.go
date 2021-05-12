@@ -83,7 +83,7 @@ func TestNodeSelectorMatch(t *testing.T) {
 				&field.Error{
 					Type:   field.ErrorTypeInvalid,
 					Field:  "nodeSelectorTerms[2].matchExpressions[0].key",
-					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$')`,
 				},
 			}.ToAggregate(),
 		},
@@ -219,7 +219,7 @@ func TestPreferredSchedulingTermsScore(t *testing.T) {
 				&field.Error{
 					Type:   field.ErrorTypeInvalid,
 					Field:  "[2].matchExpressions[0].key",
-					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]')`,
+					Detail: `name part must consist of alphanumeric characters, '-', '_' or '.', and must start and end with an alphanumeric character (e.g. 'MyName',  or 'my.name',  or '123-abc', regex used for validation is '^([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]$')`,
 				},
 			}.ToAggregate(),
 		},

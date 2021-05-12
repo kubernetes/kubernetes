@@ -55,7 +55,7 @@ func IsQualifiedName(value string) []string {
 			errs = append(errs, prefixEach(msgs, "prefix part ")...)
 		}
 	default:
-		return append(errs, "a qualified name "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc")+
+		return append(errs, "a qualified name "+RegexError(qualifiedNameErrMsg, "^" + qualifiedNameFmt + "$", "MyName", "my.name", "123-abc")+
 			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyName')")
 	}
 
@@ -65,7 +65,7 @@ func IsQualifiedName(value string) []string {
 		errs = append(errs, "name part "+MaxLenError(qualifiedNameMaxLength))
 	}
 	if !qualifiedNameRegexp.MatchString(name) {
-		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, qualifiedNameFmt, "MyName", "my.name", "123-abc"))
+		errs = append(errs, "name part "+RegexError(qualifiedNameErrMsg, "^" + qualifiedNameFmt + "$", "MyName", "my.name", "123-abc"))
 	}
 	return errs
 }
@@ -169,7 +169,7 @@ func IsValidLabelValue(value string) []string {
 		errs = append(errs, MaxLenError(LabelValueMaxLength))
 	}
 	if !labelValueRegexp.MatchString(value) {
-		errs = append(errs, RegexError(labelValueErrMsg, labelValueFmt, "MyValue", "my_value", "12345"))
+		errs = append(errs, RegexError(labelValueErrMsg, "^" + labelValueFmt + "$", "MyValue", "my_value", "12345"))
 	}
 	return errs
 }
@@ -190,7 +190,7 @@ func IsDNS1123Label(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123LabelMaxLength))
 	}
 	if !dns1123LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns1123LabelErrMsg, dns1123LabelFmt, "my-name", "123-abc"))
+		errs = append(errs, RegexError(dns1123LabelErrMsg, "^" + dns1123LabelFmt + "$", "my-name", "123-abc"))
 	}
 	return errs
 }
@@ -211,18 +211,18 @@ func IsDNS1123Subdomain(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !dns1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns1123SubdomainErrorMsg, dns1123SubdomainFmt, "example.com"))
+		errs = append(errs, RegexError(dns1123SubdomainErrorMsg, "^" + dns1123SubdomainFmt + "$", "example.com"))
 	}
 	return errs
 }
 
-const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const dns1035LabelFmt string = "^[a-z]([-a-z0-9]*[a-z0-9])?$"
 const dns1035LabelErrMsg string = "a DNS-1035 label must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 
 // DNS1035LabelMaxLength is a label's max length in DNS (RFC 1035)
 const DNS1035LabelMaxLength int = 63
 
-var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
+var dns1035LabelRegexp = regexp.MustCompile(dns1035LabelFmt)
 
 // IsDNS1035Label tests for a string that conforms to the definition of a label in
 // DNS (RFC 1035).
@@ -254,7 +254,7 @@ func IsWildcardDNS1123Subdomain(value string) []string {
 		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
 	}
 	if !wildcardDNS1123SubdomainRegexp.MatchString(value) {
-		errs = append(errs, RegexError(wildcardDNS1123SubdomainErrMsg, wildcardDNS1123SubdomainFmt, "*.example.com"))
+		errs = append(errs, RegexError(wildcardDNS1123SubdomainErrMsg, "^" + wildcardDNS1123SubdomainFmt + "$", "*.example.com"))
 	}
 	return errs
 }
