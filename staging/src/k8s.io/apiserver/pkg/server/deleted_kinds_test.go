@@ -82,6 +82,7 @@ func Test_newResourceExpirationEvaluator(t *testing.T) {
 				return
 			}
 
+			actual.(*resourceExpirationEvaluator).strictRemovedHandlingInAlpha = false
 			if !reflect.DeepEqual(tt.expected, *actual.(*resourceExpirationEvaluator)) {
 				t.Fatal(actual)
 			}
