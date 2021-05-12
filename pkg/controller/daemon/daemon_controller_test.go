@@ -241,37 +241,6 @@ func newFakePodControl() *fakePodControl {
 	}
 }
 
-func (f *fakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	f.Lock()
-	defer f.Unlock()
-	if err := f.FakePodControl.CreatePodsOnNode(nodeName, namespace, template, object, controllerRef); err != nil {
-		return fmt.Errorf("failed to create pod on node %q", nodeName)
-	}
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels:       template.Labels,
-			Namespace:    namespace,
-			GenerateName: fmt.Sprintf("%s-", nodeName),
-		},
-	}
-
-	template.Spec.DeepCopyInto(&pod.Spec)
-	if len(nodeName) != 0 {
-		pod.Spec.NodeName = nodeName
-	}
-	pod.Name = names.SimpleNameGenerator.GenerateName(fmt.Sprintf("%s-", nodeName))
-
-	f.podStore.Update(pod)
-	f.podIDMap[pod.Name] = pod
-
-	ds := object.(*apps.DaemonSet)
-	dsKey, _ := controller.KeyFunc(ds)
-	f.expectations.CreationObserved(dsKey)
-
-	return nil
-}
-
 func (f *fakePodControl) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	f.Lock()
 	defer f.Unlock()
