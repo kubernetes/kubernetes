@@ -727,6 +727,12 @@ const (
 	//
 	// Enables the PodSecurity admission plugin
 	PodSecurity featuregate.Feature = "PodSecurity"
+
+	// owner: @chrishenzie
+	// alpha: v1.22
+	//
+	// Enables usage of the ReadWriteOncePod PersistentVolume access mode.
+	ReadWriteOncePod featuregate.Feature = "ReadWriteOncePod"
 )
 
 func init() {
@@ -836,6 +842,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandedDNSConfig:                              {Default: false, PreRelease: featuregate.Alpha},
 	SeccompDefault:                                 {Default: false, PreRelease: featuregate.Alpha},
 	PodSecurity:                                    {Default: false, PreRelease: featuregate.Alpha},
+	ReadWriteOncePod:                               {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
