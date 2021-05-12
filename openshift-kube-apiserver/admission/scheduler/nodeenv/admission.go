@@ -13,10 +13,10 @@ import (
 	"k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	corev1listers "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv/labelselector"
 	coreapi "k8s.io/kubernetes/pkg/apis/core"
 
 	projectv1 "github.com/openshift/api/project/v1"
+	"github.com/openshift/apiserver-library-go/pkg/labelselector"
 )
 
 func Register(plugins *admission.Plugins) {

@@ -10,10 +10,10 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/openshift-kube-apiserver/admission/scheduler/nodeenv/labelselector"
 	kapi "k8s.io/kubernetes/pkg/apis/core"
 
 	projectv1 "github.com/openshift/api/project/v1"
+	"github.com/openshift/apiserver-library-go/pkg/labelselector"
 )
 
 // TestPodAdmission verifies various scenarios involving pod/project/global node label selectors

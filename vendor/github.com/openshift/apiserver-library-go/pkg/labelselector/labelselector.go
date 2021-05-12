@@ -266,8 +266,11 @@ func (p *Parser) parseOperator() (op string, err error) {
 
 // parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (string, error) {
+	if tok, _ := p.lookahead(); tok == EndOfStringToken || tok == CommaToken {
+		return "", nil
+	}
 	tok, lit := p.consume()
-	if tok != IdentifierToken && tok != EndOfStringToken {
+	if tok != IdentifierToken {
 		return "", fmt.Errorf("found '%s', expected: identifier", lit)
 	}
 	if err := validateLabelValue(lit); err != nil {
