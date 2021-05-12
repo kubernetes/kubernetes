@@ -654,6 +654,8 @@ function start_controller_manager {
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --feature-gates="${FEATURE_GATES}" \
       "${cloud_config_arg[@]}" \
+      --authentication-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
+      --authorization-kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --kubeconfig "${CERT_DIR}"/controller.kubeconfig \
       --use-service-account-credentials \
       --controllers="${KUBE_CONTROLLERS}" \
@@ -917,6 +919,8 @@ EOF
       --v="${LOG_LEVEL}" \
       --config=/tmp/kube-scheduler.yaml \
       --feature-gates="${FEATURE_GATES}" \
+      --authentication-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
+      --authorization-kubeconfig "${CERT_DIR}"/scheduler.kubeconfig \
       --master="https://${API_HOST}:${API_SECURE_PORT}" >"${SCHEDULER_LOG}" 2>&1 &
     SCHEDULER_PID=$!
 }
