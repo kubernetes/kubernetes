@@ -125,7 +125,8 @@ const (
 	TopologyManager featuregate.Feature = "TopologyManager"
 
 	// owner: @cynepco3hahue(alukiano) @cezaryzukowski @k-wiatrzyk
-	// alpha:: v1.20
+	// alpha: v1.21
+	// beta: v1.22
 
 	// Allows setting memory affinity for a container based on NUMA topology
 	MemoryManager featuregate.Feature = "MemoryManager"
@@ -736,7 +737,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
-	MemoryManager:                                  {Default: false, PreRelease: featuregate.Alpha},
+	MemoryManager:                                  {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
