@@ -5,7 +5,6 @@ import (
 	"strings"
 	"sync"
 
-	securejoin "github.com/cyphar/filepath-securejoin"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
@@ -17,7 +16,7 @@ const (
 )
 
 var (
-	// Set to true by fs unit tests
+	// TestMode is set to true by unit tests that need "fake" cgroupfs.
 	TestMode bool
 
 	cgroupFd     int = -1
@@ -71,12 +70,12 @@ func OpenFile(dir, file string, flags int) (*os.File, error) {
 		flags |= os.O_TRUNC | os.O_CREATE
 		mode = 0o600
 	}
+	if prepareOpenat2() != nil {
+		return openFallback(dir, file, flags, mode)
+	}
 	reldir := strings.TrimPrefix(dir, cgroupfsPrefix)
 	if len(reldir) == len(dir) { // non-standard path, old system?
-		return openWithSecureJoin(dir, file, flags, mode)
-	}
-	if prepareOpenat2() != nil {
-		return openWithSecureJoin(dir, file, flags, mode)
+		return openFallback(dir, file, flags, mode)
 	}
 
 	relname := reldir + "/" + file
@@ -93,11 +92,29 @@ func OpenFile(dir, file string, flags int) (*os.File, error) {
 	return os.NewFile(uintptr(fd), cgroupfsPrefix+relname), nil
 }
 
-func openWithSecureJoin(dir, file string, flags int, mode os.FileMode) (*os.File, error) {
-	path, err := securejoin.SecureJoin(dir, file)
+var errNotCgroupfs = errors.New("not a cgroup file")
+
+// openFallback is used when openat2(2) is not available. It checks the opened
+// file is on cgroupfs, returning an error otherwise.
+func openFallback(dir, file string, flags int, mode os.FileMode) (*os.File, error) {
+	path := dir + "/" + file
+	fd, err := os.OpenFile(path, flags, mode)
 	if err != nil {
 		return nil, err
 	}
+	if TestMode {
+		return fd, nil
+	}
+	// Check this is a cgroupfs file.
+	var st unix.Statfs_t
+	if err := unix.Fstatfs(int(fd.Fd()), &st); err != nil {
+		_ = fd.Close()
+		return nil, &os.PathError{Op: "statfs", Path: path, Err: err}
+	}
+	if st.Type != unix.CGROUP_SUPER_MAGIC && st.Type != unix.CGROUP2_SUPER_MAGIC {
+		_ = fd.Close()
+		return nil, &os.PathError{Op: "open", Path: path, Err: errNotCgroupfs}
+	}
 
-	return os.OpenFile(path, flags, mode)
+	return fd, nil
 }

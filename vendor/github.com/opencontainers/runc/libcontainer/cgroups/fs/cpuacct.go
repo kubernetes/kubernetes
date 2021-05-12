@@ -43,7 +43,7 @@ func (s *CpuacctGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *CpuacctGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *CpuacctGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 
