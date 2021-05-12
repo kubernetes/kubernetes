@@ -814,6 +814,12 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 				continue
 			}
 			count++
+			if status.State == kubecontainer.ContainerStateRunning {
+				if err := m.runtimeService.StopContainer(status.ID.ID, 0); err != nil {
+					utilruntime.HandleError(fmt.Errorf("failed to stop pod init container %q: %v; Skipping pod %q", status.Name, err, format.Pod(pod)))
+					continue
+				}
+			}
 			// Purge all init containers that match this container name
 			klog.V(4).InfoS("Removing init container", "containerName", status.Name, "containerID", status.ID.ID, "count", count)
 			if err := m.removeContainer(status.ID.ID); err != nil {
