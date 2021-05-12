@@ -93,9 +93,7 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
 	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
 	options.AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
-	// TODO: remove "kubeconfig" from "alpha"
-	// https://github.com/kubernetes/kubeadm/issues/2292
-	cmds.AddCommand(alpha.NewCmdKubeConfigUtility(out))
+	cmds.AddCommand(newCmdKubeConfigUtility(out))
 
 	return cmds
 }

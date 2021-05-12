@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package alpha
+package cmd
 
 import (
 	"io"
@@ -34,20 +34,20 @@ import (
 var (
 	kubeconfigLongDesc = cmdutil.LongDesc(`
 	Kubeconfig file utilities.
-	` + cmdutil.AlphaDisclaimer)
+	`)
 
 	userKubeconfigLongDesc = cmdutil.LongDesc(`
 	Output a kubeconfig file for an additional user.
-	` + cmdutil.AlphaDisclaimer)
+	`)
 
 	userKubeconfigExample = cmdutil.Examples(`
 	# Output a kubeconfig file for an additional user named foo using a kubeadm config file bar
-	kubeadm alpha kubeconfig user --client-name=foo --config=bar
+	kubeadm kubeconfig user --client-name=foo --config=bar
 	`)
 )
 
-// NewCmdKubeConfigUtility returns main command for kubeconfig phase
-func NewCmdKubeConfigUtility(out io.Writer) *cobra.Command {
+// newCmdKubeConfigUtility returns main command for kubeconfig phase
+func newCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "kubeconfig",
 		Short: "Kubeconfig file utilities",
