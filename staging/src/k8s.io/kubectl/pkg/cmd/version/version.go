@@ -36,8 +36,8 @@ import (
 
 // Version is a struct for version information
 type Version struct {
-	ClientVersion *apimachineryversion.Info `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
-	ServerVersion *apimachineryversion.Info `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
+	ClientVersion interface{} `json:"clientVersion,omitempty" yaml:"clientVersion,omitempty"`
+	ServerVersion interface{} `json:"serverVersion,omitempty" yaml:"serverVersion,omitempty"`
 }
 
 var (
@@ -127,18 +127,20 @@ func (o *Options) Run() error {
 		versionInfo.ServerVersion = serverVersion
 	}
 
+	if o.Short {
+		shortClientVersion := &apimachineryversion.ShortInfo{GitVersion: clientVersion.GitVersion}
+		versionInfo.ClientVersion = shortClientVersion
+		if serverVersion != nil {
+			shortServerVersion := &apimachineryversion.ShortInfo{GitVersion: serverVersion.GitVersion}
+			versionInfo.ServerVersion = shortServerVersion
+		}
+	}
+
 	switch o.Output {
 	case "":
-		if o.Short {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", clientVersion.GitVersion)
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", serverVersion.GitVersion)
-			}
-		} else {
-			fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", clientVersion))
-			if serverVersion != nil {
-				fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", *serverVersion))
-			}
+		fmt.Fprintf(o.Out, "Client Version: %s\n", fmt.Sprintf("%#v", versionInfo.ClientVersion))
+		if serverVersion != nil {
+			fmt.Fprintf(o.Out, "Server Version: %s\n", fmt.Sprintf("%#v", versionInfo.ServerVersion))
 		}
 	case "yaml":
 		marshalled, err := yaml.Marshal(&versionInfo)

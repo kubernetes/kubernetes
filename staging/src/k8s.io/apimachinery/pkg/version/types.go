@@ -35,3 +35,13 @@ type Info struct {
 func (info Info) String() string {
 	return info.GitVersion
 }
+
+// ShortInfo just contains gitVersion information.
+type ShortInfo struct {
+	GitVersion string `json:"gitVersion"`
+}
+
+// String returns info as a human-friendly version string.
+func (si ShortInfo) String() string {
+	return si.GitVersion
+}
