@@ -543,10 +543,11 @@ func (nim *nodeInfoManager) installDriverToCSINode(
 	newDriverSpecs := []storagev1.CSINodeDriver{}
 	for _, driverInfoSpec := range nodeInfo.Spec.Drivers {
 		if driverInfoSpec.Name == driverName {
-			if driverInfoSpec.NodeID == driverNodeID &&
-				sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys) &&
-				((maxAllocatableCount == 0 && (driverInfoSpec.Allocatable == nil || driverInfoSpec.Allocatable.Count == nil)) ||
-					(driverInfoSpec.Allocatable != nil && driverInfoSpec.Allocatable.Count != nil && *driverInfoSpec.Allocatable.Count == maxAllocatableCount)) {
+			topologyKeysMatch := sets.NewString(driverInfoSpec.TopologyKeys...).Equal(topologyKeys)
+			zeroMaxAllocMatch := maxAllocatableCount == 0 && (driverInfoSpec.Allocatable == nil || driverInfoSpec.Allocatable.Count == nil)
+			nonZeroMaxAllocMatch := driverInfoSpec.Allocatable != nil && driverInfoSpec.Allocatable.Count != nil && *driverInfoSpec.Allocatable.Count == maxAllocatableCount
+			maxAllocMatch := zeroMaxAllocMatch || nonZeroMaxAllocMatch
+			if driverInfoSpec.NodeID == driverNodeID && topologyKeysMatch && maxAllocMatch {
 				specModified = false
 			}
 		} else {
