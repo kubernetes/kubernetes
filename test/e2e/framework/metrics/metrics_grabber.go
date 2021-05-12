@@ -33,14 +33,10 @@ import (
 )
 
 const (
-	// insecureSchedulerPort is the default port for the scheduler status server.
-	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeSchedulerPort instead.
-	insecureSchedulerPort = 10251
-	// insecureKubeControllerManagerPort is the default port for the controller manager status server.
-	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeControllerManagerPort instead.
-	insecureKubeControllerManagerPort = 10252
+	// kubeSchedulerPort is the default port for the scheduler status server.
+	kubeSchedulerPort = 10259
+	// kubeControllerManagerPort is the default port for the controller manager status server.
+	kubeControllerManagerPort = 10257
 )
 
 // Collection is metrics collection of components
@@ -152,7 +148,7 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	if g.kubeScheduler == "" {
 		return SchedulerMetrics{}, fmt.Errorf("kube-scheduler pod is not registered. Skipping Scheduler's metrics gathering")
 	}
-	output, err := g.getMetricsFromPod(g.client, g.kubeScheduler, metav1.NamespaceSystem, insecureSchedulerPort)
+	output, err := g.getMetricsFromPod(g.client, g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
 	if err != nil {
 		return SchedulerMetrics{}, err
 	}
@@ -196,7 +192,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 
 		var lastMetricsFetchErr error
 		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, insecureKubeControllerManagerPort)
+			_, lastMetricsFetchErr = g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, kubeControllerManagerPort)
 			return lastMetricsFetchErr == nil, nil
 		}); metricsWaitErr != nil {
 			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
@@ -207,7 +203,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 		return ControllerManagerMetrics{}, err
 	}
 
-	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, insecureKubeControllerManagerPort)
+	output, err := g.getMetricsFromPod(g.client, podName, metav1.NamespaceSystem, kubeControllerManagerPort)
 	if err != nil {
 		return ControllerManagerMetrics{}, err
 	}
@@ -286,7 +282,7 @@ func (g *Grabber) getMetricsFromPod(client clientset.Interface, podName string, 
 		Namespace(namespace).
 		Resource("pods").
 		SubResource("proxy").
-		Name(fmt.Sprintf("%v:%v", podName, port)).
+		Name(fmt.Sprintf("https:%v:%v", podName, port)).
 		Suffix("metrics").
 		Do(context.TODO()).Raw()
 	if err != nil {
