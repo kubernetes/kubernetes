@@ -76,7 +76,7 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 				if len(nt.tree[zone]) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(2).Infof("Removed node from NodeTree", "node", n.Name, "group", zone)
+				klog.V(2).InfoS("Removed node from NodeTree", "node", n.Name, "group", zone)
 				nt.numNodes--
 				return nil
 			}
