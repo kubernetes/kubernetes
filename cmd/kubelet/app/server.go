@@ -1135,6 +1135,10 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeDeps.OSInterface = kubecontainer.RealOS{}
 	}
 
+	if kubeServer.KubeletConfiguration.SeccompDefault && !utilfeature.DefaultFeatureGate.Enabled(features.SeccompDefault) {
+		return fmt.Errorf("the SeccompDefault feature gate must be enabled in order to use the SeccompDefault configuration")
+	}
+
 	k, err := createAndInitKubelet(&kubeServer.KubeletConfiguration,
 		kubeDeps,
 		&kubeServer.ContainerRuntimeOptions,
@@ -1164,7 +1168,9 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		kubeServer.KeepTerminatedPodVolumes,
 		kubeServer.NodeLabels,
 		kubeServer.SeccompProfileRoot,
-		kubeServer.NodeStatusMaxImages)
+		kubeServer.NodeStatusMaxImages,
+		kubeServer.KubeletFlags.SeccompDefault || kubeServer.KubeletConfiguration.SeccompDefault,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create kubelet: %w", err)
 	}
@@ -1238,7 +1244,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	keepTerminatedPodVolumes bool,
 	nodeLabels map[string]string,
 	seccompProfileRoot string,
-	nodeStatusMaxImages int32) (k kubelet.Bootstrap, err error) {
+	nodeStatusMaxImages int32,
+	seccompDefault bool,
+) (k kubelet.Bootstrap, err error) {
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
@@ -1271,7 +1279,9 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		keepTerminatedPodVolumes,
 		nodeLabels,
 		seccompProfileRoot,
-		nodeStatusMaxImages)
+		nodeStatusMaxImages,
+		seccompDefault,
+	)
 	if err != nil {
 		return nil, err
 	}

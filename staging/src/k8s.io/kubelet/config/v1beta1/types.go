@@ -864,6 +864,11 @@ type KubeletConfiguration struct {
 	// Default: true
 	// +optional
 	EnableDebugFlagsHandler *bool `json:"enableDebugFlagsHandler,omitempty"`
+	// SeccompDefault enables the use of `RuntimeDefault` as the default seccomp profile for all workloads.
+	// This requires the corresponding SeccompDefault feature gate to be enabled as well.
+	// Default: false
+	// +optional
+	SeccompDefault *bool `json:"seccompDefault,omitempty"`
 }
 
 type KubeletAuthorizationMode string

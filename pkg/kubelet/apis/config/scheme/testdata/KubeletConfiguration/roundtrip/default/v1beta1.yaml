@@ -69,6 +69,7 @@ registryBurst: 10
 registryPullQPS: 5
 resolvConf: /etc/resolv.conf
 runtimeRequestTimeout: 2m0s
+seccompDefault: false
 serializeImagePulls: true
 shutdownGracePeriod: 0s
 shutdownGracePeriodCriticalPods: 0s
