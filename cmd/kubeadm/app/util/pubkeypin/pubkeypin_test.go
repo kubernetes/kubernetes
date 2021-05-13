@@ -143,6 +143,17 @@ func TestSet(t *testing.T) {
 		t.Error("expected the second test cert to be disallowed")
 		return
 	}
+
+	s = NewSet() // keep set empty
+	hashes := []string{
+		`sha256:0000000000000000000000000000000000000000000000000000000000000000`,
+		`sha256:0000000000000000000000000000000000000000000000000000000000000001`,
+	}
+	err = s.Allow(hashes...)
+	if err != nil || len(s.sha256Hashes) != 2 {
+		t.Error("expected allowing multiple hashes to succeed")
+		return
+	}
 }
 
 func TestHash(t *testing.T) {
