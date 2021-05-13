@@ -69,6 +69,7 @@ const (
 	RotateKubeletServerCertificate featuregate.Feature = "RotateKubeletServerCertificate"
 
 	// owner: @jinxu
+	// alpha: v1.7
 	// beta: v1.10
 	//
 	// New local storage types to support local storage capacity isolation
