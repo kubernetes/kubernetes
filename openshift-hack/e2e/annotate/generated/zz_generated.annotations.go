@@ -1459,13 +1459,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance]": "should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node": "should not launch unsafe, but not explicitly enabled sysctls on the node [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node": "should not launch unsafe, but not explicitly enabled sysctls on the node [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls": "should reject invalid sysctls [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls": "should reject invalid sysctls [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls": "should support sysctls [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls": "should support sysctls [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually whitelisted": "should support unsafe sysctls which are actually whitelisted [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually whitelisted": "should support unsafe sysctls which are actually whitelisted [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": "should allow composing env vars into new env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
