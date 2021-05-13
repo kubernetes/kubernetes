@@ -1498,7 +1498,6 @@ k8s.io/apiserver/pkg/storage/cacher
 k8s.io/apiserver/pkg/storage/errors
 k8s.io/apiserver/pkg/storage/etcd3
 k8s.io/apiserver/pkg/storage/etcd3/metrics
-k8s.io/apiserver/pkg/storage/etcd3/preflight
 k8s.io/apiserver/pkg/storage/etcd3/testing
 k8s.io/apiserver/pkg/storage/etcd3/testing/testingcert
 k8s.io/apiserver/pkg/storage/names
