@@ -201,7 +201,9 @@ func (sct *ServiceChangeTracker) newBaseServiceInfo(port *v1.ServicePort, servic
 	// Obtain Load Balancer Ingress IPs
 	var ips []string
 	for _, ing := range service.Status.LoadBalancer.Ingress {
-		ips = append(ips, ing.IP)
+		if ing.IP != "" {
+			ips = append(ips, ing.IP)
+		}
 	}
 
 	if len(ips) > 0 {
