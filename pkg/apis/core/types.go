@@ -1828,9 +1828,9 @@ type EnvVar struct {
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
 	// using the previous defined environment variables in the container and
 	// any service environment variables.  If a variable cannot be resolved,
-	// the reference in the input string will be unchanged.  Double $$ are 
-	// reduced to a single $, which allows for escaping the $(VAR_NAME) 
-	// syntax: i.e. $$(VAR_NAME).  Escaped references will never be expanded, 
+	// the reference in the input string will be unchanged.  Double $$ are
+	// reduced to a single $, which allows for escaping the $(VAR_NAME)
+	// syntax: i.e. $$(VAR_NAME).  Escaped references will never be expanded,
 	// regardless of whether the variable exists or not.
 	// +optional
 	Value string
@@ -2102,15 +2102,15 @@ type Container struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced 
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped 
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped
 	// references will never be expanded, regardless of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced 
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped 
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped
 	// references will never be expanded, regardless of whether the variable exists or not.
 	// +optional
 	Args []string
@@ -3079,15 +3079,15 @@ type EphemeralContainerCommon struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced 
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped 
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped
 	// references will never be expanded, regardless of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced 
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped 
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).  Escaped
 	// references will never be expanded, regardless of whether the variable exists or not.
 	// +optional
 	Args []string
