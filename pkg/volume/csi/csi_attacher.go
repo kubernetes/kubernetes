@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/klog/v2"
 
+	api "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -51,8 +52,8 @@ type csiAttacher struct {
 	plugin       *csiPlugin
 	k8s          kubernetes.Interface
 	watchTimeout time.Duration
-
-	csiClient csiClient
+	pod          *api.Pod
+	csiClient    csiClient
 }
 
 type verifyAttachDetachStatus func(attach *storage.VolumeAttachment, volumeHandle string) (bool, error)
@@ -144,7 +145,7 @@ func (c *csiAttacher) WaitForAttach(spec *volume.Spec, _ string, pod *v1.Pod, ti
 	}
 
 	attachID := getAttachmentName(source.VolumeHandle, source.Driver, string(c.plugin.host.GetNodeName()))
-
+	c.pod = pod
 	return c.waitForVolumeAttachment(source.VolumeHandle, attachID, timeout)
 }
 
@@ -365,6 +366,16 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		mountOptions = spec.PersistentVolume.Spec.MountOptions
 	}
 
+	volAttribs := csiSource.VolumeAttributes
+	// Inject pod information into volume_attributes
+	podInfoEnabled, err := c.plugin.podInfoEnabled(string(csiSource.Driver))
+	if err != nil {
+		return volumetypes.NewTransientOperationFailure(log("attacher.MountDevice failed to assemble volume attributes: %v", err))
+	}
+	if podInfoEnabled {
+		volAttribs = mergeMap(volAttribs, getPodInfoAttrs(c.pod, storage.VolumeLifecyclePersistent))
+	}
+
 	fsType := csiSource.FSType
 	err = csi.NodeStageVolume(ctx,
 		csiSource.VolumeHandle,
@@ -373,7 +384,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		fsType,
 		accessMode,
 		nodeStageSecrets,
-		csiSource.VolumeAttributes,
+		volAttribs,
 		mountOptions)
 
 	if err != nil {
