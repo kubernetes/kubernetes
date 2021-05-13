@@ -465,7 +465,7 @@ filename | sha512 hash
 ### Bug or Regression
 
 - Add missing --kube-api-content-type in kubemark hollow template ([#98911](https://github.com/kubernetes/kubernetes/pull/98911), [@Jeffwan](https://github.com/Jeffwan)) [SIG Scalability and Testing]
-- Avoid duplicate error messages when runing kubectl edit quota ([#98201](https://github.com/kubernetes/kubernetes/pull/98201), [@pacoxu](https://github.com/pacoxu)) [SIG API Machinery and Apps]
+- Avoid duplicate error messages when running kubectl edit quota ([#98201](https://github.com/kubernetes/kubernetes/pull/98201), [@pacoxu](https://github.com/pacoxu)) [SIG API Machinery and Apps]
 - Cleanup subnet in frontend IP configs to prevent huge subnet request bodies in some scenarios. ([#98133](https://github.com/kubernetes/kubernetes/pull/98133), [@nilo19](https://github.com/nilo19)) [SIG Cloud Provider]
 - Fix errors when accessing Windows container stats for Dockershim ([#98510](https://github.com/kubernetes/kubernetes/pull/98510), [@jsturtevant](https://github.com/jsturtevant)) [SIG Node and Windows]
 - Fixes spurious errors about IPv6 in kube-proxy logs on nodes with IPv6 disabled. ([#99127](https://github.com/kubernetes/kubernetes/pull/99127), [@danwinship](https://github.com/danwinship)) [SIG Network and Node]
