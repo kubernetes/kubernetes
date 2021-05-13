@@ -179,6 +179,7 @@ const (
 	// owner: @mikedanese
 	// alpha: v1.13
 	// beta: v1.21
+	// ga: v1.22
 	//
 	// Migrate ServiceAccount volumes to use a projected volume consisting of a
 	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
@@ -751,7 +752,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.Beta},
+	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	ServiceAccountIssuerDiscovery:                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)

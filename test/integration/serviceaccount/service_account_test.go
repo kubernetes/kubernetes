@@ -31,7 +31,6 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -211,70 +210,30 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
-	// Get default token
-	defaultTokenName, _, err := getReferencedServiceAccountToken(c, ns, serviceaccountadmission.DefaultServiceAccountName, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Pod to create
 	protoPod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "protopod"},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "container-1",
-					Image: "container-1-image",
-				},
-				{
-					Name:  "container-2",
-					Image: "container-2-image",
-					VolumeMounts: []v1.VolumeMount{
-						{Name: "empty-dir", MountPath: serviceaccountadmission.DefaultAPITokenMountPath},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name:         "empty-dir",
-					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					Name:  "container",
+					Image: "container-image",
 				},
 			},
 		},
 	}
-
-	// Pod we expect to get created
-	defaultMode := int32(0644)
-	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
-	expectedVolumes := append(protoPod.Spec.Volumes, v1.Volume{
-		Name: defaultTokenName,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  defaultTokenName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
-	expectedContainer1VolumeMounts := []v1.VolumeMount{
-		{Name: defaultTokenName, MountPath: serviceaccountadmission.DefaultAPITokenMountPath, ReadOnly: true},
-	}
-	expectedContainer2VolumeMounts := protoPod.Spec.Containers[1].VolumeMounts
 
 	createdPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), &protoPod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
 	if createdPod.Spec.ServiceAccountName != expectedServiceAccount {
 		t.Fatalf("Expected %s, got %s", expectedServiceAccount, createdPod.Spec.ServiceAccountName)
 	}
-	if !apiequality.Semantic.DeepEqual(&expectedVolumes, &createdPod.Spec.Volumes) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedVolumes, createdPod.Spec.Volumes)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer1VolumeMounts, &createdPod.Spec.Containers[0].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer1VolumeMounts, createdPod.Spec.Containers[0].VolumeMounts)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer2VolumeMounts, &createdPod.Spec.Containers[1].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer2VolumeMounts, createdPod.Spec.Containers[1].VolumeMounts)
+	if len(createdPod.Spec.Volumes) == 0 || createdPod.Spec.Volumes[0].Projected == nil {
+		t.Fatal("Expected projected volume for service account token inserted")
 	}
 }
 
