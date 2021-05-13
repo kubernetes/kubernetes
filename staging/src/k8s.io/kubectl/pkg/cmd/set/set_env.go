@@ -365,7 +365,9 @@ func (o *EnvOptions) RunEnv() error {
 	patches := CalculatePatches(infos, scheme.DefaultJSONEncoder(), func(obj runtime.Object) ([]byte, error) {
 		_, err := o.updatePodSpecForObject(obj, func(spec *v1.PodSpec) error {
 			resolutionErrorsEncountered := false
+			initContainers, _ := selectContainers(spec.InitContainers, o.ContainerSelector)
 			containers, _ := selectContainers(spec.Containers, o.ContainerSelector)
+			containers = append(containers, initContainers...)
 			objName, err := meta.NewAccessor().Name(obj)
 			if err != nil {
 				return err
