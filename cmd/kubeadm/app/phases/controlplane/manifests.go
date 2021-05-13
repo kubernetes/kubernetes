@@ -34,73 +34,56 @@ import (
 	certphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
+	userutil "k8s.io/kubernetes/cmd/kubeadm/util/users"
 	utilsnet "k8s.io/utils/net"
 )
 
 // CreateInitStaticPodManifestFiles will write all static pod manifest files needed to bring up the control plane.
-func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration) error {
+func CreateInitStaticPodManifestFiles(manifestDir, patchesDir string, cfg *kubeadmapi.InitConfiguration, isDryRun bool) error {
 	klog.V(1).Infoln("[control-plane] creating static Pod files")
-	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
+	return CreateStaticPodFiles(manifestDir, patchesDir, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, isDryRun, kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler)
 }
 
 // GetStaticPodSpecs returns all staticPodSpecs actualized to the context of the current configuration
 // NB. this methods holds the information about how kubeadm creates static pod manifests.
-func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) map[string]v1.Pod {
-	// Get the required hostpath mounts
+func GetAllStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool) (map[string]v1.Pod, error) {
+	// Get the hostVolume mounts.
 	mounts := getHostPathVolumesForTheControlPlane(cfg)
-
 	// Prepare static pod specs
-	staticPodSpecs := map[string]v1.Pod{
-		kubeadmconstants.KubeAPIServer: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeAPIServer,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeAPIServer, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getAPIServerCommand(cfg, endpoint),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", int(endpoint.BindPort), v1.URISchemeHTTPS),
-			ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/readyz", int(endpoint.BindPort), v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", int(endpoint.BindPort), v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
-			Resources:       staticpodutil.ComponentResources("250m"),
-			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer),
-			map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: endpoint.String()}),
-		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeControllerManager,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getControllerManagerCommand(cfg),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
-			Resources:       staticpodutil.ComponentResources("200m"),
-			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil),
-		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
-			Name:            kubeadmconstants.KubeScheduler,
-			Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
-			ImagePullPolicy: v1.PullIfNotPresent,
-			Command:         getSchedulerCommand(cfg),
-			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
-			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
-			StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
-			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             kubeadmutil.GetProxyEnvVars(),
-		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil),
+	staticPodSpecs := map[string]v1.Pod{}
+	for _, componentName := range []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler} {
+		spec, err := getStaticPodSpec(cfg, endpoint, mounts, isDryRun, componentName)
+		if err != nil {
+			return nil, err
+		}
+		staticPodSpecs[componentName] = spec
 	}
-	return staticPodSpecs
+	return staticPodSpecs, nil
+}
+
+func getStaticPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, mounts controlPlaneHostPathMounts, isDryRun bool, componentName string) (v1.Pod, error) {
+	switch componentName {
+	case kubeadmconstants.KubeAPIServer:
+		return getAPIServerPod(cfg, endpoint, mounts, isDryRun)
+	case kubeadmconstants.KubeControllerManager:
+		return getControllerManagerPod(cfg, mounts, isDryRun)
+	case kubeadmconstants.KubeScheduler:
+		return getSchedulerPod(cfg, mounts, isDryRun)
+	}
+	return v1.Pod{}, errors.Errorf("conponent %s is not a valid control-plane component", componentName)
 }
 
 // CreateStaticPodFiles creates all the requested static pod files.
-func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, componentNames ...string) error {
+func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, isDryRun bool, componentNames ...string) error {
+	// Get the hostVolume mounts.
+	mounts := getHostPathVolumesForTheControlPlane(cfg)
 	// gets the StaticPodSpecs, actualized for the current ClusterConfiguration
 	klog.V(1).Infoln("[control-plane] getting StaticPodSpecs")
-	specs := GetStaticPodSpecs(cfg, endpoint)
-
 	// creates required static pod specs
 	for _, componentName := range componentNames {
 		// retrieves the StaticPodSpec for given component
-		spec, exists := specs[componentName]
-		if !exists {
+		spec, err := getStaticPodSpec(cfg, endpoint, mounts, isDryRun, componentName)
+		if err != nil {
 			return errors.Errorf("couldn't retrieve StaticPodSpec for %q", componentName)
 		}
 
@@ -127,6 +110,77 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 	}
 
 	return nil
+}
+
+func getAPIServerPod(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint, mounts controlPlaneHostPathMounts, isDryRun bool) (v1.Pod, error) {
+	pod := staticpodutil.ComponentPod(v1.Container{
+		Name:            kubeadmconstants.KubeAPIServer,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeAPIServer, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getAPIServerCommand(cfg, endpoint),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
+		LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", int(endpoint.BindPort), v1.URISchemeHTTPS),
+		ReadinessProbe:  staticpodutil.ReadinessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/readyz", int(endpoint.BindPort), v1.URISchemeHTTPS),
+		StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/livez", int(endpoint.BindPort), v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
+		Resources:       staticpodutil.ComponentResources("250m"),
+		Env:             kubeadmutil.GetProxyEnvVars(),
+	}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer),
+		map[string]string{kubeadmconstants.KubeAPIServerAdvertiseAddressEndpointAnnotationKey: endpoint.String()})
+
+	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+
+		var uid int64 = 1000
+		var gid int64 = 1000
+		if !isDryRun {
+			controlPlanUsersAndGroups, err := userutil.AddUsersAndGroups()
+			if err != nil {
+				return pod, err
+			}
+			uid = controlPlanUsersAndGroups.Users[kubeadmconstants.KubeAPIServerUserName].ID()
+			gid = controlPlanUsersAndGroups.Groups[kubeadmconstants.KubeAPIServerUserName].ID()
+			saPublicKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName)
+			if err := UpdateFileOwnership(saPublicKeyFile, uid, gid, 0600); err != nil {
+				return pod, err
+			}
+
+			saPrivateKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName)
+			if err := UpdateFileOwnership(saPrivateKeyFile, 0, controlPlanUsersAndGroups.Groups[kubeadmconstants.ServiceAccountKeyReadersGroupName].ID(), 0640); err != nil {
+				return pod, err
+			}
+
+			apiServerKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKeyName)
+			if err := UpdateFileOwnership(apiServerKeyFile, uid, gid, 0600); err != nil {
+				return pod, err
+			}
+
+			apiServerKubeletClientKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerKubeletClientKeyName)
+			if err := UpdateFileOwnership(apiServerKubeletClientKeyFile, uid, gid, 0600); err != nil {
+				return pod, err
+			}
+
+			frontProxyClientKeyName := filepath.Join(cfg.CertificatesDir, kubeadmconstants.FrontProxyClientKeyName)
+			if err := UpdateFileOwnership(frontProxyClientKeyName, uid, gid, 0600); err != nil {
+				return pod, err
+			}
+
+			if cfg.Etcd.External == nil {
+				apiServerEtcdClientKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.APIServerEtcdClientKeyName)
+				if err := UpdateFileOwnership(apiServerEtcdClientKeyFile, uid, uid, 0600); err != nil {
+					return pod, err
+				}
+			}
+		}
+		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+				Add:  []v1.Capability{"NET_BIND_SERVICE"},
+			},
+		}
+		pod.Spec.SecurityContext.RunAsGroup = &[]int64{uid}[0]
+		pod.Spec.SecurityContext.RunAsUser = &[]int64{uid}[0]
+	}
+
+	return pod, nil
 }
 
 // getAPIServerCommand builds the right API server command from the given config object and version
@@ -271,6 +325,56 @@ func isValidAuthzMode(authzMode string) bool {
 	return false
 }
 
+func getControllerManagerPod(cfg *kubeadmapi.ClusterConfiguration, mounts controlPlaneHostPathMounts, isDryRun bool) (v1.Pod, error) {
+	pod := staticpodutil.ComponentPod(v1.Container{
+		Name:            kubeadmconstants.KubeControllerManager,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeControllerManager, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getControllerManagerCommand(cfg),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
+		LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS),
+		StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeControllerManagerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
+		Resources:       staticpodutil.ComponentResources("200m"),
+		Env:             kubeadmutil.GetProxyEnvVars(),
+	}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager), nil)
+
+	controlPlanUsersAndGroups, err := GetUserAndGroupIDs()
+	if err != nil {
+		return pod, err
+	}
+	uid := controlPlanUsersAndGroups[kubeadmconstants.KubeControllerManagerUsername]
+	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+		if !isDryRun {
+			kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
+			if err := UpdateFileOwnership(kubeconfigFile, uid, uid, 0600); err != nil {
+				return pod, err
+			}
+			saKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPrivateKeyName)
+			if err := UpdateFileOwnership(saKeyFile, 0, controlPlanUsersAndGroups[kubeadmconstants.ServiceAccountKeyReadersGroupName], 0640); err != nil {
+				return pod, err
+			}
+			if res, _ := certphase.UsingExternalCA(cfg); !res {
+				caKeyFile := filepath.Join(cfg.CertificatesDir, kubeadmconstants.CAKeyName)
+				err := UpdateFileOwnership(caKeyFile, uid, uid, 0600)
+				if err != nil {
+					return pod, err
+				}
+			}
+		}
+		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			AllowPrivilegeEscalation: &[]bool{false}[0],
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
+		}
+		pod.Spec.SecurityContext.RunAsUser = &[]int64{uid}[0]
+		pod.Spec.SecurityContext.RunAsGroup = &[]int64{uid}[0]
+		pod.Spec.SecurityContext.SupplementalGroups = []int64{controlPlanUsersAndGroups[kubeadmconstants.ServiceAccountKeyReadersGroupName]}
+	}
+
+	return pod, nil
+}
+
 // getControllerManagerCommand builds the right controller manager command from the given config object and version
 func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 
@@ -329,6 +433,44 @@ func getControllerManagerCommand(cfg *kubeadmapi.ClusterConfiguration) []string 
 	return command
 }
 
+func getSchedulerPod(cfg *kubeadmapi.ClusterConfiguration, mounts controlPlaneHostPathMounts, isDryRun bool) (v1.Pod, error) {
+	pod := staticpodutil.ComponentPod(v1.Container{
+		Name:            kubeadmconstants.KubeScheduler,
+		Image:           images.GetKubernetesImage(kubeadmconstants.KubeScheduler, cfg),
+		ImagePullPolicy: v1.PullIfNotPresent,
+		Command:         getSchedulerCommand(cfg),
+		VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
+		LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS),
+		StartupProbe:    staticpodutil.StartupProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.KubeSchedulerPort, v1.URISchemeHTTPS, cfg.APIServer.TimeoutForControlPlane),
+		Resources:       staticpodutil.ComponentResources("100m"),
+		Env:             kubeadmutil.GetProxyEnvVars(),
+	}, mounts.GetVolumes(kubeadmconstants.KubeScheduler), nil)
+
+	if features.Enabled(cfg.FeatureGates, features.RootlessControlPlane) {
+		controlPlanUsersAndGroups, err := GetUserAndGroupIDs()
+		if err != nil {
+			return pod, err
+		}
+		uid := controlPlanUsersAndGroups[kubeadmconstants.KubeSchedulerUserName]
+		if !isDryRun {
+			kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
+			if err := UpdateFileOwnership(kubeconfigFile, uid, uid, 0600); err != nil {
+				return pod, err
+			}
+		}
+		pod.Spec.Containers[0].SecurityContext = &v1.SecurityContext{
+			AllowPrivilegeEscalation: &[]bool{false}[0],
+			Capabilities: &v1.Capabilities{
+				Drop: []v1.Capability{"ALL"},
+			},
+		}
+		pod.Spec.SecurityContext.RunAsUser = &[]int64{controlPlanUsersAndGroups[kubeadmconstants.KubeSchedulerUserName]}[0]
+		pod.Spec.SecurityContext.RunAsGroup = &[]int64{controlPlanUsersAndGroups[kubeadmconstants.KubeSchedulerUserName]}[0]
+	}
+
+	return pod, nil
+}
+
 // getSchedulerCommand builds the right scheduler command from the given config object and version
 func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	kubeconfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.SchedulerKubeConfigFileName)
@@ -340,7 +482,6 @@ func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 		"authentication-kubeconfig": kubeconfigFile,
 		"authorization-kubeconfig":  kubeconfigFile,
 	}
-
 	// TODO: The following code should be remvoved after dual-stack is GA.
 	// Note: The user still retains the ability to explicitly set feature-gates and that value will overwrite this base value.
 	if enabled, present := cfg.FeatureGates[features.IPv6DualStack]; present {

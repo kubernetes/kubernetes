@@ -192,6 +192,7 @@ func runControlPlanePrepareControlPlaneSubphase(c workflow.RunData) error {
 			data.PatchesDir(),
 			&cfg.ClusterConfiguration,
 			&cfg.LocalAPIEndpoint,
+			false, //isDryRun
 			component,
 		)
 		if err != nil {

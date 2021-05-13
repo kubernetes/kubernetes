@@ -45,43 +45,106 @@ const (
 var cpVersion = kubeadmconstants.MinimumControlPlaneVersion.WithPreRelease("beta.2").String()
 
 func TestGetStaticPodSpecs(t *testing.T) {
-
-	// Creates a Cluster Configuration
-	cfg := &kubeadmapi.ClusterConfiguration{
-		KubernetesVersion: "v1.9.0",
-	}
-
-	// Executes GetStaticPodSpecs
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
-
 	var tests = []struct {
-		name          string
-		staticPodName string
+		name                 string
+		staticPodName        string
+		rootlessControlPlane bool
+		usersAndGroups       map[string]int64
 	}{
 		{
-			name:          "KubeAPIServer",
-			staticPodName: kubeadmconstants.KubeAPIServer,
+			name:           "KubeAPIServer",
+			staticPodName:  kubeadmconstants.KubeAPIServer,
+			usersAndGroups: map[string]int64{},
 		},
 		{
-			name:          "KubeControllerManager",
-			staticPodName: kubeadmconstants.KubeControllerManager,
+			name:           "KubeControllerManager",
+			staticPodName:  kubeadmconstants.KubeControllerManager,
+			usersAndGroups: map[string]int64{},
 		},
 		{
-			name:          "KubeScheduler",
-			staticPodName: kubeadmconstants.KubeScheduler,
+			name:           "KubeScheduler",
+			staticPodName:  kubeadmconstants.KubeScheduler,
+			usersAndGroups: map[string]int64{},
+		},
+		{
+			name:                 "KubeAPIServerRootless",
+			staticPodName:        kubeadmconstants.KubeAPIServer,
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
+		},
+		{
+			name:                 "KubeControllerManagerRootless",
+			staticPodName:        kubeadmconstants.KubeControllerManager,
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
+		},
+		{
+			name:                 "KubeSchedulerRootless",
+			staticPodName:        kubeadmconstants.KubeScheduler,
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			GetUserAndGroupIDsFn = func() (map[string]int64, error) {
+				return tc.usersAndGroups, nil
+			}
+
+			// Creates a Cluster Configuration
+			cfg := &kubeadmapi.ClusterConfiguration{
+				KubernetesVersion: "v1.9.0",
+				FeatureGates:      map[string]bool{"RootlessControlPlane": tc.rootlessControlPlane},
+			}
+
+			// Executes GetStaticPodSpecs
+			specs, err := GetAllStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+
 			// assert the spec for the staticPodName exists
 			if spec, ok := specs[tc.staticPodName]; ok {
-
 				// Assert each specs refers to the right pod
 				if spec.Spec.Containers[0].Name != tc.staticPodName {
 					t.Errorf("getKubeConfigSpecs spec for %s contains pod %s, expects %s", tc.staticPodName, spec.Spec.Containers[0].Name, tc.staticPodName)
 				}
-
+				if tc.rootlessControlPlane {
+					if spec.Spec.SecurityContext == nil {
+						t.Error("expected non-nil spec.Spec.SecurityContext, got nil")
+					}
+					if spec.Spec.SecurityContext.RunAsUser == nil {
+						t.Error("expected non-nil spec.Spec.SecurityContext.RunAsUser, got nil")
+					}
+					if spec.Spec.SecurityContext.RunAsGroup == nil {
+						t.Error("expected non-nil spec.Spec.SecurityContext.RunAsGroup, got nil")
+					}
+					if spec.Spec.Containers[0].SecurityContext == nil {
+						t.Error("expected non-nil spec.Spec.Containers[0].SecurityContext, got nil")
+					}
+					if tc.staticPodName != kubeadmconstants.KubeAPIServer && spec.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation == nil {
+						t.Error("expected non-nil spec.Spec.Containers[0].SecurityContext.AllowPrivilegeEscalation, got nil")
+					}
+					if spec.Spec.Containers[0].SecurityContext.Capabilities == nil {
+						t.Error("expected non-nil spec.Spec.Containers[0].SecurityContext.Capabilities, got nil")
+					}
+				}
 			} else {
 				t.Errorf("getStaticPodSpecs didn't create spec for %s ", tc.staticPodName)
 			}
@@ -92,24 +155,74 @@ func TestGetStaticPodSpecs(t *testing.T) {
 func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 	var tests = []struct {
-		name       string
-		components []string
+		name                 string
+		components           []string
+		rootlessControlPlane bool
+		usersAndGroups       map[string]int64
 	}{
 		{
-			name:       "KubeAPIServer KubeAPIServer KubeScheduler",
-			components: []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
+			name:           "KubeAPIServer KubeAPIServer KubeScheduler",
+			components:     []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
+			usersAndGroups: map[string]int64{},
 		},
 		{
-			name:       "KubeAPIServer",
-			components: []string{kubeadmconstants.KubeAPIServer},
+			name:           "KubeAPIServer",
+			components:     []string{kubeadmconstants.KubeAPIServer},
+			usersAndGroups: map[string]int64{},
 		},
 		{
-			name:       "KubeControllerManager",
-			components: []string{kubeadmconstants.KubeControllerManager},
+			name:           "KubeControllerManager",
+			components:     []string{kubeadmconstants.KubeControllerManager},
+			usersAndGroups: map[string]int64{},
 		},
 		{
-			name:       "KubeScheduler",
-			components: []string{kubeadmconstants.KubeScheduler},
+			name:           "KubeScheduler",
+			components:     []string{kubeadmconstants.KubeScheduler},
+			usersAndGroups: map[string]int64{},
+		},
+		{
+			name:                 "KubeAPIServer KubeAPIServer KubeScheduler Rootless",
+			components:           []string{kubeadmconstants.KubeAPIServer, kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeScheduler},
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
+		},
+		{
+			name:                 "KubeAPIServer Rootless",
+			components:           []string{kubeadmconstants.KubeAPIServer},
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
+		},
+		{
+			name:                 "KubeControllerManager Rootless",
+			components:           []string{kubeadmconstants.KubeControllerManager},
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
+		},
+		{
+			name:                 "KubeScheduler Rootless",
+			components:           []string{kubeadmconstants.KubeScheduler},
+			rootlessControlPlane: true,
+			usersAndGroups: map[string]int64{
+				kubeadmconstants.KubeAPIServerUserName:             1000,
+				kubeadmconstants.KubeControllerManagerUsername:     1001,
+				kubeadmconstants.KubeSchedulerUserName:             1002,
+				kubeadmconstants.ServiceAccountKeyReadersGroupName: 1003,
+			},
 		},
 	}
 
@@ -124,9 +237,15 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 				KubernetesVersion: "v1.9.0",
 			}
 
+			GetUserAndGroupIDsFn = func() (map[string]int64, error) {
+				return test.usersAndGroups, nil
+			}
+
+			cfg.FeatureGates = map[string]bool{"RootlessControlPlane": test.rootlessControlPlane}
+
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, true, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -171,7 +290,7 @@ func TestCreateStaticPodFilesWithPatches(t *testing.T) {
 
 	// Execute createStaticPodFunction with patches
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateStaticPodFiles(manifestPath, patchesPath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	err = CreateStaticPodFiles(manifestPath, patchesPath, cfg, &kubeadmapi.APIEndpoint{}, true, kubeadmconstants.KubeAPIServer)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return

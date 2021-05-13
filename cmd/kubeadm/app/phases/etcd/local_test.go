@@ -47,7 +47,10 @@ func TestGetEtcdPodSpec(t *testing.T) {
 	endpoint := &kubeadmapi.APIEndpoint{}
 
 	// Executes GetEtcdPodSpec
-	spec := GetEtcdPodSpec(cfg, endpoint, "", []etcdutil.Member{})
+	spec, err := GetEtcdPodSpec(cfg, endpoint, "", []etcdutil.Member{}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Assert each specs refers to the right pod
 	if spec.Spec.Containers[0].Name != kubeadmconstants.Etcd {
@@ -96,7 +99,7 @@ func TestCreateLocalEtcdStaticPodManifestFile(t *testing.T) {
 	for _, test := range tests {
 		// Execute createStaticPodFunction
 		manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", test.cfg, &kubeadmapi.APIEndpoint{})
+		err := CreateLocalEtcdStaticPodManifestFile(manifestPath, "", "", test.cfg, &kubeadmapi.APIEndpoint{}, true)
 
 		if !test.expectedError {
 			if err != nil {
@@ -144,7 +147,7 @@ func TestCreateLocalEtcdStaticPodManifestFileWithPatches(t *testing.T) {
 	}
 
 	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, patchesPath, "", cfg, &kubeadmapi.APIEndpoint{})
+	err = CreateLocalEtcdStaticPodManifestFile(manifestPath, patchesPath, "", cfg, &kubeadmapi.APIEndpoint{}, true)
 	if err != nil {
 		t.Errorf("Error executing createStaticPodFunction: %v", err)
 		return
