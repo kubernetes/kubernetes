@@ -177,7 +177,7 @@ var _ = SIGDescribe("Deployment", func() {
 		the Deployment.
 	*/
 	framework.ConformanceIt("should run the lifecycle of a Deployment", func() {
-		zero := int64(0)
+		one := int64(1)
 		deploymentResource := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}
 		testNamespaceName := f.Namespace.Name
 		testDeploymentName := "test-deployment"
@@ -215,7 +215,7 @@ var _ = SIGDescribe("Deployment", func() {
 						Labels: testDeploymentLabelSelectors.MatchLabels,
 					},
 					Spec: v1.PodSpec{
-						TerminationGracePeriodSeconds: &zero,
+						TerminationGracePeriodSeconds: &one,
 						Containers: []v1.Container{{
 							Name:  testDeploymentName,
 							Image: testDeploymentInitialImage,
@@ -272,7 +272,7 @@ var _ = SIGDescribe("Deployment", func() {
 				"replicas": testDeploymentMinimumReplicas,
 				"template": map[string]interface{}{
 					"spec": map[string]interface{}{
-						"TerminationGracePeriodSeconds": &zero,
+						"TerminationGracePeriodSeconds": &one,
 						"containers": [1]map[string]interface{}{{
 							"name":  testDeploymentName,
 							"image": testDeploymentPatchImage,
@@ -458,7 +458,7 @@ var _ = SIGDescribe("Deployment", func() {
 		framework.ExpectNoError(err, "failed to see replicas of %v in namespace %v scale to requested amount of %v", testDeployment.Name, testNamespaceName, testDeploymentDefaultReplicas)
 
 		ginkgo.By("deleting the Deployment")
-		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &zero}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
+		err = f.ClientSet.AppsV1().Deployments(testNamespaceName).DeleteCollection(context.TODO(), metav1.DeleteOptions{GracePeriodSeconds: &one}, metav1.ListOptions{LabelSelector: testDeploymentLabelsFlat})
 		framework.ExpectNoError(err, "failed to delete Deployment via collection")
 
 		ctx, cancel = context.WithTimeout(context.Background(), 1*time.Minute)
