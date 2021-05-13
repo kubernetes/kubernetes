@@ -42,6 +42,7 @@ type RegistryList struct {
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 	MicrosoftRegistry       string `yaml:"microsoftRegistry"`
+	DockerLibraryRegistry   string `yaml:"dockerLibraryRegistry"`
 }
 
 // Config holds an images registry, name, and version
@@ -67,20 +68,8 @@ func (i *Config) SetVersion(version string) {
 }
 
 func initReg() RegistryList {
-	registry := RegistryList{
-		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
-		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
-		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
-		BuildImageRegistry:      "k8s.gcr.io/build-image",
-		InvalidRegistry:         "invalid.com/invalid",
-		GcEtcdRegistry:          "k8s.gcr.io",
-		GcRegistry:              "k8s.gcr.io",
-		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
-		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
-		SampleRegistry:          "gcr.io/google-samples",
-		GcrReleaseRegistry:      "gcr.io/gke-release",
-		MicrosoftRegistry:       "mcr.microsoft.com",
-	}
+	registry := initRegistry
+
 	repoList := os.Getenv("KUBE_TEST_REPO_LIST")
 	if repoList == "" {
 		return registry
@@ -99,26 +88,26 @@ func initReg() RegistryList {
 }
 
 var (
+	initRegistry = RegistryList{
+		GcAuthenticatedRegistry: "gcr.io/authenticated-image-pulling",
+		E2eRegistry:             "gcr.io/kubernetes-e2e-test-images",
+		PromoterE2eRegistry:     "k8s.gcr.io/e2e-test-images",
+		BuildImageRegistry:      "k8s.gcr.io/build-image",
+		InvalidRegistry:         "invalid.com/invalid",
+		GcEtcdRegistry:          "k8s.gcr.io",
+		GcRegistry:              "k8s.gcr.io",
+		SigStorageRegistry:      "k8s.gcr.io/sig-storage",
+		PrivateRegistry:         "gcr.io/k8s-authenticated-test",
+		SampleRegistry:          "gcr.io/google-samples",
+		GcrReleaseRegistry:      "gcr.io/gke-release",
+		MicrosoftRegistry:       "mcr.microsoft.com",
+		DockerLibraryRegistry:   "docker.io/library",
+	}
+
 	registry = initReg()
 
-	// PrivateRegistry is an image repository that requires authentication
-	PrivateRegistry = registry.PrivateRegistry
-
 	// Preconfigured image configs
-	dockerLibraryRegistry   = "docker.io/library"
-	e2eRegistry             = registry.E2eRegistry
-	promoterE2eRegistry     = registry.PromoterE2eRegistry
-	buildImageRegistry      = registry.BuildImageRegistry
-	gcAuthenticatedRegistry = registry.GcAuthenticatedRegistry
-	gcEtcdRegistry          = registry.GcEtcdRegistry
-	gcRegistry              = registry.GcRegistry
-	sigStorageRegistry      = registry.SigStorageRegistry
-	gcrReleaseRegistry      = registry.GcrReleaseRegistry
-	invalidRegistry         = registry.InvalidRegistry
-	sampleRegistry          = registry.SampleRegistry
-	microsoftRegistry       = registry.MicrosoftRegistry
-
-	imageConfigs, originalImageConfigs = initImageConfigs()
+	imageConfigs, originalImageConfigs = initImageConfigs(registry)
 )
 
 const (
@@ -211,51 +200,51 @@ const (
 	WindowsServer
 )
 
-func initImageConfigs() (map[int]Config, map[int]Config) {
+func initImageConfigs(list RegistryList) (map[int]Config, map[int]Config) {
 	configs := map[int]Config{}
-	configs[Agnhost] = Config{promoterE2eRegistry, "agnhost", "2.32"}
-	configs[AgnhostPrivate] = Config{PrivateRegistry, "agnhost", "2.6"}
-	configs[AuthenticatedAlpine] = Config{gcAuthenticatedRegistry, "alpine", "3.7"}
-	configs[AuthenticatedWindowsNanoServer] = Config{gcAuthenticatedRegistry, "windows-nanoserver", "v1"}
-	configs[APIServer] = Config{promoterE2eRegistry, "sample-apiserver", "1.17.4"}
-	configs[AppArmorLoader] = Config{promoterE2eRegistry, "apparmor-loader", "1.3"}
-	configs[BusyBox] = Config{promoterE2eRegistry, "busybox", "1.29-1"}
-	configs[CheckMetadataConcealment] = Config{promoterE2eRegistry, "metadata-concealment", "1.6"}
-	configs[CudaVectorAdd] = Config{e2eRegistry, "cuda-vector-add", "1.0"}
-	configs[CudaVectorAdd2] = Config{promoterE2eRegistry, "cuda-vector-add", "2.2"}
-	configs[DebianIptables] = Config{buildImageRegistry, "debian-iptables", "buster-v1.6.0"}
-	configs[EchoServer] = Config{promoterE2eRegistry, "echoserver", "2.3"}
-	configs[Etcd] = Config{gcEtcdRegistry, "etcd", "3.4.13-0"}
-	configs[GlusterDynamicProvisioner] = Config{promoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
-	configs[Httpd] = Config{promoterE2eRegistry, "httpd", "2.4.38-1"}
-	configs[HttpdNew] = Config{promoterE2eRegistry, "httpd", "2.4.39-1"}
-	configs[InvalidRegistryImage] = Config{invalidRegistry, "alpine", "3.1"}
-	configs[IpcUtils] = Config{promoterE2eRegistry, "ipc-utils", "1.2"}
-	configs[JessieDnsutils] = Config{promoterE2eRegistry, "jessie-dnsutils", "1.4"}
-	configs[Kitten] = Config{promoterE2eRegistry, "kitten", "1.4"}
-	configs[Nautilus] = Config{promoterE2eRegistry, "nautilus", "1.4"}
-	configs[NFSProvisioner] = Config{sigStorageRegistry, "nfs-provisioner", "v2.2.2"}
-	configs[Nginx] = Config{promoterE2eRegistry, "nginx", "1.14-1"}
-	configs[NginxNew] = Config{promoterE2eRegistry, "nginx", "1.15-1"}
-	configs[NodePerfNpbEp] = Config{promoterE2eRegistry, "node-perf/npb-ep", "1.1"}
-	configs[NodePerfNpbIs] = Config{promoterE2eRegistry, "node-perf/npb-is", "1.1"}
-	configs[NodePerfTfWideDeep] = Config{promoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
-	configs[Nonewprivs] = Config{promoterE2eRegistry, "nonewprivs", "1.3"}
-	configs[NonRoot] = Config{promoterE2eRegistry, "nonroot", "1.1"}
+	configs[Agnhost] = Config{list.PromoterE2eRegistry, "agnhost", "2.32"}
+	configs[AgnhostPrivate] = Config{list.PrivateRegistry, "agnhost", "2.6"}
+	configs[AuthenticatedAlpine] = Config{list.GcAuthenticatedRegistry, "alpine", "3.7"}
+	configs[AuthenticatedWindowsNanoServer] = Config{list.GcAuthenticatedRegistry, "windows-nanoserver", "v1"}
+	configs[APIServer] = Config{list.PromoterE2eRegistry, "sample-apiserver", "1.17.4"}
+	configs[AppArmorLoader] = Config{list.PromoterE2eRegistry, "apparmor-loader", "1.3"}
+	configs[BusyBox] = Config{list.PromoterE2eRegistry, "busybox", "1.29-1"}
+	configs[CheckMetadataConcealment] = Config{list.PromoterE2eRegistry, "metadata-concealment", "1.6"}
+	configs[CudaVectorAdd] = Config{list.E2eRegistry, "cuda-vector-add", "1.0"}
+	configs[CudaVectorAdd2] = Config{list.PromoterE2eRegistry, "cuda-vector-add", "2.2"}
+	configs[DebianIptables] = Config{list.BuildImageRegistry, "debian-iptables", "buster-v1.6.0"}
+	configs[EchoServer] = Config{list.PromoterE2eRegistry, "echoserver", "2.3"}
+	configs[Etcd] = Config{list.GcEtcdRegistry, "etcd", "3.4.13-0"}
+	configs[GlusterDynamicProvisioner] = Config{list.PromoterE2eRegistry, "glusterdynamic-provisioner", "v1.0"}
+	configs[Httpd] = Config{list.PromoterE2eRegistry, "httpd", "2.4.38-1"}
+	configs[HttpdNew] = Config{list.PromoterE2eRegistry, "httpd", "2.4.39-1"}
+	configs[InvalidRegistryImage] = Config{list.InvalidRegistry, "alpine", "3.1"}
+	configs[IpcUtils] = Config{list.PromoterE2eRegistry, "ipc-utils", "1.2"}
+	configs[JessieDnsutils] = Config{list.PromoterE2eRegistry, "jessie-dnsutils", "1.4"}
+	configs[Kitten] = Config{list.PromoterE2eRegistry, "kitten", "1.4"}
+	configs[Nautilus] = Config{list.PromoterE2eRegistry, "nautilus", "1.4"}
+	configs[NFSProvisioner] = Config{list.SigStorageRegistry, "nfs-provisioner", "v2.2.2"}
+	configs[Nginx] = Config{list.PromoterE2eRegistry, "nginx", "1.14-1"}
+	configs[NginxNew] = Config{list.PromoterE2eRegistry, "nginx", "1.15-1"}
+	configs[NodePerfNpbEp] = Config{list.PromoterE2eRegistry, "node-perf/npb-ep", "1.1"}
+	configs[NodePerfNpbIs] = Config{list.PromoterE2eRegistry, "node-perf/npb-is", "1.1"}
+	configs[NodePerfTfWideDeep] = Config{list.PromoterE2eRegistry, "node-perf/tf-wide-deep", "1.1"}
+	configs[Nonewprivs] = Config{list.PromoterE2eRegistry, "nonewprivs", "1.3"}
+	configs[NonRoot] = Config{list.PromoterE2eRegistry, "nonroot", "1.1"}
 	// Pause - when these values are updated, also update cmd/kubelet/app/options/container_runtime.go
-	configs[Pause] = Config{gcRegistry, "pause", "3.4.1"}
-	configs[Perl] = Config{promoterE2eRegistry, "perl", "5.26"}
-	configs[PrometheusDummyExporter] = Config{gcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
-	configs[PrometheusToSd] = Config{gcRegistry, "prometheus-to-sd", "v0.5.0"}
-	configs[Redis] = Config{promoterE2eRegistry, "redis", "5.0.5-alpine"}
-	configs[RegressionIssue74839] = Config{promoterE2eRegistry, "regression-issue-74839", "1.2"}
-	configs[ResourceConsumer] = Config{promoterE2eRegistry, "resource-consumer", "1.9"}
-	configs[SdDummyExporter] = Config{gcRegistry, "sd-dummy-exporter", "v0.2.0"}
-	configs[VolumeNFSServer] = Config{promoterE2eRegistry, "volume/nfs", "1.2"}
-	configs[VolumeISCSIServer] = Config{promoterE2eRegistry, "volume/iscsi", "2.2"}
-	configs[VolumeGlusterServer] = Config{promoterE2eRegistry, "volume/gluster", "1.2"}
-	configs[VolumeRBDServer] = Config{promoterE2eRegistry, "volume/rbd", "1.0.3"}
-	configs[WindowsServer] = Config{microsoftRegistry, "windows", "1809"}
+	configs[Pause] = Config{list.GcRegistry, "pause", "3.4.1"}
+	configs[Perl] = Config{list.PromoterE2eRegistry, "perl", "5.26"}
+	configs[PrometheusDummyExporter] = Config{list.GcRegistry, "prometheus-dummy-exporter", "v0.1.0"}
+	configs[PrometheusToSd] = Config{list.GcRegistry, "prometheus-to-sd", "v0.5.0"}
+	configs[Redis] = Config{list.PromoterE2eRegistry, "redis", "5.0.5-alpine"}
+	configs[RegressionIssue74839] = Config{list.PromoterE2eRegistry, "regression-issue-74839", "1.2"}
+	configs[ResourceConsumer] = Config{list.PromoterE2eRegistry, "resource-consumer", "1.9"}
+	configs[SdDummyExporter] = Config{list.GcRegistry, "sd-dummy-exporter", "v0.2.0"}
+	configs[VolumeNFSServer] = Config{list.PromoterE2eRegistry, "volume/nfs", "1.2"}
+	configs[VolumeISCSIServer] = Config{list.PromoterE2eRegistry, "volume/iscsi", "2.2"}
+	configs[VolumeGlusterServer] = Config{list.PromoterE2eRegistry, "volume/gluster", "1.2"}
+	configs[VolumeRBDServer] = Config{list.PromoterE2eRegistry, "volume/rbd", "1.0.3"}
+	configs[WindowsServer] = Config{list.MicrosoftRegistry, "windows", "1809"}
 
 	// if requested, map all the SHAs into a known format based on the input
 	originalImageConfigs := configs
@@ -358,8 +347,15 @@ func GetPauseImageName() string {
 	return GetE2EImage(Pause)
 }
 
-// ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one
+// ReplaceRegistryInImageURL replaces the registry in the image URL with a custom one based
+// on the configured registries.
 func ReplaceRegistryInImageURL(imageURL string) (string, error) {
+	return replaceRegistryInImageURLWithList(imageURL, registry)
+}
+
+// replaceRegistryInImageURLWithList replaces the registry in the image URL with a custom one based
+// on the given registry list.
+func replaceRegistryInImageURLWithList(imageURL string, reg RegistryList) (string, error) {
 	parts := strings.Split(imageURL, "/")
 	countParts := len(parts)
 	registryAndUser := strings.Join(parts[:countParts-1], "/")
@@ -385,27 +381,35 @@ func ReplaceRegistryInImageURL(imageURL string) (string, error) {
 	}
 
 	switch registryAndUser {
-	case "gcr.io/kubernetes-e2e-test-images":
-		registryAndUser = e2eRegistry
-	case "k8s.gcr.io/e2e-test-images":
-		registryAndUser = promoterE2eRegistry
-	case "k8s.gcr.io":
-		registryAndUser = gcRegistry
-	case "k8s.gcr.io/sig-storage":
-		registryAndUser = sigStorageRegistry
-	case "gcr.io/k8s-authenticated-test":
-		registryAndUser = PrivateRegistry
-	case "gcr.io/google-samples":
-		registryAndUser = sampleRegistry
-	case "gcr.io/gke-release":
-		registryAndUser = gcrReleaseRegistry
-	case "docker.io/library":
-		registryAndUser = dockerLibraryRegistry
+	case initRegistry.E2eRegistry:
+		registryAndUser = reg.E2eRegistry
+	case initRegistry.GcRegistry:
+		registryAndUser = reg.GcRegistry
+	case initRegistry.SigStorageRegistry:
+		registryAndUser = reg.SigStorageRegistry
+	case initRegistry.PrivateRegistry:
+		registryAndUser = reg.PrivateRegistry
+	case initRegistry.SampleRegistry:
+		registryAndUser = reg.SampleRegistry
+	case initRegistry.GcrReleaseRegistry:
+		registryAndUser = reg.GcrReleaseRegistry
+	case initRegistry.InvalidRegistry:
+		registryAndUser = reg.InvalidRegistry
+	case initRegistry.MicrosoftRegistry:
+		registryAndUser = reg.MicrosoftRegistry
+	case initRegistry.PromoterE2eRegistry:
+		registryAndUser = reg.PromoterE2eRegistry
+	case initRegistry.BuildImageRegistry:
+		registryAndUser = reg.BuildImageRegistry
+	case initRegistry.GcAuthenticatedRegistry:
+		registryAndUser = reg.GcAuthenticatedRegistry
+	case initRegistry.DockerLibraryRegistry:
+		registryAndUser = reg.DockerLibraryRegistry
 	default:
 		if countParts == 1 {
 			// We assume we found an image from docker hub library
 			// e.g. openjdk -> docker.io/library/openjdk
-			registryAndUser = dockerLibraryRegistry
+			registryAndUser = reg.DockerLibraryRegistry
 			break
 		}
 
