@@ -34,38 +34,50 @@ import (
 )
 
 type componentInfo struct {
+	Name string
 	Port int
 	IP   string
 }
 
 // SetupMetricsProxy creates a nginx Pod to expose metrics from the secure port of kube-scheduler and kube-controller-manager in tests.
 func SetupMetricsProxy(c clientset.Interface) error {
-	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
 	var infos []componentInfo
-	for _, pod := range podList.Items {
-		switch {
-		case strings.HasPrefix(pod.Name, "kube-scheduler-"):
-			infos = append(infos, componentInfo{
-				Port: kubeSchedulerPort,
-				IP:   pod.Status.PodIP,
-			})
-		case strings.HasPrefix(pod.Name, "kube-controller-manager-"):
-			infos = append(infos, componentInfo{
-				Port: kubeControllerManagerPort,
-				IP:   pod.Status.PodIP,
-			})
+	// The component pods might take some time to show up.
+	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
+		podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
+		if err != nil {
+			return false, fmt.Errorf("list pods in ns %s: %w", metav1.NamespaceSystem, err)
 		}
-		if len(infos) == 2 {
-			break
+		var foundComponents []componentInfo
+		for _, pod := range podList.Items {
+			switch {
+			case strings.HasPrefix(pod.Name, "kube-scheduler-"):
+				foundComponents = append(foundComponents, componentInfo{
+					Name: pod.Name,
+					Port: kubeSchedulerPort,
+					IP:   pod.Status.PodIP,
+				})
+			case strings.HasPrefix(pod.Name, "kube-controller-manager-"):
+				foundComponents = append(foundComponents, componentInfo{
+					Name: pod.Name,
+					Port: kubeControllerManagerPort,
+					IP:   pod.Status.PodIP,
+				})
+			}
 		}
+		if len(foundComponents) != 2 {
+			klog.Infof("Only %d components found. Will retry.", len(foundComponents))
+			klog.Infof("Found components: %v", foundComponents)
+			return false, nil
+		}
+		infos = foundComponents
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("missing component pods: %w", err)
 	}
-	if len(infos) == 0 {
-		klog.Warningf("Can't find any pods in namespace %s to grab metrics from", metav1.NamespaceSystem)
-		return nil
-	}
+
+	klog.Infof("Found components: %v", infos)
 
 	const name = metricsProxyPod
 	_, err = c.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(context.TODO(), &v1.ServiceAccount{
