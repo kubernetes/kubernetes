@@ -291,7 +291,10 @@ func getPatch(set *apps.StatefulSet) ([]byte, error) {
 		return nil, err
 	}
 	var raw map[string]interface{}
-	json.Unmarshal(data, &raw)
+	err = json.Unmarshal(data, &raw)
+	if err != nil {
+		return nil, err
+	}
 	objCopy := make(map[string]interface{})
 	specCopy := make(map[string]interface{})
 	spec := raw["spec"].(map[string]interface{})
