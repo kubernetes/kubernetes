@@ -703,10 +703,6 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/prometheus/prometheus v2.5.0+incompatible => github.com/prometheus/prometheus v2.5.0+incompatible
-## explicit
-# github.com/prometheus/prometheus => github.com/prometheus/prometheus v2.5.0+incompatible
-github.com/prometheus/prometheus/util/promlint
 # github.com/quobyte/api v0.1.8 => github.com/quobyte/api v0.1.8
 ## explicit
 github.com/quobyte/api
