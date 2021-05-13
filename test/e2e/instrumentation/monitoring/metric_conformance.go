@@ -51,6 +51,6 @@ var _ = instrumentation.SIGDescribe("Metric Conformance [Feature:MetricConforman
 		linter := testutil.NewPromLinter(strings.NewReader(apimetrics))
 		problems, err := linter.Lint()
 		framework.ExpectNoError(err)
-		gom.Expect(problems).To(gom.BeEmpty())
+		framework.ExpectEmpty(problems)
 	})
 })
