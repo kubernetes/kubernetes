@@ -26,7 +26,7 @@ import (
 
 	gin "github.com/onsi/ginkgo"
 	gom "github.com/onsi/gomega"
-	promlint "github.com/prometheus/prometheus/util/promlint"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 var _ = instrumentation.SIGDescribe("Metric Conformance [Feature:MetricConformance]", func() {
@@ -48,7 +48,7 @@ var _ = instrumentation.SIGDescribe("Metric Conformance [Feature:MetricConforman
 		framework.ExpectNoError(err)
 		gom.Expect(apimetrics).NotTo(gom.BeEmpty())
 
-		linter := promlint.New(strings.NewReader(apimetrics))
+		linter := testutil.NewPromLinter(strings.NewReader(apimetrics))
 		problems, err := linter.Lint()
 		framework.ExpectNoError(err)
 		gom.Expect(problems).To(gom.BeEmpty())
