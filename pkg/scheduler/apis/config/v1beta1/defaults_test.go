@@ -402,29 +402,6 @@ func TestPluginArgsDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "NodeResourcesMostAllocatedArgs resources empty",
-			in:   &v1beta1.NodeResourcesMostAllocatedArgs{},
-			want: &v1beta1.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta1.ResourceSpec{
-					{Name: "cpu", Weight: 1},
-					{Name: "memory", Weight: 1},
-				},
-			},
-		},
-		{
-			name: "NodeResourcesMostAllocatedArgs resources with value",
-			in: &v1beta1.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta1.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-			want: &v1beta1.NodeResourcesMostAllocatedArgs{
-				Resources: []v1beta1.ResourceSpec{
-					{Name: "resource", Weight: 2},
-				},
-			},
-		},
-		{
 			name: "PodTopologySpreadArgs resources empty",
 			in:   &v1beta1.PodTopologySpreadArgs{},
 			want: &v1beta1.PodTopologySpreadArgs{
