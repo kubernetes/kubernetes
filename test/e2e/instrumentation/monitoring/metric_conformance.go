@@ -21,7 +21,7 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gin "github.com/onsi/ginkgo"
@@ -32,13 +32,13 @@ import (
 var _ = instrumentation.SIGDescribe("Metric Conformance [Feature:MetricConformance]", func() {
 	f := framework.NewDefaultFramework("metrics-conformance")
 	var c, ec clientset.Interface
-	var grabber *metrics.Grabber
+	var grabber *e2emetrics.Grabber
 	gin.BeforeEach(func() {
 		var err error
 		c = f.ClientSet
 		ec = f.KubemarkExternalClusterClientSet
 		framework.ExpectNoError(err)
-		grabber, err = metrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
+		grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
 		framework.ExpectNoError(err)
 	})
 
