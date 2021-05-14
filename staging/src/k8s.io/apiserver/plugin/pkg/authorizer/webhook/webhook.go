@@ -67,11 +67,12 @@ type WebhookAuthorizer struct {
 	retryBackoff        wait.Backoff
 	decisionOnError     authorizer.Decision
 	metrics             AuthorizerMetrics
+	requestTimeout      time.Duration
 }
 
 // NewFromInterface creates a WebhookAuthorizer using the given subjectAccessReview client
 func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1Interface, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
-	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, metrics)
+	return newWithBackoff(&subjectAccessReviewV1Client{subjectAccessReview.RESTClient()}, authorizedTTL, unauthorizedTTL, retryBackoff, metrics, time.Duration(0))
 }
 
 // New creates a new WebhookAuthorizer from the provided kubeconfig file.
@@ -93,19 +94,19 @@ func NewFromInterface(subjectAccessReview authorizationv1client.AuthorizationV1I
 //
 // For additional HTTP configuration, refer to the kubeconfig documentation
 // https://kubernetes.io/docs/user-guide/kubeconfig-file/.
-func New(kubeConfigFile string, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookAuthorizer, error) {
+func New(kubeConfigFile string, version string, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, customDial utilnet.DialFunc, requestTimeout time.Duration) (*WebhookAuthorizer, error) {
 	subjectAccessReview, err := subjectAccessReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
 	if err != nil {
 		return nil, err
 	}
+
 	return newWithBackoff(subjectAccessReview, authorizedTTL, unauthorizedTTL, retryBackoff, AuthorizerMetrics{
 		RecordRequestTotal:   noopMetrics{}.RecordRequestTotal,
-		RecordRequestLatency: noopMetrics{}.RecordRequestLatency,
-	})
+		RecordRequestLatency: noopMetrics{}.RecordRequestLatency}, requestTimeout)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics) (*WebhookAuthorizer, error) {
+func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, unauthorizedTTL time.Duration, retryBackoff wait.Backoff, metrics AuthorizerMetrics, requestTimeout time.Duration) (*WebhookAuthorizer, error) {
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
 		responseCache:       cache.NewLRUExpireCache(8192),
@@ -114,6 +115,7 @@ func newWithBackoff(subjectAccessReview subjectAccessReviewer, authorizedTTL, un
 		retryBackoff:        retryBackoff,
 		decisionOnError:     authorizer.DecisionNoOpinion,
 		metrics:             metrics,
+		requestTimeout:      requestTimeout,
 	}, nil
 }
 
@@ -198,7 +200,16 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 	if entry, ok := w.responseCache.Get(string(key)); ok {
 		r.Status = entry.(authorizationv1.SubjectAccessReviewStatus)
 	} else {
-		var result *authorizationv1.SubjectAccessReview
+		var (
+			result *authorizationv1.SubjectAccessReview
+			cancel context.CancelFunc
+		)
+
+		if w.requestTimeout > 0 {
+			ctx, cancel = context.WithTimeout(ctx, w.requestTimeout)
+			defer cancel()
+		}
+
 		// WithExponentialBackoff will return SAR create error (sarErr) if any.
 		if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 			var sarErr error

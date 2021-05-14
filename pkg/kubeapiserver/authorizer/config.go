@@ -51,6 +51,8 @@ type Config struct {
 	WebhookConfigFile string
 	// API version of subject access reviews to send to the webhook (e.g. "v1", "v1beta1")
 	WebhookVersion string
+	// Request time out for the request to the webhook server.
+	WebhookRequestTimeout time.Duration
 	// TTL for caching of authorized responses from the webhook server.
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
@@ -119,7 +121,8 @@ func (config Config) New() (authorizer.Authorizer, authorizer.RuleResolver, erro
 				config.WebhookCacheAuthorizedTTL,
 				config.WebhookCacheUnauthorizedTTL,
 				*config.WebhookRetryBackoff,
-				config.CustomDial)
+				config.CustomDial,
+				config.WebhookRequestTimeout)
 			if err != nil {
 				return nil, nil, err
 			}

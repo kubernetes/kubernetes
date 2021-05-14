@@ -36,6 +36,7 @@ type BuiltInAuthorizationOptions struct {
 	Modes                       []string
 	PolicyFile                  string
 	WebhookConfigFile           string
+	WebhookRequestTimeout       time.Duration
 	WebhookVersion              string
 	WebhookCacheAuthorizedTTL   time.Duration
 	WebhookCacheUnauthorizedTTL time.Duration
@@ -112,6 +113,10 @@ func (o *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 		"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
 		"The API server will query the remote service to determine access on the API server's secure port.")
 
+	fs.DurationVar(&o.WebhookRequestTimeout,
+		"authorization-webhook-request-timeout", o.WebhookRequestTimeout,
+		"The timeout duration set on the webhook authorizer request.")
+
 	fs.StringVar(&o.WebhookVersion, "authorization-webhook-version", o.WebhookVersion, ""+
 		"The API version of the authorization.k8s.io SubjectAccessReview to send to and expect from the webhook.")
 
@@ -135,5 +140,6 @@ func (o *BuiltInAuthorizationOptions) ToAuthorizationConfig(versionedInformerFac
 		WebhookCacheUnauthorizedTTL: o.WebhookCacheUnauthorizedTTL,
 		VersionedInformerFactory:    versionedInformerFactory,
 		WebhookRetryBackoff:         o.WebhookRetryBackoff,
+		WebhookRequestTimeout:       o.WebhookRequestTimeout,
 	}
 }

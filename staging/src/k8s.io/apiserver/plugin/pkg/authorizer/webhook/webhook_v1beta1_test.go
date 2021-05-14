@@ -190,7 +190,7 @@ current-context: default
 			if err != nil {
 				return fmt.Errorf("error building sar client: %v", err)
 			}
-			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, noopAuthorizerMetrics())
+			_, err = newWithBackoff(sarClient, 0, 0, testRetryBackoff, noopAuthorizerMetrics(), 0)
 			return err
 		}()
 		if err != nil && !tt.wantErr {
@@ -329,7 +329,7 @@ func newV1beta1Authorizer(callbackURL string, clientCert, clientKey, ca []byte, 
 	if err != nil {
 		return nil, fmt.Errorf("error building sar client: %v", err)
 	}
-	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, noopAuthorizerMetrics())
+	return newWithBackoff(sarClient, cacheTime, cacheTime, testRetryBackoff, noopAuthorizerMetrics(), 0)
 }
 
 func TestV1beta1TLSConfig(t *testing.T) {

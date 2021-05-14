@@ -91,6 +91,7 @@ func TestAddFlags(t *testing.T) {
 		"--authorization-webhook-cache-authorized-ttl=3m",
 		"--authorization-webhook-cache-unauthorized-ttl=1m",
 		"--authorization-webhook-config-file=/webhook-config",
+		"--authorization-webhook-request-timeout=10m",
 		"--bind-address=192.168.10.20",
 		"--client-ca-file=/client-ca",
 		"--cloud-config=/cloud-config",
@@ -294,6 +295,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookCacheUnauthorizedTTL: 60000000000,
 			WebhookVersion:              "v1beta1",
 			WebhookRetryBackoff:         apiserveroptions.DefaultAuthWebhookRetryBackoff(),
+			WebhookRequestTimeout:       10 * time.Minute,
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
