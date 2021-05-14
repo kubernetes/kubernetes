@@ -198,6 +198,7 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 				return true
 			})
 			framework.ExpectEqual(success, true)
+
 		}
 
 		cleanup := func() {

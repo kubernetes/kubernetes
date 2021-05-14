@@ -33,6 +33,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -817,4 +818,18 @@ func GetSizeRangesIntersection(first e2evolume.SizeRange, second e2evolume.SizeR
 		return intersectionMin.String(), nil
 	}
 	return "", fmt.Errorf("intersection of size ranges %+v, %+v is null", first, second)
+}
+
+// GetVolumeAttachment attempts to get the associated VolumeAttachment for the passed in PV.
+// It returns the VolumeAttachment, assuming one is found, and any generated errors
+func GetVolumeAttachment(cs clientset.Interface, pv *v1.PersistentVolume, provisioner, nodeName string) (*storagev1.VolumeAttachment, error) {
+	if pv.Spec.CSI == nil {
+		gomega.Expect(pv.Spec.CSI).NotTo(gomega.BeNil())
+		return nil, fmt.Errorf("PV %s is not provisioned by a CSI driver", pv.Name)
+	}
+	volumeHandle := pv.Spec.CSI.VolumeHandle
+
+	attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", volumeHandle, provisioner, nodeName)))
+	attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
+	return cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
 }

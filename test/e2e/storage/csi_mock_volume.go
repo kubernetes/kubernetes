@@ -18,7 +18,6 @@ package storage
 
 import (
 	"context"
-	"crypto/sha256"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -349,10 +348,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				framework.ExpectNoError(err, "Failed to start pod: %v", err)
 
 				ginkgo.By("Checking if VolumeAttachment was created for the pod")
-				handle := getVolumeHandle(m.cs, claim)
-				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
-				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
-				_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+				pv, err := getVolume(m.cs, claim)
+				framework.ExpectNoError(err, "Unable to obtain PV for claim: %v", err)
+				_, err = utils.GetVolumeAttachment(m.cs, pv, m.provisioner, m.config.ClientNodeSelection.Name)
 				if err != nil {
 					if apierrors.IsNotFound(err) {
 						if !test.disableAttach {
@@ -400,10 +398,9 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 			// VolumeAttachment should be created because the default value for CSI attachable is true
 			ginkgo.By("Checking if VolumeAttachment was created for the pod")
-			handle := getVolumeHandle(m.cs, claim)
-			attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeSelection.Name)))
-			attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
-			_, err = m.cs.StorageV1().VolumeAttachments().Get(context.TODO(), attachmentName, metav1.GetOptions{})
+			pv, err := getVolume(m.cs, claim)
+			framework.ExpectNoError(err, "Unable to obtain PV for claim: %v", err)
+			volumeAttachment, err := utils.GetVolumeAttachment(m.cs, pv, m.provisioner, m.config.ClientNodeSelection.Name)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					framework.ExpectNoError(err, "Expected VolumeAttachment but none was found")
@@ -436,7 +433,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 			ginkgo.By(fmt.Sprintf("Wait for the volumeattachment to be deleted up to %v", csiVolumeAttachmentTimeout))
 			// This step can be slow because we have to wait either a NodeUpdate event happens or
 			// the detachment for this volume timeout so that we can do a force detach.
-			err = waitForVolumeAttachmentTerminated(attachmentName, m.cs)
+			err = waitForVolumeAttachmentTerminated(volumeAttachment.Name, m.cs)
 			framework.ExpectNoError(err, "Failed to delete VolumeAttachment: %v", err)
 		})
 	})
@@ -2153,24 +2150,14 @@ func destroyCSIDriver(cs clientset.Interface, driverName string) {
 	}
 }
 
-func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) string {
+func getVolume(cs clientset.Interface, claim *v1.PersistentVolumeClaim) (*v1.PersistentVolume, error) {
 	// re-get the claim to the latest state with bound volume
 	claim, err := cs.CoreV1().PersistentVolumeClaims(claim.Namespace).Get(context.TODO(), claim.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PVC")
-		return ""
+		return nil, err
 	}
 	pvName := claim.Spec.VolumeName
-	pv, err := cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
-	if err != nil {
-		framework.ExpectNoError(err, "Cannot get PV")
-		return ""
-	}
-	if pv.Spec.CSI == nil {
-		gomega.Expect(pv.Spec.CSI).NotTo(gomega.BeNil())
-		return ""
-	}
-	return pv.Spec.CSI.VolumeHandle
+	return cs.CoreV1().PersistentVolumes().Get(context.TODO(), pvName, metav1.GetOptions{})
 }
 
 func getVolumeLimitFromCSINode(csiNode *storagev1.CSINode, driverName string) int32 {
