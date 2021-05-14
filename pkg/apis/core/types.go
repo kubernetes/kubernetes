@@ -2580,7 +2580,7 @@ type PodAffinityTerm struct {
 	// and the ones listed in the namespaces field.
 	// null selector and null or empty namespaces list means "this pod's namespace".
 	// An empty selector ({}) matches all namespaces.
-	// This field is alpha-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
+	// This field is beta-level and is only honored when PodAffinityNamespaceSelector feature is enabled.
 	// +optional
 	NamespaceSelector *metav1.LabelSelector
 }
@@ -4887,7 +4887,7 @@ const (
 	// Match all pod objects that have priority class mentioned
 	ResourceQuotaScopePriorityClass ResourceQuotaScope = "PriorityClass"
 	// Match all pod objects that have cross-namespace pod (anti)affinity mentioned
-	// This is an alpha feature enabled by the PodAffinityNamespaceSelector feature flag.
+	// This is a beta feature enabled by the PodAffinityNamespaceSelector feature flag.
 	ResourceQuotaScopeCrossNamespacePodAffinity ResourceQuotaScope = "CrossNamespacePodAffinity"
 )
 

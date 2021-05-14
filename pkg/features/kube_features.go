@@ -668,6 +668,7 @@ const (
 
 	// owner: @ahg-g
 	// alpha: v1.21
+	// beta: v1.22
 	//
 	// Allow specifying NamespaceSelector in PodAffinityTerm.
 	PodAffinityNamespaceSelector featuregate.Feature = "PodAffinityNamespaceSelector"
@@ -820,7 +821,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	RunAsGroup:                                     {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	PodDeletionCost:                                {Default: true, PreRelease: featuregate.Beta},
 	TopologyAwareHints:                             {Default: false, PreRelease: featuregate.Alpha},
-	PodAffinityNamespaceSelector:                   {Default: false, PreRelease: featuregate.Alpha},
+	PodAffinityNamespaceSelector:                   {Default: true, PreRelease: featuregate.Beta},
 	ServiceLoadBalancerClass:                       {Default: false, PreRelease: featuregate.Alpha},
 	LogarithmicScaleDown:                           {Default: false, PreRelease: featuregate.Alpha},
 	IngressClassNamespacedParams:                   {Default: false, PreRelease: featuregate.Alpha},
