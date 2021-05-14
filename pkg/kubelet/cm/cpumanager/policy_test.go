@@ -57,6 +57,33 @@ var (
 		},
 	}
 
+	// fake topology for testing purposes only
+	topoTripleSocketHT = &topology.CPUTopology{
+		NumCPUs:    18,
+		NumSockets: 3,
+		NumCores:   9,
+		CPUDetails: map[int]topology.CPUInfo{
+			0:  {CoreID: 0, SocketID: 1},
+			1:  {CoreID: 0, SocketID: 1},
+			2:  {CoreID: 1, SocketID: 1},
+			3:  {CoreID: 1, SocketID: 1},
+			4:  {CoreID: 2, SocketID: 1},
+			5:  {CoreID: 2, SocketID: 1},
+			6:  {CoreID: 3, SocketID: 0},
+			7:  {CoreID: 3, SocketID: 0},
+			8:  {CoreID: 4, SocketID: 0},
+			9:  {CoreID: 4, SocketID: 0},
+			10: {CoreID: 5, SocketID: 0},
+			11: {CoreID: 5, SocketID: 0},
+			12: {CoreID: 6, SocketID: 2},
+			13: {CoreID: 6, SocketID: 2},
+			14: {CoreID: 7, SocketID: 2},
+			15: {CoreID: 7, SocketID: 2},
+			16: {CoreID: 8, SocketID: 2},
+			17: {CoreID: 8, SocketID: 2},
+		},
+	}
+
 	topoDualSocketNoHT = &topology.CPUTopology{
 		NumCPUs:    8,
 		NumSockets: 2,
