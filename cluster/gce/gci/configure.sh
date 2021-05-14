@@ -180,10 +180,33 @@ function download-or-bust {
     for url in "$@"; do
       local file="${url##*/}"
       rm -f "${file}"
-      # if the url belongs to GCS API we should use oauth2_token in the headers
+      # if the url belongs to GCS API we should use oauth2_token in the headers if the VM service account has storage scopes
       local curl_headers=""
-      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
-        curl_headers="Authorization: Bearer $(get-credentials)"
+
+      if [[ "$url" =~ ^https://storage.googleapis.com.* ]] ; then
+        local canUseCredentials=0
+
+        echo "Getting the scope of service account configured for VM."
+        if ! valid-storage-scope ; then
+          canUseCredentials=$?
+          # this behavior is preserved for backward compatibility. We want to fail fast if SA is not available
+          # and try to download without SA if scope does not exist on SA
+          echo "No service account or service account without storage scope. Attempt to download without service account token."
+        fi
+
+        if [[ "${canUseCredentials}" == "0" ]] ; then
+          echo "Getting the service account access token configured for VM."
+          local access_token="";
+          if access_token=$(get-credentials); then
+            echo "Service account access token is received. Downloading ${url} using this token."
+          else
+            local exit_code=$?
+            echo "Cannot get a service account token. Exiting."
+            exit ${exit_code}
+          fi
+
+          curl_headers=${access_token:+Authorization: Bearer "${access_token}"}
+        fi
       fi
       if ! curl ${curl_headers:+-H "${curl_headers}"} -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 --retry-connrefused "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
