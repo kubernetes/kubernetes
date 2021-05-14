@@ -107,7 +107,8 @@ type WebHookAuthenticationOptions struct {
 	// RetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
-	RetryBackoff *wait.Backoff
+	RetryBackoff   *wait.Backoff
+	RequestTimeout time.Duration
 }
 
 // NewBuiltInAuthenticationOptions create a new BuiltInAuthenticationOptions, just set default token cache TTL
@@ -375,6 +376,9 @@ func (o *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 
 		fs.DurationVar(&o.WebHook.CacheTTL, "authentication-token-webhook-cache-ttl", o.WebHook.CacheTTL,
 			"The duration to cache responses from the webhook token authenticator.")
+
+		fs.DurationVar(&o.WebHook.RequestTimeout, "authentication-token-webhook-request-timeout", o.WebHook.RequestTimeout,
+			"The duration within which a response must be returned by the webhook token authenticator.")
 	}
 }
 
@@ -440,6 +444,7 @@ func (o *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 		ret.WebhookTokenAuthnVersion = o.WebHook.Version
 		ret.WebhookTokenAuthnCacheTTL = o.WebHook.CacheTTL
 		ret.WebhookRetryBackoff = o.WebHook.RetryBackoff
+		ret.WebhookTokenAuthnRequestTimeout = o.WebHook.RequestTimeout
 
 		if len(o.WebHook.ConfigFile) > 0 && o.WebHook.CacheTTL > 0 {
 			if o.TokenSuccessCacheTTL > 0 && o.WebHook.CacheTTL < o.TokenSuccessCacheTTL {

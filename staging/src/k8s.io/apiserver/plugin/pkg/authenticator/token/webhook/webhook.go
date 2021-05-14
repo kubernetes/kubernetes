@@ -70,12 +70,12 @@ func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, i
 // file. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc) (*WebhookTokenAuthenticator, error) {
+func New(kubeConfigFile string, version string, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, customDial utilnet.DialFunc, requestTimeout time.Duration) (*WebhookTokenAuthenticator, error) {
 	tokenReview, err := tokenReviewInterfaceFromKubeconfig(kubeConfigFile, version, retryBackoff, customDial)
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, retryBackoff, implicitAuds, time.Duration(0))
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds, requestTimeout)
 }
 
 // newWithBackoff allows tests to skip the sleep.

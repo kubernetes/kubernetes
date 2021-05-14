@@ -50,23 +50,24 @@ type Config struct {
 	Anonymous      bool
 	BootstrapToken bool
 
-	TokenAuthFile               string
-	OIDCIssuerURL               string
-	OIDCClientID                string
-	OIDCCAFile                  string
-	OIDCUsernameClaim           string
-	OIDCUsernamePrefix          string
-	OIDCGroupsClaim             string
-	OIDCGroupsPrefix            string
-	OIDCSigningAlgs             []string
-	OIDCRequiredClaims          map[string]string
-	ServiceAccountKeyFiles      []string
-	ServiceAccountLookup        bool
-	ServiceAccountIssuers       []string
-	APIAudiences                authenticator.Audiences
-	WebhookTokenAuthnConfigFile string
-	WebhookTokenAuthnVersion    string
-	WebhookTokenAuthnCacheTTL   time.Duration
+	TokenAuthFile                   string
+	OIDCIssuerURL                   string
+	OIDCClientID                    string
+	OIDCCAFile                      string
+	OIDCUsernameClaim               string
+	OIDCUsernamePrefix              string
+	OIDCGroupsClaim                 string
+	OIDCGroupsPrefix                string
+	OIDCSigningAlgs                 []string
+	OIDCRequiredClaims              map[string]string
+	ServiceAccountKeyFiles          []string
+	ServiceAccountLookup            bool
+	ServiceAccountIssuers           []string
+	APIAudiences                    authenticator.Audiences
+	WebhookTokenAuthnConfigFile     string
+	WebhookTokenAuthnVersion        string
+	WebhookTokenAuthnCacheTTL       time.Duration
+	WebhookTokenAuthnRequestTimeout time.Duration
 	// WebhookRetryBackoff specifies the backoff parameters for the authentication webhook retry logic.
 	// This allows us to configure the sleep time at each iteration and the maximum number of retries allowed
 	// before we fail the webhook call in order to limit the fan out that ensues when the system is degraded.
@@ -299,7 +300,7 @@ func newWebhookTokenAuthenticator(config Config) (authenticator.Token, error) {
 		return nil, errors.New("retry backoff parameters for authentication webhook has not been specified")
 	}
 
-	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, *config.WebhookRetryBackoff, config.CustomDial)
+	webhookTokenAuthenticator, err := webhook.New(config.WebhookTokenAuthnConfigFile, config.WebhookTokenAuthnVersion, config.APIAudiences, *config.WebhookRetryBackoff, config.CustomDial, config.WebhookTokenAuthnRequestTimeout)
 	if err != nil {
 		return nil, err
 	}

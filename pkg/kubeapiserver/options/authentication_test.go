@@ -161,8 +161,9 @@ func TestToAuthenticationConfig(t *testing.T) {
 			ClientCA: "testdata/root.pem",
 		},
 		WebHook: &WebHookAuthenticationOptions{
-			CacheTTL:   180000000000,
-			ConfigFile: "/token-webhook-config",
+			CacheTTL:       180000000000,
+			ConfigFile:     "/token-webhook-config",
+			RequestTimeout: 10 * time.Second,
 		},
 		BootstrapToken: &BootstrapTokenAuthenticationOptions{
 			Enable: false,
@@ -193,20 +194,21 @@ func TestToAuthenticationConfig(t *testing.T) {
 	}
 
 	expectConfig := kubeauthenticator.Config{
-		APIAudiences:                authenticator.Audiences{"http://foo.bar.com"},
-		Anonymous:                   false,
-		BootstrapToken:              false,
-		ClientCAContentProvider:     nil, // this is nil because you can't compare functions
-		TokenAuthFile:               "/testTokenFile",
-		OIDCIssuerURL:               "testIssuerURL",
-		OIDCClientID:                "testClientID",
-		OIDCCAFile:                  "/testCAFile",
-		OIDCUsernameClaim:           "sub",
-		OIDCSigningAlgs:             []string{"RS256"},
-		ServiceAccountLookup:        true,
-		ServiceAccountIssuers:       []string{"http://foo.bar.com"},
-		WebhookTokenAuthnConfigFile: "/token-webhook-config",
-		WebhookTokenAuthnCacheTTL:   180000000000,
+		APIAudiences:                    authenticator.Audiences{"http://foo.bar.com"},
+		Anonymous:                       false,
+		BootstrapToken:                  false,
+		ClientCAContentProvider:         nil, // this is nil because you can't compare functions
+		TokenAuthFile:                   "/testTokenFile",
+		OIDCIssuerURL:                   "testIssuerURL",
+		OIDCClientID:                    "testClientID",
+		OIDCCAFile:                      "/testCAFile",
+		OIDCUsernameClaim:               "sub",
+		OIDCSigningAlgs:                 []string{"RS256"},
+		ServiceAccountLookup:            true,
+		ServiceAccountIssuers:           []string{"http://foo.bar.com"},
+		WebhookTokenAuthnConfigFile:     "/token-webhook-config",
+		WebhookTokenAuthnCacheTTL:       180000000000,
+		WebhookTokenAuthnRequestTimeout: 10 * time.Second,
 
 		TokenSuccessCacheTTL: 10 * time.Second,
 		TokenFailureCacheTTL: 0,
