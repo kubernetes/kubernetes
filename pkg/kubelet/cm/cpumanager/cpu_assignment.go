@@ -74,7 +74,10 @@ func (a *cpuAccumulator) freeCores() []int {
 		func(i, j int) bool {
 			iCores := a.details.CoresInSockets(socketIDs[i]).Filter(a.isCoreFree)
 			jCores := a.details.CoresInSockets(socketIDs[j]).Filter(a.isCoreFree)
-			return iCores.Size() < jCores.Size() || socketIDs[i] < socketIDs[j]
+			if iCores.Size() != jCores.Size() {
+				return iCores.Size() < jCores.Size()
+			}
+			return socketIDs[i] < socketIDs[j]
 		})
 
 	coreIDs := []int{}
@@ -120,11 +123,19 @@ func (a *cpuAccumulator) freeCPUs() []int {
 			iCoreFreeScore := a.details.CPUsInCores(iCore).Size()
 			jCoreFreeScore := a.details.CPUsInCores(jCore).Size()
 
-			return iSocketColoScore > jSocketColoScore ||
-				iSocketFreeScore < jSocketFreeScore ||
-				iCoreFreeScore < jCoreFreeScore ||
-				iSocket < jSocket ||
-				iCore < jCore
+			if iSocketColoScore != jSocketColoScore {
+				return iSocketColoScore > jSocketColoScore
+			}
+			if iSocketFreeScore != jSocketFreeScore {
+				return iSocketFreeScore < jSocketFreeScore
+			}
+			if iCoreFreeScore != jCoreFreeScore {
+				return iCoreFreeScore < jCoreFreeScore
+			}
+			if iSocket != jSocket {
+				return iSocket < jSocket
+			}
+			return iCore < jCore
 		})
 
 	// For each core, append sorted CPU IDs to result.
