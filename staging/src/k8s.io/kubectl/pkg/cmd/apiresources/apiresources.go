@@ -53,7 +53,10 @@ var (
 		kubectl api-resources --namespaced=false
 
 		# Print the supported API Resources with specific APIGroup
-		kubectl api-resources --api-group=extensions`)
+		kubectl api-resources --api-group=extensions
+
+		# Print the supported API Resources that support the specified verbs
+		kubectl api-resources --verbs=get,list,create`)
 )
 
 // APIResourceOptions is the start of the data required to perform the operation.
