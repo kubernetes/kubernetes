@@ -28,6 +28,9 @@ set -o pipefail
 ### Hardcoded constants
 METADATA_SERVER_IP="${METADATA_SERVER_IP:-169.254.169.254}"
 
+# Standard curl flags.
+CURL_FLAGS='--fail --silent --show-error --retry 5 --retry-delay 3 --connect-timeout 10 --retry-connrefused'
+
 function convert-manifest-params {
   # A helper function to convert the manifest args from a string to a list of
   # flag arguments.
@@ -2278,14 +2281,10 @@ function download-extra-addons {
 
   mkdir -p "${out_dir}"
 
+  # shellcheck disable=SC2206
   local curl_cmd=(
     "curl"
-    "--fail"
-    "--retry" "5"
-    "--retry-delay" "3"
-    "--silent"
-    "--show-error"
-    "--retry-connrefused"
+    ${CURL_FLAGS}
   )
   if [[ -n "${EXTRA_ADDONS_HEADER:-}" ]]; then
     curl_cmd+=("-H" "${EXTRA_ADDONS_HEADER}")
@@ -2307,14 +2306,10 @@ function get-metadata-value {
   local default="${2:-}"
 
   local status
-  curl \
-      --retry 5 \
-      --retry-delay 3 \
-      --retry-connrefused \
-      --fail \
-      --silent \
-      -H 'Metadata-Flavor: Google' \
-      "http://metadata/computeMetadata/v1/${1}" \
+  # shellcheck disable=SC2086
+  curl ${CURL_FLAGS} \
+    -H 'Metadata-Flavor: Google' \
+    "http://metadata/computeMetadata/v1/${1}" \
   || status="$?"
   status="${status:-0}"
 
@@ -3158,7 +3153,7 @@ function log-trap-pop {
 function log-error {
   local bootstep="$1"
 
-  log-proto "${bootstep}" "${LOG_STATUS_ERROR}" "error calling '${BASH_COMMAND}'"
+  log-proto "${bootstep}" "${LOG_STATUS_ERROR}" "encountered non-zero exit code"
 }
 
 # Wraps a command with bootstrap logging.
