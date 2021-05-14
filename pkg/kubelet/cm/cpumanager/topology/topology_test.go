@@ -57,9 +57,10 @@ func Test_Discover(t *testing.T) {
 				},
 			},
 			want: &CPUTopology{
-				NumCPUs:    8,
-				NumSockets: 1,
-				NumCores:   4,
+				NumCPUs:      8,
+				NumSockets:   1,
+				NumCores:     4,
+				NumNUMANodes: 1,
 				CPUDetails: map[int]CPUInfo{
 					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
 					1: {CoreID: 1, SocketID: 0, NUMANodeID: 0},
@@ -94,9 +95,10 @@ func Test_Discover(t *testing.T) {
 				},
 			},
 			want: &CPUTopology{
-				NumCPUs:    4,
-				NumSockets: 2,
-				NumCores:   4,
+				NumCPUs:      4,
+				NumSockets:   2,
+				NumCores:     4,
+				NumNUMANodes: 2,
 				CPUDetails: map[int]CPUInfo{
 					0: {CoreID: 0, SocketID: 0, NUMANodeID: 0},
 					1: {CoreID: 1, SocketID: 1, NUMANodeID: 1},
@@ -129,9 +131,10 @@ func Test_Discover(t *testing.T) {
 				},
 			},
 			want: &CPUTopology{
-				NumCPUs:    12,
-				NumSockets: 2,
-				NumCores:   6,
+				NumCPUs:      12,
+				NumSockets:   2,
+				NumCores:     6,
+				NumNUMANodes: 2,
 				CPUDetails: map[int]CPUInfo{
 					0:  {CoreID: 0, SocketID: 0, NUMANodeID: 0},
 					1:  {CoreID: 1, SocketID: 0, NUMANodeID: 0},
