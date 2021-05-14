@@ -154,9 +154,14 @@ func (podStrategy) CheckGracefulDelete(ctx context.Context, obj runtime.Object, 
 	if options.GracePeriodSeconds != nil {
 		period = *options.GracePeriodSeconds
 	} else {
-		// use the default value if set, or deletes the pod immediately (0)
+		// use the default value if set
 		if pod.Spec.TerminationGracePeriodSeconds != nil {
 			period = *pod.Spec.TerminationGracePeriodSeconds
+			// The default value must be a positive integer, which we forgot to block via
+			// validation, so if we see anything else automatically set it to 1.
+			if period < 1 {
+				period = 1
+			}
 		}
 	}
 	// if the pod is not scheduled, delete immediately

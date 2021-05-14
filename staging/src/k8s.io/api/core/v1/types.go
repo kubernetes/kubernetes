@@ -3094,13 +3094,15 @@ type PodSpec struct {
 	// More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
 	// +optional
 	RestartPolicy RestartPolicy `json:"restartPolicy,omitempty" protobuf:"bytes,3,opt,name=restartPolicy,casttype=RestartPolicy"`
-	// Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request.
-	// Value must be non-negative integer. The value zero indicates stop immediately via
-	// the kill signal (no opportunity to shut down).
-	// If this value is nil, the default grace period will be used instead.
-	// The grace period is the duration in seconds after the processes running in the pod are sent
-	// a termination signal and the time when the processes are forcibly halted with a kill signal.
+	// Optional duration in seconds the pod needs to terminate gracefully.
+	// Value must be positive integer. If zero or negative value is provided, the value 1 will be used instead.
+	// If this value is nil, the default grace period of 30 seconds for pods will be used.
 	// Set this value longer than the expected cleanup time for your process.
+	// The grace period is the duration in seconds between when termination is begun and and the time when the
+	// processes are forcibly halted with a kill signal. preStop hooks are run if specified, then a termination
+	// signal is sent to each running container process, and then after the grace period duration expires (which
+	// is no less than 1 second after preStop completes) the process is forcibly halted. Termination signals may
+	// be sent more than once if the Kubelet or container runtime is restarted during termination.
 	// Defaults to 30 seconds.
 	// +optional
 	TerminationGracePeriodSeconds *int64 `json:"terminationGracePeriodSeconds,omitempty" protobuf:"varint,4,opt,name=terminationGracePeriodSeconds"`

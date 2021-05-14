@@ -39,13 +39,12 @@ import (
 	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	utilpointer "k8s.io/utils/pointer"
-
-	// ensure types are installed
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
 )
 
 func TestMatchPod(t *testing.T) {
@@ -1530,6 +1529,136 @@ func TestDropNonEphemeralContainerUpdates(t *testing.T) {
 			gotPod := dropNonEphemeralContainerUpdates(tc.newPod, tc.oldPod)
 			if diff := cmp.Diff(tc.wantPod, gotPod); diff != "" {
 				t.Errorf("unexpected diff when dropping fields (-want, +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func Test_podStrategy_CheckGracefulDelete(t *testing.T) {
+	int64p := func(i int64) *int64 { return &i }
+	tests := []struct {
+		name      string
+		obj       *core.Pod
+		options   func(*metav1.DeleteOptions)
+		wantGrace int64
+	}{
+		{
+			name:      "nil grace period (impossible) is zero",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: nil}},
+			wantGrace: 0,
+		},
+		{
+			// Grace period zero has special semantics - it means "delete without waiting for the kubelet".
+			// Since this means the same pod can be created with the same name on a different node, honoring
+			// this value as zero on a pod can result in safety guarantee violations when used incorrectly.
+			// The kubelet already ignores 0 grace period, giving containers an opportunity to shutdown before
+			// force termination, and the apiserver should not allow a zero value default.
+			name:      "nil grace period (impossible) is overridden",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: nil}},
+			options:   func(opt *metav1.DeleteOptions) { opt.GracePeriodSeconds = int64p(1) },
+			wantGrace: 1,
+		},
+		{
+			name:      "zero grace period becomes one, ensuring kubelet shutdown is not bypassed",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(0)}},
+			wantGrace: 1,
+		},
+		{
+			name:      "negative grace period becomes one, ensuring kubelet shutdown is not bypassed",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(-1)}},
+			wantGrace: 1,
+		},
+		{
+			name:      "non-zero grace period default is used",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)}},
+			wantGrace: 1,
+		},
+		{
+			name:      "large non-zero grace period default is used",
+			obj:       &core.Pod{Spec: core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(30)}},
+			wantGrace: 30,
+		},
+
+		{
+			name: "terminal (succeeded) pod is deleted immediately",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)},
+				Status: core.PodStatus{Phase: core.PodSucceeded},
+			},
+			wantGrace: 0,
+		},
+		{
+			name: "terminal (failed) pod is deleted immediately",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)},
+				Status: core.PodStatus{Phase: core.PodFailed},
+			},
+			wantGrace: 0,
+		},
+		{
+			name:      "unscheduled pod is deleted immediately",
+			obj:       &core.Pod{Spec: core.PodSpec{TerminationGracePeriodSeconds: int64p(1)}},
+			wantGrace: 0,
+		},
+
+		{
+			name: "non-terminal (unknown) pod is not deleted immediately",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)},
+				Status: core.PodStatus{Phase: core.PodUnknown},
+			},
+			wantGrace: 1,
+		},
+		{
+			name: "non-terminal (running) pod is not deleted immediately",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)},
+				Status: core.PodStatus{Phase: core.PodRunning},
+			},
+			wantGrace: 1,
+		},
+		{
+			name: "non-terminal (pending) pod is not deleted immediately",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(1)},
+				Status: core.PodStatus{Phase: core.PodPending},
+			},
+			wantGrace: 1,
+		},
+
+		{
+			name: "delete options overrides default grace period (shorter)",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(5)},
+				Status: core.PodStatus{Phase: core.PodPending},
+			},
+			options:   func(opt *metav1.DeleteOptions) { opt.GracePeriodSeconds = int64p(1) },
+			wantGrace: 1,
+		},
+		{
+			name: "delete options overrides default grace period (longer)",
+			obj: &core.Pod{
+				Spec:   core.PodSpec{NodeName: "test", TerminationGracePeriodSeconds: int64p(5)},
+				Status: core.PodStatus{Phase: core.PodPending},
+			},
+			options:   func(opt *metav1.DeleteOptions) { opt.GracePeriodSeconds = int64p(10) },
+			wantGrace: 10,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := &metav1.DeleteOptions{}
+			if tt.options != nil {
+				tt.options(opts)
+			}
+			if got := Strategy.CheckGracefulDelete(context.Background(), tt.obj, opts); !got {
+				t.Errorf("all pods should be gracefully terminated")
+			}
+			if opts.GracePeriodSeconds == nil {
+				t.Fatalf("unexpected grace period nil")
+			}
+			if tt.wantGrace != *opts.GracePeriodSeconds {
+				t.Errorf("unexpected grace period: expected %d, got %d", tt.wantGrace, *opts.GracePeriodSeconds)
 			}
 		})
 	}
