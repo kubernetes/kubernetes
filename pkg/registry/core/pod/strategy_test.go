@@ -1132,6 +1132,57 @@ func TestApplySeccompVersionSkew(t *testing.T) {
 	}
 }
 
+func testUpdatePod(t *testing.T, oldPod *api.Pod, labelValue string) *api.Pod {
+	updatedPod := oldPod.DeepCopy()
+	updatedPod.Labels = map[string]string{"XYZ": labelValue}
+	expectedPod := updatedPod.DeepCopy()
+	Strategy.PrepareForUpdate(context.Background(), updatedPod, oldPod)
+	require.Equal(t, expectedPod.Spec, updatedPod.Spec, "updated pod spec")
+	errs := Strategy.Validate(context.Background(), updatedPod)
+	require.Empty(t, errs, "errors from validation")
+	return updatedPod
+}
+
+func createPodWithGenericEphemeralVolume() *api.Pod {
+	return &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "ns",
+			Name:      "pod",
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+			Containers: []api.Container{{
+				Name:                     "foo",
+				Image:                    "example",
+				TerminationMessagePolicy: api.TerminationMessageReadFile,
+				ImagePullPolicy:          api.PullAlways,
+			}},
+			Volumes: []api.Volume{
+				{
+					Name: "ephemeral",
+					VolumeSource: api.VolumeSource{
+						Ephemeral: &api.EphemeralVolumeSource{
+							VolumeClaimTemplate: &api.PersistentVolumeClaimTemplate{
+								Spec: api.PersistentVolumeClaimSpec{
+									AccessModes: []api.PersistentVolumeAccessMode{
+										api.ReadWriteOnce,
+									},
+									Resources: api.ResourceRequirements{
+										Requests: api.ResourceList{
+											api.ResourceStorage: resource.MustParse("1Gi"),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func newPodWithHugePageValue(resourceName api.ResourceName, value resource.Quantity) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
