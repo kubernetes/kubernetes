@@ -44,9 +44,9 @@
       measurePods: 400
   - name: 5000Nodes
     params:
-      initNodes: 500
-      initPods: 100
-      measurePods: 400
+      initNodes: 5000
+      initPods: 1000
+      measurePods: 1000
 
 - name: SchedulingSecrets
   workloadTemplate:
