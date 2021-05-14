@@ -1653,7 +1653,7 @@ function Install-Pigz {
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$LOGGINGAGENT_VERSION = '1.7.3'
+$LOGGINGAGENT_VERSION = '1.7.5'
 $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
@@ -1876,7 +1876,7 @@ $FLUENTBIT_CONFIG = @'
     Interval_Sec 2
     # Channels Setup,Windows PowerShell
     Channels     application,system,security
-    Tag          winevent.raw
+    Tag          winevt.raw
     DB           /var/run/google-fluentbit/pos-files/winlog.db
 
 # Json Log Example:
@@ -1958,6 +1958,11 @@ $FLUENTBIT_CONFIG = @'
     Name        modify
     Match       *
     Hard_rename log message
+
+[FILTER]
+    Name        modify
+    Match       winevt.raw
+    Hard_rename Message message
 
 [FILTER]
     Name         parser
