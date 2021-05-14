@@ -42,6 +42,11 @@ func newCPUAccumulator(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, 
 	}
 }
 
+// Returns true if the supplied NUMANode is fully available in `topoDetails`.
+func (a *cpuAccumulator) isNUMANodeFree(numaID int) bool {
+	return a.details.CPUsInNUMANodes(numaID).Size() == a.topo.CPUDetails.CPUsInNUMANodes(numaID).Size()
+}
+
 // Returns true if the supplied socket is fully available in `topoDetails`.
 func (a *cpuAccumulator) isSocketFree(socketID int) bool {
 	return a.details.CPUsInSockets(socketID).Size() == a.topo.CPUsPerSocket()
@@ -50,6 +55,17 @@ func (a *cpuAccumulator) isSocketFree(socketID int) bool {
 // Returns true if the supplied core is fully available in `topoDetails`.
 func (a *cpuAccumulator) isCoreFree(coreID int) bool {
 	return a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
+}
+
+// Returns free NUMA Node IDs as a slice sorted by sortAvailableNUMANodes().
+func (a *cpuAccumulator) freeNUMANodes() []int {
+	free := []int{}
+	for _, numa := range a.sortAvailableNUMANodes() {
+		if a.isNUMANodeFree(numa) {
+			free = append(free, numa)
+		}
+	}
+	return free
 }
 
 // Returns free socket IDs as a slice sorted by sortAvailableSockets().
@@ -79,12 +95,12 @@ func (a *cpuAccumulator) freeCPUs() []int {
 	return a.sortAvailableCPUs()
 }
 
-// Sorts the provided list of sockets/cores/cpus referenced in 'ids' by the
-// number of available CPUs contained within them (smallest to largest). The
-// 'getCPU()' paramater defines the function that should be called to retrieve
-// the list of available CPUs for the type of socket/core/cpu being referenced.
-// If two sockets/cores/cpus have the same number of available CPUs, they are
-// sorted in ascending order by their id.
+// Sorts the provided list of NUMA nodes/sockets/cores/cpus referenced in 'ids'
+// by the number of available CPUs contained within them (smallest to largest).
+// The 'getCPU()' paramater defines the function that should be called to
+// retrieve the list of available CPUs for the type being referenced. If two
+// NUMA nodes/sockets/cores/cpus have the same number of available CPUs, they
+// are sorted in ascending order by their id.
 func (a *cpuAccumulator) sort(ids []int, getCPUs func(ids ...int) cpuset.CPUSet) {
 	sort.Slice(ids,
 		func(i, j int) bool {
@@ -100,20 +116,74 @@ func (a *cpuAccumulator) sort(ids []int, getCPUs func(ids ...int) cpuset.CPUSet)
 		})
 }
 
-// Sort all sockets with free CPUs using the sort() algorithm defined above.
+// Sort all NUMA nodes with free CPUs:
+// - If NUMA nodes are higher than sockets in the memory hierarchy then sort
+//   them directly using the sort() algorithm defined above.
+// - Otherwise sort them:
+//   - First by socket using sortAvailableSockets().
+//   - Then within each socket, using the sort() algorithm defined above.
+func (a *cpuAccumulator) sortAvailableNUMANodes() []int {
+	// If NUMA nodes are equal or higher in the memory hierarchy than sockets
+	if a.topo.NumSockets >= a.topo.NumNUMANodes {
+		numas := a.details.NUMANodes().ToSliceNoSort()
+		a.sort(numas, a.details.CPUsInNUMANodes)
+		return numas
+	}
+
+	// Otherwise each socket has multiple NUMA nodes
+	var result []int
+	for _, socket := range a.sortAvailableSockets() {
+		numas := a.details.NUMANodesInSockets(socket).ToSliceNoSort()
+		a.sort(numas, a.details.CPUsInNUMANodes)
+		result = append(result, numas...)
+	}
+	return result
+}
+
+// Sort all sockets with free CPUs:
+// - If sockets are higher than NUMA nodes in the memory hierarchy then sort
+//   them directly using the sort() algorithm defined above.
+// - Otherwise sort them:
+//   - First by NUMA node using sortAvailableNUMANodes().
+//   - Then within each NUMA node, using the sort() algorithm defined above.
 func (a *cpuAccumulator) sortAvailableSockets() []int {
-	sockets := a.details.Sockets().ToSliceNoSort()
-	a.sort(sockets, a.details.CPUsInSockets)
-	return sockets
+	// If sockets are higher than NUMA nodes in the memory hierarchy
+	if a.topo.NumNUMANodes >= a.topo.NumSockets {
+		sockets := a.details.Sockets().ToSliceNoSort()
+		a.sort(sockets, a.details.CPUsInSockets)
+		return sockets
+	}
+
+	// Otherwise each NUMA Node has multiple sockets
+	var result []int
+	for _, numa := range a.sortAvailableNUMANodes() {
+		sockets := a.details.SocketsInNUMANodes(numa).ToSliceNoSort()
+		a.sort(sockets, a.details.CPUsInSockets)
+		result = append(result, sockets...)
+	}
+	return result
 }
 
 // Sort all cores with free CPUs:
-// - First by socket using sortAvailableSockets().
-// - Then within each socket, using the sort() algorithm defined above.
+// - First by socket (or NUMA node) using sortAvailableSockets() (or sortAvailableNUMANodes()).
+// - Then within each socket or NUMA node, using the sort() algorithm defined above.
 func (a *cpuAccumulator) sortAvailableCores() []int {
+	// If NUMA nodes are higher in the memory hierarchy than sockets, then
+	// cores sit directly below sockets in the memory hierarchy.
+	if a.topo.NumSockets >= a.topo.NumNUMANodes {
+		var result []int
+		for _, socket := range a.sortAvailableSockets() {
+			cores := a.details.CoresInSockets(socket).ToSliceNoSort()
+			a.sort(cores, a.details.CPUsInCores)
+			result = append(result, cores...)
+		}
+		return result
+	}
+
+	// Otherwise they sit directly below NUMA nodes.
 	var result []int
-	for _, socket := range a.sortAvailableSockets() {
-		cores := a.details.CoresInSockets(socket).ToSliceNoSort()
+	for _, numa := range a.sortAvailableNUMANodes() {
+		cores := a.details.CoresInNUMANodes(numa).ToSliceNoSort()
 		a.sort(cores, a.details.CPUsInCores)
 		result = append(result, cores...)
 	}
@@ -137,6 +207,17 @@ func (a *cpuAccumulator) take(cpus cpuset.CPUSet) {
 	a.result = a.result.Union(cpus)
 	a.details = a.details.KeepOnly(a.details.CPUs().Difference(a.result))
 	a.numCPUsNeeded -= cpus.Size()
+}
+
+func (a *cpuAccumulator) takeFullNUMANodes() {
+	for _, numa := range a.freeNUMANodes() {
+		cpusInNUMANode := a.topo.CPUDetails.CPUsInNUMANodes(numa)
+		if !a.needs(cpusInNUMANode.Size()) {
+			continue
+		}
+		klog.V(4).InfoS("takeFullNUMANodes: claiming NUMA node", "numa", numa)
+		a.take(cpusInNUMANode)
+	}
 }
 
 func (a *cpuAccumulator) takeFullSockets() {
@@ -193,11 +274,30 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	}
 
 	// Algorithm: topology-aware best-fit
-	// 1. Acquire whole sockets, if available and the container requires at
-	//    least a socket's-worth of CPUs.
-	acc.takeFullSockets()
-	if acc.isSatisfied() {
-		return acc.result, nil
+	// 1. Acquire whole NUMA nodes and sockets, if available and the container
+	//    requires at least a NUMA node or socket's-worth of CPUs. If NUMA
+	//    Nodes map to 1 or more sockets, pull from NUMA nodes first.
+	//    Otherwise pull from sockets first.
+	if acc.topo.NumSockets >= acc.topo.NumNUMANodes {
+		acc.takeFullNUMANodes()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+
+		acc.takeFullSockets()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+	} else {
+		acc.takeFullSockets()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+
+		acc.takeFullNUMANodes()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
 	}
 
 	// 2. Acquire whole cores, if available and the container requires at least

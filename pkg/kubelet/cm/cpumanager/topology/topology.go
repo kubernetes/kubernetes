@@ -36,10 +36,11 @@ type CPUDetails map[int]CPUInfo
 // Core - physical CPU, cadvisor - Core
 // Socket - socket, cadvisor - Node
 type CPUTopology struct {
-	NumCPUs    int
-	NumCores   int
-	NumSockets int
-	CPUDetails CPUDetails
+	NumCPUs      int
+	NumCores     int
+	NumSockets   int
+	NumNUMANodes int
+	CPUDetails   CPUDetails
 }
 
 // CPUsPerCore returns the number of logical CPUs are associated with
@@ -243,10 +244,11 @@ func Discover(machineInfo *cadvisorapi.MachineInfo) (*CPUTopology, error) {
 	}
 
 	return &CPUTopology{
-		NumCPUs:    machineInfo.NumCores,
-		NumSockets: machineInfo.NumSockets,
-		NumCores:   numPhysicalCores,
-		CPUDetails: CPUDetails,
+		NumCPUs:      machineInfo.NumCores,
+		NumSockets:   machineInfo.NumSockets,
+		NumCores:     numPhysicalCores,
+		NumNUMANodes: CPUDetails.NUMANodes().Size(),
+		CPUDetails:   CPUDetails,
 	}, nil
 }
 
