@@ -32,7 +32,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
-
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -3073,11 +3073,21 @@ func createPodOrFail(f *framework.Framework, ns, name string, labels map[string]
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
+// until it's Running. It retries creation if the pod exists with the given name
+// and is being deleted.
 func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 	framework.Logf("Creating new host exec pod")
 	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
+	var pod *v1.Pod
+	err := wait.PollImmediate(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+		var err error
+		pod, err = client.CoreV1().Pods(ns).Create(context.TODO(), hostExecPod, metav1.CreateOptions{})
+		// TODO: we should have a specific cause for "AlreadyExists"
+		if err != nil && apierrors.IsAlreadyExists(err) && strings.Contains(err.Error(), "is being deleted") {
+			return false, nil
+		}
+		return true, err
+	})
 	framework.ExpectNoError(err)
 	err = e2epod.WaitTimeoutForPodReadyInNamespace(client, name, ns, framework.PodStartTimeout)
 	framework.ExpectNoError(err)
