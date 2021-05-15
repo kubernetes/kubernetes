@@ -207,7 +207,7 @@ func (o *CopyOptions) Run(args []string) error {
 	}
 
 	if len(srcSpec.PodName) != 0 {
-		return o.copyFromPod(srcSpec, destSpec)
+		return o.copyFromPod(srcSpec, destSpec, &exec.ExecOptions{})
 	}
 	if len(destSpec.PodName) != 0 {
 		return o.copyToPod(srcSpec, destSpec, &exec.ExecOptions{})
@@ -292,39 +292,46 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	return o.execute(options)
 }
 
-func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
+func (o *CopyOptions) copyFromPod(src, dest fileSpec, options *exec.ExecOptions) error {
 	if len(src.File) == 0 || len(dest.File) == 0 {
 		return errFileCannotBeEmpty
 	}
 
 	reader, outStream := io.Pipe()
-	options := &exec.ExecOptions{
-		StreamOptions: exec.StreamOptions{
-			IOStreams: genericclioptions.IOStreams{
-				In:     nil,
-				Out:    outStream,
-				ErrOut: o.Out,
-			},
 
-			Namespace: src.PodNamespace,
-			PodName:   src.PodName,
+	options.StreamOptions = exec.StreamOptions{
+		IOStreams: genericclioptions.IOStreams{
+			In:     nil,
+			Out:    outStream,
+			ErrOut: o.Out,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
-		Command:  []string{"tar", "cf", "-", src.File},
-		Executor: &exec.DefaultRemoteExecutor{},
+		Namespace: src.PodNamespace,
+		PodName:   src.PodName,
 	}
+	// TODO: Improve error messages by first testing if 'tar' is present in the container?
+	options.Command = []string{"tar", "cf", "-", src.File}
 
+	errCh := make(chan error)
 	go func() {
-		defer outStream.Close()
-		cmdutil.CheckErr(o.execute(options))
+		defer close(errCh)
+		err := o.execute(options)
+		// `outStream` must be Close immediately after `o.execute` returns to unblock tarReader
+		outStream.Close()
+		if err != nil {
+			errCh <- err
+		}
 	}()
 	prefix := getPrefix(src.File)
 	prefix = path.Clean(prefix)
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
-	return o.untarAll(src, reader, dest.File, prefix)
+	err := o.untarAll(src, reader, dest.File, prefix)
+	if err != nil {
+		return err
+	}
+	return <-errCh
 }
 
 // stripPathShortcuts removes any leading or trailing "../" from a given path
@@ -429,7 +436,8 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 	return nil
 }
 
-func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix string) error {
+func (o *CopyOptions) untarAll(src fileSpec, reader io.ReadCloser, destDir, prefix string) error {
+	defer reader.Close()
 	symlinkWarningPrinted := false
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
@@ -518,6 +526,10 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 
 	if len(o.Container) > 0 {
 		options.ContainerName = o.Container
+	}
+
+	if options.Executor == nil {
+		options.Executor = &exec.DefaultRemoteExecutor{}
 	}
 
 	options.Config = o.ClientConfig

@@ -23,6 +23,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,12 +34,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/rest/fake"
+	"k8s.io/client-go/tools/remotecommand"
 	kexec "k8s.io/kubectl/pkg/cmd/exec"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 	"k8s.io/kubectl/pkg/scheme"
@@ -51,6 +54,14 @@ const (
 	SymLink     FileType = 1
 	RegexFile   FileType = 2
 )
+
+type fakeRemoteExecutor struct {
+	execErr error
+}
+
+func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *rest.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue remotecommand.TerminalSizeQueue) error {
+	return f.execErr
+}
 
 func TestExtractFileSpec(t *testing.T) {
 	tests := []struct {
@@ -251,9 +262,9 @@ func TestIsDestRelative(t *testing.T) {
 }
 
 func checkErr(t *testing.T, err error) {
+	t.Helper()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-		t.FailNow()
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -360,7 +371,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	reader := bytes.NewBuffer(writer.Bytes())
-	if err := opts.untarAll(fileSpec{}, reader, dir2, ""); err != nil {
+	if err := opts.untarAll(fileSpec{}, ioutil.NopCloser(reader), dir2, ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -421,7 +432,7 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 	}
 
 	reader := bytes.NewBuffer(writer.Bytes())
-	err = opts.untarAll(fileSpec{}, reader, dir2, "verylongprefix-showing-the-tar-was-tempered-with")
+	err = opts.untarAll(fileSpec{}, ioutil.NopCloser(reader), dir2, "verylongprefix-showing-the-tar-was-tempered-with")
 	if err == nil || !strings.Contains(err.Error(), "tar contents corrupted") {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -536,7 +547,7 @@ func TestBadTar(t *testing.T) {
 	}
 
 	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
-	if err := opts.untarAll(fileSpec{}, &buf, dir, "/prefix"); err != nil {
+	if err := opts.untarAll(fileSpec{}, ioutil.NopCloser(&buf), dir, "/prefix"); err != nil {
 		t.Errorf("unexpected error: %v ", err)
 		t.FailNow()
 	}
@@ -546,6 +557,70 @@ func TestBadTar(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error finding file: %v", err)
 		}
+	}
+}
+
+func TestCopyFromPod(t *testing.T) {
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+	ns := scheme.Codecs.WithoutConversion()
+	codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
+	pod := &v1.Pod{Spec: v1.PodSpec{Containers: []v1.Container{{Name: "test"}}}}
+	data := []byte(runtime.EncodeOrDie(codec, pod))
+
+	tf.Client = &fake.RESTClient{
+		GroupVersion:         schema.GroupVersion{Version: "v1"},
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     cmdtesting.DefaultHeader(),
+				Body:       ioutil.NopCloser(bytes.NewBuffer(data)),
+			}
+			return resp, nil
+		}),
+	}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+	ioStreams, _, _, _ := genericclioptions.NewTestIOStreams()
+
+	cmd := NewCmdCp(tf, ioStreams)
+	src := fileSpec{
+		PodNamespace: "test",
+		PodName:      "pod-name",
+		File:         "/tmp/foo",
+	}
+	dest := fileSpec{
+		File: "/tmp/foo",
+	}
+
+	testCases := []struct {
+		name      string
+		expectErr error
+	}{
+		{
+			name:      "copy nonexistent file from pod should throw error",
+			expectErr: fmt.Errorf("tar: Cannot stat: No such file or directory"),
+		},
+		{
+			name: "successfully copy from pod",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			opts := NewCopyOptions(ioStreams)
+			err := opts.Complete(tf, cmd)
+			checkErr(t, err)
+			options := &kexec.ExecOptions{Executor: &fakeRemoteExecutor{execErr: testCase.expectErr}}
+			err = opts.copyFromPod(src, dest, options)
+			if err != nil {
+				if testCase.expectErr != nil {
+					return
+				}
+				t.Errorf("Unexpected error: %v", err)
+			} else if testCase.expectErr != nil {
+				t.Errorf("Unexpected success, expect error: %v", testCase.expectErr)
+			}
+		})
 	}
 }
 
@@ -859,7 +934,7 @@ func TestUntar(t *testing.T) {
 	output := (*testWriter)(t)
 	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
 
-	require.NoError(t, opts.untarAll(fileSpec{}, buf, filepath.Join(basedir), ""))
+	require.NoError(t, opts.untarAll(fileSpec{}, ioutil.NopCloser(buf), filepath.Join(basedir), ""))
 
 	filepath.Walk(testdir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -910,7 +985,7 @@ func TestUntar_SingleFile(t *testing.T) {
 	output := (*testWriter)(t)
 	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
 
-	require.NoError(t, opts.untarAll(fileSpec{}, buf, filepath.Join(dest), srcName))
+	require.NoError(t, opts.untarAll(fileSpec{}, ioutil.NopCloser(buf), filepath.Join(dest), srcName))
 	cmpFileData(t, dest, content)
 }
 
