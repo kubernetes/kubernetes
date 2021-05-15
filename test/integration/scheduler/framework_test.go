@@ -2122,6 +2122,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	testCtx := initTestSchedulerForFrameworkTest(t, testutils.InitTestAPIServer(t, "preempt-with-permit-plugin", nil), 0,
 		scheduler.WithProfiles(cfg.Profiles...),
 		scheduler.WithFrameworkOutOfTreeRegistry(registry))
+	testutils.StartFakeKubeletDelete(testCtx.Ctx, testCtx.ClientSet)
 	defer testutils.CleanupTest(t, testCtx)
 
 	// Add one node.

@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/test/integration/framework"
+	testutils "k8s.io/kubernetes/test/integration/util"
 )
 
 var zero = int64(0)
@@ -138,6 +139,7 @@ func newDaemonSet(name, namespace string) *apps.DaemonSet {
 }
 
 func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet) {
+	t.Helper()
 	ds, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Errorf("Failed to get DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
@@ -151,6 +153,7 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{
 		string(uuid.NewUUID()): string(uuid.NewUUID()),
 	}
+
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
 
@@ -159,16 +162,44 @@ func cleanupDaemonSets(t *testing.T, cs clientset.Interface, ds *apps.DaemonSet)
 		return
 	}
 
-	// Wait for the daemon set controller to kill all the daemon pods.
+	// Wait for the daemon set controller to mark all the daemon pods deleted
 	if err := wait.Poll(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 		updatedDS, err := cs.AppsV1().DaemonSets(ds.Namespace).Get(context.TODO(), ds.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, nil
 		}
-		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
+		ds = updatedDS
+		return updatedDS.Status.CurrentNumberScheduled == 0, nil
 	}); err != nil {
-		t.Errorf("Failed to kill the pods of DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+		t.Errorf("Failed to kill the pods of DaemonSet %s/%s (%d+%d): %v", ds.Namespace, ds.Name, ds.Status.CurrentNumberScheduled, ds.Status.NumberMisscheduled, err)
 		return
+	}
+
+	// Emulate the kubelet and finish deleting all the pods
+	emulateKubeletForceDeleteGracePeriod := int64(0)
+	selector, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		t.Errorf("unable to calculate selector: %v", err)
+		return
+	}
+	pods, err := cs.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: selector.String()})
+	if err != nil {
+		t.Errorf("get daemonset pods: %v", err)
+		return
+	}
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil {
+			t.Errorf("expected pod %s under selector to be deleted by daemonset controller", pod.Name)
+			return
+		}
+		if err := cs.CoreV1().Pods(ds.Namespace).Delete(context.TODO(), pod.Name, metav1.DeleteOptions{
+			Preconditions:      &metav1.Preconditions{UID: &pod.UID},
+			GracePeriodSeconds: &emulateKubeletForceDeleteGracePeriod,
+		}); err != nil {
+			t.Errorf("unable to delete pod %s under daemonset selector: %v", pod.Name, err)
+			return
+		}
+		t.Logf("force deleted %s", pod.Name)
 	}
 
 	falseVar := false
@@ -678,6 +709,7 @@ func TestInsufficientCapacityNode(t *testing.T) {
 func TestLaunchWithHashCollision(t *testing.T) {
 	server, closeFn, dc, informers, clientset := setup(t)
 	defer closeFn()
+	testutils.StartFakeKubeletDeleteController(informers.Core().V1().Pods(), clientset)
 	ns := framework.CreateTestingNamespace("one-node-daemonset-test", server, t)
 	defer framework.DeleteTestingNamespace(ns, server, t)
 
@@ -702,6 +734,8 @@ func TestLaunchWithHashCollision(t *testing.T) {
 
 	// Create new DaemonSet with RollingUpdate strategy
 	orgDs := newDaemonSet("foo", ns.Name)
+	// two := int64(2)
+	// orgDs.Spec.Template.Spec.TerminationGracePeriodSeconds = &two
 	oneIntString := intstr.FromInt(1)
 	orgDs.Spec.UpdateStrategy = apps.DaemonSetUpdateStrategy{
 		Type: apps.RollingUpdateDaemonSetStrategyType,

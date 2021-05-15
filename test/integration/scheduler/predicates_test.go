@@ -1037,6 +1037,7 @@ func TestEvenPodsSpreadPredicate(t *testing.T) {
 	testCtx := initTest(t, "eps-predicate")
 	cs := testCtx.ClientSet
 	ns := testCtx.NS.Name
+	testutils.StartFakeKubeletDeleteController(testCtx.InformerFactory.Core().V1().Pods(), testCtx.ClientSet)
 	defer testutils.CleanupTest(t, testCtx)
 
 	for i := 0; i < 4; i++ {

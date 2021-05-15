@@ -111,6 +111,51 @@ func StartScheduler(clientSet clientset.Interface, kubeConfig *restclient.Config
 	return sched, informerFactory.Core().V1().Pods(), shutdownFunc
 }
 
+// StartFakeKubeletDelete performs the responsibilities that belong to a Kubelet
+// in an integration test - namely performing final deletion (grace period = 0) on
+// pods that are gracefully terminating. This ensures that controllers see behavior
+// matching a real run. This method does not simulate status updates to pods.
+func StartFakeKubeletDelete(ctx context.Context, clientSet clientset.Interface) {
+	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	informer := informerFactory.Core().V1().Pods()
+
+	StartFakeKubeletDeleteController(informer, clientSet)
+
+	informerFactory.Start(ctx.Done())
+}
+
+// StartFakeKubeletDeleteController performs the responsibilities that belong to a Kubelet
+// in an integration test - namely performing final deletion (grace period = 0) on
+// pods that are gracefully terminating. This ensures that controllers see behavior
+// matching a real run. This method does not simulate status updates to pods.
+func StartFakeKubeletDeleteController(informer coreinformers.PodInformer, clientSet clientset.Interface) {
+	syncPod := func(pod *v1.Pod) {
+		if pod.DeletionTimestamp == nil {
+			return
+		}
+		zero := int64(0)
+		uid := pod.UID
+		if err := clientSet.CoreV1().Pods(pod.Namespace).Delete(context.Background(), pod.Name, metav1.DeleteOptions{
+			Preconditions:      &metav1.Preconditions{UID: &uid},
+			GracePeriodSeconds: &zero,
+		}); err != nil {
+			if !apierrors.IsNotFound(err) {
+				klog.Errorf("Unable to emulate kubelet graceful deletion of terminating pod %v/%v: %v", pod.Namespace, pod.Name, err)
+			}
+			return
+		}
+	}
+
+	informer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			syncPod(obj.(*v1.Pod))
+		},
+		UpdateFunc: func(_, obj interface{}) {
+			syncPod(obj.(*v1.Pod))
+		},
+	})
+}
+
 // StartFakePVController is a simplified pv controller logic that sets PVC VolumeName and annotation for each PV binding.
 // TODO(mborsz): Use a real PV controller here.
 func StartFakePVController(clientSet clientset.Interface) ShutdownFunc {

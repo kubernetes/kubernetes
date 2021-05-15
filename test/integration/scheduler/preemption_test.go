@@ -719,6 +719,7 @@ func mkPriorityPodWithGrace(tc *testutils.TestContext, name string, priority int
 func TestPreemptionStarvation(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "preemption")
+	testutils.StartFakeKubeletDelete(testCtx.Ctx, testCtx.ClientSet)
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
@@ -818,6 +819,7 @@ func TestPreemptionStarvation(t *testing.T) {
 func TestPreemptionRaces(t *testing.T) {
 	// Initialize scheduler.
 	testCtx := initTest(t, "preemption-race")
+	testutils.StartFakeKubeletDeleteController(testCtx.InformerFactory.Core().V1().Pods(), testCtx.ClientSet)
 	defer testutils.CleanupTest(t, testCtx)
 	cs := testCtx.ClientSet
 
