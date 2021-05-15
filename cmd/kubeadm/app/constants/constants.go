@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -633,14 +632,6 @@ func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, erro
 		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
 	}
 	return internalAPIServerVirtualIP, nil
-}
-
-// GetDNSVersion is a handy function that returns the DNS version by DNS type
-func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
-	if dnsType == kubeadmapi.CoreDNS {
-		return CoreDNSVersion
-	}
-	return ""
 }
 
 // GetKubeletConfigMapName returns the right ConfigMap name for the right branch of k8s

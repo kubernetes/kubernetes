@@ -208,12 +208,8 @@ func TestGetAllImages(t *testing.T) {
 			expect: constants.Etcd,
 		},
 		{
-			name: "CoreDNS image is returned",
-			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
-				},
-			},
+			name:   "CoreDNS image is returned",
+			cfg:    &kubeadmapi.ClusterConfiguration{},
 			expect: constants.CoreDNSImageName,
 		},
 	}
