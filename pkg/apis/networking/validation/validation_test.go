@@ -384,83 +384,57 @@ func TestValidateNetworkPolicy(t *testing.T) {
 }
 
 func TestValidateNetworkPolicyUpdate(t *testing.T) {
-	type npUpdateTest struct {
-		old    networking.NetworkPolicy
-		update networking.NetworkPolicy
+
+	// Tweaks used below.
+	setIngressEmpty := func(networkPolicy *networking.NetworkPolicy) {
+		networkPolicy.Spec.Ingress = []networking.NetworkPolicyIngressRule{{}}
 	}
-	successCases := map[string]npUpdateTest{
-		"no change": {
-			old: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
-					},
-					Ingress: []networking.NetworkPolicyIngressRule{},
-				},
-			},
-			update: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
-					},
-					Ingress: []networking.NetworkPolicyIngressRule{},
-				},
-			},
-		},
-		"change spec": {
-			old: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
-				},
-			},
-			update: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{
-						MatchLabels: map[string]string{"a": "b"},
-					},
-					Ingress: []networking.NetworkPolicyIngressRule{},
-				},
-			},
+
+	successCases := []struct{
+		name string
+		old *networking.NetworkPolicy
+		update *networking.NetworkPolicy
+	}{
+		{
+			name: "no change",
+			old: makeNetworkPolicyCustom(setIngressEmpty),
+			update: makeNetworkPolicyCustom(setIngressEmpty),
+		},{
+			name: "change spec",
+			old: makeNetworkPolicyCustom(setIngressEmpty),
+			update: makeNetworkPolicyCustom(setIngressEmpty, func(networkPolicy *networking.NetworkPolicy) {
+				networkPolicy.Spec.PodSelector = metav1.LabelSelector{}
+			}),
 		},
 	}
 
-	for testName, successCase := range successCases {
-		successCase.old.ObjectMeta.ResourceVersion = "1"
-		successCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&successCase.update, &successCase.old); len(errs) != 0 {
-			t.Errorf("expected success (%s): %v", testName, errs)
+	for _, tc := range successCases{
+		tc.old.ObjectMeta.ResourceVersion = "1"
+		tc.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateNetworkPolicyUpdate(tc.update, tc.old); len(errs) != 0 {
+			t.Errorf("expected success (%s): %v", tc.name, errs)
 		}
 	}
 
-	errorCases := map[string]npUpdateTest{
-		"change name": {
-			old: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
-				},
-			},
-			update: networking.NetworkPolicy{
-				ObjectMeta: metav1.ObjectMeta{Name: "baz", Namespace: "bar"},
-				Spec: networking.NetworkPolicySpec{
-					PodSelector: metav1.LabelSelector{},
-					Ingress:     []networking.NetworkPolicyIngressRule{},
-				},
-			},
+	errorCases := []struct{
+		name string
+		old *networking.NetworkPolicy
+		update *networking.NetworkPolicy
+	}{
+		{
+			name: "change name",
+			old: makeNetworkPolicyCustom(setIngressEmpty),
+			update: makeNetworkPolicyCustom(setIngressEmpty, func(networkPolicy *networking.NetworkPolicy) {
+				networkPolicy.ObjectMeta = metav1.ObjectMeta{Name: "newName", Namespace: "bar"}
+			}),
 		},
 	}
 
-	for testName, errorCase := range errorCases {
-		errorCase.old.ObjectMeta.ResourceVersion = "1"
-		errorCase.update.ObjectMeta.ResourceVersion = "1"
-		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
-			t.Errorf("expected failure: %s", testName)
+	for _, tc := range errorCases{
+		tc.old.ObjectMeta.ResourceVersion = "1"
+		tc.update.ObjectMeta.ResourceVersion = "1"
+		if errs := ValidateNetworkPolicyUpdate(tc.update, tc.old); len(errs) == 0 {
+			t.Errorf("expected failure: %s", tc.name)
 		}
 	}
 }
