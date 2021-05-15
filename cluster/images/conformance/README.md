@@ -7,7 +7,7 @@
 
 ```console
 # First, build the binaries by running make from the root directory
-$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl cluster/images/conformance/go-runner"
+$ make KUBE_BUILD_PLATFORMS="linux/amd64 windows/amd64" WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl cluster/images/conformance/go-runner"
 
 # Build for linux/amd64 (default)
 # export REGISTRY=$HOST/$ORG to switch from k8s.gcr.io
@@ -29,7 +29,8 @@ $ make push VERSION={target_version} ARCH=s390x
 # ---> k8s.gcr.io/conformance-s390x:VERSION
 ```
 
-If you don't want to push the images, run `make` or `make build` instead
+If you don't want to push the images, run `make` or `make build` instead. Keep in mind that
+Windows images can only be created and pushed.
 
 
 #### How to run tests

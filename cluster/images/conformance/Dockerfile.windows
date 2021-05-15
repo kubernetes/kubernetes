@@ -1,0 +1,55 @@
+# Copyright 2021 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# NOTE(claudiub): We're adding busybox to the Windows image so we can use the
+# same bash script, so we can avoid maintaining multiple scripts. This building
+# method is based on kubernetes/test/images/busybox/Dockerfile_windows
+
+ARG BASEIMAGE
+
+# We're using a Linux image to unpack the archive, then we're copying it over to Windows.
+FROM --platform=linux/amd64 alpine:3.6 as prep
+
+# Available busybox functions retrieved by running busybox.exe --list
+ENV BUSYBOX_EXES="[ [[ ar arch ash awk base64 basename bash bunzip2 bzcat bzip2 cal cat chmod cksum clear cmp comm cp cpio cut date dc dd df diff dirname dos2unix dpkg-deb du echo ed egrep env expand expr factor false fgrep find fold fsync ftpget ftpput getopt grep groups gunzip gzip hd head hexdump id ipcalc kill killall less link ln logname ls lzcat lzma lzop lzopcat man md5sum mkdir mktemp mv nl od paste patch pgrep pidof pipe_progress pkill printenv printf ps pwd rev rm rmdir rpm rpm2cpio sed seq sh sha1sum sha256sum sha3sum sha512sum shred shuf sleep sort split ssl_client stat strings sum tac tail tar tee test timeout touch tr true truncate ttysize uname uncompress unexpand uniq unix2dos unlink unlzma unlzop unxz unzip usleep uudecode uuencode vi watch wc wget which whoami whois xargs xxd xz xzcat yes zcat"
+
+ADD https://github.com/kubernetes-sigs/windows-testing/raw/master/images/busybox/busybox.exe /busybox-dir/busybox.exe
+# NOTE(claudiub): We're creating symlinks for each of the busybox binaries and after that we're copying
+# them over to Windows. Unfortunately, docker buildx has some issues copying over Windows symlinks.
+# "Files/" is always prepended to the symlink target. The symlinks themselves are relative paths,
+# so, in order to make use of them, we can simply add a busybox binary to Files\busybox.exe.
+RUN cd /busybox-dir/ && \
+    for busybox_binary in $BUSYBOX_EXES; do ln -s busybox.exe $busybox_binary.exe; done && \
+    mkdir Files && \
+    cp busybox.exe Files/busybox.exe
+
+FROM ${BASEIMAGE}
+
+COPY --from=prep /busybox-dir /bin
+COPY ginkgo.exe /bin/
+COPY e2e.test.exe /bin/
+COPY kubectl.exe /bin/
+COPY run_e2e.sh /run_e2e.sh
+COPY gorunner.exe /gorunner.exe
+COPY cluster /kubernetes/cluster
+
+ENV E2E_FOCUS="\[Conformance\]" \
+    E2E_SKIP="" \
+    E2E_PROVIDER="local" \
+    E2E_PARALLEL="1" \
+    E2E_VERBOSITY="4" \
+    RESULTS_DIR="/tmp/results" \
+    KUBECONFIG=""
+
+CMD [ "/bin/bash.exe", "-c", "/run_e2e.sh" ]
