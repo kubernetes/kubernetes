@@ -21,6 +21,7 @@ package mount
 import (
 	"context"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -291,6 +292,43 @@ func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
 }
 
+const (
+	// statTimeout avoids the risk
+	// of os.Stat getting hung forever
+	// when called on something such as
+	// an unresponsive NFS volume
+	statTimeout = time.Minute
+)
+
+// statWithTimeout is a wrapper around os.Stat which returns an error if
+// os.Stat takes more time to finish execution than the specified timeout.
+func statWithTimeout(file string, timeout time.Duration) (fs.FileInfo, error) {
+	// if this channel receives, then the command completed and did not
+	// hang beyond the set timeout, completion could've been successful
+	// or unsuccessful
+	done := make(chan error)
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	var info fs.FileInfo
+	var err error
+	go func() {
+		info, err = os.Stat(file)
+		done <- err
+	}()
+
+	// check whether a timeout occurs before os.Stat completes
+	select {
+	case <-timer.C:
+		return nil, fmt.Errorf("stat on file: %s timed out", file)
+	case err = <-done:
+		if err != nil {
+			return nil, err
+		}
+	}
+	return info, nil
+}
+
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 // It is fast but not necessarily ALWAYS correct. If the path is in fact
 // a bind mount from one part of a mount to another it will not be detected.
@@ -299,11 +337,11 @@ func (*Mounter) List() ([]MountPoint, error) {
 // will return true. When in fact /tmp/b is a mount point. If this situation
 // is of interest to you, don't use this function...
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	stat, err := os.Stat(file)
+	stat, err := statWithTimeout(file, statTimeout)
 	if err != nil {
 		return true, err
 	}
-	rootStat, err := os.Stat(filepath.Dir(strings.TrimSuffix(file, "/")))
+	rootStat, err := statWithTimeout(filepath.Dir(strings.TrimSuffix(file, "/")), statTimeout)
 	if err != nil {
 		return true, err
 	}
