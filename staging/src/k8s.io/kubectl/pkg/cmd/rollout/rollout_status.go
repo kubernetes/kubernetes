@@ -154,6 +154,10 @@ func (o *RolloutStatusOptions) Validate() error {
 		return fmt.Errorf("revision must be a positive integer: %v", o.Revision)
 	}
 
+	if len(o.BuilderArgs) == 1 && !o.Watch {
+		return fmt.Errorf("Watch must be true when watching a resource collection")
+	}
+
 	return nil
 }
 
@@ -164,6 +168,7 @@ func (o *RolloutStatusOptions) Run() error {
 		NamespaceParam(o.Namespace).DefaultNamespace().
 		FilenameParam(o.EnforceNamespace, o.FilenameOptions).
 		ResourceTypeOrNameArgs(true, o.BuilderArgs...).
+		ContinueOnError().
 		SingleResourceType().
 		Latest().
 		Do()
@@ -179,6 +184,7 @@ func (o *RolloutStatusOptions) Run() error {
 	if len(infos) != 1 {
 		return fmt.Errorf("rollout status is only supported on individual resources and resource collections - %d resources were found", len(infos))
 	}
+
 	info := infos[0]
 	mapping := info.ResourceMapping()
 
@@ -187,7 +193,11 @@ func (o *RolloutStatusOptions) Run() error {
 		return err
 	}
 
-	fieldSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	var fieldSelector string
+	if info.Name != "" {
+		fieldSelector = fields.OneTermEqualSelector("metadata.name", info.Name).String()
+	}
+
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			options.FieldSelector = fieldSelector
@@ -212,7 +222,7 @@ func (o *RolloutStatusOptions) Run() error {
 				}
 				fmt.Fprintf(o.Out, "%s", status)
 				// Quit waiting if the rollout is done
-				if done {
+				if done && info.Name != "" {
 					return true, nil
 				}
 
