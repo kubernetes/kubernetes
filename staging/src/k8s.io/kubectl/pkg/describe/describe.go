@@ -4298,6 +4298,12 @@ func (d *ConfigMapDescriber) Describe(namespace, name string, describerSettings 
 			w.Write(LEVEL_0, "%s:\n----\n", k)
 			w.Write(LEVEL_0, "%s\n", string(v))
 		}
+		w.Write(LEVEL_0, "\nBinaryData\n====\n")
+		for k, v := range configMap.BinaryData {
+			w.Write(LEVEL_0, "%s: %s bytes\n", k, strconv.Itoa(len(v)))
+		}
+		w.Write(LEVEL_0, "\n")
+
 		if describerSettings.ShowEvents {
 			events, err := searchEvents(d.CoreV1(), configMap, describerSettings.ChunkSize)
 			if err != nil {
