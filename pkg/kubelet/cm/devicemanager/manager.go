@@ -791,9 +791,23 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		nodes = append(nodes, node)
 	}
 
-	// Sort the list of nodes by how many devices they contain.
+	// Sort the list of nodes by nodes from affinity set, nodes from none-affinity
+	// set, nodes without topology set and how many devices they contain.
 	sort.Slice(nodes, func(i, j int) bool {
-		return perNodeDevices[i].Len() < perNodeDevices[j].Len()
+		ni, nj := nodes[i], nodes[j]
+		// 1. node[i] from to affninity set
+		if hint.NUMANodeAffinity.IsSet(ni) {
+			return !hint.NUMANodeAffinity.IsSet(nj) || perNodeDevices[ni].Len() < perNodeDevices[nj].Len()
+		}
+
+		// 2. node[i] from none-affinity set
+		if ni != nodeWithoutTopology {
+			return !hint.NUMANodeAffinity.IsSet(nj) &&
+				(nj == nodeWithoutTopology || perNodeDevices[ni].Len() < perNodeDevices[nj].Len())
+		}
+
+		// 3. node[i] from node without topology set
+		return nj == nodeWithoutTopology && perNodeDevices[ni].Len() < perNodeDevices[nj].Len()
 	})
 
 	// Generate three sorted lists of devices. Devices in the first list come
