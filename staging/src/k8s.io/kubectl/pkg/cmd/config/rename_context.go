@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -67,12 +68,7 @@ func NewCmdConfigRenameContext(out io.Writer, configAccess clientcmd.ConfigAcces
 		Short:                 renameContextShort,
 		Long:                  renameContextLong,
 		Example:               renameContextExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			if len(args) == 0 {
-				return CompListContextsInConfig(nil, toComplete), cobra.ShellCompDirectiveNoFileComp
-			}
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     util.ContextCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(cmd, args, out))
 			cmdutil.CheckErr(options.Validate())

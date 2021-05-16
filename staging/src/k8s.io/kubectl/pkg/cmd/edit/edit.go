@@ -20,10 +20,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"k8s.io/cli-runtime/pkg/genericclioptions"
-	"k8s.io/kubectl/pkg/cmd/apiresources"
-	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/editor"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -78,15 +77,7 @@ func NewCmdEdit(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra
 		Short:                 i18n.T("Edit a resource on the server"),
 		Long:                  editLong,
 		Example:               editExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var comps []string
-			if len(args) == 0 {
-				comps = apiresources.CompGetResourceList(f, cmd, toComplete)
-			} else if len(args) == 1 {
-				comps = get.CompGetResource(f, cmd, args[0], toComplete)
-			}
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     util.ResourceTypeAndNameCompletionFunc(f),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, args, cmd))
 			cmdutil.CheckErr(o.Run())

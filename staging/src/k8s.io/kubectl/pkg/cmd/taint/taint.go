@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 	"k8s.io/kubectl/pkg/explain"
+	"k8s.io/kubectl/pkg/util"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
-	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util/i18n"
@@ -109,19 +109,7 @@ func NewCmdTaint(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.
 		Short:                 i18n.T("Update the taints on one or more nodes"),
 		Long:                  fmt.Sprintf(taintLong, validation.DNS1123SubdomainMaxLength, validation.LabelValueMaxLength),
 		Example:               taintExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var comps []string
-			if len(args) == 0 {
-				for _, comp := range validArgs {
-					if strings.HasPrefix(comp, toComplete) {
-						comps = append(comps, comp)
-					}
-				}
-			} else if len(args) == 1 {
-				comps = get.CompGetResource(f, cmd, args[0], toComplete)
-			}
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(options.Complete(f, cmd, args))
 			cmdutil.CheckErr(options.Validate())

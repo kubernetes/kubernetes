@@ -33,11 +33,11 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"k8s.io/kubectl/pkg/cmd/get"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/cmd/util/podcmd"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/scheme"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	"k8s.io/kubectl/pkg/util/templates"
@@ -89,13 +89,7 @@ func NewCmdExec(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Short:                 i18n.T("Execute a command in a container"),
 		Long:                  i18n.T("Execute a command in a container."),
 		Example:               execExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			var comps []string
-			if len(args) == 0 {
-				comps = get.CompGetResource(f, cmd, "pod", toComplete)
-			}
-			return comps, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     util.ResourceNameCompletionFunc(f, "pod"),
 		Run: func(cmd *cobra.Command, args []string) {
 			argsLenAtDash := cmd.ArgsLenAtDash()
 			cmdutil.CheckErr(options.Complete(f, cmd, args, argsLenAtDash))

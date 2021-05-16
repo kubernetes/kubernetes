@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
 )
@@ -41,12 +42,7 @@ func NewCmdConfigDeleteCluster(out io.Writer, configAccess clientcmd.ConfigAcces
 		Short:                 i18n.T("Delete the specified cluster from the kubeconfig"),
 		Long:                  i18n.T("Delete the specified cluster from the kubeconfig"),
 		Example:               deleteClusterExample,
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			if len(args) == 0 {
-				return CompListClustersInConfig(nil, toComplete), cobra.ShellCompDirectiveNoFileComp
-			}
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		},
+		ValidArgsFunction:     util.ClusterCompletionFunc,
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(runDeleteCluster(out, configAccess, cmd))
 		},
