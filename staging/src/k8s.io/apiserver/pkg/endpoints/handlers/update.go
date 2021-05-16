@@ -118,7 +118,8 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		audit.LogRequestObject(ae, obj, scope.Resource, scope.Subresource, scope.Serializer)
+		objGV := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 		admit = admission.WithAudit(admit, ae)
 
 		if err := checkName(obj, name, namespace, scope.Namer); err != nil {
