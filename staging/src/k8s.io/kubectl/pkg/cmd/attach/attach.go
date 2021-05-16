@@ -55,14 +55,6 @@ var (
 		# Get output from the first pod of a ReplicaSet named nginx
 		kubectl attach rs/nginx
 		`))
-
-	defaultAttachResourceBuilderFlags = genericclioptions.NewResourceBuilderFlags().
-						WithLabelSelector("").
-						WithFieldSelector("").
-						WithAll(false).
-						WithAllNamespaces(false).
-						WithLocal(false).
-						WithLatest()
 )
 
 const (
@@ -74,9 +66,8 @@ const (
 // flags. They will be converted to Options, which reflect the runtime
 // requirements for the command.
 type AttachFlags struct {
-	builder              func() *resource.Builder
-	resourceBuilderFlags *genericclioptions.ResourceBuilderFlags
-	restClientGetter     genericclioptions.RESTClientGetter
+	builder          func() *resource.Builder
+	restClientGetter genericclioptions.RESTClientGetter
 	exec.StreamOptions
 }
 
@@ -86,9 +77,8 @@ func NewAttachFlags(
 	streams genericclioptions.IOStreams) *AttachFlags {
 
 	return &AttachFlags{
-		builder:              f.NewBuilder,
-		resourceBuilderFlags: defaultAttachResourceBuilderFlags,
-		restClientGetter:     f,
+		builder:          f.NewBuilder,
+		restClientGetter: f,
 		StreamOptions: exec.StreamOptions{
 			IOStreams: streams,
 		},
