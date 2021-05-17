@@ -539,12 +539,16 @@ func (o *CopyOptions) untarAll(ns, pod string, prefix string, src remotePath, de
 		if err != nil {
 			return err
 		}
-		defer outFile.Close()
 		if _, err := io.Copy(outFile, tarReader); err != nil {
+			outFile.Close()
 			return err
 		}
 		if err := outFile.Close(); err != nil {
 			return err
+		}
+		if err := os.Chmod(destFileName.String(), mode); err != nil {
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: chmod %s error: %v", destFileName, err)
+			continue
 		}
 	}
 
