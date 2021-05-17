@@ -1299,6 +1299,7 @@ func autoConvert_v1beta2_StatefulSetStatus_To_apps_StatefulSetStatus(in *v1beta2
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]apps.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 
@@ -1319,6 +1320,7 @@ func autoConvert_apps_StatefulSetStatus_To_v1beta2_StatefulSetStatus(in *apps.St
 	out.UpdateRevision = in.UpdateRevision
 	out.CollisionCount = (*int32)(unsafe.Pointer(in.CollisionCount))
 	out.Conditions = *(*[]v1beta2.StatefulSetCondition)(unsafe.Pointer(&in.Conditions))
+	out.AvailableReplicas = in.AvailableReplicas
 	return nil
 }
 

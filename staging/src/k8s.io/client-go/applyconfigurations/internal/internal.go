@@ -910,6 +910,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1.StatefulSetSpec
   map:
     fields:
+    - name: minReadySeconds
+      type:
+        scalar: numeric
     - name: podManagementPolicy
       type:
         scalar: string
@@ -943,6 +946,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1.StatefulSetStatus
   map:
     fields:
+    - name: availableReplicas
+      type:
+        scalar: numeric
     - name: collisionCount
       type:
         scalar: numeric
@@ -1191,6 +1197,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta1.StatefulSetSpec
   map:
     fields:
+    - name: minReadySeconds
+      type:
+        scalar: numeric
     - name: podManagementPolicy
       type:
         scalar: string
@@ -1224,6 +1233,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta1.StatefulSetStatus
   map:
     fields:
+    - name: availableReplicas
+      type:
+        scalar: numeric
     - name: collisionCount
       type:
         scalar: numeric
@@ -1670,6 +1682,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta2.StatefulSetSpec
   map:
     fields:
+    - name: minReadySeconds
+      type:
+        scalar: numeric
     - name: podManagementPolicy
       type:
         scalar: string
@@ -1703,6 +1718,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta2.StatefulSetStatus
   map:
     fields:
+    - name: availableReplicas
+      type:
+        scalar: numeric
     - name: collisionCount
       type:
         scalar: numeric
