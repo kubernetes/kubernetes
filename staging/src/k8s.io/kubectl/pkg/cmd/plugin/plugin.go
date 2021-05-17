@@ -55,7 +55,7 @@ var (
 	ValidPluginFilenamePrefixes = []string{"kubectl"}
 )
 
-func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPlugin(streams genericclioptions.IOStreams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:                   "plugin [flags]",
 		DisableFlagsInUseLine: true,
@@ -66,7 +66,7 @@ func NewCmdPlugin(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 		},
 	}
 
-	cmd.AddCommand(NewCmdPluginList(f, streams))
+	cmd.AddCommand(NewCmdPluginList(streams))
 	return cmd
 }
 
@@ -80,7 +80,7 @@ type PluginListOptions struct {
 }
 
 // NewCmdPluginList provides a way to list all plugin executables visible to kubectl
-func NewCmdPluginList(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.Command {
+func NewCmdPluginList(streams genericclioptions.IOStreams) *cobra.Command {
 	o := &PluginListOptions{
 		IOStreams: streams,
 	}

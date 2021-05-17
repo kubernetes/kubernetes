@@ -626,7 +626,7 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	filters := []string{"options"}
 
 	// Hide the "alpha" subcommand if there are no alpha commands in this build.
-	alpha := NewCmdAlpha(f, ioStreams)
+	alpha := NewCmdAlpha(ioStreams)
 	if !alpha.HasSubCommands() {
 		filters = append(filters, alpha.Name())
 	}
@@ -646,8 +646,8 @@ func NewKubectlCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 	}
 
 	cmds.AddCommand(alpha)
-	cmds.AddCommand(cmdconfig.NewCmdConfig(f, clientcmd.NewDefaultPathOptions(), ioStreams))
-	cmds.AddCommand(plugin.NewCmdPlugin(f, ioStreams))
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), ioStreams))
+	cmds.AddCommand(plugin.NewCmdPlugin(ioStreams))
 	cmds.AddCommand(version.NewCmdVersion(f, ioStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIVersions(f, ioStreams))
 	cmds.AddCommand(apiresources.NewCmdAPIResources(f, ioStreams))
