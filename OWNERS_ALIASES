@@ -451,6 +451,7 @@ aliases:
     - janetkuo
     - kow3ns
     - soltysh
+    - alculquicondor
 
   sig-auth-api-reviewers:
     - enj
@@ -499,9 +500,8 @@ aliases:
     - mm4tt
     - wojtek-t
 
-  # sig-scheduling-api-reviewers:
-  #   -
-  #   -
+  sig-scheduling-api-reviewers:
+    - alculquicondor
 
   sig-storage-api-reviewers:
     - deads2k
