@@ -372,7 +372,7 @@ func runTopologyManagerPolicySuiteTests(f *framework.Framework) {
 	runNonGuPodTest(f, cpuCap)
 
 	ginkgo.By("running a Gu pod")
-	runGuPodTest(f)
+	runGuPodTest(f, 1)
 
 	ginkgo.By("running multiple Gu and non-Gu pods")
 	runMultipleGuNonGuPods(f, cpuCap, cpuAlloc)
@@ -596,10 +596,7 @@ func teardownSRIOVConfigOrFail(f *framework.Framework, sd *sriovData) {
 }
 
 func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.ConfigMap, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := 1
-	if isHTEnabled() {
-		threadsPerCore = 2
-	}
+	threadsPerCore := getSMTLevel()
 	sd := setupSRIOVConfigOrFail(f, configMap)
 	var ctnAttrs, initCtnAttrs []tmCtnAttribute
 
@@ -699,10 +696,7 @@ func runTMScopeResourceAlignmentTestSuite(f *framework.Framework, configMap *v1.
 }
 
 func runTopologyManagerNodeAlignmentSuiteTests(f *framework.Framework, sd *sriovData, reservedSystemCPUs, policy string, numaNodes, coreCount int) {
-	threadsPerCore := 1
-	if isHTEnabled() {
-		threadsPerCore = 2
-	}
+	threadsPerCore := getSMTLevel()
 
 	waitForSRIOVResources(f, sd)
 
