@@ -51,17 +51,17 @@ var CmdEtcHosts = &cobra.Command{
 	Run:   printHostsFile,
 }
 
-func printDNSSuffixList(cmd *cobra.Command, args []string) {
+func printDNSSuffixList() {
 	dnsSuffixList := GetDNSSuffixList()
 	fmt.Println(strings.Join(dnsSuffixList, ","))
 }
 
-func printDNSServerList(cmd *cobra.Command, args []string) {
+func printDNSServerList() {
 	dnsServerList := getDNSServerList()
 	fmt.Println(strings.Join(dnsServerList, ","))
 }
 
-func printHostsFile(cmd *cobra.Command, args []string) {
+func printHostsFile() {
 	fmt.Println(readFile(etcHostsFile))
 }
 
