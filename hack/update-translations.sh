@@ -22,7 +22,12 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 TRANSLATIONS="staging/src/k8s.io/kubectl/pkg/util/i18n/translations"
-KUBECTL_FILES="pkg/kubectl/cmd/*.go pkg/kubectl/cmd/*/*.go"
+KUBECTL_FILES=()
+KUBECTL_DEFAULT_LOCATIONS=(
+  "pkg/kubectl/cmd"
+  "staging/src/k8s.io/kubectl/pkg/cmd"
+)
+KUBECTL_IGNORE_FILES_REGEX="cmd/kustomize/kustomize.go"
 
 generate_pot="false"
 generate_mo="false"
@@ -37,7 +42,7 @@ while getopts "hf:xg" opt; do
       exit 0
       ;;
     f)
-      KUBECTL_FILES="${OPTARG}"
+      KUBECTL_FILES+=("${OPTARG}")
       ;;
     x)
       generate_pot="true"
@@ -51,6 +56,10 @@ while getopts "hf:xg" opt; do
       ;;
   esac
 done
+
+if [[ ${#KUBECTL_FILES} -eq 0 ]]; then
+  KUBECTL_FILES+=("${KUBECTL_DEFAULT_LOCATIONS[@]}")
+fi
 
 if ! which go-xgettext > /dev/null; then
   echo 'Can not find go-xgettext, install with:'
@@ -66,7 +75,8 @@ fi
 
 if [[ "${generate_pot}" == "true" ]]; then
   echo "Extracting strings to POT"
-  go-xgettext -k=i18n.T "${KUBECTL_FILES}" > tmp.pot
+  # shellcheck disable=SC2046
+  go-xgettext -k=i18n.T $(grep -lr "i18n.T" "${KUBECTL_FILES[@]}" | grep -vE "${KUBECTL_IGNORE_FILES_REGEX}") > tmp.pot
   perl -pi -e 's/CHARSET/UTF-8/' tmp.pot
   perl -pi -e 's/\\\(/\\\\\(/g' tmp.pot
   perl -pi -e 's/\\\)/\\\\\)/g' tmp.pot
