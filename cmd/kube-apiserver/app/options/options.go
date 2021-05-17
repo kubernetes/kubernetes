@@ -250,7 +250,8 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 	fs.MarkDeprecated("kubelet-read-only-port", "kubelet-read-only-port is deprecated and will be removed.")
 
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
-		"Timeout for kubelet operations.")
+		"DEPRECATED: Timeout for kubelet operations.")
+	fs.MarkDeprecated("kubelet-timeout", "kubelet-timeout is deprecated and will be removed.")
 
 	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile,
 		"Path to a client cert file for TLS.")
