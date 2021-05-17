@@ -46,13 +46,12 @@ type PriorityLevelRemover interface {
 
 // NewSuggestedPriorityLevelEnsurerEnsurer returns a PriorityLevelEnsurer instance that
 // can be used to ensure a set of suggested PriorityLevelConfiguration configuration objects.
-// shouldCreate indicates whether a missing 'suggested' PriorityLevelConfiguration object should be recreated.
-func NewSuggestedPriorityLevelEnsurerEnsurer(client flowcontrolclient.PriorityLevelConfigurationInterface, shouldCreate bool) PriorityLevelEnsurer {
+func NewSuggestedPriorityLevelEnsurerEnsurer(client flowcontrolclient.PriorityLevelConfigurationInterface) PriorityLevelEnsurer {
 	wrapper := &priorityLevelConfigurationWrapper{
 		client: client,
 	}
 	return &plEnsurer{
-		strategy: newSuggestedEnsureStrategy(wrapper, shouldCreate),
+		strategy: newSuggestedEnsureStrategy(wrapper),
 		wrapper:  wrapper,
 	}
 }
