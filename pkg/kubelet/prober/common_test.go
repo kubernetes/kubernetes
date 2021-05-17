@@ -19,6 +19,7 @@ package prober
 import (
 	"reflect"
 	"sync"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -123,7 +124,7 @@ func newTestManager() *manager {
 func newTestWorker(m *manager, probeType probeType, probeSpec v1.Probe) *worker {
 	pod := getTestPod()
 	setTestProbe(pod, probeType, probeSpec)
-	return newWorker(m, probeType, pod, pod.Spec.Containers[0])
+	return newWorker(m, probeType, time.Second, pod, pod.Spec.Containers[0])
 }
 
 type fakeExecProber struct {

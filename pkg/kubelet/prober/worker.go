@@ -18,7 +18,6 @@ package prober
 
 import (
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -81,12 +80,14 @@ type worker struct {
 	// for the ProberDuration metric by result.
 	proberDurationSuccessfulMetricLabels metrics.Labels
 	proberDurationUnknownMetricLabels    metrics.Labels
+	randomSleep                          time.Duration
 }
 
 // Creates and starts a new probe worker.
 func newWorker(
 	m *manager,
 	probeType probeType,
+	randomSleep time.Duration,
 	pod *v1.Pod,
 	container v1.Container) *worker {
 
@@ -97,6 +98,7 @@ func newWorker(
 		container:       container,
 		probeType:       probeType,
 		probeManager:    m,
+		randomSleep:     randomSleep,
 	}
 
 	switch probeType {
@@ -153,8 +155,8 @@ func (w *worker) run() {
 	// If kubelet restarted the probes could be started in rapid succession.
 	// Let the worker wait for a random portion of tickerPeriod before probing.
 	// Do it only if the kubelet has started recently.
-	if probeTickerPeriod > time.Since(w.probeManager.start) {
-		time.Sleep(time.Duration(rand.Float64() * float64(probeTickerPeriod)))
+	if w.randomSleep > time.Since(w.probeManager.start) {
+		time.Sleep(w.randomSleep)
 	}
 
 	probeTicker := time.NewTicker(probeTickerPeriod)

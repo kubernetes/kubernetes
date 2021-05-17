@@ -17,6 +17,8 @@ limitations under the License.
 package prober
 
 import (
+	"math"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -174,6 +176,19 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
 
+		// get min PeriodSeconds of all probes
+		period := math.MaxFloat64
+		for _, p := range []*v1.Probe{c.StartupProbe, c.LivenessProbe, c.ReadinessProbe} {
+			if p != nil {
+				period = math.Min(period, float64(p.PeriodSeconds))
+			}
+		}
+		// sleep for a fraction more than the shortest PeriodSeconds
+		var randomSleep time.Duration
+		if period < math.MaxFloat64 {
+			randomSleep = time.Duration((1+rand.Float64())*period) * time.Second
+		}
+
 		if c.StartupProbe != nil {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
@@ -181,7 +196,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, startup, pod, c)
+			w := newWorker(m, startup, randomSleep, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -193,7 +208,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, readiness, pod, c)
+			w := newWorker(m, readiness, randomSleep, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
@@ -205,7 +220,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 					"pod", klog.KObj(pod), "containerName", c.Name)
 				return
 			}
-			w := newWorker(m, liveness, pod, c)
+			w := newWorker(m, liveness, randomSleep, pod, c)
 			m.workers[key] = w
 			go w.run()
 		}
