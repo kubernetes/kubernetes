@@ -18,7 +18,9 @@ package metrics
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"regexp"
 	"sync"
 	"time"
@@ -27,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -37,7 +40,6 @@ const (
 	kubeSchedulerPort = 10259
 	// kubeControllerManagerPort is the default port for the controller manager status server.
 	kubeControllerManagerPort = 10257
-	metricsProxyPod           = "metrics-proxy"
 	// snapshotControllerPort is the port for the snapshot controller
 	snapshotControllerPort = 9102
 )
@@ -56,6 +58,7 @@ type Collection struct {
 type Grabber struct {
 	client                             clientset.Interface
 	externalClient                     clientset.Interface
+	config                             *rest.Config
 	grabFromAPIServer                  bool
 	grabFromControllerManager          bool
 	grabFromKubelets                   bool
@@ -71,7 +74,7 @@ type Grabber struct {
 }
 
 // NewMetricsGrabber returns new metrics which are initialized.
-func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
+func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *rest.Config, kubelets bool, scheduler bool, controllers bool, apiServer bool, clusterAutoscaler bool, snapshotController bool) (*Grabber, error) {
 
 	kubeScheduler := ""
 	kubeControllerManager := ""
@@ -80,6 +83,10 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
 	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
 	regSnapshotController := regexp.MustCompile("volume-snapshot-controller.*")
+
+	if (scheduler || controllers) && config == nil {
+		return nil, errors.New("a rest config is required for grabbing kube-controller and kube-controller-manager metrics")
+	}
 
 	podList, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -121,6 +128,7 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 	return &Grabber{
 		client:                     c,
 		externalClient:             ec,
+		config:                     config,
 		grabFromAPIServer:          apiServer,
 		grabFromControllerManager:  controllers,
 		grabFromKubelets:           kubelets,
@@ -173,7 +181,7 @@ func (g *Grabber) GrabFromScheduler() (SchedulerMetrics, error) {
 	g.waitForSchedulerReadyOnce.Do(func() {
 		var lastMetricsFetchErr error
 		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			output, lastMetricsFetchErr = g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeSchedulerPort)
+			output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeScheduler, metav1.NamespaceSystem, kubeSchedulerPort)
 			return lastMetricsFetchErr == nil, nil
 		}); metricsWaitErr != nil {
 			err = fmt.Errorf("error waiting for scheduler pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
@@ -224,7 +232,7 @@ func (g *Grabber) GrabFromControllerManager() (ControllerManagerMetrics, error) 
 
 		var lastMetricsFetchErr error
 		if metricsWaitErr := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-			output, lastMetricsFetchErr = g.getMetricsFromPod(g.client, metricsProxyPod, metav1.NamespaceSystem, kubeControllerManagerPort)
+			output, lastMetricsFetchErr = g.getSecureMetricsFromPod(g.kubeControllerManager, metav1.NamespaceSystem, kubeControllerManagerPort)
 			return lastMetricsFetchErr == nil, nil
 		}); metricsWaitErr != nil {
 			err = fmt.Errorf("error waiting for controller manager pod to expose metrics: %v; %v", metricsWaitErr, lastMetricsFetchErr)
@@ -354,6 +362,7 @@ func (g *Grabber) Grab() (Collection, error) {
 	return result, nil
 }
 
+// getMetricsFromPod retrieves metrics data from an insecure port.
 func (g *Grabber) getMetricsFromPod(client clientset.Interface, podName string, namespace string, port int) (string, error) {
 	rawOutput, err := client.CoreV1().RESTClient().Get().
 		Namespace(namespace).
@@ -361,6 +370,53 @@ func (g *Grabber) getMetricsFromPod(client clientset.Interface, podName string, 
 		SubResource("proxy").
 		Name(fmt.Sprintf("%s:%d", podName, port)).
 		Suffix("metrics").
+		Do(context.TODO()).Raw()
+	if err != nil {
+		return "", err
+	}
+	return string(rawOutput), nil
+}
+
+// getSecureMetricsFromPod retrieves metrics from a pod that uses TLS
+// and checks client credentials. Conceptually this function is
+// similar to "kubectl port-forward" + "kubectl get --raw
+// https://localhost:<port>/metrics". It uses the same credentials
+// as kubelet.
+func (g *Grabber) getSecureMetricsFromPod(podName string, namespace string, port int) (string, error) {
+	dialer := e2epod.NewDialer(g.client, g.config)
+	metricConfig := rest.CopyConfig(g.config)
+	addr := e2epod.Addr{
+		Namespace: namespace,
+		PodName:   podName,
+		Port:      port,
+	}
+	metricConfig.Dial = func(ctx context.Context, network, address string) (net.Conn, error) {
+		return dialer.DialContainerPort(ctx, addr)
+	}
+	// This should make it possible verify the server, but while it
+	// got past the server name check, certificate validation
+	// still failed.
+	metricConfig.Host = addr.String()
+	metricConfig.ServerName = "localhost"
+	// Verifying the pod certificate with the same root CA
+	// as for the API server led to an error about "unknown root
+	// certificate". Disabling certificate checking on the client
+	// side gets around that and should be good enough for
+	// E2E testing.
+	metricConfig.Insecure = true
+	metricConfig.CAFile = ""
+	metricConfig.CAData = nil
+
+	// clientset.NewForConfig is used because
+	// metricClient.RESTClient() is directly usable, in contrast
+	// to the client constructed by rest.RESTClientFor().
+	metricClient, err := clientset.NewForConfig(metricConfig)
+	if err != nil {
+		return "", err
+	}
+
+	rawOutput, err := metricClient.RESTClient().Get().
+		AbsPath("metrics").
 		Do(context.TODO()).Raw()
 	if err != nil {
 		return "", err
