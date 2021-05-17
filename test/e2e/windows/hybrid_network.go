@@ -37,7 +37,7 @@ const (
 
 var (
 	windowsBusyBoximage = imageutils.GetE2EImage(imageutils.Agnhost)
-	linuxBusyBoxImage   = "docker.io/library/nginx:1.15-alpine"
+	linuxBusyBoxImage   = imageutils.GetE2EImage(imageutils.Nginx)
 )
 
 var _ = SIGDescribe("Hybrid cluster network", func() {
