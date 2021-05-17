@@ -38,7 +38,8 @@ func (m *fakeManager) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 
 func (m *fakeManager) Policy() Policy {
 	klog.InfoS("Policy()")
-	return NewNonePolicy()
+	pol, _ := NewNonePolicy(nil)
+	return pol
 }
 
 func (m *fakeManager) Allocate(pod *v1.Pod, container *v1.Container) error {
