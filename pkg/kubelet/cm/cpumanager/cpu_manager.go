@@ -157,6 +157,13 @@ func NewManager(cpuPolicyName string, cpuPolicyOptions map[string]string, reconc
 		}
 
 	case PolicyStatic:
+		if len(cpuPolicyOptions) > 0 {
+			return nil, fmt.Errorf("Static policy: received unsupported options=%v", cpuPolicyOptions)
+		}
+		fallthrough
+
+	case PolicyConfigurable:
+		var err error
 		topo, err = topology.Discover(machineInfo)
 		if err != nil {
 			return nil, err

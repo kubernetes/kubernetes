@@ -35,6 +35,11 @@ const (
 	// Should options be given, these will be ignored and backward (up to 1.21 included)
 	// compatible behaviour will be enforced
 	PolicyStatic policyName = "static"
+	// PolicyConfigurable is an alias to the static policy, but if options are given,
+	// they are honored.
+	// This enables possibly backward-incompatible behavior but allow entities observing
+	// the kubelet policy name to detect the behaviour will change.
+	PolicyConfigurable policyName = "configurable"
 	// ErrorSMTAlignment represents the type of an SMTAlignmentError
 	ErrorSMTAlignment = "SMTAlignmentError"
 )

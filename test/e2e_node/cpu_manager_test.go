@@ -662,7 +662,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		ginkgo.By("the deleted pod has already been deleted from the state file")
 	})
 
-	ginkgo.It("should assign CPUs as expected with enhanced policy based on strict SMT alignment", func() {
+	ginkgo.It("should assign CPUs as expected with configurable policy based on strict SMT alignment", func() {
 		fullCPUsOnlyOpt := fmt.Sprintf("option=%s", cpumanager.FullPCPUsOnlyOption)
 		_, cpuAlloc, _ = getLocalNodeCPUDetails(f)
 		smtLevel := getSMTLevel()
@@ -685,7 +685,7 @@ func runCPUManagerTests(f *framework.Framework) {
 		cpuPolicyOptions := map[string]string{
 			cpumanager.FullPCPUsOnlyOption: "true",
 		}
-		oldCfg = configureCPUManagerInKubelet(f, string(cpumanager.PolicyStatic), cleanStateFile, cpuset.NewCPUSet(0), true, cpuPolicyOptions)
+		oldCfg = configureCPUManagerInKubelet(f, string(cpumanager.PolicyConfigurable), cleanStateFile, cpuset.NewCPUSet(0), true, cpuPolicyOptions)
 
 		// the order between negative and positive doesn't really matter
 		runSMTAlignmentNegativeTests(f)

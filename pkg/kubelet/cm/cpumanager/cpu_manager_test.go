@@ -1079,6 +1079,14 @@ func TestCPUManagerHandlePolicyOptions(t *testing.T) {
 			},
 			expectedError: fmt.Errorf("received unsupported options"),
 		},
+		{
+			description:   "options to static policy",
+			cpuPolicyName: "static",
+			cpuPolicyOptions: map[string]string{
+				FullPCPUsOnlyOption: "true",
+			},
+			expectedError: fmt.Errorf("received unsupported options"),
+		},
 	}
 
 	// any correct realistic topology is fine. We pick a simple one.
