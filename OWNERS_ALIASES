@@ -171,28 +171,27 @@ aliases:
 
   sig-scheduling-maintainers:
     - alculquicondor
-    - k82cn
-    - wojtek-t
-    - ravisantoshgudimetla
     - Huang-Wei
     - ahg-g
     - damemi
   # emeritus:
   # - bsalamat
+  # - k82cn
+  # - ravisantoshgudimetla
+  # - wojtek-t  
   sig-scheduling:
-    - k82cn
-    - resouer
-    - ravisantoshgudimetla
-    - Huang-Wei
-    - wgliang
+    - Huang-Wei    
     - ahg-g
-    - draveness
-    - hex108
     - alculquicondor
-    - liu-cong
     - damemi
     - chendave
     - adtac
+  # emeritus:
+  # - liu-cong
+  # - draveness
+  # - hex108
+  # - resouer
+  # - wgliang
 
   sig-cli-maintainers:
     - deads2k
