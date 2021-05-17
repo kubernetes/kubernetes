@@ -18,6 +18,7 @@ package stats
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -112,7 +113,11 @@ func (s *volumeStatCalculator) calcAndStoreStats() {
 		for name, v := range blockVolumes {
 			// Only add the blockVolume if it implements the MetricsProvider interface
 			if _, ok := v.(volume.MetricsProvider); ok {
-				metricVolumes[name] = v
+				bv := reflect.ValueOf(v)
+				filed := bv.FieldByName("MetricsProvider")
+				if !filed.IsNil() {
+					metricVolumes[name] = v
+				}
 			}
 		}
 	}
