@@ -127,10 +127,10 @@ func (p *program) appendDevice(dev *devices.Rule) error {
 	}
 	if hasAccess {
 		p.insts = append(p.insts,
-			// if (R3 & bpfAccess == 0 /* use R1 as a temp var */) goto next
+			// if (R3 & bpfAccess != R3 /* use R1 as a temp var */) goto next
 			asm.Mov.Reg32(asm.R1, asm.R3),
 			asm.And.Imm32(asm.R1, bpfAccess),
-			asm.JEq.Imm(asm.R1, 0, nextBlockSym),
+			asm.JNE.Reg(asm.R1, asm.R3, nextBlockSym),
 		)
 	}
 	if hasMajor {
