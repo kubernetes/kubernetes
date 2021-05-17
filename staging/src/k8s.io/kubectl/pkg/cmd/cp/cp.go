@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/lithammer/dedent"
@@ -156,6 +157,29 @@ func extractFileSpec(arg string) (fileSpec, error) {
 	}
 }
 
+func extractFileSpecPair(src, dest string, inWin bool) (srcSpec fileSpec, destSpec fileSpec, err error) {
+	srcSpec, err = extractFileSpec(src)
+	if err != nil {
+		return fileSpec{}, fileSpec{}, err
+	}
+	destSpec, err = extractFileSpec(dest)
+	if err != nil {
+		return fileSpec{}, fileSpec{}, err
+	}
+
+	// Extract Windows local path
+	if inWin && srcSpec.PodName != "" && destSpec.PodName != "" {
+		if srcSpec.PodNamespace == "" && len(srcSpec.PodName) == 1 && len(destSpec.PodName) > 1 {
+			srcSpec.File = srcSpec.PodName + ":" + srcSpec.File
+			srcSpec.PodName = ""
+		} else if destSpec.PodNamespace == "" && len(destSpec.PodName) == 1 && len(srcSpec.PodName) > 1 {
+			destSpec.File = destSpec.PodName + ":" + destSpec.File
+			destSpec.PodName = ""
+		}
+	}
+	return srcSpec, destSpec, nil
+}
+
 // Complete completes all the required options
 func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	if cmd.Parent() != nil {
@@ -193,11 +217,8 @@ func (o *CopyOptions) Run(args []string) error {
 	if len(args) < 2 {
 		return fmt.Errorf("source and destination are required")
 	}
-	srcSpec, err := extractFileSpec(args[0])
-	if err != nil {
-		return err
-	}
-	destSpec, err := extractFileSpec(args[1])
+
+	srcSpec, destSpec, err := extractFileSpecPair(args[0], args[1], runtime.GOOS == "windows")
 	if err != nil {
 		return err
 	}

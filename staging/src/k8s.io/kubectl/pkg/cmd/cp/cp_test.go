@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -88,6 +88,27 @@ func TestExtractFileSpec(t *testing.T) {
 			expectedPod:  "pod",
 			expectedFile: "/some/filenamewith:in",
 		},
+		{
+			spec:              "namespace/pod:c:/some/file",
+			expectedPod:       "pod",
+			expectedNamespace: "namespace",
+			expectedFile:      "c:/some/file",
+		},
+		{
+			spec:         "pod:c:/some/file",
+			expectedPod:  "pod",
+			expectedFile: "c:/some/file",
+		},
+		{
+			spec:         "c:/some/file",
+			expectedPod:  "c",
+			expectedFile: "/some/file",
+		},
+		{
+			spec:         "pod:c:/some/filenamewith:in",
+			expectedPod:  "pod",
+			expectedFile: "c:/some/filenamewith:in",
+		},
 	}
 	for _, test := range tests {
 		spec, err := extractFileSpec(test.spec)
@@ -108,6 +129,65 @@ func TestExtractFileSpec(t *testing.T) {
 		if spec.File != test.expectedFile {
 			t.Errorf("expected: %s, saw: %s", test.expectedFile, spec.File)
 		}
+	}
+}
+
+func Test_extractFileSpecPair(t *testing.T) {
+	type args struct {
+		src   string
+		dest  string
+		inWin bool
+	}
+	tests := []struct {
+		name         string
+		args         args
+		wantSrcSpec  fileSpec
+		wantDestSpec fileSpec
+		wantErr      bool
+	}{
+		{
+			args: args{
+				src:   "pod:c:/some/file",
+				dest:  "c:/some/file",
+				inWin: true,
+			},
+			wantSrcSpec: fileSpec{
+				PodName: "pod",
+				File:    "c:/some/file",
+			},
+			wantDestSpec: fileSpec{
+				File: "c:/some/file",
+			},
+		},
+		{
+			args: args{
+				src:   "c:/some/file",
+				dest:  "pod:c:/some/file",
+				inWin: true,
+			},
+			wantSrcSpec: fileSpec{
+				File: "c:/some/file",
+			},
+			wantDestSpec: fileSpec{
+				PodName: "pod",
+				File:    "c:/some/file",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotSrcSpec, gotDestSpec, err := extractFileSpecPair(tt.args.src, tt.args.dest, tt.args.inWin)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("extractFileSpecPair() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotSrcSpec, tt.wantSrcSpec) {
+				t.Errorf("extractFileSpecPair() gotSrcSpec = %v, want %v", gotSrcSpec, tt.wantSrcSpec)
+			}
+			if !reflect.DeepEqual(gotDestSpec, tt.wantDestSpec) {
+				t.Errorf("extractFileSpecPair() gotDestSpec = %v, want %v", gotDestSpec, tt.wantDestSpec)
+			}
+		})
 	}
 }
 
