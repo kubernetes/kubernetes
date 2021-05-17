@@ -31,13 +31,15 @@ KUBECTL_IGNORE_FILES_REGEX="cmd/kustomize/kustomize.go"
 
 generate_pot="false"
 generate_mo="false"
+fix_translations="false"
 
-while getopts "hf:xg" opt; do
+while getopts "hf:xkg" opt; do
   case ${opt} in
     h)
-      echo "$0 [-f files] [-x] [-g]"
+      echo "$0 [-f files] [-x] [-k] [-g]"
       echo " -f <file-path>: Files to process"
       echo " -x extract strings to a POT file"
+      echo " -k fix .po files; deprecate translations by marking them obsolete and supply default messages"
       echo " -g sort .po files and generate .mo files"
       exit 0
       ;;
@@ -46,6 +48,9 @@ while getopts "hf:xg" opt; do
       ;;
     x)
       generate_pot="true"
+      ;;
+    k)
+      fix_translations="true"
       ;;
     g)
       generate_mo="true"
@@ -88,6 +93,23 @@ if [[ "${generate_pot}" == "true" ]]; then
     echo "Failed to update template.pot"
     exit 1
   fi
+fi
+
+if [[ "${fix_translations}" == "true" ]]; then
+  echo "Fixing .po files"
+  kube::util::ensure-temp-dir
+  for PO_FILE in translations/kubectl/*/LC_MESSAGES/k8s.po; do
+    TMP="${KUBE_TEMP}/fix.po"
+    if [[ "${PO_FILE}" =~ .*/default/.* || "${PO_FILE}" =~ .*/en_US/.*  ]]; then
+      # mark obsolete, and set default values for english translations
+      msgen translations/kubectl/template.pot | \
+        msgmerge -s --no-fuzzy-matching "${PO_FILE}" - > "${TMP}"
+    else
+      # mark obsolete, but do not add untranslated messages
+      msgmerge -s --no-fuzzy-matching "${PO_FILE}" translations/kubectl/template.pot | msgattrib --translated - > "${TMP}"
+    fi
+    mv "${TMP}" "${PO_FILE}"
+  done
 fi
 
 if [[ "${generate_mo}" == "true" ]]; then
