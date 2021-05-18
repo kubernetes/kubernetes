@@ -19,6 +19,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	netutil "k8s.io/utils/net"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
+			nodeIP = getFormattedNodeIP(nodeIP)
 			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s:%v/metrics", "%{http_code}", nodeIP, ports.KubeletPort))
 			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
 		}
@@ -81,6 +83,7 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 
 		for _, nodeIP := range nodeIPs {
+			nodeIP = getFormattedNodeIP(nodeIP)
 			result := framework.RunHostCmdOrDie(ns,
 				pod.Name,
 				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s:%v/metrics",
@@ -91,6 +94,13 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		}
 	})
 })
+
+func getFormattedNodeIP(nodeIP string) string {
+	if netutil.IsIPv6String(nodeIP) {
+		return fmt.Sprintf("[%s]", nodeIP)
+	}
+	return nodeIP
+}
 
 func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
 	pod := e2epod.NewAgnhostPod(f.Namespace.Name, "agnhost-pod", nil, nil, nil)
