@@ -29,14 +29,12 @@ var (
 
 // Spec represents decoded BTF.
 type Spec struct {
-	rawTypes   []rawType
-	strings    stringTable
-	types      []Type
-	namedTypes map[string][]namedType
-	funcInfos  map[string]extInfo
-	lineInfos  map[string]extInfo
-	coreRelos  map[string]bpfCoreRelos
-	byteOrder  binary.ByteOrder
+	rawTypes  []rawType
+	strings   stringTable
+	types     map[string][]namedType
+	funcInfos map[string]extInfo
+	lineInfos map[string]extInfo
+	byteOrder binary.ByteOrder
 }
 
 type btfHeader struct {
@@ -55,7 +53,7 @@ type btfHeader struct {
 //
 // Returns a nil Spec and no error if no BTF was present.
 func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
-	file, err := internal.NewSafeELFFile(rd)
+	file, err := elf.NewFile(rd)
 	if err != nil {
 		return nil, err
 	}
@@ -82,10 +80,6 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 			continue
 		}
 
-		if int(symbol.Section) >= len(file.Sections) {
-			return nil, fmt.Errorf("symbol %s: invalid section %d", symbol.Name, symbol.Section)
-		}
-
 		secName := file.Sections[symbol.Section].Name
 		if _, ok := sectionSizes[secName]; !ok {
 			continue
@@ -107,7 +101,7 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 		return spec, nil
 	}
 
-	spec.funcInfos, spec.lineInfos, spec.coreRelos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
+	spec.funcInfos, spec.lineInfos, err = parseExtInfos(btfExtSection.Open(), file.ByteOrder, spec.strings)
 	if err != nil {
 		return nil, fmt.Errorf("can't read ext info: %w", err)
 	}
@@ -115,7 +109,7 @@ func LoadSpecFromReader(rd io.ReaderAt) (*Spec, error) {
 	return spec, nil
 }
 
-func findBtfSections(file *internal.SafeELFFile) (*elf.Section, *elf.Section, map[string]uint32, error) {
+func findBtfSections(file *elf.File) (*elf.Section, *elf.Section, map[string]uint32, error) {
 	var (
 		btfSection    *elf.Section
 		btfExtSection *elf.Section
@@ -144,7 +138,7 @@ func findBtfSections(file *internal.SafeELFFile) (*elf.Section, *elf.Section, ma
 }
 
 func loadSpecFromVmlinux(rd io.ReaderAt) (*Spec, error) {
-	file, err := internal.NewSafeELFFile(rd)
+	file, err := elf.NewFile(rd)
 	if err != nil {
 		return nil, err
 	}
@@ -171,17 +165,16 @@ func loadNakedSpec(btf io.ReadSeeker, bo binary.ByteOrder, sectionSizes map[stri
 		return nil, err
 	}
 
-	types, typesByName, err := inflateRawTypes(rawTypes, rawStrings)
+	types, err := inflateRawTypes(rawTypes, rawStrings)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Spec{
-		rawTypes:   rawTypes,
-		namedTypes: typesByName,
-		types:      types,
-		strings:    rawStrings,
-		byteOrder:  bo,
+		rawTypes:  rawTypes,
+		types:     types,
+		strings:   rawStrings,
+		byteOrder: bo,
 	}, nil
 }
 
@@ -318,12 +311,8 @@ func fixupDatasec(rawTypes []rawType, rawStrings stringTable, sectionSizes map[s
 			return err
 		}
 
-		if name == ".kconfig" || name == ".ksyms" {
+		if name == ".kconfig" || name == ".ksym" {
 			return fmt.Errorf("reference to %s: %w", name, ErrNotSupported)
-		}
-
-		if rawTypes[i].SizeType != 0 {
-			continue
 		}
 
 		size, ok := sectionSizes[name]
@@ -432,19 +421,64 @@ func (s *Spec) Program(name string, length uint64) (*Program, error) {
 		return nil, errors.New("length musn't be zero")
 	}
 
-	if s.funcInfos == nil && s.lineInfos == nil && s.coreRelos == nil {
+	if s.funcInfos == nil && s.lineInfos == nil {
 		return nil, fmt.Errorf("BTF for section %s: %w", name, ErrNoExtendedInfo)
 	}
 
 	funcInfos, funcOK := s.funcInfos[name]
 	lineInfos, lineOK := s.lineInfos[name]
-	coreRelos, coreOK := s.coreRelos[name]
 
-	if !funcOK && !lineOK && !coreOK {
+	if !funcOK && !lineOK {
 		return nil, fmt.Errorf("no extended BTF info for section %s", name)
 	}
 
-	return &Program{s, length, funcInfos, lineInfos, coreRelos}, nil
+	return &Program{s, length, funcInfos, lineInfos}, nil
+}
+
+// Map finds the BTF for a map.
+//
+// Returns an error if there is no BTF for the given name.
+func (s *Spec) Map(name string) (*Map, []Member, error) {
+	var mapVar Var
+	if err := s.FindType(name, &mapVar); err != nil {
+		return nil, nil, err
+	}
+
+	mapStruct, ok := mapVar.Type.(*Struct)
+	if !ok {
+		return nil, nil, fmt.Errorf("expected struct, have %s", mapVar.Type)
+	}
+
+	var key, value Type
+	for _, member := range mapStruct.Members {
+		switch member.Name {
+		case "key":
+			key = member.Type
+			if pk, isPtr := key.(*Pointer); !isPtr {
+				return nil, nil, fmt.Errorf("key type is not a pointer: %T", key)
+			} else {
+				key = pk.Target
+			}
+
+		case "value":
+			value = member.Type
+			if vk, isPtr := value.(*Pointer); !isPtr {
+				return nil, nil, fmt.Errorf("value type is not a pointer: %T", value)
+			} else {
+				value = vk.Target
+			}
+		}
+	}
+
+	if key == nil {
+		key = (*Void)(nil)
+	}
+
+	if value == nil {
+		value = (*Void)(nil)
+	}
+
+	return &Map{s, key, value}, mapStruct.Members, nil
 }
 
 // Datasec returns the BTF required to create maps which represent data sections.
@@ -454,8 +488,7 @@ func (s *Spec) Datasec(name string) (*Map, error) {
 		return nil, fmt.Errorf("data section %s: can't get BTF: %w", name, err)
 	}
 
-	m := NewMap(s, &Void{}, &datasec)
-	return &m, nil
+	return &Map{s, &Void{}, &datasec}, nil
 }
 
 // FindType searches for a type with a specific name.
@@ -470,7 +503,7 @@ func (s *Spec) FindType(name string, typ Type) error {
 		candidate Type
 	)
 
-	for _, typ := range s.namedTypes[essentialName(name)] {
+	for _, typ := range s.types[essentialName(name)] {
 		if reflect.TypeOf(typ) != wanted {
 			continue
 		}
@@ -566,23 +599,6 @@ type Map struct {
 	key, value Type
 }
 
-// NewMap returns a new Map containing the given values.
-// The key and value arguments are initialized to Void if nil values are given.
-func NewMap(spec *Spec, key Type, value Type) Map {
-	if key == nil {
-		key = &Void{}
-	}
-	if value == nil {
-		value = &Void{}
-	}
-
-	return Map{
-		spec:  spec,
-		key:   key,
-		value: value,
-	}
-}
-
 // MapSpec should be a method on Map, but is a free function
 // to hide it from users of the ebpf package.
 func MapSpec(m *Map) *Spec {
@@ -606,7 +622,6 @@ type Program struct {
 	spec                 *Spec
 	length               uint64
 	funcInfos, lineInfos extInfo
-	coreRelos            bpfCoreRelos
 }
 
 // ProgramSpec returns the Spec needed for loading function and line infos into the kernel.
@@ -632,10 +647,9 @@ func ProgramAppend(s, other *Program) error {
 		return fmt.Errorf("line infos: %w", err)
 	}
 
+	s.length += other.length
 	s.funcInfos = funcInfos
 	s.lineInfos = lineInfos
-	s.coreRelos = s.coreRelos.append(other.coreRelos, s.length)
-	s.length += other.length
 	return nil
 }
 
@@ -663,19 +677,6 @@ func ProgramLineInfos(s *Program) (recordSize uint32, bytes []byte, err error) {
 	}
 
 	return s.lineInfos.recordSize, bytes, nil
-}
-
-// ProgramRelocations returns the CO-RE relocations required to adjust the
-// program to the target.
-//
-// This is a free function instead of a method to hide it from users
-// of package ebpf.
-func ProgramRelocations(s *Program, target *Spec) (map[uint64]Relocation, error) {
-	if len(s.coreRelos) == 0 {
-		return nil, nil
-	}
-
-	return coreRelocate(s.spec, target, s.coreRelos)
 }
 
 type bpfLoadBTFAttr struct {
@@ -717,7 +718,7 @@ func marshalBTF(types interface{}, strings []byte, bo binary.ByteOrder) []byte {
 	return buf.Bytes()
 }
 
-var haveBTF = internal.FeatureTest("BTF", "5.1", func() error {
+var haveBTF = internal.FeatureTest("BTF", "5.1", func() (bool, error) {
 	var (
 		types struct {
 			Integer btfType
@@ -741,24 +742,15 @@ var haveBTF = internal.FeatureTest("BTF", "5.1", func() error {
 		btf:     internal.NewSlicePointer(btf),
 		btfSize: uint32(len(btf)),
 	})
-	if errors.Is(err, unix.EINVAL) || errors.Is(err, unix.EPERM) {
-		// Treat both EINVAL and EPERM as not supported: loading the program
-		// might still succeed without BTF.
-		return internal.ErrNotSupported
+	if err == nil {
+		fd.Close()
 	}
-	if err != nil {
-		return err
-	}
-
-	fd.Close()
-	return nil
+	// Check for EINVAL specifically, rather than err != nil since we
+	// otherwise misdetect due to insufficient permissions.
+	return !errors.Is(err, unix.EINVAL), nil
 })
 
-var haveFuncLinkage = internal.FeatureTest("BTF func linkage", "5.6", func() error {
-	if err := haveBTF(); err != nil {
-		return err
-	}
-
+var haveFuncLinkage = internal.FeatureTest("BTF func linkage", "5.6", func() (bool, error) {
 	var (
 		types struct {
 			FuncProto btfType
@@ -779,13 +771,11 @@ var haveFuncLinkage = internal.FeatureTest("BTF func linkage", "5.6", func() err
 		btf:     internal.NewSlicePointer(btf),
 		btfSize: uint32(len(btf)),
 	})
-	if errors.Is(err, unix.EINVAL) {
-		return internal.ErrNotSupported
-	}
-	if err != nil {
-		return err
+	if err == nil {
+		fd.Close()
 	}
 
-	fd.Close()
-	return nil
+	// Check for EINVAL specifically, rather than err != nil since we
+	// otherwise misdetect due to insufficient permissions.
+	return !errors.Is(err, unix.EINVAL), nil
 })

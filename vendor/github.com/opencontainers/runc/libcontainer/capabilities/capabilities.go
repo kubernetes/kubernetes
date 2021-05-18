@@ -3,26 +3,16 @@
 package capabilities
 
 import (
-	"sort"
+	"fmt"
 	"strings"
 
 	"github.com/opencontainers/runc/libcontainer/configs"
-	"github.com/sirupsen/logrus"
 	"github.com/syndtr/gocapability/capability"
 )
 
-const allCapabilityTypes = capability.CAPS | capability.BOUNDING | capability.AMBIENT
+const allCapabilityTypes = capability.CAPS | capability.BOUNDS | capability.AMBS
 
-var (
-	capabilityMap map[string]capability.Cap
-	capTypes      = []capability.CapType{
-		capability.BOUNDING,
-		capability.PERMITTED,
-		capability.INHERITABLE,
-		capability.EFFECTIVE,
-		capability.AMBIENT,
-	}
-)
+var capabilityMap map[string]capability.Cap
 
 func init() {
 	capabilityMap = make(map[string]capability.Cap, capability.CAP_LAST_CAP+1)
@@ -34,78 +24,73 @@ func init() {
 	}
 }
 
-// New creates a new Caps from the given Capabilities config. Unknown Capabilities
-// or Capabilities that are unavailable in the current environment are ignored,
-// printing a warning instead.
+// New creates a new Caps from the given Capabilities config.
 func New(capConfig *configs.Capabilities) (*Caps, error) {
 	var (
-		err error
-		c   Caps
+		err  error
+		caps Caps
 	)
 
-	unknownCaps := make(map[string]struct{})
-	c.caps = map[capability.CapType][]capability.Cap{
-		capability.BOUNDING:    capSlice(capConfig.Bounding, unknownCaps),
-		capability.EFFECTIVE:   capSlice(capConfig.Effective, unknownCaps),
-		capability.INHERITABLE: capSlice(capConfig.Inheritable, unknownCaps),
-		capability.PERMITTED:   capSlice(capConfig.Permitted, unknownCaps),
-		capability.AMBIENT:     capSlice(capConfig.Ambient, unknownCaps),
-	}
-	if c.pid, err = capability.NewPid2(0); err != nil {
+	if caps.bounding, err = capSlice(capConfig.Bounding); err != nil {
 		return nil, err
 	}
-	if err = c.pid.Load(); err != nil {
+	if caps.effective, err = capSlice(capConfig.Effective); err != nil {
 		return nil, err
 	}
-	if len(unknownCaps) > 0 {
-		logrus.Warn("ignoring unknown or unavailable capabilities: ", mapKeys(unknownCaps))
+	if caps.inheritable, err = capSlice(capConfig.Inheritable); err != nil {
+		return nil, err
 	}
-	return &c, nil
+	if caps.permitted, err = capSlice(capConfig.Permitted); err != nil {
+		return nil, err
+	}
+	if caps.ambient, err = capSlice(capConfig.Ambient); err != nil {
+		return nil, err
+	}
+	if caps.pid, err = capability.NewPid2(0); err != nil {
+		return nil, err
+	}
+	if err = caps.pid.Load(); err != nil {
+		return nil, err
+	}
+	return &caps, nil
 }
 
-// capSlice converts the slice of capability names in caps, to their numeric
-// equivalent, and returns them as a slice. Unknown or unavailable capabilities
-// are not returned, but appended to unknownCaps.
-func capSlice(caps []string, unknownCaps map[string]struct{}) []capability.Cap {
-	var out []capability.Cap
-	for _, c := range caps {
-		if v, ok := capabilityMap[c]; !ok {
-			unknownCaps[c] = struct{}{}
-		} else {
-			out = append(out, v)
+func capSlice(caps []string) ([]capability.Cap, error) {
+	out := make([]capability.Cap, len(caps))
+	for i, c := range caps {
+		v, ok := capabilityMap[c]
+		if !ok {
+			return nil, fmt.Errorf("unknown capability %q", c)
 		}
+		out[i] = v
 	}
-	return out
-}
-
-// mapKeys returns the keys of input in sorted order
-func mapKeys(input map[string]struct{}) []string {
-	var keys []string
-	for c := range input {
-		keys = append(keys, c)
-	}
-	sort.Strings(keys)
-	return keys
+	return out, nil
 }
 
 // Caps holds the capabilities for a container.
 type Caps struct {
-	pid  capability.Capabilities
-	caps map[capability.CapType][]capability.Cap
+	pid         capability.Capabilities
+	bounding    []capability.Cap
+	effective   []capability.Cap
+	inheritable []capability.Cap
+	permitted   []capability.Cap
+	ambient     []capability.Cap
 }
 
 // ApplyBoundingSet sets the capability bounding set to those specified in the whitelist.
 func (c *Caps) ApplyBoundingSet() error {
-	c.pid.Clear(capability.BOUNDING)
-	c.pid.Set(capability.BOUNDING, c.caps[capability.BOUNDING]...)
-	return c.pid.Apply(capability.BOUNDING)
+	c.pid.Clear(capability.BOUNDS)
+	c.pid.Set(capability.BOUNDS, c.bounding...)
+	return c.pid.Apply(capability.BOUNDS)
 }
 
 // Apply sets all the capabilities for the current process in the config.
 func (c *Caps) ApplyCaps() error {
 	c.pid.Clear(allCapabilityTypes)
-	for _, g := range capTypes {
-		c.pid.Set(g, c.caps[g]...)
-	}
+	c.pid.Set(capability.BOUNDS, c.bounding...)
+	c.pid.Set(capability.PERMITTED, c.permitted...)
+	c.pid.Set(capability.INHERITABLE, c.inheritable...)
+	c.pid.Set(capability.EFFECTIVE, c.effective...)
+	c.pid.Set(capability.AMBIENT, c.ambient...)
 	return c.pid.Apply(allCapabilityTypes)
 }

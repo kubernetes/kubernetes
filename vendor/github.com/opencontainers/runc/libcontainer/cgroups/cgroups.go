@@ -7,44 +7,37 @@ import (
 )
 
 type Manager interface {
-	// Apply creates a cgroup, if not yet created, and adds a process
-	// with the specified pid into that cgroup.  A special value of -1
-	// can be used to merely create a cgroup.
+	// Applies cgroup configuration to the process with the specified pid
 	Apply(pid int) error
 
-	// GetPids returns the PIDs of all processes inside the cgroup.
+	// Returns the PIDs inside the cgroup set
 	GetPids() ([]int, error)
 
-	// GetAllPids returns the PIDs of all processes inside the cgroup
-	// any all its sub-cgroups.
+	// Returns the PIDs inside the cgroup set & all sub-cgroups
 	GetAllPids() ([]int, error)
 
-	// GetStats returns cgroups statistics.
+	// Returns statistics for the cgroup set
 	GetStats() (*Stats, error)
 
-	// Freeze sets the freezer cgroup to the specified state.
+	// Toggles the freezer cgroup according with specified state
 	Freeze(state configs.FreezerState) error
 
-	// Destroy removes cgroup.
+	// Destroys the cgroup set
 	Destroy() error
 
 	// Path returns a cgroup path to the specified controller/subsystem.
 	// For cgroupv2, the argument is unused and can be empty.
 	Path(string) string
 
-	// Set sets cgroup resources parameters/limits. If the argument is nil,
-	// the resources specified during Manager creation (or the previous call
-	// to Set) are used.
-	Set(r *configs.Resources) error
+	// Sets the cgroup as configured.
+	Set(container *configs.Config) error
 
-	// GetPaths returns cgroup path(s) to save in a state file in order to
-	// restore later.
+	// GetPaths returns cgroup path(s) to save in a state file in order to restore later.
 	//
-	// For cgroup v1, a key is cgroup subsystem name, and the value is the
-	// path to the cgroup for this subsystem.
+	// For cgroup v1, a key is cgroup subsystem name, and the value is the path
+	// to the cgroup for this subsystem.
 	//
-	// For cgroup v2 unified hierarchy, a key is "", and the value is the
-	// unified path.
+	// For cgroup v2 unified hierarchy, a key is "", and the value is the unified path.
 	GetPaths() map[string]string
 
 	// GetCgroups returns the cgroup data as configured.
@@ -53,9 +46,6 @@ type Manager interface {
 	// GetFreezerState retrieves the current FreezerState of the cgroup.
 	GetFreezerState() (configs.FreezerState, error)
 
-	// Exists returns whether the cgroup path exists or not.
+	// Whether the cgroup path exists or not
 	Exists() bool
-
-	// OOMKillCount reports OOM kill count for the cgroup.
-	OOMKillCount() (uint64, error)
 }

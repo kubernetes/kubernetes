@@ -7,22 +7,22 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-func isCpusetSet(r *configs.Resources) bool {
-	return r.CpusetCpus != "" || r.CpusetMems != ""
+func isCpusetSet(cgroup *configs.Cgroup) bool {
+	return cgroup.Resources.CpusetCpus != "" || cgroup.Resources.CpusetMems != ""
 }
 
-func setCpuset(dirPath string, r *configs.Resources) error {
-	if !isCpusetSet(r) {
+func setCpuset(dirPath string, cgroup *configs.Cgroup) error {
+	if !isCpusetSet(cgroup) {
 		return nil
 	}
 
-	if r.CpusetCpus != "" {
-		if err := fscommon.WriteFile(dirPath, "cpuset.cpus", r.CpusetCpus); err != nil {
+	if cgroup.Resources.CpusetCpus != "" {
+		if err := fscommon.WriteFile(dirPath, "cpuset.cpus", cgroup.Resources.CpusetCpus); err != nil {
 			return err
 		}
 	}
-	if r.CpusetMems != "" {
-		if err := fscommon.WriteFile(dirPath, "cpuset.mems", r.CpusetMems); err != nil {
+	if cgroup.Resources.CpusetMems != "" {
+		if err := fscommon.WriteFile(dirPath, "cpuset.mems", cgroup.Resources.CpusetMems); err != nil {
 			return err
 		}
 	}

@@ -11,26 +11,18 @@ import (
 var errNonLinux = fmt.Errorf("unsupported platform %s/%s", runtime.GOOS, runtime.GOARCH)
 
 const (
-	ENOENT = syscall.ENOENT
-	EEXIST = syscall.EEXIST
-	EAGAIN = syscall.EAGAIN
-	ENOSPC = syscall.ENOSPC
-	EINVAL = syscall.EINVAL
-	EINTR  = syscall.EINTR
-	EPERM  = syscall.EPERM
-	ESRCH  = syscall.ESRCH
-	ENODEV = syscall.ENODEV
-	EBADF  = syscall.Errno(0)
-	// ENOTSUPP is not the same as ENOTSUP or EOPNOTSUP
-	ENOTSUPP = syscall.Errno(0x20c)
-
-	BPF_F_NO_PREALLOC        = 0
+	ENOENT                   = syscall.ENOENT
+	EEXIST                   = syscall.EEXIST
+	EAGAIN                   = syscall.EAGAIN
+	ENOSPC                   = syscall.ENOSPC
+	EINVAL                   = syscall.EINVAL
+	EINTR                    = syscall.EINTR
+	EPERM                    = syscall.EPERM
+	ESRCH                    = syscall.ESRCH
+	ENODEV                   = syscall.ENODEV
 	BPF_F_NUMA_NODE          = 0
-	BPF_F_RDONLY             = 0
-	BPF_F_WRONLY             = 0
 	BPF_F_RDONLY_PROG        = 0
 	BPF_F_WRONLY_PROG        = 0
-	BPF_F_SLEEPABLE          = 0
 	BPF_OBJ_NAME_LEN         = 0x10
 	BPF_TAG_SIZE             = 0x8
 	SYS_BPF                  = 321
@@ -44,21 +36,12 @@ const (
 	PROT_WRITE               = 0x2
 	MAP_SHARED               = 0x1
 	PERF_TYPE_SOFTWARE       = 0x1
-	PERF_TYPE_TRACEPOINT     = 0
 	PERF_COUNT_SW_BPF_OUTPUT = 0xa
-	PERF_EVENT_IOC_DISABLE   = 0
-	PERF_EVENT_IOC_ENABLE    = 0
-	PERF_EVENT_IOC_SET_BPF   = 0
 	PerfBitWatermark         = 0x4000
 	PERF_SAMPLE_RAW          = 0x400
 	PERF_FLAG_FD_CLOEXEC     = 0x8
 	RLIM_INFINITY            = 0x7fffffffffffffff
 	RLIMIT_MEMLOCK           = 8
-	BPF_STATS_RUN_TIME       = 0
-	PERF_RECORD_LOST         = 2
-	PERF_RECORD_SAMPLE       = 9
-	AT_FDCWD                 = -0x2
-	RENAME_NOREPLACE         = 0x1
 )
 
 // Statfs_t is a wrapper
@@ -96,11 +79,6 @@ func Syscall(trap, a1, a2, a3 uintptr) (r1, r2 uintptr, err syscall.Errno) {
 // FcntlInt is a wrapper
 func FcntlInt(fd uintptr, cmd, arg int) (int, error) {
 	return -1, errNonLinux
-}
-
-// IoctlSetInt is a wrapper
-func IoctlSetInt(fd int, req uint, value int) error {
-	return errNonLinux
 }
 
 // Statfs is a wrapper
@@ -217,7 +195,6 @@ func PerfEventOpen(attr *PerfEventAttr, pid int, cpu int, groupFd int, flags int
 // Utsname is a wrapper
 type Utsname struct {
 	Release [65]byte
-	Version [65]byte
 }
 
 // Uname is a wrapper
@@ -237,21 +214,6 @@ func Gettid() int {
 
 // Tgkill is a wrapper
 func Tgkill(tgid int, tid int, sig syscall.Signal) (err error) {
-	return errNonLinux
-}
-
-// BytePtrFromString is a wrapper
-func BytePtrFromString(s string) (*byte, error) {
-	return nil, errNonLinux
-}
-
-// ByteSliceToString is a wrapper
-func ByteSliceToString(s []byte) string {
-	return ""
-}
-
-// Renameat2 is a wrapper
-func Renameat2(olddirfd int, oldpath string, newdirfd int, newpath string, flags uint) error {
 	return errNonLinux
 }
 

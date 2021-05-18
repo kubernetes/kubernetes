@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
 var (
-	configureMutex sync.Mutex
+	configureMutex = sync.Mutex{}
 	// loggingConfigured will be set once logging has been configured via invoking `ConfigureLogging`.
 	// Subsequent invocations of `ConfigureLogging` would be no-op
 	loggingConfigured = false
@@ -23,47 +23,41 @@ type Config struct {
 	LogLevel    logrus.Level
 	LogFormat   string
 	LogFilePath string
-	LogPipeFd   int
-	LogCaller   bool
+	LogPipeFd   string
 }
 
-func ForwardLogs(logPipe io.ReadCloser) chan error {
-	done := make(chan error, 1)
-	s := bufio.NewScanner(logPipe)
-
-	go func() {
-		for s.Scan() {
-			processEntry(s.Bytes())
+func ForwardLogs(logPipe io.Reader) {
+	lineReader := bufio.NewReader(logPipe)
+	for {
+		line, err := lineReader.ReadBytes('\n')
+		if len(line) > 0 {
+			processEntry(line)
 		}
-		if err := logPipe.Close(); err != nil {
-			logrus.Errorf("error closing log source: %v", err)
+		if err == io.EOF {
+			logrus.Debugf("log pipe has been closed: %+v", err)
+			return
 		}
-		// The only error we want to return is when reading from
-		// logPipe has failed.
-		done <- s.Err()
-		close(done)
-	}()
-
-	return done
+		if err != nil {
+			logrus.Errorf("log pipe read error: %+v", err)
+		}
+	}
 }
 
 func processEntry(text []byte) {
-	if len(text) == 0 {
-		return
-	}
-
-	var jl struct {
+	type jsonLog struct {
 		Level string `json:"level"`
 		Msg   string `json:"msg"`
 	}
+
+	var jl jsonLog
 	if err := json.Unmarshal(text, &jl); err != nil {
-		logrus.Errorf("failed to decode %q to json: %v", text, err)
+		logrus.Errorf("failed to decode %q to json: %+v", text, err)
 		return
 	}
 
 	lvl, err := logrus.ParseLevel(jl.Level)
 	if err != nil {
-		logrus.Errorf("failed to parse log level %q: %v", jl.Level, err)
+		logrus.Errorf("failed to parse log level %q: %v\n", jl.Level, err)
 		return
 	}
 	logrus.StandardLogger().Logf(lvl, jl.Msg)
@@ -74,16 +68,18 @@ func ConfigureLogging(config Config) error {
 	defer configureMutex.Unlock()
 
 	if loggingConfigured {
-		return errors.New("logging has already been configured")
+		logrus.Debug("logging has already been configured")
+		return nil
 	}
 
 	logrus.SetLevel(config.LogLevel)
-	logrus.SetReportCaller(config.LogCaller)
 
-	// XXX: while 0 is a valid fd (usually stdin), here we assume
-	// that we never deliberately set LogPipeFd to 0.
-	if config.LogPipeFd > 0 {
-		logrus.SetOutput(os.NewFile(uintptr(config.LogPipeFd), "logpipe"))
+	if config.LogPipeFd != "" {
+		logPipeFdInt, err := strconv.Atoi(config.LogPipeFd)
+		if err != nil {
+			return fmt.Errorf("failed to convert _LIBCONTAINER_LOGPIPE environment variable value %q to int: %v", config.LogPipeFd, err)
+		}
+		logrus.SetOutput(os.NewFile(uintptr(logPipeFdInt), "logpipe"))
 	} else if config.LogFilePath != "" {
 		f, err := os.OpenFile(config.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0644)
 		if err != nil {

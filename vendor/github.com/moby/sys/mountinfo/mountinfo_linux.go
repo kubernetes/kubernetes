@@ -12,8 +12,7 @@ import (
 // GetMountsFromReader retrieves a list of mounts from the
 // reader provided, with an optional filter applied (use nil
 // for no filter). This can be useful in tests or benchmarks
-// that provide fake mountinfo data, or when a source other
-// than /proc/self/mountinfo needs to be read from.
+// that provide a fake mountinfo data.
 //
 // This function is Linux-specific.
 func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
@@ -134,6 +133,8 @@ func GetMountsFromReader(r io.Reader, filter FilterFunc) ([]*Info, error) {
 	return out, nil
 }
 
+// Parse /proc/self/mountinfo because comparing Dev and ino does not work from
+// bind mounts
 func parseMountTable(filter FilterFunc) ([]*Info, error) {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {

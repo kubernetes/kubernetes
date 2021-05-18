@@ -1,10 +1,6 @@
 package internal
 
-import (
-	"unsafe"
-
-	"github.com/cilium/ebpf/internal/unix"
-)
+import "unsafe"
 
 // NewPointer creates a 64-bit pointer from an unsafe Pointer.
 func NewPointer(ptr unsafe.Pointer) Pointer {
@@ -26,10 +22,9 @@ func NewStringPointer(str string) Pointer {
 		return Pointer{}
 	}
 
-	p, err := unix.BytePtrFromString(str)
-	if err != nil {
-		return Pointer{}
-	}
+	// The kernel expects strings to be zero terminated
+	buf := make([]byte, len(str)+1)
+	copy(buf, str)
 
-	return Pointer{ptr: unsafe.Pointer(p)}
+	return Pointer{ptr: unsafe.Pointer(&buf[0])}
 }

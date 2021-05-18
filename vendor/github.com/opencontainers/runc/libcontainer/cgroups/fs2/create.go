@@ -10,7 +10,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-func supportedControllers() (string, error) {
+func supportedControllers(cgroup *configs.Cgroup) (string, error) {
 	return fscommon.ReadFile(UnifiedMountpoint, "/cgroup.controllers")
 }
 
@@ -18,13 +18,13 @@ func supportedControllers() (string, error) {
 // based on (1) controllers available and (2) resources that are being set.
 // We don't check "pseudo" controllers such as
 // "freezer" and "devices".
-func needAnyControllers(r *configs.Resources) (bool, error) {
-	if r == nil {
+func needAnyControllers(cgroup *configs.Cgroup) (bool, error) {
+	if cgroup == nil {
 		return false, nil
 	}
 
 	// list of all available controllers
-	content, err := supportedControllers()
+	content, err := supportedControllers(cgroup)
 	if err != nil {
 		return false, err
 	}
@@ -39,22 +39,22 @@ func needAnyControllers(r *configs.Resources) (bool, error) {
 		return ok
 	}
 
-	if isPidsSet(r) && have("pids") {
+	if isPidsSet(cgroup) && have("pids") {
 		return true, nil
 	}
-	if isMemorySet(r) && have("memory") {
+	if isMemorySet(cgroup) && have("memory") {
 		return true, nil
 	}
-	if isIoSet(r) && have("io") {
+	if isIoSet(cgroup) && have("io") {
 		return true, nil
 	}
-	if isCpuSet(r) && have("cpu") {
+	if isCpuSet(cgroup) && have("cpu") {
 		return true, nil
 	}
-	if isCpusetSet(r) && have("cpuset") {
+	if isCpusetSet(cgroup) && have("cpuset") {
 		return true, nil
 	}
-	if isHugeTlbSet(r) && have("hugetlb") {
+	if isHugeTlbSet(cgroup) && have("hugetlb") {
 		return true, nil
 	}
 
@@ -64,8 +64,8 @@ func needAnyControllers(r *configs.Resources) (bool, error) {
 // containsDomainController returns whether the current config contains domain controller or not.
 // Refer to: http://man7.org/linux/man-pages/man7/cgroups.7.html
 // As at Linux 4.19, the following controllers are threaded: cpu, perf_event, and pids.
-func containsDomainController(r *configs.Resources) bool {
-	return isMemorySet(r) || isIoSet(r) || isCpuSet(r) || isHugeTlbSet(r)
+func containsDomainController(cg *configs.Cgroup) bool {
+	return isMemorySet(cg) || isIoSet(cg) || isCpuSet(cg) || isHugeTlbSet(cg)
 }
 
 // CreateCgroupPath creates cgroupv2 path, enabling all the supported controllers.
@@ -74,7 +74,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 		return fmt.Errorf("invalid cgroup path %s", path)
 	}
 
-	content, err := supportedControllers()
+	content, err := supportedControllers(c)
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 			// the controllers requested are thread-aware we can simply put the cgroup into
 			// threaded mode.
 			case "domain invalid":
-				if containsDomainController(c.Resources) {
+				if containsDomainController(c) {
 					return fmt.Errorf("cannot enter cgroupv2 %q with domain controllers -- it is in an invalid state", current)
 				} else {
 					// Not entirely correct (in theory we'd always want to be a domain --
@@ -129,7 +129,7 @@ func CreateCgroupPath(path string, c *configs.Cgroup) (Err error) {
 			case "domain threaded":
 				fallthrough
 			case "threaded":
-				if containsDomainController(c.Resources) {
+				if containsDomainController(c) {
 					return fmt.Errorf("cannot enter cgroupv2 %q with domain controllers -- it is in %s mode", current, cgType)
 				}
 			}

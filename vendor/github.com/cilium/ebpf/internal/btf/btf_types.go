@@ -31,14 +31,12 @@ const (
 	kindDatasec
 )
 
-// btfFuncLinkage describes BTF function linkage metadata.
 type btfFuncLinkage uint8
 
-// Equivalent of enum btf_func_linkage.
 const (
 	linkageStatic btfFuncLinkage = iota
 	linkageGlobal
-	// linkageExtern // Currently unused in libbpf.
+	linkageExtern
 )
 
 const (

@@ -16,7 +16,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/fvbommel/sortorder v1.0.1
 	github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e // indirect
-	github.com/google/go-cmp v0.5.4
+	github.com/google/go-cmp v0.5.2
 	github.com/googleapis/gnostic v0.5.1
 	github.com/jonboulle/clockwork v0.1.0
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
+	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

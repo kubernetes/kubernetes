@@ -16,7 +16,6 @@ import (
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/opencontainers/selinux/go-selinux"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -25,7 +24,6 @@ type linuxStandardInit struct {
 	consoleSocket *os.File
 	parentPid     int
 	fifoFd        int
-	logFd         int
 	config        *initConfig
 }
 
@@ -182,14 +180,7 @@ func (l *linuxStandardInit) Init() error {
 		return err
 	}
 	// Close the pipe to signal that we have completed our init.
-	logrus.Debugf("init: closing the pipe to signal completion")
 	l.pipe.Close()
-
-	// Close the log pipe fd so the parent's ForwardLogs can exit.
-	if err := unix.Close(l.logFd); err != nil {
-		return newSystemErrorWithCause(err, "closing log pipe fd")
-	}
-
 	// Wait for the FIFO to be opened on the other side before exec-ing the
 	// user process. We open it through /proc/self/fd/$fd, because the fd that
 	// was given to us was an O_PATH fd to the fifo itself. Linux allows us to

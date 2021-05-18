@@ -9,7 +9,6 @@ if [[ "${1:-}" = "--in-vm" ]]; then
   shift
 
   mount -t bpf bpf /sys/fs/bpf
-  mount -t tracefs tracefs /sys/kernel/debug/tracing
   export CGO_ENABLED=0
   export GOFLAGS=-mod=readonly
   export GOPATH=/run/go-path
@@ -17,16 +16,16 @@ if [[ "${1:-}" = "--in-vm" ]]; then
   export GOSUMDB=off
   export GOCACHE=/run/go-cache
 
+  elfs=""
   if [[ -d "/run/input/bpf" ]]; then
-    export KERNEL_SELFTESTS="/run/input/bpf"
+    elfs="/run/input/bpf"
   fi
 
-  readonly output="${1}"
-  shift
-
   echo Running tests...
-  go test -v -coverpkg=./... -coverprofile="$output/coverage.txt" -count 1 ./...
-  touch "$output/success"
+  # TestLibBPFCompat runs separately to pass the "-elfs" flag only for it: https://github.com/cilium/ebpf/pull/119
+  go test -v -count 1 -run TestLibBPFCompat -elfs "$elfs"
+  go test -v -count 1 ./...
+  touch "$1/success"
   exit 0
 fi
 
@@ -83,9 +82,11 @@ if [[ ! -e "${output}/success" ]]; then
   exit 1
 else
   echo "Test successful on ${kernel_version}"
-  if [[ -v COVERALLS_TOKEN ]]; then
-    goveralls -coverprofile="${output}/coverage.txt" -service=semaphore -repotoken "$COVERALLS_TOKEN"
-  fi
+#  if [[ -v CODECOV_TOKEN ]]; then
+#    curl --fail -s https://codecov.io/bash > "${tmp_dir}/codecov.sh"
+#    chmod +x "${tmp_dir}/codecov.sh"
+#    "${tmp_dir}/codecov.sh" -f "${output}/coverage.txt"
+#  fi
 fi
 
 $sudo rm -r "${input}"

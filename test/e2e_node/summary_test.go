@@ -124,7 +124,7 @@ var _ = SIGDescribe("Summary API [NodeConformance]", func() {
 				"WorkingSetBytes": bounded(10*e2evolume.Kb, memoryLimit),
 				"RSSBytes":        bounded(1*e2evolume.Kb, memoryLimit),
 				"PageFaults":      bounded(0, 1000000),
-				"MajorPageFaults": bounded(0, 1000),
+				"MajorPageFaults": bounded(0, 10),
 			})
 			runtimeContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 			if systemdutil.IsRunningSystemd() && framework.TestContext.ContainerRuntime == "docker" {
