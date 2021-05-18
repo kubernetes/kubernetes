@@ -10,6 +10,10 @@ import (
 	"unsafe"
 )
 
+// NTStatus corresponds with NTSTATUS, error values returned by ntdll.dll and
+// other native functions.
+type NTStatus uint32
+
 const (
 	// Invented values to support what package os expects.
 	O_RDONLY   = 0x00000
@@ -213,6 +217,18 @@ const (
 	DETACHED_PROCESS                 = 0x00000008
 	EXTENDED_STARTUPINFO_PRESENT     = 0x00080000
 	INHERIT_PARENT_AFFINITY          = 0x00010000
+)
+
+const (
+	// attributes for ProcThreadAttributeList
+	PROC_THREAD_ATTRIBUTE_PARENT_PROCESS    = 0x00020000
+	PROC_THREAD_ATTRIBUTE_HANDLE_LIST       = 0x00020002
+	PROC_THREAD_ATTRIBUTE_GROUP_AFFINITY    = 0x00030003
+	PROC_THREAD_ATTRIBUTE_PREFERRED_NODE    = 0x00020004
+	PROC_THREAD_ATTRIBUTE_IDEAL_PROCESSOR   = 0x00030005
+	PROC_THREAD_ATTRIBUTE_MITIGATION_POLICY = 0x00020007
+	PROC_THREAD_ATTRIBUTE_UMS_THREAD        = 0x00030006
+	PROC_THREAD_ATTRIBUTE_PROTECTION_LEVEL  = 0x0002000b
 )
 
 const (
@@ -886,6 +902,23 @@ type StartupInfo struct {
 	StdErr        Handle
 }
 
+type StartupInfoEx struct {
+	StartupInfo
+	ProcThreadAttributeList *ProcThreadAttributeList
+}
+
+// ProcThreadAttributeList is a placeholder type to represent a PROC_THREAD_ATTRIBUTE_LIST.
+//
+// To create a *ProcThreadAttributeList, use NewProcThreadAttributeList, and
+// free its memory using ProcThreadAttributeList.Delete.
+type ProcThreadAttributeList struct {
+	// This is of type unsafe.Pointer, not of type byte or uintptr, because
+	// the contents of it is mostly a list of pointers, and in most cases,
+	// that's a list of pointers to Go-allocated objects. In order to keep
+	// the GC from collecting these objects, we declare this as unsafe.Pointer.
+	_ [1]unsafe.Pointer
+}
+
 type ProcessInformation struct {
 	Process   Handle
 	Thread    Handle
@@ -987,6 +1020,7 @@ const (
 
 	// cf. http://support.microsoft.com/default.aspx?scid=kb;en-us;257460
 
+	IP_HDRINCL         = 0x2
 	IP_TOS             = 0x3
 	IP_TTL             = 0x4
 	IP_MULTICAST_IF    = 0x9
@@ -994,6 +1028,7 @@ const (
 	IP_MULTICAST_LOOP  = 0xb
 	IP_ADD_MEMBERSHIP  = 0xc
 	IP_DROP_MEMBERSHIP = 0xd
+	IP_PKTINFO         = 0x13
 
 	IPV6_V6ONLY         = 0x1b
 	IPV6_UNICAST_HOPS   = 0x4
@@ -1002,6 +1037,7 @@ const (
 	IPV6_MULTICAST_LOOP = 0xb
 	IPV6_JOIN_GROUP     = 0xc
 	IPV6_LEAVE_GROUP    = 0xd
+	IPV6_PKTINFO        = 0x13
 
 	MSG_OOB       = 0x1
 	MSG_PEEK      = 0x2
@@ -2235,3 +2271,504 @@ const (
 	// REG_NOTIFY_THREAD_AGNOSTIC indicates that the lifetime of the registration must not be tied to the lifetime of the thread issuing the RegNotifyChangeKeyValue call. Note: This flag value is only supported in Windows 8 and later.
 	REG_NOTIFY_THREAD_AGNOSTIC = 0x10000000
 )
+
+type CommTimeouts struct {
+	ReadIntervalTimeout         uint32
+	ReadTotalTimeoutMultiplier  uint32
+	ReadTotalTimeoutConstant    uint32
+	WriteTotalTimeoutMultiplier uint32
+	WriteTotalTimeoutConstant   uint32
+}
+
+// NTUnicodeString is a UTF-16 string for NT native APIs, corresponding to UNICODE_STRING.
+type NTUnicodeString struct {
+	Length        uint16
+	MaximumLength uint16
+	Buffer        *uint16
+}
+
+// NTString is an ANSI string for NT native APIs, corresponding to STRING.
+type NTString struct {
+	Length        uint16
+	MaximumLength uint16
+	Buffer        *byte
+}
+
+type LIST_ENTRY struct {
+	Flink *LIST_ENTRY
+	Blink *LIST_ENTRY
+}
+
+type LDR_DATA_TABLE_ENTRY struct {
+	reserved1          [2]uintptr
+	InMemoryOrderLinks LIST_ENTRY
+	reserved2          [2]uintptr
+	DllBase            uintptr
+	reserved3          [2]uintptr
+	FullDllName        NTUnicodeString
+	reserved4          [8]byte
+	reserved5          [3]uintptr
+	reserved6          uintptr
+	TimeDateStamp      uint32
+}
+
+type PEB_LDR_DATA struct {
+	reserved1               [8]byte
+	reserved2               [3]uintptr
+	InMemoryOrderModuleList LIST_ENTRY
+}
+
+type CURDIR struct {
+	DosPath NTUnicodeString
+	Handle  Handle
+}
+
+type RTL_DRIVE_LETTER_CURDIR struct {
+	Flags     uint16
+	Length    uint16
+	TimeStamp uint32
+	DosPath   NTString
+}
+
+type RTL_USER_PROCESS_PARAMETERS struct {
+	MaximumLength, Length uint32
+
+	Flags, DebugFlags uint32
+
+	ConsoleHandle                                Handle
+	ConsoleFlags                                 uint32
+	StandardInput, StandardOutput, StandardError Handle
+
+	CurrentDirectory CURDIR
+	DllPath          NTUnicodeString
+	ImagePathName    NTUnicodeString
+	CommandLine      NTUnicodeString
+	Environment      unsafe.Pointer
+
+	StartingX, StartingY, CountX, CountY, CountCharsX, CountCharsY, FillAttribute uint32
+
+	WindowFlags, ShowWindowFlags                     uint32
+	WindowTitle, DesktopInfo, ShellInfo, RuntimeData NTUnicodeString
+	CurrentDirectories                               [32]RTL_DRIVE_LETTER_CURDIR
+
+	EnvironmentSize, EnvironmentVersion uintptr
+
+	PackageDependencyData unsafe.Pointer
+	ProcessGroupId        uint32
+	LoaderThreads         uint32
+
+	RedirectionDllName               NTUnicodeString
+	HeapPartitionName                NTUnicodeString
+	DefaultThreadpoolCpuSetMasks     uintptr
+	DefaultThreadpoolCpuSetMaskCount uint32
+}
+
+type PEB struct {
+	reserved1              [2]byte
+	BeingDebugged          byte
+	BitField               byte
+	reserved3              uintptr
+	ImageBaseAddress       uintptr
+	Ldr                    *PEB_LDR_DATA
+	ProcessParameters      *RTL_USER_PROCESS_PARAMETERS
+	reserved4              [3]uintptr
+	AtlThunkSListPtr       uintptr
+	reserved5              uintptr
+	reserved6              uint32
+	reserved7              uintptr
+	reserved8              uint32
+	AtlThunkSListPtr32     uint32
+	reserved9              [45]uintptr
+	reserved10             [96]byte
+	PostProcessInitRoutine uintptr
+	reserved11             [128]byte
+	reserved12             [1]uintptr
+	SessionId              uint32
+}
+
+type OBJECT_ATTRIBUTES struct {
+	Length             uint32
+	RootDirectory      Handle
+	ObjectName         *NTUnicodeString
+	Attributes         uint32
+	SecurityDescriptor *SECURITY_DESCRIPTOR
+	SecurityQoS        *SECURITY_QUALITY_OF_SERVICE
+}
+
+// Values for the Attributes member of OBJECT_ATTRIBUTES.
+const (
+	OBJ_INHERIT                       = 0x00000002
+	OBJ_PERMANENT                     = 0x00000010
+	OBJ_EXCLUSIVE                     = 0x00000020
+	OBJ_CASE_INSENSITIVE              = 0x00000040
+	OBJ_OPENIF                        = 0x00000080
+	OBJ_OPENLINK                      = 0x00000100
+	OBJ_KERNEL_HANDLE                 = 0x00000200
+	OBJ_FORCE_ACCESS_CHECK            = 0x00000400
+	OBJ_IGNORE_IMPERSONATED_DEVICEMAP = 0x00000800
+	OBJ_DONT_REPARSE                  = 0x00001000
+	OBJ_VALID_ATTRIBUTES              = 0x00001FF2
+)
+
+type IO_STATUS_BLOCK struct {
+	Status      NTStatus
+	Information uintptr
+}
+
+type RTLP_CURDIR_REF struct {
+	RefCount int32
+	Handle   Handle
+}
+
+type RTL_RELATIVE_NAME struct {
+	RelativeName        NTUnicodeString
+	ContainingDirectory Handle
+	CurDirRef           *RTLP_CURDIR_REF
+}
+
+const (
+	// CreateDisposition flags for NtCreateFile and NtCreateNamedPipeFile.
+	FILE_SUPERSEDE           = 0x00000000
+	FILE_OPEN                = 0x00000001
+	FILE_CREATE              = 0x00000002
+	FILE_OPEN_IF             = 0x00000003
+	FILE_OVERWRITE           = 0x00000004
+	FILE_OVERWRITE_IF        = 0x00000005
+	FILE_MAXIMUM_DISPOSITION = 0x00000005
+
+	// CreateOptions flags for NtCreateFile and NtCreateNamedPipeFile.
+	FILE_DIRECTORY_FILE            = 0x00000001
+	FILE_WRITE_THROUGH             = 0x00000002
+	FILE_SEQUENTIAL_ONLY           = 0x00000004
+	FILE_NO_INTERMEDIATE_BUFFERING = 0x00000008
+	FILE_SYNCHRONOUS_IO_ALERT      = 0x00000010
+	FILE_SYNCHRONOUS_IO_NONALERT   = 0x00000020
+	FILE_NON_DIRECTORY_FILE        = 0x00000040
+	FILE_CREATE_TREE_CONNECTION    = 0x00000080
+	FILE_COMPLETE_IF_OPLOCKED      = 0x00000100
+	FILE_NO_EA_KNOWLEDGE           = 0x00000200
+	FILE_OPEN_REMOTE_INSTANCE      = 0x00000400
+	FILE_RANDOM_ACCESS             = 0x00000800
+	FILE_DELETE_ON_CLOSE           = 0x00001000
+	FILE_OPEN_BY_FILE_ID           = 0x00002000
+	FILE_OPEN_FOR_BACKUP_INTENT    = 0x00004000
+	FILE_NO_COMPRESSION            = 0x00008000
+	FILE_OPEN_REQUIRING_OPLOCK     = 0x00010000
+	FILE_DISALLOW_EXCLUSIVE        = 0x00020000
+	FILE_RESERVE_OPFILTER          = 0x00100000
+	FILE_OPEN_REPARSE_POINT        = 0x00200000
+	FILE_OPEN_NO_RECALL            = 0x00400000
+	FILE_OPEN_FOR_FREE_SPACE_QUERY = 0x00800000
+
+	// Parameter constants for NtCreateNamedPipeFile.
+
+	FILE_PIPE_BYTE_STREAM_TYPE = 0x00000000
+	FILE_PIPE_MESSAGE_TYPE     = 0x00000001
+
+	FILE_PIPE_ACCEPT_REMOTE_CLIENTS = 0x00000000
+	FILE_PIPE_REJECT_REMOTE_CLIENTS = 0x00000002
+
+	FILE_PIPE_TYPE_VALID_MASK = 0x00000003
+
+	FILE_PIPE_BYTE_STREAM_MODE = 0x00000000
+	FILE_PIPE_MESSAGE_MODE     = 0x00000001
+
+	FILE_PIPE_QUEUE_OPERATION    = 0x00000000
+	FILE_PIPE_COMPLETE_OPERATION = 0x00000001
+
+	FILE_PIPE_INBOUND     = 0x00000000
+	FILE_PIPE_OUTBOUND    = 0x00000001
+	FILE_PIPE_FULL_DUPLEX = 0x00000002
+
+	FILE_PIPE_DISCONNECTED_STATE = 0x00000001
+	FILE_PIPE_LISTENING_STATE    = 0x00000002
+	FILE_PIPE_CONNECTED_STATE    = 0x00000003
+	FILE_PIPE_CLOSING_STATE      = 0x00000004
+
+	FILE_PIPE_CLIENT_END = 0x00000000
+	FILE_PIPE_SERVER_END = 0x00000001
+)
+
+// ProcessInformationClasses for NtQueryInformationProcess and NtSetInformationProcess.
+const (
+	ProcessBasicInformation = iota
+	ProcessQuotaLimits
+	ProcessIoCounters
+	ProcessVmCounters
+	ProcessTimes
+	ProcessBasePriority
+	ProcessRaisePriority
+	ProcessDebugPort
+	ProcessExceptionPort
+	ProcessAccessToken
+	ProcessLdtInformation
+	ProcessLdtSize
+	ProcessDefaultHardErrorMode
+	ProcessIoPortHandlers
+	ProcessPooledUsageAndLimits
+	ProcessWorkingSetWatch
+	ProcessUserModeIOPL
+	ProcessEnableAlignmentFaultFixup
+	ProcessPriorityClass
+	ProcessWx86Information
+	ProcessHandleCount
+	ProcessAffinityMask
+	ProcessPriorityBoost
+	ProcessDeviceMap
+	ProcessSessionInformation
+	ProcessForegroundInformation
+	ProcessWow64Information
+	ProcessImageFileName
+	ProcessLUIDDeviceMapsEnabled
+	ProcessBreakOnTermination
+	ProcessDebugObjectHandle
+	ProcessDebugFlags
+	ProcessHandleTracing
+	ProcessIoPriority
+	ProcessExecuteFlags
+	ProcessTlsInformation
+	ProcessCookie
+	ProcessImageInformation
+	ProcessCycleTime
+	ProcessPagePriority
+	ProcessInstrumentationCallback
+	ProcessThreadStackAllocation
+	ProcessWorkingSetWatchEx
+	ProcessImageFileNameWin32
+	ProcessImageFileMapping
+	ProcessAffinityUpdateMode
+	ProcessMemoryAllocationMode
+	ProcessGroupInformation
+	ProcessTokenVirtualizationEnabled
+	ProcessConsoleHostProcess
+	ProcessWindowInformation
+	ProcessHandleInformation
+	ProcessMitigationPolicy
+	ProcessDynamicFunctionTableInformation
+	ProcessHandleCheckingMode
+	ProcessKeepAliveCount
+	ProcessRevokeFileHandles
+	ProcessWorkingSetControl
+	ProcessHandleTable
+	ProcessCheckStackExtentsMode
+	ProcessCommandLineInformation
+	ProcessProtectionInformation
+	ProcessMemoryExhaustion
+	ProcessFaultInformation
+	ProcessTelemetryIdInformation
+	ProcessCommitReleaseInformation
+	ProcessDefaultCpuSetsInformation
+	ProcessAllowedCpuSetsInformation
+	ProcessSubsystemProcess
+	ProcessJobMemoryInformation
+	ProcessInPrivate
+	ProcessRaiseUMExceptionOnInvalidHandleClose
+	ProcessIumChallengeResponse
+	ProcessChildProcessInformation
+	ProcessHighGraphicsPriorityInformation
+	ProcessSubsystemInformation
+	ProcessEnergyValues
+	ProcessActivityThrottleState
+	ProcessActivityThrottlePolicy
+	ProcessWin32kSyscallFilterInformation
+	ProcessDisableSystemAllowedCpuSets
+	ProcessWakeInformation
+	ProcessEnergyTrackingState
+	ProcessManageWritesToExecutableMemory
+	ProcessCaptureTrustletLiveDump
+	ProcessTelemetryCoverage
+	ProcessEnclaveInformation
+	ProcessEnableReadWriteVmLogging
+	ProcessUptimeInformation
+	ProcessImageSection
+	ProcessDebugAuthInformation
+	ProcessSystemResourceManagement
+	ProcessSequenceNumber
+	ProcessLoaderDetour
+	ProcessSecurityDomainInformation
+	ProcessCombineSecurityDomainsInformation
+	ProcessEnableLogging
+	ProcessLeapSecondInformation
+	ProcessFiberShadowStackAllocation
+	ProcessFreeFiberShadowStackAllocation
+	ProcessAltSystemCallInformation
+	ProcessDynamicEHContinuationTargets
+	ProcessDynamicEnforcedCetCompatibleRanges
+)
+
+type PROCESS_BASIC_INFORMATION struct {
+	ExitStatus                   NTStatus
+	PebBaseAddress               *PEB
+	AffinityMask                 uintptr
+	BasePriority                 int32
+	UniqueProcessId              uintptr
+	InheritedFromUniqueProcessId uintptr
+}
+
+// Constants for LocalAlloc flags.
+const (
+	LMEM_FIXED          = 0x0
+	LMEM_MOVEABLE       = 0x2
+	LMEM_NOCOMPACT      = 0x10
+	LMEM_NODISCARD      = 0x20
+	LMEM_ZEROINIT       = 0x40
+	LMEM_MODIFY         = 0x80
+	LMEM_DISCARDABLE    = 0xf00
+	LMEM_VALID_FLAGS    = 0xf72
+	LMEM_INVALID_HANDLE = 0x8000
+	LHND                = LMEM_MOVEABLE | LMEM_ZEROINIT
+	LPTR                = LMEM_FIXED | LMEM_ZEROINIT
+	NONZEROLHND         = LMEM_MOVEABLE
+	NONZEROLPTR         = LMEM_FIXED
+)
+
+// Constants for the CreateNamedPipe-family of functions.
+const (
+	PIPE_ACCESS_INBOUND  = 0x1
+	PIPE_ACCESS_OUTBOUND = 0x2
+	PIPE_ACCESS_DUPLEX   = 0x3
+
+	PIPE_CLIENT_END = 0x0
+	PIPE_SERVER_END = 0x1
+
+	PIPE_WAIT                  = 0x0
+	PIPE_NOWAIT                = 0x1
+	PIPE_READMODE_BYTE         = 0x0
+	PIPE_READMODE_MESSAGE      = 0x2
+	PIPE_TYPE_BYTE             = 0x0
+	PIPE_TYPE_MESSAGE          = 0x4
+	PIPE_ACCEPT_REMOTE_CLIENTS = 0x0
+	PIPE_REJECT_REMOTE_CLIENTS = 0x8
+
+	PIPE_UNLIMITED_INSTANCES = 255
+)
+
+// Constants for security attributes when opening named pipes.
+const (
+	SECURITY_ANONYMOUS      = SecurityAnonymous << 16
+	SECURITY_IDENTIFICATION = SecurityIdentification << 16
+	SECURITY_IMPERSONATION  = SecurityImpersonation << 16
+	SECURITY_DELEGATION     = SecurityDelegation << 16
+
+	SECURITY_CONTEXT_TRACKING = 0x40000
+	SECURITY_EFFECTIVE_ONLY   = 0x80000
+
+	SECURITY_SQOS_PRESENT     = 0x100000
+	SECURITY_VALID_SQOS_FLAGS = 0x1f0000
+)
+
+// ResourceID represents a 16-bit resource identifier, traditionally created with the MAKEINTRESOURCE macro.
+type ResourceID uint16
+
+// ResourceIDOrString must be either a ResourceID, to specify a resource or resource type by ID,
+// or a string, to specify a resource or resource type by name.
+type ResourceIDOrString interface{}
+
+// Predefined resource names and types.
+var (
+	// Predefined names.
+	CREATEPROCESS_MANIFEST_RESOURCE_ID                 ResourceID = 1
+	ISOLATIONAWARE_MANIFEST_RESOURCE_ID                ResourceID = 2
+	ISOLATIONAWARE_NOSTATICIMPORT_MANIFEST_RESOURCE_ID ResourceID = 3
+	ISOLATIONPOLICY_MANIFEST_RESOURCE_ID               ResourceID = 4
+	ISOLATIONPOLICY_BROWSER_MANIFEST_RESOURCE_ID       ResourceID = 5
+	MINIMUM_RESERVED_MANIFEST_RESOURCE_ID              ResourceID = 1  // inclusive
+	MAXIMUM_RESERVED_MANIFEST_RESOURCE_ID              ResourceID = 16 // inclusive
+
+	// Predefined types.
+	RT_CURSOR       ResourceID = 1
+	RT_BITMAP       ResourceID = 2
+	RT_ICON         ResourceID = 3
+	RT_MENU         ResourceID = 4
+	RT_DIALOG       ResourceID = 5
+	RT_STRING       ResourceID = 6
+	RT_FONTDIR      ResourceID = 7
+	RT_FONT         ResourceID = 8
+	RT_ACCELERATOR  ResourceID = 9
+	RT_RCDATA       ResourceID = 10
+	RT_MESSAGETABLE ResourceID = 11
+	RT_GROUP_CURSOR ResourceID = 12
+	RT_GROUP_ICON   ResourceID = 14
+	RT_VERSION      ResourceID = 16
+	RT_DLGINCLUDE   ResourceID = 17
+	RT_PLUGPLAY     ResourceID = 19
+	RT_VXD          ResourceID = 20
+	RT_ANICURSOR    ResourceID = 21
+	RT_ANIICON      ResourceID = 22
+	RT_HTML         ResourceID = 23
+	RT_MANIFEST     ResourceID = 24
+)
+
+type COAUTHIDENTITY struct {
+	User           *uint16
+	UserLength     uint32
+	Domain         *uint16
+	DomainLength   uint32
+	Password       *uint16
+	PasswordLength uint32
+	Flags          uint32
+}
+
+type COAUTHINFO struct {
+	AuthnSvc           uint32
+	AuthzSvc           uint32
+	ServerPrincName    *uint16
+	AuthnLevel         uint32
+	ImpersonationLevel uint32
+	AuthIdentityData   *COAUTHIDENTITY
+	Capabilities       uint32
+}
+
+type COSERVERINFO struct {
+	Reserved1 uint32
+	Aame      *uint16
+	AuthInfo  *COAUTHINFO
+	Reserved2 uint32
+}
+
+type BIND_OPTS3 struct {
+	CbStruct          uint32
+	Flags             uint32
+	Mode              uint32
+	TickCountDeadline uint32
+	TrackFlags        uint32
+	ClassContext      uint32
+	Locale            uint32
+	ServerInfo        *COSERVERINFO
+	Hwnd              HWND
+}
+
+const (
+	CLSCTX_INPROC_SERVER          = 0x1
+	CLSCTX_INPROC_HANDLER         = 0x2
+	CLSCTX_LOCAL_SERVER           = 0x4
+	CLSCTX_INPROC_SERVER16        = 0x8
+	CLSCTX_REMOTE_SERVER          = 0x10
+	CLSCTX_INPROC_HANDLER16       = 0x20
+	CLSCTX_RESERVED1              = 0x40
+	CLSCTX_RESERVED2              = 0x80
+	CLSCTX_RESERVED3              = 0x100
+	CLSCTX_RESERVED4              = 0x200
+	CLSCTX_NO_CODE_DOWNLOAD       = 0x400
+	CLSCTX_RESERVED5              = 0x800
+	CLSCTX_NO_CUSTOM_MARSHAL      = 0x1000
+	CLSCTX_ENABLE_CODE_DOWNLOAD   = 0x2000
+	CLSCTX_NO_FAILURE_LOG         = 0x4000
+	CLSCTX_DISABLE_AAA            = 0x8000
+	CLSCTX_ENABLE_AAA             = 0x10000
+	CLSCTX_FROM_DEFAULT_CONTEXT   = 0x20000
+	CLSCTX_ACTIVATE_32_BIT_SERVER = 0x40000
+	CLSCTX_ACTIVATE_64_BIT_SERVER = 0x80000
+	CLSCTX_ENABLE_CLOAKING        = 0x100000
+	CLSCTX_APPCONTAINER           = 0x400000
+	CLSCTX_ACTIVATE_AAA_AS_IU     = 0x800000
+	CLSCTX_PS_DLL                 = 0x80000000
+
+	COINIT_MULTITHREADED     = 0x0
+	COINIT_APARTMENTTHREADED = 0x2
+	COINIT_DISABLE_OLE1DDE   = 0x4
+	COINIT_SPEED_OVER_MEMORY = 0x8
+)
+
+// Flag for QueryFullProcessImageName.
+const PROCESS_NAME_NATIVE = 1

@@ -1,4 +1,5 @@
 language: go
+
 sudo: false
 
 go_import_path: go.uber.org/zap
@@ -9,9 +10,13 @@ env:
 
 matrix:
   include:
-  - go: 1.13.x
-  - go: 1.14.x
+  - go: oldstable
+  - go: stable
     env: LINT=1
+  - arch: ppc64le
+    go: oldstable
+  - arch: ppc64le
+    go: stable
 
 script:
   - test -z "$LINT" || make lint

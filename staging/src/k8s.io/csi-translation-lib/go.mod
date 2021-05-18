@@ -5,7 +5,7 @@ module k8s.io/csi-translation-lib
 go 1.16
 
 require (
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/klog/v2 v2.8.0

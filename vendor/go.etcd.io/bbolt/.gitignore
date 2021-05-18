@@ -3,3 +3,4 @@
 *.swp
 /bin/
 cover.out
+/.idea

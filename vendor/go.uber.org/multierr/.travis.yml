@@ -4,17 +4,11 @@ go_import_path: go.uber.org/multierr
 
 env:
   global:
-    - GO15VENDOREXPERIMENT=1
     - GO111MODULE=on
 
 go:
-  - 1.11.x
-  - 1.12.x
-  - 1.13.x
-
-cache:
-  directories:
-    - vendor
+  - oldstable
+  - stable
 
 before_install:
 - go version

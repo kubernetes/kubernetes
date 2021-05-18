@@ -85,12 +85,19 @@ const (
 	Backend AddressType = iota
 	// GRPCLB indicates the address is for a grpclb load balancer.
 	//
-	// Deprecated: use Attributes in Address instead.
+	// Deprecated: to select the GRPCLB load balancing policy, use a service
+	// config with a corresponding loadBalancingConfig.  To supply balancer
+	// addresses to the GRPCLB load balancing policy, set State.Attributes
+	// using balancer/grpclb/state.Set.
 	GRPCLB
 )
 
 // Address represents a server the client connects to.
-// This is the EXPERIMENTAL API and may be changed or extended in the future.
+//
+// Experimental
+//
+// Notice: This type is EXPERIMENTAL and may be changed or removed in a
+// later release.
 type Address struct {
 	// Addr is the server address on which a connection will be established.
 	Addr string

@@ -8,7 +8,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
-	google.golang.org/grpc v1.27.1
+	google.golang.org/grpc v1.37.1
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/component-base v0.0.0

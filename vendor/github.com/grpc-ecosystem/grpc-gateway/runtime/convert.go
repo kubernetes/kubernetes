@@ -206,16 +206,22 @@ func BytesSlice(val, sep string) ([][]byte, error) {
 
 // Timestamp converts the given RFC3339 formatted string into a timestamp.Timestamp.
 func Timestamp(val string) (*timestamp.Timestamp, error) {
-	var r *timestamp.Timestamp
-	err := jsonpb.UnmarshalString(val, r)
-	return r, err
+	var r timestamp.Timestamp
+	err := jsonpb.UnmarshalString(val, &r)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // Duration converts the given string into a timestamp.Duration.
 func Duration(val string) (*duration.Duration, error) {
-	var r *duration.Duration
-	err := jsonpb.UnmarshalString(val, r)
-	return r, err
+	var r duration.Duration
+	err := jsonpb.UnmarshalString(val, &r)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
 }
 
 // Enum converts the given string into an int32 that should be type casted into the
