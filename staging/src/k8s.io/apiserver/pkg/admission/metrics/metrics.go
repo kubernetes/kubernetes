@@ -178,13 +178,13 @@ func (m *AdmissionMetrics) ObserveWebhook(ctx context.Context, elapsed time.Dura
 }
 
 // ObserveWebhookRejection records admission related metrics for an admission webhook rejection.
-func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, stepType, operation string, errorType WebhookRejectionErrorType, rejectionCode int) {
+func (m *AdmissionMetrics) ObserveWebhookRejection(ctx context.Context, name, stepType string, attr admission.Attributes, errorType WebhookRejectionErrorType, rejectionCode int) {
 	// We truncate codes greater than 600 to keep the cardinality bounded.
 	// This should be rarely done by a malfunctioning webhook server.
 	if rejectionCode > 600 {
 		rejectionCode = 600
 	}
-	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode), attr.GetNamespace()).Inc()
+	m.webhookRejection.WithContext(ctx).WithLabelValues(name, stepType, string(attr.GetOperation()), string(errorType), strconv.Itoa(rejectionCode), attr.GetNamespace()).Inc()
 }
 
 type metricSet struct {
