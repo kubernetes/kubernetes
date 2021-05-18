@@ -3,9 +3,11 @@ kind: Ingress
 metadata:
   name: example
 spec:
-  backend:
-    serviceName: default-backend
-    servicePort: 80
+  defaultBackend:
+    service:
+      name: default-backend
+      port:
+        number: 80
   rules:
   - http:
       paths:
