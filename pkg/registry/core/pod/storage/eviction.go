@@ -25,6 +25,7 @@ import (
 	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -220,7 +221,7 @@ func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Obje
 		pdbName = pdb.Name
 
 		// If the pod is not ready, it doesn't count towards healthy and we should not decrement
-		if !podutil.IsPodReady(pod) && pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0 {
+		if !podutil.IsPodReady(pod) && enoughHealthyReplicas(pdb) {
 			updateDeletionOptions = true
 			return nil
 		}
@@ -301,6 +302,26 @@ func canIgnorePDB(pod *api.Pod) bool {
 		return true
 	}
 	return false
+}
+
+// enoughHealthyReplicas checks to determine there are enough healthy replicas
+// available to allow already disrupted pods to be evicted.  We also ensure the
+// PDB is not in failSafe mode so we don't use stale data.
+func enoughHealthyReplicas(pdb *policyv1.PodDisruptionBudget) bool {
+	// We only consider if the conditions is not nil and if we're in failSafe mode represented by
+	// condition.Reason == policyv1.SyncFailedReason
+	disruptionAllowed := apimeta.FindStatusCondition(pdb.Status.Conditions, policyv1.DisruptionAllowedCondition)
+
+	// we only allow disruptions for PDBs that have synced at least once
+	if disruptionAllowed == nil {
+		return false
+	}
+	// if the sync failed, PDB was unable to calculate accurate DesiredHealthy
+	if disruptionAllowed.Status == metav1.ConditionFalse && disruptionAllowed.Reason == policyv1.SyncFailedReason {
+		return false
+	}
+
+	return pdb.Status.CurrentHealthy >= pdb.Status.DesiredHealthy && pdb.Status.DesiredHealthy > 0
 }
 
 func shouldEnforceResourceVersion(pod *api.Pod) bool {

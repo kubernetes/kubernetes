@@ -337,12 +337,105 @@ func TestEvictionIngorePDB(t *testing.T) {
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
 					DesiredHealthy:     2,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionTrue,
+							Reason:  "none",
+							Message: "none",
+						},
+					},
 				},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
 			expectError:         false,
 			podName:             "t8",
 			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, nil conditions",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         true,
+			podName:             "t8",
+			expectedDeleteCount: 0,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, conditions.disruptionAllowed==False, conditions.reason=other",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionFalse,
+							Reason:  "other",
+							Message: "none",
+						},
+					},
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         false,
+			podName:             "t8",
+			expectedDeleteCount: 1,
+			podTerminating:      false,
+			podPhase:            api.PodRunning,
+			prc: &api.PodCondition{
+				Type:   api.PodReady,
+				Status: api.ConditionFalse,
+			},
+		},
+		{
+			name: "matching pdbs with no disruptions allowed, pod running, pod unhealthy, unhealthy pod ours, conditions.disruptionAllowed==False, conditions.reason=policyv1.SyncFailedReason",
+			pdbs: []runtime.Object{&policyv1.PodDisruptionBudget{
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"},
+				Spec:       policyv1.PodDisruptionBudgetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"a": "true"}}},
+				Status: policyv1.PodDisruptionBudgetStatus{
+					// This simulates 3 pods desired, our pod unhealthy
+					DisruptionsAllowed: 0,
+					CurrentHealthy:     2,
+					DesiredHealthy:     2,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionFalse,
+							Reason:  policyv1.SyncFailedReason,
+							Message: "none",
+						},
+					},
+				},
+			}},
+			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t8", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
+			expectError:         true,
+			podName:             "t8",
+			expectedDeleteCount: 0,
 			podTerminating:      false,
 			podPhase:            api.PodRunning,
 			prc: &api.PodCondition{
@@ -361,6 +454,14 @@ func TestEvictionIngorePDB(t *testing.T) {
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
 					DesiredHealthy:     2,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionTrue,
+							Reason:  "none",
+							Message: "none",
+						},
+					},
 				},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t9", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
@@ -385,6 +486,14 @@ func TestEvictionIngorePDB(t *testing.T) {
 					DisruptionsAllowed: 0,
 					CurrentHealthy:     2,
 					DesiredHealthy:     2,
+					Conditions: []metav1.Condition{
+						{
+							Type:    policyv1.DisruptionAllowedCondition,
+							Status:  metav1.ConditionTrue,
+							Reason:  "none",
+							Message: "none",
+						},
+					},
 				},
 			}},
 			eviction:            &policy.Eviction{ObjectMeta: metav1.ObjectMeta{Name: "t10", Namespace: "default"}, DeleteOptions: metav1.NewDeleteOptions(0)},
