@@ -21,6 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	// mark the dependency caused by the generated file so update-vendor.sh correctly sets up modules.txt
+	_ "github.com/go-openapi/spec"
+
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kube-openapi/pkg/handler"
 	"k8s.io/kube-openapi/pkg/validation/spec"
