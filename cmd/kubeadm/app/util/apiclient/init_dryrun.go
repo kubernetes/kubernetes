@@ -144,7 +144,7 @@ func (idr *InitDryRunGetter) handleSystemNodesClusterRoleBinding(action core.Get
 		// We can't handle this event
 		return false, nil, nil
 	}
-	// We can safely return a NotFound error here as the code will just proceed normally and don't care about modifying this clusterrolebinding
+	// We can safely return a NotFound error here as the code will proceed normally and don't care about modifying this clusterrolebinding
 	// This can only happen on an upgrade; and in that case the ClientBackedDryRunGetter impl will be used
 	return true, nil, apierrors.NewNotFound(action.GetResource().GroupResource(), "clusterrolebinding not found")
 }

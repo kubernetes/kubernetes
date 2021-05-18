@@ -497,7 +497,7 @@ function dump_nodes() {
 # does not run on Windows nodes.
 #
 # Note: This step is O(#nodes^2) as we check if each node is present in the list of succeeded nodes.
-# Making it linear would add code complexity without much benefit (as it just takes ~1s for 5k nodes).
+# Making it linear would add code complexity without much benefit (as it takes ~1s for 5k nodes).
 # Assumes:
 #   NODE_NAMES
 # Sets:

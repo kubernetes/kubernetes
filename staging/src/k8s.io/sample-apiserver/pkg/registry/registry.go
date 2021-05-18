@@ -28,7 +28,7 @@ type REST struct {
 	*genericregistry.Store
 }
 
-// RESTInPeace is just a simple function that panics on error.
+// RESTInPeace is a simple function that panics on error.
 // Otherwise returns the given storage object. It is meant to be
 // a wrapper for wardle registries.
 func RESTInPeace(storage rest.StandardStorage, err error) rest.StandardStorage {

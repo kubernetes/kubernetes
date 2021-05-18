@@ -180,7 +180,7 @@ func (m *Migrator) rollbackEtcd3MinorVersion(current *EtcdVersionPair, target *E
 func (m *Migrator) minorVersionUpgrade(current *EtcdVersionPair, target *EtcdVersionPair) (*EtcdVersionPair, error) {
 	runner := m.newServer()
 
-	// Do the migration step, by just starting etcd in the target version.
+	// Do the migration step, by starting etcd in the target version.
 	err := runner.Start(target.version)
 	if err != nil {
 		return nil, err
