@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -238,7 +238,7 @@ func (tc *Controller) processJob(key string) error {
 		PropagationPolicy: &policy,
 		Preconditions:     &metav1.Preconditions{UID: &fresh.UID},
 	}
-	klog.V(4).Infof("Cleaning up Job %s/%s", namespace, name)
+	klog.V(1).Infof("Cleaning up Job %s/%s", namespace, name)
 	if err := tc.client.BatchV1().Jobs(fresh.Namespace).Delete(context.TODO(), fresh.Name, options); err != nil {
 		return err
 	}
