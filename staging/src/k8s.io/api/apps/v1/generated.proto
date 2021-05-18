@@ -219,7 +219,8 @@ message DaemonSetUpdateStrategy {
 
 // Deployment enables declarative updates for Pods and ReplicaSets.
 message Deployment {
-  // Standard object metadata.
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -366,7 +367,8 @@ message DeploymentStrategy {
 message ReplicaSet {
   // If the Labels of a ReplicaSet are empty, they are defaulted to
   // be the same as the Pod(s) that the ReplicaSet manages.
-  // Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -562,6 +564,8 @@ message RollingUpdateStatefulSetStrategy {
 // The StatefulSet guarantees that a given network identity will always
 // map to the same storage identity.
 message StatefulSet {
+  // Standard object's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ObjectMeta metadata = 1;
 
@@ -598,9 +602,12 @@ message StatefulSetCondition {
 
 // StatefulSetList is a collection of StatefulSets.
 message StatefulSetList {
+  // Standard list's metadata.
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional k8s.io.apimachinery.pkg.apis.meta.v1.ListMeta metadata = 1;
 
+  // Items is the list of stateful sets.
   repeated StatefulSet items = 2;
 }
 
