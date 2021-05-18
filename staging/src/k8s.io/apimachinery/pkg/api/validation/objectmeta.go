@@ -33,7 +33,7 @@ import (
 // FieldImmutableErrorMsg is a error message for field is immutable.
 const FieldImmutableErrorMsg string = `field is immutable`
 
-const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
+const TotalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
@@ -53,8 +53,8 @@ func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) fie
 		}
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
-	if totalSize > (int64)(totalAnnotationSizeLimitB) {
-		allErrs = append(allErrs, field.TooLong(fldPath, "", totalAnnotationSizeLimitB))
+	if totalSize > (int64)(TotalAnnotationSizeLimitB) {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", TotalAnnotationSizeLimitB))
 	}
 	return allErrs
 }

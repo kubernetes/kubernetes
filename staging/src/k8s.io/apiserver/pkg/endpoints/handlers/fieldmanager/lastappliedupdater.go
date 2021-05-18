@@ -21,11 +21,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
+	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 )
-
-const totalAnnotationSizeLimitB int64 = 256 * (1 << 10) // 256 kB
 
 type lastAppliedUpdater struct {
 	fieldManager Manager
@@ -126,8 +125,8 @@ func isAnnotationsValid(annotations map[string]string) error {
 	for k, v := range annotations {
 		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
-	if totalSize > (int64)(totalAnnotationSizeLimitB) {
-		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, totalAnnotationSizeLimitB)
+	if totalSize > (int64)(apimachineryvalidation.TotalAnnotationSizeLimitB) {
+		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, apimachineryvalidation.TotalAnnotationSizeLimitB)
 	}
 	return nil
 }
