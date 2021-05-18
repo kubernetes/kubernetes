@@ -88,7 +88,7 @@ github.com/PuerkitoBio/urlesc
 # github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 ## explicit
 github.com/armon/circbuf
-# github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
+# github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 => github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
 github.com/asaskevich/govalidator
 # github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7 => github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
 ## explicit
@@ -301,9 +301,9 @@ github.com/go-logr/logr
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.3 => github.com/go-openapi/jsonreference v0.19.3
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/spec v0.19.5 => github.com/go-openapi/spec v0.19.5
+# github.com/go-openapi/spec v0.19.8 => github.com/go-openapi/spec v0.19.8
 github.com/go-openapi/spec
-# github.com/go-openapi/swag v0.19.5 => github.com/go-openapi/swag v0.19.5
+# github.com/go-openapi/swag v0.19.9 => github.com/go-openapi/swag v0.19.9
 github.com/go-openapi/swag
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 ## explicit
@@ -541,7 +541,7 @@ github.com/lithammer/dedent
 ## explicit
 # github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
-# github.com/mailru/easyjson v0.7.0 => github.com/mailru/easyjson v0.7.0
+# github.com/mailru/easyjson v0.7.1 => github.com/mailru/easyjson v0.7.1
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
@@ -556,7 +556,7 @@ github.com/mindprince/gonvml
 github.com/mistifyio/go-zfs
 # github.com/mitchellh/go-wordwrap v1.0.0 => github.com/mitchellh/go-wordwrap v1.0.0
 github.com/mitchellh/go-wordwrap
-# github.com/mitchellh/mapstructure v1.1.2 => github.com/mitchellh/mapstructure v1.1.2
+# github.com/mitchellh/mapstructure v1.3.2 => github.com/mitchellh/mapstructure v1.3.2
 github.com/mitchellh/mapstructure
 # github.com/moby/ipvs v1.0.1 => github.com/moby/ipvs v1.0.1
 ## explicit
@@ -2366,7 +2366,7 @@ sigs.k8s.io/yaml
 # github.com/armon/circbuf => github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e
 # github.com/armon/go-metrics => github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da
 # github.com/armon/go-radix => github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310
-# github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
+# github.com/asaskevich/govalidator => github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535
 # github.com/auth0/go-jwt-middleware => github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
 # github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.35.24
 # github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
@@ -2448,9 +2448,9 @@ sigs.k8s.io/yaml
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
 # github.com/go-openapi/loads => github.com/go-openapi/loads v0.19.4
 # github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.19.4
-# github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.5
+# github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.8
 # github.com/go-openapi/strfmt => github.com/go-openapi/strfmt v0.19.5
-# github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+# github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.9
 # github.com/go-openapi/validate => github.com/go-openapi/validate v0.19.8
 # github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 # github.com/go-stack/stack => github.com/go-stack/stack v1.8.0
@@ -2535,7 +2535,7 @@ sigs.k8s.io/yaml
 # github.com/lucas-clemente/quic-go => github.com/lucas-clemente/quic-go v0.10.2
 # github.com/lucas-clemente/quic-go-certificates => github.com/lucas-clemente/quic-go-certificates v0.0.0-20160823095156-d2f86524cced
 # github.com/magiconair/properties => github.com/magiconair/properties v1.8.1
-# github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
+# github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.1
 # github.com/markbates/pkger => github.com/markbates/pkger v0.17.1
 # github.com/marten-seemann/qtls => github.com/marten-seemann/qtls v0.2.3
 # github.com/mattn/go-colorable => github.com/mattn/go-colorable v0.0.9
@@ -2552,7 +2552,7 @@ sigs.k8s.io/yaml
 # github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0
 # github.com/mitchellh/gox => github.com/mitchellh/gox v0.4.0
 # github.com/mitchellh/iochan => github.com/mitchellh/iochan v1.0.0
-# github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
+# github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.3.2
 # github.com/moby/ipvs => github.com/moby/ipvs v1.0.1
 # github.com/moby/spdystream => github.com/moby/spdystream v0.2.0
 # github.com/moby/sys/mountinfo => github.com/moby/sys/mountinfo v0.4.1

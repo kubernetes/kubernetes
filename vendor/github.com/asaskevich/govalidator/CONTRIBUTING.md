@@ -11,7 +11,7 @@ If you don't know what to do, there are some features and functions that need to
 - [ ] Update actual [list of functions](https://github.com/asaskevich/govalidator#list-of-functions)
 - [ ] Update [list of validators](https://github.com/asaskevich/govalidator#validatestruct-2) that available for `ValidateStruct` and add new
 - [ ] Implement new validators: `IsFQDN`, `IsIMEI`, `IsPostalCode`, `IsISIN`, `IsISRC` etc
-- [ ] Implement [validation by maps](https://github.com/asaskevich/govalidator/issues/224)
+- [x] Implement [validation by maps](https://github.com/asaskevich/govalidator/issues/224)
 - [ ] Implement fuzzing testing
 - [ ] Implement some struct/map/array utilities
 - [ ] Implement map/array validation
@@ -37,7 +37,7 @@ Anyone can file an expense. If the expense makes sense for the development of th
 ### Contributors
 
 Thank you to all the people who have already contributed to govalidator!
-<a href="graphs/contributors"><img src="https://opencollective.com/govalidator/contributors.svg?width=890" /></a>
+<a href="https://github.com/asaskevich/govalidator/graphs/contributors"><img src="https://opencollective.com/govalidator/contributors.svg?width=890" /></a>
 
 
 ### Backers

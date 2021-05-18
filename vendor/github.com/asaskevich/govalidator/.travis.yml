@@ -1,14 +1,18 @@
+dist: bionic
 language: go
+env: GO111MODULE=on GOFLAGS='-mod vendor'
+install: true
+email: false
 
 go:
-  - 1.1
-  - 1.2
-  - 1.3
-  - 1.4
-  - 1.5
-  - 1.6
+  - 1.10
+  - 1.11
+  - 1.12
+  - 1.13
   - tip
 
-notifications:
-  email:
-    - bwatas@gmail.com
+before_script:
+  - go install github.com/golangci/golangci-lint/cmd/golangci-lint
+script:
+  - golangci-lint run       # run a bunch of code checkers/linters in parallel
+  - go test -v -race ./...  # Run all the tests with the race detector enabled

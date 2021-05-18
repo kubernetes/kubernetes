@@ -1,8 +1,9 @@
 language: go
 
 go:
-  - "1.11.x"
+  - "1.14.x"
   - tip
 
 script:
   - go test
+  - go test -bench . -benchmem

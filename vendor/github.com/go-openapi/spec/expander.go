@@ -200,11 +200,11 @@ func ExpandSpec(spec *Swagger, options *ExpandOptions) error {
 	return nil
 }
 
+const rootBase = "root"
 // baseForRoot loads in the cache the root document and produces a fake "root" base path entry
 // for further $ref resolution
 func baseForRoot(root interface{}, cache ResolutionCache) string {
 	// cache the root document to resolve $ref's
-	const rootBase = "root"
 	if root != nil {
 		base, _ := absPath(rootBase)
 		normalizedBase := normalizeAbsPath(base)
