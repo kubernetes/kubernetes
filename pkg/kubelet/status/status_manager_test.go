@@ -1091,8 +1091,9 @@ func TestMergePodStatus(t *testing.T) {
 				Phase: v1.PodRunning,
 				Conditions: []v1.PodCondition{
 					{
-						Type:   v1.PodReady,
-						Status: v1.ConditionFalse,
+						Type:               v1.PodReady,
+						Status:             v1.ConditionFalse,
+						LastTransitionTime: metav1.Now(),
 					},
 					{
 						Type:   v1.PodScheduled,
@@ -1169,6 +1170,10 @@ func conditionsEqual(left, right []v1.PodCondition) bool {
 			if l.Type == r.Type {
 				found = true
 				if l.Status != r.Status {
+					return false
+				}
+				// If r.LastTransitionTime is not zero, l.LastTransitionTime must not be either. But they aren't compared.
+				if !r.LastTransitionTime.IsZero() && l.LastTransitionTime.IsZero() {
 					return false
 				}
 			}
