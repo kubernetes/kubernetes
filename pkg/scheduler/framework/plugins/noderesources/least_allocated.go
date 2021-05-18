@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // LeastAllocated is a score plugin that favors nodes with fewer allocation requested resources based on requested resources.
@@ -65,7 +66,7 @@ func (la *LeastAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewLeastAllocated initializes a new plugin and returns it.
-func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewLeastAllocated(laArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := laArgs.(*config.NodeResourcesLeastAllocatedArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesLeastAllocatedArgs, got %T", laArgs)
@@ -85,6 +86,7 @@ func NewLeastAllocated(laArgs runtime.Object, h framework.Handle) (framework.Plu
 			Name:                LeastAllocatedName,
 			scorer:              leastResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }

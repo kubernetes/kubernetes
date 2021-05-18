@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 // MostAllocated is a score plugin that favors nodes with high allocation based on requested resources.
@@ -63,7 +64,7 @@ func (ma *MostAllocated) ScoreExtensions() framework.ScoreExtensions {
 }
 
 // NewMostAllocated initializes a new plugin and returns it.
-func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
+func NewMostAllocated(maArgs runtime.Object, h framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := maArgs.(*config.NodeResourcesMostAllocatedArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesMostAllocatedArgs, got %T", args)
@@ -83,6 +84,7 @@ func NewMostAllocated(maArgs runtime.Object, h framework.Handle) (framework.Plug
 			Name:                MostAllocatedName,
 			scorer:              mostResourceScorer(resToWeightMap),
 			resourceToWeightMap: resToWeightMap,
+			enablePodOverhead:   fts.EnablePodOverhead,
 		},
 	}, nil
 }
