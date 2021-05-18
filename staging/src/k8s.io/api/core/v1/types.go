@@ -1916,10 +1916,11 @@ type EnvVar struct {
 	// Optional: no more than one of the following may be specified.
 
 	// Variable references $(VAR_NAME) are expanded
-	// using the previous defined environment variables in the container and
+	// using the previously defined environment variables in the container and
 	// any service environment variables. If a variable cannot be resolved,
 	// the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+	// "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
 	// Escaped references will never be expanded, regardless of whether the variable
 	// exists or not.
 	// Defaults to "".
@@ -2218,9 +2219,9 @@ type Container struct {
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).
-	// Escaped references will never be expanded, regardless of whether the variable exists or not.
-	// Cannot be updated.
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
@@ -2228,9 +2229,9 @@ type Container struct {
 	// The docker image's CMD is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME).
-	// Escaped references will never be expanded, regardless of whether the variable exists or not.
-	// Cannot be updated.
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
@@ -3436,9 +3437,9 @@ type EphemeralContainerCommon struct {
 	// The docker image's ENTRYPOINT is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME). Escaped
-	// references will never be expanded, regardless of whether the variable exists or not.
-	// Cannot be updated.
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
@@ -3446,9 +3447,9 @@ type EphemeralContainerCommon struct {
 	// The docker image's CMD is used if this is not provided.
 	// Variable references $(VAR_NAME) are expanded using the container's environment. If a variable
 	// cannot be resolved, the reference in the input string will be unchanged. Double $$ are reduced
-	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. $$(VAR_NAME). Escaped
-	// references will never be expanded, regardless of whether the variable exists or not.
-	// Cannot be updated.
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)". Escaped references will never be expanded, regardless
+	// of whether the variable exists or not. Cannot be updated.
 	// More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell
 	// +optional
 	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
