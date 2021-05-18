@@ -251,7 +251,7 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 
 	fs.DurationVar(&s.KubeletConfig.HTTPTimeout, "kubelet-timeout", s.KubeletConfig.HTTPTimeout,
 		"DEPRECATED: Timeout for kubelet operations.")
-	fs.MarkDeprecated("kubelet-timeout", "kubelet-timeout is deprecated and will be removed.")
+	fs.MarkDeprecated("kubelet-timeout", "kubelet-timeout is deprecated and will be removed in v1.23")
 
 	fs.StringVar(&s.KubeletConfig.CertFile, "kubelet-client-certificate", s.KubeletConfig.CertFile,
 		"Path to a client cert file for TLS.")
