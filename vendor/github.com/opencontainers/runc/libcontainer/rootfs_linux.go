@@ -17,10 +17,9 @@ import (
 	"github.com/moby/sys/mountinfo"
 	"github.com/mrunalp/fileutils"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs2"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
-	"github.com/opencontainers/runc/libcontainer/userns"
+	"github.com/opencontainers/runc/libcontainer/system"
 	"github.com/opencontainers/runc/libcontainer/utils"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/opencontainers/runtime-spec/specs-go"
@@ -29,14 +28,6 @@ import (
 )
 
 const defaultMountFlags = unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
-
-type mountConfig struct {
-	root            string
-	label           string
-	cgroup2Path     string
-	rootlessCgroups bool
-	cgroupns        bool
-}
 
 // needsSetupDev returns true if /dev needs to be set up.
 func needsSetupDev(config *configs.Config) bool {
@@ -57,13 +48,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 		return newSystemErrorWithCause(err, "preparing rootfs")
 	}
 
-	mountConfig := &mountConfig{
-		root:            config.Rootfs,
-		label:           config.MountLabel,
-		cgroup2Path:     iConfig.Cgroup2Path,
-		rootlessCgroups: iConfig.RootlessCgroups,
-		cgroupns:        config.Namespaces.Contains(configs.NEWCGROUP),
-	}
+	hasCgroupns := config.Namespaces.Contains(configs.NEWCGROUP)
 	setupDev := needsSetupDev(config)
 	for _, m := range config.Mounts {
 		for _, precmd := range m.PremountCmds {
@@ -71,7 +56,7 @@ func prepareRootfs(pipe io.ReadWriter, iConfig *initConfig) (err error) {
 				return newSystemErrorWithCause(err, "running premount command")
 			}
 		}
-		if err := mountToRootfs(m, mountConfig); err != nil {
+		if err := mountToRootfs(m, config.Rootfs, config.MountLabel, hasCgroupns); err != nil {
 			return newSystemErrorWithCausef(err, "mounting %q to rootfs at %q", m.Source, m.Destination)
 		}
 
@@ -237,7 +222,7 @@ func prepareBindMount(m *configs.Mount, rootfs string) error {
 	return nil
 }
 
-func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
+func mountCgroupV1(m *configs.Mount, rootfs, mountLabel string, enableCgroupns bool) error {
 	binds, err := getCgroupMounts(m)
 	if err != nil {
 		return err
@@ -257,12 +242,12 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 		Data:             "mode=755",
 		PropagationFlags: m.PropagationFlags,
 	}
-	if err := mountToRootfs(tmpfs, c); err != nil {
+	if err := mountToRootfs(tmpfs, rootfs, mountLabel, enableCgroupns); err != nil {
 		return err
 	}
 	for _, b := range binds {
-		if c.cgroupns {
-			subsystemPath := filepath.Join(c.root, b.Destination)
+		if enableCgroupns {
+			subsystemPath := filepath.Join(rootfs, b.Destination)
 			if err := os.MkdirAll(subsystemPath, 0755); err != nil {
 				return err
 			}
@@ -281,7 +266,7 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 				return err
 			}
 		} else {
-			if err := mountToRootfs(b, c); err != nil {
+			if err := mountToRootfs(b, rootfs, mountLabel, enableCgroupns); err != nil {
 				return err
 			}
 		}
@@ -291,7 +276,7 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 			// symlink(2) is very dumb, it will just shove the path into
 			// the link and doesn't do any checks or relative path
 			// conversion. Also, don't error out if the cgroup already exists.
-			if err := os.Symlink(mc, filepath.Join(c.root, m.Destination, ss)); err != nil && !os.IsExist(err) {
+			if err := os.Symlink(mc, filepath.Join(rootfs, m.Destination, ss)); err != nil && !os.IsExist(err) {
 				return err
 			}
 		}
@@ -299,39 +284,28 @@ func mountCgroupV1(m *configs.Mount, c *mountConfig) error {
 	return nil
 }
 
-func mountCgroupV2(m *configs.Mount, c *mountConfig) error {
-	dest, err := securejoin.SecureJoin(c.root, m.Destination)
+func mountCgroupV2(m *configs.Mount, rootfs, mountLabel string, enableCgroupns bool) error {
+	cgroupPath, err := securejoin.SecureJoin(rootfs, m.Destination)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dest, 0755); err != nil {
+	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		return err
 	}
-	if err := unix.Mount(m.Source, dest, "cgroup2", uintptr(m.Flags), m.Data); err != nil {
+	if err := unix.Mount(m.Source, cgroupPath, "cgroup2", uintptr(m.Flags), m.Data); err != nil {
 		// when we are in UserNS but CgroupNS is not unshared, we cannot mount cgroup2 (#2158)
 		if err == unix.EPERM || err == unix.EBUSY {
-			src := fs2.UnifiedMountpoint
-			if c.cgroupns && c.cgroup2Path != "" {
-				// Emulate cgroupns by bind-mounting
-				// the container cgroup path rather than
-				// the whole /sys/fs/cgroup.
-				src = c.cgroup2Path
-			}
-			err = unix.Mount(src, dest, "", uintptr(m.Flags)|unix.MS_BIND, "")
-			if err == unix.ENOENT && c.rootlessCgroups {
-				err = nil
-			}
-			return err
+			return unix.Mount("/sys/fs/cgroup", cgroupPath, "", uintptr(m.Flags)|unix.MS_BIND, "")
 		}
 		return err
 	}
 	return nil
 }
 
-func mountToRootfs(m *configs.Mount, c *mountConfig) error {
-	rootfs := c.root
-	mountLabel := c.label
-	dest := m.Destination
+func mountToRootfs(m *configs.Mount, rootfs, mountLabel string, enableCgroupns bool) error {
+	var (
+		dest = m.Destination
+	)
 	if !strings.HasPrefix(dest, rootfs) {
 		dest = filepath.Join(rootfs, dest)
 	}
@@ -450,9 +424,9 @@ func mountToRootfs(m *configs.Mount, c *mountConfig) error {
 		}
 	case "cgroup":
 		if cgroups.IsCgroup2UnifiedMode() {
-			return mountCgroupV2(m, c)
+			return mountCgroupV2(m, rootfs, mountLabel, enableCgroupns)
 		}
-		return mountCgroupV1(m, c)
+		return mountCgroupV1(m, rootfs, mountLabel, enableCgroupns)
 	default:
 		// ensure that the destination of the mount is resolved of symlinks at mount time because
 		// any previous mounts can invalidate the next mount's destination.
@@ -629,7 +603,7 @@ func reOpenDevNull() error {
 
 // Create the device nodes in the container.
 func createDevices(config *configs.Config) error {
-	useBindMount := userns.RunningInUserNS() || config.Namespaces.Contains(configs.NEWUSER)
+	useBindMount := system.RunningInUserNS() || config.Namespaces.Contains(configs.NEWUSER)
 	oldMask := unix.Umask(0000)
 	for _, node := range config.Devices {
 
@@ -957,20 +931,9 @@ func readonlyPath(path string) error {
 		if os.IsNotExist(err) {
 			return nil
 		}
-		return &os.PathError{Op: "bind-mount", Path: path, Err: err}
+		return err
 	}
-
-	var s unix.Statfs_t
-	if err := unix.Statfs(path, &s); err != nil {
-		return &os.PathError{Op: "statfs", Path: path, Err: err}
-	}
-	flags := uintptr(s.Flags) & (unix.MS_NOSUID | unix.MS_NODEV | unix.MS_NOEXEC)
-
-	if err := unix.Mount(path, path, "", flags|unix.MS_BIND|unix.MS_REMOUNT|unix.MS_RDONLY, ""); err != nil {
-		return &os.PathError{Op: "bind-mount-ro", Path: path, Err: err}
-	}
-
-	return nil
+	return unix.Mount(path, path, "", unix.MS_BIND|unix.MS_REMOUNT|unix.MS_RDONLY|unix.MS_REC, "")
 }
 
 // remountReadonly will remount an existing mount point and ensure that it is read-only.

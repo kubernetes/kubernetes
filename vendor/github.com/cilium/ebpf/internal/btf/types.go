@@ -21,14 +21,12 @@ func (tid TypeID) ID() TypeID {
 type Type interface {
 	ID() TypeID
 
-	String() string
-
 	// Make a copy of the type, without copying Type members.
 	copy() Type
 
 	// Enumerate all nested Types. Repeated calls must visit nested
 	// types in the same order.
-	walk(*typeDeque)
+	walk(*copyStack)
 }
 
 // namedType is a type with a name.
@@ -52,10 +50,9 @@ func (n Name) name() string {
 type Void struct{}
 
 func (v *Void) ID() TypeID      { return 0 }
-func (v *Void) String() string  { return "void#0" }
 func (v *Void) size() uint32    { return 0 }
 func (v *Void) copy() Type      { return (*Void)(nil) }
-func (v *Void) walk(*typeDeque) {}
+func (v *Void) walk(*copyStack) {}
 
 type IntEncoding byte
 
@@ -81,40 +78,11 @@ type Int struct {
 
 var _ namedType = (*Int)(nil)
 
-func (i *Int) String() string {
-	var s strings.Builder
-
-	switch {
-	case i.Encoding&Char != 0:
-		s.WriteString("char")
-	case i.Encoding&Bool != 0:
-		s.WriteString("bool")
-	default:
-		if i.Encoding&Signed == 0 {
-			s.WriteRune('u')
-		}
-		s.WriteString("int")
-		fmt.Fprintf(&s, "%d", i.Size*8)
-	}
-
-	fmt.Fprintf(&s, "#%d", i.TypeID)
-
-	if i.Bits > 0 {
-		fmt.Fprintf(&s, "[bits=%d]", i.Bits)
-	}
-
-	return s.String()
-}
-
 func (i *Int) size() uint32    { return i.Size }
-func (i *Int) walk(*typeDeque) {}
+func (i *Int) walk(*copyStack) {}
 func (i *Int) copy() Type {
 	cpy := *i
 	return &cpy
-}
-
-func (i *Int) isBitfield() bool {
-	return i.Offset > 0
 }
 
 // Pointer is a pointer to another type.
@@ -123,12 +91,8 @@ type Pointer struct {
 	Target Type
 }
 
-func (p *Pointer) String() string {
-	return fmt.Sprintf("pointer#%d[target=#%d]", p.TypeID, p.Target.ID())
-}
-
-func (p *Pointer) size() uint32        { return 8 }
-func (p *Pointer) walk(tdq *typeDeque) { tdq.push(&p.Target) }
+func (p *Pointer) size() uint32       { return 8 }
+func (p *Pointer) walk(cs *copyStack) { cs.push(&p.Target) }
 func (p *Pointer) copy() Type {
 	cpy := *p
 	return &cpy
@@ -141,11 +105,7 @@ type Array struct {
 	Nelems uint32
 }
 
-func (arr *Array) String() string {
-	return fmt.Sprintf("array#%d[type=#%d n=%d]", arr.TypeID, arr.Type.ID(), arr.Nelems)
-}
-
-func (arr *Array) walk(tdq *typeDeque) { tdq.push(&arr.Type) }
+func (arr *Array) walk(cs *copyStack) { cs.push(&arr.Type) }
 func (arr *Array) copy() Type {
 	cpy := *arr
 	return &cpy
@@ -160,15 +120,11 @@ type Struct struct {
 	Members []Member
 }
 
-func (s *Struct) String() string {
-	return fmt.Sprintf("struct#%d[%q]", s.TypeID, s.Name)
-}
-
 func (s *Struct) size() uint32 { return s.Size }
 
-func (s *Struct) walk(tdq *typeDeque) {
+func (s *Struct) walk(cs *copyStack) {
 	for i := range s.Members {
-		tdq.push(&s.Members[i].Type)
+		cs.push(&s.Members[i].Type)
 	}
 }
 
@@ -192,15 +148,11 @@ type Union struct {
 	Members []Member
 }
 
-func (u *Union) String() string {
-	return fmt.Sprintf("union#%d[%q]", u.TypeID, u.Name)
-}
-
 func (u *Union) size() uint32 { return u.Size }
 
-func (u *Union) walk(tdq *typeDeque) {
+func (u *Union) walk(cs *copyStack) {
 	for i := range u.Members {
-		tdq.push(&u.Members[i].Type)
+		cs.push(&u.Members[i].Type)
 	}
 }
 
@@ -242,10 +194,6 @@ type Enum struct {
 	Values []EnumValue
 }
 
-func (e *Enum) String() string {
-	return fmt.Sprintf("enum#%d[%q]", e.TypeID, e.Name)
-}
-
 // EnumValue is part of an Enum
 //
 // Is is not a valid Type
@@ -255,7 +203,7 @@ type EnumValue struct {
 }
 
 func (e *Enum) size() uint32    { return 4 }
-func (e *Enum) walk(*typeDeque) {}
+func (e *Enum) walk(*copyStack) {}
 func (e *Enum) copy() Type {
 	cpy := *e
 	cpy.Values = make([]EnumValue, len(e.Values))
@@ -263,38 +211,13 @@ func (e *Enum) copy() Type {
 	return &cpy
 }
 
-// FwdKind is the type of forward declaration.
-type FwdKind int
-
-// Valid types of forward declaration.
-const (
-	FwdStruct FwdKind = iota
-	FwdUnion
-)
-
-func (fk FwdKind) String() string {
-	switch fk {
-	case FwdStruct:
-		return "struct"
-	case FwdUnion:
-		return "union"
-	default:
-		return fmt.Sprintf("%T(%d)", fk, int(fk))
-	}
-}
-
 // Fwd is a forward declaration of a Type.
 type Fwd struct {
 	TypeID
 	Name
-	Kind FwdKind
 }
 
-func (f *Fwd) String() string {
-	return fmt.Sprintf("fwd#%d[%s %q]", f.TypeID, f.Kind, f.Name)
-}
-
-func (f *Fwd) walk(*typeDeque) {}
+func (f *Fwd) walk(*copyStack) {}
 func (f *Fwd) copy() Type {
 	cpy := *f
 	return &cpy
@@ -307,11 +230,7 @@ type Typedef struct {
 	Type Type
 }
 
-func (td *Typedef) String() string {
-	return fmt.Sprintf("typedef#%d[%q #%d]", td.TypeID, td.Name, td.Type.ID())
-}
-
-func (td *Typedef) walk(tdq *typeDeque) { tdq.push(&td.Type) }
+func (td *Typedef) walk(cs *copyStack) { cs.push(&td.Type) }
 func (td *Typedef) copy() Type {
 	cpy := *td
 	return &cpy
@@ -323,12 +242,8 @@ type Volatile struct {
 	Type Type
 }
 
-func (v *Volatile) String() string {
-	return fmt.Sprintf("volatile#%d[#%d]", v.TypeID, v.Type.ID())
-}
-
-func (v *Volatile) qualify() Type       { return v.Type }
-func (v *Volatile) walk(tdq *typeDeque) { tdq.push(&v.Type) }
+func (v *Volatile) qualify() Type      { return v.Type }
+func (v *Volatile) walk(cs *copyStack) { cs.push(&v.Type) }
 func (v *Volatile) copy() Type {
 	cpy := *v
 	return &cpy
@@ -340,12 +255,8 @@ type Const struct {
 	Type Type
 }
 
-func (c *Const) String() string {
-	return fmt.Sprintf("const#%d[#%d]", c.TypeID, c.Type.ID())
-}
-
-func (c *Const) qualify() Type       { return c.Type }
-func (c *Const) walk(tdq *typeDeque) { tdq.push(&c.Type) }
+func (c *Const) qualify() Type      { return c.Type }
+func (c *Const) walk(cs *copyStack) { cs.push(&c.Type) }
 func (c *Const) copy() Type {
 	cpy := *c
 	return &cpy
@@ -357,12 +268,8 @@ type Restrict struct {
 	Type Type
 }
 
-func (r *Restrict) String() string {
-	return fmt.Sprintf("restrict#%d[#%d]", r.TypeID, r.Type.ID())
-}
-
-func (r *Restrict) qualify() Type       { return r.Type }
-func (r *Restrict) walk(tdq *typeDeque) { tdq.push(&r.Type) }
+func (r *Restrict) qualify() Type      { return r.Type }
+func (r *Restrict) walk(cs *copyStack) { cs.push(&r.Type) }
 func (r *Restrict) copy() Type {
 	cpy := *r
 	return &cpy
@@ -375,11 +282,7 @@ type Func struct {
 	Type Type
 }
 
-func (f *Func) String() string {
-	return fmt.Sprintf("func#%d[%q proto=#%d]", f.TypeID, f.Name, f.Type.ID())
-}
-
-func (f *Func) walk(tdq *typeDeque) { tdq.push(&f.Type) }
+func (f *Func) walk(cs *copyStack) { cs.push(&f.Type) }
 func (f *Func) copy() Type {
 	cpy := *f
 	return &cpy
@@ -392,20 +295,10 @@ type FuncProto struct {
 	Params []FuncParam
 }
 
-func (fp *FuncProto) String() string {
-	var s strings.Builder
-	fmt.Fprintf(&s, "proto#%d[", fp.TypeID)
-	for _, param := range fp.Params {
-		fmt.Fprintf(&s, "%q=#%d, ", param.Name, param.Type.ID())
-	}
-	fmt.Fprintf(&s, "return=#%d]", fp.Return.ID())
-	return s.String()
-}
-
-func (fp *FuncProto) walk(tdq *typeDeque) {
-	tdq.push(&fp.Return)
+func (fp *FuncProto) walk(cs *copyStack) {
+	cs.push(&fp.Return)
 	for i := range fp.Params {
-		tdq.push(&fp.Params[i].Type)
+		cs.push(&fp.Params[i].Type)
 	}
 }
 
@@ -428,12 +321,7 @@ type Var struct {
 	Type Type
 }
 
-func (v *Var) String() string {
-	// TODO: Linkage
-	return fmt.Sprintf("var#%d[%q]", v.TypeID, v.Name)
-}
-
-func (v *Var) walk(tdq *typeDeque) { tdq.push(&v.Type) }
+func (v *Var) walk(cs *copyStack) { cs.push(&v.Type) }
 func (v *Var) copy() Type {
 	cpy := *v
 	return &cpy
@@ -447,15 +335,11 @@ type Datasec struct {
 	Vars []VarSecinfo
 }
 
-func (ds *Datasec) String() string {
-	return fmt.Sprintf("section#%d[%q]", ds.TypeID, ds.Name)
-}
-
 func (ds *Datasec) size() uint32 { return ds.Size }
 
-func (ds *Datasec) walk(tdq *typeDeque) {
+func (ds *Datasec) walk(cs *copyStack) {
 	for i := range ds.Vars {
-		tdq.push(&ds.Vars[i].Type)
+		cs.push(&ds.Vars[i].Type)
 	}
 }
 
@@ -467,8 +351,6 @@ func (ds *Datasec) copy() Type {
 }
 
 // VarSecinfo describes variable in a Datasec
-//
-// It is not a valid Type.
 type VarSecinfo struct {
 	Type   Type
 	Offset uint32
@@ -556,7 +438,7 @@ func Sizeof(typ Type) (int, error) {
 func copyType(typ Type) Type {
 	var (
 		copies = make(map[Type]Type)
-		work   typeDeque
+		work   copyStack
 	)
 
 	for t := &typ; t != nil; t = work.pop() {
@@ -577,83 +459,34 @@ func copyType(typ Type) Type {
 	return typ
 }
 
-// typeDeque keeps track of pointers to types which still
+// copyStack keeps track of pointers to types which still
 // need to be visited.
-type typeDeque struct {
-	types       []*Type
-	read, write uint64
-	mask        uint64
-}
+type copyStack []*Type
 
 // push adds a type to the stack.
-func (dq *typeDeque) push(t *Type) {
-	if dq.write-dq.read < uint64(len(dq.types)) {
-		dq.types[dq.write&dq.mask] = t
-		dq.write++
-		return
-	}
-
-	new := len(dq.types) * 2
-	if new == 0 {
-		new = 8
-	}
-
-	types := make([]*Type, new)
-	pivot := dq.read & dq.mask
-	n := copy(types, dq.types[pivot:])
-	n += copy(types[n:], dq.types[:pivot])
-	types[n] = t
-
-	dq.types = types
-	dq.mask = uint64(new) - 1
-	dq.read, dq.write = 0, uint64(n+1)
+func (cs *copyStack) push(t *Type) {
+	*cs = append(*cs, t)
 }
 
-// shift returns the first element or null.
-func (dq *typeDeque) shift() *Type {
-	if dq.read == dq.write {
+// pop returns the topmost Type, or nil.
+func (cs *copyStack) pop() *Type {
+	n := len(*cs)
+	if n == 0 {
 		return nil
 	}
 
-	index := dq.read & dq.mask
-	t := dq.types[index]
-	dq.types[index] = nil
-	dq.read++
+	t := (*cs)[n-1]
+	*cs = (*cs)[:n-1]
 	return t
-}
-
-// pop returns the last element or null.
-func (dq *typeDeque) pop() *Type {
-	if dq.read == dq.write {
-		return nil
-	}
-
-	dq.write--
-	index := dq.write & dq.mask
-	t := dq.types[index]
-	dq.types[index] = nil
-	return t
-}
-
-// all returns all elements.
-//
-// The deque is empty after calling this method.
-func (dq *typeDeque) all() []*Type {
-	length := dq.write - dq.read
-	types := make([]*Type, 0, length)
-	for t := dq.shift(); t != nil; t = dq.shift() {
-		types = append(types, t)
-	}
-	return types
 }
 
 // inflateRawTypes takes a list of raw btf types linked via type IDs, and turns
 // it into a graph of Types connected via pointers.
 //
-// Returns a map of named types (so, where NameOff is non-zero) and a slice of types
-// indexed by TypeID. Since BTF ignores compilation units, multiple types may share
-// the same name. A Type may form a cyclic graph by pointing at itself.
-func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, namedTypes map[string][]namedType, err error) {
+// Returns a map of named types (so, where NameOff is non-zero). Since BTF ignores
+// compilation units, multiple types may share the same name. A Type may form a
+// cyclic graph by pointing at itself.
+func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (namedTypes map[string][]namedType, err error) {
 	type fixupDef struct {
 		id           TypeID
 		expectedKind btfKind
@@ -690,7 +523,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 		return members, nil
 	}
 
-	types = make([]Type, 0, len(rawTypes))
+	types := make([]Type, 0, len(rawTypes))
 	types = append(types, (*Void)(nil))
 	namedTypes = make(map[string][]namedType)
 
@@ -704,7 +537,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 
 		name, err := rawStrings.LookupName(raw.NameOff)
 		if err != nil {
-			return nil, nil, fmt.Errorf("get name for type id %d: %w", id, err)
+			return nil, fmt.Errorf("can't get name for type id %d: %w", id, err)
 		}
 
 		switch raw.Kind() {
@@ -729,14 +562,14 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 		case kindStruct:
 			members, err := convertMembers(raw.data.([]btfMember), raw.KindFlag())
 			if err != nil {
-				return nil, nil, fmt.Errorf("struct %s (id %d): %w", name, id, err)
+				return nil, fmt.Errorf("struct %s (id %d): %w", name, id, err)
 			}
 			typ = &Struct{id, name, raw.Size(), members}
 
 		case kindUnion:
 			members, err := convertMembers(raw.data.([]btfMember), raw.KindFlag())
 			if err != nil {
-				return nil, nil, fmt.Errorf("union %s (id %d): %w", name, id, err)
+				return nil, fmt.Errorf("union %s (id %d): %w", name, id, err)
 			}
 			typ = &Union{id, name, raw.Size(), members}
 
@@ -746,7 +579,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			for i, btfVal := range rawvals {
 				name, err := rawStrings.LookupName(btfVal.NameOff)
 				if err != nil {
-					return nil, nil, fmt.Errorf("get name for enum value %d: %s", i, err)
+					return nil, fmt.Errorf("can't get name for enum value %d: %s", i, err)
 				}
 				vals = append(vals, EnumValue{
 					Name:  name,
@@ -756,11 +589,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			typ = &Enum{id, name, vals}
 
 		case kindForward:
-			if raw.KindFlag() {
-				typ = &Fwd{id, name, FwdUnion}
-			} else {
-				typ = &Fwd{id, name, FwdStruct}
-			}
+			typ = &Fwd{id, name}
 
 		case kindTypedef:
 			typedef := &Typedef{id, name, nil}
@@ -793,7 +622,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			for i, param := range rawparams {
 				name, err := rawStrings.LookupName(param.NameOff)
 				if err != nil {
-					return nil, nil, fmt.Errorf("get name for func proto parameter %d: %s", i, err)
+					return nil, fmt.Errorf("can't get name for func proto parameter %d: %s", i, err)
 				}
 				params = append(params, FuncParam{
 					Name: name,
@@ -827,7 +656,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 			typ = &Datasec{id, name, raw.SizeType, vars}
 
 		default:
-			return nil, nil, fmt.Errorf("type id %d: unknown kind: %v", id, raw.Kind())
+			return nil, fmt.Errorf("type id %d: unknown kind: %v", id, raw.Kind())
 		}
 
 		types = append(types, typ)
@@ -842,7 +671,7 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 	for _, fixup := range fixups {
 		i := int(fixup.id)
 		if i >= len(types) {
-			return nil, nil, fmt.Errorf("reference to invalid type id: %d", fixup.id)
+			return nil, fmt.Errorf("reference to invalid type id: %d", fixup.id)
 		}
 
 		// Default void (id 0) to unknown
@@ -852,13 +681,13 @@ func inflateRawTypes(rawTypes []rawType, rawStrings stringTable) (types []Type, 
 		}
 
 		if expected := fixup.expectedKind; expected != kindUnknown && rawKind != expected {
-			return nil, nil, fmt.Errorf("expected type id %d to have kind %s, found %s", fixup.id, expected, rawKind)
+			return nil, fmt.Errorf("expected type id %d to have kind %s, found %s", fixup.id, expected, rawKind)
 		}
 
 		*fixup.typ = types[i]
 	}
 
-	return types, namedTypes, nil
+	return namedTypes, nil
 }
 
 // essentialName returns name without a ___ suffix.

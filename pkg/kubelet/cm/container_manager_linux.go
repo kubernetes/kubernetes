@@ -533,8 +533,12 @@ func (cm *containerManagerImpl) setupNode(activePods ActivePodsFunc) error {
 			return err
 		}
 
+		manager, err := createManager(cm.KubeletCgroupsName)
+		if err != nil {
+			return err
+		}
 		cont.ensureStateFunc = func(_ cgroups.Manager) error {
-			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, cont.manager)
+			return ensureProcessInContainerWithOOMScore(os.Getpid(), qos.KubeletOOMScoreAdj, manager)
 		}
 		systemContainers = append(systemContainers, cont)
 	} else {

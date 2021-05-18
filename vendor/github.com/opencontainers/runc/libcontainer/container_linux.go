@@ -27,13 +27,13 @@ import (
 	"github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/checkpoint-restore/go-criu/v5"
-	criurpc "github.com/checkpoint-restore/go-criu/v5/rpc"
+	"github.com/checkpoint-restore/go-criu/v4"
+	criurpc "github.com/checkpoint-restore/go-criu/v4/rpc"
+	"github.com/golang/protobuf/proto"
 	errorsf "github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink/nl"
 	"golang.org/x/sys/unix"
-	"google.golang.org/protobuf/proto"
 )
 
 const stdioFdCount = 3
@@ -55,7 +55,6 @@ type linuxContainer struct {
 	criuVersion          int
 	state                containerState
 	created              time.Time
-	fifo                 *os.File
 }
 
 // State represents a running container's state
@@ -225,9 +224,9 @@ func (c *linuxContainer) Set(config configs.Config) error {
 	if status == Stopped {
 		return newGenericError(errors.New("container not running"), ContainerNotRunning)
 	}
-	if err := c.cgroupManager.Set(config.Cgroups.Resources); err != nil {
+	if err := c.cgroupManager.Set(&config); err != nil {
 		// Set configs back
-		if err2 := c.cgroupManager.Set(c.config.Cgroups.Resources); err2 != nil {
+		if err2 := c.cgroupManager.Set(c.config); err2 != nil {
 			logrus.Warnf("Setting back cgroup configs failed due to error: %v, your state.json and actual configs might be inconsistent.", err2)
 		}
 		return err
@@ -235,7 +234,7 @@ func (c *linuxContainer) Set(config configs.Config) error {
 	if c.intelRdtManager != nil {
 		if err := c.intelRdtManager.Set(&config); err != nil {
 			// Set configs back
-			if err2 := c.cgroupManager.Set(c.config.Cgroups.Resources); err2 != nil {
+			if err2 := c.cgroupManager.Set(c.config); err2 != nil {
 				logrus.Warnf("Setting back cgroup configs failed due to error: %v, your state.json and actual configs might be inconsistent.", err2)
 			}
 			if err2 := c.intelRdtManager.Set(c.config); err2 != nil {
@@ -358,30 +357,17 @@ type openResult struct {
 	err  error
 }
 
-func (c *linuxContainer) start(process *Process) (retErr error) {
+func (c *linuxContainer) start(process *Process) error {
 	parent, err := c.newParentProcess(process)
 	if err != nil {
 		return newSystemErrorWithCause(err, "creating new parent process")
 	}
-
-	logsDone := parent.forwardChildLogs()
-	if logsDone != nil {
-		defer func() {
-			// Wait for log forwarder to finish. This depends on
-			// runc init closing the _LIBCONTAINER_LOGPIPE log fd.
-			err := <-logsDone
-			if err != nil && retErr == nil {
-				retErr = newSystemErrorWithCause(err, "forwarding init logs")
-			}
-		}()
-	}
-
+	parent.forwardChildLogs()
 	if err := parent.start(); err != nil {
 		return newSystemErrorWithCause(err, "starting container process")
 	}
 
 	if process.Init {
-		c.fifo.Close()
 		if c.config.Hooks != nil {
 			s, err := c.currentOCIState()
 			if err != nil {
@@ -457,13 +443,12 @@ func (c *linuxContainer) deleteExecFifo() {
 // fd, with _LIBCONTAINER_FIFOFD set to its fd number.
 func (c *linuxContainer) includeExecFifo(cmd *exec.Cmd) error {
 	fifoName := filepath.Join(c.root, execFifoFilename)
-	fifo, err := os.OpenFile(fifoName, unix.O_PATH|unix.O_CLOEXEC, 0)
+	fifoFd, err := unix.Open(fifoName, unix.O_PATH|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return err
 	}
-	c.fifo = fifo
 
-	cmd.ExtraFiles = append(cmd.ExtraFiles, fifo)
+	cmd.ExtraFiles = append(cmd.ExtraFiles, os.NewFile(uintptr(fifoFd), fifoName))
 	cmd.Env = append(cmd.Env,
 		"_LIBCONTAINER_FIFOFD="+strconv.Itoa(stdioFdCount+len(cmd.ExtraFiles)-1))
 	return nil
@@ -585,7 +570,6 @@ func (c *linuxContainer) newSetnsProcess(p *Process, cmd *exec.Cmd, messageSockP
 		intelRdtPath:    state.IntelRdtPath,
 		messageSockPair: messageSockPair,
 		logFilePair:     logFilePair,
-		manager:         c.cgroupManager,
 		config:          c.newInitConfig(p),
 		process:         p,
 		bootstrapData:   data,
@@ -610,9 +594,6 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 		AppArmorProfile:  c.config.AppArmorProfile,
 		ProcessLabel:     c.config.ProcessLabel,
 		Rlimits:          c.config.Rlimits,
-		CreateConsole:    process.ConsoleSocket != nil,
-		ConsoleWidth:     process.ConsoleWidth,
-		ConsoleHeight:    process.ConsoleHeight,
 	}
 	if process.NoNewPrivileges != nil {
 		cfg.NoNewPrivileges = *process.NoNewPrivileges
@@ -626,10 +607,9 @@ func (c *linuxContainer) newInitConfig(process *Process) *initConfig {
 	if len(process.Rlimits) > 0 {
 		cfg.Rlimits = process.Rlimits
 	}
-	if cgroups.IsCgroup2UnifiedMode() {
-		cfg.Cgroup2Path = c.cgroupManager.Path("")
-	}
-
+	cfg.CreateConsole = process.ConsoleSocket != nil
+	cfg.ConsoleWidth = process.ConsoleWidth
+	cfg.ConsoleHeight = process.ConsoleHeight
 	return cfg
 }
 
@@ -721,6 +701,7 @@ func (c *linuxContainer) checkCriuFeatures(criuOpts *CriuOpts, rpcOpts *criurpc.
 		return errors.New("CRIU feature check failed")
 	}
 
+	logrus.Debugf("Feature check says: %s", criuFeatures)
 	missingFeatures := false
 
 	// The outer if checks if the fields actually exist
@@ -1254,37 +1235,10 @@ func (c *linuxContainer) prepareCriuRestoreMounts(mounts []*configs.Mount) error
 	// Now go through all mounts and create the mountpoints
 	// if the mountpoints are not on a tmpfs, as CRIU will
 	// restore the complete tmpfs content from its checkpoint.
-	umounts := []string{}
-	defer func() {
-		for _, u := range umounts {
-			if e := unix.Unmount(u, unix.MNT_DETACH); e != nil {
-				if e != unix.EINVAL {
-					// Ignore EINVAL as it means 'target is not a mount point.'
-					// It probably has already been unmounted.
-					logrus.Warnf("Error during cleanup unmounting of %q (%v)", u, e)
-				}
-			}
-		}
-	}()
 	for _, m := range mounts {
 		if !isPathInPrefixList(m.Destination, tmpfs) {
 			if err := c.makeCriuRestoreMountpoints(m); err != nil {
 				return err
-			}
-			// If the mount point is a bind mount, we need to mount
-			// it now so that runc can create the necessary mount
-			// points for mounts in bind mounts.
-			// This also happens during initial container creation.
-			// Without this CRIU restore will fail
-			// See: https://github.com/opencontainers/runc/issues/2748
-			// It is also not necessary to order the mount points
-			// because during initial container creation mounts are
-			// set up in the order they are configured.
-			if m.Device == "bind" {
-				if err := unix.Mount(m.Source, m.Destination, "", unix.MS_BIND|unix.MS_REC, ""); err != nil {
-					return errorsf.Wrapf(err, "unable to bind mount %q to %q", m.Source, m.Destination)
-				}
-				umounts = append(umounts, m.Destination)
 			}
 		}
 	}
@@ -1462,7 +1416,7 @@ func (c *linuxContainer) criuApplyCgroups(pid int, req *criurpc.CriuReq) error {
 		return err
 	}
 
-	if err := c.cgroupManager.Set(c.config.Cgroups.Resources); err != nil {
+	if err := c.cgroupManager.Set(c.config); err != nil {
 		return newSystemError(err)
 	}
 
@@ -1521,6 +1475,7 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 		// the initial CRIU run to detect the version. Skip it.
 		logrus.Debugf("Using CRIU %d at: %s", c.criuVersion, c.criuPath)
 	}
+	logrus.Debugf("Using CRIU with following args: %s", args)
 	cmd := exec.Command(c.criuPath, args...)
 	if process != nil {
 		cmd.Stdin = process.Stdin
@@ -1568,19 +1523,19 @@ func (c *linuxContainer) criuSwrk(process *Process, req *criurpc.CriuReq, opts *
 	// should be empty. For older CRIU versions it still will be
 	// available but empty. criurpc.CriuReqType_VERSION actually
 	// has no req.GetOpts().
-	if logrus.GetLevel() >= logrus.DebugLevel &&
-		!(req.GetType() == criurpc.CriuReqType_FEATURE_CHECK ||
-			req.GetType() == criurpc.CriuReqType_VERSION) {
+	if !(req.GetType() == criurpc.CriuReqType_FEATURE_CHECK ||
+		req.GetType() == criurpc.CriuReqType_VERSION) {
 
 		val := reflect.ValueOf(req.GetOpts())
 		v := reflect.Indirect(val)
 		for i := 0; i < v.NumField(); i++ {
 			st := v.Type()
 			name := st.Field(i).Name
-			if 'A' <= name[0] && name[0] <= 'Z' {
-				value := val.MethodByName("Get" + name).Call([]reflect.Value{})
-				logrus.Debugf("CRIU option %s with value %v", name, value[0])
+			if strings.HasPrefix(name, "XXX_") {
+				continue
 			}
+			value := val.MethodByName("Get" + name).Call([]reflect.Value{})
+			logrus.Debugf("CRIU option %s with value %v", name, value[0])
 		}
 	}
 	data, err := proto.Marshal(req)

@@ -3,7 +3,6 @@
 package fs2
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -14,15 +13,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func isPidsSet(r *configs.Resources) bool {
-	return r.PidsLimit != 0
+func isPidsSet(cgroup *configs.Cgroup) bool {
+	return cgroup.Resources.PidsLimit != 0
 }
 
-func setPids(dirPath string, r *configs.Resources) error {
-	if !isPidsSet(r) {
+func setPids(dirPath string, cgroup *configs.Cgroup) error {
+	if !isPidsSet(cgroup) {
 		return nil
 	}
-	if val := numToStr(r.PidsLimit); val != "" {
+	if val := numToStr(cgroup.Resources.PidsLimit); val != "" {
 		if err := fscommon.WriteFile(dirPath, "pids.max", val); err != nil {
 			return err
 		}
@@ -31,7 +30,7 @@ func setPids(dirPath string, r *configs.Resources) error {
 	return nil
 }
 
-func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
+func statPidsWithoutController(dirPath string, stats *cgroups.Stats) error {
 	// if the controller is not enabled, let's read PIDS from cgroups.procs
 	// (or threads if cgroup.threads is enabled)
 	contents, err := fscommon.ReadFile(dirPath, "cgroup.procs")
@@ -41,8 +40,13 @@ func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 	if err != nil {
 		return err
 	}
-	pids := strings.Count(contents, "\n")
-	stats.PidsStats.Current = uint64(pids)
+	pids := make(map[string]string)
+	for _, i := range strings.Split(contents, "\n") {
+		if i != "" {
+			pids[i] = i
+		}
+	}
+	stats.PidsStats.Current = uint64(len(pids))
 	stats.PidsStats.Limit = 0
 	return nil
 }
@@ -50,9 +54,6 @@ func statPidsFromCgroupProcs(dirPath string, stats *cgroups.Stats) error {
 func statPids(dirPath string, stats *cgroups.Stats) error {
 	current, err := fscommon.GetCgroupParamUint(dirPath, "pids.current")
 	if err != nil {
-		if os.IsNotExist(err) {
-			return statPidsFromCgroupProcs(dirPath, stats)
-		}
 		return errors.Wrap(err, "failed to parse pids.current")
 	}
 

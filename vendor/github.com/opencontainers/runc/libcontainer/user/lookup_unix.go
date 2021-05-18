@@ -16,19 +16,13 @@ const (
 	unixGroupPath  = "/etc/group"
 )
 
-// LookupUser looks up a user by their username in /etc/passwd. If the user
-// cannot be found (or there is no /etc/passwd file on the filesystem), then
-// LookupUser returns an error.
-func LookupUser(username string) (User, error) {
+func lookupUser(username string) (User, error) {
 	return lookupUserFunc(func(u User) bool {
 		return u.Name == username
 	})
 }
 
-// LookupUid looks up a user by their user id in /etc/passwd. If the user cannot
-// be found (or there is no /etc/passwd file on the filesystem), then LookupId
-// returns an error.
-func LookupUid(uid int) (User, error) {
+func lookupUid(uid int) (User, error) {
 	return lookupUserFunc(func(u User) bool {
 		return u.Uid == uid
 	})
@@ -57,19 +51,13 @@ func lookupUserFunc(filter func(u User) bool) (User, error) {
 	return users[0], nil
 }
 
-// LookupGroup looks up a group by its name in /etc/group. If the group cannot
-// be found (or there is no /etc/group file on the filesystem), then LookupGroup
-// returns an error.
-func LookupGroup(groupname string) (Group, error) {
+func lookupGroup(groupname string) (Group, error) {
 	return lookupGroupFunc(func(g Group) bool {
 		return g.Name == groupname
 	})
 }
 
-// LookupGid looks up a group by its group id in /etc/group. If the group cannot
-// be found (or there is no /etc/group file on the filesystem), then LookupGid
-// returns an error.
-func LookupGid(gid int) (Group, error) {
+func lookupGid(gid int) (Group, error) {
 	return lookupGroupFunc(func(g Group) bool {
 		return g.Gid == gid
 	})

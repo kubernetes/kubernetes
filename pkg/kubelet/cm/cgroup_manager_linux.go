@@ -334,7 +334,7 @@ type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *libcontainerconfigs.Resources) error
+	Set(path string, cgroup *libcontainerconfigs.Cgroup) error
 	// GetStats returns the statistics associated with the cgroup
 	GetStats(path string, stats *libcontainercgroups.Stats) error
 }
@@ -370,7 +370,7 @@ func setSupportedSubsystemsV1(cgroupConfig *libcontainerconfigs.Cgroup) error {
 			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
 			continue
 		}
-		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig.Resources); err != nil {
+		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
 			return fmt.Errorf("failed to set config for supported subsystems : %v", err)
 		}
 	}
@@ -492,7 +492,10 @@ func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
 	if err != nil {
 		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
 	}
-	return manager.Set(cgroupConfig.Resources)
+	config := &libcontainerconfigs.Config{
+		Cgroups: cgroupConfig,
+	}
+	return manager.Set(config)
 }
 
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {

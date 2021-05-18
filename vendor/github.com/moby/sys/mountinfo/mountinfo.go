@@ -29,38 +29,35 @@ type Info struct {
 	// ID is a unique identifier of the mount (may be reused after umount).
 	ID int
 
-	// Parent is the ID of the parent mount (or of self for the root
-	// of this mount namespace's mount tree).
+	// Parent indicates the ID of the mount parent (or of self for the top of the
+	// mount tree).
 	Parent int
 
-	// Major and Minor are the major and the minor components of the Dev
-	// field of unix.Stat_t structure returned by unix.*Stat calls for
-	// files on this filesystem.
-	Major, Minor int
+	// Major indicates one half of the device ID which identifies the device class.
+	Major int
 
-	// Root is the pathname of the directory in the filesystem which forms
-	// the root of this mount.
+	// Minor indicates one half of the device ID which identifies a specific
+	// instance of device.
+	Minor int
+
+	// Root of the mount within the filesystem.
 	Root string
 
-	// Mountpoint is the pathname of the mount point relative to the
-	// process's root directory.
+	// Mountpoint indicates the mount point relative to the process's root.
 	Mountpoint string
 
-	// Options is a comma-separated list of mount options.
+	// Options represents mount-specific options.
 	Options string
 
-	// Optional are zero or more fields of the form "tag[:value]",
-	// separated by a space.  Currently, the possible optional fields are
-	// "shared", "master", "propagate_from", and "unbindable". For more
-	// information, see mount_namespaces(7) Linux man page.
+	// Optional represents optional fields.
 	Optional string
 
-	// FSType is the filesystem type in the form "type[.subtype]".
+	// FSType indicates the type of filesystem, such as EXT3.
 	FSType string
 
-	// Source is filesystem-specific information, or "none".
+	// Source indicates filesystem specific information or "none".
 	Source string
 
-	// VFSOptions is a comma-separated list of superblock options.
+	// VFSOptions represents per super block options.
 	VFSOptions string
 }

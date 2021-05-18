@@ -12,7 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	"github.com/opencontainers/runc/libcontainer/devices"
-	"github.com/opencontainers/runc/libcontainer/userns"
+	"github.com/opencontainers/runc/libcontainer/system"
 )
 
 type DevicesGroup struct {
@@ -54,8 +54,8 @@ func buildEmulator(rules []*devices.Rule) (*cgroupdevices.Emulator, error) {
 	return emu, nil
 }
 
-func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
-	if userns.RunningInUserNS() || r.SkipDevices {
+func (s *DevicesGroup) Set(path string, cgroup *configs.Cgroup) error {
+	if system.RunningInUserNS() || cgroup.SkipDevices {
 		return nil
 	}
 
@@ -65,7 +65,7 @@ func (s *DevicesGroup) Set(path string, r *configs.Resources) error {
 	if err != nil {
 		return err
 	}
-	target, err := buildEmulator(r.Devices)
+	target, err := buildEmulator(cgroup.Resources.Devices)
 	if err != nil {
 		return err
 	}

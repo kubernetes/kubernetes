@@ -2,7 +2,6 @@ package systemd
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"math"
 	"os"
@@ -29,6 +28,10 @@ const (
 )
 
 var (
+	connOnce sync.Once
+	connDbus *systemdDbus.Conn
+	connErr  error
+
 	versionOnce sync.Once
 	version     int
 
@@ -288,6 +291,19 @@ func generateDeviceProperties(rules []*devices.Rule) ([]systemdDbus.Property, er
 	return properties, nil
 }
 
+// getDbusConnection lazy initializes systemd dbus connection
+// and returns it
+func getDbusConnection(rootless bool) (*systemdDbus.Conn, error) {
+	connOnce.Do(func() {
+		if rootless {
+			connDbus, connErr = NewUserSystemdDbus()
+		} else {
+			connDbus, connErr = systemdDbus.New()
+		}
+	})
+	return connDbus, connErr
+}
+
 func newProp(name string, units interface{}) systemdDbus.Property {
 	return systemdDbus.Property{
 		Name:  name,
@@ -303,42 +319,32 @@ func getUnitName(c *configs.Cgroup) string {
 	return c.Name
 }
 
-// isDbusError returns true if the error is a specific dbus error.
-func isDbusError(err error, name string) bool {
+// isUnitExists returns true if the error is that a systemd unit already exists.
+func isUnitExists(err error) bool {
 	if err != nil {
-		var derr *dbus.Error
-		if errors.As(err, &derr) {
-			return strings.Contains(derr.Name, name)
+		if dbusError, ok := err.(dbus.Error); ok {
+			return strings.Contains(dbusError.Name, "org.freedesktop.systemd1.UnitExists")
 		}
 	}
 	return false
 }
 
-// isUnitExists returns true if the error is that a systemd unit already exists.
-func isUnitExists(err error) bool {
-	return isDbusError(err, "org.freedesktop.systemd1.UnitExists")
-}
-
-func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Property) error {
+func startUnit(dbusConnection *systemdDbus.Conn, unitName string, properties []systemdDbus.Property) error {
 	statusChan := make(chan string, 1)
-	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
-		_, err := c.StartTransientUnitContext(context.TODO(), unitName, "replace", properties, statusChan)
-		return err
-	})
-	if err == nil {
+	if _, err := dbusConnection.StartTransientUnit(unitName, "replace", properties, statusChan); err == nil {
 		timeout := time.NewTimer(30 * time.Second)
 		defer timeout.Stop()
 
 		select {
 		case s := <-statusChan:
 			close(statusChan)
-			// Please refer to https://pkg.go.dev/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
+			// Please refer to https://godoc.org/github.com/coreos/go-systemd/dbus#Conn.StartUnit
 			if s != "done" {
-				resetFailedUnit(cm, unitName)
+				dbusConnection.ResetFailedUnit(unitName)
 				return errors.Errorf("error creating systemd unit `%s`: got `%s`", unitName, s)
 			}
 		case <-timeout.C:
-			resetFailedUnit(cm, unitName)
+			dbusConnection.ResetFailedUnit(unitName)
 			return errors.New("Timeout waiting for systemd to create " + unitName)
 		}
 	} else if !isUnitExists(err) {
@@ -348,17 +354,13 @@ func startUnit(cm *dbusConnManager, unitName string, properties []systemdDbus.Pr
 	return nil
 }
 
-func stopUnit(cm *dbusConnManager, unitName string) error {
+func stopUnit(dbusConnection *systemdDbus.Conn, unitName string) error {
 	statusChan := make(chan string, 1)
-	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
-		_, err := c.StopUnitContext(context.TODO(), unitName, "replace", statusChan)
-		return err
-	})
-	if err == nil {
+	if _, err := dbusConnection.StopUnit(unitName, "replace", statusChan); err == nil {
 		select {
 		case s := <-statusChan:
 			close(statusChan)
-			// Please refer to https://godoc.org/github.com/coreos/go-systemd/v22/dbus#Conn.StartUnit
+			// Please refer to https://godoc.org/github.com/coreos/go-systemd/dbus#Conn.StartUnit
 			if s != "done" {
 				logrus.Warnf("error removing unit `%s`: got `%s`. Continuing...", unitName, s)
 			}
@@ -369,38 +371,10 @@ func stopUnit(cm *dbusConnManager, unitName string) error {
 	return nil
 }
 
-func resetFailedUnit(cm *dbusConnManager, name string) {
-	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
-		return c.ResetFailedUnitContext(context.TODO(), name)
-	})
-	if err != nil {
-		logrus.Warnf("unable to reset failed unit: %v", err)
-	}
-}
-
-func setUnitProperties(cm *dbusConnManager, name string, properties ...systemdDbus.Property) error {
-	return cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
-		return c.SetUnitPropertiesContext(context.TODO(), name, true, properties...)
-	})
-}
-
-func getManagerProperty(cm *dbusConnManager, name string) (string, error) {
-	str := ""
-	err := cm.retryOnDisconnect(func(c *systemdDbus.Conn) error {
-		var err error
-		str, err = c.GetManagerProperty(name)
-		return err
-	})
-	if err != nil {
-		return "", err
-	}
-	return strconv.Unquote(str)
-}
-
-func systemdVersion(cm *dbusConnManager) int {
+func systemdVersion(conn *systemdDbus.Conn) int {
 	versionOnce.Do(func() {
 		version = -1
-		verStr, err := getManagerProperty(cm, "Version")
+		verStr, err := conn.GetManagerProperty("Version")
 		if err == nil {
 			version, err = systemdVersionAtoi(verStr)
 		}
@@ -415,11 +389,11 @@ func systemdVersion(cm *dbusConnManager) int {
 
 func systemdVersionAtoi(verStr string) (int, error) {
 	// verStr should be of the form:
-	// "v245.4-1.fc32", "245", "v245-1.fc32", "245-1.fc32" (without quotes).
-	// The result for all of the above should be 245.
-	// Thus, we unconditionally remove the "v" prefix
-	// and then match on the first integer we can grab.
-	re := regexp.MustCompile(`v?([0-9]+)`)
+	// "v245.4-1.fc32", "245", "v245-1.fc32", "245-1.fc32"
+	// all the input strings include quotes, and the output int should be 245
+	// thus, we unconditionally remove the `"v`
+	// and then match on the first integer we can grab
+	re := regexp.MustCompile(`"?v?([0-9]+)`)
 	matches := re.FindStringSubmatch(verStr)
 	if len(matches) < 2 {
 		return 0, errors.Errorf("can't parse version %s: incorrect number of matches %v", verStr, matches)
@@ -428,10 +402,10 @@ func systemdVersionAtoi(verStr string) (int, error) {
 	return ver, errors.Wrapf(err, "can't parse version %s", verStr)
 }
 
-func addCpuQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota int64, period uint64) {
+func addCpuQuota(conn *systemdDbus.Conn, properties *[]systemdDbus.Property, quota int64, period uint64) {
 	if period != 0 {
 		// systemd only supports CPUQuotaPeriodUSec since v242
-		sdVer := systemdVersion(cm)
+		sdVer := systemdVersion(conn)
 		if sdVer >= 242 {
 			*properties = append(*properties,
 				newProp("CPUQuotaPeriodUSec", period))
@@ -462,13 +436,13 @@ func addCpuQuota(cm *dbusConnManager, properties *[]systemdDbus.Property, quota 
 	}
 }
 
-func addCpuset(cm *dbusConnManager, props *[]systemdDbus.Property, cpus, mems string) error {
+func addCpuset(conn *systemdDbus.Conn, props *[]systemdDbus.Property, cpus, mems string) error {
 	if cpus == "" && mems == "" {
 		return nil
 	}
 
 	// systemd only supports AllowedCPUs/AllowedMemoryNodes since v244
-	sdVer := systemdVersion(cm)
+	sdVer := systemdVersion(conn)
 	if sdVer < 244 {
 		logrus.Debugf("systemd v%d is too old to support AllowedCPUs/AllowedMemoryNodes"+
 			" (settings will still be applied to cgroupfs)", sdVer)

@@ -1,41 +1,27 @@
 package apparmor
 
 import (
-	"errors"
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/utils"
 )
 
-var (
-	appArmorEnabled bool
-	checkAppArmor   sync.Once
-)
-
 // IsEnabled returns true if apparmor is enabled for the host.
 func IsEnabled() bool {
-	checkAppArmor.Do(func() {
-		if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil {
-			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
-			appArmorEnabled = err == nil && len(buf) > 1 && buf[0] == 'Y'
-		}
-	})
-	return appArmorEnabled
+	if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil {
+		buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
+		return err == nil && bytes.HasPrefix(buf, []byte("Y"))
+	}
+	return false
 }
 
 func setProcAttr(attr, value string) error {
 	// Under AppArmor you can only change your own attr, so use /proc/self/
 	// instead of /proc/<tid>/ like libapparmor does
-	attrPath := "/proc/self/attr/apparmor/" + attr
-	if _, err := os.Stat(attrPath); errors.Is(err, os.ErrNotExist) {
-		// fall back to the old convention
-		attrPath = "/proc/self/attr/" + attr
-	}
-
-	f, err := os.OpenFile(attrPath, os.O_WRONLY, 0)
+	f, err := os.OpenFile("/proc/self/attr/"+attr, os.O_WRONLY, 0)
 	if err != nil {
 		return err
 	}

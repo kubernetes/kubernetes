@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build riscv64 && gc
-// +build riscv64
-// +build gc
+// +build riscv64,gc
 
 #include "textflag.h"
 

@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
-	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
 	libcontainerUtils "github.com/opencontainers/runc/libcontainer/utils"
 	"github.com/pkg/errors"
@@ -44,8 +43,8 @@ type subsystem interface {
 	GetStats(path string, stats *cgroups.Stats) error
 	// Creates and joins the cgroup represented by 'cgroupData'.
 	Apply(path string, c *cgroupData) error
-	// Set sets the cgroup resources.
-	Set(path string, r *configs.Resources) error
+	// Set the cgroup represented by cgroup.
+	Set(path string, cgroup *configs.Cgroup) error
 }
 
 type manager struct {
@@ -274,8 +273,8 @@ func (m *manager) GetStats() (*cgroups.Stats, error) {
 	return stats, nil
 }
 
-func (m *manager) Set(r *configs.Resources) error {
-	if r == nil {
+func (m *manager) Set(container *configs.Config) error {
+	if container.Cgroups == nil {
 		return nil
 	}
 
@@ -284,7 +283,7 @@ func (m *manager) Set(r *configs.Resources) error {
 	if m.cgroups != nil && m.cgroups.Paths != nil {
 		return nil
 	}
-	if r.Unified != nil {
+	if container.Cgroups.Resources.Unified != nil {
 		return cgroups.ErrV1NoUnified
 	}
 
@@ -292,11 +291,11 @@ func (m *manager) Set(r *configs.Resources) error {
 	defer m.mu.Unlock()
 	for _, sys := range subsystems {
 		path := m.paths[sys.Name()]
-		if err := sys.Set(path, r); err != nil {
+		if err := sys.Set(path, container.Cgroups); err != nil {
 			if m.rootless && sys.Name() == "devices" {
 				continue
 			}
-			// When m.rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
+			// When m.Rootless is true, errors from the device subsystem are ignored because it is really not expected to work.
 			// However, errors from other subsystems are not ignored.
 			// see @test "runc create (rootless + limits + no cgrouppath + no permission) fails with informative error"
 			if path == "" {
@@ -322,7 +321,7 @@ func (m *manager) Freeze(state configs.FreezerState) error {
 	prevState := m.cgroups.Resources.Freezer
 	m.cgroups.Resources.Freezer = state
 	freezer := &FreezerGroup{}
-	if err := freezer.Set(path, m.cgroups.Resources); err != nil {
+	if err := freezer.Set(path, m.cgroups); err != nil {
 		m.cgroups.Resources.Freezer = prevState
 		return err
 	}
@@ -421,18 +420,4 @@ func (m *manager) GetFreezerState() (configs.FreezerState, error) {
 
 func (m *manager) Exists() bool {
 	return cgroups.PathExists(m.Path("devices"))
-}
-
-func OOMKillCount(path string) (uint64, error) {
-	return fscommon.GetValueByKey(path, "memory.oom_control", "oom_kill")
-}
-
-func (m *manager) OOMKillCount() (uint64, error) {
-	c, err := OOMKillCount(m.Path("memory"))
-	// Ignore ENOENT when rootless as it couldn't create cgroup.
-	if err != nil && m.rootless && os.IsNotExist(err) {
-		err = nil
-	}
-
-	return c, err
 }

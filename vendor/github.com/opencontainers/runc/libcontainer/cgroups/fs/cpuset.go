@@ -24,17 +24,17 @@ func (s *CpusetGroup) Name() string {
 }
 
 func (s *CpusetGroup) Apply(path string, d *cgroupData) error {
-	return s.ApplyDir(path, d.config.Resources, d.pid)
+	return s.ApplyDir(path, d.config, d.pid)
 }
 
-func (s *CpusetGroup) Set(path string, r *configs.Resources) error {
-	if r.CpusetCpus != "" {
-		if err := fscommon.WriteFile(path, "cpuset.cpus", r.CpusetCpus); err != nil {
+func (s *CpusetGroup) Set(path string, cgroup *configs.Cgroup) error {
+	if cgroup.Resources.CpusetCpus != "" {
+		if err := fscommon.WriteFile(path, "cpuset.cpus", cgroup.Resources.CpusetCpus); err != nil {
 			return err
 		}
 	}
-	if r.CpusetMems != "" {
-		if err := fscommon.WriteFile(path, "cpuset.mems", r.CpusetMems); err != nil {
+	if cgroup.Resources.CpusetMems != "" {
+		if err := fscommon.WriteFile(path, "cpuset.mems", cgroup.Resources.CpusetMems); err != nil {
 			return err
 		}
 	}
@@ -144,7 +144,7 @@ func (s *CpusetGroup) GetStats(path string, stats *cgroups.Stats) error {
 	return nil
 }
 
-func (s *CpusetGroup) ApplyDir(dir string, r *configs.Resources, pid int) error {
+func (s *CpusetGroup) ApplyDir(dir string, cgroup *configs.Cgroup, pid int) error {
 	// This might happen if we have no cpuset cgroup mounted.
 	// Just do nothing and don't fail.
 	if dir == "" {
@@ -166,7 +166,7 @@ func (s *CpusetGroup) ApplyDir(dir string, r *configs.Resources, pid int) error 
 	// specified configs, otherwise, inherit from parent. This makes
 	// cpuset configs work correctly with 'cpuset.cpu_exclusive', and
 	// keep backward compatibility.
-	if err := s.ensureCpusAndMems(dir, r); err != nil {
+	if err := s.ensureCpusAndMems(dir, cgroup); err != nil {
 		return err
 	}
 
@@ -241,8 +241,8 @@ func isEmptyCpuset(str string) bool {
 	return str == "" || str == "\n"
 }
 
-func (s *CpusetGroup) ensureCpusAndMems(path string, r *configs.Resources) error {
-	if err := s.Set(path, r); err != nil {
+func (s *CpusetGroup) ensureCpusAndMems(path string, cgroup *configs.Cgroup) error {
+	if err := s.Set(path, cgroup); err != nil {
 		return err
 	}
 	return cpusetCopyIfNeeded(path, filepath.Dir(path))

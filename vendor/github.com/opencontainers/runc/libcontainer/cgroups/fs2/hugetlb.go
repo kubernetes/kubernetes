@@ -12,15 +12,15 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-func isHugeTlbSet(r *configs.Resources) bool {
-	return len(r.HugetlbLimit) > 0
+func isHugeTlbSet(cgroup *configs.Cgroup) bool {
+	return len(cgroup.Resources.HugetlbLimit) > 0
 }
 
-func setHugeTlb(dirPath string, r *configs.Resources) error {
-	if !isHugeTlbSet(r) {
+func setHugeTlb(dirPath string, cgroup *configs.Cgroup) error {
+	if !isHugeTlbSet(cgroup) {
 		return nil
 	}
-	for _, hugetlb := range r.HugetlbLimit {
+	for _, hugetlb := range cgroup.Resources.HugetlbLimit {
 		if err := fscommon.WriteFile(dirPath, "hugetlb."+hugetlb.Pagesize+".max", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}
@@ -44,9 +44,13 @@ func statHugeTlb(dirPath string, stats *cgroups.Stats) error {
 		hugetlbStats.Usage = value
 
 		fileName := "hugetlb." + pagesize + ".events"
-		value, err = fscommon.GetValueByKey(dirPath, fileName, "max")
+		contents, err := fscommon.ReadFile(dirPath, fileName)
 		if err != nil {
 			return errors.Wrap(err, "failed to read stats")
+		}
+		_, value, err = fscommon.GetCgroupParamKeyValue(contents)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse "+fileName)
 		}
 		hugetlbStats.Failcnt = value
 
