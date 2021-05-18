@@ -25,6 +25,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const totalAnnotationSizeLimitB int64 = 256 * (1 << 10) // 256 kB
+
 type lastAppliedUpdater struct {
 	fieldManager Manager
 }
@@ -78,8 +80,8 @@ func hasLastApplied(obj runtime.Object) bool {
 	if annotations == nil {
 		return false
 	}
-	_, ok := annotations[corev1.LastAppliedConfigAnnotation]
-	return ok
+	lastApplied, ok := annotations[corev1.LastAppliedConfigAnnotation]
+	return ok && len(lastApplied) > 0
 }
 
 func setLastApplied(obj runtime.Object, value string) error {
@@ -92,6 +94,9 @@ func setLastApplied(obj runtime.Object, value string) error {
 		annotations = map[string]string{}
 	}
 	annotations[corev1.LastAppliedConfigAnnotation] = value
+	if isAnnotationsValid(annotations) != nil {
+		delete(annotations, corev1.LastAppliedConfigAnnotation)
+	}
 	accessor.SetAnnotations(annotations)
 	return nil
 }
@@ -114,4 +119,15 @@ func buildLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("couldn't encode object into last applied annotation: %v", err)
 	}
 	return string(lastApplied), nil
+}
+
+func isAnnotationsValid(annotations map[string]string) error {
+	var totalSize int64
+	for k, v := range annotations {
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+	if totalSize > (int64)(totalAnnotationSizeLimitB) {
+		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, totalAnnotationSizeLimitB)
+	}
+	return nil
 }
