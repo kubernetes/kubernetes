@@ -109,14 +109,14 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 				case *webhookutil.ErrCallingWebhook:
 					if !ignoreClientCallFailures {
 						rejected = true
-						admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+						admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", versionedAttr.Attributes, admissionmetrics.WebhookRejectionCallingWebhookError, 0)
 					}
 				case *webhookutil.ErrWebhookRejection:
 					rejected = true
-					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", versionedAttr.Attributes, admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
 				default:
 					rejected = true
-					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
+					admissionmetrics.Metrics.ObserveWebhookRejection(ctx, hook.Name, "validating", versionedAttr.Attributes, admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
 				}
 			}
 			admissionmetrics.Metrics.ObserveWebhook(ctx, time.Since(t), rejected, versionedAttr.Attributes, "validating", hook.Name)

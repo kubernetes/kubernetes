@@ -94,9 +94,9 @@ func TestObserveWebhook(t *testing.T) {
 
 func TestObserveWebhookRejection(t *testing.T) {
 	Metrics.reset()
-	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
-	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
-	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, attr, WebhookRejectionNoError, 500)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, attr, WebhookRejectionNoError, 654)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, attr, WebhookRejectionCallingWebhookError, 0)
 	wantLabels := map[string]string{
 		"name":           "x",
 		"operation":      string(admission.Create),
@@ -115,7 +115,7 @@ func TestObserveWebhookRejection(t *testing.T) {
 	}
 	wantLabelsCallingWebhookError := map[string]string{
 		"name":           "x",
-		"operation":      string(admission.Update),
+		"operation":      string(admission.Create),
 		"type":           "validate",
 		"error_type":     "calling_webhook_error",
 		"rejection_code": "0",
