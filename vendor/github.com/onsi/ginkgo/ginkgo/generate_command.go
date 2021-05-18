@@ -39,7 +39,7 @@ import (
 	{{if .IncludeImports}}. "github.com/onsi/ginkgo"{{end}}
 	{{if .IncludeImports}}. "github.com/onsi/gomega"{{end}}
 
-	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
+	{{if .ImportPackage}}"{{.PackageImportPath}}"{{end}}
 )
 
 var _ = Describe("{{.Subject}}", func() {
@@ -55,7 +55,7 @@ import (
 	"github.com/sclevine/agouti"
 	. "github.com/sclevine/agouti/matchers"
 
-	{{if .DotImportPackage}}. "{{.PackageImportPath}}"{{end}}
+	{{if .ImportPackage}}"{{.PackageImportPath}}"{{end}}
 )
 
 var _ = Describe("{{.Subject}}", func() {
@@ -78,7 +78,7 @@ type specData struct {
 	Subject           string
 	PackageImportPath string
 	IncludeImports    bool
-	DotImportPackage  bool
+	ImportPackage     bool
 }
 
 func generateSpec(args []string, agouti, noDot, internal bool) {
@@ -119,7 +119,7 @@ func generateSpecForSubject(subject string, agouti, noDot, internal bool) error 
 		Subject:           formattedName,
 		PackageImportPath: getPackageImportPath(),
 		IncludeImports:    !noDot,
-		DotImportPackage:  !internal,
+		ImportPackage:     !internal,
 	}
 
 	targetFile := fmt.Sprintf("%s_test.go", specFilePrefix)
