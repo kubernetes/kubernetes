@@ -360,7 +360,7 @@ func (f *IngressScaleFramework) GetFormattedLatencies() string {
 }
 
 func addTestPathToIngress(ing *networkingv1.Ingress) {
-	prefixPathType := networkingv1.PathTypePrefix
+	prefixPathType := networkingv1.PathTypeImplementationSpecific
 	ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = append(
 		ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths,
 		networkingv1.HTTPIngressPath{
@@ -383,7 +383,7 @@ func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, ena
 }
 
 func generateScaleTestIngressSpec(suffix string, enableTLS bool) *networkingv1.Ingress {
-	prefixPathType := networkingv1.PathTypePrefix
+	prefixPathType := networkingv1.PathTypeImplementationSpecific
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", scaleTestIngressNamePrefix, suffix),

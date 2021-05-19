@@ -220,7 +220,7 @@ func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[stri
 	updatedTLSHost := "foobar.com"
 	updateURLMapHost := "bar.baz.com"
 	updateURLMapPath := "/testurl"
-	prefixPathType := networkingv1.PathTypePrefix
+	prefixPathType := networkingv1.PathTypeImplementationSpecific
 	// Platform agnostic list of tests that must be satisfied by all controllers
 	tests := []ConformanceTests{
 		{

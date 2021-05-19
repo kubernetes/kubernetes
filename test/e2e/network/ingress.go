@@ -926,7 +926,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ingVersion := "v1"
 		ingClient := f.ClientSet.NetworkingV1().Ingresses(ns)
 
-		prefixPathType := networkingv1.PathTypePrefix
+		prefixPathType := networkingv1.PathTypeImplementationSpecific
 		serviceBackend := &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
 			Port: networkingv1.ServiceBackendPort{

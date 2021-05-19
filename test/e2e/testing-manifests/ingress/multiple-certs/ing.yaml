@@ -8,7 +8,7 @@ spec:
     http:
       paths:
       - path: /test
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheaders-https
@@ -18,7 +18,7 @@ spec:
     http:
       paths:
       - path: /test
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheaders-https
@@ -28,7 +28,7 @@ spec:
     http:
       paths:
       - path: /test
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheaders-https
@@ -38,7 +38,7 @@ spec:
     http:
       paths:
       - path: /test
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheaders-https

@@ -14,7 +14,7 @@ spec:
     http:
       paths:
       - path: /foo
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheadersx
@@ -24,14 +24,14 @@ spec:
     http:
       paths:
       - path: /bar
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheadersy
             port:
               number: 80
       - path: /foo
-        pathType: "Prefix"
+        pathType: "ImplementationSpecific"
         backend:
           service:
             name: echoheadersx
