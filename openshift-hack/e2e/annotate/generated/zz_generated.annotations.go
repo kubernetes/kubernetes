@@ -833,11 +833,11 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Netpol API should support creating NetworkPolicy API operations": "should support creating NetworkPolicy API operations [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Netpol [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny-ingress' policy [Feature:NetworkPolicy]": "should support a 'default-deny-ingress' policy [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Netpol [Feature:UDPConnectivity][LinuxOnly] NetworkPolicy between server and client using UDP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -925,11 +925,11 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] NetworkPolicy API should support creating NetworkPolicy API operations": "should support creating NetworkPolicy API operations [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy based on Ports [Feature:NetworkPolicy]": "should enforce policy based on Ports [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy]": "should enforce policy to allow traffic only from a pod in a different namespace based on PodSelector and NamespaceSelector [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny' policy [Feature:NetworkPolicy]": "should support a 'default-deny' policy [Feature:NetworkPolicy] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] NetworkPolicy [Feature:SCTPConnectivity][LinuxOnly][Disruptive] NetworkPolicy between server and client using SCTP should support a 'default-deny' policy [Feature:NetworkPolicy]": "should support a 'default-deny' policy [Feature:NetworkPolicy] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] NetworkPolicy [LinuxOnly] NetworkPolicy between server and client should allow egress access on one named port [Feature:NetworkPolicy]": "should allow egress access on one named port [Feature:NetworkPolicy] [Skipped:Network/OpenShiftSDN] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -991,13 +991,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for intra-pod communication: http [NodeConformance] [Conformance]": "should function for intra-pod communication: http [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": "should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": "should function for intra-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for intra-pod communication: udp [NodeConformance] [Conformance]": "should function for intra-pod communication: udp [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance]": "should function for node-pod communication: http [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": "should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive]": "should function for node-pod communication: sctp [LinuxOnly][Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Pods should function for node-pod communication: udp [LinuxOnly] [NodeConformance] [Conformance]": "should function for node-pod communication: udp [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
@@ -1011,7 +1011,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for endpoint-Service: http": "should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Services should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking Granular Checks: Services should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for endpoint-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for endpoint-Service: udp": "should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1019,7 +1019,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for node-Service: http": "should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Services should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking Granular Checks: Services should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for node-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for node-Service: udp": "should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1027,7 +1027,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: http": "should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: udp": "should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
@@ -1049,7 +1049,7 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv4]": "should provide Internet connection for containers [Feature:Networking-IPv4] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]": "should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly] [Disabled:Unimplemented] [Skipped:azure] [Suite:k8s]",
+	"[Top Level] [sig-network] Networking should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]": "should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly] [Skipped:azure] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking should provide unchanging, static URL paths for kubernetes api services": "should provide unchanging, static URL paths for kubernetes api services [Disabled:Broken] [Suite:k8s]",
 
@@ -1137,51 +1137,51 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Services should work after restarting kube-proxy [Disruptive]": "should work after restarting kube-proxy [Disruptive] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: http": "should be able to handle large requests: http [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: http": "should be able to handle large requests: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: udp": "should be able to handle large requests: udp [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should be able to handle large requests: udp": "should be able to handle large requests: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: http [LinuxOnly]": "should function for client IP based session affinity: http [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: http [LinuxOnly]": "should function for client IP based session affinity: http [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: udp [LinuxOnly]": "should function for client IP based session affinity: udp [LinuxOnly] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for client IP based session affinity: udp [LinuxOnly]": "should function for client IP based session affinity: udp [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: http": "should function for endpoint-Service: http [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: http": "should function for endpoint-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: udp": "should function for endpoint-Service: udp [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for endpoint-Service: udp": "should function for endpoint-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: http": "should function for node-Service: http [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: http": "should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: udp": "should function for node-Service: udp [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for node-Service: udp": "should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: http": "should function for pod-Service: http [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: http": "should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Disabled:Alpha] [Disabled:Broken] [Serial] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: udp": "should function for pod-Service: udp [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for pod-Service: udp": "should function for pod-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for service endpoints using hostNetwork": "should function for service endpoints using hostNetwork [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should function for service endpoints using hostNetwork": "should function for service endpoints using hostNetwork [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: http": "should update endpoints: http [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: http": "should update endpoints: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: udp": "should update endpoints: udp [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] Granular Checks: Services Secondary IP Family should update endpoints: udp": "should update endpoints: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack]": "should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack]": "should be able to reach pod on ipv4 and ipv6 ip [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack]": "should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack]": "should create a single stack service with cluster ip from primary service range [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create pod, add ipv6 and ipv4 ip to pod ips": "should create pod, add ipv6 and ipv4 ip to pod ips [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create pod, add ipv6 and ipv4 ip to pod ips": "should create pod, add ipv6 and ipv4 ip to pod ips [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4 cluster ip [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv4,v6 cluster ip [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6 cluster ip [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack] [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack]": "should create service with ipv6,v4 cluster ip [Feature:IPv6DualStack] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 internal node ip": "should have ipv4 and ipv6 internal node ip [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 internal node ip": "should have ipv4 and ipv6 internal node ip [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 node podCIDRs": "should have ipv4 and ipv6 node podCIDRs [Disabled:Broken] [Suite:k8s]",
+	"[Top Level] [sig-network] [Feature:IPv6DualStack] [LinuxOnly] should have ipv4 and ipv6 node podCIDRs": "should have ipv4 and ipv6 node podCIDRs [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] [Feature:PerformanceDNS][Serial] Should answer DNS query for maximum number of services per cluster": "Should answer DNS query for maximum number of services per cluster [Slow] [Suite:k8s]",
 
