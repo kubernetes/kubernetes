@@ -74,10 +74,11 @@ var (
 	ErrVersionNotSupported = errors.New("runtime api version is not supported")
 )
 
-// podStateProvider can determine if a pod is deleted ir terminated
+// podStateProvider can determine if none of the elements are necessary to retain (pod content)
+// or if none of the runtime elements are necessary to retain (containers)
 type podStateProvider interface {
-	IsPodDeleted(kubetypes.UID) bool
-	IsPodTerminated(kubetypes.UID) bool
+	ShouldPodContentBeRemoved(kubetypes.UID) bool
+	ShouldPodRuntimeBeRemoved(kubetypes.UID) bool
 }
 
 type kubeGenericRuntimeManager struct {
@@ -787,7 +788,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			// or CRI if the Pod has been deleted while the POD is
 			// being created. If the pod has been deleted then it's
 			// not a real error.
-			if m.podStateProvider.IsPodDeleted(pod.UID) {
+			// TODO: this is probably not needed now that termination is part of the sync loop
+			if m.podStateProvider.ShouldPodContentBeRemoved(pod.UID) {
 				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
 				return
 			}

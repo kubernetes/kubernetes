@@ -212,7 +212,7 @@ func TestManager(t *testing.T) {
 			}
 
 			podKillChan := make(chan PodKillInfo, 1)
-			killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(podStatus *v1.PodStatus)) error {
 				var gracePeriod int64
 				if gracePeriodOverride != nil {
 					gracePeriod = *gracePeriodOverride
@@ -297,7 +297,7 @@ func TestFeatureEnabled(t *testing.T) {
 			activePodsFunc := func() []*v1.Pod {
 				return nil
 			}
-			killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+			killPodsFunc := func(pod *v1.Pod, evict bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 				return nil
 			}
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, pkgfeatures.GracefulNodeShutdown, tc.featureGateEnabled)()
@@ -323,7 +323,7 @@ func TestRestart(t *testing.T) {
 	activePodsFunc := func() []*v1.Pod {
 		return nil
 	}
-	killPodsFunc := func(pod *v1.Pod, status v1.PodStatus, gracePeriodOverride *int64) error {
+	killPodsFunc := func(pod *v1.Pod, isEvicted bool, gracePeriodOverride *int64, fn func(*v1.PodStatus)) error {
 		return nil
 	}
 	syncNodeStatus := func() {}

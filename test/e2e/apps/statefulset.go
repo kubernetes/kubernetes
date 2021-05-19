@@ -756,6 +756,10 @@ var _ = SIGDescribe("StatefulSet", func() {
 			}
 			pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
+			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
+			if err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name); err != nil {
+				framework.Failf("Pod %v did not start running: %v", podName, err)
+			}
 
 			ginkgo.By("Creating statefulset with conflicting port in namespace " + f.Namespace.Name)
 			ss := e2estatefulset.NewStatefulSet(ssName, f.Namespace.Name, headlessSvcName, 1, nil, nil, labels)
@@ -764,11 +768,6 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ss.Spec.Template.Spec.NodeName = node.Name
 			_, err = f.ClientSet.AppsV1().StatefulSets(f.Namespace.Name).Create(context.TODO(), ss, metav1.CreateOptions{})
 			framework.ExpectNoError(err)
-
-			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
-			if err := e2epod.WaitForPodNameRunningInNamespace(f.ClientSet, podName, f.Namespace.Name); err != nil {
-				framework.Failf("Pod %v did not start running: %v", podName, err)
-			}
 
 			var initialStatefulPodUID types.UID
 			ginkgo.By("Waiting until stateful pod " + statefulPodName + " will be recreated and deleted at least once in namespace " + f.Namespace.Name)
