@@ -213,7 +213,6 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 				"bronze.storageclass.storage.k8s.io/storage",
 				"gold.storage.k8s.io/requests.storage",
 			},
-
 			want: []corev1.ResourceName{},
 		},
 	}
@@ -223,6 +222,5 @@ func TestPersistentVolumeClaimEvaluatorMatchingResources(t *testing.T) {
 		if !reflect.DeepEqual(testCase.want, actual) {
 			t.Errorf("%s expected:\n%v\n, actual:\n%v", testName, testCase.want, actual)
 		}
-
 	}
 }
