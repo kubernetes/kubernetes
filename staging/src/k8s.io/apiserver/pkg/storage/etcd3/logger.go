@@ -19,12 +19,12 @@ package etcd3
 import (
 	"fmt"
 
-	clientv3 "go.etcd.io/etcd/client/v3"
+	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog/v2"
 )
 
 func init() {
-	clientv3.SetLogger(klogWrapper{})
+	grpclog.SetLoggerV2(klogWrapper{})
 }
 
 type klogWrapper struct{}
