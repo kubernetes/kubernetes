@@ -33,7 +33,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -342,7 +341,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				},
 			}
 
-			var betaTest *testsuites.StorageClassTest
 			for i, t := range tests {
 				// Beware of closure, use local variables instead of those from
 				// outer scope
@@ -352,9 +350,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
-
-				// Remember the last supported test for subsequent test of beta API
-				betaTest = &test
 
 				ginkgo.By("Testing " + test.Name)
 				suffix := fmt.Sprintf("%d", i)
@@ -372,31 +367,6 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				}, ns)
 
 				test.TestDynamicProvisioning()
-			}
-
-			// Run the last test with storage.k8s.io/v1beta1 on pvc
-			if betaTest != nil {
-				ginkgo.By("Testing " + betaTest.Name + " with beta volume provisioning")
-				betaClass := newBetaStorageClass(*betaTest, "beta")
-				// create beta class manually
-				betaClass, err := c.StorageV1beta1().StorageClasses().Create(context.TODO(), betaClass, metav1.CreateOptions{})
-				framework.ExpectNoError(err)
-				defer deleteStorageClass(c, betaClass.Name)
-
-				// fetch V1beta1 StorageClass as V1 object for the test
-				class, err := c.StorageV1().StorageClasses().Get(context.TODO(), betaClass.Name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-
-				betaTest.Client = c
-				betaTest.Class = class
-				betaTest.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-					ClaimSize:        betaTest.ClaimSize,
-					StorageClassName: &class.Name,
-					VolumeMode:       &betaTest.VolumeMode,
-				}, ns)
-				betaTest.Claim.Spec.StorageClassName = &(class.Name)
-
-				(*betaTest).TestDynamicProvisioning()
 			}
 		})
 
@@ -989,29 +959,6 @@ func getStorageClass(
 		Provisioner:       provisioner,
 		Parameters:        parameters,
 		VolumeBindingMode: bindingMode,
-	}
-}
-
-// TODO: remove when storage.k8s.io/v1beta1 is removed.
-func newBetaStorageClass(t testsuites.StorageClassTest, suffix string) *storagev1beta1.StorageClass {
-	pluginName := t.Provisioner
-
-	if pluginName == "" {
-		pluginName = getDefaultPluginName()
-	}
-	if suffix == "" {
-		suffix = "default"
-	}
-
-	return &storagev1beta1.StorageClass{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "StorageClass",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: suffix + "-",
-		},
-		Provisioner: pluginName,
-		Parameters:  t.Parameters,
 	}
 }
 
