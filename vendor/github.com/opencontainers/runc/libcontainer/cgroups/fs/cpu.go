@@ -32,7 +32,7 @@ func (s *CpuGroup) Apply(path string, d *cgroupData) error {
 	// We should set the real-Time group scheduling settings before moving
 	// in the process because if the process is already in SCHED_RR mode
 	// and no RT bandwidth is set, adding it will fail.
-	if err := s.SetRtSched(path, d.config); err != nil {
+	if err := s.SetRtSched(path, d.config.Resources); err != nil {
 		return err
 	}
 	// Since we are not using join(), we need to place the pid
@@ -40,23 +40,23 @@ func (s *CpuGroup) Apply(path string, d *cgroupData) error {
 	return cgroups.WriteCgroupProc(path, d.pid)
 }
 
-func (s *CpuGroup) SetRtSched(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.CpuRtPeriod != 0 {
-		if err := fscommon.WriteFile(path, "cpu.rt_period_us", strconv.FormatUint(cgroup.Resources.CpuRtPeriod, 10)); err != nil {
+func (s *CpuGroup) SetRtSched(path string, r *configs.Resources) error {
+	if r.CpuRtPeriod != 0 {
+		if err := fscommon.WriteFile(path, "cpu.rt_period_us", strconv.FormatUint(r.CpuRtPeriod, 10)); err != nil {
 			return err
 		}
 	}
-	if cgroup.Resources.CpuRtRuntime != 0 {
-		if err := fscommon.WriteFile(path, "cpu.rt_runtime_us", strconv.FormatInt(cgroup.Resources.CpuRtRuntime, 10)); err != nil {
+	if r.CpuRtRuntime != 0 {
+		if err := fscommon.WriteFile(path, "cpu.rt_runtime_us", strconv.FormatInt(r.CpuRtRuntime, 10)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.CpuShares != 0 {
-		shares := cgroup.Resources.CpuShares
+func (s *CpuGroup) Set(path string, r *configs.Resources) error {
+	if r.CpuShares != 0 {
+		shares := r.CpuShares
 		if err := fscommon.WriteFile(path, "cpu.shares", strconv.FormatUint(shares, 10)); err != nil {
 			return err
 		}
@@ -72,17 +72,17 @@ func (s *CpuGroup) Set(path string, cgroup *configs.Cgroup) error {
 			return fmt.Errorf("the minimum allowed cpu-shares is %d", sharesRead)
 		}
 	}
-	if cgroup.Resources.CpuPeriod != 0 {
-		if err := fscommon.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(cgroup.Resources.CpuPeriod, 10)); err != nil {
+	if r.CpuPeriod != 0 {
+		if err := fscommon.WriteFile(path, "cpu.cfs_period_us", strconv.FormatUint(r.CpuPeriod, 10)); err != nil {
 			return err
 		}
 	}
-	if cgroup.Resources.CpuQuota != 0 {
-		if err := fscommon.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(cgroup.Resources.CpuQuota, 10)); err != nil {
+	if r.CpuQuota != 0 {
+		if err := fscommon.WriteFile(path, "cpu.cfs_quota_us", strconv.FormatInt(r.CpuQuota, 10)); err != nil {
 			return err
 		}
 	}
-	return s.SetRtSched(path, cgroup)
+	return s.SetRtSched(path, r)
 }
 
 func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
@@ -97,7 +97,7 @@ func (s *CpuGroup) GetStats(path string, stats *cgroups.Stats) error {
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
-		t, v, err := fscommon.GetCgroupParamKeyValue(sc.Text())
+		t, v, err := fscommon.ParseKeyValue(sc.Text())
 		if err != nil {
 			return err
 		}
