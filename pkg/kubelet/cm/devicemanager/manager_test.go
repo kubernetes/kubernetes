@@ -776,9 +776,8 @@ func (m *fakeTopologyManagerWithHint) AddHintProvider(h topologymanager.HintProv
 	m.t.Logf("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
 }
 
-func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, containerID string) error {
-	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container id:  %v", format.Pod(pod), containerID)
-	return nil
+func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container name: %v container id:  %v", format.Pod(pod), container.Name, containerID)
 }
 
 func (m *fakeTopologyManagerWithHint) RemoveContainer(containerID string) error {
