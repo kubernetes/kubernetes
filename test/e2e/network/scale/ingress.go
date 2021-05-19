@@ -383,6 +383,7 @@ func (f *IngressScaleFramework) createScaleTestServiceIngress(suffix string, ena
 }
 
 func generateScaleTestIngressSpec(suffix string, enableTLS bool) *networkingv1.Ingress {
+	prefixPathType := networkingv1.PathTypePrefix
 	ing := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fmt.Sprintf("%s-%s", scaleTestIngressNamePrefix, suffix),
@@ -398,7 +399,8 @@ func generateScaleTestIngressSpec(suffix string, enableTLS bool) *networkingv1.I
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
 								{
-									Path: "/scale",
+									Path:     "/scale",
+									PathType: &prefixPathType,
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: fmt.Sprintf("%s-%s", scaleTestBackendName, suffix),
