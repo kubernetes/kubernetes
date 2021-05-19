@@ -28,6 +28,7 @@ import (
 
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/logutil"
 	"go.etcd.io/etcd/pkg/transport"
 	"google.golang.org/grpc"
 
@@ -145,6 +146,9 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		}
 		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
 	}
+	lcfg := logutil.DefaultZapLoggerConfig
+	// Disable sampling to save memory.
+	lcfg.Sampling = nil
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
@@ -152,6 +156,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 		DialOptions:          dialOptions,
 		Endpoints:            c.ServerList,
 		TLS:                  tlsConfig,
+		LogConfig:            &lcfg,
 	}
 
 	return clientv3.New(cfg)
