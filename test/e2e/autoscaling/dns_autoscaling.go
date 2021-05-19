@@ -252,7 +252,7 @@ func getSchedulableCores(nodes []v1.Node) int64 {
 	var sc resource.Quantity
 	for _, node := range nodes {
 		if !node.Spec.Unschedulable {
-			sc.Add(node.Status.Capacity[v1.ResourceCPU])
+			sc.Add(node.Status.Allocatable[v1.ResourceCPU])
 		}
 	}
 
