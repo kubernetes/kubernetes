@@ -420,9 +420,9 @@ type TestJig struct {
 	RootCAs map[string][]byte
 	Address string
 	Ingress *networkingv1.Ingress
-	// class is the value of the annotation keyed under
-	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
-	// this jig.
+	// class was the value of the annotation keyed under `kubernetes.io/ingress.class`.
+	// A new ingressClassName field has been added that is used to reference the IngressClass.
+	// It's added to all ingresses created by this jig.
 	Class string
 
 	// The interval used to poll urls
@@ -485,7 +485,9 @@ func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[stri
 	j.Ingress, err = ingressFromManifest(filepath.Join(manifestPath, "ing.yaml"))
 	framework.ExpectNoError(err)
 	j.Ingress.Namespace = ns
-	j.Ingress.Spec.IngressClassName = &j.Class
+	if j.Class != "" {
+		j.Ingress.Spec.IngressClassName = &j.Class
+	}
 	j.Logger.Infof("creating %v ingress", j.Ingress.Name)
 	j.Ingress, err = j.runCreate(j.Ingress)
 	framework.ExpectNoError(err)
