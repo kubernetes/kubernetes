@@ -1,12 +1,16 @@
 package asm
 
 import (
+	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"math"
 	"strings"
+
+	"github.com/cilium/ebpf/internal/unix"
 )
 
 // InstructionSize is the size of a BPF instruction in bytes
@@ -159,6 +163,9 @@ func (ins *Instruction) mapOffset() uint32 {
 	return uint32(uint64(ins.Constant) >> 32)
 }
 
+// isLoadFromMap returns true if the instruction loads from a map.
+//
+// This covers both loading the map pointer and direct map value loads.
 func (ins *Instruction) isLoadFromMap() bool {
 	return ins.OpCode == LoadImmOp(DWord) && (ins.Src == PseudoMapFD || ins.Src == PseudoMapValue)
 }
@@ -330,7 +337,7 @@ func (insns Instructions) ReferenceOffsets() map[string][]int {
 // You can control indentation of symbols by
 // specifying a width. Setting a precision controls the indentation of
 // instructions.
-// The default character is a tab, which can be overriden by specifying
+// The default character is a tab, which can be overridden by specifying
 // the ' ' space flag.
 func (insns Instructions) Format(f fmt.State, c rune) {
 	if c != 's' && c != 'v' {
@@ -375,8 +382,6 @@ func (insns Instructions) Format(f fmt.State, c rune) {
 		}
 		fmt.Fprintf(f, "%s%*d: %v\n", indent, offsetWidth, iter.Offset, iter.Ins)
 	}
-
-	return
 }
 
 // Marshal encodes a BPF program into the kernel format.
@@ -388,6 +393,25 @@ func (insns Instructions) Marshal(w io.Writer, bo binary.ByteOrder) error {
 		}
 	}
 	return nil
+}
+
+// Tag calculates the kernel tag for a series of instructions.
+//
+// It mirrors bpf_prog_calc_tag in the kernel and so can be compared
+// to ProgramInfo.Tag to figure out whether a loaded program matches
+// certain instructions.
+func (insns Instructions) Tag(bo binary.ByteOrder) (string, error) {
+	h := sha1.New()
+	for i, ins := range insns {
+		if ins.isLoadFromMap() {
+			ins.Constant = 0
+		}
+		_, err := ins.Marshal(h, bo)
+		if err != nil {
+			return "", fmt.Errorf("instruction %d: %w", i, err)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil)[:unix.BPF_TAG_SIZE]), nil
 }
 
 // Iterate allows iterating a BPF program while keeping track of
@@ -417,6 +441,7 @@ func (iter *InstructionIterator) Next() bool {
 	}
 
 	if iter.Ins != nil {
+		iter.Index++
 		iter.Offset += RawInstructionOffset(iter.Ins.OpCode.rawInstructions())
 	}
 	iter.Ins = &iter.insns[0]

@@ -12,6 +12,7 @@ import (
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sys/unix"
 )
 
@@ -26,29 +27,62 @@ func (s *FreezerGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
-	switch cgroup.Resources.Freezer {
+func (s *FreezerGroup) Set(path string, r *configs.Resources) (Err error) {
+	switch r.Freezer {
 	case configs.Frozen:
+		defer func() {
+			if Err != nil {
+				// Freezing failed, and it is bad and dangerous
+				// to leave the cgroup in FROZEN or FREEZING
+				// state, so (try to) thaw it back.
+				_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
+			}
+		}()
+
 		// As per older kernel docs (freezer-subsystem.txt before
 		// kernel commit ef9fe980c6fcc1821), if FREEZING is seen,
 		// userspace should either retry or thaw. While current
 		// kernel cgroup v1 docs no longer mention a need to retry,
-		// the kernel (tested on v5.4, Ubuntu 20.04) can't reliably
-		// freeze a cgroup while new processes keep appearing in it
+		// even a recent kernel (v5.4, Ubuntu 20.04) can't reliably
+		// freeze a cgroup v1 while new processes keep appearing in it
 		// (either via fork/clone or by writing new PIDs to
 		// cgroup.procs).
 		//
-		// The number of retries below is chosen to have a decent
-		// chance to succeed even in the worst case scenario (runc
-		// pause/unpause with parallel runc exec).
+		// The numbers below are empirically chosen to have a decent
+		// chance to succeed in various scenarios ("runc pause/unpause
+		// with parallel runc exec" and "bare freeze/unfreeze on a very
+		// slow system"), tested on RHEL7 and Ubuntu 20.04 kernels.
 		//
 		// Adding any amount of sleep in between retries did not
-		// increase the chances of successful freeze.
+		// increase the chances of successful freeze in "pause/unpause
+		// with parallel exec" reproducer. OTOH, adding an occasional
+		// sleep helped for the case where the system is extremely slow
+		// (CentOS 7 VM on GHA CI).
+		//
+		// Alas, this is still a game of chances, since the real fix
+		// belong to the kernel (cgroup v2 do not have this bug).
+
 		for i := 0; i < 1000; i++ {
+			if i%50 == 49 {
+				// Occasional thaw and sleep improves
+				// the chances to succeed in freezing
+				// in case new processes keep appearing
+				// in the cgroup.
+				_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
+				time.Sleep(10 * time.Millisecond)
+			}
+
 			if err := fscommon.WriteFile(path, "freezer.state", string(configs.Frozen)); err != nil {
 				return err
 			}
 
+			if i%25 == 24 {
+				// Occasional short sleep before reading
+				// the state back also improves the chances to
+				// succeed in freezing in case of a very slow
+				// system.
+				time.Sleep(10 * time.Microsecond)
+			}
 			state, err := fscommon.ReadFile(path, "freezer.state")
 			if err != nil {
 				return err
@@ -58,6 +92,9 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 			case "FREEZING":
 				continue
 			case string(configs.Frozen):
+				if i > 1 {
+					logrus.Debugf("frozen after %d retries", i)
+				}
 				return nil
 			default:
 				// should never happen
@@ -65,16 +102,13 @@ func (s *FreezerGroup) Set(path string, cgroup *configs.Cgroup) error {
 			}
 		}
 		// Despite our best efforts, it got stuck in FREEZING.
-		// Leaving it in this state is bad and dangerous, so
-		// let's (try to) thaw it back and error out.
-		_ = fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
 		return errors.New("unable to freeze")
 	case configs.Thawed:
 		return fscommon.WriteFile(path, "freezer.state", string(configs.Thawed))
 	case configs.Undefined:
 		return nil
 	default:
-		return fmt.Errorf("Invalid argument '%s' to freezer.state", string(cgroup.Resources.Freezer))
+		return fmt.Errorf("Invalid argument '%s' to freezer.state", string(r.Freezer))
 	}
 }
 

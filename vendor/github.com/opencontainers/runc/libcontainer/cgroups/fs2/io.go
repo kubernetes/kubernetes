@@ -13,42 +13,50 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-func isIoSet(cgroup *configs.Cgroup) bool {
-	return cgroup.Resources.BlkioWeight != 0 ||
-		len(cgroup.Resources.BlkioThrottleReadBpsDevice) > 0 ||
-		len(cgroup.Resources.BlkioThrottleWriteBpsDevice) > 0 ||
-		len(cgroup.Resources.BlkioThrottleReadIOPSDevice) > 0 ||
-		len(cgroup.Resources.BlkioThrottleWriteIOPSDevice) > 0
+func isIoSet(r *configs.Resources) bool {
+	return r.BlkioWeight != 0 ||
+		len(r.BlkioThrottleReadBpsDevice) > 0 ||
+		len(r.BlkioThrottleWriteBpsDevice) > 0 ||
+		len(r.BlkioThrottleReadIOPSDevice) > 0 ||
+		len(r.BlkioThrottleWriteIOPSDevice) > 0
 }
 
-func setIo(dirPath string, cgroup *configs.Cgroup) error {
-	if !isIoSet(cgroup) {
+func setIo(dirPath string, r *configs.Resources) error {
+	if !isIoSet(r) {
 		return nil
 	}
 
-	if cgroup.Resources.BlkioWeight != 0 {
+	if r.BlkioWeight != 0 {
 		filename := "io.bfq.weight"
 		if err := fscommon.WriteFile(dirPath, filename,
-			strconv.FormatUint(cgroups.ConvertBlkIOToCgroupV2Value(cgroup.Resources.BlkioWeight), 10)); err != nil {
-			return err
+			strconv.FormatUint(uint64(r.BlkioWeight), 10)); err != nil {
+			// if io.bfq.weight does not exist, then bfq module is not loaded.
+			// Fallback to use io.weight with a conversion scheme
+			if !os.IsNotExist(err) {
+				return err
+			}
+			v := cgroups.ConvertBlkIOToIOWeightValue(r.BlkioWeight)
+			if err := fscommon.WriteFile(dirPath, "io.weight", strconv.FormatUint(v, 10)); err != nil {
+				return err
+			}
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleReadBpsDevice {
+	for _, td := range r.BlkioThrottleReadBpsDevice {
 		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("rbps")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleWriteBpsDevice {
+	for _, td := range r.BlkioThrottleWriteBpsDevice {
 		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("wbps")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleReadIOPSDevice {
+	for _, td := range r.BlkioThrottleReadIOPSDevice {
 		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("riops")); err != nil {
 			return err
 		}
 	}
-	for _, td := range cgroup.Resources.BlkioThrottleWriteIOPSDevice {
+	for _, td := range r.BlkioThrottleWriteIOPSDevice {
 		if err := fscommon.WriteFile(dirPath, "io.max", td.StringName("wiops")); err != nil {
 			return err
 		}

@@ -168,3 +168,7 @@ func (d *Rule) CgroupString() string {
 	}
 	return fmt.Sprintf("%c %s:%s %s", d.Type, major, minor, d.Permissions)
 }
+
+func (d *Rule) Mkdev() (uint64, error) {
+	return mkDev(d)
+}
