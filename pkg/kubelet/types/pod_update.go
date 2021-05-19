@@ -120,9 +120,13 @@ const (
 	SyncPodUpdate
 	// SyncPodCreate is when the pod is created from source
 	SyncPodCreate
-	// SyncPodKill is when the pod is killed based on a trigger internal to the kubelet for eviction.
-	// If a SyncPodKill request is made to pod workers, the request is never dropped, and will always be processed.
+	// SyncPodKill is when the pod should have no running containers. A pod stopped in this way could be
+	// restarted in the future due config changes.
 	SyncPodKill
+	// SyncPodTerminated is when the pod has no running containers and is ready to be cleaned up. Is considered
+	// the same as SyncPodKill when invoking the UpdatePod method, and is used internally to the pod worker to
+	// distinguish between terminating and terminated.
+	SyncPodTerminated
 )
 
 func (sp SyncPodType) String() string {
@@ -135,6 +139,8 @@ func (sp SyncPodType) String() string {
 		return "sync"
 	case SyncPodKill:
 		return "kill"
+	case SyncPodTerminated:
+		return "terminated"
 	default:
 		return "unknown"
 	}

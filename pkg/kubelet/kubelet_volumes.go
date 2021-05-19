@@ -110,8 +110,8 @@ func (kl *Kubelet) newVolumeMounterFromPlugins(spec *volume.Spec, pod *v1.Pod, o
 	return physicalMounter, nil
 }
 
-// cleanupOrphanedPodDirs removes the volumes of pods that should not be
-// running and that have no containers running.  Note that we roll up logs here since it runs in the main loop.
+// cleanupOrphanedPodDirs removes the volumes of pods that should not be running and that have no
+// containers running.  Note that we roll up logs here since it runs in the main loop.
 func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecontainer.Pod) error {
 	allPods := sets.NewString()
 	for _, pod := range pods {
@@ -131,11 +131,6 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 
 	for _, uid := range found {
 		if allPods.Has(string(uid)) {
-			continue
-		}
-		// if the pod is within termination grace period, we shouldn't cleanup the underlying volumes
-		if kl.podKiller.IsPodPendingTerminationByUID(uid) {
-			klog.V(3).InfoS("Pod is pending termination", "podUID", uid)
 			continue
 		}
 		// If volumes have not been unmounted/detached, do not delete directory.

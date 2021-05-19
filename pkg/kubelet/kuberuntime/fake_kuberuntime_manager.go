@@ -51,25 +51,25 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 type fakePodStateProvider struct {
-	existingPods map[types.UID]struct{}
-	runningPods  map[types.UID]struct{}
+	terminating map[types.UID]struct{}
+	removed     map[types.UID]struct{}
 }
 
 func newFakePodStateProvider() *fakePodStateProvider {
 	return &fakePodStateProvider{
-		existingPods: make(map[types.UID]struct{}),
-		runningPods:  make(map[types.UID]struct{}),
+		terminating: make(map[types.UID]struct{}),
+		removed:     make(map[types.UID]struct{}),
 	}
 }
 
-func (f *fakePodStateProvider) IsPodDeleted(uid types.UID) bool {
-	_, found := f.existingPods[uid]
-	return !found
+func (f *fakePodStateProvider) ShouldPodContainersBeTerminating(uid types.UID) bool {
+	_, found := f.terminating[uid]
+	return found
 }
 
-func (f *fakePodStateProvider) IsPodTerminated(uid types.UID) bool {
-	_, found := f.runningPods[uid]
-	return !found
+func (f *fakePodStateProvider) ShouldPodContentBeRemoved(uid types.UID) bool {
+	_, found := f.removed[uid]
+	return found
 }
 
 func newFakeKubeRuntimeManager(runtimeService internalapi.RuntimeService, imageService internalapi.ImageManagerService, machineInfo *cadvisorapi.MachineInfo, osInterface kubecontainer.OSInterface, runtimeHelper kubecontainer.RuntimeHelper, keyring credentialprovider.DockerKeyring) (*kubeGenericRuntimeManager, error) {

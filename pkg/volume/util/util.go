@@ -381,7 +381,10 @@ func GetUniqueVolumeNameFromSpec(
 
 // IsPodTerminated checks if pod is terminated
 func IsPodTerminated(pod *v1.Pod, podStatus v1.PodStatus) bool {
-	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.ContainerStatuses))
+	// TODO: the guarantees provided by kubelet status are not sufficient to guarantee it's safe to ignore a deleted pod,
+	// even if everything is notRunning (kubelet does not guarantee that when pod status is waiting that it isn't trying
+	// to start a container).
+	return podStatus.Phase == v1.PodFailed || podStatus.Phase == v1.PodSucceeded || (pod.DeletionTimestamp != nil && notRunning(podStatus.InitContainerStatuses) && notRunning(podStatus.ContainerStatuses) && notRunning(podStatus.EphemeralContainerStatuses))
 }
 
 // notRunning returns true if every status is terminated or waiting, or the status list
