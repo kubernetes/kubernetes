@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -43,6 +44,8 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/expfmt"
 )
 
 var _ = SIGDescribe("Pods Extended", func() {
@@ -215,6 +218,18 @@ var _ = SIGDescribe("Pods Extended", func() {
 				wg sync.WaitGroup
 			)
 
+			r := prometheus.NewRegistry()
+			h := prometheus.NewSummaryVec(prometheus.SummaryOpts{
+				Name: "start_latency",
+				Objectives: map[float64]float64{
+					0.5:  0.05,
+					0.75: 0.025,
+					0.9:  0.01,
+					0.99: 0.001,
+				},
+			}, []string{"node"})
+			r.MustRegister(h)
+
 			const delay = 2000
 			const workers = 3
 			const pods = 15
@@ -352,10 +367,15 @@ var _ = SIGDescribe("Pods Extended", func() {
 									return fmt.Errorf("pod %s on node %s was terminated and then had termination cleared: %#v", pod.Name, pod.Spec.NodeName, status)
 								}
 							}
+							var hasNoStartTime bool
 							hasRunningContainers = status.State.Waiting == nil && status.State.Terminated == nil
 							if t != nil {
 								if !t.FinishedAt.Time.IsZero() {
-									duration = t.FinishedAt.Sub(t.StartedAt.Time)
+									if t.StartedAt.IsZero() {
+										hasNoStartTime = true
+									} else {
+										duration = t.FinishedAt.Sub(t.StartedAt.Time)
+									}
 									completeDuration = t.FinishedAt.Sub(pod.CreationTimestamp.Time)
 								}
 
@@ -368,6 +388,14 @@ var _ = SIGDescribe("Pods Extended", func() {
 									framework.Logf("pod %s on node %s failed with the symptoms of https://github.com/kubernetes/kubernetes/issues/88766", pod.Name, pod.Spec.NodeName)
 								default:
 									return fmt.Errorf("pod %s on node %s container unexpected exit code %d: start=%s end=%s reason=%s message=%s", pod.Name, pod.Spec.NodeName, t.ExitCode, t.StartedAt, t.FinishedAt, t.Reason, t.Message)
+								}
+								switch {
+								case duration > time.Hour:
+									// problem with status reporting
+									return fmt.Errorf("pod %s container %s on node %s had very long duration %s: start=%s end=%s", pod.Name, status.Name, pod.Spec.NodeName, duration, t.StartedAt, t.FinishedAt)
+								case hasNoStartTime:
+									// should never happen
+									return fmt.Errorf("pod %s container %s on node %s had finish time but not start time: end=%s", pod.Name, status.Name, pod.Spec.NodeName, t.FinishedAt)
 								}
 							}
 							if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
@@ -422,6 +450,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 						if duration > max || max == 0 {
 							max = duration
 						}
+						h.WithLabelValues(pod.Spec.NodeName).Observe(end.Sub(start).Seconds())
 						framework.Logf("Pod %s on node %s timings total=%s t=%s run=%s execute=%s", pod.Name, pod.Spec.NodeName, end.Sub(start), t, completeDuration, duration)
 					}
 
@@ -437,8 +466,13 @@ var _ = SIGDescribe("Pods Extended", func() {
 				}
 				framework.Failf("%d errors:\n%v", len(errs), strings.Join(messages, "\n"))
 			}
+			values, _ := r.Gather()
+			var buf bytes.Buffer
+			for _, m := range values {
+				expfmt.MetricFamilyToText(&buf, m)
+			}
+			framework.Logf("Summary of latencies:\n%s", buf.String())
 		})
-
 	})
 
 	ginkgo.Describe("Pod Container lifecycle", func() {
