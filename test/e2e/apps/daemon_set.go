@@ -184,7 +184,7 @@ var _ = SIGDescribe("Daemon set", func() {
 	  Description: A conformant Kubernetes distribution MUST support DaemonSet Pod node selection via label
 	  selectors.
 	*/
-	framework.ConformanceIt("should run and stop complex daemon", func() {
+	framework.ConformanceIt("should run and stop complex daemon [Serial]", func() {
 		complexLabel := map[string]string{daemonsetNameLabel: dsName}
 		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
 		framework.Logf("Creating daemon %q with a node selector", dsName)
@@ -494,7 +494,7 @@ var _ = SIGDescribe("Daemon set", func() {
 	})
 
 	// TODO: This test is expected to be promoted to conformance after the feature is promoted
-	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate [Feature:DaemonSetUpdateSurge]", func() {
+	ginkgo.It("should surge pods onto nodes when spec was updated and update strategy is RollingUpdate", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 
 		framework.Logf("Creating surge daemon set %s", dsName)
