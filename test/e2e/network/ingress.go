@@ -131,11 +131,10 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("multicluster ingress should get instance group annotation", func() {
+		ginkgo.It("multicluster ingress should get instance group annotation [Feature:kubemci]", func() {
 			name := "echomap"
-			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{
-				e2eingress.IngressClassKey: e2eingress.MulticlusterIngressClassValue,
-			}, map[string]string{})
+			jig.Class = e2eingress.MulticlusterIngressClassValue
+			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{}, map[string]string{})
 
 			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
 			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
