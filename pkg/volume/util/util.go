@@ -20,18 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
-	storagehelpers "k8s.io/component-helpers/storage/volume"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
-
-	"k8s.io/component-helpers/scheduling/corev1"
-	"k8s.io/klog/v2"
-	"k8s.io/mount-utils"
-	utilexec "k8s.io/utils/exec"
-	utilstrings "k8s.io/utils/strings"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
@@ -40,13 +34,21 @@ import (
 	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-helpers/scheduling/corev1"
+	storagehelpers "k8s.io/component-helpers/storage/volume"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	"k8s.io/mount-utils"
+	utilexec "k8s.io/utils/exec"
+	"k8s.io/utils/io"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -731,4 +733,30 @@ func IsDeviceMountableVolume(volumeSpec *volume.Spec, volumePluginMgr *volume.Vo
 	}
 
 	return false
+}
+
+// GetReliableMountRefs calls mounter.GetMountRefs and retries on IsInconsistentReadError.
+// To be used in volume reconstruction of volume plugins that don't have any protection
+// against mounting a single volume on multiple nodes (such as attach/detach).
+func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, error) {
+	var paths []string
+	var lastErr error
+	err := wait.PollImmediate(10*time.Millisecond, time.Minute, func() (bool, error) {
+		var err error
+		paths, err = mounter.GetMountRefs(mountPath)
+		if io.IsInconsistentReadError(err) {
+			lastErr = err
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
+	if err == wait.ErrWaitTimeout {
+		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
+		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it manually", mountPath)
+		return nil, lastErr
+	}
+	return paths, err
 }

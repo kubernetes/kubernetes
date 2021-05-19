@@ -231,8 +231,13 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 	//   mountPath:     pods/{podUid}/volumes/kubernetes.io~fc/{volumeName}
 	//   globalPDPath : plugins/kubernetes.io/fc/50060e801049cfd1-lun-0
 	var globalPDPath string
+
 	mounter := plugin.host.GetMounter(plugin.GetPluginName())
-	paths, err := mounter.GetMountRefs(mountPath)
+	// Try really hard to get the global mount of the volume, an error returned from here would
+	// leave the global mount still mounted, while marking the volume as unused.
+	// The volume can then be mounted on several nodes, resulting in volume
+	// corruption.
+	paths, err := util.GetReliableMountRefs(mounter, mountPath)
 	if err != nil {
 		return nil, err
 	}
