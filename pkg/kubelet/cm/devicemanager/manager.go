@@ -120,6 +120,14 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.String
 
+type nodePriority int
+
+const (
+	priorityFromAffinity nodePriority = iota
+	priorityNotFromAffinity
+	priorityWithoutTopology
+)
+
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
@@ -791,23 +799,27 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		nodes = append(nodes, node)
 	}
 
+	getNodePriority := func(n int) nodePriority {
+		if hint.NUMANodeAffinity.IsSet(n) {
+			return priorityFromAffinity
+		}
+
+		if n != nodeWithoutTopology {
+			return priorityNotFromAffinity
+		}
+
+		return priorityWithoutTopology
+	}
+
 	// Sort the list of nodes by nodes from affinity set, nodes from none-affinity
 	// set, nodes without topology set and how many devices they contain.
 	sort.Slice(nodes, func(i, j int) bool {
-		ni, nj := nodes[i], nodes[j]
-		// 1. node[i] from to affninity set
-		if hint.NUMANodeAffinity.IsSet(ni) {
-			return !hint.NUMANodeAffinity.IsSet(nj) || perNodeDevices[ni].Len() < perNodeDevices[nj].Len()
+		pi, pj := getNodePriority(nodes[i]), getNodePriority(nodes[j])
+		if pi != pj {
+			return pi < pj
 		}
 
-		// 2. node[i] from none-affinity set
-		if ni != nodeWithoutTopology {
-			return !hint.NUMANodeAffinity.IsSet(nj) &&
-				(nj == nodeWithoutTopology || perNodeDevices[ni].Len() < perNodeDevices[nj].Len())
-		}
-
-		// 3. node[i] from node without topology set
-		return nj == nodeWithoutTopology && perNodeDevices[ni].Len() < perNodeDevices[nj].Len()
+		return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
 	})
 
 	// Generate three sorted lists of devices. Devices in the first list come
