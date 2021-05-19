@@ -23,6 +23,7 @@ import (
 	"net"
 	"net/http"
 	"runtime"
+	"strings"
 	"time"
 
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -52,7 +53,7 @@ type respLogger struct {
 	statusRecorded bool
 	status         int
 	statusStack    string
-	addedInfo      string
+	addedInfo      strings.Builder
 	startTime      time.Time
 
 	captureErrorOutput bool
@@ -83,7 +84,7 @@ func DefaultStacktracePred(status int) bool {
 func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		if old := respLoggerFromContext(req); old != nil {
+		if old := respLoggerFromRequest(req); old != nil {
 			panic("multiple WithLogging calls!")
 		}
 
@@ -103,13 +104,16 @@ func WithLogging(handler http.Handler, pred StacktracePred) http.Handler {
 }
 
 // respLoggerFromContext returns the respLogger or nil.
-func respLoggerFromContext(req *http.Request) *respLogger {
-	ctx := req.Context()
+func respLoggerFromContext(ctx context.Context) *respLogger {
 	val := ctx.Value(respLoggerContextKey)
 	if rl, ok := val.(*respLogger); ok {
 		return rl
 	}
 	return nil
+}
+
+func respLoggerFromRequest(req *http.Request) *respLogger {
+	return respLoggerFromContext(req.Context())
 }
 
 func newLoggedWithStartTime(req *http.Request, w http.ResponseWriter, startTime time.Time) *respLogger {
@@ -130,7 +134,7 @@ func newLogged(req *http.Request, w http.ResponseWriter) *respLogger {
 // then a passthroughLogger will be created which will log to stdout immediately
 // when Addf is called.
 func LogOf(req *http.Request, w http.ResponseWriter) logger {
-	if rl := respLoggerFromContext(req); rl != nil {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl
 	}
 	return &passthroughLogger{}
@@ -138,7 +142,7 @@ func LogOf(req *http.Request, w http.ResponseWriter) logger {
 
 // Unlogged returns the original ResponseWriter, or w if it is not our inserted logger.
 func Unlogged(req *http.Request, w http.ResponseWriter) http.ResponseWriter {
-	if rl := respLoggerFromContext(req); rl != nil {
+	if rl := respLoggerFromRequest(req); rl != nil {
 		return rl.w
 	}
 	return w
@@ -166,7 +170,14 @@ func StatusIsNot(statuses ...int) StacktracePred {
 
 // Addf adds additional data to be logged with this request.
 func (rl *respLogger) Addf(format string, data ...interface{}) {
-	rl.addedInfo += "\n" + fmt.Sprintf(format, data...)
+	rl.addedInfo.WriteString("\n")
+	rl.addedInfo.WriteString(fmt.Sprintf(format, data...))
+}
+
+func AddInfof(ctx context.Context, format string, data ...interface{}) {
+	if rl := respLoggerFromContext(ctx); rl != nil {
+		rl.Addf(format, data...)
+	}
 }
 
 func (rl *respLogger) LogArgs() []interface{} {
@@ -196,8 +207,9 @@ func (rl *respLogger) LogArgs() []interface{} {
 		args = append(args, "statusStack", rl.statusStack)
 	}
 
-	if len(rl.addedInfo) > 0 {
-		args = append(args, "addedInfo", rl.addedInfo)
+	info := rl.addedInfo.String()
+	if len(info) > 0 {
+		args = append(args, "addedInfo", info)
 	}
 	return args
 }
