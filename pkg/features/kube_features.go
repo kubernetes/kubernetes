@@ -824,6 +824,13 @@ const (
 	//
 	// Allow users to recover from volume expansion failure
 	RecoverVolumeExpansionFailure featuregate.Feature = "RecoverVolumeExpansionFailure"
+
+	// owner: @yuzhiquan, @bowei, @PxyUp
+	// kep: http://kep.k8s.io/2727
+	// alpha: v1.23
+	//
+	// Enables GRPC probe method for {Liveness,Readiness,Startup}Probe.
+	GRPCContainerProbe featuregate.Feature = "GRPCContainerProbe"
 )
 
 func init() {
@@ -944,6 +951,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodAndContainerStatsFromCRI:                    {Default: false, PreRelease: featuregate.Alpha},
 	HonorPVReclaimPolicy:                           {Default: false, PreRelease: featuregate.Alpha},
 	RecoverVolumeExpansionFailure:                  {Default: false, PreRelease: featuregate.Alpha},
+	GRPCContainerProbe:                             {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
