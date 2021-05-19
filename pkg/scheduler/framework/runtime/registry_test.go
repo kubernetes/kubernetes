@@ -76,7 +76,7 @@ func TestDecodeInto(t *testing.T) {
 func isRegistryEqual(registryX, registryY Registry) bool {
 	for name, pluginFactory := range registryY {
 		if val, ok := registryX[name]; ok {
-			if reflect.ValueOf(pluginFactory).Pointer() != reflect.ValueOf(val).Pointer() {
+			if reflect.ValueOf(pluginFactory).Interface() != reflect.ValueOf(val).Interface() {
 				// pluginFactory functions are not the same.
 				return false
 			}
