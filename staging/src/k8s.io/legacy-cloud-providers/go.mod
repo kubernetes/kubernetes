@@ -28,8 +28,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	google.golang.org/api v0.20.0
-	gopkg.in/gcfg.v1 v1.2.0
-	gopkg.in/warnings.v0 v0.1.1 // indirect
+	gopkg.in/gcfg.v1 v1.2.3
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
