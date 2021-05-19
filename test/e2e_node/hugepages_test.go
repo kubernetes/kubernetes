@@ -189,10 +189,15 @@ func getHugepagesTestPod(f *framework.Framework, limits v1.ResourceList, mounts 
 }
 
 // Serial because the test updates kubelet configuration.
-var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages]", func() {
+var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:HugePages] [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("hugepages-test")
 
-	ginkgo.It("should remove resources for huge page sizes no longer supported", func() {
+	/*
+	   Release : v1.22
+	   Testname: Removal of hugepages resources
+	   Description: Kubelet should remove hugepages resources of deallocated hugepages.
+	*/
+	framework.ConformanceIt("should remove resources for huge page sizes no longer supported [NodeConformance]", func() {
 		ginkgo.By("mimicking support for 9Mi of 3Mi huge page memory by patching the node status")
 		patch := []byte(`[{"op": "add", "path": "/status/capacity/hugepages-3Mi", "value": "9Mi"}, {"op": "add", "path": "/status/allocatable/hugepages-3Mi", "value": "9Mi"}]`)
 		result := f.ClientSet.CoreV1().RESTClient().Patch(types.JSONPatchType).Resource("nodes").Name(framework.TestContext.NodeName).SubResource("status").Body(patch).Do(context.TODO())
@@ -218,7 +223,12 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 		}, 30*time.Second, framework.Poll).Should(gomega.Equal(false))
 	})
 
-	ginkgo.It("should add resources for new huge page sizes on kubelet restart", func() {
+	/*
+	   Release : v1.22
+	   Testname: Addition of hugepages resources
+	   Description: Kubelet should add hugepages resources for pre-allocated hugepages.
+	*/
+	framework.ConformanceIt("should add resources for new huge page sizes on kubelet restart [NodeConformance]", func() {
 		ginkgo.By("Stopping kubelet")
 		startKubelet := stopKubelet()
 		ginkgo.By(`Patching away support for hugepage resource "hugepages-2Mi"`)
