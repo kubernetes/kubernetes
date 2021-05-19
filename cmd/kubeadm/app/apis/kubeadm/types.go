@@ -179,18 +179,6 @@ type ImageMeta struct {
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
-// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
-type ClusterStatus struct {
-	metav1.TypeMeta
-
-	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
-	// The key of the map is the IP of the host's default interface
-	APIEndpoints map[string]APIEndpoint
-}
-
 // APIEndpoint struct contains elements of API server instance deployed on a node.
 type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
