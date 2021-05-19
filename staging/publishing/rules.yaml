@@ -1459,3 +1459,11 @@ rules:
       branch: release-1.21
       dir: staging/src/k8s.io/mount-utils
     name: release-1.21
+
+- destination: pod-security-standards
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/pod-security-standards
+    name: master
