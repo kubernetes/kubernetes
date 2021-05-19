@@ -120,14 +120,6 @@ type sourcesReadyStub struct{}
 // PodReusableDevices is a map by pod name of devices to reuse.
 type PodReusableDevices map[string]map[string]sets.String
 
-type nodePriority int
-
-const (
-	priorityFromAffinity nodePriority = iota
-	priorityNotFromAffinity
-	priorityWithoutTopology
-)
-
 func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
@@ -799,26 +791,35 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		nodes = append(nodes, node)
 	}
 
-	getNodePriority := func(n int) nodePriority {
-		if hint.NUMANodeAffinity.IsSet(n) {
-			return priorityFromAffinity
-		}
-
-		if n != nodeWithoutTopology {
-			return priorityNotFromAffinity
-		}
-
-		return priorityWithoutTopology
-	}
-
-	// Sort the list of nodes by nodes from affinity set, nodes from none-affinity
-	// set, nodes without topology set and how many devices they contain.
+	// Sort the list of nodes by:
+	// 1) Nodes contained in the 'hint's affinity set
+	// 2) Nodes not contained in the 'hint's affinity set
+	// 3) The fake NUMANode of -1 (assuming it is included in the list)
+	// Within each of the groups above, sort the nodes by how many devices they contain
 	sort.Slice(nodes, func(i, j int) bool {
-		pi, pj := getNodePriority(nodes[i]), getNodePriority(nodes[j])
-		if pi != pj {
-			return pi < pj
+		// If one or the other of nodes[i] or nodes[j] is in the 'hint's affinity set
+		if hint.NUMANodeAffinity.IsSet(nodes[i]) && hint.NUMANodeAffinity.IsSet(nodes[j]) {
+			return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
+		}
+		if hint.NUMANodeAffinity.IsSet(nodes[i]) {
+			return true
+		}
+		if hint.NUMANodeAffinity.IsSet(nodes[j]) {
+			return false
 		}
 
+		// If either nodes[i] or nodes[j] are in the 'hint's affinity set (but are not -1)
+		if nodes[i] != nodeWithoutTopology && nodes[j] != nodeWithoutTopology {
+			return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
+		}
+		if nodes[i] != nodeWithoutTopology {
+			return true
+		}
+		if nodes[j] != nodeWithoutTopology {
+			return false
+		}
+
+		// If both nodes[i] and nodes[j] are -1
 		return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
 	})
 
