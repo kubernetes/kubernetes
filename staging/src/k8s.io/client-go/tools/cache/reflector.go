@@ -417,7 +417,8 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			// It doesn't make sense to re-list all objects because most likely we will be able to restart
 			// watch where we ended.
 			// If that's the case begin exponentially backing off and resend watch request.
-			if utilnet.IsConnectionRefused(err) {
+			// Do the same for "429" errors.
+			if utilnet.IsConnectionRefused(err) || apierrors.IsTooManyRequests(err) {
 				<-r.initConnBackoffManager.Backoff().C()
 				continue
 			}
@@ -432,6 +433,10 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 					// has a semantic that it returns data at least as fresh as provided RV.
 					// So first try to LIST with setting RV to resource version of last observed object.
 					klog.V(4).Infof("%s: watch of %v closed with: %v", r.name, r.expectedTypeName, err)
+				case apierrors.IsTooManyRequests(err):
+					klog.V(2).Infof("%s: watch of %v returned 429 - backing off", r.name, r.expectedTypeName)
+					<-r.initConnBackoffManager.Backoff().C()
+					continue
 				default:
 					klog.Warningf("%s: watch of %v ended with: %v", r.name, r.expectedTypeName, err)
 				}
