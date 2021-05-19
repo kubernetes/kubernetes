@@ -8,6 +8,10 @@ import (
 	"strings"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
+	configv1informer "github.com/openshift/client-go/config/informers/externalversions/config/v1"
+	configv1listers "github.com/openshift/client-go/config/listers/config/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -44,12 +48,15 @@ const (
 	namespaceAllowedAnnotation = "workload.openshift.io/allowed"
 	// workloadAdmissionWarning contains the admission warning annotation key
 	workloadAdmissionWarning = "workload.openshift.io/warning"
+	// infraClusterName contains the name of the cluster infrastructure resource
+	infraClusterName = "cluster"
 )
 
 var _ = initializer.WantsExternalKubeInformerFactory(&managementCPUsOverride{})
 var _ = initializer.WantsExternalKubeClientSet(&managementCPUsOverride{})
 var _ = admission.MutationInterface(&managementCPUsOverride{})
 var _ = admission.ValidationInterface(&managementCPUsOverride{})
+var _ = WantsInfraInformer(&managementCPUsOverride{})
 
 func Register(plugins *admission.Plugins) {
 	plugins.Register(PluginName,
@@ -76,11 +83,13 @@ func Register(plugins *admission.Plugins) {
 // 4. The CPU request deletion will not change the pod QoS class
 type managementCPUsOverride struct {
 	*admission.Handler
-	client         kubernetes.Interface
-	nsLister       corev1listers.NamespaceLister
-	nsListerSynced func() bool
-	nodeLister     corev1listers.NodeLister
-	nodeListSynced func() bool
+	client                kubernetes.Interface
+	nsLister              corev1listers.NamespaceLister
+	nsListerSynced        func() bool
+	nodeLister            corev1listers.NodeLister
+	nodeListSynced        func() bool
+	infraConfigLister     configv1listers.InfrastructureLister
+	infraConfigListSynced func() bool
 }
 
 func (a *managementCPUsOverride) SetExternalKubeInformerFactory(kubeInformers informers.SharedInformerFactory) {
@@ -93,6 +102,11 @@ func (a *managementCPUsOverride) SetExternalKubeInformerFactory(kubeInformers in
 // SetExternalKubeClientSet implements the WantsExternalKubeClientSet interface.
 func (a *managementCPUsOverride) SetExternalKubeClientSet(client kubernetes.Interface) {
 	a.client = client
+}
+
+func (a *managementCPUsOverride) SetInfraInformer(informer configv1informer.InfrastructureInformer) {
+	a.infraConfigLister = informer.Lister()
+	a.infraConfigListSynced = informer.Informer().HasSynced
 }
 
 func (a *managementCPUsOverride) ValidateInitialization() error {
@@ -110,6 +124,12 @@ func (a *managementCPUsOverride) ValidateInitialization() error {
 	}
 	if a.nodeListSynced == nil {
 		return fmt.Errorf("%s plugin needs a node lister synced", PluginName)
+	}
+	if a.infraConfigLister == nil {
+		return fmt.Errorf("%s did not get a config infrastructure lister", PluginName)
+	}
+	if a.infraConfigListSynced == nil {
+		return fmt.Errorf("%s plugin needs a config infrastructure lister synced", PluginName)
 	}
 	return nil
 }
@@ -152,7 +172,21 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 	}
 
 	if !a.waitForSyncedStore(time.After(timeToWaitForCacheSync)) {
-		return admission.NewForbidden(attr, fmt.Errorf("%s node and namespace caches not synchronized", PluginName))
+		return admission.NewForbidden(attr, fmt.Errorf("%s node or namespace or infra config cache not synchronized", PluginName))
+	}
+
+	clusterInfra, err := a.infraConfigLister.Get(infraClusterName)
+	if err != nil {
+		return admission.NewForbidden(attr, err) // can happen due to informer latency
+	}
+
+	// not the SNO cluster, skip mutation
+	// TODO: currently we supports only SNO use case because we have not yet worked out the best approach to determining whether the feature
+	// should be on or off in a multi-node cluster, and computing that state incorrectly could lead to breaking running clusters.
+	if clusterInfra.Status.InfrastructureTopology != configv1.SingleReplicaTopologyMode ||
+		clusterInfra.Status.ControlPlaneTopology != configv1.SingleReplicaTopologyMode {
+		pod.Annotations[workloadAdmissionWarning] = "only single-node clusters support workload partitioning"
+		return nil
 	}
 
 	nodes, err := a.nodeLister.List(labels.Everything())
@@ -160,16 +194,9 @@ func (a *managementCPUsOverride) Admit(ctx context.Context, attr admission.Attri
 		return admission.NewForbidden(attr, err) // can happen due to informer latency
 	}
 
-	// only pods that possible to run without any nodes is static pods, but we skip mutation of static pods in the beginning
+	// we still need to have nodes under the cluster to decide if the management resource enabled or not
 	if len(nodes) == 0 {
 		return admission.NewForbidden(attr, fmt.Errorf("%s the cluster does not have any nodes", PluginName))
-	}
-
-	// TODO: currently we supports only SNO use case because we have not yet worked out the best approach to determining whether the feature
-	// should be on or off in a multi-node cluster, and computing that state incorrectly could lead to breaking running clusters.
-	if len(nodes) > 1 {
-		pod.Annotations[workloadAdmissionWarning] = "only clusters with a single node are supported"
-		return nil
 	}
 
 	// probably the workload feature disabled, because some of cluster nodes do not have workload resource
@@ -260,7 +287,7 @@ func (a *managementCPUsOverride) getPodNamespace(attr admission.Attributes) (*co
 }
 
 func (a *managementCPUsOverride) waitForSyncedStore(timeout <-chan time.Time) bool {
-	for !a.nsListerSynced() || !a.nodeListSynced() {
+	for !a.nsListerSynced() || !a.nodeListSynced() || !a.infraConfigListSynced() {
 		select {
 		case <-time.After(100 * time.Millisecond):
 		case <-timeout:
