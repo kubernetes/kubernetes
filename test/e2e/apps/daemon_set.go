@@ -96,7 +96,10 @@ func updateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 // happen.  In the future, running in parallel may work if we have an eviction
 // model which lets the DS controller kick out other pods to make room.
 // See http://issues.k8s.io/21767 for more details
-var _ = SIGDescribe("Daemon set [Serial]", func() {
+// Update: DS Pods are run now managed by default scheduler which has the notion
+// of priority and preemption
+// https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/#scheduled-by-default-scheduler
+var _ = SIGDescribe("Daemon set", func() {
 	var f *framework.Framework
 
 	ginkgo.AfterEach(func() {
