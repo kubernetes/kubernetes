@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"sigs.k8s.io/kustomize/api/resid"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // Var represents a variable whose value will be sourced

@@ -6,7 +6,7 @@ package types
 import (
 	"fmt"
 
-	"sigs.k8s.io/kustomize/api/resid"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 )
 
 // FieldSpec completely specifies a kustomizable field in a k8s API object.
