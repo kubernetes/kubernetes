@@ -14,15 +14,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -o errexit
-set -o nounset
-set -o pipefail
-
-if [[ -n "${EXEC_PLUGIN_OUTPUT_FILE-""}" ]]; then
-  cat "$EXEC_PLUGIN_OUTPUT_FILE"
-  exit
-fi
-
-echo "${EXEC_PLUGIN_OUTPUT-""}"
-
-exit "${EXEC_PLUGIN_EXEC_CODE-0}"
+# This file is not executable, and therefore it will not be run.
+exit 1
