@@ -812,14 +812,15 @@ func (m *ManagerImpl) filterByAffinity(podUID, contName, resource string, availa
 		if nodes[i] != nodeWithoutTopology && nodes[j] != nodeWithoutTopology {
 			return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
 		}
-		if nodes[i] != nodeWithoutTopology {
-			return true
-		}
-		if nodes[j] != nodeWithoutTopology {
+		// If one or the other of nodes[i] or nodes[j] is the fake NUMA node -1 (they can't both be)
+		if nodes[i] == nodeWithoutTopology {
 			return false
 		}
+		if nodes[j] == nodeWithoutTopology {
+			return true
+		}
 
-		// If both nodes[i] and nodes[j] are -1
+		// Otherwise both nodes[i] and nodes[j] are real NUMA nodes that are not in the 'hint's' affinity list.
 		return perNodeDevices[nodes[i]].Len() < perNodeDevices[nodes[j]].Len()
 	})
 
