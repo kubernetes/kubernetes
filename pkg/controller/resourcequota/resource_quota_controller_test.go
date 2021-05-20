@@ -220,6 +220,35 @@ func newTestPodsWithPriorityClasses() []runtime.Object {
 	}
 }
 
+func newTestPodsWithInconsistentUnits() []runtime.Object {
+	return []runtime.Object{
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "400M"), getResourceList("", ""))}},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodRunning},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "400Mi"), getResourceList("", ""))}},
+			},
+		},
+		&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
+			Status:     v1.PodStatus{Phase: v1.PodFailed},
+			Spec: v1.PodSpec{
+				Volumes:    []v1.Volume{{Name: "vol"}},
+				Containers: []v1.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
+			},
+		},
+	}
+}
+
 func TestSyncResourceQuota(t *testing.T) {
 	testCases := map[string]struct {
 		gvr               schema.GroupVersionResource
@@ -770,6 +799,64 @@ func TestSyncResourceQuota(t *testing.T) {
 			expectedError:     "error listing",
 			expectedActionSet: sets.NewString("update-resourcequotas-status"),
 			items:             []runtime.Object{},
+		},
+		"quota-with-consistent-unit-format-in-binary-si": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100Gi"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100Gi"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("800225Ki"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithInconsistentUnits(),
+		},
+		"quota-with-consistent-unit-format-in-decimal-si": {
+			gvr: v1.SchemeGroupVersion.WithResource("pods"),
+			quota: v1.ResourceQuota{
+				ObjectMeta: metav1.ObjectMeta{Name: "quota", Namespace: "testing"},
+				Spec: v1.ResourceQuotaSpec{
+					Hard: v1.ResourceList{
+						v1.ResourceCPU:    resource.MustParse("3"),
+						v1.ResourceMemory: resource.MustParse("100G"),
+						v1.ResourcePods:   resource.MustParse("5"),
+					},
+				},
+			},
+			status: v1.ResourceQuotaStatus{
+				Hard: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("3"),
+					v1.ResourceMemory: resource.MustParse("100G"),
+					v1.ResourcePods:   resource.MustParse("5"),
+				},
+				Used: v1.ResourceList{
+					v1.ResourceCPU:    resource.MustParse("200m"),
+					v1.ResourceMemory: resource.MustParse("819430400"),
+					v1.ResourcePods:   resource.MustParse("2"),
+				},
+			},
+			expectedActionSet: sets.NewString(
+				strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+			),
+			items: newTestPodsWithInconsistentUnits(),
 		},
 	}
 

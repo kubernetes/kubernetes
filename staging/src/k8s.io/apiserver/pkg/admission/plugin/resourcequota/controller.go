@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -565,6 +566,14 @@ func CheckRequest(quotas []corev1.ResourceQuota, a admission.Attributes, evaluat
 					prettyPrint(failedRequestedUsage),
 					prettyPrint(failedUsed),
 					prettyPrint(failedHard)))
+		}
+
+		// use the same format in used as in hard to prevent inconsistent unit format switching
+		for resourceName, usedQuantity := range newUsage {
+			hardQuantity := resourceQuota.Status.Hard[resourceName]
+			if hardQuantity.Format != usedQuantity.Format {
+				newUsage[resourceName] = *resource.NewQuantity(usedQuantity.Value(), hardQuantity.Format)
+			}
 		}
 
 		// update to the new usage number

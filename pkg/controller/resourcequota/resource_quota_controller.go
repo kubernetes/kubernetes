@@ -28,6 +28,7 @@ import (
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -344,6 +345,14 @@ func (rq *Controller) syncResourceQuota(resourceQuota *v1.ResourceQuota) (err er
 	// ensure set of used values match those that have hard constraints
 	hardResources := quota.ResourceNames(hardLimits)
 	used = quota.Mask(used, hardResources)
+
+	// use the same format in used as in hard to prevent inconsistent unit format switching
+	for resourceName, usedQuantity := range used {
+		hardQuantity := hardLimits[resourceName]
+		if hardQuantity.Format != usedQuantity.Format {
+			used[resourceName] = *resource.NewQuantity(usedQuantity.Value(), hardQuantity.Format)
+		}
+	}
 
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec

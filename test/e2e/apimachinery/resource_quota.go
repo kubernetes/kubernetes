@@ -211,7 +211,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		Create a Pod with resource request count for CPU, Memory, EphemeralStorage and ExtendedResourceName. Pod creation MUST be successful and respective resource usage count MUST be captured in ResourceQuotaStatus of the ResourceQuota.
 		Create another Pod with resource request exceeding remaining quota. Pod creation MUST fail as the request exceeds ResourceQuota limits.
 		Update the successfully created pod's resource requests. Updation MUST fail as a Pod can not dynamically update its resource requirements.
-		Delete the successfully created Pod. Pod Deletion MUST be scuccessful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
+		Delete the successfully created Pod. Pod Deletion MUST be successful and it MUST release the allocated resource counts from ResourceQuotaStatus of the ResourceQuota.
 	*/
 	framework.ConformanceIt("should create a ResourceQuota and capture the life of a pod.", func() {
 		ginkgo.By("Counting existing ResourceQuota")
@@ -235,7 +235,7 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		requests := v1.ResourceList{}
 		limits := v1.ResourceList{}
 		requests[v1.ResourceCPU] = resource.MustParse("500m")
-		requests[v1.ResourceMemory] = resource.MustParse("252Mi")
+		requests[v1.ResourceMemory] = resource.MustParse("256M")
 		requests[v1.ResourceEphemeralStorage] = resource.MustParse("30Gi")
 		requests[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
 		limits[v1.ResourceName(extendedResourceName)] = resource.MustParse("2")
@@ -253,6 +253,13 @@ var _ = SIGDescribe("ResourceQuota", func() {
 		usedResources[v1.ResourceName(v1.DefaultResourceRequestsPrefix+extendedResourceName)] = requests[v1.ResourceName(extendedResourceName)]
 		err = waitForResourceQuota(f.ClientSet, f.Namespace.Name, quotaName, usedResources)
 		framework.ExpectNoError(err)
+
+		ginkgo.By("Ensuring ResourceQuota status used unit format matches hard unit format")
+		resourceQuotaResult, err := f.ClientSet.CoreV1().ResourceQuotas(f.Namespace.Name).Get(context.TODO(), quotaName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(resourceQuotaResult.Status.Used[v1.ResourceCPU], resource.MustParse("500m"))
+		framework.ExpectEqual(resourceQuotaResult.Status.Used[v1.ResourceMemory], resource.MustParse("250000Ki"))
+		framework.ExpectEqual(resourceQuotaResult.Status.Used[v1.ResourceEphemeralStorage], resource.MustParse("30Gi"))
 
 		ginkgo.By("Not allowing a pod to be created that exceeds remaining quota")
 		requests = v1.ResourceList{}
