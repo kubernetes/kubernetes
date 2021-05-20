@@ -19,8 +19,6 @@ package flowcontrol
 import (
 	"context"
 	"sync"
-
-	"k8s.io/klog/v2"
 )
 
 type priorityAndFairnessKeyType int
@@ -50,7 +48,6 @@ func initializationSignalFrom(ctx context.Context) (InitializationSignal, bool) 
 // that a given watch request has already been initialized.
 func WatchInitialized(ctx context.Context) {
 	if signal, ok := initializationSignalFrom(ctx); ok {
-		klog.Errorf("QQQ: Marking watch initialized")
 		signal.Signal()
 	}
 }

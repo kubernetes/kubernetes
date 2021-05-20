@@ -50,6 +50,9 @@ var waitingMark = &requestWatermark{
 var atomicMutatingExecuting, atomicReadOnlyExecuting int32
 var atomicMutatingWaiting, atomicReadOnlyWaiting int32
 
+// newInitializationSignal is defined for testing purposes.
+var newInitializationSignal = utilflowcontrol.NewInitializationSignal
+
 // WithPriorityAndFairness limits the number of in-flight
 // requests in a fine-grained way.
 func WithPriorityAndFairness(
@@ -79,8 +82,6 @@ func WithPriorityAndFairness(
 		// Skip tracking long running non-watch requests.
 		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) && !isWatchRequest {
 			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
-			// FIXME: Remove before submitting.
-			klog.Errorf("UUUUU Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
 			handler.ServeHTTP(w, r)
 			return
 		}
@@ -119,9 +120,7 @@ func WithPriorityAndFairness(
 			innerCtx := ctx
 			var watchInitializationSignal utilflowcontrol.InitializationSignal
 			if isWatchRequest {
-				// FIXME: Remove before submitting.
-				klog.Errorf("AAA Setting initialization channel")
-				watchInitializationSignal = utilflowcontrol.NewInitializationSignal()
+				watchInitializationSignal = newInitializationSignal()
 				innerCtx = utilflowcontrol.WithInitializationSignal(ctx, watchInitializationSignal)
 			}
 			innerReq := r.Clone(innerCtx)
@@ -139,8 +138,6 @@ func WithPriorityAndFairness(
 				}()
 
 				watchInitializationSignal.Wait()
-				// FIXME: Remove before submitting.
-				klog.Errorf("BBB Initialization observed")
 			} else {
 				handler.ServeHTTP(w, innerReq)
 			}

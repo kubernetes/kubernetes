@@ -318,7 +318,6 @@ func TestWatchInitializationSignal(t *testing.T) {
 	_, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 
-
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	initSignal := utilflowcontrol.NewInitializationSignal()
 	ctx = utilflowcontrol.WithInitializationSignal(ctx, initSignal)
