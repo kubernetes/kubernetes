@@ -236,6 +236,10 @@ TEST_CLUSTER_RESYNC_PERIOD=${TEST_CLUSTER_RESYNC_PERIOD:---min-resync-period=3m}
 # ContentType used by all components to communicate with apiserver.
 TEST_CLUSTER_API_CONTENT_TYPE=${TEST_CLUSTER_API_CONTENT_TYPE:-}
 
+# Enable debug handlers (port forwarding, exec, container logs, etc.).
+KUBELET_ENABLE_DEBUGGING_HANDLERS=${KUBELET_ENABLE_DEBUGGING_HANDLERS:-true}
+MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS=${MASTER_KUBELET_ENABLE_DEBUGGING_HANDLERS:-${KUBELET_ENABLE_DEBUGGING_HANDLERS}}
+
 KUBELET_TEST_ARGS="${KUBELET_TEST_ARGS:-} --serialize-image-pulls=false ${TEST_CLUSTER_API_CONTENT_TYPE}"
 if [[ "${NODE_OS_DISTRIBUTION}" = 'gci' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'ubuntu' ]] || [[ "${NODE_OS_DISTRIBUTION}" = 'custom' ]]; then
   NODE_KUBELET_TEST_ARGS="${NODE_KUBELET_TEST_ARGS:-} --kernel-memcg-notification=true"
