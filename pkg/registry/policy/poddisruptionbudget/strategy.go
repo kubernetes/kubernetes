@@ -90,6 +90,11 @@ func (podDisruptionBudgetStrategy) Validate(ctx context.Context, obj runtime.Obj
 	return validation.ValidatePodDisruptionBudget(podDisruptionBudget)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (podDisruptionBudgetStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (podDisruptionBudgetStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -102,6 +107,11 @@ func (podDisruptionBudgetStrategy) AllowCreateOnUpdate() bool {
 // ValidateUpdate is the default update validation for an end user.
 func (podDisruptionBudgetStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePodDisruptionBudget(obj.(*policy.PodDisruptionBudget))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDisruptionBudgetStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for PodDisruptionBudget objects. Status update should
@@ -151,4 +161,9 @@ func (podDisruptionBudgetStatusStrategy) ValidateUpdate(ctx context.Context, obj
 	}
 	return validation.ValidatePodDisruptionBudgetStatusUpdate(obj.(*policy.PodDisruptionBudget).Status,
 		old.(*policy.PodDisruptionBudget).Status, field.NewPath("status"), apiVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (podDisruptionBudgetStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

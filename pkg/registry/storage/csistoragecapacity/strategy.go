@@ -54,6 +54,11 @@ func (csiStorageCapacityStrategy) Validate(ctx context.Context, obj runtime.Obje
 	return errs
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (csiStorageCapacityStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (csiStorageCapacityStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -71,6 +76,11 @@ func (csiStorageCapacityStrategy) ValidateUpdate(ctx context.Context, obj, old r
 	oldCSIStorageCapacityObj := old.(*storage.CSIStorageCapacity)
 	errorList := validation.ValidateCSIStorageCapacity(newCSIStorageCapacityObj)
 	return append(errorList, validation.ValidateCSIStorageCapacityUpdate(newCSIStorageCapacityObj, oldCSIStorageCapacityObj)...)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (csiStorageCapacityStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (csiStorageCapacityStrategy) AllowUnconditionalUpdate() bool {

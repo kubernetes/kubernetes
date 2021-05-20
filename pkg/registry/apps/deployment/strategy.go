@@ -96,6 +96,12 @@ func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) fiel
 	return validation.ValidateDeployment(deployment, opts)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (deploymentStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newDeployment := obj.(*apps.Deployment)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, nil)
+}
+
 // Canonicalize normalizes the object after validation.
 func (deploymentStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -149,6 +155,17 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	return allErrs
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newDeployment := obj.(*apps.Deployment)
+	oldDeployment := old.(*apps.Deployment)
+	if newDeployment.Generation != oldDeployment.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	}
+	return warnings
+}
+
 func (deploymentStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -182,4 +199,9 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (deploymentStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
