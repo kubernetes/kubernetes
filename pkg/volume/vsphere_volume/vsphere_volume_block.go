@@ -144,6 +144,7 @@ var _ volume.BlockVolumeUnmapper = &vsphereBlockVolumeUnmapper{}
 
 type vsphereBlockVolumeUnmapper struct {
 	*vsphereVolume
+	volume.MetricsNil
 }
 
 // GetGlobalMapPath returns global map path and error
@@ -158,4 +159,10 @@ func (v *vsphereVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 
 func (v *vsphereVolume) GetPodDeviceMapPath() (string, string) {
 	return v.plugin.host.GetPodVolumeDeviceDir(v.podUID, utilstrings.EscapeQualifiedName(vsphereVolumePluginName)), v.volName
+}
+
+// SupportsMetrics returns true for vsphereBlockVolumeMapper as it initializes the
+// MetricsProvider.
+func (vbvm *vsphereBlockVolumeMapper) SupportsMetrics() bool {
+	return true
 }

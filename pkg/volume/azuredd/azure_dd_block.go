@@ -129,6 +129,7 @@ func (plugin *azureDataDiskPlugin) newUnmapperInternal(volName string, podUID ty
 
 type azureDataDiskUnmapper struct {
 	*dataDisk
+	volume.MetricsNil
 }
 
 var _ volume.BlockVolumeUnmapper = &azureDataDiskUnmapper{}
@@ -156,4 +157,10 @@ func (disk *dataDisk) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 func (disk *dataDisk) GetPodDeviceMapPath() (string, string) {
 	name := azureDataDiskPluginName
 	return disk.plugin.host.GetPodVolumeDeviceDir(disk.podUID, utilstrings.EscapeQualifiedName(name)), disk.volumeName
+}
+
+// SupportsMetrics returns true for azureDataDiskMapper as it initializes the
+// MetricsProvider.
+func (addm *azureDataDiskMapper) SupportsMetrics() bool {
+	return true
 }
