@@ -112,29 +112,32 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 	// Check bind mount exists
 	linkPath := filepath.Join(mapPath, string(linkName))
 
-	file, err := os.Stat(linkPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to stat file %s: %v", linkPath, err)
-		}
+	file, err := os.Lstat(linkPath)
 
-		// Create file
-		newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
-		if err != nil {
-			return fmt.Errorf("failed to open file %s: %v", linkPath, err)
-		}
-		if err := newFile.Close(); err != nil {
-			return fmt.Errorf("failed to close file %s: %v", linkPath, err)
-		}
-	} else {
+	if err == nil {
 		// Check if device file
 		// TODO: Need to check if this device file is actually the expected bind mount
 		if file.Mode()&os.ModeDevice == os.ModeDevice {
 			klog.Warningf("Warning: Map skipped because bind mount already exist on the path: %v", linkPath)
 			return nil
 		}
+	} else {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to stat file %s: %v", linkPath, err)
+		}
+	}
 
-		klog.Warningf("Warning: file %s is already exist but not mounted, skip creating file", linkPath)
+	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
+	}
+
+	// Create file
+	newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
+	if err != nil {
+		return fmt.Errorf("failed to open file %s: %v", linkPath, err)
+	}
+	if err := newFile.Close(); err != nil {
+		return fmt.Errorf("failed to close file %s: %v", linkPath, err)
 	}
 
 	// Bind mount file
