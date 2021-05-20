@@ -31,8 +31,8 @@ import (
 // of view and as an authentication method for the node in the bootstrap phase of
 // "kubeadm join". This token is and should be short-lived
 type BootstrapTokenString struct {
-	ID     string `json:"-"`
-	Secret string `json:"-"`
+	ID     string `json:"-" datapolicy:"token"`
+	Secret string `json:"-" datapolicy:"token"`
 }
 
 // MarshalJSON implements the json.Marshaler interface.

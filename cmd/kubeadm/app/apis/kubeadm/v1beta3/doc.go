@@ -27,6 +27,8 @@ limitations under the License.
 // Kubeadm no longer supports the hyperkube image.
 // - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
 // DNS server type by kubeadm.
+// - Include "datapolicy" tags on the fields that hold secrets.
+// This would result in the field values to be omitted when API structures are printed with klog.
 //
 // Migration from old kubeadm config versions
 //
