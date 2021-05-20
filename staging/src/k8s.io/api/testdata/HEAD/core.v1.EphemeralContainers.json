@@ -295,6 +295,24 @@
       },
       "tty": true,
       "targetContainerName": "88"
+          "gmsaCredentialSpecName": "86",
+          "gmsaCredentialSpec": "87",
+          "runAsUserName": "88",
+          "hostProcess": false
+        },
+        "runAsUser": -3031446704001093654,
+        "runAsGroup": 7608666948531988994,
+        "runAsNonRoot": true,
+        "readOnlyRootFilesystem": true,
+        "allowPrivilegeEscalation": true,
+        "procMount": "Ðl恕ɍȇ廄裭4懙鏮嵒ƫS",
+        "seccompProfile": {
+          "type": "ɷD¡轫n(鲼ƳÐƣKʘń",
+          "localhostProfile": "89"
+        }
+      },
+      "stdinOnce": true,
+      "targetContainerName": "90"
     }
   ]
 }

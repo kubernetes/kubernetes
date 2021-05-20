@@ -8212,6 +8212,7 @@ func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContext
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
+	out.HostProcess = (*bool)(unsafe.Pointer(in.HostProcess))
 	return nil
 }
 
@@ -8224,6 +8225,7 @@ func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContext
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
 	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
+	out.HostProcess = (*bool)(unsafe.Pointer(in.HostProcess))
 	return nil
 }
 
