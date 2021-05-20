@@ -393,6 +393,13 @@ type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       utilexec.Interface
 	deviceUtil ioutil.DeviceUtil
+	volume.MetricsNil
+}
+
+// SupportsMetrics returns true for SupportsMetrics as it initializes the
+// MetricsProvider.
+func (idm *iscsiDiskMapper) SupportsMetrics() bool {
+	return true
 }
 
 var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}

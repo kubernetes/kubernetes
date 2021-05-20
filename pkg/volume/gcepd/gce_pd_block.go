@@ -174,3 +174,9 @@ func (pd *gcePersistentDisk) GetPodDeviceMapPath() (string, string) {
 	name := gcePersistentDiskPluginName
 	return pd.plugin.host.GetPodVolumeDeviceDir(pd.podUID, utilstrings.EscapeQualifiedName(name)), pd.volName
 }
+
+// SupportsMetrics returns true for gcePersistentDisk as it initializes the
+// MetricsProvider.
+func (pd *gcePersistentDisk) SupportsMetrics() bool {
+	return true
+}

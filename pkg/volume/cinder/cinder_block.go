@@ -140,6 +140,7 @@ func (plugin *cinderPlugin) newUnmapperInternal(volName string, podUID types.UID
 
 type cinderPluginUnmapper struct {
 	*cinderVolume
+	volume.MetricsNil
 }
 
 var _ volume.BlockVolumeUnmapper = &cinderPluginUnmapper{}
@@ -167,4 +168,10 @@ func (cd *cinderVolume) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 func (cd *cinderVolume) GetPodDeviceMapPath() (string, string) {
 	name := cinderVolumePluginName
 	return cd.plugin.host.GetPodVolumeDeviceDir(cd.podUID, utilstrings.EscapeQualifiedName(name)), cd.volName
+}
+
+// SupportsMetrics returns true for cinderVolumeMapper as it initializes the
+// MetricsProvider.
+func (cvm *cinderVolumeMapper) SupportsMetrics() bool {
+	return true
 }

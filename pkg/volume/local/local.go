@@ -633,9 +633,16 @@ func (m *localVolumeMapper) GetStagingPath() string {
 	return ""
 }
 
+// SupportsMetrics returns true for SupportsMetrics as it initializes the
+// MetricsProvider.
+func (m *localVolumeMapper) SupportsMetrics() bool {
+	return true
+}
+
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
 type localVolumeUnmapper struct {
 	*localVolume
+	volume.MetricsNil
 }
 
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}

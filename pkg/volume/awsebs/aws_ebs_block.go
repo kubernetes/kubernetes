@@ -165,3 +165,9 @@ func (ebs *awsElasticBlockStore) GetPodDeviceMapPath() (string, string) {
 	name := awsElasticBlockStorePluginName
 	return ebs.plugin.host.GetPodVolumeDeviceDir(ebs.podUID, utilstrings.EscapeQualifiedName(name)), ebs.volName
 }
+
+// SupportsMetrics returns true for awsElasticBlockStore as it initializes the
+// MetricsProvider.
+func (ebs *awsElasticBlockStore) SupportsMetrics() bool {
+	return true
+}

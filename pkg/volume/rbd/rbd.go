@@ -938,6 +938,12 @@ func (rbd *rbd) rbdPodDeviceMapPath() (string, string) {
 	return rbd.plugin.host.GetPodVolumeDeviceDir(rbd.podUID, utilstrings.EscapeQualifiedName(name)), rbd.volName
 }
 
+// SupportsMetrics returns true for rbdDiskMapper as it initializes the
+// MetricsProvider.
+func (rdm *rbdDiskMapper) SupportsMetrics() bool {
+	return true
+}
+
 type rbdDiskUnmapper struct {
 	*rbdDiskMapper
 }
