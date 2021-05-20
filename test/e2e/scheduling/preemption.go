@@ -430,22 +430,12 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			ginkgo.By("Verify there are 3 Pods left in this namespace")
 			wantPods := sets.NewString("high", "medium", "low")
 
-			var pods []v1.Pod
 			// Wait until the number of pods stabilizes. Note that `medium` pod can get scheduled once the
 			// second low priority pod is marked as terminating.
-			// TODO: exact the wait.PollImmediate block to framework.WaitForNumberOfRunningPods.
-			err := wait.PollImmediate(framework.Poll, framework.PollShortTimeout, func() (bool, error) {
-				podList, err := cs.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
-				// ignore intermittent network error
-				if err != nil {
-					return false, nil
-				}
-				pods = podList.Items
-				return len(pods) == 3, nil
-			})
+			pods, err := e2epod.WaitForNumberOfPods(cs, ns, 3, framework.PollShortTimeout)
 			framework.ExpectNoError(err)
 
-			for _, pod := range pods {
+			for _, pod := range pods.Items {
 				// Remove the ordinal index for low pod.
 				podName := strings.Split(pod.Name, "-")[0]
 				if wantPods.Has(podName) {

@@ -435,6 +435,21 @@ func PodsResponding(c clientset.Interface, ns, name string, wantName bool, pods 
 	return wait.PollImmediate(poll, podRespondingTimeout, NewProxyResponseChecker(c, ns, label, name, wantName, pods).CheckAllResponses)
 }
 
+// WaitForNumberOfPods waits up to timeout to ensure there are exact
+// `num` pods in namespace `ns`.
+// It returns the matching Pods or a timeout error.
+func WaitForNumberOfPods(c clientset.Interface, ns string, num int, timeout time.Duration) (pods *v1.PodList, err error) {
+	err = wait.PollImmediate(poll, timeout, func() (bool, error) {
+		pods, err = c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
+		// ignore intermittent network error
+		if err != nil {
+			return false, nil
+		}
+		return len(pods.Items) == num, nil
+	})
+	return
+}
+
 // WaitForPodsWithLabelScheduled waits for all matching pods to become scheduled and at least one
 // matching pod exists.  Return the list of matching pods.
 func WaitForPodsWithLabelScheduled(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
