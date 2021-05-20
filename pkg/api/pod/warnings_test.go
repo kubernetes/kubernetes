@@ -158,7 +158,52 @@ func TestWarnings(t *testing.T) {
 					{Name: "p", VolumeSource: api.VolumeSource{PhotonPersistentDisk: &api.PhotonPersistentDiskVolumeSource{}}},
 				}},
 			},
-			expected: []string{`spec.volumes[0].photonPersistentDisk: non-functional in v1.16+`},
+			expected: []string{`spec.volumes[0].photonPersistentDisk: deprecated in v1.11, non-functional in v1.16+`},
+		},
+		{
+			name: "gitRepo",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].gitRepo: deprecated in v1.11`},
+		},
+		{
+			name: "scaleIO",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{ScaleIO: &api.ScaleIOVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].scaleIO: deprecated in v1.16, non-functional in v1.22+`},
+		},
+		{
+			name: "flocker",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].flocker: deprecated in v1.22, support removal is planned in v1.26`},
+		},
+		{
+			name: "storageOS",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{StorageOS: &api.StorageOSVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].storageOS: deprecated in v1.22, support removal is planned in v1.26`},
+		},
+		{
+			name: "quobyte",
+			template: &api.PodTemplateSpec{Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{Name: "s", VolumeSource: api.VolumeSource{Quobyte: &api.QuobyteVolumeSource{}}},
+				}},
+			},
+			expected: []string{`spec.volumes[0].quobyte: deprecated in v1.22, support removal is planned in v1.26`},
 		},
 		{
 			name: "duplicate hostAlias",
