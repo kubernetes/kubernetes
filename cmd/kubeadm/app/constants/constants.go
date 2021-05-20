@@ -400,6 +400,17 @@ const (
 	CgroupDriverSystemd = "systemd"
 	// CgroupDriverCgroupfs holds the cgroupfs driver type
 	CgroupDriverCgroupfs = "cgroupfs"
+
+	// The username of the user that kube-controller-manager runs as if RootlessControlPlane feature-gate is enabled.
+	KubeControllerManagerUserName string = "kubeadm-kcm"
+	// The username of the user that kube-apiserver runs as if RootlessControlPlane feature-gate is enabled.
+	KubeAPIServerUserName string = "kubeadm-kas"
+	// The username of the user that kube-scheduler runs as if RootlessControlPlane feature-gate is enabled.
+	KubeSchedulerUserName string = "kubeadm-ks"
+	// The username of the user that etcd runs as if RootlessControlPlane feature-gate is enabled.
+	EtcdUserName string = "kubeadm-etcd"
+	// The group of users that are allowed to read the service account private key, used when RootlessControlPlane feature-gate is enabled.
+	ServiceAccountKeyReadersGroupName string = "kubeadm-sa-key-readers"
 )
 
 var (
