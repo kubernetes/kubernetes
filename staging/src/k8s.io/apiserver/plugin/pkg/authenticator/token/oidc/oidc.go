@@ -611,8 +611,6 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		}
 	}
 
-	resp := &authenticator.Response{User: info}
-
 	// check to ensure all required claims are present in the ID token and have matching values.
 	for claim, value := range a.requiredClaims {
 		if !c.hasClaim(claim) {
@@ -623,15 +621,19 @@ func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*a
 		if err := c.unmarshalClaim(claim, &claimValues); err != nil {
 			return nil, false, fmt.Errorf("oidc: parse claim %s: %v", claim, err)
 		}
+		matchingClaimFound := false
 		for _, claimValue := range []string(claimValues) {
 			if claimValue == value {
-				return resp, true, nil
+				matchingClaimFound = true
+				break
 			}
 		}
-		return nil, false, fmt.Errorf("oidc: required claim %s value does not match. Got = %v, want = %s", claim, claimValues, value)
+		if !matchingClaimFound {
+			return nil, false, fmt.Errorf("oidc: required claim %s value does not match. Got = %v, want = %s", claim, claimValues, value)
+		}
 	}
 
-	return resp, true, nil
+	return &authenticator.Response{User: info}, true, nil
 }
 
 // getClaimJWT gets a distributed claim JWT from url, using the supplied access
