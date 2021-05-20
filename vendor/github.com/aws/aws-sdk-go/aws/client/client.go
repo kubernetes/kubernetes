@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Config        *aws.Config
 	Handlers      request.Handlers
+	PartitionID   string
 	Endpoint      string
 	SigningRegion string
 	SigningName   string
@@ -64,7 +65,7 @@ func New(cfg aws.Config, info metadata.ClientInfo, handlers request.Handlers, op
 	default:
 		maxRetries := aws.IntValue(cfg.MaxRetries)
 		if cfg.MaxRetries == nil || maxRetries == aws.UseServiceDefaultRetries {
-			maxRetries = 3
+			maxRetries = DefaultRetryerMaxNumRetries
 		}
 		svc.Retryer = DefaultRetryer{NumMaxRetries: maxRetries}
 	}
@@ -87,10 +88,6 @@ func (c *Client) NewRequest(operation *request.Operation, params interface{}, da
 // AddDebugHandlers injects debug logging handlers into the service to log request
 // debug information.
 func (c *Client) AddDebugHandlers() {
-	if !c.Config.LogLevel.AtLeast(aws.LogDebug) {
-		return
-	}
-
 	c.Handlers.Send.PushFrontNamed(LogHTTPRequestHandler)
 	c.Handlers.Send.PushBackNamed(LogHTTPResponseHandler)
 }

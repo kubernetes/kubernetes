@@ -18,6 +18,14 @@ type XMLNode struct {
 	parent     *XMLNode
 }
 
+// textEncoder is a string type alias that implemnts the TextMarshaler interface.
+// This alias type is used to ensure that the line feed (\n) (U+000A) is escaped.
+type textEncoder string
+
+func (t textEncoder) MarshalText() ([]byte, error) {
+	return []byte(t), nil
+}
+
 // NewXMLElement returns a pointer to a new XMLNode initialized to default values.
 func NewXMLElement(name xml.Name) *XMLNode {
 	return &XMLNode{
@@ -119,11 +127,27 @@ func (n *XMLNode) findElem(name string) (string, bool) {
 
 // StructToXML writes an XMLNode to a xml.Encoder as tokens.
 func StructToXML(e *xml.Encoder, node *XMLNode, sorted bool) error {
-	e.EncodeToken(xml.StartElement{Name: node.Name, Attr: node.Attr})
+	// Sort Attributes
+	attrs := node.Attr
+	if sorted {
+		sortedAttrs := make([]xml.Attr, len(attrs))
+		for _, k := range node.Attr {
+			sortedAttrs = append(sortedAttrs, k)
+		}
+		sort.Sort(xmlAttrSlice(sortedAttrs))
+		attrs = sortedAttrs
+	}
+
+	startElement := xml.StartElement{Name: node.Name, Attr: attrs}
 
 	if node.Text != "" {
-		e.EncodeToken(xml.CharData([]byte(node.Text)))
-	} else if sorted {
+		e.EncodeElement(textEncoder(node.Text), startElement)
+		return e.Flush()
+	}
+
+	e.EncodeToken(startElement)
+
+	if sorted {
 		sortedNames := []string{}
 		for k := range node.Children {
 			sortedNames = append(sortedNames, k)
@@ -143,6 +167,7 @@ func StructToXML(e *xml.Encoder, node *XMLNode, sorted bool) error {
 		}
 	}
 
-	e.EncodeToken(xml.EndElement{Name: node.Name})
+	e.EncodeToken(startElement.End())
+
 	return e.Flush()
 }

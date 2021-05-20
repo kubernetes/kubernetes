@@ -152,6 +152,8 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 	volumeOptions := &aws.VolumeOptions{
 		CapacityGB: requestGiB,
 		Tags:       tags,
+		IOPS:       3000,
+		Throughput: 125,
 	}
 
 	// Apply Parameters (case-insensitive). We leave validation of
@@ -185,6 +187,16 @@ func populateVolumeOptions(pluginName, pvcName string, capacityGB resource.Quant
 			}
 		case "kmskeyid":
 			volumeOptions.KmsKeyID = v
+		case "iops":
+			volumeOptions.IOPS, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid iops value %q: must be integer between 3000 and 16000: %v", v, err)
+			}
+		case "throughput":
+			volumeOptions.Throughput, err = strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid throughput value %q: must be integer between 125 and 1000: %v", v, err)
+			}
 		case volume.VolumeParameterFSType:
 			// Do nothing but don't make this fail
 		default:

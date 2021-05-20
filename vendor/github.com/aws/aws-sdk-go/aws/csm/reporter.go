@@ -10,11 +10,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 )
 
-const (
-	// DefaultPort is used when no port is specified
-	DefaultPort = "31000"
-)
-
 // Reporter will gather metrics of API requests made and
 // send those metrics to the CSM endpoint.
 type Reporter struct {
@@ -71,7 +66,6 @@ func (rep *Reporter) sendAPICallAttemptMetric(r *request.Request) {
 
 		XAmzRequestID: aws.String(r.RequestID),
 
-		AttemptCount:   aws.Int(r.RetryCount + 1),
 		AttemptLatency: aws.Int(int(now.Sub(r.AttemptTime).Nanoseconds() / int64(time.Millisecond))),
 		AccessKey:      aws.String(creds.AccessKeyID),
 	}
@@ -95,8 +89,8 @@ func getMetricException(err awserr.Error) metricException {
 	code := err.Code()
 
 	switch code {
-	case "RequestError",
-		"SerializationError",
+	case request.ErrCodeRequestError,
+		request.ErrCodeSerialization,
 		request.CanceledErrorCode:
 		return sdkException{
 			requestException{exception: code, message: msg},
@@ -123,7 +117,7 @@ func (rep *Reporter) sendAPICallMetric(r *request.Request) {
 		Type:               aws.String("ApiCall"),
 		AttemptCount:       aws.Int(r.RetryCount + 1),
 		Region:             r.Config.Region,
-		Latency:            aws.Int(int(time.Now().Sub(r.Time) / time.Millisecond)),
+		Latency:            aws.Int(int(time.Since(r.Time) / time.Millisecond)),
 		XAmzRequestID:      aws.String(r.RequestID),
 		MaxRetriesExceeded: aws.Int(boolIntValue(r.RetryCount >= r.MaxRetries())),
 	}
@@ -190,8 +184,9 @@ func (rep *Reporter) start() {
 	}
 }
 
-// Pause will pause the metric channel preventing any new metrics from
-// being added.
+// Pause will pause the metric channel preventing any new metrics from being
+// added. It is safe to call concurrently with other calls to Pause, but if
+// called concurently with Continue can lead to unexpected state.
 func (rep *Reporter) Pause() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -203,8 +198,9 @@ func (rep *Reporter) Pause() {
 	rep.close()
 }
 
-// Continue will reopen the metric channel and allow for monitoring
-// to be resumed.
+// Continue will reopen the metric channel and allow for monitoring to be
+// resumed. It is safe to call concurrently with other calls to Continue, but
+// if called concurently with Pause can lead to unexpected state.
 func (rep *Reporter) Continue() {
 	lock.Lock()
 	defer lock.Unlock()
@@ -219,10 +215,18 @@ func (rep *Reporter) Continue() {
 	rep.metricsCh.Continue()
 }
 
+// Client side metric handler names
+const (
+	APICallMetricHandlerName        = "awscsm.SendAPICallMetric"
+	APICallAttemptMetricHandlerName = "awscsm.SendAPICallAttemptMetric"
+)
+
 // InjectHandlers will will enable client side metrics and inject the proper
 // handlers to handle how metrics are sent.
 //
-//	Example:
+// InjectHandlers is NOT safe to call concurrently. Calling InjectHandlers
+// multiple times may lead to unexpected behavior, (e.g. duplicate metrics).
+//
 //		// Start must be called in order to inject the correct handlers
 //		r, err := csm.Start("clientID", "127.0.0.1:8094")
 //		if err != nil {

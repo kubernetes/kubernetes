@@ -2,7 +2,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["locked_source.go"],
+    srcs = [
+        "locked_source.go",
+        "read.go",
+        "read_1_5.go",
+    ],
     importmap = "k8s.io/kubernetes/vendor/github.com/aws/aws-sdk-go/internal/sdkrand",
     importpath = "github.com/aws/aws-sdk-go/internal/sdkrand",
     visibility = ["//vendor/github.com/aws/aws-sdk-go:__subpackages__"],

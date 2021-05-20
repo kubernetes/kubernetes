@@ -15,7 +15,7 @@
 // Elastic Load Balancing supports three types of load balancers: Application
 // Load Balancers, Network Load Balancers, and Classic Load Balancers. You can
 // select a load balancer based on your application needs. For more information,
-// see the Elastic Load Balancing User Guide (http://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/).
+// see the Elastic Load Balancing User Guide (https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/).
 //
 // This reference covers the 2012-06-01 API, which supports Classic Load Balancers.
 // The 2015-12-01 API supports Application Load Balancers and Network Load Balancers.

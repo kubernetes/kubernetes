@@ -5,6 +5,7 @@ type ClientInfo struct {
 	ServiceName   string
 	ServiceID     string
 	APIVersion    string
+	PartitionID   string
 	Endpoint      string
 	SigningName   string
 	SigningRegion string

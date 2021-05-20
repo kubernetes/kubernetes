@@ -2,6 +2,7 @@ package csm
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -9,19 +10,40 @@ var (
 	lock sync.Mutex
 )
 
-// Client side metric handler names
 const (
-	APICallMetricHandlerName        = "awscsm.SendAPICallMetric"
-	APICallAttemptMetricHandlerName = "awscsm.SendAPICallAttemptMetric"
+	// DefaultPort is used when no port is specified.
+	DefaultPort = "31000"
+
+	// DefaultHost is the host that will be used when none is specified.
+	DefaultHost = "127.0.0.1"
 )
 
-// Start will start the a long running go routine to capture
+// AddressWithDefaults returns a CSM address built from the host and port
+// values. If the host or port is not set, default values will be used
+// instead. If host is "localhost" it will be replaced with "127.0.0.1".
+func AddressWithDefaults(host, port string) string {
+	if len(host) == 0 || strings.EqualFold(host, "localhost") {
+		host = DefaultHost
+	}
+
+	if len(port) == 0 {
+		port = DefaultPort
+	}
+
+	// Only IP6 host can contain a colon
+	if strings.Contains(host, ":") {
+		return "[" + host + "]:" + port
+	}
+
+	return host + ":" + port
+}
+
+// Start will start a long running go routine to capture
 // client side metrics. Calling start multiple time will only
 // start the metric listener once and will panic if a different
 // client ID or port is passed in.
 //
-//	Example:
-//		r, err := csm.Start("clientID", "127.0.0.1:8094")
+//		r, err := csm.Start("clientID", "127.0.0.1:31000")
 //		if err != nil {
 //			panic(fmt.Errorf("expected no error, but received %v", err))
 //		}

@@ -7,10 +7,12 @@ go_library(
     importpath = "github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/awserr:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/client:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/ec2metadata:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/internal/sdkuri:go_default_library",
     ],
 )

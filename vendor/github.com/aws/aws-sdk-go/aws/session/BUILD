@@ -3,6 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = [
+        "credentials.go",
+        "custom_transport.go",
+        "custom_transport_go1.12.go",
+        "custom_transport_go1.5.go",
+        "custom_transport_go1.6.go",
         "doc.go",
         "env_config.go",
         "session.go",
@@ -18,6 +23,7 @@ go_library(
         "//vendor/github.com/aws/aws-sdk-go/aws/corehandlers:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/processcreds:go_default_library",
+        "//vendor/github.com/aws/aws-sdk-go/aws/credentials/ssocreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/credentials/stscreds:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/csm:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/defaults:go_default_library",

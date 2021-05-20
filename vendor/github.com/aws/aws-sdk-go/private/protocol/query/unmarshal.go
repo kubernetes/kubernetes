@@ -1,6 +1,6 @@
 package query
 
-//go:generate go run -tags codegen ../../../models/protocol_tests/generate.go ../../../models/protocol_tests/output/query.json unmarshal_test.go
+//go:generate go run -tags codegen ../../../private/model/cli/gen-protocol-tests ../../../models/protocol_tests/output/query.json unmarshal_test.go
 
 import (
 	"encoding/xml"
@@ -24,7 +24,7 @@ func Unmarshal(r *request.Request) {
 		err := xmlutil.UnmarshalXML(r.Data, decoder, r.Operation.Name+"Result")
 		if err != nil {
 			r.Error = awserr.NewRequestFailure(
-				awserr.New("SerializationError", "failed decoding Query response", err),
+				awserr.New(request.ErrCodeSerialization, "failed decoding Query response", err),
 				r.HTTPResponse.StatusCode,
 				r.RequestID,
 			)
