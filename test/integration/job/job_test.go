@@ -214,7 +214,7 @@ func TestIndexedJob(t *testing.T) {
 	validateJobPodsStatus(ctx, t, clientSet, jobObj, podsByStatus{
 		Active: 3,
 	})
-	validateJobPodsIndexes(ctx, t, clientSet, jobObj, sets.NewInt(0, 1, 2), "")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 1, 2), "")
 
 	// One Pod succeeds.
 	if err := setJobPhaseForIndex(ctx, clientSet, jobObj, v1.PodSucceeded, 1); err != nil {
@@ -224,7 +224,7 @@ func TestIndexedJob(t *testing.T) {
 		Active:    3,
 		Succeeded: 1,
 	})
-	validateJobPodsIndexes(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
 
 	// Disable feature gate and restart controller.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, false)()
@@ -243,7 +243,7 @@ func TestIndexedJob(t *testing.T) {
 	if err := waitForEvent(events, jobObj.UID, "IndexedJobDisabled"); err != nil {
 		t.Errorf("Waiting for an event for IndexedJobDisabled: %v", err)
 	}
-	validateJobPodsIndexes(ctx, t, clientSet, jobObj, sets.NewInt(0, 3), "1")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 3), "1")
 
 	// Re-enable feature gate and restart controller. Failed Pod should be recreated now.
 	defer featuregatetesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.IndexedJob, true)()
@@ -255,7 +255,7 @@ func TestIndexedJob(t *testing.T) {
 		Failed:    1,
 		Succeeded: 1,
 	})
-	validateJobPodsIndexes(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, sets.NewInt(0, 2, 3), "1")
 
 	// Remaining Pods succeed.
 	if err := setJobPodsPhase(ctx, clientSet, jobObj, v1.PodSucceeded, 3); err != nil {
@@ -266,7 +266,7 @@ func TestIndexedJob(t *testing.T) {
 		Failed:    1,
 		Succeeded: 4,
 	})
-	validateJobPodsIndexes(ctx, t, clientSet, jobObj, nil, "0-3")
+	validateIndexedJobPods(ctx, t, clientSet, jobObj, nil, "0-3")
 	validateJobSucceeded(ctx, t, clientSet, jobObj)
 }
 
@@ -439,9 +439,10 @@ func validateJobPodsStatus(ctx context.Context, t *testing.T, clientSet clientse
 	}
 }
 
-// validateJobPodsIndexes validates indexes of active and completed Pods of an
-// Indexed Job. Call after validateJobPodsStatus
-func validateJobPodsIndexes(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, wantActive sets.Int, gotCompleted string) {
+// validateIndexedJobPods validates indexes and hostname of
+// active and completed Pods of an Indexed Job.
+// Call after validateJobPodsStatus
+func validateIndexedJobPods(ctx context.Context, t *testing.T, clientSet clientset.Interface, jobObj *batchv1.Job, wantActive sets.Int, gotCompleted string) {
 	t.Helper()
 	updatedJob, err := clientSet.BatchV1().Jobs(jobObj.Namespace).Get(ctx, jobObj.Name, metav1.GetOptions{})
 	if err != nil {
@@ -458,10 +459,15 @@ func validateJobPodsIndexes(ctx context.Context, t *testing.T, clientSet clients
 	for _, pod := range pods.Items {
 		if isPodOwnedByJob(&pod, jobObj) {
 			if pod.Status.Phase == v1.PodPending || pod.Status.Phase == v1.PodRunning {
-				if ix, err := getCompletionIndex(&pod); err != nil {
+				ix, err := getCompletionIndex(&pod)
+				if err != nil {
 					t.Errorf("Failed getting completion index for pod %s: %v", pod.Name, err)
 				} else {
 					gotActive.Insert(ix)
+				}
+				expectedName := fmt.Sprintf("%s-%d", jobObj.Name, ix)
+				if diff := cmp.Equal(expectedName, pod.Spec.Hostname); !diff {
+					t.Errorf("Got pod hostname %s, want %s", pod.Spec.Hostname, expectedName)
 				}
 			}
 		}

@@ -269,6 +269,38 @@ func TestAppendDuplicatedIndexPodsForRemoval(t *testing.T) {
 	}
 }
 
+func TestPodGenerateNameWithIndex(t *testing.T) {
+	cases := map[string]struct {
+		jobname             string
+		index               int
+		wantPodGenerateName string
+	}{
+		"short job name": {
+			jobname:             "indexed-job",
+			index:               1,
+			wantPodGenerateName: "indexed-job-1-",
+		},
+		"job name exceeds MaxGeneneratedNameLength": {
+			jobname:             "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooo",
+			index:               1,
+			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhh-1-",
+		},
+		"job name with index suffix exceeds MaxGeneratedNameLength": {
+			jobname:             "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhoo",
+			index:               1,
+			wantPodGenerateName: "hhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhhooooohhhhh-1-",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			podGenerateName := podGenerateNameWithIndex(tc.jobname, tc.index)
+			if diff := cmp.Equal(tc.wantPodGenerateName, podGenerateName); !diff {
+				t.Errorf("Got pod generateName %s, want %s", podGenerateName, tc.wantPodGenerateName)
+			}
+		})
+	}
+}
+
 func hollowPodsWithIndexPhase(descs []indexPhase) []*v1.Pod {
 	pods := make([]*v1.Pod, 0, len(descs))
 	for _, desc := range descs {
