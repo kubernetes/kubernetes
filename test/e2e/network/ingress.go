@@ -29,7 +29,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -132,16 +131,15 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			}
 		})
 
-		ginkgo.It("multicluster ingress should get instance group annotation", func() {
+		ginkgo.It("multicluster ingress should get instance group annotation [Feature:kubemci]", func() {
 			name := "echomap"
-			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{
-				e2eingress.IngressClassKey: e2eingress.MulticlusterIngressClassValue,
-			}, map[string]string{})
+			jig.Class = e2eingress.MulticlusterIngressClassValue
+			jig.CreateIngress(filepath.Join(e2eingress.IngressManifestPath, "http"), ns, map[string]string{}, map[string]string{})
 
 			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
 			propagationTimeout := e2eservice.GetServiceLoadBalancerPropagationTimeout(f.ClientSet)
 			pollErr := wait.Poll(2*time.Second, propagationTimeout, func() (bool, error) {
-				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
+				ing, err := f.ClientSet.NetworkingV1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations == nil || annotations[instanceGroupAnnotation] == "" {
@@ -162,7 +160,7 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 			scKey := e2eingress.StatusPrefix + "/ssl-cert"
 			beKey := e2eingress.StatusPrefix + "/backends"
 			wait.Poll(2*time.Second, time.Minute, func() (bool, error) {
-				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
+				ing, err := f.ClientSet.NetworkingV1().Ingresses(ns).Get(context.TODO(), name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
 				if annotations != nil && (annotations[umKey] != "" || annotations[fwKey] != "" ||
@@ -686,6 +684,11 @@ var _ = common.SIGDescribe("Loadbalancing: L7", func() {
 		var nginxController *e2eingress.NginxIngressController
 
 		ginkgo.BeforeEach(func() {
+			// Skip until nginx-ingress controller works against kubernetes 1.22+
+			// Those versions no longer server ingress v1beta1
+			// xref: https://github.com/kubernetes/ingress-nginx/issues/7145
+			e2eskipper.Skipf("Skipping because nginx-controller requires ingress/v1beta1 API")
+
 			e2eskipper.SkipUnlessProviderIs("gce", "gke")
 			ginkgo.By("Initializing nginx controller")
 			jig.Class = "nginx"
@@ -922,7 +925,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 		ingVersion := "v1"
 		ingClient := f.ClientSet.NetworkingV1().Ingresses(ns)
 
-		prefixPathType := networkingv1.PathTypePrefix
+		prefixPathType := networkingv1.PathTypeImplementationSpecific
 		serviceBackend := &networkingv1.IngressServiceBackend{
 			Name: "default-backend",
 			Port: networkingv1.ServiceBackendPort{
@@ -972,7 +975,7 @@ var _ = common.SIGDescribe("Ingress API", func() {
 			framework.ExpectNoError(err)
 			found := false
 			for _, group := range discoveryGroups.Groups {
-				if group.Name == networkingv1beta1.GroupName {
+				if group.Name == networkingv1.GroupName {
 					for _, version := range group.Versions {
 						if version.Version == ingVersion {
 							found = true
