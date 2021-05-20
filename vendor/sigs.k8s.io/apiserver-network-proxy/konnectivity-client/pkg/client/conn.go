@@ -22,6 +22,7 @@ import (
 	"net"
 	"time"
 
+	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client"
 )
@@ -33,6 +34,7 @@ const CloseTimeout = 10 * time.Second
 // conn is an implementation of net.Conn, where the data is transported
 // over an established tunnel defined by a gRPC service ProxyService.
 type conn struct {
+	cc      *grpc.ClientConn
 	stream  client.ProxyService_ProxyClient
 	connID  int64
 	readCh  chan []byte
@@ -109,6 +111,18 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 	return errors.New("not implemented")
 }
 
+func (c *conn) cleanup() {
+	close(c.readCh)
+	close(c.closeCh)
+	err := c.cc.Close()
+	if err != nil && err == grpc.ErrClientConnClosing {
+		klog.V(2).InfoS("grpc ClientConn is already closed", "err", err)
+	}
+	if err != nil && err != grpc.ErrClientConnClosing {
+		klog.ErrorS(err, "error closing grpc ClientConn")
+	}
+}
+
 // Close closes the connection. It also sends CLOSE_REQ packet over
 // proxy service to notify remote to drop the connection.
 func (c *conn) Close() error {
@@ -135,6 +149,10 @@ func (c *conn) Close() error {
 		}
 		return nil
 	case <-time.After(CloseTimeout):
+		// This means that the client either timed out receiving the CLOSE_RSP,
+		// or is blocked in its serve() loop and can't deliver the CLOSE_RSP
+		// over closeCh. We call the cleanup() to unblock the tunnels.
+		c.cleanup()
 	}
 
 	return errors.New("close timeout")
