@@ -1795,8 +1795,14 @@ def resolve(host):
       continue
 
 '
+  if [[ -n "${MULTIMASTER:-}" ]]; then
+    # Multi-master should expose the peer server on the host level.
+    local -r host_ip=$(python3 -c "${resolve_host_script_py}"$'\n'"resolve(\"${host_name}\")")
+  else
+    # Single-master should expose the peer connection on the host level.
+    local -r host_ip=127.0.0.1
+  fi
 
-  local -r host_ip=$(python3 -c "${resolve_host_script_py}"$'\n'"resolve(\"${host_name}\")")
   local etcd_cluster=""
   local cluster_state="new"
   local etcd_protocol="http"
