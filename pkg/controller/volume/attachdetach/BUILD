@@ -63,7 +63,6 @@ go_test(
         "//pkg/features:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi:go_default_library",
-        "//pkg/volume/gcepd:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
