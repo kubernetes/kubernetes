@@ -36,12 +36,12 @@ import (
 func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error) {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
-		klog.Warningf("Resource %s is not available now", gvr.String())
+		klog.InfoS("Resource is not available now", "resource", gvr.String())
 		return nil, false, nil
 	}
 	missingSingleSigningFile := ctx.ComponentConfig.CSRSigningController.ClusterSigningCertFile == "" || ctx.ComponentConfig.CSRSigningController.ClusterSigningKeyFile == ""
 	if missingSingleSigningFile && !anySpecificFilesSet(ctx.ComponentConfig.CSRSigningController) {
-		klog.V(2).Info("skipping CSR signer controller because no csr cert/key was specified")
+		klog.V(2).InfoS("Skipping CSR signer controller because no csr cert/key was specified")
 		return nil, false, nil
 	}
 	if !missingSingleSigningFile && anySpecificFilesSet(ctx.ComponentConfig.CSRSigningController) {
@@ -59,7 +59,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		}
 		go kubeletServingSigner.Run(5, ctx.Stop)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kubelet-serving")
+		klog.V(2).InfoS("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controllerName", "kubernetes.io/kubelet-serving")
 	}
 
 	if kubeletClientSignerCertFile, kubeletClientSignerKeyFile := getKubeletClientSignerFiles(ctx.ComponentConfig.CSRSigningController); len(kubeletClientSignerCertFile) > 0 || len(kubeletClientSignerKeyFile) > 0 {
@@ -69,7 +69,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		}
 		go kubeletClientSigner.Run(5, ctx.Stop)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client-kubelet")
+		klog.V(2).InfoS("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controllerName", "kubernetes.io/kube-apiserver-client-kubelet")
 	}
 
 	if kubeAPIServerSignerCertFile, kubeAPIServerSignerKeyFile := getKubeAPIServerClientSignerFiles(ctx.ComponentConfig.CSRSigningController); len(kubeAPIServerSignerCertFile) > 0 || len(kubeAPIServerSignerKeyFile) > 0 {
@@ -79,7 +79,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		}
 		go kubeAPIServerClientSigner.Run(5, ctx.Stop)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/kube-apiserver-client")
+		klog.V(2).InfoS("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controllerName", "kubernetes.io/kube-apiserver-client")
 	}
 
 	if legacyUnknownSignerCertFile, legacyUnknownSignerKeyFile := getLegacyUnknownSignerFiles(ctx.ComponentConfig.CSRSigningController); len(legacyUnknownSignerCertFile) > 0 || len(legacyUnknownSignerKeyFile) > 0 {
@@ -89,7 +89,7 @@ func startCSRSigningController(ctx ControllerContext) (http.Handler, bool, error
 		}
 		go legacyUnknownSigner.Run(5, ctx.Stop)
 	} else {
-		klog.V(2).Infof("skipping CSR signer controller %q because specific files were specified for other signers and not this one.", "kubernetes.io/legacy-unknown")
+		klog.V(2).InfoS("Skipping CSR signer controller because specific files were specified for other signers and not this one", "controllerName", "kubernetes.io/legacy-unknown")
 	}
 
 	return nil, true, nil
@@ -168,7 +168,7 @@ func getLegacyUnknownSignerFiles(config csrsigningconfig.CSRSigningControllerCon
 func startCSRApprovingController(ctx ControllerContext) (http.Handler, bool, error) {
 	gvr := schema.GroupVersionResource{Group: "certificates.k8s.io", Version: "v1", Resource: "certificatesigningrequests"}
 	if !ctx.AvailableResources[gvr] {
-		klog.Warningf("Resource %s is not available now", gvr.String())
+		klog.InfoS("Resource is not available now", "resource", gvr.String())
 		return nil, false, nil
 	}
 

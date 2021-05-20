@@ -104,7 +104,8 @@ func checkNonZeroInsecurePort(fs *pflag.FlagSet) error {
 func NewControllerManagerCommand() *cobra.Command {
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
-		klog.Fatalf("unable to initialize command options: %v", err)
+		klog.ErrorS(err, "Unable to initialize command options")
+		os.Exit(1)
 	}
 
 	cmd := &cobra.Command{
@@ -183,12 +184,12 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 // Run runs the KubeControllerManagerOptions.  This should never exit.
 func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
+	klog.InfoS("Kube-controller-manager version", "version", version.Get())
 
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		klog.Errorf("unable to register configz: %v", err)
+		klog.ErrorS(err, "Unable to register configz")
 	}
 
 	// Setup any healthz checks we will want to use.
@@ -219,11 +220,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 		controllerContext, err := CreateControllerContext(c, rootClientBuilder, clientBuilder, ctx.Done())
 		if err != nil {
-			klog.Fatalf("error building controller context: %v", err)
+			klog.ErrorS(err, "Error building controller context")
+			os.Exit(1)
 		}
 		controllerInitializers := initializersFunc(controllerContext.LoopMode)
 		if err := StartControllers(controllerContext, startSATokenController, controllerInitializers, unsecuredMux); err != nil {
-			klog.Fatalf("error starting controllers: %v", err)
+			klog.ErrorS(err, "Error starting controllers")
+			os.Exit(1)
 		}
 
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
@@ -255,7 +258,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// If leader migration is enabled, create the LeaderMigrator and prepare for migration
 	if leadermigration.Enabled(&c.ComponentConfig.Generic) {
-		klog.Infof("starting leader migration")
+		klog.InfoS("Starting leader migration")
 
 		leaderMigrator = leadermigration.NewLeaderMigrator(&c.ComponentConfig.Generic.LeaderMigration,
 			"kube-controller-manager")
@@ -279,12 +282,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 					// If leader migration is enabled, we should start only non-migrated controllers
 					//  for the main lock.
 					initializersFunc = createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerNonMigrated)
-					klog.Info("leader migration: starting main controllers.")
+					klog.InfoS("Leader migration: starting main controllers")
 				}
 				run(ctx, startSATokenController, initializersFunc)
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				klog.ErrorS(nil, "Leaderelection lost")
+				os.Exit(1)
 			},
 		})
 
@@ -302,12 +306,13 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 			c.ComponentConfig.Generic.LeaderMigration.LeaderName,
 			leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
-					klog.Info("leader migration: starting migrated controllers.")
+					klog.InfoS("Leader migration: starting migrated controllers")
 					// DO NOT start saTokenController under migration lock
 					run(ctx, nil, createInitializersFunc(leaderMigrator.FilterFunc, leadermigration.ControllerMigrated))
 				},
 				OnStoppedLeading: func() {
-					klog.Fatalf("migration leaderelection lost")
+					klog.ErrorS(nil, "Migration leaderelection lost")
+					os.Exit(1)
 				},
 			})
 	}
@@ -553,20 +558,20 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 
 	for controllerName, initFn := range controllers {
 		if !ctx.IsControllerEnabled(controllerName) {
-			klog.Warningf("%q is disabled", controllerName)
+			klog.InfoS("Controller is disabled", "controllerName", controllerName)
 			continue
 		}
 
 		time.Sleep(wait.Jitter(ctx.ComponentConfig.Generic.ControllerStartInterval.Duration, ControllerStartJitter))
 
-		klog.V(1).Infof("Starting %q", controllerName)
+		klog.V(1).InfoS("Starting controller", "controllerName", controllerName)
 		debugHandler, started, err := initFn(ctx)
 		if err != nil {
-			klog.Errorf("Error starting %q", controllerName)
+			klog.ErrorS(err, "Error starting controller", "controllerName", controllerName)
 			return err
 		}
 		if !started {
-			klog.Warningf("Skipping %q", controllerName)
+			klog.InfoS("Skipping controller", "controllerName", controllerName)
 			continue
 		}
 		if debugHandler != nil && unsecuredMux != nil {
@@ -574,7 +579,7 @@ func StartControllers(ctx ControllerContext, startSATokenController InitFunc, co
 			unsecuredMux.UnlistedHandle(basePath, http.StripPrefix(basePath, debugHandler))
 			unsecuredMux.UnlistedHandlePrefix(basePath+"/", http.StripPrefix(basePath, debugHandler))
 		}
-		klog.Infof("Started %q", controllerName)
+		klog.InfoS("Started controller", "controllerName", controllerName)
 	}
 
 	return nil
@@ -589,12 +594,12 @@ type serviceAccountTokenControllerStarter struct {
 
 func (c serviceAccountTokenControllerStarter) startServiceAccountTokenController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ctx.IsControllerEnabled(saTokenControllerName) {
-		klog.Warningf("%q is disabled", saTokenControllerName)
+		klog.InfoS("SATokenController is disabled", "saTokenControllerName", saTokenControllerName)
 		return nil, false, nil
 	}
 
 	if len(ctx.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
-		klog.Warningf("%q is disabled because there is no private key", saTokenControllerName)
+		klog.InfoS("SATokenController is disabled because there is no private key", "saTokenControllerName", saTokenControllerName)
 		return nil, false, nil
 	}
 	privateKey, err := keyutil.PrivateKeyFromFile(ctx.ComponentConfig.SAController.ServiceAccountKeyFile)
@@ -656,7 +661,7 @@ func createClientBuilders(c *config.CompletedConfig) (clientBuilder clientbuilde
 		if len(c.ComponentConfig.SAController.ServiceAccountKeyFile) == 0 {
 			// It's possible another controller process is creating the tokens for us.
 			// If one isn't, we'll timeout and exit when our client builder is unable to create the tokens.
-			klog.Warningf("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
+			klog.InfoS("--use-service-account-credentials was specified without providing a --service-account-private-key-file")
 		}
 
 		clientBuilder = clientbuilder.NewDynamicClientBuilder(
@@ -682,7 +687,8 @@ func leaderElectAndRun(c *config.CompletedConfig, lockIdentity string, electionC
 		c.Kubeconfig,
 		c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration)
 	if err != nil {
-		klog.Fatalf("error creating lock: %v", err)
+		klog.ErrorS(err, "Error creating lock")
+		os.Exit(1)
 	}
 
 	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{

@@ -52,7 +52,7 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 
 	if cloud != nil && !cloud.HasClusterID() {
 		if allowUntaggedCloud {
-			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
+			klog.InfoS("Detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			return nil, loopMode, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")
 		}

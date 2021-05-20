@@ -22,6 +22,7 @@ import (
 	// given binary target.
 
 	"fmt"
+	"os"
 
 	"k8s.io/klog/v2"
 
@@ -117,7 +118,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
-		klog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
+		klog.ErrorS(err, "Could not create hostpath recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath)
+		os.Exit(1)
 	}
 	allPlugins = append(allPlugins, hostpath.ProbeVolumePlugins(hostPathConfig)...)
 
@@ -127,7 +129,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config persiste
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, &nfsConfig); err != nil {
-		klog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
+		klog.ErrorS(err, "Could not create NFS recycler pod from file", "path", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS)
+		os.Exit(1)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
