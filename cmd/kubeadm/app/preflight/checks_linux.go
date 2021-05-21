@@ -22,6 +22,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/utils/exec"
 )
@@ -32,12 +33,12 @@ func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
 	if err != nil {
 		return nil, []error{err}
 	}
-	if driver != kubeadmutil.CgroupDriverSystemd {
+	if driver != constants.CgroupDriverSystemd {
 		err = errors.Errorf("detected %q as the Docker cgroup driver. "+
 			"The recommended driver is %q. "+
 			"Please follow the guide at https://kubernetes.io/docs/setup/cri/",
 			driver,
-			kubeadmutil.CgroupDriverSystemd)
+			constants.CgroupDriverSystemd)
 		return []error{err}, nil
 	}
 	return nil, nil
