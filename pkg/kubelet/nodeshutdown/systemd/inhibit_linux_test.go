@@ -71,6 +71,10 @@ func (obj *fakeDBusObject) SetProperty(p string, v interface{}) error {
 	return nil
 }
 
+func (obj *fakeDBusObject) StoreProperty(p string, v interface{}) error {
+	return nil
+}
+
 func (obj *fakeDBusObject) Destination() string {
 	return ""
 }

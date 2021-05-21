@@ -18,7 +18,7 @@ func (s *PerfEventGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *PerfEventGroup) Set(path string, cgroup *configs.Cgroup) error {
+func (s *PerfEventGroup) Set(_ string, _ *configs.Resources) error {
 	return nil
 }
 
