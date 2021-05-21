@@ -200,7 +200,7 @@ func newV1beta1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []
 		return nil, err
 	}
 
-	authn, err := newWithBackoff(c, testRetryBackoff, implicitAuds, 10*time.Second)
+	authn, err := newWithBackoff(c, testRetryBackoff, implicitAuds)
 	if err != nil {
 		return nil, err
 	}

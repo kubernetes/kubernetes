@@ -52,18 +52,17 @@ type tokenReviewer interface {
 }
 
 type WebhookTokenAuthenticator struct {
-	tokenReview    tokenReviewer
-	retryBackoff   wait.Backoff
-	implicitAuds   authenticator.Audiences
-	requestTimeout time.Duration
+	tokenReview  tokenReviewer
+	retryBackoff wait.Backoff
+	implicitAuds authenticator.Audiences
 }
 
 // NewFromInterface creates a webhook authenticator using the given tokenReview
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in
 // k8s.io/apiserver/pkg/authentication/token/cache.
-func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff, requestTimeout time.Duration) (*WebhookTokenAuthenticator, error) {
-	return newWithBackoff(tokenReview, retryBackoff, implicitAuds, requestTimeout)
+func NewFromInterface(tokenReview authenticationv1client.TokenReviewInterface, implicitAuds authenticator.Audiences, retryBackoff wait.Backoff) (*WebhookTokenAuthenticator, error) {
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
 // New creates a new WebhookTokenAuthenticator from the provided kubeconfig
@@ -75,12 +74,12 @@ func New(kubeConfigFile string, version string, implicitAuds authenticator.Audie
 	if err != nil {
 		return nil, err
 	}
-	return newWithBackoff(tokenReview, retryBackoff, implicitAuds, time.Duration(0))
+	return newWithBackoff(tokenReview, retryBackoff, implicitAuds)
 }
 
 // newWithBackoff allows tests to skip the sleep.
-func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences, requestTimeout time.Duration) (*WebhookTokenAuthenticator, error) {
-	return &WebhookTokenAuthenticator{tokenReview, retryBackoff, implicitAuds, requestTimeout}, nil
+func newWithBackoff(tokenReview tokenReviewer, retryBackoff wait.Backoff, implicitAuds authenticator.Audiences) (*WebhookTokenAuthenticator, error) {
+	return &WebhookTokenAuthenticator{tokenReview, retryBackoff, implicitAuds}, nil
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
@@ -106,17 +105,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	var (
 		result *authenticationv1.TokenReview
 		auds   authenticator.Audiences
-		cancel context.CancelFunc
 	)
-
-	// set a hard timeout if it was defined
-	// if the child has a shorter deadline then it will expire first,
-	// otherwise if the parent has a shorter deadline then the parent will expire and it will be propagate to the child
-	if w.requestTimeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, w.requestTimeout)
-		defer cancel()
-	}
-
 	// WithExponentialBackoff will return tokenreview create error (tokenReviewErr) if any.
 	if err := webhook.WithExponentialBackoff(ctx, w.retryBackoff, func() error {
 		var tokenReviewErr error
