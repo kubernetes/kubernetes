@@ -457,24 +457,6 @@ func (g *Cloud) InsertInstance(project string, zone string, i *compute.Instance)
 	return mc.Observe(g.c.Instances().Insert(ctx, meta.ZonalKey(i.Name, zone), i))
 }
 
-// ListInstanceNames returns a string of instance names separated by spaces.
-// This method should only be used for e2e testing.
-// TODO: remove this method.
-func (g *Cloud) ListInstanceNames(project, zone string) (string, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
-	defer cancel()
-
-	l, err := g.c.Instances().List(ctx, zone, filter.None)
-	if err != nil {
-		return "", err
-	}
-	var names []string
-	for _, i := range l {
-		names = append(names, i.Name)
-	}
-	return strings.Join(names, " "), nil
-}
-
 // DeleteInstance deletes an instance specified by project, zone, and name
 func (g *Cloud) DeleteInstance(project, zone, name string) error {
 	ctx, cancel := cloud.ContextWithCallTimeout()
