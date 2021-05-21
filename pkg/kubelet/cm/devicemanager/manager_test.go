@@ -40,9 +40,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -667,6 +669,132 @@ type TestResource struct {
 	resourceQuantity resource.Quantity
 	devs             checkpoint.DevicesPerNUMA
 	topology         bool
+}
+
+func TestFilterByAffinity(t *testing.T) {
+	as := require.New(t)
+	allDevices := ResourceDeviceInstances{
+		"res1": map[string]pluginapi.Device{
+			"dev1": {
+				ID: "dev1",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 1,
+						},
+					},
+				},
+			},
+			"dev2": {
+				ID: "dev2",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 1,
+						},
+						{
+							ID: 2,
+						},
+					},
+				},
+			},
+			"dev3": {
+				ID: "dev3",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 2,
+						},
+					},
+				},
+			},
+			"dev4": {
+				ID: "dev4",
+				Topology: &pluginapi.TopologyInfo{
+					Nodes: []*pluginapi.NUMANode{
+						{
+							ID: 2,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeAffinity, _ := bitmask.NewBitMask(2)
+	fakeHint := topologymanager.TopologyHint{
+		NUMANodeAffinity: fakeAffinity,
+		Preferred:        true,
+	}
+	testManager := ManagerImpl{
+		topologyAffinityStore: NewFakeTopologyManagerWithHint(t, &fakeHint),
+		allDevices:            allDevices,
+	}
+
+	testCases := []struct {
+		available               sets.String
+		fromAffinityExpected    sets.String
+		notFromAffinityExpected sets.String
+		withoutTopologyExpected sets.String
+	}{
+		{
+			available:               sets.NewString("dev1", "dev2"),
+			fromAffinityExpected:    sets.NewString("dev2"),
+			notFromAffinityExpected: sets.NewString("dev1"),
+			withoutTopologyExpected: sets.NewString(),
+		},
+		{
+			available:               sets.NewString("dev1", "dev2", "dev3", "dev4"),
+			fromAffinityExpected:    sets.NewString("dev2", "dev3", "dev4"),
+			notFromAffinityExpected: sets.NewString("dev1"),
+			withoutTopologyExpected: sets.NewString(),
+		},
+	}
+
+	for _, testCase := range testCases {
+		fromAffinity, notFromAffinity, withoutTopology := testManager.filterByAffinity("", "", "res1", testCase.available)
+		as.Truef(fromAffinity.Equal(testCase.fromAffinityExpected), "expect devices from affinity to be %v but got %v", testCase.fromAffinityExpected, fromAffinity)
+		as.Truef(notFromAffinity.Equal(testCase.notFromAffinityExpected), "expect devices not from affinity to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
+		as.Truef(withoutTopology.Equal(testCase.withoutTopologyExpected), "expect devices without topology to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
+	}
+}
+
+type fakeTopologyManagerWithHint struct {
+	t    *testing.T
+	hint *topologymanager.TopologyHint
+}
+
+// NewFakeTopologyManagerWithHint returns an instance of fake topology manager with specified topology hints
+func NewFakeTopologyManagerWithHint(t *testing.T, hint *topologymanager.TopologyHint) topologymanager.Manager {
+	return &fakeTopologyManagerWithHint{
+		t:    t,
+		hint: hint,
+	}
+}
+
+func (m *fakeTopologyManagerWithHint) AddHintProvider(h topologymanager.HintProvider) {
+	m.t.Logf("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
+}
+
+func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
+	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container name: %v container id:  %v", format.Pod(pod), container.Name, containerID)
+}
+
+func (m *fakeTopologyManagerWithHint) RemoveContainer(containerID string) error {
+	m.t.Logf("[fake topologymanager] RemoveContainer container id:  %v", containerID)
+	return nil
+}
+
+func (m *fakeTopologyManagerWithHint) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	m.t.Logf("[fake topologymanager] Topology Admit Handler")
+	return lifecycle.PodAdmitResult{
+		Admit: true,
+	}
+}
+
+func (m *fakeTopologyManagerWithHint) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
+	m.t.Logf("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
+	return *m.hint
 }
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
