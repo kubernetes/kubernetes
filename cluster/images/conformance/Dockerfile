@@ -13,16 +13,24 @@
 # limitations under the License.
 
 ARG BASEIMAGE
+ARG RUNNERIMAGE
 
-FROM ${BASEIMAGE}
+FROM ${BASEIMAGE} as debbase
 
+FROM ${RUNNERIMAGE}
+
+# This is a dependency for `kubectl diff` tests
+COPY --from=debbase /usr/bin/diff /usr/local/bin/
+
+COPY cluster /kubernetes/cluster
 COPY ginkgo /usr/local/bin/
 COPY e2e.test /usr/local/bin/
 COPY kubectl /usr/local/bin/
-COPY run_e2e.sh /run_e2e.sh
+COPY gorunner /usr/local/bin/kubeconformance
+
+# Legacy executables -- deprecated
+COPY gorunner /run_e2e.sh
 COPY gorunner /gorunner
-COPY cluster /kubernetes/cluster
-WORKDIR /usr/local/bin
 
 ENV E2E_FOCUS="\[Conformance\]"
 ENV E2E_SKIP=""
@@ -32,4 +40,4 @@ ENV E2E_VERBOSITY="4"
 ENV RESULTS_DIR="/tmp/results"
 ENV KUBECONFIG=""
 
-CMD [ "/bin/bash", "-c", "/run_e2e.sh" ]
+ENTRYPOINT [ "kubeconformance" ]
