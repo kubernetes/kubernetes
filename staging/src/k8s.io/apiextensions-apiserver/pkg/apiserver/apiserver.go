@@ -116,9 +116,11 @@ func (cfg *Config) Complete() CompletedConfig {
 	}
 
 	c.GenericConfig.EnableDiscovery = false
-	c.GenericConfig.Version = &version.Info{
-		Major: "0",
-		Minor: "1",
+	if c.GenericConfig.Version == nil {
+		c.GenericConfig.Version = &version.Info{
+			Major: "0",
+			Minor: "1",
+		}
 	}
 
 	return CompletedConfig{&c}
