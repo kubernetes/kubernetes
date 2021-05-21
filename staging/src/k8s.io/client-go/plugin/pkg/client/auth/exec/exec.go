@@ -263,8 +263,9 @@ func (a *Authenticator) UpdateTransportConfig(c *transport.Config) error {
 	// setting up the transport, as that triggers the exec action if the server is
 	// also configured to allow client certificates for authentication. For requests
 	// like "kubectl get --token (token) pods" we should assume the intention is to
-	// use the provided token for authentication.
-	if c.HasTokenAuth() {
+	// use the provided token for authentication. The same can be said for when the
+	// user specifies basic auth.
+	if c.HasTokenAuth() || c.HasBasicAuth() {
 		return nil
 	}
 

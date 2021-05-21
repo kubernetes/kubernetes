@@ -329,12 +329,8 @@ func TestExecPluginViaClient(t *testing.T) {
 				c.Password = "unauthorized"
 			},
 			wantAuthorizationHeaderValues: [][]string{{"Basic " + basicAuthHeaderValue("unauthorized", "unauthorized")}},
-			wantCertificate:               &tls.Certificate{},
 			wantClientErrorPrefix:         "Unauthorized",
-			// I don't think we should be calling the exec plugin here. We don't call the exec
-			// plugin in the case where bearer tokens are already present, and this case is
-			// similar. See https://github.com/kubernetes/kubernetes/pull/102175.
-			wantMetrics: &execPluginMetrics{calls: []execPluginCall{{exitCode: 0, callStatus: "no_error"}}},
+			wantMetrics:                   &execPluginMetrics{},
 		},
 		{
 			name: "good token with static auth bearer token favors static auth bearer token",

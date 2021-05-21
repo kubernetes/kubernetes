@@ -922,24 +922,47 @@ func TestRoundTripper(t *testing.T) {
 	get(t, http.StatusOK)
 }
 
-func TestTokenPresentCancelsExecAction(t *testing.T) {
-	a, err := newAuthenticator(newCache(), &api.ExecConfig{
-		Command:    "./testdata/test-plugin.sh",
-		APIVersion: "client.authentication.k8s.io/v1alpha1",
-	}, nil)
-	if err != nil {
-		t.Fatal(err)
+func TestAuthorizationHeaderPresentCancelsExecAction(t *testing.T) {
+	tests := []struct {
+		name               string
+		setTransportConfig func(*transport.Config)
+	}{
+		{
+			name: "bearer token",
+			setTransportConfig: func(config *transport.Config) {
+				config.BearerToken = "token1f"
+			},
+		},
+		{
+			name: "basic auth",
+			setTransportConfig: func(config *transport.Config) {
+				config.Username = "marshmallow"
+				config.Password = "zelda"
+			},
+		},
 	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			a, err := newAuthenticator(newCache(), &api.ExecConfig{
+				Command:    "./testdata/test-plugin.sh",
+				APIVersion: "client.authentication.k8s.io/v1alpha1",
+			}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
-	// transport config, in which case it takes precedence
-	cert := func() (*tls.Certificate, error) {
-		return nil, nil
-	}
-	tc := &transport.Config{BearerToken: "token1", TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+			// UpdateTransportConfig returns error on existing TLS certificate callback, unless a bearer token is present in the
+			// transport config, in which case it takes precedence
+			cert := func() (*tls.Certificate, error) {
+				return nil, nil
+			}
+			tc := &transport.Config{TLS: transport.TLSConfig{Insecure: true, GetCert: cert}}
+			test.setTransportConfig(tc)
 
-	if err := a.UpdateTransportConfig(tc); err != nil {
-		t.Error("Expected presence of bearer token in config to cancel exec action")
+			if err := a.UpdateTransportConfig(tc); err != nil {
+				t.Error("Expected presence of bearer token in config to cancel exec action")
+			}
+		})
 	}
 }
 
