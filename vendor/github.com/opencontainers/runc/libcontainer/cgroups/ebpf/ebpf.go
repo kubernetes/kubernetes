@@ -3,6 +3,7 @@ package ebpf
 import (
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/asm"
+	"github.com/cilium/ebpf/link"
 	"github.com/pkg/errors"
 	"golang.org/x/sys/unix"
 )
@@ -32,12 +33,23 @@ func LoadAttachCgroupDeviceFilter(insts asm.Instructions, license string, dirFD 
 	if err != nil {
 		return nilCloser, err
 	}
-	if err := prog.Attach(dirFD, ebpf.AttachCGroupDevice, unix.BPF_F_ALLOW_MULTI); err != nil {
+	err = link.RawAttachProgram(link.RawAttachProgramOptions{
+		Target:  dirFD,
+		Program: prog,
+		Attach:  ebpf.AttachCGroupDevice,
+		Flags:   unix.BPF_F_ALLOW_MULTI,
+	})
+	if err != nil {
 		return nilCloser, errors.Wrap(err, "failed to call BPF_PROG_ATTACH (BPF_CGROUP_DEVICE, BPF_F_ALLOW_MULTI)")
 	}
 	closer := func() error {
-		if err := prog.Detach(dirFD, ebpf.AttachCGroupDevice, unix.BPF_F_ALLOW_MULTI); err != nil {
-			return errors.Wrap(err, "failed to call BPF_PROG_DETACH (BPF_CGROUP_DEVICE, BPF_F_ALLOW_MULTI)")
+		err = link.RawDetachProgram(link.RawDetachProgramOptions{
+			Target:  dirFD,
+			Program: prog,
+			Attach:  ebpf.AttachCGroupDevice,
+		})
+		if err != nil {
+			return errors.Wrap(err, "failed to call BPF_PROG_DETACH (BPF_CGROUP_DEVICE)")
 		}
 		return nil
 	}

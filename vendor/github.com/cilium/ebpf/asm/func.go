@@ -7,7 +7,7 @@ type BuiltinFunc int32
 
 // eBPF built-in functions
 //
-// You can renegerate this list using the following gawk script:
+// You can regenerate this list using the following gawk script:
 //
 //    /FN\(.+\),/ {
 //      match($1, /\((.+)\)/, r)

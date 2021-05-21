@@ -19,8 +19,8 @@ func (s *NetPrioGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *NetPrioGroup) Set(path string, cgroup *configs.Cgroup) error {
-	for _, prioMap := range cgroup.Resources.NetPrioIfpriomap {
+func (s *NetPrioGroup) Set(path string, r *configs.Resources) error {
+	for _, prioMap := range r.NetPrioIfpriomap {
 		if err := fscommon.WriteFile(path, "net_prio.ifpriomap", prioMap.CgroupString()); err != nil {
 			return err
 		}
