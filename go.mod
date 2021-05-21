@@ -69,10 +69,10 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/runc v1.0.0-rc93
 	github.com/opencontainers/selinux v1.8.0
-	github.com/openshift/api v0.0.0-20210422150128-d8a48168c81c
-	github.com/openshift/apiserver-library-go v0.0.0-20210426120049-59b0e972bfb7
-	github.com/openshift/client-go v0.0.0-20210422153130-25c8450d1535
-	github.com/openshift/library-go v0.0.0-20210407092538-7021fda6f427
+	github.com/openshift/api v0.0.0-20210521075222-e273a339932a
+	github.com/openshift/apiserver-library-go v0.0.0-20210521113822-91c23a9a7ddf
+	github.com/openshift/client-go v0.0.0-20210521082421-73d9475a9142
+	github.com/openshift/library-go v0.0.0-20210521084623-7392ea9b02ca
 	github.com/pkg/errors v0.9.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/prometheus/client_model v0.2.0
@@ -546,6 +546,8 @@ replace (
 	modernc.org/xc => modernc.org/xc v1.0.0
 	rsc.io/pdf => rsc.io/pdf v0.1.1
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.15
+	sigs.k8s.io/controller-tools => sigs.k8s.io/controller-tools v0.2.8
+	sigs.k8s.io/kube-storage-version-migrator => sigs.k8s.io/kube-storage-version-migrator v0.0.3
 	sigs.k8s.io/kustomize/api => sigs.k8s.io/kustomize/api v0.8.8
 	sigs.k8s.io/kustomize/cmd/config => sigs.k8s.io/kustomize/cmd/config v0.9.10
 	sigs.k8s.io/kustomize/kustomize/v4 => sigs.k8s.io/kustomize/kustomize/v4 v4.1.2
