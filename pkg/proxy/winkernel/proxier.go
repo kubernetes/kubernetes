@@ -317,7 +317,7 @@ func newSourceVIP(hns HostNetworkService, network string, ip string, mac string,
 
 func (ep *endpointsInfo) Cleanup() {
 	Log(ep, "Endpoint Cleanup", 3)
-	if ep.refCount != nil {
+	if !ep.GetIsLocal() && ep.refCount != nil {
 		*ep.refCount--
 
 		// Remove the remote hns endpoint, if no service is referring it
@@ -1112,10 +1112,10 @@ func (proxier *Proxier) syncProxyRules() {
 			} else {
 				// We only share the refCounts for remote endpoints
 				ep.refCount = proxier.endPointsRefCount.getRefCount(newHnsEndpoint.hnsID)
+				*ep.refCount++
 			}
 
 			ep.hnsID = newHnsEndpoint.hnsID
-			*ep.refCount++
 
 			Log(ep, "Endpoint resource found", 3)
 		}
