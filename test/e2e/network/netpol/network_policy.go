@@ -117,7 +117,7 @@ and what is happening in practice:
 		z/c	.	.	.	.	.	.	.	.	.
 */
 
-var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol", func() {
 	f := framework.NewDefaultFramework("netpol")
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -1312,6 +1312,7 @@ func initializeResourcesByFixedNS(f *framework.Framework) {
 // model derived from the framework.  It then waits for the resources described by the model to be up and running
 // (i.e. all pods are ready and running in their namespaces).
 func initializeResources(f *framework.Framework) error {
+	var protocols []v1.Protocol
 	_, _, _, model, k8s := getK8SModel(f)
 
 	framework.Logf("initializing cluster: ensuring namespaces, deployments, and pods exist and are ready")
@@ -1322,6 +1323,10 @@ func initializeResources(f *framework.Framework) error {
 	}
 
 	framework.Logf("finished initializing cluster state")
-
-	return k8s.waitForHTTPServers(model)
+	if framework.NodeOSDistroIs("windows") {
+		protocols = append(protocols, v1.ProtocolTCP)
+	} else {
+		protocols = model.Protocols
+	}
+	return k8s.waitForHTTPServers(model, protocols)
 }
