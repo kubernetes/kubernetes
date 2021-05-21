@@ -393,51 +393,6 @@ func getSupportedUnifiedControllers() sets.String {
 	return supportedControllers.Intersection(availableRootControllers)
 }
 
-// propagateControllers on an unified hierarchy enables all the supported controllers for the specified cgroup
-func propagateControllers(path string) error {
-	if err := os.MkdirAll(filepath.Join(cmutil.CgroupRoot, path), 0755); err != nil {
-		return fmt.Errorf("failed to create cgroup %q : %v", path, err)
-	}
-
-	// Retrieve all the supported controllers from the cgroup root
-	controllersFileContent, err := ioutil.ReadFile(filepath.Join(cmutil.CgroupRoot, "cgroup.controllers"))
-	if err != nil {
-		return fmt.Errorf("failed to read controllers from %q : %v", cmutil.CgroupRoot, err)
-	}
-
-	supportedControllers := getSupportedUnifiedControllers()
-
-	// The retrieved content looks like: "cpuset cpu io memory hugetlb pids".  Prepend each of the controllers
-	// with '+', so we have something like "+cpuset +cpu +io +memory +hugetlb +pids"
-	controllers := ""
-	for _, controller := range strings.Fields(string(controllersFileContent)) {
-		// ignore controllers we don't care about
-		if !supportedControllers.Has(controller) {
-			continue
-		}
-
-		sep := " +"
-		if controllers == "" {
-			sep = "+"
-		}
-		controllers = controllers + sep + controller
-	}
-
-	current := cmutil.CgroupRoot
-
-	// Write the controllers list to each "cgroup.subtree_control" file until it reaches the parent cgroup.
-	// For the /foo/bar/baz cgroup, controllers must be enabled sequentially in the files:
-	// - /sys/fs/cgroup/foo/cgroup.subtree_control
-	// - /sys/fs/cgroup/foo/bar/cgroup.subtree_control
-	for _, p := range strings.Split(filepath.Dir(path), "/") {
-		current = filepath.Join(current, p)
-		if err := ioutil.WriteFile(filepath.Join(current, "cgroup.subtree_control"), []byte(controllers), 0755); err != nil {
-			return fmt.Errorf("failed to enable controllers on %q: %v", cmutil.CgroupRoot, err)
-		}
-	}
-	return nil
-}
-
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
 		Devices: []*libcontainerdevices.Rule{
@@ -535,10 +490,6 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}
 
 	if unified {
-		if err := propagateControllers(libcontainerCgroupConfig.Path); err != nil {
-			return err
-		}
-
 		supportedControllers := getSupportedUnifiedControllers()
 		if !supportedControllers.Has("hugetlb") {
 			resources.HugetlbLimit = nil
