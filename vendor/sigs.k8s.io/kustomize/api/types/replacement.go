@@ -3,6 +3,13 @@
 
 package types
 
+import (
+	"fmt"
+	"strings"
+
+	"sigs.k8s.io/kustomize/kyaml/resid"
+)
+
 const DefaultReplacementFieldPath = "metadata.name"
 
 // Replacement defines how to perform a substitution
@@ -18,13 +25,27 @@ type Replacement struct {
 // SourceSelector is the source of the replacement transformer.
 type SourceSelector struct {
 	// A specific object to read it from.
-	KrmId `json:",inline,omitempty" yaml:",inline,omitempty"`
+	resid.ResId `json:",inline,omitempty" yaml:",inline,omitempty"`
 
 	// Structured field path expected in the allowed object.
 	FieldPath string `json:"fieldPath" yaml:"fieldPath"`
 
 	// Used to refine the interpretation of the field.
 	Options *FieldOptions `json:"options" yaml:"options"`
+}
+
+func (s *SourceSelector) String() string {
+	if s == nil {
+		return ""
+	}
+	result := []string{s.ResId.String()}
+	if s.FieldPath != "" {
+		result = append(result, s.FieldPath)
+	}
+	if opts := s.Options.String(); opts != "" {
+		result = append(result, opts)
+	}
+	return strings.Join(result, ":")
 }
 
 // TargetSelector specifies fields in one or more objects.
@@ -56,4 +77,11 @@ type FieldOptions struct {
 
 	// If field missing, add it.
 	Create bool `json:"create" yaml:"create"`
+}
+
+func (fo *FieldOptions) String() string {
+	if fo == nil || fo.Delimiter == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s(%d)", fo.Delimiter, fo.Index)
 }

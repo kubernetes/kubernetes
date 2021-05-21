@@ -12,13 +12,10 @@ type ResId struct {
 	// Gvk of the resource.
 	Gvk `json:",inline,omitempty" yaml:",inline,omitempty"`
 
-	// Name of the resource before transformation.
+	// Name of the resource.
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 
-	// Namespace the resource belongs to.
-	// An untransformed resource has no namespace.
-	// A fully transformed resource has the namespace
-	// from the top most overlay.
+	// Namespace the resource belongs to, if it can belong to a namespace.
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 }
 
@@ -30,12 +27,12 @@ func NewResIdWithNamespace(k Gvk, n, ns string) ResId {
 
 // NewResId creates new ResId.
 func NewResId(k Gvk, n string) ResId {
-	return ResId{Gvk: k, Name: n}
+	return NewResIdWithNamespace(k, n, "")
 }
 
 // NewResIdKindOnly creates a new ResId.
 func NewResIdKindOnly(k string, n string) ResId {
-	return ResId{Gvk: FromKind(k), Name: n}
+	return NewResId(FromKind(k), n)
 }
 
 const (
@@ -90,6 +87,13 @@ func (id ResId) GvknEquals(o ResId) bool {
 	return id.Name == o.Name && id.Gvk.Equals(o.Gvk)
 }
 
+// IsSelectedBy returns true if self is selected by the argument.
+func (id ResId) IsSelectedBy(selector ResId) bool {
+	return (selector.Name == "" || selector.Name == id.Name) &&
+		(selector.Namespace == "" || selector.IsNsEquals(id)) &&
+		id.Gvk.IsSelected(&selector.Gvk)
+}
+
 // Equals returns true if the other id matches
 // namespace/Group/Version/Kind/name.
 func (id ResId) Equals(o ResId) bool {
@@ -106,7 +110,7 @@ func (id ResId) IsNsEquals(o ResId) bool {
 // ResId and the Namespace is either not set or set
 // to DefaultNamespace.
 func (id ResId) IsInDefaultNs() bool {
-	return id.IsNamespaceableKind() && id.isPutativelyDefaultNs()
+	return !id.IsClusterScoped() && id.isPutativelyDefaultNs()
 }
 
 func (id ResId) isPutativelyDefaultNs() bool {
@@ -117,7 +121,7 @@ func (id ResId) isPutativelyDefaultNs() bool {
 // namespace for use in reporting and equality tests.
 func (id ResId) EffectiveNamespace() string {
 	// The order of these checks matters.
-	if !id.IsNamespaceableKind() {
+	if id.IsClusterScoped() {
 		return TotallyNotANamespace
 	}
 	if id.isPutativelyDefaultNs() {

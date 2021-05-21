@@ -267,6 +267,9 @@ func (p *HelmChartInflationGeneratorPlugin) templateCommand() []string {
 	if p.ReleaseName != "" {
 		args = append(args, p.ReleaseName)
 	}
+	if p.Namespace != "" {
+		args = append(args, "--namespace", p.Namespace)
+	}
 	args = append(args, filepath.Join(p.absChartHome(), p.Name))
 	if p.ValuesFile != "" {
 		args = append(args, "--values", p.ValuesFile)
