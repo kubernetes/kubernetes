@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"sigs.k8s.io/kustomize/api/filesys"
 	"sigs.k8s.io/kustomize/api/ifc"
 	"sigs.k8s.io/kustomize/api/internal/plugins/builtinhelpers"
 	"sigs.k8s.io/kustomize/api/internal/plugins/execplugin"
@@ -29,11 +30,21 @@ import (
 type Loader struct {
 	pc *types.PluginConfig
 	rf *resmap.Factory
+	fs filesys.FileSystem
+
+	// absolutePluginHome caches the location of a valid plugin root directory.
+	// It should only be set once the directory's existence has been confirmed.
+	absolutePluginHome string
 }
 
 func NewLoader(
-	pc *types.PluginConfig, rf *resmap.Factory) *Loader {
-	return &Loader{pc: pc, rf: rf}
+	pc *types.PluginConfig, rf *resmap.Factory, fs filesys.FileSystem) *Loader {
+	return &Loader{pc: pc, rf: rf, fs: fs}
+}
+
+// Config provides the global (not plugin specific) PluginConfig data.
+func (l *Loader) Config() *types.PluginConfig {
+	return l.pc
 }
 
 func (l *Loader) LoadGenerators(
@@ -95,13 +106,47 @@ func relativePluginPath(id resid.ResId) string {
 		strings.ToLower(id.Kind))
 }
 
-func AbsolutePluginPath(pc *types.PluginConfig, id resid.ResId) string {
-	return filepath.Join(
-		pc.AbsPluginHome, relativePluginPath(id), id.Kind)
+func (l *Loader) AbsolutePluginPath(id resid.ResId) (string, error) {
+	pluginHome, err := l.absPluginHome()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(pluginHome, relativePluginPath(id), id.Kind), nil
 }
 
-func (l *Loader) absolutePluginPath(id resid.ResId) string {
-	return AbsolutePluginPath(l.pc, id)
+// absPluginHome is the home of kustomize Exec and Go plugins.
+// Kustomize plugin configuration files are k8s-style objects
+// containing the fields 'apiVersion' and 'kind', e.g.
+//   apiVersion: apps/v1
+//   kind: Deployment
+// kustomize reads plugin configuration data from a file path
+// specified in the 'generators:' or 'transformers:' field of a
+// kustomization file.  For Exec and Go plugins, kustomize
+// uses this data to both locate the plugin and configure it.
+// Each Exec or Go plugin (its code, its tests, its supporting data
+// files, etc.) must be housed in its own directory at
+//   ${absPluginHome}/${pluginApiVersion}/LOWERCASE(${pluginKind})
+// where
+//   - ${absPluginHome} is an absolute path, defined below.
+//   - ${pluginApiVersion} is taken from the plugin config file.
+//   - ${pluginKind} is taken from the plugin config file.
+func (l *Loader) absPluginHome() (string, error) {
+	// External plugins are disabled--return the dummy plugin root.
+	if l.pc.PluginRestrictions != types.PluginRestrictionsNone {
+		return konfig.NoPluginHomeSentinal, nil
+	}
+	// We've already determined plugin home--use the cached value.
+	if l.absolutePluginHome != "" {
+		return l.absolutePluginHome, nil
+	}
+
+	// Check default locations for a valid plugin root, and cache it if found.
+	dir, err := konfig.DefaultAbsPluginHome(l.fs)
+	if err != nil {
+		return "", err
+	}
+	l.absolutePluginHome = dir
+	return l.absolutePluginHome, nil
 }
 
 func isBuiltinPlugin(res *resource.Resource) bool {
@@ -148,7 +193,7 @@ func (l *Loader) loadAndConfigurePlugin(
 	if err != nil {
 		return nil, errors.Wrapf(err, "marshalling yaml from res %s", res.OrgId())
 	}
-	err = c.Config(resmap.NewPluginHelpers(ldr, v, l.rf), yaml)
+	err = c.Config(resmap.NewPluginHelpers(ldr, v, l.rf, l.pc), yaml)
 	if err != nil {
 		return nil, errors.Wrapf(
 			err, "plugin %s fails configuration", res.OrgId())
@@ -176,10 +221,13 @@ func (l *Loader) loadPlugin(res *resource.Resource) (resmap.Configurable, error)
 }
 
 func (l *Loader) loadExecOrGoPlugin(resId resid.ResId) (resmap.Configurable, error) {
+	absPluginPath, err := l.AbsolutePluginPath(resId)
+	if err != nil {
+		return nil, err
+	}
 	// First try to load the plugin as an executable.
-	p := execplugin.NewExecPlugin(l.absolutePluginPath(resId))
-	err := p.ErrIfNotExecutable()
-	if err == nil {
+	p := execplugin.NewExecPlugin(absPluginPath)
+	if err = p.ErrIfNotExecutable(); err == nil {
 		return p, nil
 	}
 	if !os.IsNotExist(err) {
@@ -193,7 +241,7 @@ func (l *Loader) loadExecOrGoPlugin(resId resid.ResId) (resmap.Configurable, err
 		return nil, err
 	}
 	// Failing the above, try loading it as a Go plugin.
-	c, err := l.loadGoPlugin(resId)
+	c, err := l.loadGoPlugin(resId, absPluginPath+".so")
 	if err != nil {
 		return nil, err
 	}
@@ -208,12 +256,11 @@ func (l *Loader) loadExecOrGoPlugin(resId resid.ResId) (resmap.Configurable, err
 // as a Loader instance variable.  So make it a package variable.
 var registry = make(map[string]resmap.Configurable)
 
-func (l *Loader) loadGoPlugin(id resid.ResId) (resmap.Configurable, error) {
+func (l *Loader) loadGoPlugin(id resid.ResId, absPath string) (resmap.Configurable, error) {
 	regId := relativePluginPath(id)
 	if c, ok := registry[regId]; ok {
 		return copyPlugin(c), nil
 	}
-	absPath := l.absolutePluginPath(id) + ".so"
 	if !utils.FileExists(absPath) {
 		return nil, fmt.Errorf(
 			"expected file with Go object code at: %s", absPath)

@@ -36,7 +36,7 @@ type Kustomizer struct {
 func MakeKustomizer(o *Options) *Kustomizer {
 	return &Kustomizer{
 		options:     o,
-		depProvider: provider.NewDepProvider(o.UseKyaml),
+		depProvider: provider.NewDepProvider(),
 	}
 }
 
@@ -52,9 +52,7 @@ func MakeKustomizer(o *Options) *Kustomizer {
 // and Run can be called on each of them).
 func (b *Kustomizer) Run(
 	fSys filesys.FileSystem, path string) (resmap.ResMap, error) {
-	resmapFactory := resmap.NewFactory(
-		b.depProvider.GetResourceFactory(),
-		b.depProvider.GetConflictDetectorFactory())
+	resmapFactory := resmap.NewFactory(b.depProvider.GetResourceFactory())
 	lr := fLdr.RestrictionNone
 	if b.options.LoadRestrictions == types.LoadRestrictionsRootOnly {
 		lr = fLdr.RestrictionRootOnly
@@ -68,7 +66,8 @@ func (b *Kustomizer) Run(
 		ldr,
 		b.depProvider.GetFieldValidator(),
 		resmapFactory,
-		pLdr.NewLoader(b.options.PluginConfig, resmapFactory),
+		// The plugin configs are always located on disk, regardless of the fSys passed in
+		pLdr.NewLoader(b.options.PluginConfig, resmapFactory, filesys.MakeFsOnDisk()),
 	)
 	err = kt.Load()
 	if err != nil {

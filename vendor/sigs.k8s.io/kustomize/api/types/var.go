@@ -12,8 +12,6 @@ import (
 	"sigs.k8s.io/kustomize/api/resid"
 )
 
-const defaultFieldPath = "metadata.name"
-
 // Var represents a variable whose value will be sourced
 // from a field in a Kubernetes object.
 type Var struct {
@@ -71,7 +69,7 @@ type FieldSelector struct {
 // defaulting sets reference to field used by default.
 func (v *Var) Defaulting() {
 	if v.FieldRef.FieldPath == "" {
-		v.FieldRef.FieldPath = defaultFieldPath
+		v.FieldRef.FieldPath = DefaultReplacementFieldPath
 	}
 	v.ObjRef.GVK()
 }

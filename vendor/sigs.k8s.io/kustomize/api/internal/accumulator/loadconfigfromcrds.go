@@ -25,7 +25,7 @@ type OpenAPIDefinition struct {
 	Dependencies []string
 }
 
-type myProperties map[string]spec.Schema
+type myProperties = map[string]spec.Schema
 type nameToApiMap map[string]OpenAPIDefinition
 
 // LoadConfigFromCRDs parse CRD schemas from paths into a TransformerConfig

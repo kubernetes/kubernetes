@@ -3,6 +3,8 @@
 
 package types
 
+import "reflect"
+
 // Patch represent either a Strategic Merge Patch or a JSON patch
 // and its targets.
 // The content of the patch can either be from a file
@@ -16,6 +18,9 @@ type Patch struct {
 
 	// Target points to the resources that the patch is applied to
 	Target *Selector `json:"target,omitempty" yaml:"target,omitempty"`
+
+	// Options is a list of options for the patch
+	Options map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 // Equals return true if p equals o.
@@ -24,5 +29,6 @@ func (p *Patch) Equals(o Patch) bool {
 		(p.Target != nil && o.Target != nil && *p.Target == *o.Target)
 	return p.Path == o.Path &&
 		p.Patch == o.Patch &&
-		targetEqual
+		targetEqual &&
+		reflect.DeepEqual(p.Options, o.Options)
 }

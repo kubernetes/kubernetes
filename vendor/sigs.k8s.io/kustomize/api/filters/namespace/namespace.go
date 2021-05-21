@@ -118,7 +118,6 @@ func (ns Filter) roleBindingHack(obj *yaml.RNode, meta yaml.ResourceMeta) error 
 
 	// add the namespace to each "subject" with name: default
 	err = obj.VisitElements(func(o *yaml.RNode) error {
-		// copied from kunstruct based kustomize NamespaceTransformer plugin
 		// The only case we need to force the namespace
 		// if for the "service account". "default" is
 		// kind of hardcoded here for right now.

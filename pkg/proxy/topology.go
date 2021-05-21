@@ -49,15 +49,15 @@ func FilterEndpoints(endpoints []Endpoint, svcInfo ServicePort, nodeLabels map[s
 // filterEndpointsWithHints provides filtering based on the hints included in
 // EndpointSlices. If any of the following are true, the full list of endpoints
 // will be returned without any filtering:
-// * The AnnotationTopologyAwareHints annotation is not set to "auto" for this
+// * The AnnotationTopologyAwareHints annotation is not set to "Auto" for this
 //   Service.
 // * No zone is specified in node labels.
 // * No endpoints for this Service have a hint pointing to the zone this
 //   instance of kube-proxy is running in.
 // * One or more endpoints for this Service do not have hints specified.
 func filterEndpointsWithHints(endpoints []Endpoint, hintsAnnotation string, nodeLabels map[string]string) []Endpoint {
-	if hintsAnnotation != "auto" {
-		if hintsAnnotation != "" && hintsAnnotation != "disabled" {
+	if hintsAnnotation != "Auto" && hintsAnnotation != "auto" {
+		if hintsAnnotation != "" && hintsAnnotation != "Disabled" && hintsAnnotation != "disabled" {
 			klog.Warningf("Skipping topology aware endpoint filtering since Service has unexpected value for %s annotation: %s", v1.AnnotationTopologyAwareHints, hintsAnnotation)
 		}
 		return endpoints

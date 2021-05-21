@@ -378,6 +378,9 @@ cleanup()
   if [[ "${PRESERVE_ETCD}" == "false" ]]; then
     [[ -n "${ETCD_DIR-}" ]] && kube::etcd::clean_etcd_dir
   fi
+
+  # Drop the rule we added
+  iptables -t nat -D OUTPUT -m addrtype --dst-type LOCAL -j DOCKER || true
   exit 0
 }
 
@@ -570,6 +573,7 @@ EOF
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --service-account-issuer="https://kubernetes.default.svc" \
+      --service-account-jwks-uri="https://kubernetes.default.svc/openid/v1/jwks" \
       --service-account-signing-key-file="${SERVICE_ACCOUNT_KEY}" \
       --enable-admission-plugins="${ENABLE_ADMISSION_PLUGINS}" \
       --disable-admission-plugins="${DISABLE_ADMISSION_PLUGINS}" \
@@ -870,6 +874,13 @@ clientConnection:
   kubeconfig: ${CERT_DIR}/kube-proxy.kubeconfig
 hostnameOverride: ${HOSTNAME_OVERRIDE}
 mode: ${KUBE_PROXY_MODE}
+conntrack:
+# Skip setting sysctl value "net.netfilter.nf_conntrack_max"
+  maxPerCore: 0
+# Skip setting "net.netfilter.nf_conntrack_tcp_timeout_established"
+  tcpEstablishedTimeout: 0s
+# Skip setting "net.netfilter.nf_conntrack_tcp_timeout_close"
+  tcpCloseWaitTimeout: 0s
 EOF
     if [[ -n ${FEATURE_GATES} ]]; then
       parse_feature_gates "${FEATURE_GATES}"
@@ -1086,8 +1097,17 @@ if [[ "${START_MODE}" != "kubeletonly" ]]; then
   kube::etcd::validate
 fi
 
-if [ "${CONTAINER_RUNTIME}" == "docker" ] && ! kube::util::ensure_docker_daemon_connectivity; then
-  exit 1
+if [ "${CONTAINER_RUNTIME}" == "docker" ]; then
+  if ! kube::util::ensure_docker_daemon_connectivity; then
+    exit 1
+  else
+    # docker doesn't allow to reach exposed hostPorts from the node, however, Kubernetes does
+    # so we append a new rule on top of the docker one
+    # -A OUTPUT ! -d 127.0.0.0/8 -m addrtype --dst-type LOCAL -j DOCKER  <-- docker rule
+    if ! iptables -t nat -C OUTPUT -m addrtype --dst-type LOCAL -j DOCKER; then
+      iptables -t nat -A OUTPUT -m addrtype --dst-type LOCAL -j DOCKER
+    fi
+  fi
 fi
 
 if [[ "${START_MODE}" != "kubeletonly" ]]; then

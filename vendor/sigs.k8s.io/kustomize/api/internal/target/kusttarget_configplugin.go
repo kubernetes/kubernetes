@@ -112,16 +112,22 @@ var generatorConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 		return
 	},
 
-	builtinhelpers.HelmChartInflationGenerator: func(kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f gFactory) (
+	builtinhelpers.HelmChartInflationGenerator: func(
+		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f gFactory) (
 		result []resmap.Generator, err error) {
 		var c struct {
-			types.HelmChartArgs
+			types.HelmGlobals
+			types.HelmChart
 		}
-		for _, args := range kt.kustomization.HelmChartInflationGenerator {
-			c.HelmChartArgs = args
+		var globals types.HelmGlobals
+		if kt.kustomization.HelmGlobals != nil {
+			globals = *kt.kustomization.HelmGlobals
+		}
+		for _, chart := range kt.kustomization.HelmCharts {
+			c.HelmGlobals = globals
+			c.HelmChart = chart
 			p := f()
-			err := kt.configureBuiltinPlugin(p, c, bpt)
-			if err != nil {
+			if err = kt.configureBuiltinPlugin(p, c, bpt); err != nil {
 				return nil, err
 			}
 			result = append(result, p)
@@ -201,14 +207,16 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 			return
 		}
 		var c struct {
-			Path   string          `json:"path,omitempty" yaml:"path,omitempty"`
-			Patch  string          `json:"patch,omitempty" yaml:"patch,omitempty"`
-			Target *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
+			Path    string          `json:"path,omitempty" yaml:"path,omitempty"`
+			Patch   string          `json:"patch,omitempty" yaml:"patch,omitempty"`
+			Target  *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
+			Options map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
 		}
 		for _, pc := range kt.kustomization.Patches {
 			c.Target = pc.Target
 			c.Patch = pc.Patch
 			c.Path = pc.Path
+			c.Options = pc.Options
 			p := f()
 			err = kt.configureBuiltinPlugin(p, c, bpt)
 			if err != nil {
@@ -221,6 +229,31 @@ var transformerConfigurators = map[builtinhelpers.BuiltinPluginType]func(
 	builtinhelpers.LabelTransformer: func(
 		kt *KustTarget, bpt builtinhelpers.BuiltinPluginType, f tFactory, tc *builtinconfig.TransformerConfig) (
 		result []resmap.Transformer, err error) {
+		for _, label := range kt.kustomization.Labels {
+			var c struct {
+				Labels     map[string]string
+				FieldSpecs []types.FieldSpec
+			}
+			c.Labels = label.Pairs
+			fss := types.FsSlice(label.FieldSpecs)
+			// merge the custom fieldSpecs with the default
+			if label.IncludeSelectors {
+				fss, err = fss.MergeAll(tc.CommonLabels)
+			} else {
+				// only add to metadata by default
+				fss, err = fss.MergeOne(types.FieldSpec{Path: "metadata/labels", CreateIfNotPresent: true})
+			}
+			if err != nil {
+				return nil, err
+			}
+			c.FieldSpecs = fss
+			p := f()
+			err = kt.configureBuiltinPlugin(p, c, bpt)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, p)
+		}
 		var c struct {
 			Labels     map[string]string
 			FieldSpecs []types.FieldSpec

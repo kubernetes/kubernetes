@@ -21,6 +21,7 @@ type PatchTransformerPlugin struct {
 	Path         string          `json:"path,omitempty" yaml:"path,omitempty"`
 	Patch        string          `json:"patch,omitempty" yaml:"patch,omitempty"`
 	Target       *types.Selector `json:"target,omitempty" yaml:"target,omitempty"`
+	Options      map[string]bool `json:"options,omitempty" yaml:"options,omitempty"`
 }
 
 func (p *PatchTransformerPlugin) Config(
@@ -60,6 +61,12 @@ func (p *PatchTransformerPlugin) Config(
 	}
 	if errSM == nil {
 		p.loadedPatch = patchSM
+		if p.Options["allowNameChange"] {
+			p.loadedPatch.SetAllowNameChange("true")
+		}
+		if p.Options["allowKindChange"] {
+			p.loadedPatch.SetAllowKindChange("true")
+		}
 	} else {
 		p.decodedPatch = patchJson
 	}
