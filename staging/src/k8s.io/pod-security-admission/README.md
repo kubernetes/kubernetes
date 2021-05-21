@@ -1,4 +1,4 @@
-# Pod Security Standards
+# Pod Security Admission
 
 <!-- TODO: Placeholder README. Update with more detail and repo contents once initial implementation is in place. -->
 

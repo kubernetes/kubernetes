@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package podsecuritystandards is a placeholder until the initial podsecurity implementation is
+// Package podsecurityadmission is a placeholder until the initial podsecurity implementation is
 // added.
-package podsecuritystandards // import "k8s.io/pod-security-standards"
+package podsecurityadmission // import "k8s.io/pod-security-admission"
