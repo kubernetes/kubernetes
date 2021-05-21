@@ -1023,8 +1023,6 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for node-Service: udp": "should function for node-Service: udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service(hostNetwork): udp": "should function for pod-Service(hostNetwork): udp [Suite:openshift/conformance/parallel] [Suite:k8s]",
-
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: http": "should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-network] Networking Granular Checks: Services should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive]": "should function for pod-Service: sctp [Feature:SCTPConnectivity][Disruptive] [Serial] [Suite:k8s]",
@@ -1367,6 +1365,8 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Probing container should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance]": "should be restarted with a exec \"cat /tmp/health\" liveness probe [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
+	"[Top Level] [sig-node] Probing container should be restarted with a failing exec liveness probe that took longer than the timeout": "should be restarted with a failing exec liveness probe that took longer than the timeout [Suite:openshift/conformance/parallel] [Suite:k8s]",
+
 	"[Top Level] [sig-node] Probing container should be restarted with a local redirect http liveness probe": "should be restarted with a local redirect http liveness probe [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Probing container should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance]": "should be restarted with an exec liveness probe with timeout [MinimumKubeletVersion:1.20] [NodeConformance] [Suite:openshift/conformance/parallel] [Suite:k8s]",
@@ -1459,13 +1459,13 @@ var annotations = map[string]string{
 
 	"[Top Level] [sig-node] Security Context when creating containers with AllowPrivilegeEscalation should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance]": "should not allow privilege escalation when false [LinuxOnly] [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node": "should not launch unsafe, but not explicitly enabled sysctls on the node [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]": "should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21] [Suite:openshift/conformance/parallel] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls": "should reject invalid sysctls [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should reject invalid sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls": "should support sysctls [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support sysctls [MinimumKubeletVersion:1.21] [Conformance]": "should support sysctls [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
-	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually whitelisted": "should support unsafe sysctls which are actually whitelisted [Suite:openshift/conformance/parallel] [Suite:k8s]",
+	"[Top Level] [sig-node] Sysctls [LinuxOnly] [NodeFeature:Sysctls] should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance]": "should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
 	"[Top Level] [sig-node] Variable Expansion should allow composing env vars into new env vars [NodeConformance] [Conformance]": "should allow composing env vars into new env vars [NodeConformance] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]",
 
