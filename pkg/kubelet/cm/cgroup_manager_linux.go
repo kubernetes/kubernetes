@@ -17,6 +17,7 @@ limitations under the License.
 package cm
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,7 @@ import (
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupfs2 "github.com/opencontainers/runc/libcontainer/cgroups/fs2"
+	"github.com/opencontainers/runc/libcontainer/cgroups/fscommon"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
@@ -330,27 +332,6 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 	return nil
 }
 
-type subsystem interface {
-	// Name returns the name of the subsystem.
-	Name() string
-	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *libcontainerconfigs.Resources) error
-	// GetStats returns the statistics associated with the cgroup
-	GetStats(path string, stats *libcontainercgroups.Stats) error
-}
-
-// getSupportedSubsystems returns a map of subsystem and if it must be mounted for the kubelet to function.
-func getSupportedSubsystems() map[subsystem]bool {
-	supportedSubsystems := map[subsystem]bool{
-		&cgroupfs.MemoryGroup{}: true,
-		&cgroupfs.CpuGroup{}:    true,
-		&cgroupfs.PidsGroup{}:   true,
-	}
-	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
-	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
-	return supportedSubsystems
-}
-
 // getCpuWeight converts from the range [2, 262144] to [1, 10000]
 func getCpuWeight(cpuShares *uint64) uint64 {
 	if cpuShares == nil {
@@ -620,53 +601,21 @@ func (m *cgroupManagerImpl) ReduceCPULimits(cgroupName CgroupName) error {
 	return m.Update(containerConfig)
 }
 
-func getStatsSupportedSubsystems(cgroupPaths map[string]string) (*libcontainercgroups.Stats, error) {
-	stats := libcontainercgroups.NewStats()
-	for sys, required := range getSupportedSubsystems() {
-		if _, ok := cgroupPaths[sys.Name()]; !ok {
-			if required {
-				return nil, fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
-			}
-			// the cgroup is not mounted, but its not required so continue...
-			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
-			continue
-		}
-		if err := sys.GetStats(cgroupPaths[sys.Name()], stats); err != nil {
-			return nil, fmt.Errorf("failed to get stats for supported subsystems : %v", err)
-		}
-	}
-	return stats, nil
-}
-
-func toResourceStats(stats *libcontainercgroups.Stats) *ResourceStats {
-	return &ResourceStats{
-		MemoryStats: &MemoryStats{
-			Usage: int64(stats.MemoryStats.Usage.Usage),
-		},
-	}
-}
-
-// Get sets the ResourceParameters of the specified cgroup as read from the cgroup fs
-func (m *cgroupManagerImpl) GetResourceStats(name CgroupName) (*ResourceStats, error) {
-	var err error
-	var stats *libcontainercgroups.Stats
+// MemoryUsage returns the current memory usage of the specified cgroup,
+// as read from cgroupfs.
+func (m *cgroupManagerImpl) MemoryUsage(name CgroupName) (int64, error) {
+	var path, file string
 	if libcontainercgroups.IsCgroup2UnifiedMode() {
-		cgroupPath := m.buildCgroupUnifiedPath(name)
-		manager, err := cgroupfs2.NewManager(nil, cgroupPath, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create cgroup v2 manager: %v", err)
-		}
-
-		stats, err = manager.GetStats()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats for cgroup %v: %v", name, err)
-		}
+		path = m.buildCgroupUnifiedPath(name)
+		file = "memory.current"
 	} else {
-		cgroupPaths := m.buildCgroupPaths(name)
-		stats, err = getStatsSupportedSubsystems(cgroupPaths)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get stats supported cgroup subsystems for cgroup %v: %v", name, err)
+		mp, ok := m.subsystems.MountPoints["memory"]
+		if !ok { // should not happen
+			return -1, errors.New("no cgroup v1 mountpoint for memory controller found")
 		}
+		path = mp + "/" + m.Name(name)
+		file = "memory.usage_in_bytes"
 	}
-	return toResourceStats(stats), nil
+	val, err := fscommon.GetCgroupParamUint(path, file)
+	return int64(val), err
 }
