@@ -26,6 +26,7 @@ require (
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/clusterhq/flocker-go v0.0.0-20160920122132-2b8b7259d313
 	github.com/container-storage-interface/spec v1.3.0
+	github.com/containerd/ttrpc v1.0.2 // indirect
 	github.com/containernetworking/cni v0.8.1
 	github.com/coredns/corefile-migration v1.0.11
 	github.com/coreos/go-oidc v2.1.0+incompatible
@@ -48,7 +49,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 	github.com/golang/mock v1.4.3
 	github.com/golang/protobuf v1.4.3
-	github.com/google/cadvisor v0.39.0
+	github.com/google/cadvisor v0.39.1-0.20210520055723-717582da87e0
 	github.com/google/go-cmp v0.5.4
 	github.com/google/gofuzz v1.1.0
 	github.com/google/uuid v1.1.2
@@ -70,6 +71,7 @@ require (
 	github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega v1.10.1
 	github.com/opencontainers/go-digest v1.0.0
+	github.com/opencontainers/image-spec v1.0.1 // indirect
 	github.com/opencontainers/runc v1.0.0-rc95
 	github.com/opencontainers/selinux v1.8.0
 	github.com/pkg/errors v0.9.1
@@ -87,11 +89,12 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/urfave/negroni v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae // indirect
 	github.com/vmware/govmomi v0.20.3
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20210220032938-85be41e4509f // indirect
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
@@ -101,7 +104,7 @@ require (
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
 	google.golang.org/api v0.20.0
 	google.golang.org/appengine v1.6.5 // indirect
-	google.golang.org/grpc v1.27.1
+	google.golang.org/grpc v1.33.2
 	gopkg.in/gcfg.v1 v1.2.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	gopkg.in/yaml.v2 v2.4.0
@@ -265,7 +268,7 @@ replace (
 	github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v1.0.0
-	github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
+	github.com/google/cadvisor => github.com/google/cadvisor v0.39.1-0.20210520055723-717582da87e0
 	github.com/google/go-cmp => github.com/google/go-cmp v0.5.4
 	github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 	github.com/google/martian => github.com/google/martian v2.1.0+incompatible

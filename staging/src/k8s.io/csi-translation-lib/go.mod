@@ -12,6 +12,8 @@ require (
 )
 
 replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/csi-translation-lib => ../csi-translation-lib

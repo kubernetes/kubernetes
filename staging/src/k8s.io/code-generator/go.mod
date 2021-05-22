@@ -18,7 +18,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0 // indirect
 	golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449 // indirect
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7 // indirect
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
 	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887 // indirect
 	golang.org/x/text v0.3.4 // indirect
 	golang.org/x/tools v0.1.0 // indirect
@@ -31,4 +31,8 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
 
-replace k8s.io/code-generator => ../code-generator
+replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
+	k8s.io/code-generator => ../code-generator
+)

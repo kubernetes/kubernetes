@@ -31,11 +31,11 @@ require (
 	go.etcd.io/etcd v0.5.0-alpha.5.0.20200910180754-dd1b699fc489
 	go.uber.org/zap v1.16.0
 	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 	google.golang.org/genproto v0.0.0-20201110150050-8816d57aaa9a // indirect
-	google.golang.org/grpc v1.27.1
+	google.golang.org/grpc v1.33.2
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.0.0
@@ -51,6 +51,8 @@ require (
 )
 
 replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -12,7 +12,7 @@ require (
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
 	k8s.io/apiserver v0.0.0
@@ -26,6 +26,8 @@ require (
 )
 
 replace (
+	golang.org/x/net => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+	google.golang.org/grpc => google.golang.org/grpc v1.27.1
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

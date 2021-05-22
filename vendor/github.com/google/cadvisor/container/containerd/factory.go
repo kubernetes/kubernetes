@@ -41,6 +41,8 @@ const k8sContainerdNamespace = "containerd"
 // --cgroup-parent have another prefix than 'containerd'
 var containerdCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
+var containerdEnvWhitelist = flag.String("containerd_env_metadata_whitelist", "", "a comma-separated list of environment variable keys matched with specified prefix that needs to be collected for containerd containers")
+
 type containerdFactory struct {
 	machineInfoFactory info.MachineInfoFactory
 	client             ContainerdClient
@@ -62,7 +64,8 @@ func (f *containerdFactory) NewContainerHandler(name string, inHostNamespace boo
 		return
 	}
 
-	metadataEnvs := []string{}
+	metadataEnvs := strings.Split(*containerdEnvWhitelist, ",")
+
 	return newContainerdContainerHandler(
 		client,
 		name,

@@ -173,7 +173,7 @@ github.com/container-storage-interface/spec/lib/go/csi
 github.com/containerd/cgroups/stats/v1
 # github.com/containerd/console v1.0.2 => github.com/containerd/console v1.0.2
 github.com/containerd/console
-# github.com/containerd/containerd v1.4.4 => github.com/containerd/containerd v1.4.4
+# github.com/containerd/containerd v1.5.1 => github.com/containerd/containerd v1.4.4
 github.com/containerd/containerd/api/services/containers/v1
 github.com/containerd/containerd/api/services/tasks/v1
 github.com/containerd/containerd/api/services/version/v1
@@ -187,6 +187,7 @@ github.com/containerd/containerd/namespaces
 github.com/containerd/containerd/pkg/dialer
 github.com/containerd/containerd/platforms
 # github.com/containerd/ttrpc v1.0.2 => github.com/containerd/ttrpc v1.0.2
+## explicit
 github.com/containerd/ttrpc
 # github.com/containernetworking/cni v0.8.1 => github.com/containernetworking/cni v0.8.1
 ## explicit
@@ -362,7 +363,7 @@ github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/btree v1.0.0 => github.com/google/btree v1.0.0
 github.com/google/btree
-# github.com/google/cadvisor v0.39.0 => github.com/google/cadvisor v0.39.0
+# github.com/google/cadvisor v0.39.1-0.20210520055723-717582da87e0 => github.com/google/cadvisor v0.39.1-0.20210520055723-717582da87e0
 ## explicit
 github.com/google/cadvisor/accelerators
 github.com/google/cadvisor/cache/memory
@@ -637,6 +638,7 @@ github.com/onsi/gomega/types
 ## explicit
 github.com/opencontainers/go-digest
 # github.com/opencontainers/image-spec v1.0.1 => github.com/opencontainers/image-spec v1.0.1
+## explicit
 github.com/opencontainers/image-spec/specs-go
 github.com/opencontainers/image-spec/specs-go/v1
 # github.com/opencontainers/runc v1.0.0-rc95 => github.com/opencontainers/runc v1.0.0-rc95
@@ -769,6 +771,7 @@ github.com/tmc/grpc-websocket-proxy/wsproxy
 github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae => github.com/vishvananda/netns v0.0.0-20200728191858-db3c7e526aae
+## explicit
 github.com/vishvananda/netns
 # github.com/vmware/govmomi v0.20.3 => github.com/vmware/govmomi v0.20.3
 ## explicit
@@ -957,7 +960,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 # golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449 => golang.org/x/mod v0.3.1-0.20200828183125-ce943fd02449
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.0.0-20210224082022-3d97a244fca7 => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
+# golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 => golang.org/x/net v0.0.0-20210224082022-3d97a244fca7
 ## explicit
 golang.org/x/net/bpf
 golang.org/x/net/context
@@ -1117,7 +1120,7 @@ google.golang.org/appengine/urlfetch
 google.golang.org/genproto/googleapis/api/httpbody
 google.golang.org/genproto/googleapis/rpc/status
 google.golang.org/genproto/protobuf/field_mask
-# google.golang.org/grpc v1.27.1 => google.golang.org/grpc v1.27.1
+# google.golang.org/grpc v1.33.2 => google.golang.org/grpc v1.27.1
 ## explicit
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -2448,7 +2451,7 @@ sigs.k8s.io/yaml
 # github.com/golang/protobuf => github.com/golang/protobuf v1.4.3
 # github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 # github.com/google/btree => github.com/google/btree v1.0.0
-# github.com/google/cadvisor => github.com/google/cadvisor v0.39.0
+# github.com/google/cadvisor => github.com/google/cadvisor v0.39.1-0.20210520055723-717582da87e0
 # github.com/google/go-cmp => github.com/google/go-cmp v0.5.4
 # github.com/google/gofuzz => github.com/google/gofuzz v1.1.0
 # github.com/google/martian => github.com/google/martian v2.1.0+incompatible
