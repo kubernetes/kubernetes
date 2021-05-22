@@ -36,6 +36,8 @@ func TestMicroTimeMarshalYAML(t *testing.T) {
 	}{
 		{MicroTime{}, "t: null\n"},
 		{DateMicro(1998, time.May, 5, 1, 5, 5, 50, time.FixedZone("test", -4*60*60)), "t: \"1998-05-05T05:05:05.000000Z\"\n"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123000000, time.UTC), "t: \"1998-05-05T05:05:05.123000Z\"\n"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC), "t: \"1998-05-05T05:05:05.123456Z\"\n"},
 		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "t: \"1998-05-05T05:05:05.000000Z\"\n"},
 	}
 
@@ -57,6 +59,9 @@ func TestMicroTimeUnmarshalYAML(t *testing.T) {
 		result MicroTime
 	}{
 		{"t: null\n", MicroTime{}},
+		{"t: 1998-05-05T05:05:05Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"t: 1998-05-05T05:05:05.123Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 123000000, time.UTC).Local()}},
+		{"t: 1998-05-05T05:05:05.123456Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC).Local()}},
 		{"t: 1998-05-05T05:05:05.000000Z\n", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
@@ -78,6 +83,8 @@ func TestMicroTimeMarshalJSON(t *testing.T) {
 	}{
 		{MicroTime{}, "{\"t\":null}"},
 		{DateMicro(1998, time.May, 5, 5, 5, 5, 50, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000000Z\"}"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123000000, time.UTC), "{\"t\":\"1998-05-05T05:05:05.123000Z\"}"},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC), "{\"t\":\"1998-05-05T05:05:05.123456Z\"}"},
 		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.UTC), "{\"t\":\"1998-05-05T05:05:05.000000Z\"}"},
 	}
 
@@ -99,6 +106,9 @@ func TestMicroTimeUnmarshalJSON(t *testing.T) {
 		result MicroTime
 	}{
 		{"{\"t\":null}", MicroTime{}},
+		{"{\"t\":\"1998-05-05T05:05:05Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
+		{"{\"t\":\"1998-05-05T05:05:05.123Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 123000000, time.UTC).Local()}},
+		{"{\"t\":\"1998-05-05T05:05:05.123456Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 123456000, time.UTC).Local()}},
 		{"{\"t\":\"1998-05-05T05:05:05.000000Z\"}", MicroTime{Date(1998, time.May, 5, 5, 5, 5, 0, time.UTC).Local()}},
 	}
 
@@ -119,6 +129,8 @@ func TestMicroTimeProto(t *testing.T) {
 	}{
 		{MicroTime{}},
 		{DateMicro(1998, time.May, 5, 1, 5, 5, 50, time.Local)},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123000000, time.Local)},
+		{DateMicro(1998, time.May, 5, 5, 5, 5, 123456000, time.Local)},
 		{DateMicro(1998, time.May, 5, 5, 5, 5, 0, time.Local)},
 	}
 

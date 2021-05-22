@@ -21,7 +21,8 @@ import (
 	"time"
 )
 
-const RFC3339Micro = "2006-01-02T15:04:05.000000Z07:00"
+const RFC3339MicroLenient = "2006-01-02T15:04:05.999999Z07:00"
+const RFC3339MicroFixed = "2006-01-02T15:04:05.000000Z07:00"
 
 // MicroTime is version of Time with microsecond level precision.
 //
@@ -120,7 +121,7 @@ func (t *MicroTime) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	pt, err := time.Parse(RFC3339Micro, str)
+	pt, err := time.Parse(RFC3339MicroLenient, str)
 	if err != nil {
 		return err
 	}
@@ -141,7 +142,7 @@ func (t *MicroTime) UnmarshalQueryParameter(str string) error {
 		return nil
 	}
 
-	pt, err := time.Parse(RFC3339Micro, str)
+	pt, err := time.Parse(RFC3339MicroLenient, str)
 	if err != nil {
 		return err
 	}
@@ -157,7 +158,7 @@ func (t MicroTime) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return json.Marshal(t.UTC().Format(RFC3339Micro))
+	return json.Marshal(t.UTC().Format(RFC3339MicroFixed))
 }
 
 // OpenAPISchemaType is used by the kube-openapi generator when constructing
@@ -177,5 +178,5 @@ func (t MicroTime) MarshalQueryParameter() (string, error) {
 		return "", nil
 	}
 
-	return t.UTC().Format(RFC3339Micro), nil
+	return t.UTC().Format(RFC3339MicroFixed), nil
 }
