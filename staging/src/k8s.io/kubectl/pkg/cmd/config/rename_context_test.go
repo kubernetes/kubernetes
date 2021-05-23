@@ -24,10 +24,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 const (
@@ -155,19 +153,4 @@ func (test renameContextTest) run(t *testing.T) {
 			t.Errorf("Failed in:%q\n expected out %v\n but got %v", test.description, test.expectedOut, buf.String())
 		}
 	}
-}
-
-func TestCompletionRenameContextNoArg(t *testing.T) {
-	// FIXME
-	t.Skip("Should not be skipeed")
-
-	pathOptions, streams, factory := cmdtesting.PrepareConfigForCompletion(t)
-	configCmd := NewCmdConfig(factory, pathOptions, streams)
-	cmd, _, err := configCmd.Find([]string{"rename-context"})
-	if err != nil {
-		t.Fatalf("unexpected error finding rename-context command: %v", err)
-	}
-
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "my")
-	cmdtesting.CheckCompletion(t, comps, []string{"my-context"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }

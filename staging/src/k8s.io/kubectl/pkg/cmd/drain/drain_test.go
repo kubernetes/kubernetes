@@ -930,27 +930,6 @@ func TestDrain(t *testing.T) {
 	}
 }
 
-func TestCompletionCordonNoArg(t *testing.T) {
-	tf, streams := cmdtesting.PrepareNodesForCompletion(t)
-	cmd := NewCmdCordon(tf, streams)
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "f")
-	cmdtesting.CheckCompletion(t, comps, []string{"firstnode"}, directive, cobra.ShellCompDirectiveNoFileComp)
-}
-
-func TestCompletionDrainNoArg(t *testing.T) {
-	tf, streams := cmdtesting.PrepareNodesForCompletion(t)
-	cmd := NewCmdDrain(tf, streams)
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "f")
-	cmdtesting.CheckCompletion(t, comps, []string{"firstnode"}, directive, cobra.ShellCompDirectiveNoFileComp)
-}
-
-func TestCompletionUncordonNoArg(t *testing.T) {
-	tf, streams := cmdtesting.PrepareNodesForCompletion(t)
-	cmd := NewCmdUncordon(tf, streams)
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "f")
-	cmdtesting.CheckCompletion(t, comps, []string{"firstnode"}, directive, cobra.ShellCompDirectiveNoFileComp)
-}
-
 type MyReq struct {
 	Request *http.Request
 }

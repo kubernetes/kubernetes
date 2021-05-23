@@ -22,10 +22,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type useContextTest struct {
@@ -103,19 +101,4 @@ func (test useContextTest) run(t *testing.T) {
 	if test.expectedConfig.CurrentContext != config.CurrentContext {
 		t.Errorf("Failed in :%q\n expected config %v, but found %v\n in kubeconfig\n", test.description, test.expectedConfig, config)
 	}
-}
-
-func TestCompletionUseContextNoArg(t *testing.T) {
-	// FIXME
-	t.Skip("Should not be skipeed")
-
-	pathOptions, streams, factory := cmdtesting.PrepareConfigForCompletion(t)
-	configCmd := NewCmdConfig(factory, pathOptions, streams)
-	cmd, _, err := configCmd.Find([]string{"use-context"})
-	if err != nil {
-		t.Fatalf("unexpected error finding use-context command: %v", err)
-	}
-
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "my")
-	cmdtesting.CheckCompletion(t, comps, []string{"my-context"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
