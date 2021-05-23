@@ -12,6 +12,7 @@ go_test(
         "handler_apis_test.go",
         "handler_proxy_test.go",
     ],
+    data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
