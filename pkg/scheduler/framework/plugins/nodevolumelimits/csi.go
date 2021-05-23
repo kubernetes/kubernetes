@@ -75,7 +75,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found: %s", node.Name))
+		return framework.NewStatus(framework.Error, "node not found")
 	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object
