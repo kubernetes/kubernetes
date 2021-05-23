@@ -14,9 +14,7 @@
 
 package spec
 
-import (
-	"encoding/json"
-)
+import "encoding/json"
 
 //go:generate curl -L --progress -o ./schemas/v2/schema.json http://swagger.io/v2/schema.json
 //go:generate curl -L --progress  -o ./schemas/jsonschema-draft-04.json http://json-schema.org/draft-04/schema
@@ -29,6 +27,16 @@ const (
 	// JSONSchemaURL the url for the json schema schema
 	JSONSchemaURL = "http://json-schema.org/draft-04/schema#"
 )
+
+var (
+	jsonSchema    *Schema
+	swaggerSchema *Schema
+)
+
+func init() {
+	jsonSchema = MustLoadJSONSchemaDraft04()
+	swaggerSchema = MustLoadSwagger20Schema()
+}
 
 // MustLoadJSONSchemaDraft04 panics when Swagger20Schema returns an error
 func MustLoadJSONSchemaDraft04() *Schema {

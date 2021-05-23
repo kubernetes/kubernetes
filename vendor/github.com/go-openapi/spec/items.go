@@ -53,6 +53,22 @@ func (s *SimpleSchema) ItemsTypeName() string {
 	return s.Items.TypeName()
 }
 
+// CommonValidations describe common JSON-schema validations
+type CommonValidations struct {
+	Maximum          *float64      `json:"maximum,omitempty"`
+	ExclusiveMaximum bool          `json:"exclusiveMaximum,omitempty"`
+	Minimum          *float64      `json:"minimum,omitempty"`
+	ExclusiveMinimum bool          `json:"exclusiveMinimum,omitempty"`
+	MaxLength        *int64        `json:"maxLength,omitempty"`
+	MinLength        *int64        `json:"minLength,omitempty"`
+	Pattern          string        `json:"pattern,omitempty"`
+	MaxItems         *int64        `json:"maxItems,omitempty"`
+	MinItems         *int64        `json:"minItems,omitempty"`
+	UniqueItems      bool          `json:"uniqueItems,omitempty"`
+	MultipleOf       *float64      `json:"multipleOf,omitempty"`
+	Enum             []interface{} `json:"enum,omitempty"`
+}
+
 // Items a limited subset of JSON-Schema's items object.
 // It is used by parameter definitions that are not located in "body".
 //
@@ -161,12 +177,6 @@ func (i *Items) UniqueValues() *Items {
 // AllowDuplicates this array can have duplicates
 func (i *Items) AllowDuplicates() *Items {
 	i.UniqueItems = false
-	return i
-}
-
-// WithValidations is a fluent method to set Items validations
-func (i *Items) WithValidations(val CommonValidations) *Items {
-	i.SetValidations(SchemaValidations{CommonValidations: val})
 	return i
 }
 

@@ -15,189 +15,138 @@
 package spec
 
 import (
+	"fmt"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
-const fileScheme = "file"
-
-// normalizeURI ensures that all $ref paths used internally by the expander are canonicalized.
-//
-// NOTE(windows): there is a tolerance over the strict URI format on windows.
-//
-// The normalizer accepts relative file URLs like 'Path\File.JSON' as well as absolute file URLs like
-// 'C:\Path\file.Yaml'.
-//
-// Both are canonicalized with a "file://" scheme, slashes and a lower-cased path:
-// 'file:///c:/path/file.yaml'
-//
-// URLs can be specified with a file scheme, like in 'file:///folder/file.json' or
-// 'file:///c:\folder\File.json'.
-//
-// URLs like file://C:\folder are considered invalid (i.e. there is no host 'c:\folder') and a "repair"
-// is attempted.
-//
-// The base path argument is assumed to be canonicalized (e.g. using normalizeBase()).
-func normalizeURI(refPath, base string) string {
-	refURL, err := url.Parse(refPath)
+// normalize absolute path for cache.
+// on Windows, drive letters should be converted to lower as scheme in net/url.URL
+func normalizeAbsPath(path string) string {
+	u, err := url.Parse(path)
 	if err != nil {
-		specLogger.Printf("warning: invalid URI in $ref  %q: %v", refPath, err)
-		refURL, refPath = repairURI(refPath)
+		debugLog("normalize absolute path failed: %s", err)
+		return path
+	}
+	return u.String()
+}
+
+// base or refPath could be a file path or a URL
+// given a base absolute path and a ref path, return the absolute path of refPath
+// 1) if refPath is absolute, return it
+// 2) if refPath is relative, join it with basePath keeping the scheme, hosts, and ports if exists
+// base could be a directory or a full file path
+func normalizePaths(refPath, base string) string {
+	refURL, _ := url.Parse(refPath)
+	if path.IsAbs(refURL.Path) || filepath.IsAbs(refPath) {
+		// refPath is actually absolute
+		if refURL.Host != "" {
+			return refPath
+		}
+		parts := strings.Split(refPath, "#")
+		result := filepath.FromSlash(parts[0])
+		if len(parts) == 2 {
+			result += "#" + parts[1]
+		}
+		return result
 	}
 
-	fixWindowsURI(refURL, refPath) // noop on non-windows OS
-
-	refURL.Path = path.Clean(refURL.Path)
-	if refURL.Path == "." {
-		refURL.Path = ""
-	}
-
-	r := MustCreateRef(refURL.String())
-	if r.IsCanonical() {
-		return refURL.String()
-	}
-
+	// relative refPath
 	baseURL, _ := url.Parse(base)
-	if path.IsAbs(refURL.Path) {
-		baseURL.Path = refURL.Path
-	} else if refURL.Path != "" {
-		baseURL.Path = path.Join(path.Dir(baseURL.Path), refURL.Path)
+	if !strings.HasPrefix(refPath, "#") {
+		// combining paths
+		if baseURL.Host != "" {
+			baseURL.Path = path.Join(path.Dir(baseURL.Path), refURL.Path)
+		} else { // base is a file
+			newBase := fmt.Sprintf("%s#%s", filepath.Join(filepath.Dir(base), filepath.FromSlash(refURL.Path)), refURL.Fragment)
+			return newBase
+		}
+
 	}
 	// copying fragment from ref to base
 	baseURL.Fragment = refURL.Fragment
-
 	return baseURL.String()
 }
 
-// denormalizeRef returns the simplest notation for a normalized $ref, given the path of the original root document.
+// denormalizePaths returns to simplest notation on file $ref,
+// i.e. strips the absolute path and sets a path relative to the base path.
 //
-// When calling this, we assume that:
-// * $ref is a canonical URI
-// * originalRelativeBase is a canonical URI
-//
-// denormalizeRef is currently used when we rewrite a $ref after a circular $ref has been detected.
-// In this case, expansion stops and normally renders the internal canonical $ref.
-//
-// This internal $ref is eventually rebased to the original RelativeBase used for the expansion.
-//
-// There is a special case for schemas that are anchored with an "id":
-// in that case, the rebasing is performed // against the id only if this is an anchor for the initial root document.
-// All other intermediate "id"'s found along the way are ignored for the purpose of rebasing.
-//
-func denormalizeRef(ref *Ref, originalRelativeBase, id string) Ref {
-	debugLog("denormalizeRef called:\n$ref: %q\noriginal: %s\nroot ID:%s", ref.String(), originalRelativeBase, id)
+// This is currently used when we rewrite ref after a circular ref has been detected
+func denormalizeFileRef(ref *Ref, relativeBase, originalRelativeBase string) *Ref {
+	debugLog("denormalizeFileRef for: %s", ref.String())
 
 	if ref.String() == "" || ref.IsRoot() || ref.HasFragmentOnly {
-		// short circuit: $ref to current doc
-		return *ref
+		return ref
+	}
+	// strip relativeBase from URI
+	relativeBaseURL, _ := url.Parse(relativeBase)
+	relativeBaseURL.Fragment = ""
+
+	if relativeBaseURL.IsAbs() && strings.HasPrefix(ref.String(), relativeBase) {
+		// this should work for absolute URI (e.g. http://...): we have an exact match, just trim prefix
+		r, _ := NewRef(strings.TrimPrefix(ref.String(), relativeBase))
+		return &r
 	}
 
-	if id != "" {
-		idBaseURL, err := url.Parse(id)
-		if err == nil { // if the schema id is not usable as a URI, ignore it
-			if ref, ok := rebase(ref, idBaseURL, true); ok { // rebase, but keep references to root unchaged (do not want $ref: "")
-				// $ref relative to the ID of the schema in the root document
-				return ref
-			}
-		}
+	if relativeBaseURL.IsAbs() {
+		// other absolute URL get unchanged (i.e. with a non-empty scheme)
+		return ref
 	}
 
+	// for relative file URIs:
 	originalRelativeBaseURL, _ := url.Parse(originalRelativeBase)
-
-	r, _ := rebase(ref, originalRelativeBaseURL, false)
-
-	return r
-}
-
-func rebase(ref *Ref, v *url.URL, notEqual bool) (Ref, bool) {
-	var newBase url.URL
-
-	u := ref.GetURL()
-
-	if u.Scheme != v.Scheme || u.Host != v.Host {
-		return *ref, false
+	originalRelativeBaseURL.Fragment = ""
+	if strings.HasPrefix(ref.String(), originalRelativeBaseURL.String()) {
+		// the resulting ref is in the expanded spec: return a local ref
+		r, _ := NewRef(strings.TrimPrefix(ref.String(), originalRelativeBaseURL.String()))
+		return &r
 	}
 
-	docPath := v.Path
-	v.Path = path.Dir(v.Path)
-
-	if v.Path == "." {
-		v.Path = ""
-	} else if !strings.HasSuffix(v.Path, "/") {
-		v.Path += "/"
+	// check if we may set a relative path, considering the original base path for this spec.
+	// Example:
+	//   spec is located at /mypath/spec.json
+	//   my normalized ref points to: /mypath/item.json#/target
+	//   expected result: item.json#/target
+	parts := strings.Split(ref.String(), "#")
+	relativePath, err := filepath.Rel(path.Dir(originalRelativeBaseURL.String()), parts[0])
+	if err != nil {
+		// there is no common ancestor (e.g. different drives on windows)
+		// leaves the ref unchanged
+		return ref
 	}
-
-	newBase.Fragment = u.Fragment
-
-	if strings.HasPrefix(u.Path, docPath) {
-		newBase.Path = strings.TrimPrefix(u.Path, docPath)
-	} else {
-		newBase.Path = strings.TrimPrefix(u.Path, v.Path)
+	if len(parts) == 2 {
+		relativePath += "#" + parts[1]
 	}
-
-	if notEqual && newBase.Path == "" && newBase.Fragment == "" {
-		// do not want rebasing to end up in an empty $ref
-		return *ref, false
-	}
-
-	if path.IsAbs(newBase.Path) {
-		// whenever we end up with an absolute path, specify the scheme and host
-		newBase.Scheme = v.Scheme
-		newBase.Host = v.Host
-	}
-
-	return MustCreateRef(newBase.String()), true
-}
-
-// normalizeRef canonicalize a Ref, using a canonical relativeBase as its absolute anchor
-func normalizeRef(ref *Ref, relativeBase string) *Ref {
-	r := MustCreateRef(normalizeURI(ref.String(), relativeBase))
+	r, _ := NewRef(relativePath)
 	return &r
 }
 
-// normalizeBase performs a normalization of the input base path.
-//
-// This always yields a canonical URI (absolute), usable for the document cache.
-//
-// It ensures that all further internal work on basePath may safely assume
-// a non-empty, cross-platform, canonical URI (i.e. absolute).
-//
-// This normalization tolerates windows paths (e.g. C:\x\y\File.dat) and transform this
-// in a file:// URL with lower cased drive letter and path.
-//
-// See also: https://en.wikipedia.org/wiki/File_URI_scheme
-func normalizeBase(in string) string {
-	u, err := url.Parse(in)
-	if err != nil {
-		specLogger.Printf("warning: invalid URI in RelativeBase  %q: %v", in, err)
-		u, in = repairURI(in)
+// relativeBase could be an ABSOLUTE file path or an ABSOLUTE URL
+func normalizeFileRef(ref *Ref, relativeBase string) *Ref {
+	// This is important for when the reference is pointing to the root schema
+	if ref.String() == "" {
+		r, _ := NewRef(relativeBase)
+		return &r
 	}
 
-	u.Fragment = "" // any fragment in the base is irrelevant
+	debugLog("normalizing %s against %s", ref.String(), relativeBase)
 
-	fixWindowsURI(u, in) // noop on non-windows OS
+	s := normalizePaths(ref.String(), relativeBase)
+	r, _ := NewRef(s)
+	return &r
+}
 
-	u.Path = path.Clean(u.Path)
-	if u.Path == "." { // empty after Clean()
-		u.Path = ""
+// absPath returns the absolute path of a file
+func absPath(fname string) (string, error) {
+	if strings.HasPrefix(fname, "http") {
+		return fname, nil
 	}
-
-	if u.Scheme != "" {
-		if path.IsAbs(u.Path) || u.Scheme != fileScheme {
-			// this is absolute or explicitly not a local file: we're good
-			return u.String()
-		}
+	if filepath.IsAbs(fname) {
+		return fname, nil
 	}
-
-	// no scheme or file scheme with relative path: assume file and make it absolute
-	// enforce scheme file://... with absolute path.
-	//
-	// If the input path is relative, we anchor the path to the current working directory.
-	// NOTE: we may end up with a host component. Leave it unchanged: e.g. file://host/folder/file.json
-
-	u.Scheme = fileScheme
-	u.Path = absPath(u.Path) // platform-dependent
-	u.RawQuery = ""          // any query component is irrelevant for a base
-	return u.String()
+	wd, err := os.Getwd()
+	return filepath.Join(wd, fname), err
 }

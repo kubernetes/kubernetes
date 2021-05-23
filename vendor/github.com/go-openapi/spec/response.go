@@ -23,7 +23,7 @@ import (
 
 // ResponseProps properties specific to a response
 type ResponseProps struct {
-	Description string                 `json:"description"`
+	Description string                 `json:"description,omitempty"`
 	Schema      *Schema                `json:"schema,omitempty"`
 	Headers     map[string]Header      `json:"headers,omitempty"`
 	Examples    map[string]interface{} `json:"examples,omitempty"`
@@ -63,31 +63,10 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 
 // MarshalJSON converts this items object to JSON
 func (r Response) MarshalJSON() ([]byte, error) {
-	var (
-		b1  []byte
-		err error
-	)
-
-	if r.Ref.String() == "" {
-		// when there is no $ref, empty description is rendered as an empty string
-		b1, err = json.Marshal(r.ResponseProps)
-	} else {
-		// when there is $ref inside the schema, description should be omitempty-ied
-		b1, err = json.Marshal(struct {
-			Description string                 `json:"description,omitempty"`
-			Schema      *Schema                `json:"schema,omitempty"`
-			Headers     map[string]Header      `json:"headers,omitempty"`
-			Examples    map[string]interface{} `json:"examples,omitempty"`
-		}{
-			Description: r.ResponseProps.Description,
-			Schema:      r.ResponseProps.Schema,
-			Examples:    r.ResponseProps.Examples,
-		})
-	}
+	b1, err := json.Marshal(r.ResponseProps)
 	if err != nil {
 		return nil, err
 	}
-
 	b2, err := json.Marshal(r.Refable)
 	if err != nil {
 		return nil, err

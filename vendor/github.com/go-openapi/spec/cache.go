@@ -14,9 +14,7 @@
 
 package spec
 
-import (
-	"sync"
-)
+import "sync"
 
 // ResolutionCache a cache for resolving urls
 type ResolutionCache interface {
@@ -29,23 +27,12 @@ type simpleCache struct {
 	store map[string]interface{}
 }
 
-func (s *simpleCache) ShallowClone() ResolutionCache {
-	store := make(map[string]interface{}, len(s.store))
-	s.lock.RLock()
-	for k, v := range s.store {
-		store[k] = v
-	}
-	s.lock.RUnlock()
-
-	return &simpleCache{
-		store: store,
-	}
-}
-
 // Get retrieves a cached URI
 func (s *simpleCache) Get(uri string) (interface{}, bool) {
+	debugLog("getting %q from resolution cache", uri)
 	s.lock.RLock()
 	v, ok := s.store[uri]
+	debugLog("got %q from resolution cache: %t", uri, ok)
 
 	s.lock.RUnlock()
 	return v, ok
@@ -58,41 +45,16 @@ func (s *simpleCache) Set(uri string, data interface{}) {
 	s.lock.Unlock()
 }
 
-var (
-	// resCache is a package level cache for $ref resolution and expansion.
-	// It is initialized lazily by methods that have the need for it: no
-	// memory is allocated unless some expander methods are called.
-	//
-	// It is initialized with JSON schema and swagger schema,
-	// which do not mutate during normal operations.
-	//
-	// All subsequent utilizations of this cache are produced from a shallow
-	// clone of this initial version.
-	resCache  *simpleCache
-	onceCache sync.Once
+var resCache ResolutionCache
 
-	_ ResolutionCache = &simpleCache{}
-)
-
-// initResolutionCache initializes the URI resolution cache. To be wrapped in a sync.Once.Do call.
-func initResolutionCache() {
-	resCache = defaultResolutionCache()
+func init() {
+	resCache = initResolutionCache()
 }
 
-func defaultResolutionCache() *simpleCache {
+// initResolutionCache initializes the URI resolution cache
+func initResolutionCache() ResolutionCache {
 	return &simpleCache{store: map[string]interface{}{
 		"http://swagger.io/v2/schema.json":       MustLoadSwagger20Schema(),
 		"http://json-schema.org/draft-04/schema": MustLoadJSONSchemaDraft04(),
 	}}
-}
-
-func cacheOrDefault(cache ResolutionCache) ResolutionCache {
-	onceCache.Do(initResolutionCache)
-
-	if cache != nil {
-		return cache
-	}
-
-	// get a shallow clone of the base cache with swagger and json schema
-	return resCache.ShallowClone()
 }

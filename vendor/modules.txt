@@ -301,7 +301,7 @@ github.com/go-logr/logr
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.5 => github.com/go-openapi/jsonreference v0.19.3
 github.com/go-openapi/jsonreference
-# github.com/go-openapi/spec v0.20.3 => github.com/go-openapi/spec v0.20.3
+# github.com/go-openapi/spec v0.19.5 => github.com/go-openapi/spec v0.19.5
 ## explicit
 github.com/go-openapi/spec
 # github.com/go-openapi/swag v0.19.14 => github.com/go-openapi/swag v0.19.5
@@ -2439,7 +2439,7 @@ sigs.k8s.io/yaml
 # github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
 # github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
 # github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
-# github.com/go-openapi/spec => github.com/go-openapi/spec v0.20.3
+# github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.5
 # github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
 # github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 # github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4

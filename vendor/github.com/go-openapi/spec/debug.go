@@ -18,16 +18,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 )
 
-// Debug is true when the SWAGGER_DEBUG env var is not empty.
-//
-// It enables a more verbose logging of this package.
-var Debug = os.Getenv("SWAGGER_DEBUG") != ""
-
 var (
+	// Debug is true when the SWAGGER_DEBUG env var is not empty.
+	// It enables a more verbose logging of this package.
+	Debug = os.Getenv("SWAGGER_DEBUG") != ""
 	// specLogger is a debug logger for this package
 	specLogger *log.Logger
 )
@@ -44,6 +42,6 @@ func debugLog(msg string, args ...interface{}) {
 	// A private, trivial trace logger, based on go-openapi/spec/expander.go:debugLog()
 	if Debug {
 		_, file1, pos1, _ := runtime.Caller(1)
-		specLogger.Printf("%s:%d: %s", path.Base(file1), pos1, fmt.Sprintf(msg, args...))
+		specLogger.Printf("%s:%d: %s", filepath.Base(file1), pos1, fmt.Sprintf(msg, args...))
 	}
 }
