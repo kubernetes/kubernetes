@@ -14,4 +14,7 @@ require (
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )
 
-replace k8s.io/mount-utils => ../mount-utils
+replace (
+	golang.org/x/text => golang.org/x/text v0.3.4
+	k8s.io/mount-utils => ../mount-utils
+)

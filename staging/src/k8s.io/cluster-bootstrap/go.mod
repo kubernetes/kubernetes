@@ -14,6 +14,7 @@ require (
 )
 
 replace (
+	golang.org/x/text => golang.org/x/text v0.3.4
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/cluster-bootstrap => ../cluster-bootstrap

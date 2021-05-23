@@ -934,6 +934,7 @@ func (future *ContainerServicesCreateOrUpdateFuture) result(client ContainerServ
 		return
 	}
 	if !done {
+		cs.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.ContainerServicesCreateOrUpdateFuture")
 		return
 	}
@@ -976,6 +977,7 @@ func (future *ContainerServicesDeleteFuture) result(client ContainerServicesClie
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.ContainerServicesDeleteFuture")
 		return
 	}
@@ -1887,6 +1889,7 @@ func (future *DedicatedHostsCreateOrUpdateFuture) result(client DedicatedHostsCl
 		return
 	}
 	if !done {
+		dh.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DedicatedHostsCreateOrUpdateFuture")
 		return
 	}
@@ -1929,6 +1932,7 @@ func (future *DedicatedHostsDeleteFuture) result(client DedicatedHostsClient) (a
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DedicatedHostsDeleteFuture")
 		return
 	}
@@ -1965,6 +1969,7 @@ func (future *DedicatedHostsUpdateFuture) result(client DedicatedHostsClient) (d
 		return
 	}
 	if !done {
+		dh.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DedicatedHostsUpdateFuture")
 		return
 	}
@@ -2511,6 +2516,7 @@ func (future *DiskEncryptionSetsCreateOrUpdateFuture) result(client DiskEncrypti
 		return
 	}
 	if !done {
+		desVar.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsCreateOrUpdateFuture")
 		return
 	}
@@ -2553,6 +2559,7 @@ func (future *DiskEncryptionSetsDeleteFuture) result(client DiskEncryptionSetsCl
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsDeleteFuture")
 		return
 	}
@@ -2589,6 +2596,7 @@ func (future *DiskEncryptionSetsUpdateFuture) result(client DiskEncryptionSetsCl
 		return
 	}
 	if !done {
+		desVar.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DiskEncryptionSetsUpdateFuture")
 		return
 	}
@@ -2950,6 +2958,7 @@ func (future *DisksCreateOrUpdateFuture) result(client DisksClient) (d Disk, err
 		return
 	}
 	if !done {
+		d.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DisksCreateOrUpdateFuture")
 		return
 	}
@@ -2991,6 +3000,7 @@ func (future *DisksDeleteFuture) result(client DisksClient) (ar autorest.Respons
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DisksDeleteFuture")
 		return
 	}
@@ -3027,6 +3037,7 @@ func (future *DisksGrantAccessFuture) result(client DisksClient) (au AccessURI, 
 		return
 	}
 	if !done {
+		au.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DisksGrantAccessFuture")
 		return
 	}
@@ -3086,6 +3097,7 @@ func (future *DisksRevokeAccessFuture) result(client DisksClient) (ar autorest.R
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DisksRevokeAccessFuture")
 		return
 	}
@@ -3121,6 +3133,7 @@ func (future *DisksUpdateFuture) result(client DisksClient) (d Disk, err error) 
 		return
 	}
 	if !done {
+		d.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.DisksUpdateFuture")
 		return
 	}
@@ -3323,6 +3336,7 @@ func (future *GalleriesCreateOrUpdateFuture) result(client GalleriesClient) (g G
 		return
 	}
 	if !done {
+		g.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleriesCreateOrUpdateFuture")
 		return
 	}
@@ -3365,6 +3379,7 @@ func (future *GalleriesDeleteFuture) result(client GalleriesClient) (ar autorest
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleriesDeleteFuture")
 		return
 	}
@@ -3401,6 +3416,7 @@ func (future *GalleriesUpdateFuture) result(client GalleriesClient) (g Gallery, 
 		return
 	}
 	if !done {
+		g.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleriesUpdateFuture")
 		return
 	}
@@ -3819,6 +3835,7 @@ func (future *GalleryApplicationsCreateOrUpdateFuture) result(client GalleryAppl
 		return
 	}
 	if !done {
+		ga.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationsCreateOrUpdateFuture")
 		return
 	}
@@ -3861,6 +3878,7 @@ func (future *GalleryApplicationsDeleteFuture) result(client GalleryApplications
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationsDeleteFuture")
 		return
 	}
@@ -3897,6 +3915,7 @@ func (future *GalleryApplicationsUpdateFuture) result(client GalleryApplications
 		return
 	}
 	if !done {
+		ga.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationsUpdateFuture")
 		return
 	}
@@ -4355,6 +4374,7 @@ func (future *GalleryApplicationVersionsCreateOrUpdateFuture) result(client Gall
 		return
 	}
 	if !done {
+		gav.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationVersionsCreateOrUpdateFuture")
 		return
 	}
@@ -4397,6 +4417,7 @@ func (future *GalleryApplicationVersionsDeleteFuture) result(client GalleryAppli
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationVersionsDeleteFuture")
 		return
 	}
@@ -4433,6 +4454,7 @@ func (future *GalleryApplicationVersionsUpdateFuture) result(client GalleryAppli
 		return
 	}
 	if !done {
+		gav.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryApplicationVersionsUpdateFuture")
 		return
 	}
@@ -4999,6 +5021,7 @@ func (future *GalleryImagesCreateOrUpdateFuture) result(client GalleryImagesClie
 		return
 	}
 	if !done {
+		gi.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImagesCreateOrUpdateFuture")
 		return
 	}
@@ -5041,6 +5064,7 @@ func (future *GalleryImagesDeleteFuture) result(client GalleryImagesClient) (ar 
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImagesDeleteFuture")
 		return
 	}
@@ -5077,6 +5101,7 @@ func (future *GalleryImagesUpdateFuture) result(client GalleryImagesClient) (gi 
 		return
 	}
 	if !done {
+		gi.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImagesUpdateFuture")
 		return
 	}
@@ -5523,6 +5548,7 @@ func (future *GalleryImageVersionsCreateOrUpdateFuture) result(client GalleryIma
 		return
 	}
 	if !done {
+		giv.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImageVersionsCreateOrUpdateFuture")
 		return
 	}
@@ -5565,6 +5591,7 @@ func (future *GalleryImageVersionsDeleteFuture) result(client GalleryImageVersio
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImageVersionsDeleteFuture")
 		return
 	}
@@ -5609,6 +5636,7 @@ func (future *GalleryImageVersionsUpdateFuture) result(client GalleryImageVersio
 		return
 	}
 	if !done {
+		giv.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.GalleryImageVersionsUpdateFuture")
 		return
 	}
@@ -6443,6 +6471,7 @@ func (future *ImagesCreateOrUpdateFuture) result(client ImagesClient) (i Image, 
 		return
 	}
 	if !done {
+		i.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.ImagesCreateOrUpdateFuture")
 		return
 	}
@@ -6484,6 +6513,7 @@ func (future *ImagesDeleteFuture) result(client ImagesClient) (ar autorest.Respo
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.ImagesDeleteFuture")
 		return
 	}
@@ -6529,6 +6559,7 @@ func (future *ImagesUpdateFuture) result(client ImagesClient) (i Image, err erro
 		return
 	}
 	if !done {
+		i.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.ImagesUpdateFuture")
 		return
 	}
@@ -6863,6 +6894,7 @@ func (future *LogAnalyticsExportRequestRateByIntervalFuture) result(client LogAn
 		return
 	}
 	if !done {
+		laor.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.LogAnalyticsExportRequestRateByIntervalFuture")
 		return
 	}
@@ -6905,6 +6937,7 @@ func (future *LogAnalyticsExportThrottledRequestsFuture) result(client LogAnalyt
 		return
 	}
 	if !done {
+		laor.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.LogAnalyticsExportThrottledRequestsFuture")
 		return
 	}
@@ -8659,6 +8692,7 @@ func (future *SnapshotsCreateOrUpdateFuture) result(client SnapshotsClient) (s S
 		return
 	}
 	if !done {
+		s.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.SnapshotsCreateOrUpdateFuture")
 		return
 	}
@@ -8701,6 +8735,7 @@ func (future *SnapshotsDeleteFuture) result(client SnapshotsClient) (ar autorest
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.SnapshotsDeleteFuture")
 		return
 	}
@@ -8737,6 +8772,7 @@ func (future *SnapshotsGrantAccessFuture) result(client SnapshotsClient) (au Acc
 		return
 	}
 	if !done {
+		au.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.SnapshotsGrantAccessFuture")
 		return
 	}
@@ -8796,6 +8832,7 @@ func (future *SnapshotsRevokeAccessFuture) result(client SnapshotsClient) (ar au
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.SnapshotsRevokeAccessFuture")
 		return
 	}
@@ -8832,6 +8869,7 @@ func (future *SnapshotsUpdateFuture) result(client SnapshotsClient) (s Snapshot,
 		return
 	}
 	if !done {
+		s.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.SnapshotsUpdateFuture")
 		return
 	}
@@ -9990,6 +10028,7 @@ func (future *VirtualMachineExtensionsCreateOrUpdateFuture) result(client Virtua
 		return
 	}
 	if !done {
+		vme.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineExtensionsCreateOrUpdateFuture")
 		return
 	}
@@ -10032,6 +10071,7 @@ func (future *VirtualMachineExtensionsDeleteFuture) result(client VirtualMachine
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineExtensionsDeleteFuture")
 		return
 	}
@@ -10075,6 +10115,7 @@ func (future *VirtualMachineExtensionsUpdateFuture) result(client VirtualMachine
 		return
 	}
 	if !done {
+		vme.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineExtensionsUpdateFuture")
 		return
 	}
@@ -11115,6 +11156,7 @@ func (future *VirtualMachineScaleSetExtensionsCreateOrUpdateFuture) result(clien
 		return
 	}
 	if !done {
+		vmsse.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetExtensionsCreateOrUpdateFuture")
 		return
 	}
@@ -11157,6 +11199,7 @@ func (future *VirtualMachineScaleSetExtensionsDeleteFuture) result(client Virtua
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetExtensionsDeleteFuture")
 		return
 	}
@@ -11193,6 +11236,7 @@ func (future *VirtualMachineScaleSetExtensionsUpdateFuture) result(client Virtua
 		return
 	}
 	if !done {
+		vmsse.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetExtensionsUpdateFuture")
 		return
 	}
@@ -12406,6 +12450,7 @@ func (future *VirtualMachineScaleSetRollingUpgradesCancelFuture) result(client V
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetRollingUpgradesCancelFuture")
 		return
 	}
@@ -12442,6 +12487,7 @@ func (future *VirtualMachineScaleSetRollingUpgradesStartExtensionUpgradeFuture) 
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetRollingUpgradesStartExtensionUpgradeFuture")
 		return
 	}
@@ -12478,6 +12524,7 @@ func (future *VirtualMachineScaleSetRollingUpgradesStartOSUpgradeFuture) result(
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetRollingUpgradesStartOSUpgradeFuture")
 		return
 	}
@@ -12514,6 +12561,7 @@ func (future *VirtualMachineScaleSetsCreateOrUpdateFuture) result(client Virtual
 		return
 	}
 	if !done {
+		vmss.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsCreateOrUpdateFuture")
 		return
 	}
@@ -12556,6 +12604,7 @@ func (future *VirtualMachineScaleSetsDeallocateFuture) result(client VirtualMach
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsDeallocateFuture")
 		return
 	}
@@ -12592,6 +12641,7 @@ func (future *VirtualMachineScaleSetsDeleteFuture) result(client VirtualMachineS
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsDeleteFuture")
 		return
 	}
@@ -12628,6 +12678,7 @@ func (future *VirtualMachineScaleSetsDeleteInstancesFuture) result(client Virtua
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsDeleteInstancesFuture")
 		return
 	}
@@ -12686,6 +12737,7 @@ func (future *VirtualMachineScaleSetsPerformMaintenanceFuture) result(client Vir
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsPerformMaintenanceFuture")
 		return
 	}
@@ -12722,6 +12774,7 @@ func (future *VirtualMachineScaleSetsPowerOffFuture) result(client VirtualMachin
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsPowerOffFuture")
 		return
 	}
@@ -12758,6 +12811,7 @@ func (future *VirtualMachineScaleSetsRedeployFuture) result(client VirtualMachin
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsRedeployFuture")
 		return
 	}
@@ -12794,6 +12848,7 @@ func (future *VirtualMachineScaleSetsReimageAllFuture) result(client VirtualMach
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsReimageAllFuture")
 		return
 	}
@@ -12830,6 +12885,7 @@ func (future *VirtualMachineScaleSetsReimageFuture) result(client VirtualMachine
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsReimageFuture")
 		return
 	}
@@ -12866,6 +12922,7 @@ func (future *VirtualMachineScaleSetsRestartFuture) result(client VirtualMachine
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsRestartFuture")
 		return
 	}
@@ -12902,6 +12959,7 @@ func (future *VirtualMachineScaleSetsSetOrchestrationServiceStateFuture) result(
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsSetOrchestrationServiceStateFuture")
 		return
 	}
@@ -12938,6 +12996,7 @@ func (future *VirtualMachineScaleSetsStartFuture) result(client VirtualMachineSc
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsStartFuture")
 		return
 	}
@@ -12984,6 +13043,7 @@ func (future *VirtualMachineScaleSetsUpdateFuture) result(client VirtualMachineS
 		return
 	}
 	if !done {
+		vmss.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsUpdateFuture")
 		return
 	}
@@ -13026,6 +13086,7 @@ func (future *VirtualMachineScaleSetsUpdateInstancesFuture) result(client Virtua
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetsUpdateInstancesFuture")
 		return
 	}
@@ -13639,6 +13700,7 @@ func (future *VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture) result(cli
 		return
 	}
 	if !done {
+		vme.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsCreateOrUpdateFuture")
 		return
 	}
@@ -13681,6 +13743,7 @@ func (future *VirtualMachineScaleSetVMExtensionsDeleteFuture) result(client Virt
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsDeleteFuture")
 		return
 	}
@@ -13726,6 +13789,7 @@ func (future *VirtualMachineScaleSetVMExtensionsUpdateFuture) result(client Virt
 		return
 	}
 	if !done {
+		vme.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMExtensionsUpdateFuture")
 		return
 	}
@@ -14121,6 +14185,7 @@ func (future *VirtualMachineScaleSetVMsDeallocateFuture) result(client VirtualMa
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsDeallocateFuture")
 		return
 	}
@@ -14157,6 +14222,7 @@ func (future *VirtualMachineScaleSetVMsDeleteFuture) result(client VirtualMachin
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsDeleteFuture")
 		return
 	}
@@ -14193,6 +14259,7 @@ func (future *VirtualMachineScaleSetVMsPerformMaintenanceFuture) result(client V
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsPerformMaintenanceFuture")
 		return
 	}
@@ -14229,6 +14296,7 @@ func (future *VirtualMachineScaleSetVMsPowerOffFuture) result(client VirtualMach
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsPowerOffFuture")
 		return
 	}
@@ -14265,6 +14333,7 @@ func (future *VirtualMachineScaleSetVMsRedeployFuture) result(client VirtualMach
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsRedeployFuture")
 		return
 	}
@@ -14301,6 +14370,7 @@ func (future *VirtualMachineScaleSetVMsReimageAllFuture) result(client VirtualMa
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsReimageAllFuture")
 		return
 	}
@@ -14337,6 +14407,7 @@ func (future *VirtualMachineScaleSetVMsReimageFuture) result(client VirtualMachi
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsReimageFuture")
 		return
 	}
@@ -14373,6 +14444,7 @@ func (future *VirtualMachineScaleSetVMsRestartFuture) result(client VirtualMachi
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsRestartFuture")
 		return
 	}
@@ -14409,6 +14481,7 @@ func (future *VirtualMachineScaleSetVMsRunCommandFuture) result(client VirtualMa
 		return
 	}
 	if !done {
+		rcr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsRunCommandFuture")
 		return
 	}
@@ -14451,6 +14524,7 @@ func (future *VirtualMachineScaleSetVMsStartFuture) result(client VirtualMachine
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsStartFuture")
 		return
 	}
@@ -14487,6 +14561,7 @@ func (future *VirtualMachineScaleSetVMsUpdateFuture) result(client VirtualMachin
 		return
 	}
 	if !done {
+		vmssv.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachineScaleSetVMsUpdateFuture")
 		return
 	}
@@ -14529,6 +14604,7 @@ func (future *VirtualMachinesCaptureFuture) result(client VirtualMachinesClient)
 		return
 	}
 	if !done {
+		vmcr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesCaptureFuture")
 		return
 	}
@@ -14571,6 +14647,7 @@ func (future *VirtualMachinesConvertToManagedDisksFuture) result(client VirtualM
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesConvertToManagedDisksFuture")
 		return
 	}
@@ -14607,6 +14684,7 @@ func (future *VirtualMachinesCreateOrUpdateFuture) result(client VirtualMachines
 		return
 	}
 	if !done {
+		VM.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesCreateOrUpdateFuture")
 		return
 	}
@@ -14649,6 +14727,7 @@ func (future *VirtualMachinesDeallocateFuture) result(client VirtualMachinesClie
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesDeallocateFuture")
 		return
 	}
@@ -14685,6 +14764,7 @@ func (future *VirtualMachinesDeleteFuture) result(client VirtualMachinesClient) 
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesDeleteFuture")
 		return
 	}
@@ -14744,6 +14824,7 @@ func (future *VirtualMachinesPerformMaintenanceFuture) result(client VirtualMach
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesPerformMaintenanceFuture")
 		return
 	}
@@ -14780,6 +14861,7 @@ func (future *VirtualMachinesPowerOffFuture) result(client VirtualMachinesClient
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesPowerOffFuture")
 		return
 	}
@@ -14816,6 +14898,7 @@ func (future *VirtualMachinesReapplyFuture) result(client VirtualMachinesClient)
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesReapplyFuture")
 		return
 	}
@@ -14852,6 +14935,7 @@ func (future *VirtualMachinesRedeployFuture) result(client VirtualMachinesClient
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesRedeployFuture")
 		return
 	}
@@ -14888,6 +14972,7 @@ func (future *VirtualMachinesReimageFuture) result(client VirtualMachinesClient)
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesReimageFuture")
 		return
 	}
@@ -14924,6 +15009,7 @@ func (future *VirtualMachinesRestartFuture) result(client VirtualMachinesClient)
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesRestartFuture")
 		return
 	}
@@ -14960,6 +15046,7 @@ func (future *VirtualMachinesRunCommandFuture) result(client VirtualMachinesClie
 		return
 	}
 	if !done {
+		rcr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesRunCommandFuture")
 		return
 	}
@@ -15002,6 +15089,7 @@ func (future *VirtualMachinesStartFuture) result(client VirtualMachinesClient) (
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesStartFuture")
 		return
 	}
@@ -15047,6 +15135,7 @@ func (future *VirtualMachinesUpdateFuture) result(client VirtualMachinesClient) 
 		return
 	}
 	if !done {
+		VM.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("compute.VirtualMachinesUpdateFuture")
 		return
 	}

@@ -80,6 +80,7 @@ func (future *CreateOrUpdateByIDFuture) result(client Client) (gr GenericResourc
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.CreateOrUpdateByIDFuture")
 		return
 	}
@@ -122,6 +123,7 @@ func (future *CreateOrUpdateFuture) result(client Client) (gr GenericResource, e
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.CreateOrUpdateFuture")
 		return
 	}
@@ -169,6 +171,7 @@ func (future *DeleteByIDFuture) result(client Client) (ar autorest.Response, err
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeleteByIDFuture")
 		return
 	}
@@ -204,6 +207,7 @@ func (future *DeleteFuture) result(client Client) (ar autorest.Response, err err
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeleteFuture")
 		return
 	}
@@ -748,6 +752,7 @@ func (future *DeploymentsCreateOrUpdateFuture) result(client DeploymentsClient) 
 		return
 	}
 	if !done {
+		de.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeploymentsCreateOrUpdateFuture")
 		return
 	}
@@ -790,6 +795,7 @@ func (future *DeploymentsDeleteFuture) result(client DeploymentsClient) (ar auto
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.DeploymentsDeleteFuture")
 		return
 	}
@@ -1251,6 +1257,7 @@ func (future *GroupsDeleteFuture) result(client GroupsClient) (ar autorest.Respo
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.GroupsDeleteFuture")
 		return
 	}
@@ -1500,6 +1507,7 @@ func (future *MoveResourcesFuture) result(client Client) (ar autorest.Response, 
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.MoveResourcesFuture")
 		return
 	}
@@ -2099,6 +2107,7 @@ func (future *UpdateByIDFuture) result(client Client) (gr GenericResource, err e
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.UpdateByIDFuture")
 		return
 	}
@@ -2140,6 +2149,7 @@ func (future *UpdateFuture) result(client Client) (gr GenericResource, err error
 		return
 	}
 	if !done {
+		gr.Response.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.UpdateFuture")
 		return
 	}
@@ -2182,6 +2192,7 @@ func (future *ValidateMoveResourcesFuture) result(client Client) (ar autorest.Re
 		return
 	}
 	if !done {
+		ar.Response = future.Response()
 		err = azure.NewAsyncOpIncompleteError("resources.ValidateMoveResourcesFuture")
 		return
 	}
