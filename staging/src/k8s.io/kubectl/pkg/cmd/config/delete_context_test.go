@@ -24,10 +24,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
 )
 
 type deleteContextTest struct {
@@ -97,19 +95,4 @@ func (test deleteContextTest) run(t *testing.T) {
 	if !reflect.DeepEqual(test.expectedContexts, contexts) {
 		t.Errorf("expected contexts %v, but found %v in kubeconfig", test.expectedContexts, contexts)
 	}
-}
-
-func TestCompletionDeleteContextNoArg(t *testing.T) {
-	// FIXME
-	t.Skip("Should not be skipeed")
-
-	pathOptions, streams, factory := cmdtesting.PrepareConfigForCompletion(t)
-	configCmd := NewCmdConfig(factory, pathOptions, streams)
-	cmd, _, err := configCmd.Find([]string{"delete-context"})
-	if err != nil {
-		t.Fatalf("unexpected error finding delete-context command: %v", err)
-	}
-
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "my")
-	cmdtesting.CheckCompletion(t, comps, []string{"my-context"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }

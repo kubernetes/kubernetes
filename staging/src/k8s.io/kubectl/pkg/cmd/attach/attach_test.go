@@ -26,7 +26,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/cobra"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -446,13 +445,6 @@ func TestAttachWarnings(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCompletionAttachNoArg(t *testing.T) {
-	tf, streams := cmdtesting.PreparePodsForCompletion(t)
-	cmd := NewCmdAttach(tf, streams)
-	comps, directive := cmd.ValidArgsFunction(cmd, []string{}, "b")
-	cmdtesting.CheckCompletion(t, comps, []string{"bar"}, directive, cobra.ShellCompDirectiveNoFileComp)
 }
 
 func attachPod() *corev1.Pod {
