@@ -167,10 +167,25 @@ func warningsForPodSpecAndMeta(fieldPath *field.Path, podSpec *api.PodSpec, meta
 		}
 	}
 
-	// removed volume plugins
+	// deprecated and removed volume plugins
 	for i, v := range podSpec.Volumes {
 		if v.PhotonPersistentDisk != nil {
-			warnings = append(warnings, fmt.Sprintf("%s: non-functional in v1.16+", fieldPath.Child("spec", "volumes").Index(i).Child("photonPersistentDisk")))
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11, non-functional in v1.16+", fieldPath.Child("spec", "volumes").Index(i).Child("photonPersistentDisk")))
+		}
+		if v.GitRepo != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.11", fieldPath.Child("spec", "volumes").Index(i).Child("gitRepo")))
+		}
+		if v.ScaleIO != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.16, non-functional in v1.22+", fieldPath.Child("spec", "volumes").Index(i).Child("scaleIO")))
+		}
+		if v.Flocker != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("flocker")))
+		}
+		if v.StorageOS != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("storageOS")))
+		}
+		if v.Quobyte != nil {
+			warnings = append(warnings, fmt.Sprintf("%s: deprecated in v1.22, support removal is planned in v1.26", fieldPath.Child("spec", "volumes").Index(i).Child("quobyte")))
 		}
 	}
 
