@@ -6562,6 +6562,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 		desc          string
 		dnsConfig     *core.PodDNSConfig
 		dnsPolicy     *core.DNSPolicy
+		opts          PodValidationOptions
 		expectedError bool
 	}{
 		{
@@ -6608,7 +6609,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			desc: "valid: 3 nameservers and 6 search paths",
+			desc: "valid: 3 nameservers and 6 search paths(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
 				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local."},
@@ -6616,7 +6617,18 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: false,
 		},
 		{
-			desc: "valid: 256 characters in search path list",
+			desc: "valid: 3 nameservers and 32 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Nameservers: []string{"127.0.0.1", "10.0.0.10", "8.8.8.8"},
+				Searches:    []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32"},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 256 characters in search path list(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				// We can have 256 - (6 - 1) = 251 characters in total for 6 search paths.
 				Searches: []string{
@@ -6627,6 +6639,50 @@ func TestValidatePodDNSConfig(t *testing.T) {
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 				},
+			},
+			expectedError: false,
+		},
+		{
+			desc: "valid: 2048 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 2048 - (32 - 1) = 2017 characters in total for 32 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(64),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+				},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: false,
 		},
@@ -6645,9 +6701,19 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			expectedError: true,
 		},
 		{
-			desc: "invalid: 7 search paths",
+			desc: "invalid: 7 search paths(legacy)",
 			dnsConfig: &core.PodDNSConfig{
 				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local", "exceeded"},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 33 search paths",
+			dnsConfig: &core.PodDNSConfig{
+				Searches: []string{"custom", "mydomain.com", "local", "cluster.local", "svc.cluster.local", "default.svc.cluster.local.", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32", "33"},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: true,
 		},
@@ -6663,6 +6729,50 @@ func TestValidatePodDNSConfig(t *testing.T) {
 					generateTestSearchPathFunc(50),
 					generateTestSearchPathFunc(50),
 				},
+			},
+			expectedError: true,
+		},
+		{
+			desc: "invalid: 2049 characters in search path list",
+			dnsConfig: &core.PodDNSConfig{
+				// We can have 2048 - (32 - 1) = 2017 characters in total for 32 search paths.
+				Searches: []string{
+					generateTestSearchPathFunc(65),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+					generateTestSearchPathFunc(63),
+				},
+			},
+			opts: PodValidationOptions{
+				AllowExpandedDNSConfig: true,
 			},
 			expectedError: true,
 		},
@@ -6704,7 +6814,7 @@ func TestValidatePodDNSConfig(t *testing.T) {
 			tc.dnsPolicy = &testDNSClusterFirst
 		}
 
-		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"))
+		errs := validatePodDNSConfig(tc.dnsConfig, tc.dnsPolicy, field.NewPath("dnsConfig"), tc.opts)
 		if len(errs) != 0 && !tc.expectedError {
 			t.Errorf("%v: validatePodDNSConfig(%v) = %v, want nil", tc.desc, tc.dnsConfig, errs)
 		} else if len(errs) == 0 && tc.expectedError {
