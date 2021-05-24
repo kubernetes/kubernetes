@@ -471,7 +471,7 @@ function install-docker {
 
   # Install Docker
   apt-get update && \
-    apt-get install -y --no-install-recommends "${GCI_DOCKER_VERSION:-"docker-ce=5:19.03.*"}"
+    apt-get install -y --no-install-recommends "${GCI_DOCKER_VERSION:-"docker-ce docker-ce-cli containerd.io"}"
   rm -rf /var/lib/apt/lists/*
 }
 
