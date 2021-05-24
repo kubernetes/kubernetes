@@ -29,7 +29,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -221,6 +224,7 @@ func New(client clientset.Interface,
 	}
 
 	snapshot := internalcache.NewEmptySnapshot()
+	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 
 	configurator := &Configurator{
 		client:                   client,
@@ -238,6 +242,7 @@ func New(client clientset.Interface,
 		extenders:                options.extenders,
 		frameworkCapturer:        options.frameworkCapturer,
 		parallellism:             options.parallelism,
+		clusterEventMap:          clusterEventMap,
 	}
 
 	metrics.Register()
@@ -281,8 +286,28 @@ func New(client clientset.Interface,
 	sched.StopEverything = stopEverything
 	sched.client = client
 
-	addAllEventHandlers(sched, informerFactory)
+	// Build dynamic client and dynamic informer factory
+	var dynInformerFactory dynamicinformer.DynamicSharedInformerFactory
+	// options.kubeConfig can be nil in tests.
+	if options.kubeConfig != nil {
+		dynClient := dynamic.NewForConfigOrDie(options.kubeConfig)
+		dynInformerFactory = dynamicinformer.NewFilteredDynamicSharedInformerFactory(dynClient, 0, v1.NamespaceAll, nil)
+	}
+
+	addAllEventHandlers(sched, informerFactory, dynInformerFactory, unionedGVKs(clusterEventMap))
 	return sched, nil
+}
+
+func unionedGVKs(m map[framework.ClusterEvent]sets.String) map[framework.GVK]framework.ActionType {
+	gvkMap := make(map[framework.GVK]framework.ActionType)
+	for evt := range m {
+		if _, ok := gvkMap[evt.Resource]; ok {
+			gvkMap[evt.Resource] |= evt.ActionType
+		} else {
+			gvkMap[evt.Resource] = evt.ActionType
+		}
+	}
+	return gvkMap
 }
 
 // initPolicyFromFile initialize policy from file

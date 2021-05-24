@@ -86,6 +86,8 @@ type Configurator struct {
 	extenders         []schedulerapi.Extender
 	frameworkCapturer FrameworkCapturer
 	parallellism      int32
+	// A "cluster event" -> "plugin names" map.
+	clusterEventMap map[framework.ClusterEvent]sets.String
 }
 
 // create a scheduler from a set of registered plugins.
@@ -135,8 +137,6 @@ func (c *Configurator) create() (*Scheduler, error) {
 
 	// The nominator will be passed all the way to framework instantiation.
 	nominator := internalqueue.NewPodNominator()
-	// It's a "cluster event" -> "plugin names" map.
-	clusterEventMap := make(map[framework.ClusterEvent]sets.String)
 	profiles, err := profile.NewMap(c.profiles, c.registry, c.recorderFactory,
 		frameworkruntime.WithClientSet(c.client),
 		frameworkruntime.WithKubeConfig(c.kubeConfig),
@@ -145,7 +145,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		frameworkruntime.WithRunAllFilters(c.alwaysCheckAllPredicates),
 		frameworkruntime.WithPodNominator(nominator),
 		frameworkruntime.WithCaptureProfile(frameworkruntime.CaptureProfile(c.frameworkCapturer)),
-		frameworkruntime.WithClusterEventMap(clusterEventMap),
+		frameworkruntime.WithClusterEventMap(c.clusterEventMap),
 		frameworkruntime.WithParallelism(int(c.parallellism)),
 	)
 	if err != nil {
@@ -162,7 +162,7 @@ func (c *Configurator) create() (*Scheduler, error) {
 		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
 		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
 		internalqueue.WithPodNominator(nominator),
-		internalqueue.WithClusterEventMap(clusterEventMap),
+		internalqueue.WithClusterEventMap(c.clusterEventMap),
 	)
 
 	// Setup cache debugger.
