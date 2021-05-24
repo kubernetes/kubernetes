@@ -112,7 +112,7 @@ var _ = SIGDescribe("Restart [Serial] [Slow] [Disruptive] [NodeFeature:Container
 						}
 						return nil
 					}, 1*time.Minute, 2*time.Second).Should(gomega.BeNil())
-					if stdout, err := exec.Command("sudo", "kill", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
+					if stdout, err := exec.Command("sudo", "kill", "-SIGKILL", fmt.Sprintf("%d", pid)).CombinedOutput(); err != nil {
 						framework.Failf("Failed to kill container runtime (pid=%d): %v, stdout: %q", pid, err, string(stdout))
 					}
 					// Assume that container runtime will be restarted by systemd/supervisord etc.
