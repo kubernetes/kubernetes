@@ -257,6 +257,13 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 		if err != nil {
 			return false
 		}
+
+		// In case of systemd, it is responsible for ensuring the correct
+		// controllers are enabled.
+		if m.adapter.cgroupManagerType == libcontainerSystemd {
+			return true
+		}
+
 		difference := neededControllers.Difference(enabledControllers)
 		if difference.Len() > 0 {
 			klog.V(4).InfoS("The cgroup has some missing controllers", "cgroupName", name, "controllers", difference)
@@ -267,6 +274,13 @@ func (m *cgroupManagerImpl) Exists(name CgroupName) bool {
 
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := m.buildCgroupPaths(name)
+
+	// In case of systemd, it is responsible for ensuring the correct
+	// controllers are enabled. Only verify that directory on systemd
+	// mount exists
+	if m.adapter.cgroupManagerType == libcontainerSystemd {
+		return libcontainercgroups.PathExists(cgroupPaths["systemd"])
+	}
 
 	// the presence of alternative control groups not known to runc confuses
 	// the kubelet existence checks.
