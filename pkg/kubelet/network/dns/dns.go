@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -103,6 +104,19 @@ func (c *Configurer) formDNSSearchFitsLimits(composedSearch []string, pod *v1.Po
 		composedSearch = composedSearch[:validation.MaxDNSSearchPaths]
 		limitsExceeded = true
 	}
+
+	// In some DNS resolvers(e.g. glibc 2.28), DNS resolving causes abort() if there is a
+	// search path exceeding 255 characters. We have to filter them out.
+	l := 0
+	for _, search := range composedSearch {
+		if len(search) > utilvalidation.DNS1123SubdomainMaxLength {
+			limitsExceeded = true
+			continue
+		}
+		composedSearch[l] = search
+		l++
+	}
+	composedSearch = composedSearch[:l]
 
 	if resolvSearchLineStrLen := len(strings.Join(composedSearch, " ")); resolvSearchLineStrLen > validation.MaxDNSSearchListChars {
 		cutDomainsNum := 0
