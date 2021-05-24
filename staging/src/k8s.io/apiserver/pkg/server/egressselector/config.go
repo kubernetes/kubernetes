@@ -34,8 +34,7 @@ import (
 var cfgScheme = runtime.NewScheme()
 
 // validEgressSelectorNames contains the set of valid egress selctor names.
-// 'master' is deprecated in favor of 'controlplane' and will be removed in v1.22.
-var validEgressSelectorNames = sets.NewString("master", "controlplane", "cluster", "etcd")
+var validEgressSelectorNames = sets.NewString("controlplane", "cluster", "etcd")
 
 func init() {
 	install.Install(cfgScheme)
@@ -110,10 +109,6 @@ func ValidateEgressSelectorConfiguration(config *apiserver.EgressSelectorConfigu
 		if !validEgressSelectorNames.Has(canonicalName) {
 			allErrs = append(allErrs, field.NotSupported(field.NewPath("egressSelection", "name"), canonicalName, validEgressSelectorNames.List()))
 			continue
-		}
-
-		if canonicalName == "master" {
-			foundMaster = true
 		}
 
 		if canonicalName == "controlplane" {

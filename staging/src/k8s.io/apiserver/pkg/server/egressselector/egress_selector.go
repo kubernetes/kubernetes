@@ -91,10 +91,6 @@ func (s EgressType) AsNetworkContext() NetworkContext {
 
 func lookupServiceName(name string) (EgressType, error) {
 	switch strings.ToLower(name) {
-	// 'master' is deprecated, interpret "master" as controlplane internally until removed in v1.22.
-	case "master":
-		klog.Warning("EgressSelection name 'master' is deprecated, use 'controlplane' instead")
-		return ControlPlane, nil
 	case "controlplane":
 		return ControlPlane, nil
 	case "etcd":
