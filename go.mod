@@ -252,10 +252,10 @@ replace (
 	github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
 	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
 	github.com/go-logr/logr => github.com/go-logr/logr v0.4.0
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.5
+	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.5
 	github.com/go-openapi/spec => github.com/go-openapi/spec v0.19.5
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
+	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.14
 	github.com/go-ozzo/ozzo-validation => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 	github.com/godbus/dbus/v5 => github.com/godbus/dbus/v5 v5.0.4
 	github.com/gofrs/uuid => github.com/gofrs/uuid v4.0.0+incompatible
@@ -448,7 +448,7 @@ replace (
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20210426230700-d19ff857e887
 	golang.org/x/term => golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d
-	golang.org/x/text => golang.org/x/text v0.3.4
+	golang.org/x/text => golang.org/x/text v0.3.5
 	golang.org/x/time => golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	golang.org/x/tools => golang.org/x/tools v0.1.0
 	golang.org/x/xerrors => golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1

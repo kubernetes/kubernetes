@@ -133,14 +133,15 @@ func (s *scanner) resizeRange(oldStart, oldEnd, newSize int) {
 	s.start = oldStart
 	if end := oldStart + newSize; end != oldEnd {
 		diff := end - oldEnd
-		if end < cap(s.b) {
-			b := make([]byte, len(s.b)+diff)
+		var b []byte
+		if n := len(s.b) + diff; n > cap(s.b) {
+			b = make([]byte, n)
 			copy(b, s.b[:oldStart])
-			copy(b[end:], s.b[oldEnd:])
-			s.b = b
 		} else {
-			s.b = append(s.b[end:], s.b[oldEnd:]...)
+			b = s.b[:n:n]
 		}
+		copy(b[end:], s.b[oldEnd:])
+		s.b = b
 		s.next = end + (s.next - s.end)
 		s.end = end
 	}

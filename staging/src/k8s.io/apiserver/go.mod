@@ -23,7 +23,6 @@ require (
 	github.com/googleapis/gnostic v0.5.1
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/mailru/easyjson v0.7.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
@@ -54,10 +53,7 @@ require (
 )
 
 replace (
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
-	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.3
-	github.com/go-openapi/swag => github.com/go-openapi/swag v0.19.5
-	golang.org/x/text => golang.org/x/text v0.3.4
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

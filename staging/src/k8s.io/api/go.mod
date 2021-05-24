@@ -11,7 +11,7 @@ require (
 )
 
 replace (
-	golang.org/x/text => golang.org/x/text v0.3.4
+	github.com/mailru/easyjson => github.com/mailru/easyjson v0.7.0
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 )

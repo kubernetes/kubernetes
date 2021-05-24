@@ -22,7 +22,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776 // indirect
 )
 
-replace (
-	golang.org/x/text => golang.org/x/text v0.3.4
-	k8s.io/cri-api => ../cri-api
-)
+replace k8s.io/cri-api => ../cri-api
