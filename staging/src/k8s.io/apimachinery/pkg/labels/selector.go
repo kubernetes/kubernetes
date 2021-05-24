@@ -637,6 +637,11 @@ func (p *Parser) consume(context ParserContext) (Token, string) {
 	return tok, lit
 }
 
+// increase current position
+func (p *Parser) incPosition() {
+	p.position++
+}
+
 // scan runs through the input string and stores the ScannedItem in an array
 // Parser can now lookahead and consume the tokens
 func (p *Parser) scan() {
@@ -779,7 +784,7 @@ func (p *Parser) parseValues() (sets.String, error) {
 		}
 		return s, nil
 	case ClosedParToken: // handles "()"
-		p.consume(Values)
+		p.incPosition()
 		return sets.NewString(""), nil
 	default:
 		return nil, fmt.Errorf("found '%s', expected: ',', ')' or identifier", lit)
@@ -814,7 +819,7 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 				return s, nil
 			}
 			if tok2 == CommaToken {
-				p.consume(Values)
+				p.incPosition()
 				s.Insert("") // to handle ,, Double "" removed by StringSet
 			}
 		default: // it can be operator
@@ -826,12 +831,12 @@ func (p *Parser) parseIdentifiersList() (sets.String, error) {
 // parseExactValue parses the only value for exact match style
 func (p *Parser) parseExactValue() (sets.String, error) {
 	s := sets.NewString()
-	tok, _ := p.lookahead(Values)
+	tok, lit := p.lookahead(Values)
 	if tok == EndOfStringToken || tok == CommaToken {
 		s.Insert("")
 		return s, nil
 	}
-	tok, lit := p.consume(Values)
+	p.incPosition()
 	if tok == IdentifierToken {
 		s.Insert(lit)
 		return s, nil
