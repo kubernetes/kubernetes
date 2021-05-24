@@ -29,7 +29,6 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -301,9 +300,10 @@ func TestCreatePods(t *testing.T) {
 	}
 
 	controllerSpec := newReplicationController(1)
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
-	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec)
+	err := podControl.CreatePods(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
@@ -321,7 +321,7 @@ func TestCreatePods(t *testing.T) {
 		"Body: %s", fakeHandler.RequestBody)
 }
 
-func TestCreatePodsWithControllerRefAndGenerateName(t *testing.T) {
+func TestCreatePodsWithGenerateName(t *testing.T) {
 	ns := metav1.NamespaceDefault
 	body := runtime.EncodeOrDie(clientscheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "empty_pod"}})
 	fakeHandler := utiltesting.FakeHandler{
@@ -338,11 +338,11 @@ func TestCreatePodsWithControllerRefAndGenerateName(t *testing.T) {
 	}
 
 	controllerSpec := newReplicationController(1)
-	controllerRef := metav1.NewControllerRef(controllerSpec, batchv1.SchemeGroupVersion.WithKind("Job"))
+	controllerRef := metav1.NewControllerRef(controllerSpec, v1.SchemeGroupVersion.WithKind("ReplicationController"))
 
 	// Make sure createReplica sends a POST to the apiserver with a pod from the controllers pod template
 	generateName := "hello-"
-	err := podControl.CreatePodsWithControllerRefAndGenerateName(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
+	err := podControl.CreatePodsWithGenerateName(ns, controllerSpec.Spec.Template, controllerSpec, controllerRef, generateName)
 	assert.NoError(t, err, "unexpected error: %v", err)
 
 	expectedPod := v1.Pod{
