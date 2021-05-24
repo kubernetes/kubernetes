@@ -175,30 +175,49 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 		{ID: "Dev3", Health: pluginapi.Healthy},
 	}
 
-	m, ch, p1, _ := setupInProbeMode(t, devs, nil, socketName, pluginSocketName)
+	m, ch, p1, _ := setupInProbeMode(t, []*pluginapi.Device{
+		{ID: "Dev0", Health: pluginapi.Healthy},
+	}, nil, socketName, pluginSocketName)
+
+	waitForDeviceID := func(deviceID string) {
+		timeoutCh := make(chan interface{})
+
+		go func() {
+			for {
+				t := <-ch
+				switch t := t.(type) {
+				case []pluginapi.Device:
+					for _, device := range t {
+						if device.ID == deviceID {
+							timeoutCh <- new(interface{})
+							return
+						}
+					}
+				}
+			}
+		}()
+
+		select {
+		case <-timeoutCh:
+			return
+		case <-time.After(5 * time.Second):
+			t.FailNow()
+		}
+	}
 
 	// Wait for the first callback to be issued.
-	select {
-	case <-ch:
-	case <-time.After(5 * time.Second):
-		t.FailNow()
-	}
+	waitForDeviceID("Dev0")
 	capacity, allocatable, _ := m.GetCapacity()
 	resourceCapacity := capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable := allocatable[v1.ResourceName(testResourceName)]
 	require.Equal(t, resourceCapacity.Value(), resourceAllocatable.Value(), "capacity should equal to allocatable")
-	require.Equal(t, int64(2), resourceAllocatable.Value(), "Devices are not updated.")
+	require.Equal(t, int64(1), resourceAllocatable.Value(), "Devices are not updated.")
 
 	p2 := NewDevicePluginStub(devs, pluginSocketName+".new", testResourceName, false, false)
 	err = p2.Start()
 	require.NoError(t, err)
 	// Wait for the second callback to be issued.
-	select {
-	case <-ch:
-	case <-time.After(5 * time.Second):
-		t.FailNow()
-	}
-
+	waitForDeviceID("Dev1")
 	capacity, allocatable, _ = m.GetCapacity()
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
@@ -209,13 +228,8 @@ func TestDevicePluginReRegistrationProbeMode(t *testing.T) {
 	p3 := NewDevicePluginStub(devsForRegistration, pluginSocketName+".third", testResourceName, false, false)
 	err = p3.Start()
 	require.NoError(t, err)
+	waitForDeviceID("Dev3")
 	// Wait for the third callback to be issued.
-	select {
-	case <-ch:
-	case <-time.After(5 * time.Second):
-		t.FailNow()
-	}
-
 	capacity, allocatable, _ = m.GetCapacity()
 	resourceCapacity = capacity[v1.ResourceName(testResourceName)]
 	resourceAllocatable = allocatable[v1.ResourceName(testResourceName)]
@@ -239,7 +253,7 @@ func setupDeviceManager(t *testing.T, devs []*pluginapi.Device, callback monitor
 	originalCallback := m.callback
 	m.callback = func(resourceName string, devices []pluginapi.Device) {
 		originalCallback(resourceName, devices)
-		updateChan <- new(interface{})
+		updateChan <- devices
 	}
 	activePods := func() []*v1.Pod {
 		return []*v1.Pod{}
