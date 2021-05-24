@@ -1095,7 +1095,7 @@ func (m *ManagerImpl) GetAllocatableDevices() ResourceDeviceInstances {
 	m.mutex.Lock()
 	resp := m.allDevices.Clone()
 	m.mutex.Unlock()
-	klog.V(4).InfoS("known devices", "numDevices", len(resp))
+	klog.V(4).InfoS("Known devices", "numDevices", len(resp))
 	return resp
 }
 
