@@ -90,6 +90,7 @@ func TestStatefulSetControl(t *testing.T) {
 		{UpdatePodFailure, simpleSetFn},
 		{UpdateSetStatusFailure, simpleSetFn},
 		{PodRecreateDeleteFailure, simpleSetFn},
+		{DeleteOutdatedPendingPods, simpleSetFn},
 	}
 
 	for _, testCase := range testCases {
@@ -440,6 +441,37 @@ func PodRecreateDeleteFailure(t *testing.T, set *apps.StatefulSet, invariants in
 	}
 	if isCreated(pods[0]) {
 		t.Error("StatefulSet did not recreate failed Pod")
+	}
+}
+
+func DeleteOutdatedPendingPods(t *testing.T, set *apps.StatefulSet, invariants invariantFunc) {
+	client := fake.NewSimpleClientset()
+	spc, _, ssc, stop := setupController(client)
+	defer close(stop)
+
+	if err := scaleUpStatefulSetControl(set, ssc, spc, invariants); err != nil {
+		t.Errorf("Failed to turn up StatefulSet : %s", err)
+	}
+	selector, err := metav1.LabelSelectorAsSelector(set.Spec.Selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods, err := spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	pods[0].Status.Phase = v1.PodPending
+	setPodRevision(pods[0], "outdated")
+	spc.podsIndexer.Update(pods[0])
+	if err := ssc.UpdateStatefulSet(set, pods); err != nil {
+		t.Errorf("Error updating StatefulSet %s", err)
+	}
+	pods, err = spc.podsLister.Pods(set.Namespace).List(selector)
+	if err != nil {
+		t.Error(err)
+	}
+	if len(pods) != 2 {
+		t.Error("StatefulSet did not delete outdated and pending Pod")
 	}
 }
 

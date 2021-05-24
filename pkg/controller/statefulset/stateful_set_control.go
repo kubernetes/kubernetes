@@ -436,10 +436,10 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 				replicas[i].Name)
 			return &status, nil
 		}
-		// If we have a Pod that has been created but is not running and ready we can not make progress.
+		// If we have a Pod that matches the update revision but is not running and ready we can not make progress.
 		// We must ensure that all for each Pod, when we create it, all of its predecessors, with respect to its
 		// ordinal, are Running and Ready.
-		if !isRunningAndReady(replicas[i]) && monotonic {
+		if getPodRevision(replicas[i]) == updateRevision.Name && !isRunningAndReady(replicas[i]) && monotonic {
 			klog.V(4).Infof(
 				"StatefulSet %s/%s is waiting for Pod %s to be Running and Ready",
 				set.Namespace,
