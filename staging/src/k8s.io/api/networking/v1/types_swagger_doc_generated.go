@@ -141,7 +141,8 @@ func (IngressRule) SwaggerDoc() map[string]string {
 }
 
 var map_IngressRuleValue = map[string]string{
-	"": "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"":     "IngressRuleValue represents a rule to apply against incoming requests. If the rule is satisfied, the request is routed to the specified backend. Currently mixing different types of rules in a single Ingress is disallowed, so exactly one of the following must be set.",
+	"http": "HTTP is a list of selectors which are used to match incoming requests to a set of backends",
 }
 
 func (IngressRuleValue) SwaggerDoc() map[string]string {

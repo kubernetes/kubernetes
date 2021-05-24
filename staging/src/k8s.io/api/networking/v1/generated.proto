@@ -252,6 +252,7 @@ message IngressRule {
 // one of the following must be set.
 message IngressRuleValue {
   // +optional
+  // HTTP is a list of selectors which are used to match incoming requests to a set of backends
   optional HTTPIngressRuleValue http = 1;
 }
 

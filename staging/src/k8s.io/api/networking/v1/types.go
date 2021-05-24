@@ -358,6 +358,7 @@ type IngressRule struct {
 // one of the following must be set.
 type IngressRuleValue struct {
 	// +optional
+	// HTTP is a list of selectors which are used to match incoming requests to a set of backends
 	HTTP *HTTPIngressRuleValue `json:"http,omitempty" protobuf:"bytes,1,opt,name=http"`
 }
 
