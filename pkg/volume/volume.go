@@ -49,6 +49,10 @@ type BlockVolume interface {
 	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/, {volumeName}
 	GetPodDeviceMapPath() (string, string)
 
+	// SupportsMetrics should return true if the MetricsProvider is
+	// initialized
+	SupportsMetrics() bool
+
 	// MetricsProvider embeds methods for exposing metrics (e.g.
 	// used, available space).
 	MetricsProvider
