@@ -22,6 +22,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -255,10 +256,15 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 			}
 			b.URL(defaultHttpGetAttempts, url)
 		default:
-			if !recursive {
+			matches, err := b.expandIfFilePattern(s)
+			if err != nil {
+				b.errs = append(b.errs, fmt.Errorf("file pattern %v is not valid: %v", s, err))
+				continue
+			}
+			if !recursive && len(matches) == 1 {
 				b.singleItemImplied = true
 			}
-			b.Path(recursive, s)
+			b.Path(recursive, matches...)
 		}
 	}
 	if filenameOptions.Kustomize != "" {
@@ -277,6 +283,17 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	}
 
 	return b
+}
+
+// expandIfFilePattern returns all the filenames that match the input pattern
+// or the filename if it is a specific filename and not a pattern.
+// If the input is a pattern and it yields no result it will result into an error.
+func (b *Builder) expandIfFilePattern(pattern string) ([]string, error) {
+	matches, err := filepath.Glob(pattern)
+	if err == nil && len(matches) == 0 {
+		return nil, fmt.Errorf("pattern did not yield any results")
+	}
+	return matches, err
 }
 
 // Unstructured updates the builder so that it will request and send unstructured

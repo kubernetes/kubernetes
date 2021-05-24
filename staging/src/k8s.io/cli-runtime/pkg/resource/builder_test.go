@@ -617,6 +617,26 @@ func TestDirectoryBuilder(t *testing.T) {
 	}
 }
 
+func TestFilePatternBuilder(t *testing.T) {
+	b := newDefaultBuilder().
+		FilenameParam(false, &FilenameOptions{Recursive: false, Filenames: []string{"../../artifacts/guestbook/redis-*.yaml"}}).
+		NamespaceParam("test").DefaultNamespace()
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || singleItemImplied || len(test.Infos) < 3 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+
+	for _, info := range test.Infos {
+		if strings.Index(info.Name, "redis-") != 0{
+			t.Errorf("unexpected response: %#v", info.Name)
+		}
+	}
+}
+
 func setupKustomizeDirectory() (string, error) {
 	path, err := ioutil.TempDir("/tmp", "")
 	if err != nil {
