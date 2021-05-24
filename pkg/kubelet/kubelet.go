@@ -789,11 +789,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec.
 	// Hence, we concatenate those two lists.
 	safeAndUnsafeSysctls := append(sysctlwhitelist.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
-	sysctlsWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls)
+	sysctlsAllowlist, err := sysctl.NewAllowlist(safeAndUnsafeSysctls)
 	if err != nil {
 		return nil, err
 	}
-	klet.admitHandlers.AddPodAdmitHandler(sysctlsWhitelist)
+	klet.admitHandlers.AddPodAdmitHandler(sysctlsAllowlist)
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, kubeDeps.Recorder, klet.clock)

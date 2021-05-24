@@ -30,19 +30,19 @@ const (
 	ForbiddenReason         = "SysctlForbidden"
 )
 
-// patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
+// patternAllowlist takes a list of sysctls or sysctl patterns (ending in *) and
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
-type patternWhitelist struct {
+type patternAllowlist struct {
 	sysctls  map[string]Namespace
 	prefixes map[string]Namespace
 }
 
-var _ lifecycle.PodAdmitHandler = &patternWhitelist{}
+var _ lifecycle.PodAdmitHandler = &patternAllowlist{}
 
-// NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(patterns []string) (*patternWhitelist, error) {
-	w := &patternWhitelist{
+// NewAllowlist creates a new Allowlist from a list of sysctls and sysctl pattern (ending in *).
+func NewAllowlist(patterns []string) (*patternAllowlist, error) {
+	w := &patternAllowlist{
 		sysctls:  map[string]Namespace{},
 		prefixes: map[string]Namespace{},
 	}
@@ -73,14 +73,14 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 	return w, nil
 }
 
-// validateSysctl checks that a sysctl is whitelisted because it is known
-// to be namespaced by the Linux kernel. Note that being whitelisted is required, but not
+// validateSysctl checks that a sysctl is allowlisted because it is known
+// to be namespaced by the Linux kernel. Note that being allowlisted is required, but not
 // sufficient: the container runtime might have a stricter check and refuse to launch a pod.
 //
 // The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
 // respective namespaces with the host. This check is only possible for sysctls on
-// the static default whitelist, not those on the custom whitelist provided by the admin.
-func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
+// the static default allowlist, not those on the custom allowlist provided by the admin.
+func (w *patternAllowlist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
 		if ns == ipcNamespace && hostIPC {
@@ -102,12 +102,12 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 			return nil
 		}
 	}
-	return fmt.Errorf("%q not whitelisted", sysctl)
+	return fmt.Errorf("%q not allowlisted", sysctl)
 }
 
 // Admit checks that all sysctls given in pod's security context
-// are valid according to the whitelist.
-func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+// are valid according to the allowlist.
+func (w *patternAllowlist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
 	if pod.Spec.SecurityContext == nil || len(pod.Spec.SecurityContext.Sysctls) == 0 {
 		return lifecycle.PodAdmitResult{
