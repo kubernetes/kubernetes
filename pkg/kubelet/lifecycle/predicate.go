@@ -21,10 +21,13 @@ import (
 	"runtime"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-helpers/scheduling/corev1"
 	"k8s.io/klog/v2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 )
 
 type getNodeAnyWayFuncType func() (*v1.Node, error)
@@ -270,5 +273,17 @@ func generalFilter(pod *v1.Pod, nodeInfo *schedulerframework.NodeInfo) []Predica
 			reasons = append(reasons, &PredicateFailureError{r.Name, r.Reason})
 		}
 	}
+
+	// Check taint/toleration except for static pods
+	if !types.IsStaticPod(pod) {
+		_, isUntolerated := corev1.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, func(t *v1.Taint) bool {
+			// Kubelet is only interested in the NoExecute taint.
+			return t.Effect == v1.TaintEffectNoExecute
+		})
+		if isUntolerated {
+			reasons = append(reasons, &PredicateFailureError{tainttoleration.Name, tainttoleration.ErrReasonNotMatch})
+		}
+	}
+
 	return reasons
 }
