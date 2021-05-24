@@ -25,15 +25,13 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/klog/v2"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -110,6 +108,29 @@ type ExposeServiceOptions struct {
 
 	Recorder genericclioptions.Recorder
 	genericclioptions.IOStreams
+
+	Protocol string
+	// protocols will be used to keep port-protocol mapping derived from
+	// exposed object
+	Protocols string
+	// port will be used if a user specifies --port OR the exposed object
+	// has one port
+	Port string
+	// ports will be used iff a user doesn't specify --port AND the
+	// exposed object has multiple ports
+	Ports string
+	Type string
+	LoadBalancerIP string
+	Selector string
+	Labels string
+	TargetPort string
+	ExternalIP string
+	Override string
+	PortName string
+	//Override string
+	Name string
+	SessionAffinity string
+	ClusterIP string
 }
 
 type Param struct {
@@ -145,6 +166,7 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 		ValidArgsFunction:     util.SpecifiedResourceTypeAndNameCompletionFunc(f, validArgs),
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(o.Complete(f, cmd))
+			cmdutil.CheckErr(o.Validate())
 			cmdutil.CheckErr(o.RunExpose(cmd, args))
 		},
 	}
@@ -152,22 +174,18 @@ func NewCmdExposeService(f cmdutil.Factory, streams genericclioptions.IOStreams)
 	o.RecordFlags.AddFlags(cmd)
 	o.PrintFlags.AddFlags(cmd)
 
-	cmd.Flags().String("generator", "service/v2", i18n.T("The name of the API generator to use. There are 2 generators: 'service/v1' and 'service/v2'. The only difference between them is that service port in v1 is named 'default', while it is left unnamed in v2. Default is 'service/v2'."))
-	cmd.Flags().MarkDeprecated("generator", "has no effect and will be removed in the future")
-	cmd.Flags().String("protocol", "", i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
-	cmd.Flags().String("port", "", i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
-	cmd.Flags().String("type", "", i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
-	cmd.Flags().String("load-balancer-ip", "", i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
-	cmd.Flags().String("selector", "", i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
-	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
-	cmd.Flags().String("container-port", "", i18n.T("Synonym for --target-port"))
-	cmd.Flags().MarkDeprecated("container-port", "--container-port will be removed in the future, please use --target-port instead")
-	cmd.Flags().String("target-port", "", i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
-	cmd.Flags().String("external-ip", "", i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
-	cmd.Flags().String("overrides", "", i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
-	cmd.Flags().String("name", "", i18n.T("The name for the newly created object."))
-	cmd.Flags().String("session-affinity", "", i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
-	cmd.Flags().String("cluster-ip", "", i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
+	cmd.Flags().StringVar(&o.Protocol, "protocol", o.Protocol, i18n.T("The network protocol for the service to be created. Default is 'TCP'."))
+	cmd.Flags().StringVar(&o.Port, "port", o.Port, i18n.T("The port that the service should serve on. Copied from the resource being exposed, if unspecified"))
+	cmd.Flags().StringVar(&o.Type, "type", o.Type, i18n.T("Type for this service: ClusterIP, NodePort, LoadBalancer, or ExternalName. Default is 'ClusterIP'."))
+	cmd.Flags().StringVar(&o.LoadBalancerIP, "load-balancer-ip", o.LoadBalancerIP, i18n.T("IP to assign to the LoadBalancer. If empty, an ephemeral IP will be created and used (cloud-provider specific)."))
+	cmd.Flags().StringVar(&o.Selector, "selector", o.Selector, i18n.T("A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.)"))
+	cmd.Flags().StringVarP(&o.Labels, "labels", "l", o.Labels, i18n.T("Labels to apply to the service created by this call."))
+	cmd.Flags().StringVar(&o.TargetPort, "target-port", o.TargetPort, i18n.T("Name or number for the port on the container that the service should direct traffic to. Optional."))
+	cmd.Flags().StringVar(&o.ExternalIP, "external-ip", o.ExternalIP, i18n.T("Additional external IP address (not managed by Kubernetes) to accept for the service. If this IP is routed to a node, the service can be accessed by this IP in addition to its generated service IP."))
+	cmd.Flags().StringVar(&o.Override, "overrides", o.Override, i18n.T("An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field."))
+	cmd.Flags().StringVar(&o.Name, "name", o.Name, i18n.T("The name for the newly created object."))
+	cmd.Flags().StringVar(&o.SessionAffinity,"session-affinity", o.SessionAffinity, i18n.T("If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'"))
+	cmd.Flags().StringVar(&o.ClusterIP, "cluster-ip", o.ClusterIP, i18n.T("ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service."))
 	cmdutil.AddFieldManagerFlagVar(cmd, &o.fieldManager, "kubectl-expose")
 
 	usage := "identifying the resource to expose a service"
@@ -222,6 +240,16 @@ func (o *ExposeServiceOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) e
 	return err
 }
 
+func (o *ExposeServiceOptions) Validate() error {
+	if len(o.Name) == 0 {
+		return fmt.Errorf("name must be specified")
+	}
+	if len(o.Selector) == 0 {
+		return fmt.Errorf("selector must be specified")
+	}
+	return nil
+}
+
 func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) error {
 	r := o.Builder.
 		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
@@ -236,31 +264,6 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 		return cmdutil.UsageErrorf(cmd, err.Error())
 	}
 
-	names := []Param{
-		{Name: "default-name", Required: true},
-		{Name: "name", Required: false},
-		{Name: "selector", Required: true},
-		// port will be used if a user specifies --port OR the exposed object
-		// has one port
-		{Name: "port", Required: false},
-		// ports will be used iff a user doesn't specify --port AND the
-		// exposed object has multiple ports
-		{Name: "ports", Required: false},
-		{Name: "labels", Required: false},
-		{Name: "external-ip", Required: false},
-		{Name: "load-balancer-ip", Required: false},
-		{Name: "type", Required: false},
-		{Name: "protocol", Required: false},
-		// protocols will be used to keep port-protocol mapping derived from
-		// exposed object
-		{Name: "protocols", Required: false},
-		{Name: "container-port", Required: false}, // alias of target-port
-		{Name: "target-port", Required: false},
-		{Name: "port-name", Required: false},
-		{Name: "session-affinity", Required: false},
-		{Name: "cluster-ip", Required: false},
-	}
-
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
 			return err
@@ -271,28 +274,21 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 			return err
 		}
 
-		params := generate.MakeParams(cmd, names)
-		name := info.Name
-		if len(name) > validation.DNS1035LabelMaxLength {
-			name = name[:validation.DNS1035LabelMaxLength]
-		}
-		params["default-name"] = name
-
 		// For objects that need a pod selector, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --selector
-		if s, found := params["selector"]; found && s == nil {
+		if len(o.Selector) == 0 {
 			s, err := o.MapBasedSelectorForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't retrieve selectors via --selector flag or introspection: %v", err)
 			}
-			params["selector"] = s
+			o.Selector = s
 		}
 
-		isHeadlessService := params["cluster-ip"] == "None"
+		isHeadlessService := o.ClusterIP == "None"
 
 		// For objects that need a port, derive it from the exposed object in case a user
 		// didn't explicitly specify one via --port
-		if port, found := params["port"]; found && port == nil {
+		if len(o.Port) == 0 {
 			ports, err := o.PortsForObject(info.Object)
 			if err != nil {
 				return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection: %v", err)
@@ -303,65 +299,60 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 					return cmdutil.UsageErrorf(cmd, "couldn't find port via --port flag or introspection")
 				}
 			case 1:
-				params["port"] = ports[0]
+				o.Port = ports[0]
 			default:
-				params["ports"] = strings.Join(ports, ",")
+				o.Ports = strings.Join(ports, ",")
 			}
 		}
 
 		// Always try to derive protocols from the exposed object, may use
 		// different protocols for different ports.
-		if _, found := params["protocol"]; found {
-			protocolsMap, err := o.ProtocolsForObject(info.Object)
-			if err != nil {
-				return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
-			}
-			if protocols := MakeProtocols(protocolsMap); protocols != nil {
-				params["protocols"] = protocols
-			}
+		protocolsMap, err := o.ProtocolsForObject(info.Object)
+		if err != nil {
+			return cmdutil.UsageErrorf(cmd, "couldn't find protocol via introspection: %v", err)
+		}
+		if protocols := makeProtocols(protocolsMap); protocols != "" {
+			o.Protocols = protocols
 		}
 
-		if params["labels"] == nil {
+		if len(o.Labels) == 0 {
 			labels, err := meta.NewAccessor().Labels(info.Object)
 			if err != nil {
 				return err
 			}
-			params["labels"] = polymorphichelpers.MakeLabels(labels)
-		}
-		if err = ValidateParams(names, params); err != nil {
-			return err
+			o.Labels = polymorphichelpers.MakeLabels(labels)
 		}
 
-		// Generate new object
-		object, err := generateService(params)
+		// Generate new service
+		service, err := o.createService()
 		if err != nil {
 			return err
 		}
 
 		if inline := cmdutil.GetFlagString(cmd, "overrides"); len(inline) > 0 {
 			codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
-			object, err = cmdutil.Merge(codec, object, inline)
+			service, err = cmdutil.Merge(codec, service, inline)
 			if err != nil {
 				return err
 			}
 		}
 
-		if err := o.Recorder.Record(object); err != nil {
+		if err := o.Recorder.Record(service); err != nil {
 			klog.V(4).Infof("error recording current command: %v", err)
 		}
 
 		if o.DryRunStrategy == cmdutil.DryRunClient {
-			if meta, err := meta.Accessor(object); err == nil && o.EnforceNamespace {
+			if meta, err := meta.Accessor(service); err == nil && o.EnforceNamespace {
 				meta.SetNamespace(o.Namespace)
 			}
-			return o.PrintObj(object, o.Out)
+			return o.PrintObj(service, o.Out)
 		}
-		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), object, scheme.DefaultJSONEncoder()); err != nil {
+		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), service, scheme.DefaultJSONEncoder()); err != nil {
 			return err
 		}
 
 		asUnstructured := &unstructured.Unstructured{}
-		if err := scheme.Scheme.Convert(object, asUnstructured, nil); err != nil {
+		if err := scheme.Scheme.Convert(service, asUnstructured, nil); err != nil {
 			return err
 		}
 		gvks, _, err := unstructuredscheme.NewUnstructuredObjectTyper().ObjectKinds(asUnstructured)
@@ -377,7 +368,7 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 				return err
 			}
 		}
-		// Serialize the object with the annotation applied.
+		// Serialize the service with the annotation applied.
 		client, err := o.ClientForMapping(objMapping)
 		if err != nil {
 			return err
@@ -399,102 +390,62 @@ func (o *ExposeServiceOptions) RunExpose(cmd *cobra.Command, args []string) erro
 	return nil
 }
 
-func generateService(genericParams map[string]interface{}) (runtime.Object, error) {
-	params := map[string]string{}
-	for key, value := range genericParams {
-		strVal, isString := value.(string)
-		if !isString {
-			return nil, fmt.Errorf("expected string, saw %v for '%s'", value, key)
-		}
-		params[key] = strVal
-	}
-	selectorString, found := params["selector"]
-	if !found || len(selectorString) == 0 {
-		return nil, fmt.Errorf("'selector' is a required parameter")
-	}
-	selector, err := ParseLabels(selectorString)
+func (o *ExposeServiceOptions) createService() (*v1.Service, error) {
+	selector, err := parseLabels(o.Selector)
 	if err != nil {
 		return nil, err
 	}
 
-	labelsString, found := params["labels"]
 	var labels map[string]string
-	if found && len(labelsString) > 0 {
-		labels, err = ParseLabels(labelsString)
+	if len(o.Labels) > 0 {
+		labels, err = parseLabels(o.Labels)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	name, found := params["name"]
-	if !found || len(name) == 0 {
-		name, found = params["default-name"]
-		if !found || len(name) == 0 {
-			return nil, fmt.Errorf("'name' is a required parameter")
-		}
-	}
-
-	isHeadlessService := params["cluster-ip"] == "None"
-
+	name := o.Name
 	ports := []v1.ServicePort{}
-	servicePortName, found := params["port-name"]
-	if !found {
-		// Leave the port unnamed.
-		servicePortName = ""
-	}
-
-	protocolsString, found := params["protocols"]
 	var portProtocolMap map[string]string
-	if found && len(protocolsString) > 0 {
-		portProtocolMap, err = ParseProtocols(protocolsString)
+	if len(o.Protocols) > 0 {
+		portProtocolMap, err = parseProtocols(o.Protocols)
 		if err != nil {
 			return nil, err
 		}
 	}
-	// ports takes precedence over port since it will be
-	// specified only when the user hasn't specified a port
-	// via --port and the exposed object has multiple ports.
-	var portString string
-	if portString, found = params["ports"]; !found {
-		portString, found = params["port"]
-		if !found && !isHeadlessService {
-			return nil, fmt.Errorf("'ports' or 'port' is a required parameter")
-		}
-	}
 
-	if portString != "" {
-		portStringSlice := strings.Split(portString, ",")
+	if o.Port != "" {
+		portStringSlice := strings.Split(o.Port, ",")
 		for i, stillPortString := range portStringSlice {
 			port, err := strconv.Atoi(stillPortString)
 			if err != nil {
 				return nil, err
 			}
-			name := servicePortName
+			name := ""
 			// If we are going to assign multiple ports to a service, we need to
 			// generate a different name for each one.
 			if len(portStringSlice) > 1 {
 				name = fmt.Sprintf("port-%d", i+1)
 			}
-			protocol := params["protocol"]
 
 			switch {
-			case len(protocol) == 0 && len(portProtocolMap) == 0:
+			case len(o.Protocol) == 0 && len(portProtocolMap) == 0:
 				// Default to TCP, what the flag was doing previously.
-				protocol = "TCP"
-			case len(protocol) > 0 && len(portProtocolMap) > 0:
+				o.Protocol = "TCP"
+			case len(o.Protocol) > 0 && len(portProtocolMap) > 0:
 				// User has specified the --protocol while exposing a multiprotocol resource
 				// We should stomp multiple protocols with the one specified ie. do nothing
-			case len(protocol) == 0 && len(portProtocolMap) > 0:
+			case len(o.Protocol) == 0 && len(portProtocolMap) > 0:
 				// no --protocol and we expose a multiprotocol resource
-				protocol = "TCP" // have the default so we can stay sane
-				if exposeProtocol, found := portProtocolMap[stillPortString]; found {
-					protocol = exposeProtocol
+				o.Protocol = "TCP" // have the default so we can stay sane
+				if len(stillPortString) > 0 {
+					o.Protocol = stillPortString
 				}
 			}
 			ports = append(ports, v1.ServicePort{
 				Name:     name,
 				Port:     int32(port),
-				Protocol: v1.Protocol(protocol),
+				Protocol: v1.Protocol(o.Protocol),
 			})
 		}
 	}
@@ -509,14 +460,10 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 			Ports:    ports,
 		},
 	}
-	targetPortString := params["target-port"]
-	if len(targetPortString) == 0 {
-		targetPortString = params["container-port"]
-	}
-	if len(targetPortString) > 0 {
+	if len(o.TargetPort) > 0 {
 		var targetPort intstr.IntOrString
-		if portNum, err := strconv.Atoi(targetPortString); err != nil {
-			targetPort = intstr.FromString(targetPortString)
+		if portNum, err := strconv.Atoi(o.TargetPort); err != nil {
+			targetPort = intstr.FromString(o.TargetPort)
 		} else {
 			targetPort = intstr.FromInt(portNum)
 		}
@@ -532,37 +479,37 @@ func generateService(genericParams map[string]interface{}) (runtime.Object, erro
 			service.Spec.Ports[i].TargetPort = intstr.FromInt(int(port))
 		}
 	}
-	if len(params["external-ip"]) > 0 {
-		service.Spec.ExternalIPs = []string{params["external-ip"]}
+	if len(o.ExternalIP) > 0 {
+		service.Spec.ExternalIPs = []string{o.ExternalIP}
 	}
-	if len(params["type"]) != 0 {
-		service.Spec.Type = v1.ServiceType(params["type"])
+	if len(o.Type) != 0 {
+		service.Spec.Type = v1.ServiceType(o.Type)
 	}
 	if service.Spec.Type == v1.ServiceTypeLoadBalancer {
-		service.Spec.LoadBalancerIP = params["load-balancer-ip"]
+		service.Spec.LoadBalancerIP = o.LoadBalancerIP
 	}
-	if len(params["session-affinity"]) != 0 {
-		switch v1.ServiceAffinity(params["session-affinity"]) {
+	if len(o.SessionAffinity) != 0 {
+		switch v1.ServiceAffinity(o.SessionAffinity) {
 		case v1.ServiceAffinityNone:
 			service.Spec.SessionAffinity = v1.ServiceAffinityNone
 		case v1.ServiceAffinityClientIP:
 			service.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		default:
-			return nil, fmt.Errorf("unknown session affinity: %s", params["session-affinity"])
+			return nil, fmt.Errorf("unknown session affinity: %s", o.SessionAffinity)
 		}
 	}
-	if len(params["cluster-ip"]) != 0 {
-		if params["cluster-ip"] == "None" {
+	if len(o.ClusterIP) != 0 {
+		if o.ClusterIP == "None" {
 			service.Spec.ClusterIP = v1.ClusterIPNone
 		} else {
-			service.Spec.ClusterIP = params["cluster-ip"]
+			service.Spec.ClusterIP = o.ClusterIP
 		}
 	}
 	return &service, nil
 }
 
-// ParseLabels turns a string representation of a label set into a map[string]string
-func ParseLabels(labelSpec interface{}) (map[string]string, error) {
+// parseLabels turns a string representation of a label set into a map[string]string
+func parseLabels(labelSpec interface{}) (map[string]string, error) {
 	labelString, isString := labelSpec.(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", labelSpec)
@@ -585,8 +532,8 @@ func ParseLabels(labelSpec interface{}) (map[string]string, error) {
 	return labels, nil
 }
 
-// ParseProtocols turns a string representation of a protocol set into a map[string]string
-func ParseProtocols(protocols interface{}) (map[string]string, error) {
+// parseProtocols turns a string representation of a protocol set into a map[string]string
+func parseProtocols(protocols interface{}) (map[string]string, error) {
 	protocolsString, isString := protocols.(string)
 	if !isString {
 		return nil, fmt.Errorf("expected string, found %v", protocols)
@@ -612,33 +559,7 @@ func ParseProtocols(protocols interface{}) (map[string]string, error) {
 	return portProtocolMap, nil
 }
 
-// MakeParams is a utility that creates generator parameters from a command line
-func MakeParams(cmd *cobra.Command, params []GeneratorParam) map[string]interface{} {
-	result := map[string]interface{}{}
-	for ix := range params {
-		f := cmd.Flags().Lookup(params[ix].Name)
-		if f != nil {
-			result[params[ix].Name] = f.Value.String()
-		}
-	}
-	return result
-}
-
-// ValidateParams ensures that all required params are present in the params map
-func ValidateParams(paramSpec []GeneratorParam, params map[string]interface{}) error {
-	allErrs := []error{}
-	for ix := range paramSpec {
-		if paramSpec[ix].Required {
-			value, found := params[paramSpec[ix].Name]
-			if !found || IsZero(value) {
-				allErrs = append(allErrs, fmt.Errorf("Parameter: %s is required", paramSpec[ix].Name))
-			}
-		}
-	}
-	return utilerrors.NewAggregate(allErrs)
-}
-
-func MakeProtocols(protocols map[string]string) string {
+func makeProtocols(protocols map[string]string) string {
 	out := []string{}
 	for key, value := range protocols {
 		out = append(out, fmt.Sprintf("%s/%s", key, value))
