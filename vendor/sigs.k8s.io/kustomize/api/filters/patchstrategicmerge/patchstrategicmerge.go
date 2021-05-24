@@ -4,7 +4,6 @@
 package patchstrategicmerge
 
 import (
-	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 	"sigs.k8s.io/kustomize/kyaml/yaml/merge2"
@@ -29,7 +28,7 @@ func (pf Filter) Filter(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
 		if err != nil {
 			return nil, err
 		}
-		if !konfig.FlagEnableKyamlDefaultValue || r != nil {
+		if r != nil {
 			result = append(result, r)
 		}
 	}

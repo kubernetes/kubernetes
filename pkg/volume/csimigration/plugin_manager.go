@@ -122,19 +122,19 @@ func (pm PluginManager) IsMigratable(spec *volume.Spec) (bool, error) {
 // from references to in-tree plugins to migrated CSI plugins
 type InTreeToCSITranslator interface {
 	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
-	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume, podNamespace string) (*v1.PersistentVolume, error)
 }
 
 // TranslateInTreeSpecToCSI translates a volume spec (either PV or inline volume)
 // supported by an in-tree plugin to CSI
-func TranslateInTreeSpecToCSI(spec *volume.Spec, translator InTreeToCSITranslator) (*volume.Spec, error) {
+func TranslateInTreeSpecToCSI(spec *volume.Spec, podNamespace string, translator InTreeToCSITranslator) (*volume.Spec, error) {
 	var csiPV *v1.PersistentVolume
 	var err error
 	inlineVolume := false
 	if spec.PersistentVolume != nil {
 		csiPV, err = translator.TranslateInTreePVToCSI(spec.PersistentVolume)
 	} else if spec.Volume != nil {
-		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(spec.Volume)
+		csiPV, err = translator.TranslateInTreeInlineVolumeToCSI(spec.Volume, podNamespace)
 		inlineVolume = true
 	} else {
 		err = errors.New("not a valid volume spec")

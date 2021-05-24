@@ -10,28 +10,33 @@ import (
 	"strings"
 
 	"sigs.k8s.io/kustomize/api/ifc"
+	"sigs.k8s.io/kustomize/api/internal/generators"
 	"sigs.k8s.io/kustomize/api/internal/kusterr"
+	"sigs.k8s.io/kustomize/api/konfig"
 	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
+	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
 // Factory makes instances of Resource.
 type Factory struct {
-	kf ifc.KunstructuredFactory
+	hasher ifc.KustHasher
 }
 
 // NewFactory makes an instance of Factory.
-func NewFactory(kf ifc.KunstructuredFactory) *Factory {
-	return &Factory{kf: kf}
+func NewFactory(h ifc.KustHasher) *Factory {
+	return &Factory{hasher: h}
 }
 
-func (rf *Factory) Hasher() ifc.KunstructuredHasher {
-	return rf.kf.Hasher()
+// Hasher returns an ifc.KustHasher
+func (rf *Factory) Hasher() ifc.KustHasher {
+	return rf.hasher
 }
 
 // FromMap returns a new instance of Resource.
 func (rf *Factory) FromMap(m map[string]interface{}) *Resource {
-	return rf.makeOne(rf.kf.FromMap(m), nil)
+	return rf.FromMapAndOption(m, nil)
 }
 
 // FromMapWithName returns a new instance with the given "original" name.
@@ -41,34 +46,30 @@ func (rf *Factory) FromMapWithName(n string, m map[string]interface{}) *Resource
 
 // FromMapWithNamespaceAndName returns a new instance with the given "original" namespace.
 func (rf *Factory) FromMapWithNamespaceAndName(ns string, n string, m map[string]interface{}) *Resource {
-	return rf.makeOne(rf.kf.FromMap(m), nil).setPreviousNamespaceAndName(ns, n)
+	r := rf.FromMapAndOption(m, nil)
+	return r.setPreviousId(ns, n, r.GetKind())
 }
 
 // FromMapAndOption returns a new instance of Resource with given options.
 func (rf *Factory) FromMapAndOption(
 	m map[string]interface{}, args *types.GeneratorArgs) *Resource {
-	return rf.makeOne(rf.kf.FromMap(m), types.NewGenArgs(args))
-}
-
-// FromKunstructured returns a new instance of Resource.
-func (rf *Factory) FromKunstructured(u ifc.Kunstructured) *Resource {
-	return rf.makeOne(u, nil)
+	n, err := yaml.FromMap(m)
+	if err != nil {
+		// TODO: return err instead of log.
+		log.Fatal(err)
+	}
+	return rf.makeOne(n, types.NewGenArgs(args))
 }
 
 // makeOne returns a new instance of Resource.
-func (rf *Factory) makeOne(
-	u ifc.Kunstructured, o *types.GenArgs) *Resource {
-	if u == nil {
-		log.Fatal("unstruct ifc must not be null")
+func (rf *Factory) makeOne(rn *yaml.RNode, o *types.GenArgs) *Resource {
+	if rn == nil {
+		log.Fatal("RNode must not be null")
 	}
 	if o == nil {
 		o = types.NewGenArgs(nil)
 	}
-	r := &Resource{
-		kunStr:  u,
-		options: o,
-	}
-	return r
+	return &Resource{node: rn, options: o}
 }
 
 // SliceFromPatches returns a slice of resources given a patch path
@@ -105,45 +106,133 @@ func (rf *Factory) FromBytes(in []byte) (*Resource, error) {
 
 // SliceFromBytes unmarshals bytes into a Resource slice.
 func (rf *Factory) SliceFromBytes(in []byte) ([]*Resource, error) {
-	kunStructs, err := rf.kf.SliceFromBytes(in)
+	nodes, err := rf.RNodesFromBytes(in)
 	if err != nil {
 		return nil, err
 	}
-	var result []*Resource
-	for len(kunStructs) > 0 {
-		u := kunStructs[0]
-		kunStructs = kunStructs[1:]
-		if strings.HasSuffix(u.GetKind(), "List") {
-			m, err := u.Map()
-			if err != nil {
-				return nil, err
+	return rf.resourcesFromRNodes(nodes), nil
+}
+
+// ResourcesFromRNodes converts RNodes to Resources.
+func (rf *Factory) ResourcesFromRNodes(
+	nodes []*yaml.RNode) (result []*Resource, err error) {
+	nodes, err = rf.dropBadNodes(nodes)
+	if err != nil {
+		return nil, err
+	}
+	return rf.resourcesFromRNodes(nodes), nil
+}
+
+// resourcesFromRNode assumes all nodes are good.
+func (rf *Factory) resourcesFromRNodes(
+	nodes []*yaml.RNode) (result []*Resource) {
+	for _, n := range nodes {
+		result = append(result, rf.makeOne(n, nil))
+	}
+	return
+}
+
+func (rf *Factory) RNodesFromBytes(b []byte) (result []*yaml.RNode, err error) {
+	nodes, err := kio.FromBytes(b)
+	if err != nil {
+		return nil, err
+	}
+	nodes, err = rf.dropBadNodes(nodes)
+	if err != nil {
+		return nil, err
+	}
+	for len(nodes) > 0 {
+		n0 := nodes[0]
+		nodes = nodes[1:]
+		kind := n0.GetKind()
+		if !strings.HasSuffix(kind, "List") {
+			result = append(result, n0)
+			continue
+		}
+		// Convert a FooList into a slice of Foo.
+		var m map[string]interface{}
+		m, err = n0.Map()
+		if err != nil {
+			return nil, err
+		}
+		items, ok := m["items"]
+		if !ok {
+			// treat as an empty list
+			continue
+		}
+		slice, ok := items.([]interface{})
+		if !ok {
+			if items == nil {
+				// an empty list
+				continue
 			}
-			items := m["items"]
-			itemsSlice, ok := items.([]interface{})
-			if !ok {
-				if items == nil {
-					// an empty list
-					continue
-				}
-				return nil, fmt.Errorf("items in List is type %T, expected array", items)
-			}
-			for _, item := range itemsSlice {
-				itemJSON, err := json.Marshal(item)
-				if err != nil {
-					return nil, err
-				}
-				innerU, err := rf.kf.SliceFromBytes(itemJSON)
-				if err != nil {
-					return nil, err
-				}
-				// append innerU to kunStructs so nested Lists can be handled
-				kunStructs = append(kunStructs, innerU...)
-			}
-		} else {
-			result = append(result, rf.FromKunstructured(u))
+			return nil, fmt.Errorf(
+				"expected array in %s/items, but found %T", kind, items)
+		}
+		innerNodes, err := rf.convertObjectSliceToNodeSlice(slice)
+		if err != nil {
+			return nil, err
+		}
+		nodes = append(nodes, innerNodes...)
+	}
+	return result, nil
+}
+
+// convertObjectSlice converts a list of objects to a list of RNode.
+func (rf *Factory) convertObjectSliceToNodeSlice(
+	objects []interface{}) (result []*yaml.RNode, err error) {
+	var bytes []byte
+	var nodes []*yaml.RNode
+	for _, obj := range objects {
+		bytes, err = json.Marshal(obj)
+		if err != nil {
+			return
+		}
+		nodes, err = kio.FromBytes(bytes)
+		if err != nil {
+			return
+		}
+		nodes, err = rf.dropBadNodes(nodes)
+		if err != nil {
+			return
+		}
+		result = append(result, nodes...)
+	}
+	return
+}
+
+// dropBadNodes may drop some nodes from its input argument.
+func (rf *Factory) dropBadNodes(nodes []*yaml.RNode) ([]*yaml.RNode, error) {
+	var result []*yaml.RNode
+	for _, n := range nodes {
+		ignore, err := rf.shouldIgnore(n)
+		if err != nil {
+			return nil, err
+		}
+		if !ignore {
+			result = append(result, n)
 		}
 	}
 	return result, nil
+}
+
+// shouldIgnore returns true if there's some reason to ignore the node.
+func (rf *Factory) shouldIgnore(n *yaml.RNode) (bool, error) {
+	if n.IsNilOrEmpty() {
+		return true, nil
+	}
+	md, err := n.GetValidatedMetadata()
+	if err != nil {
+		return true, err
+	}
+	_, ignore := md.ObjectMeta.Annotations[konfig.IgnoredByKustomizeAnnotation]
+	if ignore {
+		return true, nil
+	}
+	if foundNil, path := n.HasNilEntryInList(); foundNil {
+		return true, fmt.Errorf("empty item at %v in object %v", path, n)
+	}
+	return false, nil
 }
 
 // SliceFromBytesWithNames unmarshals bytes into a Resource slice with specified original
@@ -157,25 +246,25 @@ func (rf *Factory) SliceFromBytesWithNames(names []string, in []byte) ([]*Resour
 		return nil, fmt.Errorf("number of names doesn't match number of resources")
 	}
 	for i, res := range result {
-		res.setPreviousNamespaceAndName(resid.DefaultNamespace, names[i])
+		res.setPreviousId(resid.DefaultNamespace, names[i], res.GetKind())
 	}
 	return result, nil
 }
 
 // MakeConfigMap makes an instance of Resource for ConfigMap
 func (rf *Factory) MakeConfigMap(kvLdr ifc.KvLoader, args *types.ConfigMapArgs) (*Resource, error) {
-	u, err := rf.kf.MakeConfigMap(kvLdr, args)
+	rn, err := generators.MakeConfigMap(kvLdr, args)
 	if err != nil {
 		return nil, err
 	}
-	return rf.makeOne(u, types.NewGenArgs(&args.GeneratorArgs)), nil
+	return rf.makeOne(rn, types.NewGenArgs(&args.GeneratorArgs)), nil
 }
 
 // MakeSecret makes an instance of Resource for Secret
 func (rf *Factory) MakeSecret(kvLdr ifc.KvLoader, args *types.SecretArgs) (*Resource, error) {
-	u, err := rf.kf.MakeSecret(kvLdr, args)
+	rn, err := generators.MakeSecret(kvLdr, args)
 	if err != nil {
 		return nil, err
 	}
-	return rf.makeOne(u, types.NewGenArgs(&args.GeneratorArgs)), nil
+	return rf.makeOne(rn, types.NewGenArgs(&args.GeneratorArgs)), nil
 }

@@ -65,7 +65,13 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 		podClient = f.PodClient()
 	})
 
-	ginkgo.It("should support sysctls", func() {
+	/*
+	  Release: v1.21
+	  Testname: Sysctl, test sysctls
+	  Description: Pod is created with kernel.shm_rmid_forced sysctl. Kernel.shm_rmid_forced must be set to 1
+	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
+	*/
+	framework.ConformanceIt("should support sysctls [MinimumKubeletVersion:1.21]", func() {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -105,7 +111,13 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 		gomega.Expect(log).To(gomega.ContainSubstring("kernel.shm_rmid_forced = 1"))
 	})
 
-	ginkgo.It("should support unsafe sysctls which are actually whitelisted", func() {
+	/*
+	  Release: v1.21
+	  Testname: Sysctl, allow specified unsafe sysctls
+	  Description: Pod is created with kernel.shm_rmid_forced. Should allow unsafe sysctls that are specified.
+	  [LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
+	*/
+	framework.ConformanceIt("should support unsafe sysctls which are actually allowed [MinimumKubeletVersion:1.21]", func() {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -145,7 +157,13 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 		gomega.Expect(log).To(gomega.ContainSubstring("kernel.shm_rmid_forced = 1"))
 	})
 
-	ginkgo.It("should reject invalid sysctls", func() {
+	/*
+		Release: v1.21
+		Testname: Sysctls, reject invalid sysctls
+		Description: Pod is created with one valid and two invalid sysctls. Pod should not apply invalid sysctls.
+		[LinuxOnly]: This test is marked as LinuxOnly since Windows does not support sysctls
+	*/
+	framework.ConformanceIt("should reject invalid sysctls [MinimumKubeletVersion:1.21]", func() {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{
@@ -180,7 +198,7 @@ var _ = SIGDescribe("Sysctls [LinuxOnly] [NodeFeature:Sysctls]", func() {
 		gomega.Expect(err.Error()).NotTo(gomega.ContainSubstring("kernel.shmmax"))
 	})
 
-	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node", func() {
+	ginkgo.It("should not launch unsafe, but not explicitly enabled sysctls on the node [MinimumKubeletVersion:1.21]", func() {
 		pod := testPod()
 		pod.Spec.SecurityContext = &v1.PodSecurityContext{
 			Sysctls: []v1.Sysctl{

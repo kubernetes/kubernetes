@@ -36,6 +36,14 @@ func ParseGroupVersion(apiVersion string) (group, version string) {
 // GvkFromString makes a Gvk from the output of Gvk.String().
 func GvkFromString(s string) Gvk {
 	values := strings.Split(s, fieldSep)
+	if len(values) != 3 {
+		// ...then the string didn't come from Gvk.String().
+		return Gvk{
+			Group:   noGroup,
+			Version: noVersion,
+			Kind:    noKind,
+		}
+	}
 	g := values[0]
 	if g == noGroup {
 		g = ""
@@ -213,7 +221,10 @@ func (x Gvk) toKyamlTypeMeta() yaml.TypeMeta {
 	}
 }
 
-// IsNamespaceableKind returns true if x is a namespaceable Gvk
+// IsNamespaceableKind returns true if x is a namespaceable Gvk,
+// e.g. instances of Pod and Deployment are namespaceable,
+// but instances of Node and Namespace are not namespaceable.
+// Alternative name for this method: IsNotClusterScoped.
 // Implements https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/#not-all-objects-are-in-a-namespace
 func (x Gvk) IsNamespaceableKind() bool {
 	isNamespaceScoped, found := openapi.IsNamespaceScoped(x.toKyamlTypeMeta())

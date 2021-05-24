@@ -177,7 +177,7 @@ func TestTranslateInTreeInlineVolumeToCSI(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Logf("Testing %v", tc.name)
-			got, err := translator.TranslateInTreeInlineVolumeToCSI(&v1.Volume{Name: "volume", VolumeSource: tc.volumeSource})
+			got, err := translator.TranslateInTreeInlineVolumeToCSI(&v1.Volume{Name: "volume", VolumeSource: tc.volumeSource}, "")
 			if err != nil && !tc.expErr {
 				t.Fatalf("Did not expect error but got: %v", err)
 			}

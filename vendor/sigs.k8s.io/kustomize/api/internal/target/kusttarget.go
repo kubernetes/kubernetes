@@ -443,7 +443,10 @@ func (kt *KustTarget) configureBuiltinPlugin(
 				err, "builtin %s marshal", bpt)
 		}
 	}
-	err = p.Config(resmap.NewPluginHelpers(kt.ldr, kt.validator, kt.rFactory), y)
+	err = p.Config(
+		resmap.NewPluginHelpers(
+			kt.ldr, kt.validator, kt.rFactory, kt.pLdr.Config()),
+		y)
 	if err != nil {
 		return errors.Wrapf(
 			err, "trouble configuring builtin %s with config: `\n%s`", bpt, string(y))

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -84,7 +84,7 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 				err)
 		}
 
-		volumeSpec, err = translateInTreeSpecToCSIIfNeeded(volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator)
+		volumeSpec, err = translateInTreeSpecToCSIIfNeeded(volumeSpec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"error performing CSI migration checks and translation for PVC %q/%q: %v",
@@ -109,7 +109,7 @@ func CreateVolumeSpec(podVolume v1.Volume, pod *v1.Pod, nodeName types.NodeName,
 	clonedPodVolume := podVolume.DeepCopy()
 
 	origspec := volume.NewSpecFromVolume(clonedPodVolume)
-	spec, err := translateInTreeSpecToCSIIfNeeded(origspec, nodeName, vpm, csiMigratedPluginManager, csiTranslator)
+	spec, err := translateInTreeSpecToCSIIfNeeded(origspec, nodeName, vpm, csiMigratedPluginManager, csiTranslator, pod.Namespace)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"error performing CSI migration checks and translation for inline volume %q: %v",
@@ -285,7 +285,7 @@ func ProcessPodVolumes(pod *v1.Pod, addVolumes bool, desiredStateOfWorld cache.D
 	return
 }
 
-func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator) (*volume.Spec, error) {
+func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName, vpm *volume.VolumePluginMgr, csiMigratedPluginManager csimigration.PluginManager, csiTranslator csimigration.InTreeToCSITranslator, podNamespace string) (*volume.Spec, error) {
 	translatedSpec := spec
 	migratable, err := csiMigratedPluginManager.IsMigratable(spec)
 	if err != nil {
@@ -300,7 +300,7 @@ func translateInTreeSpecToCSIIfNeeded(spec *volume.Spec, nodeName types.NodeName
 		return nil, err
 	}
 	if migratable && migrationSupportedOnNode {
-		translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(spec, csiTranslator)
+		translatedSpec, err = csimigration.TranslateInTreeSpecToCSI(spec, podNamespace, csiTranslator)
 		if err != nil {
 			return nil, err
 		}

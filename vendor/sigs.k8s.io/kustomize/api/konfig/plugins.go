@@ -41,32 +41,6 @@ const (
 	NoPluginHomeSentinal = "/No/non-builtin/plugins!"
 )
 
-func EnabledPluginConfig(b types.BuiltinPluginLoadingOptions) (*types.PluginConfig, error) {
-	dir, err := DefaultAbsPluginHome(filesys.MakeFsOnDisk())
-	if err != nil {
-		return nil, err
-	}
-	return MakePluginConfig(types.PluginRestrictionsNone, b, dir), nil
-}
-
-func DisabledPluginConfig() *types.PluginConfig {
-	return MakePluginConfig(
-		types.PluginRestrictionsBuiltinsOnly,
-		types.BploUseStaticallyLinked,
-		NoPluginHomeSentinal)
-}
-
-func MakePluginConfig(
-	pr types.PluginRestrictions,
-	b types.BuiltinPluginLoadingOptions,
-	home string) *types.PluginConfig {
-	return &types.PluginConfig{
-		PluginRestrictions: pr,
-		AbsPluginHome:      home,
-		BpLoadingOptions:   b,
-	}
-}
-
 type NotedFunc struct {
 	Note string
 	F    func() string
@@ -77,7 +51,7 @@ type NotedFunc struct {
 // the home of kustomize plugins.
 func DefaultAbsPluginHome(fSys filesys.FileSystem) (string, error) {
 	return FirstDirThatExistsElseError(
-		"plugin home directory", fSys, []NotedFunc{
+		"plugin root", fSys, []NotedFunc{
 			{
 				Note: "homed in $" + KustomizePluginHomeEnv,
 				F: func() string {
@@ -87,9 +61,11 @@ func DefaultAbsPluginHome(fSys filesys.FileSystem) (string, error) {
 			{
 				Note: "homed in $" + XdgConfigHomeEnv,
 				F: func() string {
-					return filepath.Join(
-						os.Getenv(XdgConfigHomeEnv),
-						ProgramName, RelPluginHome)
+					if root := os.Getenv(XdgConfigHomeEnv); root != "" {
+						return filepath.Join(root, ProgramName, RelPluginHome)
+					}
+					// do not look in "kustomize/plugin" if XdgConfigHomeEnv is unset
+					return ""
 				},
 			},
 			{
@@ -118,11 +94,14 @@ func FirstDirThatExistsElseError(
 	pathFuncs []NotedFunc) (string, error) {
 	var nope []types.Pair
 	for _, dt := range pathFuncs {
-		dir := dt.F()
-		if fSys.Exists(dir) {
-			return dir, nil
+		if dir := dt.F(); dir != "" {
+			if fSys.Exists(dir) {
+				return dir, nil
+			}
+			nope = append(nope, types.Pair{Key: dt.Note, Value: dir})
+		} else {
+			nope = append(nope, types.Pair{Key: dt.Note, Value: "<no value>"})
 		}
-		nope = append(nope, types.Pair{Key: dt.Note, Value: dir})
 	}
 	return "", types.NewErrUnableToFind(what, nope)
 }

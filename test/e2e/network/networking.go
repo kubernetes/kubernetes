@@ -468,21 +468,6 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for pod-Service(hostNetwork): udp", func() {
-			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EndpointsUseHostNetwork)
-			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
-			err := config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
-			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
-			}
-
-			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUDPPort))
-			err = config.DialFromTestContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
-			if err != nil {
-				framework.Failf("failed dialing endpoint, %v", err)
-			}
-		})
-
 		// if the endpoints pods use hostNetwork, several tests can't run in parallel
 		// because the pods will try to acquire the same port in the host.
 		// We run the test in serial, to avoid port conflicts.
@@ -498,6 +483,20 @@ var _ = common.SIGDescribe("Networking", func() {
 			}
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeHTTPPort))
 			err = config.DialFromTestContainer("http", config.NodeIP, config.NodeHTTPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By("pod-Service(hostNetwork): udp")
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
+			err = config.DialFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, config.EndpointHostnames())
+			if err != nil {
+				framework.Failf("failed dialing endpoint, %v", err)
+			}
+
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (nodeIP)", config.TestContainerPod.Name, config.NodeIP, config.NodeUDPPort))
+			err = config.DialFromTestContainer("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, 0, config.EndpointHostnames())
 			if err != nil {
 				framework.Failf("failed dialing endpoint, %v", err)
 			}

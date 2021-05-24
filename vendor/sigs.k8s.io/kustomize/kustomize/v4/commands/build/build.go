@@ -6,7 +6,6 @@ package build
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/kustomize/api/filesys"
@@ -22,10 +21,11 @@ var theArgs struct {
 var theFlags struct {
 	outputPath string
 	enable     struct {
-		resourceIdChanges bool
-		plugins           bool
-		managedByLabel    bool
+		plugins        bool
+		managedByLabel bool
+		helm           bool
 	}
+	helmCommand    string
 	loadRestrictor string
 	reorderOutput  string
 	fnOptions      types.FnPluginLoadingOptions
@@ -104,7 +104,7 @@ func NewCmdBuild(
 	AddFlagEnablePlugins(cmd.Flags())
 	AddFlagReorderOutput(cmd.Flags())
 	AddFlagEnableManagedbyLabel(cmd.Flags())
-	AddFlagAllowResourceIdChanges(cmd.Flags())
+	AddFlagEnableHelm(cmd.Flags())
 	return cmd
 }
 
@@ -132,14 +132,13 @@ func HonorKustomizeFlags(kOpts *krusty.Options) *krusty.Options {
 	kOpts.DoLegacyResourceSort = getFlagReorderOutput() == legacy
 	kOpts.LoadRestrictions = getFlagLoadRestrictorValue()
 	if theFlags.enable.plugins {
-		c, err := konfig.EnabledPluginConfig(types.BploUseStaticallyLinked)
-		if err != nil {
-			log.Fatal(err)
-		}
+		c := types.EnabledPluginConfig(types.BploUseStaticallyLinked)
 		c.FnpLoadingOptions = theFlags.fnOptions
 		kOpts.PluginConfig = c
+	} else {
+		kOpts.PluginConfig.HelmConfig.Enabled = theFlags.enable.helm
 	}
+	kOpts.PluginConfig.HelmConfig.Command = theFlags.helmCommand
 	kOpts.AddManagedbyLabel = isManagedByLabelEnabled()
-	kOpts.AllowResourceIdChanges = theFlags.enable.resourceIdChanges
 	return kOpts
 }

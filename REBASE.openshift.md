@@ -375,3 +375,17 @@ signal for the next 2-3 days.
 
 1. Update cluster-kube-apiserver-operator `pre-release-lifecycle` alert's
 `removed_release` version similarly to https://github.com/openshift/cluster-kube-apiserver-operator/pull/1092.
+
+## Updating with `git merge` (experimental)
+
+After the initial bump as described above it is possible to update
+to newer released version using `git merge`. To do that follow these steps:
+
+1. Revert any commits that were merged into kubernetes between previous update and current one.
+2. `git merge <new_version>`, example `git merge v1.21.1`.
+   Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
+   coming from newer versions. Manually verify them, and in most cases pick the
+   newer versions of deps. This will be properly update when re-runing
+   `hack/update-vendor.sh` in the next step.
+3. Update openshift dependencies and re-run `hack/update-vendor.sh`.
+4. Run `make update` see [Updating generated files](#updating-generated-files).
