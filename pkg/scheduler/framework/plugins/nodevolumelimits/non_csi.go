@@ -215,7 +215,7 @@ func (pl *nonCSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found: %s", node.Name))
+		return framework.NewStatus(framework.Error, "node not found")
 	}
 
 	var csiNode *storage.CSINode
