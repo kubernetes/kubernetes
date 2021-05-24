@@ -408,7 +408,7 @@ func (rc *reconciler) syncStates() {
 				continue
 			}
 			// No pod needs the volume.
-			klog.InfoS("Could not construct volume information, cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "error", err)
+			klog.InfoS("Could not construct volume information, cleaning up mounts", "podName", volume.podName, "volumeSpecName", volume.volumeSpecName, "err", err)
 			rc.cleanupMounts(volume)
 			continue
 		}
