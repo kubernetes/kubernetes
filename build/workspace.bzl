@@ -74,15 +74,15 @@ def cri_tarballs():
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.3
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:v2.1.3
+# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
+# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:37cfe133a6ff3fc3aa4aa5ab9fda127861902940b8e8078fff7191c7a81be8d8",
-    "amd64": "sha256:dc06e242160076b72bd75135fb3dd0a9e91f386b2d812ec10cbf9e65864c755d",
-    "arm": "sha256:9c52e9b31d679102586381fb4a03bba73fc05992adacce31df3db6d2f75f010e",
-    "arm64": "sha256:9a3ae250d59f317c9cf1f7bf0b61c0d90e70012ee82996867655401968076ee4",
-    "ppc64le": "sha256:d7c50e06d954bedb1f362ce42380f7a059423f8cbd9e7b426a7f2d73dfb4431a",
-    "s390x": "sha256:7e6d43baf4972f7faa33f1179fb92ff858a3e0e23f78b96a5821d13199b9da91",
+    "manifest": "sha256:08c14f378308dd053bca28f64ab4cbfbca469c8ce5b2831fc3c267adbdc2ae6a",
+    "amd64": "sha256:bfed8b269fcb8333845a55560ef35e66e71998bd4be33a6b92302f5cbe9ab181",
+    "arm": "sha256:52722bb698a8d742148c9075f3261f442f3e7bc9d12bcc9c96a045d24d27ffd4",
+    "arm64": "sha256:0ac88bfb3df67f63bc328cd23610959310c8bc36377662de3220c7c0c15f6dbd",
+    "ppc64le": "sha256:4bc9d7fa374f3e065ed4c62ac815806afe2e519bc4a9d94786e70fe88e5acc42",
+    "s390x": "sha256:3045c5d5e716ce22cf0131b4d34bac99a7539e952546e4e8cb20739079bf6401",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
@@ -137,7 +137,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "v2.1.3",  # ignored, but kept here for documentation
+            tag = "buster-v1.7.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
