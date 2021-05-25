@@ -140,13 +140,13 @@ func TestEmptyList(t *testing.T) {
 }
 
 func initStatusForbiddenControlPlaneConfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysDenyAuthorizer()
 	return masterConfig
 }
 
 func initUnauthorizedControlPlaneConfig() *controlplane.Config {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	tokenAuthenticator := tokentest.New()
 	tokenAuthenticator.Tokens[AliceToken] = &user.DefaultInfo{Name: "alice", UID: "1"}
 	tokenAuthenticator.Tokens[BobToken] = &user.DefaultInfo{Name: "bob", UID: "2"}
@@ -601,7 +601,7 @@ func countEndpoints(eps *corev1.Endpoints) int {
 }
 
 func TestMasterService(t *testing.T) {
-	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, s, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL})
@@ -637,7 +637,7 @@ func TestMasterService(t *testing.T) {
 }
 
 func TestServiceAlloc(t *testing.T) {
-	cfg := framework.NewIntegrationTestMasterConfig()
+	cfg := framework.NewIntegrationTestControlPlaneConfig()
 	_, cidr, err := net.ParseCIDR("192.168.0.0/29")
 	if err != nil {
 		t.Fatalf("bad cidr: %v", err)

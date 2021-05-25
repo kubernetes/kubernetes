@@ -67,7 +67,7 @@ func TestWatchRestartsIfTimeoutNotReached(t *testing.T) {
 	timeout := 30 * time.Second
 
 	// Set up a master
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	// Timeout is set random between MinRequestTimeout and 2x
 	masterConfig.GenericConfig.MinRequestTimeout = int(timeout.Seconds()) / 4
 	_, s, closeFn := framework.RunAMaster(masterConfig)

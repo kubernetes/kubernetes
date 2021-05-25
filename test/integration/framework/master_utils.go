@@ -251,14 +251,14 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	return m, s, closeFn
 }
 
-// NewIntegrationTestMasterConfig returns the master config appropriate for most integration tests.
-func NewIntegrationTestMasterConfig() *controlplane.Config {
-	return NewIntegrationTestMasterConfigWithOptions(&MasterConfigOptions{})
+// NewIntegrationTestControlPlaneConfig returns the master config appropriate for most integration tests.
+func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
+	return NewIntegrationTestControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewIntegrationTestMasterConfigWithOptions returns the master config appropriate for most integration tests
+// NewIntegrationTestControlPlaneConfigWithOptions returns the master config appropriate for most integration tests
 // configured with the provided options.
-func NewIntegrationTestMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
 	masterConfig := NewMasterConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()

@@ -36,7 +36,7 @@ import (
 func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 
@@ -80,7 +80,7 @@ func Test_ServiceLoadBalancerDisableAllocateNodePorts(t *testing.T) {
 func Test_ServiceLoadBalancerEnableThenDisableAllocatedNodePorts(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLBNodePortControl, true)()
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

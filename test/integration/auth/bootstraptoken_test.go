@@ -117,7 +117,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 
 		authenticator := bearertoken.New(bootstrap.NewTokenAuthenticator(bootstrapSecrets{test.secret}))
 		// Set up a master
-		masterConfig := framework.NewIntegrationTestMasterConfig()
+		masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 		_, s, closeFn := framework.RunAMaster(masterConfig)
 		defer closeFn()

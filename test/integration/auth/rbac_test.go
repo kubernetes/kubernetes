@@ -519,7 +519,7 @@ func TestRBAC(t *testing.T) {
 
 	for i, tc := range tests {
 		// Create an API Server.
-		masterConfig := framework.NewIntegrationTestMasterConfig()
+		masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 		masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 		masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 			superUser:                          {Name: "admin", Groups: []string{"system:masters"}},
@@ -642,7 +642,7 @@ func TestRBAC(t *testing.T) {
 func TestBootstrapping(t *testing.T) {
 	superUser := "admin/system:masters"
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
@@ -703,7 +703,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	superUser := "admin/system:masters"
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = newRBACAuthorizer(t, masterConfig)
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
