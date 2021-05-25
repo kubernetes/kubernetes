@@ -31,10 +31,10 @@ BUNDLED_ETCD_VERSIONS?=3.0.17 3.1.12 3.2.24 3.3.17 3.4.13 3.5.0-beta.3
 # LATEST_ETCD_VERSION identifies the most recent etcd version available.
 LATEST_ETCD_VERSION?=3.5.0-beta.3
 
-# REVISION provides a version number fo this image and all it's bundled
+# REVISION provides a version number for this image and all it's bundled
 # artifacts. It should start at zero for each LATEST_ETCD_VERSION and increment
 # for each revision of this image at that etcd version.
-REVISION?=0
+REVISION?=1
 
 # IMAGE_TAG Uniquely identifies k8s.gcr.io/etcd docker image with a tag of the form "<etcd-version>-<revision>".
 IMAGE_TAG=$(LATEST_ETCD_VERSION)-$(REVISION)
