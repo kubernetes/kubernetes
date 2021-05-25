@@ -36,7 +36,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
-	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -52,17 +51,25 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
-// ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
-var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
-
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods
 // onto machines.
 // TODO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(context.Context, framework.Framework, *framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
+	// Schedule(context.Context, framework.Framework, *framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
 	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
 	Extenders() []framework.Extender
+	Snapshot() error
+	NodeInfoSnapshot() *internalcache.Snapshot
+	FindNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error)
+	PrioritizeNodes(
+		ctx context.Context,
+		fwk framework.Framework,
+		state *framework.CycleState,
+		pod *v1.Pod,
+		nodes []*v1.Node,
+	) (framework.NodeScoreList, error)
+	SelectHost(nodeScoreList framework.NodeScoreList) (string, error)
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -86,63 +93,9 @@ type genericScheduler struct {
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
 // functions.
-func (g *genericScheduler) snapshot() error {
+func (g *genericScheduler) Snapshot() error {
 	// Used for all fit and priority funcs.
 	return g.cache.UpdateSnapshot(g.nodeInfoSnapshot)
-}
-
-// Schedule tries to schedule the given pod to one of the nodes in the node list.
-// If it succeeds, it will return the name of the node.
-// If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
-	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
-	defer trace.LogIfLong(100 * time.Millisecond)
-
-	if err := g.snapshot(); err != nil {
-		return result, err
-	}
-	trace.Step("Snapshotting scheduler cache and node infos done")
-
-	if g.nodeInfoSnapshot.NumNodes() == 0 {
-		return result, ErrNoNodesAvailable
-	}
-
-	feasibleNodes, diagnosis, err := g.findNodesThatFitPod(ctx, fwk, state, pod)
-	if err != nil {
-		return result, err
-	}
-	trace.Step("Computing predicates done")
-
-	if len(feasibleNodes) == 0 {
-		return result, &framework.FitError{
-			Pod:         pod,
-			NumAllNodes: g.nodeInfoSnapshot.NumNodes(),
-			Diagnosis:   diagnosis,
-		}
-	}
-
-	// When only one node after predicate, just use it.
-	if len(feasibleNodes) == 1 {
-		return ScheduleResult{
-			SuggestedHost:  feasibleNodes[0].Name,
-			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
-			FeasibleNodes:  1,
-		}, nil
-	}
-
-	priorityList, err := g.prioritizeNodes(ctx, fwk, state, pod, feasibleNodes)
-	if err != nil {
-		return result, err
-	}
-
-	host, err := g.selectHost(priorityList)
-	trace.Step("Prioritizing done")
-
-	return ScheduleResult{
-		SuggestedHost:  host,
-		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
-		FeasibleNodes:  len(feasibleNodes),
-	}, err
 }
 
 func (g *genericScheduler) Extenders() []framework.Extender {
@@ -151,7 +104,7 @@ func (g *genericScheduler) Extenders() []framework.Extender {
 
 // selectHost takes a prioritized list of nodes and then picks one
 // in a reservoir sampling manner from the nodes that had the highest score.
-func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (string, error) {
+func (g *genericScheduler) SelectHost(nodeScoreList framework.NodeScoreList) (string, error) {
 	if len(nodeScoreList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
 	}
@@ -220,7 +173,7 @@ func (g *genericScheduler) evaluateNominatedNode(ctx context.Context, pod *v1.Po
 
 // Filters the nodes to find the ones that fit the pod based on the framework
 // filter plugins and filter extenders.
-func (g *genericScheduler) findNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
+func (g *genericScheduler) FindNodesThatFitPod(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, framework.Diagnosis, error) {
 	diagnosis := framework.Diagnosis{
 		NodeToStatusMap:      make(framework.NodeToStatusMap),
 		UnschedulablePlugins: sets.NewString(),
@@ -403,7 +356,7 @@ func (g *genericScheduler) findNodesThatPassExtenders(pod *v1.Pod, feasibleNodes
 // The scores from each plugin are added together to make the score for that node, then
 // any extenders are run as well.
 // All scores are finally combined (added) to get the total weighted scores of all nodes
-func (g *genericScheduler) prioritizeNodes(
+func (g *genericScheduler) PrioritizeNodes(
 	ctx context.Context,
 	fwk framework.Framework,
 	state *framework.CycleState,
@@ -513,4 +466,8 @@ func NewGenericScheduler(
 		nodeInfoSnapshot:         nodeInfoSnapshot,
 		percentageOfNodesToScore: percentageOfNodesToScore,
 	}
+}
+
+func (g *genericScheduler) NodeInfoSnapshot() *internalcache.Snapshot {
+	return g.nodeInfoSnapshot
 }

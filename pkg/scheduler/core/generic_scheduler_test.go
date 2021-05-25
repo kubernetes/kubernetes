@@ -18,7 +18,6 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -39,17 +38,14 @@ import (
 	"k8s.io/client-go/informers"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/selectorspread"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -257,7 +253,7 @@ func TestSelectHost(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// increase the randomness
 			for i := 0; i < 10; i++ {
-				got, err := scheduler.selectHost(test.list)
+				got, err := scheduler.SelectHost(test.list)
 				if test.expectsErr {
 					if err == nil {
 						t.Error("Unexpected non-error")
@@ -449,589 +445,589 @@ func TestFindNodesThatPassExtenders(t *testing.T) {
 	}
 }
 
-func TestGenericScheduler(t *testing.T) {
-	tests := []struct {
-		name            string
-		registerPlugins []st.RegisterPluginFunc
-		nodes           []string
-		pvcs            []v1.PersistentVolumeClaim
-		pod             *v1.Pod
-		pods            []*v1.Pod
-		expectedHosts   sets.String
-		wErr            error
-	}{
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:  "test 1",
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes: 2,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("FalseFilter"),
-				},
-			},
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
-			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "test 2",
-			wErr:          nil,
-		},
-		{
-			// Fits on a machine where the pod ID matches the machine name
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"machine1", "machine2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
-			expectedHosts: sets.NewString("machine2"),
-			name:          "test 3",
-			wErr:          nil,
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
-			expectedHosts: sets.NewString("3"),
-			name:          "test 4",
-			wErr:          nil,
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			expectedHosts: sets.NewString("2"),
-			name:          "test 5",
-			wErr:          nil,
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"3", "2", "1"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			expectedHosts: sets.NewString("1"),
-			name:          "test 6",
-			wErr:          nil,
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"3", "2", "1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:  "test 7",
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes: 3,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("FalseFilter"),
-				},
-			},
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("NoPodsFilter", NewNoPodsFilterPlugin),
-				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")},
-					Spec: v1.PodSpec{
-						NodeName: "2",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-			},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			nodes: []string{"1", "2"},
-			name:  "test 8",
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-				NumAllNodes: 2,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
-						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("NoPodsFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("MatchFilter", "NoPodsFilter"),
-				},
-			},
-		},
-		{
-			// Pod with existing PVC
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2"},
-			pvcs: []v1.PersistentVolumeClaim{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
-					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
-				},
-			},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "existingPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			expectedHosts: sets.NewString("machine1", "machine2"),
-			name:          "existing PVC",
-			wErr:          nil,
-		},
-		{
-			// Pod with non existing PVC
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "unknownPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			name: "unknown PVC",
-			wErr: &framework.FitError{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
-					Spec: v1.PodSpec{
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "unknownPVC",
-									},
-								},
-							},
-						},
-					},
-				},
-				NumAllNodes: 2,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
-						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
-					},
-					UnschedulablePlugins: sets.NewString(volumebinding.Name),
-				},
-			},
-		},
-		{
-			// Pod with deleting PVC
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2"},
-			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-				Spec: v1.PodSpec{
-					Volumes: []v1.Volume{
-						{
-							VolumeSource: v1.VolumeSource{
-								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-									ClaimName: "existingPVC",
-								},
-							},
-						},
-					},
-				},
-			},
-			name: "deleted PVC",
-			wErr: &framework.FitError{
-				Pod: &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
-					Spec: v1.PodSpec{
-						Volumes: []v1.Volume{
-							{
-								VolumeSource: v1.VolumeSource{
-									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-										ClaimName: "existingPVC",
-									},
-								},
-							},
-						},
-					},
-				},
-				NumAllNodes: 2,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
-						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
-					},
-					UnschedulablePlugins: sets.NewString(volumebinding.Name),
-				},
-			},
-		},
-		{
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
-				st.RegisterScorePlugin("FalseMap", newFalseMapPlugin(), 1),
-				st.RegisterScorePlugin("TrueMap", newTrueMapPlugin(), 2),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"2", "1"},
-			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
-			name:  "test error with priority map",
-			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
-		},
-		{
-			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPluginAsExtensions(
-					podtopologyspread.Name,
-					podtopologyspread.New,
-					"PreFilter",
-					"Filter",
-				),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
-				Spec: v1.PodSpec{
-					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-						{
-							MaxSkew:           1,
-							TopologyKey:       "hostname",
-							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-			},
-			expectedHosts: sets.NewString("machine2"),
-			wErr:          nil,
-		},
-		{
-			name: "test podtopologyspread plugin - 3 nodes with maxskew=2",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPluginAsExtensions(
-					podtopologyspread.Name,
-					podtopologyspread.New,
-					"PreFilter",
-					"Filter",
-				),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes: []string{"machine1", "machine2", "machine3"},
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
-				Spec: v1.PodSpec{
-					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
-						{
-							MaxSkew:           2,
-							TopologyKey:       "hostname",
-							WhenUnsatisfiable: v1.DoNotSchedule,
-							LabelSelector: &metav1.LabelSelector{
-								MatchExpressions: []metav1.LabelSelectorRequirement{
-									{
-										Key:      "foo",
-										Operator: metav1.LabelSelectorOpExists,
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-			pods: []*v1.Pod{
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1a", UID: types.UID("pod1a"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod1b", UID: types.UID("pod1b"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine1",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID("pod2"), Labels: map[string]string{"foo": ""}},
-					Spec: v1.PodSpec{
-						NodeName: "machine2",
-					},
-					Status: v1.PodStatus{
-						Phase: v1.PodRunning,
-					},
-				},
-			},
-			expectedHosts: sets.NewString("machine2", "machine3"),
-			wErr:          nil,
-		},
-		{
-			name: "test with filter plugin returning Unschedulable status",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(
-					"FakeFilter",
-					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
-				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"3"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-				NumAllNodes: 1,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("FakeFilter"),
-				},
-			},
-		},
-		{
-			name: "test with filter plugin returning UnschedulableAndUnresolvable status",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(
-					"FakeFilter",
-					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
-				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"3"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-				NumAllNodes: 1,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("FakeFilter"),
-				},
-			},
-		},
-		{
-			name: "test with partial failed filter plugin",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterFilterPlugin(
-					"FakeFilter",
-					st.NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
-				),
-				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
-			expectedHosts: nil,
-			wErr:          nil,
-		},
-		{
-			name: "test prefilter plugin returning Unschedulable status",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(
-					"FakePreFilter",
-					st.NewFakePreFilterPlugin(framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status")),
-				),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
-			expectedHosts: nil,
-			wErr: &framework.FitError{
-				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
-				NumAllNodes: 2,
-				Diagnosis: framework.Diagnosis{
-					NodeToStatusMap: framework.NodeToStatusMap{
-						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
-						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
-					},
-					UnschedulablePlugins: sets.NewString("FakePreFilter"),
-				},
-			},
-		},
-		{
-			name: "test prefilter plugin returning error status",
-			registerPlugins: []st.RegisterPluginFunc{
-				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
-				st.RegisterPreFilterPlugin(
-					"FakePreFilter",
-					st.NewFakePreFilterPlugin(framework.NewStatus(framework.Error, "injected error status")),
-				),
-				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
-			},
-			nodes:         []string{"1", "2"},
-			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
-			expectedHosts: nil,
-			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			cache := internalcache.New(time.Duration(0), wait.NeverStop)
-			for _, pod := range test.pods {
-				cache.AddPod(pod)
-			}
-			var nodes []*v1.Node
-			for _, name := range test.nodes {
-				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
-				nodes = append(nodes, node)
-				cache.AddNode(node)
-			}
+// func TestGenericScheduler(t *testing.T) {
+// 	tests := []struct {
+// 		name            string
+// 		registerPlugins []st.RegisterPluginFunc
+// 		nodes           []string
+// 		pvcs            []v1.PersistentVolumeClaim
+// 		pod             *v1.Pod
+// 		pods            []*v1.Pod
+// 		expectedHosts   sets.String
+// 		wErr            error
+// 	}{
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2"},
+// 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 			name:  "test 1",
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 				NumAllNodes: 2,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"machine1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+// 						"machine2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("FalseFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"machine1", "machine2"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
+// 			expectedHosts: sets.NewString("machine1", "machine2"),
+// 			name:          "test 2",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			// Fits on a machine where the pod ID matches the machine name
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"machine1", "machine2"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
+// 			expectedHosts: sets.NewString("machine2"),
+// 			name:          "test 3",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"3", "2", "1"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
+// 			expectedHosts: sets.NewString("3"),
+// 			name:          "test 4",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"3", "2", "1"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 			expectedHosts: sets.NewString("2"),
+// 			name:          "test 5",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterScorePlugin("ReverseNumericMap", newReverseNumericMapPlugin(), 2),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"3", "2", "1"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 			expectedHosts: sets.NewString("1"),
+// 			name:          "test 6",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterFilterPlugin("FalseFilter", st.NewFalseFilterPlugin),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"3", "2", "1"},
+// 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 			name:  "test 7",
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 				NumAllNodes: 3,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"3": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+// 						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+// 						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("FalseFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("FalseFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("NoPodsFilter", NewNoPodsFilterPlugin),
+// 				st.RegisterFilterPlugin("MatchFilter", st.NewMatchFilterPlugin),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			pods: []*v1.Pod{
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")},
+// 					Spec: v1.PodSpec{
+// 						NodeName: "2",
+// 					},
+// 					Status: v1.PodStatus{
+// 						Phase: v1.PodRunning,
+// 					},
+// 				},
+// 			},
+// 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 			nodes: []string{"1", "2"},
+// 			name:  "test 8",
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+// 				NumAllNodes: 2,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"1": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("MatchFilter"),
+// 						"2": framework.NewStatus(framework.Unschedulable, st.ErrReasonFake).WithFailedPlugin("NoPodsFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("MatchFilter", "NoPodsFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			// Pod with existing PVC
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2"},
+// 			pvcs: []v1.PersistentVolumeClaim{
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault},
+// 					Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "existingPV"},
+// 				},
+// 			},
+// 			pod: &v1.Pod{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
+// 				Spec: v1.PodSpec{
+// 					Volumes: []v1.Volume{
+// 						{
+// 							VolumeSource: v1.VolumeSource{
+// 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+// 									ClaimName: "existingPVC",
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			expectedHosts: sets.NewString("machine1", "machine2"),
+// 			name:          "existing PVC",
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			// Pod with non existing PVC
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2"},
+// 			pod: &v1.Pod{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+// 				Spec: v1.PodSpec{
+// 					Volumes: []v1.Volume{
+// 						{
+// 							VolumeSource: v1.VolumeSource{
+// 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+// 									ClaimName: "unknownPVC",
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			name: "unknown PVC",
+// 			wErr: &framework.FitError{
+// 				Pod: &v1.Pod{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
+// 					Spec: v1.PodSpec{
+// 						Volumes: []v1.Volume{
+// 							{
+// 								VolumeSource: v1.VolumeSource{
+// 									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+// 										ClaimName: "unknownPVC",
+// 									},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 				NumAllNodes: 2,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+// 						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "unknownPVC" not found`).WithFailedPlugin(volumebinding.Name),
+// 					},
+// 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			// Pod with deleting PVC
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPreFilterPlugin(volumebinding.Name, volumebinding.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2"},
+// 			pvcs:  []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", UID: types.UID("existingPVC"), Namespace: v1.NamespaceDefault, DeletionTimestamp: &metav1.Time{}}}},
+// 			pod: &v1.Pod{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
+// 				Spec: v1.PodSpec{
+// 					Volumes: []v1.Volume{
+// 						{
+// 							VolumeSource: v1.VolumeSource{
+// 								PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+// 									ClaimName: "existingPVC",
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			name: "deleted PVC",
+// 			wErr: &framework.FitError{
+// 				Pod: &v1.Pod{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore"), Namespace: v1.NamespaceDefault},
+// 					Spec: v1.PodSpec{
+// 						Volumes: []v1.Volume{
+// 							{
+// 								VolumeSource: v1.VolumeSource{
+// 									PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+// 										ClaimName: "existingPVC",
+// 									},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 				NumAllNodes: 2,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"machine1": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+// 						"machine2": framework.NewStatus(framework.UnschedulableAndUnresolvable, `persistentvolumeclaim "existingPVC" is being deleted`).WithFailedPlugin(volumebinding.Name),
+// 					},
+// 					UnschedulablePlugins: sets.NewString(volumebinding.Name),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin("TrueFilter", st.NewTrueFilterPlugin),
+// 				st.RegisterScorePlugin("FalseMap", newFalseMapPlugin(), 1),
+// 				st.RegisterScorePlugin("TrueMap", newTrueMapPlugin(), 2),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"2", "1"},
+// 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2"}},
+// 			name:  "test error with priority map",
+// 			wErr:  fmt.Errorf("running Score plugins: %w", fmt.Errorf(`plugin "FalseMap" failed with: %w`, errPrioritize)),
+// 		},
+// 		{
+// 			name: "test podtopologyspread plugin - 2 nodes with maxskew=1",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPluginAsExtensions(
+// 					podtopologyspread.Name,
+// 					podtopologyspread.New,
+// 					"PreFilter",
+// 					"Filter",
+// 				),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2"},
+// 			pod: &v1.Pod{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+// 				Spec: v1.PodSpec{
+// 					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+// 						{
+// 							MaxSkew:           1,
+// 							TopologyKey:       "hostname",
+// 							WhenUnsatisfiable: v1.DoNotSchedule,
+// 							LabelSelector: &metav1.LabelSelector{
+// 								MatchExpressions: []metav1.LabelSelectorRequirement{
+// 									{
+// 										Key:      "foo",
+// 										Operator: metav1.LabelSelectorOpExists,
+// 									},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			pods: []*v1.Pod{
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "pod1", UID: types.UID("pod1"), Labels: map[string]string{"foo": ""}},
+// 					Spec: v1.PodSpec{
+// 						NodeName: "machine1",
+// 					},
+// 					Status: v1.PodStatus{
+// 						Phase: v1.PodRunning,
+// 					},
+// 				},
+// 			},
+// 			expectedHosts: sets.NewString("machine2"),
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			name: "test podtopologyspread plugin - 3 nodes with maxskew=2",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPluginAsExtensions(
+// 					podtopologyspread.Name,
+// 					podtopologyspread.New,
+// 					"PreFilter",
+// 					"Filter",
+// 				),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes: []string{"machine1", "machine2", "machine3"},
+// 			pod: &v1.Pod{
+// 				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
+// 				Spec: v1.PodSpec{
+// 					TopologySpreadConstraints: []v1.TopologySpreadConstraint{
+// 						{
+// 							MaxSkew:           2,
+// 							TopologyKey:       "hostname",
+// 							WhenUnsatisfiable: v1.DoNotSchedule,
+// 							LabelSelector: &metav1.LabelSelector{
+// 								MatchExpressions: []metav1.LabelSelectorRequirement{
+// 									{
+// 										Key:      "foo",
+// 										Operator: metav1.LabelSelectorOpExists,
+// 									},
+// 								},
+// 							},
+// 						},
+// 					},
+// 				},
+// 			},
+// 			pods: []*v1.Pod{
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "pod1a", UID: types.UID("pod1a"), Labels: map[string]string{"foo": ""}},
+// 					Spec: v1.PodSpec{
+// 						NodeName: "machine1",
+// 					},
+// 					Status: v1.PodStatus{
+// 						Phase: v1.PodRunning,
+// 					},
+// 				},
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "pod1b", UID: types.UID("pod1b"), Labels: map[string]string{"foo": ""}},
+// 					Spec: v1.PodSpec{
+// 						NodeName: "machine1",
+// 					},
+// 					Status: v1.PodStatus{
+// 						Phase: v1.PodRunning,
+// 					},
+// 				},
+// 				{
+// 					ObjectMeta: metav1.ObjectMeta{Name: "pod2", UID: types.UID("pod2"), Labels: map[string]string{"foo": ""}},
+// 					Spec: v1.PodSpec{
+// 						NodeName: "machine2",
+// 					},
+// 					Status: v1.PodStatus{
+// 						Phase: v1.PodRunning,
+// 					},
+// 				},
+// 			},
+// 			expectedHosts: sets.NewString("machine2", "machine3"),
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			name: "test with filter plugin returning Unschedulable status",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin(
+// 					"FakeFilter",
+// 					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.Unschedulable}),
+// 				),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"3"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+// 			expectedHosts: nil,
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+// 				NumAllNodes: 1,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"3": framework.NewStatus(framework.Unschedulable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("FakeFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "test with filter plugin returning UnschedulableAndUnresolvable status",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin(
+// 					"FakeFilter",
+// 					st.NewFakeFilterPlugin(map[string]framework.Code{"3": framework.UnschedulableAndUnresolvable}),
+// 				),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"3"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+// 			expectedHosts: nil,
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+// 				NumAllNodes: 1,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"3": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injecting failure for pod test-filter").WithFailedPlugin("FakeFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("FakeFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "test with partial failed filter plugin",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterFilterPlugin(
+// 					"FakeFilter",
+// 					st.NewFakeFilterPlugin(map[string]framework.Code{"1": framework.Unschedulable}),
+// 				),
+// 				st.RegisterScorePlugin("NumericMap", newNumericMapPlugin(), 1),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"1", "2"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-filter", UID: types.UID("test-filter")}},
+// 			expectedHosts: nil,
+// 			wErr:          nil,
+// 		},
+// 		{
+// 			name: "test prefilter plugin returning Unschedulable status",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPreFilterPlugin(
+// 					"FakePreFilter",
+// 					st.NewFakePreFilterPlugin(framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status")),
+// 				),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"1", "2"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+// 			expectedHosts: nil,
+// 			wErr: &framework.FitError{
+// 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+// 				NumAllNodes: 2,
+// 				Diagnosis: framework.Diagnosis{
+// 					NodeToStatusMap: framework.NodeToStatusMap{
+// 						"1": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
+// 						"2": framework.NewStatus(framework.UnschedulableAndUnresolvable, "injected unschedulable status").WithFailedPlugin("FakePreFilter"),
+// 					},
+// 					UnschedulablePlugins: sets.NewString("FakePreFilter"),
+// 				},
+// 			},
+// 		},
+// 		{
+// 			name: "test prefilter plugin returning error status",
+// 			registerPlugins: []st.RegisterPluginFunc{
+// 				st.RegisterQueueSortPlugin(queuesort.Name, queuesort.New),
+// 				st.RegisterPreFilterPlugin(
+// 					"FakePreFilter",
+// 					st.NewFakePreFilterPlugin(framework.NewStatus(framework.Error, "injected error status")),
+// 				),
+// 				st.RegisterBindPlugin(defaultbinder.Name, defaultbinder.New),
+// 			},
+// 			nodes:         []string{"1", "2"},
+// 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-prefilter", UID: types.UID("test-prefilter")}},
+// 			expectedHosts: nil,
+// 			wErr:          fmt.Errorf(`running PreFilter plugin "FakePreFilter": %w`, errors.New("injected error status")),
+// 		},
+// 	}
+// 	for _, test := range tests {
+// 		t.Run(test.name, func(t *testing.T) {
+// 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
+// 			for _, pod := range test.pods {
+// 				cache.AddPod(pod)
+// 			}
+// 			var nodes []*v1.Node
+// 			for _, name := range test.nodes {
+// 				node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}}
+// 				nodes = append(nodes, node)
+// 				cache.AddNode(node)
+// 			}
 
-			ctx := context.Background()
-			cs := clientsetfake.NewSimpleClientset()
-			informerFactory := informers.NewSharedInformerFactory(cs, 0)
-			for _, pvc := range test.pvcs {
-				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "true")
-				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
-				if pvName := pvc.Spec.VolumeName; pvName != "" {
-					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
-					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
-				}
-			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			fwk, err := st.NewFramework(
-				test.registerPlugins, "",
-				frameworkruntime.WithSnapshotSharedLister(snapshot),
-				frameworkruntime.WithInformerFactory(informerFactory),
-				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+// 			ctx := context.Background()
+// 			cs := clientsetfake.NewSimpleClientset()
+// 			informerFactory := informers.NewSharedInformerFactory(cs, 0)
+// 			for _, pvc := range test.pvcs {
+// 				metav1.SetMetaDataAnnotation(&pvc.ObjectMeta, pvutil.AnnBindCompleted, "true")
+// 				cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(ctx, &pvc, metav1.CreateOptions{})
+// 				if pvName := pvc.Spec.VolumeName; pvName != "" {
+// 					pv := v1.PersistentVolume{ObjectMeta: metav1.ObjectMeta{Name: pvName}}
+// 					cs.CoreV1().PersistentVolumes().Create(ctx, &pv, metav1.CreateOptions{})
+// 				}
+// 			}
+// 			snapshot := internalcache.NewSnapshot(test.pods, nodes)
+// 			fwk, err := st.NewFramework(
+// 				test.registerPlugins, "",
+// 				frameworkruntime.WithSnapshotSharedLister(snapshot),
+// 				frameworkruntime.WithInformerFactory(informerFactory),
+// 				frameworkruntime.WithPodNominator(internalqueue.NewPodNominator()),
+// 			)
+// 			if err != nil {
+// 				t.Fatal(err)
+// 			}
 
-			scheduler := NewGenericScheduler(
-				cache,
-				snapshot,
-				[]framework.Extender{},
-				schedulerapi.DefaultPercentageOfNodesToScore,
-			)
-			informerFactory.Start(ctx.Done())
-			informerFactory.WaitForCacheSync(ctx.Done())
+// 			scheduler := NewGenericScheduler(
+// 				cache,
+// 				snapshot,
+// 				[]framework.Extender{},
+// 				schedulerapi.DefaultPercentageOfNodesToScore,
+// 			)
+// 			informerFactory.Start(ctx.Done())
+// 			informerFactory.WaitForCacheSync(ctx.Done())
 
-			result, err := scheduler.Schedule(ctx, fwk, framework.NewCycleState(), test.pod)
-			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
-			if err != test.wErr {
-				gotFitErr, gotOK := err.(*framework.FitError)
-				wantFitErr, wantOK := test.wErr.(*framework.FitError)
-				if gotOK != wantOK {
-					t.Errorf("Expected err to be FitError: %v, but got %v", wantOK, gotOK)
-				} else if gotOK && !reflect.DeepEqual(gotFitErr, wantFitErr) {
-					t.Errorf("Unexpected fitError. Want %v, but got %v", wantFitErr, gotFitErr)
-				}
-			}
-			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
-				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
-			}
-			if test.wErr == nil && len(test.nodes) != result.EvaluatedNodes {
-				t.Errorf("Expected EvaluatedNodes: %d, got: %d", len(test.nodes), result.EvaluatedNodes)
-			}
-		})
-	}
-}
+// 			result, err := scheduler.Schedule(ctx, fwk, framework.NewCycleState(), test.pod)
+// 			// TODO(#94696): replace reflect.DeepEqual with cmp.Diff().
+// 			if err != test.wErr {
+// 				gotFitErr, gotOK := err.(*framework.FitError)
+// 				wantFitErr, wantOK := test.wErr.(*framework.FitError)
+// 				if gotOK != wantOK {
+// 					t.Errorf("Expected err to be FitError: %v, but got %v", wantOK, gotOK)
+// 				} else if gotOK && !reflect.DeepEqual(gotFitErr, wantFitErr) {
+// 					t.Errorf("Unexpected fitError. Want %v, but got %v", wantFitErr, gotFitErr)
+// 				}
+// 			}
+// 			if test.expectedHosts != nil && !test.expectedHosts.Has(result.SuggestedHost) {
+// 				t.Errorf("Expected: %s, got: %s", test.expectedHosts, result.SuggestedHost)
+// 			}
+// 			if test.wErr == nil && len(test.nodes) != result.EvaluatedNodes {
+// 				t.Errorf("Expected EvaluatedNodes: %d, got: %d", len(test.nodes), result.EvaluatedNodes)
+// 			}
+// 		})
+// 	}
+// }
 
 // makeScheduler makes a simple genericScheduler for testing.
 func makeScheduler(nodes []*v1.Node) *genericScheduler {
@@ -1066,7 +1062,7 @@ func TestFindFitAllError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+	_, diagnosis, err := scheduler.FindNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1100,7 +1096,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, diagnosis, err := scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
+	_, diagnosis, err := scheduler.FindNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1179,7 +1175,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			}
 			fwk.AddNominatedPod(framework.NewPodInfo(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: "nominated"}, Spec: v1.PodSpec{Priority: &midPriority}}), "1")
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.FindNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1344,12 +1340,12 @@ func TestZeroRequest(t *testing.T) {
 
 			ctx := context.Background()
 			state := framework.NewCycleState()
-			_, _, err = scheduler.findNodesThatFitPod(ctx, fwk, state, test.pod)
+			_, _, err = scheduler.FindNodesThatFitPod(ctx, fwk, state, test.pod)
 			if err != nil {
 				t.Fatalf("error filtering nodes: %+v", err)
 			}
 			fwk.RunPreScorePlugins(ctx, state, test.pod, test.nodes)
-			list, err := scheduler.prioritizeNodes(ctx, fwk, state, test.pod, test.nodes)
+			list, err := scheduler.PrioritizeNodes(ctx, fwk, state, test.pod, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1444,7 +1440,7 @@ func TestFairEvaluationForNodes(t *testing.T) {
 
 	// Iterating over all nodes more than twice
 	for i := 0; i < 2*(numAllNodes/nodesToFind+1); i++ {
-		nodesThatFit, _, err := g.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
+		nodesThatFit, _, err := g.FindNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), &v1.Pod{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -1530,7 +1526,7 @@ func TestPreferNominatedNodeFilterCallCounts(t *testing.T) {
 				[]framework.Extender{},
 				schedulerapi.DefaultPercentageOfNodesToScore).(*genericScheduler)
 
-			_, _, err = scheduler.findNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
+			_, _, err = scheduler.FindNodesThatFitPod(context.Background(), fwk, framework.NewCycleState(), test.pod)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

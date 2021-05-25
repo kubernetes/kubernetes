@@ -50,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/profile"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	utiltrace "k8s.io/utils/trace"
 )
 
 const (
@@ -59,9 +60,18 @@ const (
 	pluginMetricsSamplePercent = 10
 )
 
+// ErrNoNodesAvailable is used to describe the error that no nodes available to schedule pods.
+var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
+
+type SchedulerInterface interface {
+	Schedule(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error)
+}
+
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
+	i SchedulerInterface
+
 	// It is expected that changes made via SchedulerCache will be observed
 	// by NodeLister and Algorithm.
 	SchedulerCache internalcache.Cache
@@ -88,6 +98,17 @@ type Scheduler struct {
 	Profiles profile.Map
 
 	client clientset.Interface
+}
+
+// ScheduleResult represents the result of one pod scheduled. It will contain
+// the final selected Node, along with the selected intermediate information.
+type ScheduleResult struct {
+	// Name of the scheduler suggest host
+	SuggestedHost string
+	// Number of nodes scheduler evaluated on one pod scheduled
+	EvaluatedNodes int
+	// Number of feasible nodes on one pod scheduled
+	FeasibleNodes int
 }
 
 type schedulerOptions struct {
@@ -251,6 +272,7 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler using provider %q: %v", *source.Provider, err)
 		}
+		sc.i = sc // interface hijack
 		sched = sc
 	case source.Policy != nil:
 		// Create the config from a user specified policy source.
@@ -273,6 +295,7 @@ func New(client clientset.Interface,
 		if err != nil {
 			return nil, fmt.Errorf("couldn't create scheduler from policy: %v", err)
 		}
+		sc.i = sc // interface hijack
 		sched = sc
 	default:
 		return nil, fmt.Errorf("unsupported algorithm source: %v", source)
@@ -475,7 +498,8 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	state.SetRecordPluginMetrics(rand.Intn(100) < pluginMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, fwk, state, pod)
+	scheduleResult, err := sched.i.Schedule(schedulingCycleCtx, fwk, state, pod)
+	// scheduleResult, err := sched.Schedule(schedulingCycleCtx, fwk, state, pod)
 	if err != nil {
 		// Schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
@@ -501,7 +525,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			// succeeds, the pod should get counted as a success the next time we try to
 			// schedule it. (hopefully)
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
-		} else if err == core.ErrNoNodesAvailable {
+		} else if err == ErrNoNodesAvailable {
 			// No nodes available is counted as unschedulable rather than an error.
 			metrics.PodUnschedulable(fwk.ProfileName(), metrics.SinceInSeconds(start))
 		} else {
@@ -622,6 +646,60 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunPostBindPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
+}
+
+// Schedule tries to schedule the given pod to one of the nodes in the node list.
+// If it succeeds, it will return the name of the node.
+// If it fails, it will return a FitError error with reasons.
+func (sched *Scheduler) Schedule(ctx context.Context, fwk framework.Framework, state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
+	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
+	defer trace.LogIfLong(100 * time.Millisecond)
+
+	if err := sched.Algorithm.Snapshot(); err != nil {
+		return result, err
+	}
+	trace.Step("Snapshotting scheduler cache and node infos done")
+
+	if sched.Algorithm.NodeInfoSnapshot().NumNodes() == 0 {
+		return result, ErrNoNodesAvailable
+	}
+
+	feasibleNodes, diagnosis, err := sched.Algorithm.FindNodesThatFitPod(ctx, fwk, state, pod)
+	if err != nil {
+		return result, err
+	}
+	trace.Step("Computing predicates done")
+
+	if len(feasibleNodes) == 0 {
+		return result, &framework.FitError{
+			Pod:         pod,
+			NumAllNodes: sched.Algorithm.NodeInfoSnapshot().NumNodes(),
+			Diagnosis:   diagnosis,
+		}
+	}
+
+	// When only one node after predicate, just use it.
+	if len(feasibleNodes) == 1 {
+		return ScheduleResult{
+			SuggestedHost:  feasibleNodes[0].Name,
+			EvaluatedNodes: 1 + len(diagnosis.NodeToStatusMap),
+			FeasibleNodes:  1,
+		}, nil
+	}
+
+	priorityList, err := sched.Algorithm.PrioritizeNodes(ctx, fwk, state, pod, feasibleNodes)
+	if err != nil {
+		return result, err
+	}
+
+	host, err := sched.Algorithm.SelectHost(priorityList)
+	trace.Step("Prioritizing done")
+
+	return ScheduleResult{
+		SuggestedHost:  host,
+		EvaluatedNodes: len(feasibleNodes) + len(diagnosis.NodeToStatusMap),
+		FeasibleNodes:  len(feasibleNodes),
+	}, err
 }
 
 func getAttemptsLabel(p *framework.QueuedPodInfo) string {
