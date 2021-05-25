@@ -1,5 +1,7 @@
 = vendor/github.com/opencontainers/image-spec licensed under: =
 
+= vendor/github.com/opencontainers/image-spec licensed under: =
+
 
                                  Apache License
                            Version 2.0, January 2004
@@ -193,3 +195,5 @@
    limitations under the License.
 
 = vendor/github.com/opencontainers/image-spec/LICENSE 27ef03aa2da6e424307f102e8b42621d
+
+= vendor/github.com/opencontainers/image-spec/LICENSE 07da7c41ba319d5ec2b52eba2f26c269

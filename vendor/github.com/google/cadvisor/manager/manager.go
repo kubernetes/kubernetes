@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/cadvisor/accelerators"
@@ -35,7 +36,7 @@ import (
 	"github.com/google/cadvisor/events"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	v2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/nvm"
 	"github.com/google/cadvisor/perf"
@@ -692,6 +693,10 @@ func (m *manager) GetRequestedContainersInfo(containerName string, options v2.Re
 	for name, data := range containers {
 		info, err := m.containerDataToContainerInfo(data, &query)
 		if err != nil {
+			if err == memory.ErrDataNotFound {
+				klog.Warningf("Error getting data for container %s because of race condition", name)
+				continue
+			}
 			errs.append(name, "containerDataToContainerInfo", err)
 		}
 		containersMap[name] = info
@@ -1236,6 +1241,24 @@ func (m *manager) watchForNewOoms() error {
 			err = m.eventHandler.AddEvent(newEvent)
 			if err != nil {
 				klog.Errorf("failed to add OOM kill event for %q: %v", oomInstance.ContainerName, err)
+			}
+
+			// Count OOM events for later collection by prometheus
+			request := v2.RequestOptions{
+				IdType: v2.TypeName,
+				Count:  1,
+			}
+			conts, err := m.getRequestedContainers(oomInstance.ContainerName, request)
+			if err != nil {
+				klog.V(2).Infof("failed getting container info for %q: %v", oomInstance.ContainerName, err)
+				continue
+			}
+			if len(conts) != 1 {
+				klog.V(2).Info("Expected the request to match only one container")
+				continue
+			}
+			for _, cont := range conts {
+				atomic.AddUint64(&cont.oomEvents, 1)
 			}
 		}
 	}()

@@ -17,9 +17,9 @@ package common
 import (
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -50,25 +50,6 @@ func DebugInfo(watches map[string][]string) map[string][]string {
 	return out
 }
 
-// findFileInAncestorDir returns the path to the parent directory that contains the specified file.
-// "" is returned if the lookup reaches the limit.
-func findFileInAncestorDir(current, file, limit string) (string, error) {
-	for {
-		fpath := path.Join(current, file)
-		_, err := os.Stat(fpath)
-		if err == nil {
-			return current, nil
-		}
-		if !os.IsNotExist(err) {
-			return "", err
-		}
-		if current == limit {
-			return "", nil
-		}
-		current = filepath.Dir(current)
-	}
-}
-
 var bootTime = func() time.Time {
 	now := time.Now()
 	var sysinfo unix.Sysinfo_t
@@ -80,6 +61,10 @@ var bootTime = func() time.Time {
 }()
 
 func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem bool) (info.ContainerSpec, error) {
+	return getSpecInternal(cgroupPaths, machineInfoFactory, hasNetwork, hasFilesystem, cgroups.IsCgroup2UnifiedMode())
+}
+
+func getSpecInternal(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem, cgroup2UnifiedMode bool) (info.ContainerSpec, error) {
 	var spec info.ContainerSpec
 
 	// Assume unified hierarchy containers.
@@ -96,7 +81,7 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 		// Use clone_children/events as a workaround as it isn't usually modified. It is only likely changed
 		// immediately after creating a container. If the directory modified time is lower, we use that.
 		cgroupPathFile := path.Join(cgroupPathDir, "cgroup.clone_children")
-		if cgroups.IsCgroup2UnifiedMode() {
+		if cgroup2UnifiedMode {
 			cgroupPathFile = path.Join(cgroupPathDir, "cgroup.events")
 		}
 		fi, err := os.Stat(cgroupPathFile)
@@ -122,17 +107,43 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	cpuRoot, ok := cgroupPaths["cpu"]
 	if ok {
 		if utils.FileExists(cpuRoot) {
-			spec.HasCpu = true
-			spec.Cpu.Limit = readUInt64(cpuRoot, "cpu.shares")
-			spec.Cpu.Period = readUInt64(cpuRoot, "cpu.cfs_period_us")
-			quota := readString(cpuRoot, "cpu.cfs_quota_us")
+			if cgroup2UnifiedMode {
+				spec.HasCpu = true
 
-			if quota != "" && quota != "-1" {
-				val, err := strconv.ParseUint(quota, 10, 64)
-				if err != nil {
-					klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
-				} else {
-					spec.Cpu.Quota = val
+				weight := readUInt64(cpuRoot, "cpu.weight")
+				if weight > 0 {
+					limit, err := convertCPUWeightToCPULimit(weight)
+					if err != nil {
+						klog.Errorf("GetSpec: Failed to read CPULimit from %q: %s", path.Join(cpuRoot, "cpu.weight"), err)
+					} else {
+						spec.Cpu.Limit = limit
+					}
+				}
+				max := readString(cpuRoot, "cpu.max")
+				if max != "" {
+					splits := strings.SplitN(max, " ", 2)
+					if len(splits) != 2 {
+						klog.Errorf("GetSpec: Failed to parse CPUmax from %q", path.Join(cpuRoot, "cpu.max"))
+					} else {
+						if splits[0] != "max" {
+							spec.Cpu.Quota = parseUint64String(splits[0])
+						}
+						spec.Cpu.Period = parseUint64String(splits[1])
+					}
+				}
+			} else {
+				spec.HasCpu = true
+				spec.Cpu.Limit = readUInt64(cpuRoot, "cpu.shares")
+				spec.Cpu.Period = readUInt64(cpuRoot, "cpu.cfs_period_us")
+				quota := readString(cpuRoot, "cpu.cfs_quota_us")
+
+				if quota != "" && quota != "-1" {
+					val, err := strconv.ParseUint(quota, 10, 64)
+					if err != nil {
+						klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
+					} else {
+						spec.Cpu.Quota = val
+					}
 				}
 			}
 		}
@@ -145,7 +156,7 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 		if utils.FileExists(cpusetRoot) {
 			spec.HasCpu = true
 			mask := ""
-			if cgroups.IsCgroup2UnifiedMode() {
+			if cgroup2UnifiedMode {
 				mask = readString(cpusetRoot, "cpuset.cpus.effective")
 			} else {
 				mask = readString(cpusetRoot, "cpuset.cpus")
@@ -157,23 +168,19 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	// Memory
 	memoryRoot, ok := cgroupPaths["memory"]
 	if ok {
-		if !cgroups.IsCgroup2UnifiedMode() {
+		if cgroup2UnifiedMode {
+			if utils.FileExists(path.Join(memoryRoot, "memory.max")) {
+				spec.HasMemory = true
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.high")
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
+			}
+		} else {
 			if utils.FileExists(memoryRoot) {
 				spec.HasMemory = true
 				spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
 				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
 				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
-			}
-		} else {
-			memoryRoot, err := findFileInAncestorDir(memoryRoot, "memory.max", "/sys/fs/cgroup")
-			if err != nil {
-				return spec, err
-			}
-			if memoryRoot != "" {
-				spec.HasMemory = true
-				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.high")
-				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
-				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
 			}
 		}
 	}
@@ -199,7 +206,7 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	spec.HasFilesystem = hasFilesystem
 
 	ioControllerName := "blkio"
-	if cgroups.IsCgroup2UnifiedMode() {
+	if cgroup2UnifiedMode {
 		ioControllerName = "io"
 	}
 	if blkioRoot, ok := cgroupPaths[ioControllerName]; ok && utils.FileExists(blkioRoot) {
@@ -224,9 +231,43 @@ func readString(dirpath string, file string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// Convert from [1-10000] to [2-262144]
+func convertCPUWeightToCPULimit(weight uint64) (uint64, error) {
+	const (
+		// minWeight is the lowest value possible for cpu.weight
+		minWeight = 1
+		// maxWeight is the highest value possible for cpu.weight
+		maxWeight = 10000
+	)
+	if weight < minWeight || weight > maxWeight {
+		return 0, fmt.Errorf("convertCPUWeightToCPULimit: invalid cpu weight: %v", weight)
+	}
+	return 2 + ((weight-1)*262142)/9999, nil
+}
+
+func parseUint64String(strValue string) uint64 {
+	if strValue == "max" {
+		return math.MaxUint64
+	}
+	if strValue == "" {
+		return 0
+	}
+
+	val, err := strconv.ParseUint(strValue, 10, 64)
+	if err != nil {
+		klog.Errorf("parseUint64String: Failed to parse int %q: %s", strValue, err)
+		return 0
+	}
+
+	return val
+}
+
 func readUInt64(dirpath string, file string) uint64 {
 	out := readString(dirpath, file)
-	if out == "" || out == "max" {
+	if out == "max" {
+		return math.MaxUint64
+	}
+	if out == "" {
 		return 0
 	}
 
