@@ -372,7 +372,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			continue
 		}
 		if enabled, _, _ := managed.IsPodManaged(pod); enabled {
-			klog.Warningf("[cpumanager] reconcileState: skipping pod; pod is managed (pod: %s)", pod.Name)
+			klog.V(4).InfoS("[cpumanager] reconcileState: skipping pod; pod is managed (pod: %s)", pod.Name)
 			continue
 		}
 
