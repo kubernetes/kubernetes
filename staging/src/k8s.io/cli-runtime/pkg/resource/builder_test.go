@@ -631,7 +631,7 @@ func TestFilePatternBuilder(t *testing.T) {
 	}
 
 	for _, info := range test.Infos {
-		if strings.Index(info.Name, "redis-") != 0{
+		if strings.Index(info.Name, "redis-") != 0 {
 			t.Errorf("unexpected response: %#v", info.Name)
 		}
 	}
