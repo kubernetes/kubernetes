@@ -136,7 +136,7 @@ dependencies:
       match: BASEIMAGE\?\=k8s\.gcr\.io\/build-image\/debian-base-s390x:v\d+\.\d+\.\d+
 
   - name: "k8s.gcr.io/debian-iptables: dependents"
-    version: 12.1.2
+    version: buster-v1.6.1
     refPaths:
     - path: build/common.sh
       match: debian_iptables_version=
