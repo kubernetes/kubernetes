@@ -32,7 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -332,6 +332,7 @@ func TestTarUntar(t *testing.T) {
 		data     string
 		omitted  bool
 		fileType FileType
+		perm     os.FileMode
 	}{
 		{
 			name:     "foo",
@@ -386,12 +387,12 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	for _, file := range files {
-		completePath := dir + file.name
+		completePath := filepath.Join(dir, file.name)
 		if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if file.fileType == RegularFile {
-			createTmpFile(t, completePath, file.data)
+			createTmpFile(t, completePath, file.data, file.perm)
 		} else if file.fileType == SymLink {
 			err := os.Symlink(file.data, completePath)
 			if err != nil {
@@ -399,7 +400,7 @@ func TestTarUntar(t *testing.T) {
 			}
 		} else if file.fileType == RegexFile {
 			for _, fileName := range file.nameList {
-				createTmpFile(t, dir+fileName, file.data)
+				createTmpFile(t, filepath.Join(dir, fileName), file.data, file.perm)
 			}
 		} else {
 			t.Fatalf("unexpected file type: %v", file)
@@ -462,11 +463,11 @@ func TestTarUntarWrongPrefix(t *testing.T) {
 		os.RemoveAll(dir2)
 	}()
 
-	completePath := dir + "foo"
+	completePath := filepath.Join(dir, "foo")
 	if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	createTmpFile(t, completePath, "sample data")
+	createTmpFile(t, completePath, "sample data", 0644)
 
 	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
 
@@ -501,6 +502,7 @@ func TestTarDestinationName(t *testing.T) {
 	files := []struct {
 		name string
 		data string
+		perm os.FileMode
 	}{
 		{
 			name: "foo",
@@ -522,12 +524,12 @@ func TestTarDestinationName(t *testing.T) {
 
 	// ensure files exist on disk
 	for _, file := range files {
-		completePath := dir + "/" + file.name
+		completePath := filepath.Join(dir, file.name)
 		if err := os.MkdirAll(filepath.Dir(completePath), 0755); err != nil {
 			t.Errorf("unexpected error: %v", err)
 			t.FailNow()
 		}
-		createTmpFile(t, completePath, file.data)
+		createTmpFile(t, completePath, file.data, file.perm)
 	}
 
 	reader, writer := io.Pipe()
@@ -967,8 +969,11 @@ func TestUntar_SingleFile(t *testing.T) {
 	cmpFileData(t, dest, content)
 }
 
-func createTmpFile(t *testing.T, filepath, data string) {
-	f, err := os.Create(filepath)
+func createTmpFile(t *testing.T, filepath, data string, perm os.FileMode) {
+	if perm == 0 {
+		perm = 0666
+	}
+	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
