@@ -1798,7 +1798,7 @@ function Configure-NodeProblemDetector {
 # TODO(pjh): move the logging agent code below into a separate
 # module; it was put here temporarily to avoid disrupting the file layout in
 # the K8s release machinery.
-$LOGGINGAGENT_VERSION = '1.7.5'
+$LOGGINGAGENT_VERSION = '1.7.6'
 $LOGGINGAGENT_ROOT = 'C:\fluent-bit'
 $LOGGINGAGENT_SERVICE = 'fluent-bit'
 $LOGGINGAGENT_CMDLINE = '*fluent-bit.exe*'
