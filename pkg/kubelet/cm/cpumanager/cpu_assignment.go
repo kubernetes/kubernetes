@@ -22,6 +22,8 @@ import (
 
 	"k8s.io/klog/v2"
 
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -48,6 +50,11 @@ func (a *cpuAccumulator) isSocketFree(socketID int) bool {
 }
 
 // Returns true if the supplied core is fully available in `topoDetails`.
+func (a *cpuAccumulator) isUncoreCacheFree(uncoreCacheID int) bool {
+	return a.details.CPUsInUncoreCaches(uncoreCacheID).Size() == a.topo.CPUsPerUncoreCache()
+}
+
+// Returns true if the supplied core is fully available in `topoDetails`.
 func (a *cpuAccumulator) isCoreFree(coreID int) bool {
 	return a.details.CPUsInCores(coreID).Size() == a.topo.CPUsPerCore()
 }
@@ -58,6 +65,18 @@ func (a *cpuAccumulator) freeSockets() []int {
 	for _, socket := range a.sortAvailableSockets() {
 		if a.isSocketFree(socket) {
 			free = append(free, socket)
+		}
+	}
+	return free
+}
+
+// Returns free uncore cache IDs as a slice sorted by sortAvailableUncoreCaches().
+// Only support when CpuManagerUncoreCacheAlign is enabled.
+func (a *cpuAccumulator) freeUncoreCaches() []int {
+	free := []int{}
+	for _, cache := range a.sortAvailableUncoreCaches() {
+		if a.isUncoreCacheFree(cache) {
+			free = append(free, cache)
 		}
 	}
 	return free
@@ -79,11 +98,11 @@ func (a *cpuAccumulator) freeCPUs() []int {
 	return a.sortAvailableCPUs()
 }
 
-// Sorts the provided list of sockets/cores/cpus referenced in 'ids' by the
-// number of available CPUs contained within them (smallest to largest). The
-// 'getCPU()' paramater defines the function that should be called to retrieve
-// the list of available CPUs for the type of socket/core/cpu being referenced.
-// If two sockets/cores/cpus have the same number of available CPUs, they are
+// Sorts the provided list of sockets/uncore-caches/cores/cpus referenced in 'ids'
+// by the number of available CPUs contained within them (smallest to largest).
+// The 'getCPU()' paramater defines the function that should be called to retrieve
+// the list of available CPUs for the type of socket/core/cpu being referenced. If two
+// sockets/uncore-caches/cores/cpus have the same number of available CPUs, they are
 // sorted in ascending order by their id.
 func (a *cpuAccumulator) sort(ids []int, getCPUs func(ids ...int) cpuset.CPUSet) {
 	sort.Slice(ids,
@@ -107,16 +126,36 @@ func (a *cpuAccumulator) sortAvailableSockets() []int {
 	return sockets
 }
 
+// Sort all sockets with free CPUs using the sort() algorithm defined above.
+func (a *cpuAccumulator) sortAvailableUncoreCaches() []int {
+	var result []int
+	for _, socket := range a.sortAvailableSockets() {
+		caches := a.details.UncoreCachesInSocket(socket).ToSliceNoSort()
+		a.sort(caches, a.details.CPUsInUncoreCaches)
+		result = append(result, caches...)
+	}
+	return result
+}
+
 // Sort all cores with free CPUs:
 // - First by socket using sortAvailableSockets().
 // - Then within each socket, using the sort() algorithm defined above.
 func (a *cpuAccumulator) sortAvailableCores() []int {
 	var result []int
-	for _, socket := range a.sortAvailableSockets() {
-		cores := a.details.CoresInSockets(socket).ToSliceNoSort()
-		a.sort(cores, a.details.CPUsInCores)
-		result = append(result, cores...)
+	if a.isUncoreCacheAlignEnabled() {
+		for _, cache := range a.sortAvailableUncoreCaches() {
+			cores := a.details.CoresInUncoreCaches(cache).ToSliceNoSort()
+			a.sort(cores, a.details.CPUsInCores)
+			result = append(result, cores...)
+		}
+	} else {
+		for _, socket := range a.sortAvailableSockets() {
+			cores := a.details.CoresInSockets(socket).ToSliceNoSort()
+			a.sort(cores, a.details.CPUsInCores)
+			result = append(result, cores...)
+		}
 	}
+
 	return result
 }
 
@@ -147,6 +186,17 @@ func (a *cpuAccumulator) takeFullSockets() {
 		}
 		klog.V(4).InfoS("takeFullSockets: claiming socket", "socket", socket)
 		a.take(cpusInSocket)
+	}
+}
+
+func (a *cpuAccumulator) takeFullUncoreCaches() {
+	for _, uncorecache := range a.freeUncoreCaches() {
+		cpusInUncoreCache := a.topo.CPUDetails.CPUsInUncoreCaches(uncorecache)
+		if !a.needs(cpusInUncoreCache.Size()) {
+			continue
+		}
+		klog.V(4).InfoS("takeFullUncoreCaches: claiming uncore-cache", "uncore-cache", uncorecache)
+		a.take(cpusInUncoreCache)
 	}
 }
 
@@ -200,14 +250,24 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 		return acc.result, nil
 	}
 
-	// 2. Acquire whole cores, if available and the container requires at least
+	// 2. Acquire whole uncore cache, if available and the container requires at least
+	//    a uncore-cache's-worth of CPUs.
+	//    Only support when CpuManagerUncoreCacheAlign is enabled.
+	if acc.isUncoreCacheAlignEnabled() {
+		acc.takeFullUncoreCaches()
+		if acc.isSatisfied() {
+			return acc.result, nil
+		}
+	}
+
+	// 3. Acquire whole cores, if available and the container requires at least
 	//    a core's-worth of CPUs.
 	acc.takeFullCores()
 	if acc.isSatisfied() {
 		return acc.result, nil
 	}
 
-	// 3. Acquire single threads, preferring to fill partially-allocated cores
+	// 4. Acquire single threads, preferring to fill partially-allocated cores
 	//    on the same sockets as the whole cores we have already taken in this
 	//    allocation.
 	acc.takeRemainingCPUs()
@@ -216,4 +276,11 @@ func takeByTopology(topo *topology.CPUTopology, availableCPUs cpuset.CPUSet, num
 	}
 
 	return cpuset.NewCPUSet(), fmt.Errorf("failed to allocate cpus")
+}
+
+func (a *cpuAccumulator) isUncoreCacheAlignEnabled() bool {
+	sauc := a.sortAvailableUncoreCaches()
+	l := len(sauc)
+	return utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManagerUncoreCacheAlign) &&
+		(l != 0 && sauc[0] != sauc[l-1])
 }

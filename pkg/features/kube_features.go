@@ -746,6 +746,12 @@ const (
 	//
 	// Enables apiserver and kubelet to allow up to 32 DNSSearchPaths and up to 2048 DNSSearchListChars.
 	ExpandedDNSConfig featuregate.Feature = "ExpandedDNSConfig"
+
+	// owner: @ranchothu
+	// alpha: v1.23
+	//
+	// Add uncore cache affinity to cpu manager
+	CPUManagerUncoreCacheAlign featuregate.Feature = "CPUManagerUncoreCacheAlign"
 )
 
 func init() {
@@ -769,6 +775,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ExpandInUsePersistentVolumes:                   {Default: true, PreRelease: featuregate.Beta},
 	ExpandCSIVolumes:                               {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                                     {Default: true, PreRelease: featuregate.Beta},
+	CPUManagerUncoreCacheAlign:                     {Default: false, PreRelease: featuregate.Alpha},
 	MemoryManager:                                  {Default: false, PreRelease: featuregate.Alpha},
 	CPUCFSQuotaPeriod:                              {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                                {Default: true, PreRelease: featuregate.Beta},
