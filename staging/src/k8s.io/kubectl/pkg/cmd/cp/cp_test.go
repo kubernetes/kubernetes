@@ -384,6 +384,12 @@ func TestTarUntar(t *testing.T) {
 			data:     "regexp file name",
 			fileType: RegexFile,
 		},
+		{
+			name:     "perm",
+			data:     "0600",
+			fileType: RegularFile,
+			perm:     0600,
+		},
 	}
 
 	for _, file := range files {
@@ -425,6 +431,15 @@ func TestTarUntar(t *testing.T) {
 
 		if file.fileType == RegularFile {
 			cmpFileData(t, filePath, file.data)
+			if file.perm != 0 {
+				stat, err := os.Stat(filePath)
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if file.perm != stat.Mode() {
+					t.Fatalf("unexpected file mode: expected: %s, saw: %s", file.perm, stat.Mode())
+				}
+			}
 		} else if file.fileType == SymLink {
 			dest, err := os.Readlink(filePath)
 			if file.omitted {
@@ -520,6 +535,11 @@ func TestTarDestinationName(t *testing.T) {
 			name: "blah",
 			data: "same file name different data",
 		},
+		{
+			name: "perm",
+			data: "0600",
+			perm: 0600,
+		},
 	}
 
 	// ensure files exist on disk
@@ -550,7 +570,19 @@ func TestTarDestinationName(t *testing.T) {
 		}
 
 		if !strings.HasPrefix(hdr.Name, filepath.Base(dir2)) {
-			t.Errorf("expected %q as destination filename prefix, saw: %q", filepath.Base(dir2), hdr.Name)
+			t.Errorf("expected %q as destination filename prefix, saw: %q", path.Base(dir2), hdr.Name)
+			continue
+		}
+		name := strings.TrimPrefix(hdr.Name, path.Base(dir2))
+		for _, file := range files {
+			if file.name == name {
+				if file.perm != 0 {
+					break
+				}
+				if os.FileMode(hdr.Mode) != file.perm {
+					t.Fatalf("unexpected file mode: expected: %s, saw: %s", file.perm, os.FileMode(hdr.Mode))
+				}
+			}
 		}
 	}
 }
