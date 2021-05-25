@@ -31,7 +31,7 @@ import (
 )
 
 func TestAdmission(t *testing.T) {
-	masterConfig := framework.NewMasterConfig()
+	masterConfig := framework.NewControlPlaneConfig()
 	masterConfig.GenericConfig.EnableProfiling = true
 	masterConfig.GenericConfig.AdmissionControl = defaulttolerationseconds.NewDefaultTolerationSeconds()
 	_, s, closeFn := framework.RunAMaster(masterConfig)

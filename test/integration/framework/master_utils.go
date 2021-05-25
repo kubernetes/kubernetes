@@ -153,7 +153,7 @@ func startApiserverOrDie(controlPlaneConfig *controlplane.Config, incomingServer
 	}
 
 	if controlPlaneConfig == nil {
-		controlPlaneConfig = NewMasterConfig()
+		controlPlaneConfig = NewControlPlaneConfig()
 		controlPlaneConfig.GenericConfig.OpenAPIConfig = DefaultOpenAPIConfig()
 	}
 
@@ -256,10 +256,10 @@ func NewIntegrationTestControlPlaneConfig() *controlplane.Config {
 	return NewIntegrationTestControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewIntegrationTestControlPlaneConfigWithOptions returns the master config appropriate for most integration tests
+// NewIntegrationTestControlPlaneConfigWithOptions returns the control plane config appropriate for most integration tests
 // configured with the provided options.
 func NewIntegrationTestControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
-	masterConfig := NewMasterConfigWithOptions(opts)
+	masterConfig := NewControlPlaneConfigWithOptions(opts)
 	masterConfig.GenericConfig.PublicAddress = net.ParseIP("192.168.10.4")
 	masterConfig.ExtraConfig.APIResourceConfigSource = controlplane.DefaultAPIResourceConfigSource()
 
@@ -284,13 +284,13 @@ func DefaultEtcdOptions() *options.EtcdOptions {
 	return etcdOptions
 }
 
-// NewMasterConfig returns a basic master config.
-func NewMasterConfig() *controlplane.Config {
-	return NewMasterConfigWithOptions(&MasterConfigOptions{})
+// NewControlPlaneConfig returns a basic control plane config.
+func NewControlPlaneConfig() *controlplane.Config {
+	return NewControlPlaneConfigWithOptions(&MasterConfigOptions{})
 }
 
-// NewMasterConfigWithOptions returns a basic master config configured with the provided options.
-func NewMasterConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
+// NewControlPlaneConfigWithOptions returns a basic control plane config configured with the provided options.
+func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.Config {
 	etcdOptions := DefaultEtcdOptions()
 	if opts.EtcdOptions != nil {
 		etcdOptions = opts.EtcdOptions
@@ -344,7 +344,7 @@ type CloseFunc func()
 // RunAMaster starts a master with the provided config.
 func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
-		masterConfig = NewMasterConfig()
+		masterConfig = NewControlPlaneConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
 	}
 	return startApiserverOrDie(masterConfig, nil, nil)

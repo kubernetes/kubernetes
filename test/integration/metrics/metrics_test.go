@@ -266,7 +266,7 @@ func TestApiserverMetricsPods(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewControlPlaneConfig())
 	defer closeFn()
 
 	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
@@ -372,7 +372,7 @@ func TestApiserverMetricsNamespaces(t *testing.T) {
 		}
 	}
 
-	_, server, closeFn := framework.RunAMaster(framework.NewMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewControlPlaneConfig())
 	defer closeFn()
 
 	client, err := clientset.NewForConfig(&restclient.Config{Host: server.URL, QPS: -1})
