@@ -306,7 +306,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			return gottenObj, false, err
 		}
 
-		timeout := endTime.Sub(time.Now())
+		timeout := time.Until(endTime)
 		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
 		if timeout < 0 {
 			// we're out of time
@@ -401,7 +401,7 @@ func (w ConditionalWait) IsConditionMet(info *resource.Info, o *WaitOptions) (ru
 			return gottenObj, false, err
 		}
 
-		timeout := endTime.Sub(time.Now())
+		timeout := time.Until(endTime)
 		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
 		if timeout < 0 {
 			// we're out of time
