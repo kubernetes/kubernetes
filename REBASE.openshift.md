@@ -378,11 +378,18 @@ signal for the next 2-3 days.
 
 ## Updating with `git merge` (experimental)
 
+*This is the preferred way to update to patch releases of kubernetes*
+
 After the initial bump as described above it is possible to update
 to newer released version using `git merge`. To do that follow these steps:
 
-1. Revert any commits that were merged into kubernetes between previous update and current one.
-2. `git merge <new_version>`, example `git merge v1.21.1`.
+
+1. Push appropriate upstream tag you're updating to:
+```
+git push git@github.com:openshift/kubernetes.git refs/tags/v1.21.1
+```
+2. Revert any commits that were merged into kubernetes between previous update and current one.
+3. `git merge <new_version>`, example `git merge v1.21.1`.
    Most likely you'll encounter conflicts, but most are around go.sum and go.mod,
    coming from newer versions. Manually verify them, and in most cases pick the
    newer versions of deps. This will be properly update when re-runing
