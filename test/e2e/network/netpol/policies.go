@@ -170,7 +170,7 @@ func GetAllowEgressByPort(name string, port *intstr.IntOrString) *networkingv1.N
 						{Port: port},
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
@@ -208,7 +208,7 @@ func GetDenyAllWithEgressDNS() *networkingv1.NetworkPolicy {
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
@@ -442,7 +442,7 @@ func GetAllowEgressByNamespaceAndPod(name string, targetLabels map[string]string
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
@@ -511,7 +511,7 @@ func GetAllowEgressByCIDR(podname string, podserverCIDR string) *networkingv1.Ne
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
@@ -550,7 +550,7 @@ func GetAllowEgressByCIDRExcept(podname string, podserverCIDR string, except []s
 					Ports: []networkingv1.NetworkPolicyPort{
 						{
 							Protocol: &protocolUDP,
-							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 53},
+							Port:     &intstr.IntOrString{Type: intstr.Int, IntVal: 5353},
 						},
 					},
 				},
