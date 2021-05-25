@@ -109,39 +109,39 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		}
 		pvcName := volume.PersistentVolumeClaim.ClaimName
 		if pvcName == "" {
-			return framework.NewStatus(framework.Error, "PersistentVolumeClaim had no name")
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
 		if err != nil {
-			return framework.AsStatus(err)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 		}
 
 		pvName := pvc.Spec.VolumeName
 		if pvName == "" {
 			scName := storagehelpers.GetPersistentVolumeClaimClass(pvc)
 			if len(scName) == 0 {
-				return framework.NewStatus(framework.Error, "PersistentVolumeClaim had no pv name and storageClass name")
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no pv name and storageClass name")
 			}
 
-			class, _ := pl.scLister.Get(scName)
-			if class == nil {
-				return framework.NewStatus(framework.Error, fmt.Sprintf("StorageClass %q claimed by PersistentVolumeClaim %q not found", scName, pvcName))
+			class, err := pl.scLister.Get(scName)
+			if err != nil {
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 
 			}
 			if class.VolumeBindingMode == nil {
-				return framework.NewStatus(framework.Error, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
+				return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
 			}
 			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
 				// Skip unbound volumes
 				continue
 			}
 
-			return framework.NewStatus(framework.Error, "PersistentVolume had no name")
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolume had no name")
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
 		if err != nil {
-			return framework.AsStatus(err)
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
 		}
 
 		for k, v := range pv.ObjectMeta.Labels {
