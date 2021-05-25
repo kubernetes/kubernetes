@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include <errno.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,14 +30,39 @@ limitations under the License.
 #define VERSION HEAD
 #endif
 
+static int ret_val;
+
 static void sigdown(int signo) {
   psignal(signo, "Shutting down, got signal");
-  exit(0);
+  exit(ret_val);
 }
 
 static void sigreap(int signo) {
   while (waitpid(-1, NULL, WNOHANG) > 0)
     ;
+}
+
+void set_ret_val() {
+  const char* s = getenv("PAUSE_EXIT_CODE");
+  char *ptr;
+  if (s) {
+    long tmp = strtol(s,&ptr, 10);
+    if (*ptr != 0) {
+      fprintf(stderr, "Error: could not parse '%s', non-parsable character '%c'\n", s, *ptr);
+      exit(3);
+    }
+    if (tmp == 0 && errno != 0) {
+      fprintf(stderr, "Error: could not parse '%s', errno: '%d'\n", s, errno);
+      exit(4);
+    }
+    if (tmp > 255 || tmp < 0) {
+      fprintf(stderr, "Error: '%ld' is outside int range: <0, 255>\n", tmp);
+      exit(5);
+    }
+    ret_val = (int)tmp;
+  } else {
+    ret_val = 0;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -47,6 +73,8 @@ int main(int argc, char **argv) {
       return 0;
     }
   }
+
+  set_ret_val();
 
   if (getpid() != 1)
     /* Not an error because pause sees use outside of infra containers. */
