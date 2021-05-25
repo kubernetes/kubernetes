@@ -49,9 +49,6 @@ type ensureStrategy interface {
 	// This comes handy in logging.
 	Name() string
 
-	// ShouldCreate returns true if a missing configuration object should be recreated.
-	ShouldCreate() bool
-
 	// ShouldUpdate accepts the current and the bootstrap configuration and determines
 	// whether an update is necessary.
 	// current is the existing in-cluster configuration object.
@@ -107,10 +104,9 @@ type configurationObject interface {
 	runtime.Object
 }
 
-func newSuggestedEnsureStrategy(copier specCopier, shouldCreate bool) ensureStrategy {
+func newSuggestedEnsureStrategy(copier specCopier) ensureStrategy {
 	return &strategy{
 		copier:               copier,
-		shouldCreate:         shouldCreate,
 		alwaysAutoUpdateSpec: false,
 		name:                 "suggested",
 	}
@@ -119,7 +115,6 @@ func newSuggestedEnsureStrategy(copier specCopier, shouldCreate bool) ensureStra
 func newMandatoryEnsureStrategy(copier specCopier) ensureStrategy {
 	return &strategy{
 		copier:               copier,
-		shouldCreate:         true,
 		alwaysAutoUpdateSpec: true,
 		name:                 "mandatory",
 	}
@@ -128,17 +123,12 @@ func newMandatoryEnsureStrategy(copier specCopier) ensureStrategy {
 // auto-update strategy for the configuration objects
 type strategy struct {
 	copier               specCopier
-	shouldCreate         bool
 	alwaysAutoUpdateSpec bool
 	name                 string
 }
 
 func (s *strategy) Name() string {
 	return s.name
-}
-
-func (s *strategy) ShouldCreate() bool {
-	return s.shouldCreate
 }
 
 func (s *strategy) ShouldUpdate(current, bootstrap configurationObject) (runtime.Object, bool, error) {
@@ -235,16 +225,12 @@ func ensureConfiguration(wrapper configurationWrapper, strategy ensureStrategy, 
 			return fmt.Errorf("failed to retrieve %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 		}
 
-		if strategy.ShouldCreate() {
-			if _, err := wrapper.Create(bootstrap); err != nil {
-				return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
-			}
-
-			klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
-			return nil
+		// we always re-create a missing configuration object
+		if _, err := wrapper.Create(bootstrap); err != nil {
+			return fmt.Errorf("cannot create %s type=%s name=%q error=%w", wrapper.TypeName(), configurationType, name, err)
 		}
 
-		klog.V(5).InfoS(fmt.Sprintf("Skipping creation of %s", wrapper.TypeName()), "type", configurationType, "name", name)
+		klog.V(2).InfoS(fmt.Sprintf("Successfully created %s", wrapper.TypeName()), "type", configurationType, "name", name)
 		return nil
 	}
 

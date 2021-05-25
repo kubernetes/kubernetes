@@ -43,27 +43,18 @@ func TestEnsurePriorityLevel(t *testing.T) {
 	}{
 		// for suggested configurations
 		{
-			name: "suggested priority level configuration does not exist and we should ensure - new object should be created",
+			name: "suggested priority level configuration does not exist - the object should always be re-created",
 			strategy: func(client flowcontrolclient.PriorityLevelConfigurationInterface) PriorityLevelEnsurer {
-				return NewSuggestedPriorityLevelEnsurerEnsurer(client, true)
+				return NewSuggestedPriorityLevelEnsurerEnsurer(client)
 			},
 			bootstrap: newPLConfiguration("pl1").WithLimited(10).Object(),
 			current:   nil,
 			expected:  newPLConfiguration("pl1").WithLimited(10).Object(),
 		},
 		{
-			name: "suggested priority level configuration does not exist and we should not ensure - new object should not be created",
-			strategy: func(client flowcontrolclient.PriorityLevelConfigurationInterface) PriorityLevelEnsurer {
-				return NewSuggestedPriorityLevelEnsurerEnsurer(client, false)
-			},
-			bootstrap: newPLConfiguration("pl1").WithLimited(10).Object(),
-			current:   nil,
-			expected:  nil,
-		},
-		{
 			name: "suggested priority level configuration exists, auto update is enabled, spec does not match - current object should be updated",
 			strategy: func(client flowcontrolclient.PriorityLevelConfigurationInterface) PriorityLevelEnsurer {
-				return NewSuggestedPriorityLevelEnsurerEnsurer(client, true)
+				return NewSuggestedPriorityLevelEnsurerEnsurer(client)
 			}, bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:  newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(10).Object(),
 			expected: newPLConfiguration("pl1").WithAutoUpdateAnnotation("true").WithLimited(20).Object(),
@@ -71,7 +62,7 @@ func TestEnsurePriorityLevel(t *testing.T) {
 		{
 			name: "suggested priority level configuration exists, auto update is disabled, spec does not match - current object should not be updated",
 			strategy: func(client flowcontrolclient.PriorityLevelConfigurationInterface) PriorityLevelEnsurer {
-				return NewSuggestedPriorityLevelEnsurerEnsurer(client, true)
+				return NewSuggestedPriorityLevelEnsurerEnsurer(client)
 			},
 			bootstrap: newPLConfiguration("pl1").WithLimited(20).Object(),
 			current:   newPLConfiguration("pl1").WithAutoUpdateAnnotation("false").WithLimited(10).Object(),
@@ -223,7 +214,7 @@ func TestSuggestedPLEnsureStrategy_ShouldUpdate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			strategy := newSuggestedEnsureStrategy(&priorityLevelConfigurationWrapper{}, false)
+			strategy := newSuggestedEnsureStrategy(&priorityLevelConfigurationWrapper{})
 			newObjectGot, updateGot, err := strategy.ShouldUpdate(test.current, test.bootstrap)
 			if err != nil {
 				t.Errorf("Expected no error, but got: %v", err)
