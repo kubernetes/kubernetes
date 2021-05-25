@@ -88,15 +88,15 @@ _DEBIAN_BASE_DIGEST = {
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.3.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.3.0
+# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.6.1
+# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-iptables:buster-v1.6.1
 _DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:4c9410a4ee555dcb0e8b7bd6fc77c65ac400f7c5bd4555df8187630efaea6ea4",
-    "amd64": "sha256:e30919918299988b318f0208e7fd264dee21a6be9d74bbd9f7fc15e78eade9b4",
-    "arm": "sha256:bf59578f532bfd3378c4a713eeb14cf0dbed224d5ad03f549165f8d853997ca4",
-    "arm64": "sha256:3d7ede6013b0516f1ec3852590895d4a7b6ec8f5e15bebc1a55237bba4538da2",
-    "ppc64le": "sha256:ebd3bb280f8da8fc6a7158b7c2fc59b4552487bffd95d0b5ac1b190aff7b0fd9",
-    "s390x": "sha256:a73b94aace7a571f36149aa917d4c7ee13453ed24a31f26549dd13b386dae4c1",
+    "manifest": "sha256:ace0d3b734717529f8cc0ff49ef54a13d53ae459d26ffff28a643ae26a32725f",
+    "amd64": "sha256:dfe9612ca4a74c89814ecb07895c0e73a479f42fb4c457fdf3d40205627c2beb",
+    "arm": "sha256:7f7160cbc8e7b593d2ff29dc2ecb4514a3edcee5da1ccf20f693bd9da30c7ed1",
+    "arm64": "sha256:3eefa4772a673e7d0eda706691e7829b64f62e95d464e9cd69e483a57c83a2fc",
+    "ppc64le": "sha256:f26c878f26cb1e61fa7a988a2e8c14b05685d105d9d2d4ac4a02241df4e4e3bf",
+    "s390x": "sha256:5b883c6c79130aa4a5a699e1c24cf09df034127f0ac6aec84fe7b17b3197fdd6",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
@@ -147,7 +147,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-iptables",
             # Ensure the digests above are updated to match a new tag
-            tag = "buster-v1.3.0",  # ignored, but kept here for documentation
+            tag = "buster-v1.6.1",  # ignored, but kept here for documentation
         )
 
 def etcd_tarballs():
