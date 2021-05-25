@@ -63,15 +63,9 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 		for _, pod := range ns.Pods {
 			framework.Logf("creating/updating pod %s/%s", ns.Name, pod.Name)
 
-			thePod := pod.KubePod()
-			if framework.NodeOSDistroIs("windows") {
-				thePod.Spec.NodeSelector = map[string]string{
-					"kubernetes.io/os": "windows",
-				}
-			} else {
-				framework.Logf("node distro is NOT WINDOWS !!!!!!!!!!!")
-			}
-			kubePod, err := k.createPod(thePod)
+			// note that we defer the logic of pod (i.e. node selector) specifics to the model
+			// which is aware of linux vs windows pods
+			kubePod, err := k.createPod(pod.KubePod())
 			if err != nil {
 				return err
 			}
@@ -86,7 +80,6 @@ func (k *kubeManager) initializeCluster(model *Model) error {
 
 	for _, podString := range model.AllPodStrings() {
 		k8sPod, err := k.getPod(podString.Namespace(), podString.PodName())
-
 		if err != nil {
 			return err
 		}
@@ -119,16 +112,18 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 }
 
 // probeConnectivity execs into a pod and checks its connectivity to another pod..
-func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int) (bool, string, error) {
+func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error) {
 	port := strconv.Itoa(toPort)
 	var cmd []string
+	timeout := fmt.Sprintf("--timeout=%vs", timeoutSeconds)
+
 	switch protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=3s", "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=3s", "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), "--timeout=3s", "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=udp"}
 		if framework.NodeOSDistroIs("windows") {
 			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
 		}
@@ -265,14 +260,14 @@ func (k *kubeManager) deleteNamespaces(namespaces []string) error {
 }
 
 // waitForHTTPServers waits for all webservers to be up, on all protocols sent in the input,  and then validates them using the same probe logic as the rest of the suite.
-func (k *kubeManager) waitForHTTPServers(model *Model, protocols []v1.Protocol) error {
+func (k *kubeManager) waitForHTTPServers(model *Model) error {
 	const maxTries = 10
 	framework.Logf("waiting for HTTP servers (ports 80 and 81) to become ready")
 
 	testCases := map[string]*TestCase{}
 	for _, port := range model.Ports {
 		// Protocols is provided as input so that we can skip udp polling for windows
-		for _, protocol := range protocols {
+		for _, protocol := range model.Protocols {
 			fromPort := 81
 			desc := fmt.Sprintf("%d->%d,%s", fromPort, port, protocol)
 			testCases[desc] = &TestCase{ToPort: int(port), Protocol: protocol}

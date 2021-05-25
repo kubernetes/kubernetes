@@ -66,8 +66,9 @@ package auth
 import (
 	"encoding/json"
 	"io/ioutil"
-	restclient "k8s.io/client-go/rest"
 	"os"
+
+	restclient "k8s.io/client-go/rest"
 )
 
 // Info holds Kubernetes API authorization config.  It is intended
