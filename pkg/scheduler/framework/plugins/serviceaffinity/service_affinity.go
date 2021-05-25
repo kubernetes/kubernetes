@@ -359,7 +359,6 @@ func (pl *ServiceAffinity) NormalizeScore(ctx context.Context, _ *framework.Cycl
 // TODO: This will be deprecated soon.
 func (pl *ServiceAffinity) updateNodeScoresForLabel(sharedLister framework.SharedLister, mapResult framework.NodeScoreList, reduceResult []float64, label string) error {
 	var numServicePods int64
-	var labelValue string
 	podCounts := map[string]int64{}
 	labelNodesStatus := map[string]string{}
 	maxPriorityFloat64 := float64(framework.MaxNodeScore)
@@ -370,11 +369,12 @@ func (pl *ServiceAffinity) updateNodeScoresForLabel(sharedLister framework.Share
 		if err != nil {
 			return err
 		}
-		if !labels.Set(nodeInfo.Node().Labels).Has(label) {
+
+		labelValue, exists := labels.Set(nodeInfo.Node().Labels).GetIfExists(label)
+		if !exists {
 			continue
 		}
 
-		labelValue = labels.Set(nodeInfo.Node().Labels).Get(label)
 		labelNodesStatus[nodePriority.Name] = labelValue
 		podCounts[labelValue] += nodePriority.Score
 	}
@@ -414,8 +414,8 @@ func addUnsetLabelsToMap(aL map[string]string, labelsToAdd []string, labelSet la
 			continue
 		}
 		// otherwise, backfill this label.
-		if labelSet.Has(l) {
-			aL[l] = labelSet.Get(l)
+		if val, exists := labelSet.GetIfExists(l); exists {
+			aL[l] = val
 		}
 	}
 }
@@ -449,8 +449,8 @@ func filterPods(nodeInfos []*framework.NodeInfo, selector labels.Selector, ns st
 func findLabelsInSet(labelsToKeep []string, selector labels.Set) map[string]string {
 	aL := make(map[string]string)
 	for _, l := range labelsToKeep {
-		if selector.Has(l) {
-			aL[l] = selector.Get(l)
+		if val, exists := selector.GetIfExists(l); exists {
+			aL[l] = val
 		}
 	}
 	return aL
