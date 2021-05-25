@@ -373,6 +373,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func() {
+			f.PodClient().DeleteSync(testpod.Name, metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			releaseHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")
