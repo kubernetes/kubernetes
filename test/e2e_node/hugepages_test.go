@@ -275,6 +275,8 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 				}
 
 				for hugepagesResource, count := range hugepages {
+					expectedSize := count * resourceToSize[hugepagesResource] * 1024
+
 					capacity, ok := node.Status.Capacity[v1.ResourceName(hugepagesResource)]
 					if !ok {
 						return fmt.Errorf("the node does not have the resource %s", hugepagesResource)
@@ -285,9 +287,22 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 						return fmt.Errorf("failed to convert quantity to int64")
 					}
 
-					expectedSize := count * resourceToSize[hugepagesResource] * 1024
 					if size != int64(expectedSize) {
-						return fmt.Errorf("the actual size %d is different from the expected one %d", size, expectedSize)
+						return fmt.Errorf("the actual capacity %d is different from the expected one %d for resource: %q", size, expectedSize, hugepagesResource)
+					}
+
+					allocatable, ok := node.Status.Allocatable[v1.ResourceName(hugepagesResource)]
+					if !ok {
+						return fmt.Errorf("the node does not have the resource %s", hugepagesResource)
+					}
+
+					allocatableSize, succeed := allocatable.AsInt64()
+					if !succeed {
+						return fmt.Errorf("failed to convert quantity to int64")
+					}
+
+					if allocatableSize != int64(expectedSize) {
+						return fmt.Errorf("the actual allocatable value %d is different from the expected one %d for resource: %q", allocatableSize, expectedSize, hugepagesResource)
 					}
 				}
 				return nil
