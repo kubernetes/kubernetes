@@ -93,7 +93,7 @@ func setLastApplied(obj runtime.Object, value string) error {
 		annotations = map[string]string{}
 	}
 	annotations[corev1.LastAppliedConfigAnnotation] = value
-	if isAnnotationsValid(annotations) != nil {
+	if err := apimachineryvalidation.ValidateAnnotationsSize(annotations); err != nil {
 		delete(annotations, corev1.LastAppliedConfigAnnotation)
 	}
 	accessor.SetAnnotations(annotations)
@@ -118,15 +118,4 @@ func buildLastApplied(obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("couldn't encode object into last applied annotation: %v", err)
 	}
 	return string(lastApplied), nil
-}
-
-func isAnnotationsValid(annotations map[string]string) error {
-	var totalSize int64
-	for k, v := range annotations {
-		totalSize += (int64)(len(k)) + (int64)(len(v))
-	}
-	if totalSize > (int64)(apimachineryvalidation.TotalAnnotationSizeLimitB) {
-		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, apimachineryvalidation.TotalAnnotationSizeLimitB)
-	}
-	return nil
 }
