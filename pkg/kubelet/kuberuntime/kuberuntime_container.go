@@ -279,12 +279,14 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		}
 		msg, handlerErr := m.runner.Run(kubeContainerID, pod, container, container.Lifecycle.PostStart)
 		if handlerErr != nil {
+			klog.ErrorS(handlerErr, "Failed to execute PostStartHook", "pod", klog.KObj(pod),
+				"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			m.recordContainerEvent(pod, container, kubeContainerID.ID, v1.EventTypeWarning, events.FailedPostStartHook, msg)
 			if err := m.killContainer(pod, kubeContainerID, container.Name, "FailedPostStartHook", reasonFailedPostStartHook, nil); err != nil {
-				klog.ErrorS(fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr), "Failed to kill container", "pod", klog.KObj(pod),
+				klog.ErrorS(err, "Failed to kill container", "pod", klog.KObj(pod),
 					"podUID", pod.UID, "containerName", container.Name, "containerID", kubeContainerID.String())
 			}
-			return msg, fmt.Errorf("%s: %v", ErrPostStartHook, handlerErr)
+			return msg, ErrPostStartHook
 		}
 	}
 
