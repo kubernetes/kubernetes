@@ -268,71 +268,9 @@ profiles:
 			name: "default algorithm provider",
 			flags: []string{
 				"--kubeconfig", configKubeconfig,
-				"--algorithm-provider", "DefaultProvider",
 			},
 			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
 				"default-scheduler": defaultPlugins,
-			},
-		},
-		{
-			name: "cluster autoscaler provider",
-			flags: []string{
-				"--kubeconfig", configKubeconfig,
-				"--algorithm-provider", "ClusterAutoscalerProvider",
-			},
-			wantPlugins: map[string]map[string][]kubeschedulerconfig.Plugin{
-				"default-scheduler": {
-					"QueueSortPlugin": {
-						{Name: "PrioritySort"},
-					},
-					"PreFilterPlugin": {
-						{Name: "NodeResourcesFit"},
-						{Name: "NodePorts"},
-						{Name: "PodTopologySpread"},
-						{Name: "InterPodAffinity"},
-						{Name: "VolumeBinding"},
-						{Name: "NodeAffinity"},
-					},
-					"FilterPlugin": {
-						{Name: "NodeUnschedulable"},
-						{Name: "NodeName"},
-						{Name: "TaintToleration"},
-						{Name: "NodeAffinity"},
-						{Name: "NodePorts"},
-						{Name: "NodeResourcesFit"},
-						{Name: "VolumeRestrictions"},
-						{Name: "EBSLimits"},
-						{Name: "GCEPDLimits"},
-						{Name: "NodeVolumeLimits"},
-						{Name: "AzureDiskLimits"},
-						{Name: "VolumeBinding"},
-						{Name: "VolumeZone"},
-						{Name: "PodTopologySpread"},
-						{Name: "InterPodAffinity"},
-					},
-					"PostFilterPlugin": {
-						{Name: "DefaultPreemption"},
-					},
-					"PreScorePlugin": {
-						{Name: "InterPodAffinity"},
-						{Name: "PodTopologySpread"},
-						{Name: "TaintToleration"},
-						{Name: "NodeAffinity"},
-					},
-					"ScorePlugin": {
-						{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-						{Name: "ImageLocality", Weight: 1},
-						{Name: "InterPodAffinity", Weight: 1},
-						{Name: "NodeResourcesMostAllocated", Weight: 1},
-						{Name: "NodeAffinity", Weight: 1},
-						{Name: "NodePreferAvoidPods", Weight: 10000},
-						{Name: "PodTopologySpread", Weight: 2},
-						{Name: "TaintToleration", Weight: 1},
-					},
-					"BindPlugin":    {{Name: "DefaultBinder"}},
-					"ReservePlugin": {{Name: "VolumeBinding"}},
-					"PreBindPlugin": {{Name: "VolumeBinding"}},
-				},
 			},
 		},
 		{
