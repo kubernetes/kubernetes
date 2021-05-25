@@ -119,7 +119,7 @@ func TestBootstrapTokenAuth(t *testing.T) {
 		// Set up a master
 		masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 		masterConfig.GenericConfig.Authentication.Authenticator = authenticator
-		_, s, closeFn := framework.RunAMaster(masterConfig)
+		_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 		defer closeFn()
 
 		ns := framework.CreateTestingNamespace("auth-bootstrap-token", s, t)

@@ -112,7 +112,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 
 func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 
 	config := restclient.Config{Host: s.URL}
 	clientSet, err := clientset.NewForConfig(&config)

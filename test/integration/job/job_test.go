@@ -608,7 +608,7 @@ func createJobWithDefaults(ctx context.Context, clientSet clientset.Interface, n
 
 func setup(t *testing.T, nsBaseName string) (framework.CloseFunc, *restclient.Config, clientset.Interface, *v1.Namespace) {
 	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
-	_, server, masterCloseFn := framework.RunAMaster(masterConfig)
+	_, server, masterCloseFn := framework.RunAnAPIServer(masterConfig)
 
 	config := restclient.Config{Host: server.URL}
 	clientSet, err := clientset.NewForConfig(&config)

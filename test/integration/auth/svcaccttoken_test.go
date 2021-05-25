@@ -119,7 +119,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	masterConfig.ExtraConfig.ServiceAccountJWKSURI = ""
 	masterConfig.ExtraConfig.ServiceAccountPublicKeys = []interface{}{&pk}
 
-	master, _, closeFn := framework.RunAMaster(masterConfig)
+	master, _, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	cs, err := clientset.NewForConfig(master.GenericAPIServer.LoopbackClientConfig)

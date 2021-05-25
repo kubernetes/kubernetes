@@ -341,8 +341,8 @@ func NewControlPlaneConfigWithOptions(opts *MasterConfigOptions) *controlplane.C
 // CloseFunc can be called to cleanup the master
 type CloseFunc func()
 
-// RunAMaster starts a master with the provided config.
-func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// RunAnAPIServer starts a API server with the provided config.
+func RunAnAPIServer(masterConfig *controlplane.Config) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	if masterConfig == nil {
 		masterConfig = NewControlPlaneConfig()
 		masterConfig.GenericConfig.EnableProfiling = true
@@ -350,8 +350,8 @@ func RunAMaster(masterConfig *controlplane.Config) (*controlplane.Instance, *htt
 	return startApiserverOrDie(masterConfig, nil, nil)
 }
 
-// RunAnApiserverUsingServer starts up an instance using the provided config on the specified server.
-func RunAnApiserverUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
+// RunAnAPIServerUsingServer starts up an instance using the provided config on the specified server.
+func RunAnAPIServerUsingServer(controlPlaneConfig *controlplane.Config, s *httptest.Server, masterReceiver MasterReceiver) (*controlplane.Instance, *httptest.Server, CloseFunc) {
 	return startApiserverOrDie(controlPlaneConfig, s, masterReceiver)
 }
 

@@ -59,7 +59,7 @@ func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server
 		masterConfig.ExtraConfig.APIResourceConfigSource = resourceConfig
 	}
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 
 	clientSet, err := clientset.NewForConfig(&restclient.Config{Host: s.URL, QPS: -1})
 	if err != nil {
@@ -2825,7 +2825,7 @@ func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-	_, master, closeFn := framework.RunAMaster(masterConfig)
+	_, master, closeFn := framework.RunAnAPIServer(masterConfig)
 	client, err := clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)
@@ -2878,7 +2878,7 @@ spec:
 	// Restart server with server-side apply disabled
 	closeFn()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, false)()
-	_, master, closeFn = framework.RunAMaster(masterConfig)
+	_, master, closeFn = framework.RunAnAPIServer(masterConfig)
 	client, err = clientset.NewForConfig(&restclient.Config{Host: master.URL, QPS: -1})
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)

@@ -535,7 +535,7 @@ func TestRBAC(t *testing.T) {
 			"user-with-no-permissions":         {Name: "user-with-no-permissions"},
 		}))
 		masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()
-		_, s, closeFn := framework.RunAMaster(masterConfig)
+		_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 		defer closeFn()
 
 		clientConfig := &restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{NegotiatedSerializer: legacyscheme.Codecs}}
@@ -647,7 +647,7 @@ func TestBootstrapping(t *testing.T) {
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 	}))
-	_, s, closeFn := framework.RunAMaster(masterConfig)
+	_, s, closeFn := framework.RunAnAPIServer(masterConfig)
 	defer closeFn()
 
 	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
@@ -708,7 +708,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(tokenfile.New(map[string]*user.DefaultInfo{
 		superUser: {Name: "admin", Groups: []string{"system:masters"}},
 	}))
-	_, s, tearDownFn := framework.RunAMaster(masterConfig)
+	_, s, tearDownFn := framework.RunAnAPIServer(masterConfig)
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
@@ -752,7 +752,7 @@ func TestDiscoveryUpgradeBootstrapping(t *testing.T) {
 
 	// Check that upgraded API servers inherit `system:public-info-viewer` settings from
 	// `system:discovery`, and respect auto-reconciliation annotations.
-	_, s, tearDownFn = framework.RunAMaster(masterConfig)
+	_, s, tearDownFn = framework.RunAnAPIServer(masterConfig)
 
 	client = clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL})
 
