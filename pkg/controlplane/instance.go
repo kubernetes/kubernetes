@@ -149,7 +149,7 @@ type ExtraConfig struct {
 	// Used to start and monitor tunneling
 	Tunneler          tunneler.Tunneler
 	EnableLogsSupport bool
-	ProxyTransport    http.RoundTripper
+	ProxyTransport    *http.Transport
 
 	// Values to build the IP addresses used by discovery
 	// The range of IPs to be assigned to services with type=ClusterIP or greater
