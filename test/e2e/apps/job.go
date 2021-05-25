@@ -153,7 +153,7 @@ var _ = SIGDescribe("Job", func() {
 		Testcase: Ensure Pods of an Indexed Job get a unique index.
 		Description: Create an Indexed Job, wait for completion, capture the output of the pods and verify that they contain the completion index.
 	*/
-	ginkgo.It("[Feature:IndexedJob] should create pods for an Indexed job with completion indexes and specified hostname", func() {
+	ginkgo.It("should create pods for an Indexed job with completion indexes and specified hostname", func() {
 		ginkgo.By("Creating Indexed job")
 		job := e2ejob.NewTestJob("succeed", "indexed-job", v1.RestartPolicyNever, parallelism, completions, nil, backoffLimit)
 		mode := batchv1.IndexedCompletion
