@@ -74,15 +74,15 @@ def cri_tarballs():
 # Use skopeo to find these values: https://github.com/containers/skopeo
 #
 # Example
-# Manifest: skopeo inspect docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.2.0
-# Arches: skopeo inspect --raw docker://gcr.io/k8s-staging-build-image/debian-base:buster-v1.2.0
+# Manifest: skopeo inspect docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
+# Arches: skopeo inspect --raw docker://k8s.gcr.io/build-image/debian-base:buster-v1.7.0
 _DEBIAN_BASE_DIGEST = {
-    "manifest": "sha256:ea668d3febd312e0edfbbdab6bd7d86448ddc8fddb484e20ec76b36a7aeac04c",
-    "amd64": "sha256:2f3e61995bcd4b3a1a0aef49e4a7a6817c978031734b09df2aaaa28181898b0e",
-    "arm": "sha256:d1073dcf8f1d55fbbd297e5b280375b6f276ea83a08a25fd59dc4f3ca43c6d50",
-    "arm64": "sha256:dadcff1ab81177de4914f6db0e7d78a52e525daf7a1efb246cb3545de5e818d1",
-    "ppc64le": "sha256:bfb24dc0d1e71e1deb0f04a078fadf2c94070266746b1b5acc4e739aa57d5601",
-    "s390x": "sha256:cfe6a3508b7ee198cb5a0b3a62e0981676b1dfa4b3049f36398d03e6bd35a801",
+    "manifest": "sha256:08c14f378308dd053bca28f64ab4cbfbca469c8ce5b2831fc3c267adbdc2ae6a",
+    "amd64": "sha256:bfed8b269fcb8333845a55560ef35e66e71998bd4be33a6b92302f5cbe9ab181",
+    "arm": "sha256:52722bb698a8d742148c9075f3261f442f3e7bc9d12bcc9c96a045d24d27ffd4",
+    "arm64": "sha256:0ac88bfb3df67f63bc328cd23610959310c8bc36377662de3220c7c0c15f6dbd",
+    "ppc64le": "sha256:4bc9d7fa374f3e065ed4c62ac815806afe2e519bc4a9d94786e70fe88e5acc42",
+    "s390x": "sha256:3045c5d5e716ce22cf0131b4d34bac99a7539e952546e4e8cb20739079bf6401",
 }
 
 # Use skopeo to find these values: https://github.com/containers/skopeo
@@ -137,7 +137,7 @@ def image_dependencies():
             registry = "k8s.gcr.io/build-image",
             repository = "debian-base",
             # Ensure the digests above are updated to match a new tag
-            tag = "buster-v1.2.0",  # ignored, but kept here for documentation
+            tag = "buster-v1.7.0",  # ignored, but kept here for documentation
         )
 
         container_pull(
