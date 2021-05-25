@@ -99,7 +99,7 @@ run_template_output_tests() {
 
   # check that "create job" command supports --template output
   kubectl create "${kube_flags[@]:?}" -f - <<EOF
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: pi

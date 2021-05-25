@@ -1201,7 +1201,7 @@ metadata:
 
 			ginkgo.By("waiting for cronjob to start.")
 			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				cj, err := c.BatchV1beta1().CronJobs(ns).List(context.TODO(), metav1.ListOptions{})
+				cj, err := c.BatchV1().CronJobs(ns).List(context.TODO(), metav1.ListOptions{})
 				if err != nil {
 					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
 				}
