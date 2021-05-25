@@ -88,10 +88,7 @@ func (plugin *emptyDirPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
 }
 
 func (plugin *emptyDirPlugin) CanSupport(spec *volume.Spec) bool {
-	if spec.Volume != nil && spec.Volume.EmptyDir != nil {
-		return true
-	}
-	return false
+	return spec.Volume != nil && spec.Volume.EmptyDir != nil
 }
 
 func (plugin *emptyDirPlugin) RequiresRemount(spec *volume.Spec) bool {
