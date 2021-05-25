@@ -54,8 +54,8 @@ import (
 // 	quota_test.go:100: Took 4.196205966s to scale up without quota
 // 	quota_test.go:115: Took 12.021640372s to scale up with quota
 func TestQuota(t *testing.T) {
-	// Set up a master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// Set up a API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -245,8 +245,8 @@ func scale(t *testing.T, namespace string, clientset *clientset.Clientset) {
 }
 
 func TestQuotaLimitedResourceDenial(t *testing.T) {
-	// Set up a master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// Set up an API server
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)

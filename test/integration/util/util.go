@@ -56,7 +56,7 @@ type ShutdownFunc func()
 
 // StartApiserver starts a local API server for testing and returns the handle to the URL and the shutdown function to stop it.
 func StartApiserver() (string, ShutdownFunc) {
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
@@ -329,8 +329,8 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		CancelFn: cancelFunc,
 	}
 
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
+	// 1. Create control plane
+	h := &framework.APIServerHolder{Initialized: make(chan struct{})}
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		<-h.Initialized
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
