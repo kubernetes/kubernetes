@@ -754,8 +754,6 @@ func GetReliableMountRefs(mounter mount.Interface, mountPath string) ([]string, 
 		return true, nil
 	})
 	if err == wait.ErrWaitTimeout {
-		klog.Errorf("Failed to read mount refs from /proc/mounts for %s: %s", mountPath, err)
-		klog.Errorf("Kubelet cannot unmount volume at %s, please unmount it manually", mountPath)
 		return nil, lastErr
 	}
 	return paths, err
