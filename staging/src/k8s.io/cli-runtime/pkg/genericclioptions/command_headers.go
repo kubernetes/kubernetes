@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	kubectlCommandHeader = "X-Kubectl-Command"
-	kubectlSessionHeader = "X-Kubectl-Session"
+	kubectlCommandHeader = "Kubectl-Command"
+	kubectlSessionHeader = "Kubectl-Session"
 )
 
 // CommandHeaderRoundTripper adds a layer around the standard
