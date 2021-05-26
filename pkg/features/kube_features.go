@@ -734,6 +734,12 @@ const (
 	//
 	// Enables support for 'HostProcess' containers on Windows nodes.
 	WindowsHostProcessContainers featuregate.Feature = "WindowsHostProcessContainers"
+
+	// owner: @ravig
+	// alpha: v1.22
+	//
+	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
+	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
 )
 
 func init() {
@@ -845,6 +851,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
 	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
 	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetMinReadySeconds:                     {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

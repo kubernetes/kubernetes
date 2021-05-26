@@ -157,6 +157,13 @@ type StatefulSetSpec struct {
 	// consists of all revisions not represented by a currently applied
 	// StatefulSetSpec version. The default value is 10.
 	RevisionHistoryLimit *int32
+
+	// Minimum number of seconds for which a newly created pod should be ready
+	// without any of its container crashing for it to be considered available.
+	// Defaults to 0 (pod will be considered available as soon as it is ready)
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// +optional
+	MinReadySeconds int32
 }
 
 // StatefulSetStatus represents the current state of a StatefulSet.
@@ -196,6 +203,12 @@ type StatefulSetStatus struct {
 
 	// Represents the latest available observations of a statefulset's current state.
 	Conditions []StatefulSetCondition
+
+	// Total number of available pods (ready for at least minReadySeconds) targeted by this statefulset.
+	// This is an alpha field and requires enabling StatefulSetMinReadySeconds feature gate.
+	// Remove omitempty when graduating to beta
+	// +optional
+	AvailableReplicas int32
 }
 
 // StatefulSetConditionType describes the condition types of StatefulSets.
