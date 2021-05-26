@@ -36,7 +36,9 @@ type NodeAffinity struct {
 	addedPrefSchedTerms *nodeaffinity.PreferredSchedulingTerms
 }
 
+var _ framework.PreFilterPlugin = &NodeAffinity{}
 var _ framework.FilterPlugin = &NodeAffinity{}
+var _ framework.PreScorePlugin = &NodeAffinity{}
 var _ framework.ScorePlugin = &NodeAffinity{}
 var _ framework.EnqueueExtensions = &NodeAffinity{}
 
