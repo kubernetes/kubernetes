@@ -74,7 +74,7 @@ func (c *BlobDiskController) initStorageAccounts() {
 		// get accounts
 		accounts, err := c.getAllStorageAccounts()
 		if err != nil {
-			klog.Errorf("azureDisk - getAllStorageAccounts error: %v", err)
+			klog.ErrorS(nil, "azureDisk - getAllStorageAccounts error", "error", err)
 			c.accounts = make(map[string]*storageAccountState)
 		}
 		c.accounts = accounts
@@ -110,13 +110,13 @@ func (c *BlobDiskController) CreateVolume(blobName, accountName, accountType, lo
 		return "", "", 0, err
 	}
 
-	klog.V(4).Infof("azureDisk - created vhd blob uri: %s", diskURI)
+	klog.V(4).InfoS("azureDisk - created vhd blob uri", "diskURI", diskURI)
 	return diskName, diskURI, requestGB, err
 }
 
 // DeleteVolume deletes a VHD blob
 func (c *BlobDiskController) DeleteVolume(diskURI string) error {
-	klog.V(4).Infof("azureDisk - begin to delete volume %s", diskURI)
+	klog.V(4).InfoS("azureDisk - begin to delete volume", "diskURI", diskURI)
 	accountName, blob, err := c.common.cloud.getBlobNameAndAccountFromURI(diskURI)
 	if err != nil {
 		return fmt.Errorf("failed to parse vhd URI %v", err)
@@ -127,7 +127,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 	}
 	err = c.common.cloud.deleteVhdBlob(accountName, key, blob)
 	if err != nil {
-		klog.Warningf("azureDisk - failed to delete blob %s err: %v", diskURI, err)
+		klog.InfoS("azureDisk - failed to delete blob err", "deleteBlobURI", diskURI, "error", err)
 		detail := err.Error()
 		if strings.Contains(detail, errLeaseIDMissing) {
 			// disk is still being used
@@ -136,7 +136,7 @@ func (c *BlobDiskController) DeleteVolume(diskURI string) error {
 		}
 		return fmt.Errorf("failed to delete vhd %v, account %s, blob %s, err: %v", diskURI, accountName, blob, err)
 	}
-	klog.V(4).Infof("azureDisk - blob %s deleted", diskURI)
+	klog.V(4).InfoS("azureDisk - blob deleted", "deletedBlogURI", diskURI)
 	return nil
 
 }
@@ -166,7 +166,7 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 
 	tags := make(map[string]string)
 	tags["createdby"] = "k8sAzureDataDisk"
-	klog.V(4).Infof("azureDisk - creating page blob %s in container %s account %s", vhdName, containerName, accountName)
+	klog.V(4).InfoS("azureDisk - creating page blob in container account", "vhdName",vhdName, "containerName", containerName, "accountName", accountName)
 
 	blob := container.GetBlobReference(vhdName)
 	blob.Properties.ContentLength = vhdSize
@@ -198,8 +198,8 @@ func (c *BlobDiskController) createVHDBlobDisk(blobClient azstorage.BlobStorageC
 		End:   uint64(vhdSize - 1),
 	}
 	if err = blob.WriteRange(blobRange, bytes.NewBuffer(h[:vhd.VHD_HEADER_SIZE]), nil); err != nil {
-		klog.Infof("azureDisk - failed to put header page for data disk %s in container %s account %s, error was %s\n",
-			vhdName, containerName, accountName, err.Error())
+		klog.InfoS("azureDisk - failed to put header page for data disk  in container account",
+			"dataDiskName",vhdName, "containerName", containerName, "accountName", accountName, "error", err.Error())
 		return "", "", err
 	}
 
@@ -228,7 +228,8 @@ func (c *BlobDiskController) deleteVhdBlob(accountName, accountKey, blobName str
 
 //CreateBlobDisk : create a blob disk in a node
 func (c *BlobDiskController) CreateBlobDisk(dataDiskName string, storageAccountType storage.SkuName, sizeGB int) (string, error) {
-	klog.V(4).Infof("azureDisk - creating blob data disk named:%s on StorageAccountType:%s", dataDiskName, storageAccountType)
+	klog.V(4).InfoS("azureDisk - creating blob data disk named on StorageAccountType",
+		"dataDiskName", dataDiskName, "storageAccountType", storageAccountType)
 
 	c.initStorageAccounts()
 
@@ -262,7 +263,7 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 	_, ok := c.accounts[storageAccountName]
 	if !ok {
 		// the storage account is specified by user
-		klog.V(4).Infof("azureDisk - deleting volume %s", diskURI)
+		klog.V(4).InfoS("azureDisk - deleting volume", "deletingDiskURI", diskURI)
 		return c.DeleteVolume(diskURI)
 	}
 
@@ -271,7 +272,7 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 		return err
 	}
 
-	klog.V(4).Infof("azureDisk - About to delete vhd file %s on storage account %s container %s", vhdName, storageAccountName, vhdContainerName)
+	klog.V(4).InfoS("azureDisk - About to delete vhd file on storage account container", "deleteVhdFileName",vhdName, "storageAccountName", storageAccountName, "vhdContainerName", vhdContainerName)
 
 	container := blobSvc.GetContainerReference(vhdContainerName)
 	blob := container.GetBlobReference(vhdName)
@@ -281,7 +282,7 @@ func (c *BlobDiskController) DeleteBlobDisk(diskURI string) error {
 		if diskCount, err := c.getDiskCount(storageAccountName); err != nil {
 			c.accounts[storageAccountName].diskCount = int32(diskCount)
 		} else {
-			klog.Warningf("azureDisk - failed to get disk count for %s however the delete disk operation was ok", storageAccountName)
+			klog.InfoS("azureDisk - failed to get disk count for storageAccountName however the delete disk operation was ok", "storageAccountName", storageAccountName)
 			return nil // we have failed to acquire a new count. not an error condition
 		}
 	}
@@ -306,7 +307,7 @@ func (c *BlobDiskController) getStorageAccountKey(SAName string) (string, error)
 	for _, v := range *listKeysResult.Keys {
 		if v.Value != nil && *v.Value == "key1" {
 			if _, ok := c.accounts[SAName]; !ok {
-				klog.Warningf("azureDisk - account %s was not cached while getting keys", SAName)
+				klog.InfoS("azureDisk - account was not cached while getting keys", "acountName", SAName)
 				return *v.Value, nil
 			}
 			c.accounts[SAName].key = *v.Value
@@ -380,7 +381,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 			_, provisionState, err := c.getStorageAccountState(storageAccountName)
 
 			if err != nil {
-				klog.V(4).Infof("azureDisk - GetStorageAccount:%s err %s", storageAccountName, err.Error())
+				klog.V(4).InfoS("azureDisk - GetStorageAccount", "storageAccountName", storageAccountName, "error", err.Error())
 				return false, nil // error performing the query - retryable
 			}
 
@@ -388,7 +389,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 				return true, nil
 			}
 
-			klog.V(4).Infof("azureDisk - GetStorageAccount:%s not ready yet (not flagged Succeeded by ARM)", storageAccountName)
+			klog.V(4).InfoS("azureDisk - GetStorageAccount not ready yet (not flagged Succeeded by ARM)", "storageAccountName", storageAccountName)
 			return false, nil // back off and see if the account becomes ready on next retry
 		})
 		// we have failed to ensure that account is ready for us to create
@@ -411,7 +412,7 @@ func (c *BlobDiskController) ensureDefaultContainer(storageAccountName string) e
 		return err
 	}
 	if bCreated {
-		klog.V(2).Infof("azureDisk - storage account:%s had no default container(%s) and it was created \n", storageAccountName, vhdContainerName)
+		klog.V(2).InfoS("azureDisk - storage account had no default container and it was created \n", "storageAccountName",storageAccountName, "defaultContainerName",vhdContainerName)
 	}
 
 	// flag so we no longer have to check on ARM
@@ -443,7 +444,7 @@ func (c *BlobDiskController) getDiskCount(SAName string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	klog.V(4).Infof("azure-Disk -  refreshed data count for account %s and found %v", SAName, len(response.Blobs))
+	klog.V(4).InfoS("azure-Disk -  refreshed data count for account and found", "dataAcountName", SAName, "foundBlobsCount", len(response.Blobs))
 	c.accounts[SAName].diskCount = int32(len(response.Blobs))
 
 	return int(c.accounts[SAName].diskCount), nil
@@ -460,13 +461,13 @@ func (c *BlobDiskController) getAllStorageAccounts() (map[string]*storageAccount
 	accounts := make(map[string]*storageAccountState)
 	for _, v := range accountList {
 		if v.Name == nil || v.Sku == nil {
-			klog.Info("azureDisk - accountListResult Name or Sku is nil")
+			klog.InfoS("azureDisk - accountListResult Name or Sku is nil")
 			continue
 		}
 		if !strings.HasPrefix(*v.Name, sharedDiskAccountNamePrefix) {
 			continue
 		}
-		klog.Infof("azureDisk - identified account %s as part of shared PVC accounts", *v.Name)
+		klog.InfoS("azureDisk - identified account as part of shared PVC accounts", "identifiedAccountName", *v.Name)
 
 		saState := &storageAccountState{
 			name:      *v.Name,
@@ -497,7 +498,7 @@ func (c *BlobDiskController) createStorageAccount(storageAccountName string, sto
 			return fmt.Errorf("azureDisk - can not create new storage account, current storage accounts count:%v Max is:%v", len(c.accounts), maxStorageAccounts)
 		}
 
-		klog.V(2).Infof("azureDisk - Creating storage account %s type %s", storageAccountName, string(storageAccountType))
+		klog.V(2).InfoS("azureDisk - Creating storage account  type", "storageAccountName",storageAccountName, "storageAccountType", string(storageAccountType))
 
 		cp := storage.AccountCreateParameters{
 			Sku: &storage.Sku{Name: storageAccountType},
@@ -553,7 +554,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 			countAccounts = countAccounts + 1
 			// empty account
 			if dCount == 0 {
-				klog.V(2).Infof("azureDisk - account %s identified for a new disk  is because it has 0 allocated disks", v.name)
+				klog.V(2).InfoS("azureDisk - account identified for a new disk  is because it has 0 allocated disks", "accountNameIdentified", v.name)
 				return v.name, nil // short circuit, avg is good and no need to adjust
 			}
 			// if this account is less allocated
@@ -566,7 +567,7 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 
 	// if we failed to find storageaccount
 	if SAName == "" {
-		klog.V(2).Infof("azureDisk - failed to identify a suitable account for new disk and will attempt to create new account")
+		klog.V(2).InfoS("azureDisk - failed to identify a suitable account for new disk and will attempt to create new account")
 		SAName = generateStorageAccountName(sharedDiskAccountNamePrefix)
 		err := c.createStorageAccount(SAName, storageAccountType, c.common.location, true)
 		if err != nil {
@@ -582,7 +583,9 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 
 	// avg are not create and we should create more accounts if we can
 	if aboveAvg && countAccounts < maxStorageAccounts {
-		klog.V(2).Infof("azureDisk - shared storageAccounts utilization(%v) >  grow-at-avg-utilization (%v). New storage account will be created", avgUtilization, storageAccountUtilizationBeforeGrowing)
+		klog.V(2).InfoS("azureDisk - shared storageAccounts utilization >  grow-at-avg-utilization. New storage account will be created",
+			"sharedStorageAccountsUtilization", avgUtilization,
+			"storageAccountUtilizationBeforeGrowing", storageAccountUtilizationBeforeGrowing)
 		SAName = generateStorageAccountName(sharedDiskAccountNamePrefix)
 		err := c.createStorageAccount(SAName, storageAccountType, c.common.location, true)
 		if err != nil {
@@ -593,8 +596,10 @@ func (c *BlobDiskController) findSANameForDisk(storageAccountType storage.SkuNam
 
 	// averages are not ok and we are at capacity (max storage accounts allowed)
 	if aboveAvg && countAccounts == maxStorageAccounts {
-		klog.Infof("azureDisk - shared storageAccounts utilization(%v) > grow-at-avg-utilization (%v). But k8s maxed on SAs for PVC(%v). k8s will now exceed grow-at-avg-utilization without adding accounts",
-			avgUtilization, storageAccountUtilizationBeforeGrowing, maxStorageAccounts)
+		klog.InfoS("azureDisk - shared storageAccounts utilization > grow-at-avg-utilization. But k8s maxed on SAs for PVC(%v). k8s will now exceed grow-at-avg-utilization without adding accounts",
+			"sharedStorageAccountsUtilization", avgUtilization,
+			"storageAccountUtilizationBeforeGrowing", storageAccountUtilizationBeforeGrowing,
+			"maxPVCStorageAccounts", maxStorageAccounts)
 	}
 
 	// we found a  storage accounts && [ avg are ok || we reached max sa count ]
