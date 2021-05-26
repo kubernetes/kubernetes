@@ -613,6 +613,14 @@
     and deletecollection. CronJob/status MUST support get, update and patch.'
   release: v1.21
   file: test/e2e/apps/cronjob.go
+- testname: DaemonSet, list and delete a collection of DaemonSets
+  codename: '[sig-apps] Daemon set [Serial] should list and delete a collection of
+    DaemonSets [Conformance]'
+  description: When a DaemonSet is created it MUST succeed. It MUST succeed when listing
+    DaemonSets via a label selector. It MUST succeed when deleting the DaemonSet via
+    deleteCollection.
+  release: v1.22
+  file: test/e2e/apps/daemon_set.go
 - testname: DaemonSet-FailedPodCreation
   codename: '[sig-apps] Daemon set [Serial] should retry creating failed daemon pods
     [Conformance]'

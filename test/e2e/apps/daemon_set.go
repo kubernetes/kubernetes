@@ -809,7 +809,14 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		checkDaemonSetPodsLabels(listDaemonPods(c, ns, label), hash)
 	})
 
-	ginkgo.It("should list and delete a collection of DaemonSets", func() {
+	/*
+		Release: v1.22
+		Testname: DaemonSet, list and delete a collection of DaemonSets
+		Description: When a DaemonSet is created it MUST succeed. It
+		MUST succeed when listing DaemonSets via a label selector. It
+		MUST succeed when deleting the DaemonSet via deleteCollection.
+	*/
+	framework.ConformanceIt("should list and delete a collection of DaemonSets", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 		labelSelector := labels.SelectorFromSet(label).String()
 
