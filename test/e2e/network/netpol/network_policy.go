@@ -117,7 +117,7 @@ and what is happening in practice:
 		z/c	.	.	.	.	.	.	.	.	.
 */
 
-var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol", func() {
 	f := framework.NewDefaultFramework("netpol")
 
 	ginkgo.Context("NetworkPolicy between server and client", func() {
@@ -1268,6 +1268,10 @@ func defaultModel(namespaces []string, dnsDomain string) *Model {
 	protocols := []v1.Protocol{v1.ProtocolTCP, v1.ProtocolUDP}
 	if addSCTPContainers {
 		protocols = append(protocols, v1.ProtocolSCTP)
+	}
+
+	if framework.NodeOSDistroIs("windows") {
+		return NewWindowsModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, dnsDomain)
 	}
 	return NewModel(namespaces, []string{"a", "b", "c"}, []int32{80, 81}, protocols, dnsDomain)
 }
