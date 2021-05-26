@@ -1462,6 +1462,27 @@ func testValidatePVC(t *testing.T, ephemeral bool) {
 				VolumeMode: &invalidMode,
 			}),
 		},
+		"mismatch-data-source-and-ref": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim(goodName, goodNS, core.PersistentVolumeClaimSpec{
+				AccessModes: []core.PersistentVolumeAccessMode{
+					core.ReadWriteOnce,
+				},
+				Resources: core.ResourceRequirements{
+					Requests: core.ResourceList{
+						core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+					},
+				},
+				DataSource: &core.TypedLocalObjectReference{
+					Kind: "PersistentVolumeClaim",
+					Name: "pvc1",
+				},
+				DataSourceRef: &core.TypedLocalObjectReference{
+					Kind: "PersistentVolumeClaim",
+					Name: "pvc2",
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
@@ -16833,7 +16854,7 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 	}
 }
 
-func testDataSourceInSpec(name string, kind string, apiGroup string) *core.PersistentVolumeClaimSpec {
+func testDataSourceInSpec(name, kind, apiGroup string) *core.PersistentVolumeClaimSpec {
 	scName := "csi-plugin"
 	dataSourceInSpec := core.PersistentVolumeClaimSpec{
 		AccessModes: []core.PersistentVolumeAccessMode{
@@ -16891,19 +16912,79 @@ func TestAlphaVolumePVCDataSource(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
+		opts := PersistentVolumeClaimSpecValidationOptions{}
 		if tc.expectedFail {
-			opts := PersistentVolumeClaimSpecValidationOptions{}
 			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
 				t.Errorf("expected failure: %v", errs)
 			}
 
 		} else {
-			opts := PersistentVolumeClaimSpecValidationOptions{}
 			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
 				t.Errorf("expected success: %v", errs)
 			}
 		}
 	}
+}
+
+func testAnyDataSource(t *testing.T, ds, dsRef bool) {
+	testCases := []struct {
+		testName     string
+		claimSpec    core.PersistentVolumeClaimSpec
+		expectedFail bool
+	}{
+		{
+			testName:  "test create from valid snapshot source",
+			claimSpec: *testDataSourceInSpec("test_snapshot", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+		},
+		{
+			testName:  "test create from valid pvc source",
+			claimSpec: *testDataSourceInSpec("test_pvc", "PersistentVolumeClaim", ""),
+		},
+		{
+			testName:     "test missing name in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("", "VolumeSnapshot", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:     "test missing kind in snapshot datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_snapshot", "", "snapshot.storage.k8s.io"),
+			expectedFail: true,
+		},
+		{
+			testName:  "test create from valid generic custom resource source",
+			claimSpec: *testDataSourceInSpec("test_generic", "Generic", "generic.storage.k8s.io"),
+		},
+		{
+			testName:     "test invalid datasource should fail",
+			claimSpec:    *testDataSourceInSpec("test_pod", "Pod", ""),
+			expectedFail: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		if dsRef {
+			tc.claimSpec.DataSourceRef = tc.claimSpec.DataSource.DeepCopy()
+		}
+		if !ds {
+			tc.claimSpec.DataSource = nil
+		}
+		opts := PersistentVolumeClaimSpecValidationOptions{}
+		if tc.expectedFail {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) == 0 {
+				t.Errorf("expected failure: %v", errs)
+			}
+		} else {
+			if errs := ValidatePersistentVolumeClaimSpec(&tc.claimSpec, field.NewPath("spec"), opts); len(errs) != 0 {
+				t.Errorf("expected success: %v", errs)
+			}
+		}
+	}
+}
+
+func TestAnyDataSource(t *testing.T) {
+	testAnyDataSource(t, true, false)
+	testAnyDataSource(t, false, true)
+	testAnyDataSource(t, true, false)
 }
 
 func TestValidateTopologySpreadConstraints(t *testing.T) {
