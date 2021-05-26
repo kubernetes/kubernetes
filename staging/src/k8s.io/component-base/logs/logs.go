@@ -17,7 +17,6 @@ limitations under the License.
 package logs
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -30,10 +29,6 @@ import (
 const logFlushFreqFlagName = "log-flush-frequency"
 
 var logFlushFreq = pflag.Duration(logFlushFreqFlagName, 5*time.Second, "Maximum number of seconds between log flushes")
-
-func init() {
-	klog.InitFlags(flag.CommandLine)
-}
 
 // AddFlags registers this package's flags on arbitrary FlagSets, such that they point to the
 // same value as the global flags.
