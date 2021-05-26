@@ -646,6 +646,14 @@
   description: A conformant Kubernetes distribution MUST support DaemonSet RollingUpdates.
   release: v1.10
   file: test/e2e/apps/daemon_set.go
+- testname: DaemonSet, status sub-resource
+  codename: '[sig-apps] Daemon set [Serial] should verify changes to a daemon set
+    status [Conformance]'
+  description: When a DaemonSet is created it MUST succeed. Attempt to read, update
+    and patch its status sub-resource; all mutating sub-resource operations MUST be
+    visible to subsequent reads.
+  release: v1.22
+  file: test/e2e/apps/daemon_set.go
 - testname: Deployment, completes the scaling of a Deployment subresource
   codename: '[sig-apps] Deployment Deployment should have a working scale subresource
     [Conformance]'

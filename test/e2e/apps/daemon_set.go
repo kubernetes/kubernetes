@@ -842,7 +842,13 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectEqual(len(dsList.Items), 0, "filtered list should have no daemonset")
 	})
 
-	ginkgo.It("should verify changes to a daemon set status", func() {
+	/*	Release: v1.22
+		Testname: DaemonSet, status sub-resource
+		Description: When a DaemonSet is created it MUST succeed.
+		Attempt to read, update and patch its status sub-resource; all
+		mutating sub-resource operations MUST be visible to subsequent reads.
+	*/
+	framework.ConformanceIt("should verify changes to a daemon set status", func() {
 		label := map[string]string{daemonsetNameLabel: dsName}
 		labelSelector := labels.SelectorFromSet(label).String()
 
