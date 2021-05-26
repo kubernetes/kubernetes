@@ -240,6 +240,7 @@
   - k8s.io/csi-translation-lib
   - k8s.io/klog
   - k8s.io/legacy-cloud-providers
+  - k8s.io/mount-utils
   - k8s.io/utils
   - k8s.io/apiserver/pkg/util/feature
   - k8s.io/component-base/featuregate
