@@ -26,7 +26,7 @@ require (
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/gengo v0.0.0-20201214224949-b6c5ce23f027
-	k8s.io/klog/v2 v2.8.0
+	k8s.io/klog/v2 v2.9.0
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.1 // indirect
 )
