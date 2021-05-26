@@ -1185,7 +1185,7 @@ func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
 // It shells out to cluster/log-dump/log-dump.sh to accomplish this.
 func CoreDump(dir string) {
-	if TestContext.DisableLogDump {
+	if TestContext.DisableLogDump || os.Getenv("USE_TEST_INFRA_LOG_DUMPING") == "true" {
 		Logf("Skipping dumping logs from cluster")
 		return
 	}
