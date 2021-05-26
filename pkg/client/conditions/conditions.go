@@ -64,17 +64,3 @@ func PodCompleted(event watch.Event) (bool, error) {
 	}
 	return false, nil
 }
-
-// ServiceAccountHasSecrets returns true if the service account has at least one secret,
-// false if it does not, or an error.
-func ServiceAccountHasSecrets(event watch.Event) (bool, error) {
-	switch event.Type {
-	case watch.Deleted:
-		return false, errors.NewNotFound(schema.GroupResource{Resource: "serviceaccounts"}, "")
-	}
-	switch t := event.Object.(type) {
-	case *v1.ServiceAccount:
-		return len(t.Secrets) > 0, nil
-	}
-	return false, nil
-}
