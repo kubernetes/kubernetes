@@ -628,10 +628,7 @@ func getAttachmentName(volName, csiDriverName, nodeName string) string {
 // and false otherwise
 func isAttachmentName(unknownString string) bool {
 	// 68 == "csi-" + len(sha256hash)
-	if strings.HasPrefix(unknownString, "csi-") && len(unknownString) == 68 {
-		return true
-	}
-	return false
+	return strings.HasPrefix(unknownString, "csi-") && len(unknownString) == 68
 }
 
 func makeDeviceMountPath(plugin *csiPlugin, spec *volume.Spec) (string, error) {
