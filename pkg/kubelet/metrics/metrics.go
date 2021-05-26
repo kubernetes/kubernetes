@@ -412,12 +412,13 @@ var (
 		[]string{"runtime_handler"},
 	)
 
-	// RunningPodCount is a gauge that tracks the number of Pods currently running
+	// RunningPodCount is a gauge that tracks the number of Pods currently with a running sandbox
+	// It is used to expose the kubelet internal state: how many pods have running containers in the container runtime, and mainly for debugging purpose.
 	RunningPodCount = metrics.NewGauge(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
 			Name:           RunningPodsKey,
-			Help:           "Number of pods currently running",
+			Help:           "Number of pods that have a running pod sandbox",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
