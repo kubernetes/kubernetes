@@ -158,7 +158,13 @@ var _ = SIGDescribe("ReplicaSet", func() {
 
 	})
 
-	ginkgo.It("should validate Replicaset Status endpoints", func() {
+	/*	Release: v1.22
+		Testname: ReplicaSet, status sub-resource
+		Description: Create a ReplicaSet resource which MUST succeed.
+		Attempt to read, update and patch its status sub-resource; all
+		mutating sub-resource operations MUST be visible to subsequent reads.
+	*/
+	framework.ConformanceIt("should validate Replicaset Status endpoints", func() {
 		testRSStatus(f)
 	})
 })
