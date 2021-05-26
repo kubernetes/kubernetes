@@ -1216,8 +1216,8 @@ func validateMountPropagation(mountPropagation *core.MountPropagationMode, conta
 	}
 
 	if container == nil {
-		// The container is not available yet, e.g. during validation of
-		// PodPreset. Stop validation now, Pod validation will refuse final
+		// The container is not available yet.
+		// Stop validation now, Pod validation will refuse final
 		// Pods with Bidirectional propagation in non-privileged containers.
 		return allErrs
 	}
