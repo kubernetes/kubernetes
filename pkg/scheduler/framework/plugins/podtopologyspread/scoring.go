@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/component-helpers/scheduling/corev1/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -58,12 +59,14 @@ func (s *preScoreState) Clone() framework.StateData {
 // 3) s.TopologyNormalizingWeight: The weight to be given to each constraint based on the number of values in a topology.
 func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, filteredNodes []*v1.Node) error {
 	var err error
+	var isSystemDefaulted bool
 	if len(pod.Spec.TopologySpreadConstraints) > 0 {
 		s.Constraints, err = filterTopologySpreadConstraints(pod.Spec.TopologySpreadConstraints, v1.ScheduleAnyway)
 		if err != nil {
 			return fmt.Errorf("obtaining pod's soft topology spread constraints: %w", err)
 		}
 	} else {
+		isSystemDefaulted = pl.defaultingType == config.SystemDefaulting
 		s.Constraints, err = pl.buildDefaultConstraints(pod, v1.ScheduleAnyway)
 		if err != nil {
 			return fmt.Errorf("setting default soft topology spread constraints: %w", err)
@@ -74,7 +77,7 @@ func (pl *PodTopologySpread) initPreScoreState(s *preScoreState, pod *v1.Pod, fi
 	}
 	topoSize := make([]int, len(s.Constraints))
 	for _, node := range filteredNodes {
-		if !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
+		if !isSystemDefaulted && !nodeLabelsMatchSpreadConstraints(node.Labels, s.Constraints) {
 			// Nodes which don't have all required topologyKeys present are ignored
 			// when scoring later.
 			s.IgnoredNodes.Insert(node.Name)
@@ -121,6 +124,7 @@ func (pl *PodTopologySpread) PreScore(
 		return nil
 	}
 
+	isSystemDefaultConstraints := len(pod.Spec.TopologySpreadConstraints) == 0 && pl.defaultingType == config.SystemDefaulting
 	state := &preScoreState{
 		IgnoredNodes:            sets.NewString(),
 		TopologyPairToPodCounts: make(map[topologyPair]*int64),
@@ -145,9 +149,9 @@ func (pl *PodTopologySpread) PreScore(
 			return
 		}
 		// (1) `node` should satisfy incoming pod's NodeSelector/NodeAffinity
-		// (2) All topologyKeys need to be present in `node`
+		// (2) All topologyKeys need to be present in `node` when constrains is not SystemDefaulting
 		match, _ := requiredNodeAffinity.Match(node)
-		if !match || !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints) {
+		if !match || (!isSystemDefaultConstraints && !nodeLabelsMatchSpreadConstraints(node.Labels, state.Constraints)) {
 			return
 		}
 

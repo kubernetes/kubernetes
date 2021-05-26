@@ -54,6 +54,7 @@ var systemDefaultConstraints = []v1.TopologySpreadConstraint{
 type PodTopologySpread struct {
 	parallelizer       parallelize.Parallelizer
 	defaultConstraints []v1.TopologySpreadConstraint
+	defaultingType     config.PodTopologySpreadConstraintsDefaulting
 	sharedLister       framework.SharedLister
 	services           corelisters.ServiceLister
 	replicationCtrls   corelisters.ReplicationControllerLister
@@ -93,6 +94,7 @@ func New(plArgs runtime.Object, h framework.Handle) (framework.Plugin, error) {
 		parallelizer:       h.Parallelizer(),
 		sharedLister:       h.SnapshotSharedLister(),
 		defaultConstraints: args.DefaultConstraints,
+		defaultingType:     args.DefaultingType,
 	}
 	if args.DefaultingType == config.SystemDefaulting {
 		pl.defaultConstraints = systemDefaultConstraints
