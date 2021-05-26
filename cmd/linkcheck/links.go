@@ -67,7 +67,7 @@ var (
 	}
 
 	visitedURLs    = map[string]struct{}{}
-	htmlpreviewReg = regexp.MustCompile(`https://htmlpreview\.github\.io/\?`)
+	htmlPreviewReg = regexp.MustCompile(`https://htmlpreview\.github\.io/\?`)
 	httpOrhttpsReg = regexp.MustCompile(`https?.*`)
 )
 
@@ -102,8 +102,8 @@ func newWalkFunc(invalidLink *bool, client *http.Client) filepath.WalkFunc {
 			if _, found := fullURLWhiteList[string(URL)]; found {
 				continue
 			}
-			// remove the htmlpreview Prefix
-			processedURL := htmlpreviewReg.ReplaceAll(URL, []byte{})
+			// remove the htmlPreview Prefix
+			processedURL := htmlPreviewReg.ReplaceAll(URL, []byte{})
 
 			// check if we have visited the URL.
 			if _, found := visitedURLs[string(processedURL)]; found {
@@ -180,7 +180,7 @@ func main() {
 		os.Exit(2)
 	}
 	client := http.Client{
-		Timeout: time.Duration(5 * time.Second),
+		Timeout: 5 * time.Second,
 	}
 	invalidLink := false
 	if err := filepath.Walk(*rootDir, newWalkFunc(&invalidLink, &client)); err != nil {
