@@ -390,6 +390,37 @@ func usesIndivisibleHugePagesValues(podSpec *api.PodSpec) bool {
 	return false
 }
 
+// haveSameExpandedDNSConfig returns true if the oldPodSpec already had
+// ExpandedDNSConfig and podSpec has the same DNSConfig
+func haveSameExpandedDNSConfig(podSpec, oldPodSpec *api.PodSpec) bool {
+	if oldPodSpec == nil || oldPodSpec.DNSConfig == nil {
+		return false
+	}
+	if podSpec == nil || podSpec.DNSConfig == nil {
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) <= apivalidation.MaxDNSSearchPathsLegacy &&
+		len(strings.Join(oldPodSpec.DNSConfig.Searches, " ")) <= apivalidation.MaxDNSSearchListCharsLegacy {
+		// didn't have ExpandedDNSConfig
+		return false
+	}
+
+	if len(oldPodSpec.DNSConfig.Searches) != len(podSpec.DNSConfig.Searches) {
+		// updates DNSConfig
+		return false
+	}
+
+	for i, oldSearch := range oldPodSpec.DNSConfig.Searches {
+		if podSpec.DNSConfig.Searches[i] != oldSearch {
+			// updates DNSConfig
+			return false
+		}
+	}
+
+	return true
+}
+
 // GetValidationOptionsFromPodSpecAndMeta returns validation options based on pod specs and metadata
 func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, podMeta, oldPodMeta *metav1.ObjectMeta) apivalidation.PodValidationOptions {
 	// default pod validation options based on feature gate
@@ -402,6 +433,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		// Do not allow pod spec to use non-integer multiple of huge page unit size default
 		AllowIndivisibleHugePagesValues: false,
 		AllowWindowsHostProcessField:    utilfeature.DefaultFeatureGate.Enabled(features.WindowsHostProcessContainers),
+		// Allow pod spec with expanded DNS configuration
+		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 	}
 
 	if oldPodSpec != nil {
