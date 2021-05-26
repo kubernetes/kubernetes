@@ -9,3 +9,10 @@ spec:
   containers:
   - name: kubernetes-pause2
     image: k8s.gcr.io/pause:3.5
+    resources: 
+      requests:
+        memory: "64Mi"
+        cpu: "250m"
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
