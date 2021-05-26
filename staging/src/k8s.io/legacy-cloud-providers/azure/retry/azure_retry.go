@@ -181,7 +181,7 @@ func doBackoffRetry(s autorest.Sender, r *http.Request, backoff *Backoff) (resp 
 			return resp, rerr.Error()
 		}
 
-		klog.V(3).Infof("Backoff retrying %s %q with error %v", r.Method, r.URL.String(), rerr)
+		klog.V(3).InfoS("Backoff retrying error","retryMethod", r.Method, "retryURL", r.URL.String(), "error",  rerr)
 	}
 
 	return resp, err
