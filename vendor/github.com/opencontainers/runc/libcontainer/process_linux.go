@@ -51,7 +51,7 @@ type parentProcess interface {
 
 	setExternalDescriptors(fds []string)
 
-	forwardChildLogs()
+	forwardChildLogs() chan error
 }
 
 type filePair struct {
@@ -65,6 +65,7 @@ type setnsProcess struct {
 	logFilePair     filePair
 	cgroupPaths     map[string]string
 	rootlessCgroups bool
+	manager         cgroups.Manager
 	intelRdtPath    string
 	config          *initConfig
 	fds             []string
@@ -88,6 +89,8 @@ func (p *setnsProcess) signal(sig os.Signal) error {
 
 func (p *setnsProcess) start() (retErr error) {
 	defer p.messageSockPair.parent.Close()
+	// get the "before" value of oom kill count
+	oom, _ := p.manager.OOMKillCount()
 	err := p.cmd.Start()
 	// close the write-side of the pipes (controlled by child)
 	p.messageSockPair.child.Close()
@@ -95,18 +98,33 @@ func (p *setnsProcess) start() (retErr error) {
 	if err != nil {
 		return newSystemErrorWithCause(err, "starting setns process")
 	}
+
+	waitInit := initWaiter(p.messageSockPair.parent)
 	defer func() {
 		if retErr != nil {
+			if newOom, err := p.manager.OOMKillCount(); err == nil && newOom != oom {
+				// Someone in this cgroup was killed, this _might_ be us.
+				retErr = newSystemErrorWithCause(retErr, "possibly OOM-killed")
+			}
+			werr := <-waitInit
+			if werr != nil {
+				logrus.WithError(werr).Warn()
+			}
 			err := ignoreTerminateErrors(p.terminate())
 			if err != nil {
 				logrus.WithError(err).Warn("unable to terminate setnsProcess")
 			}
 		}
 	}()
+
 	if p.bootstrapData != nil {
 		if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 			return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 		}
+	}
+	err = <-waitInit
+	if err != nil {
+		return err
 	}
 	if err := p.execSetns(); err != nil {
 		return newSystemErrorWithCause(err, "executing setns process")
@@ -244,8 +262,8 @@ func (p *setnsProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *setnsProcess) forwardChildLogs() {
-	go logs.ForwardLogs(p.logFilePair.parent)
+func (p *setnsProcess) forwardChildLogs() chan error {
+	return logs.ForwardLogs(p.logFilePair.parent)
 }
 
 type initProcess struct {
@@ -319,9 +337,36 @@ func (p *initProcess) start() (retErr error) {
 		p.process.ops = nil
 		return newSystemErrorWithCause(err, "starting init process command")
 	}
+
+	waitInit := initWaiter(p.messageSockPair.parent)
 	defer func() {
 		if retErr != nil {
-			// terminate the process to ensure we can remove cgroups
+			// Find out if init is killed by the kernel's OOM killer.
+			// Get the count before killing init as otherwise cgroup
+			// might be removed by systemd.
+			oom, err := p.manager.OOMKillCount()
+			if err != nil {
+				logrus.WithError(err).Warn("unable to get oom kill count")
+			} else if oom > 0 {
+				// Does not matter what the particular error was,
+				// its cause is most probably OOM, so report that.
+				const oomError = "container init was OOM-killed (memory limit too low?)"
+
+				if logrus.GetLevel() >= logrus.DebugLevel {
+					// Only show the original error if debug is set,
+					// as it is not generally very useful.
+					retErr = newSystemErrorWithCause(retErr, oomError)
+				} else {
+					retErr = newSystemError(errors.New(oomError))
+				}
+			}
+
+			werr := <-waitInit
+			if werr != nil {
+				logrus.WithError(werr).Warn()
+			}
+
+			// Terminate the process to ensure we can remove cgroups.
 			if err := ignoreTerminateErrors(p.terminate()); err != nil {
 				logrus.WithError(err).Warn("unable to terminate initProcess")
 			}
@@ -347,6 +392,11 @@ func (p *initProcess) start() (retErr error) {
 	if _, err := io.Copy(p.messageSockPair.parent, p.bootstrapData); err != nil {
 		return newSystemErrorWithCause(err, "copying bootstrap data to pipe")
 	}
+	err = <-waitInit
+	if err != nil {
+		return err
+	}
+
 	childPid, err := p.getChildPid()
 	if err != nil {
 		return newSystemErrorWithCause(err, "getting the final child's pid from pipe")
@@ -398,7 +448,7 @@ func (p *initProcess) start() (retErr error) {
 			// call prestart and CreateRuntime hooks
 			if !p.config.Config.Namespaces.Contains(configs.NEWNS) {
 				// Setup cgroup before the hook, so that the prestart and CreateRuntime hook could apply cgroup permissions.
-				if err := p.manager.Set(p.config.Config); err != nil {
+				if err := p.manager.Set(p.config.Config.Cgroups.Resources); err != nil {
 					return newSystemErrorWithCause(err, "setting cgroup config for ready process")
 				}
 				if p.intelRdtManager != nil {
@@ -454,7 +504,7 @@ func (p *initProcess) start() (retErr error) {
 			sentRun = true
 		case procHooks:
 			// Setup cgroup before prestart hook, so that the prestart hook could apply cgroup permissions.
-			if err := p.manager.Set(p.config.Config); err != nil {
+			if err := p.manager.Set(p.config.Config.Cgroups.Resources); err != nil {
 				return newSystemErrorWithCause(err, "setting cgroup config for procHooks process")
 			}
 			if p.intelRdtManager != nil {
@@ -580,8 +630,8 @@ func (p *initProcess) setExternalDescriptors(newFds []string) {
 	p.fds = newFds
 }
 
-func (p *initProcess) forwardChildLogs() {
-	go logs.ForwardLogs(p.logFilePair.parent)
+func (p *initProcess) forwardChildLogs() chan error {
+	return logs.ForwardLogs(p.logFilePair.parent)
 }
 
 func getPipeFds(pid int) ([]string, error) {
@@ -648,4 +698,29 @@ func (p *Process) InitializeIO(rootuid, rootgid int) (i *IO, err error) {
 		}
 	}
 	return i, nil
+}
+
+// initWaiter returns a channel to wait on for making sure
+// runc init has finished the initial setup.
+func initWaiter(r io.Reader) chan error {
+	ch := make(chan error, 1)
+	go func() {
+		defer close(ch)
+
+		inited := make([]byte, 1)
+		n, err := r.Read(inited)
+		if err == nil {
+			if n < 1 {
+				err = errors.New("short read")
+			} else if inited[0] != 0 {
+				err = fmt.Errorf("unexpected %d != 0", inited[0])
+			} else {
+				ch <- nil
+				return
+			}
+		}
+		ch <- newSystemErrorWithCause(err, "waiting for init preliminary setup")
+	}()
+
+	return ch
 }

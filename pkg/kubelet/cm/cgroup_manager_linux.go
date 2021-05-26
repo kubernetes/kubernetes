@@ -334,7 +334,7 @@ type subsystem interface {
 	// Name returns the name of the subsystem.
 	Name() string
 	// Set the cgroup represented by cgroup.
-	Set(path string, cgroup *libcontainerconfigs.Cgroup) error
+	Set(path string, cgroup *libcontainerconfigs.Resources) error
 	// GetStats returns the statistics associated with the cgroup
 	GetStats(path string, stats *libcontainercgroups.Stats) error
 }
@@ -349,32 +349,6 @@ func getSupportedSubsystems() map[subsystem]bool {
 	// not all hosts support hugetlb cgroup, and in the absent of hugetlb, we will fail silently by reporting no capacity.
 	supportedSubsystems[&cgroupfs.HugetlbGroup{}] = false
 	return supportedSubsystems
-}
-
-// setSupportedSubsystemsV1 sets cgroup resource limits on cgroup v1 only on the supported
-// subsystems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
-// method as it doesn't allow us to skip updates on the devices cgroup
-// Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
-// not possible once the device cgroups has children. Once the pod level cgroup are
-// created under the QOS level cgroup we cannot update the QOS level device cgroup.
-// We would like to skip setting any values on the device cgroup in this case
-// but this is not possible with libcontainers Set() method
-// See https://github.com/opencontainers/runc/issues/932
-func setSupportedSubsystemsV1(cgroupConfig *libcontainerconfigs.Cgroup) error {
-	for sys, required := range getSupportedSubsystems() {
-		if _, ok := cgroupConfig.Paths[sys.Name()]; !ok {
-			if required {
-				return fmt.Errorf("failed to find subsystem mount for required subsystem: %v", sys.Name())
-			}
-			// the cgroup is not mounted, but its not required so continue...
-			klog.V(6).InfoS("Unable to find subsystem mount for optional subsystem", "subsystemName", sys.Name())
-			continue
-		}
-		if err := sys.Set(cgroupConfig.Paths[sys.Name()], cgroupConfig); err != nil {
-			return fmt.Errorf("failed to set config for supported subsystems : %v", err)
-		}
-	}
-	return nil
 }
 
 // getCpuWeight converts from the range [2, 262144] to [1, 10000]
@@ -464,40 +438,6 @@ func propagateControllers(path string) error {
 	return nil
 }
 
-// setResourcesV2 sets cgroup resource limits on cgroup v2
-func setResourcesV2(cgroupConfig *libcontainerconfigs.Cgroup) error {
-	if err := propagateControllers(cgroupConfig.Path); err != nil {
-		return err
-	}
-	cgroupConfig.Resources.Devices = []*libcontainerdevices.Rule{
-		{
-			Type:        'a',
-			Permissions: "rwm",
-			Allow:       true,
-			Minor:       libcontainerdevices.Wildcard,
-			Major:       libcontainerdevices.Wildcard,
-		},
-	}
-	cgroupConfig.Resources.SkipDevices = true
-
-	// if the hugetlb controller is missing
-	supportedControllers := getSupportedUnifiedControllers()
-	if !supportedControllers.Has("hugetlb") {
-		cgroupConfig.Resources.HugetlbLimit = nil
-		// the cgroup is not present, but its not required so skip it
-		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
-	}
-
-	manager, err := cgroupfs2.NewManager(cgroupConfig, filepath.Join(cmutil.CgroupRoot, cgroupConfig.Path), false)
-	if err != nil {
-		return fmt.Errorf("failed to create cgroup v2 manager: %v", err)
-	}
-	config := &libcontainerconfigs.Config{
-		Cgroups: cgroupConfig,
-	}
-	return manager.Set(config)
-}
-
 func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcontainerconfigs.Resources {
 	resources := &libcontainerconfigs.Resources{
 		Devices: []*libcontainerdevices.Rule{
@@ -577,10 +517,11 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}
 
 	unified := libcontainercgroups.IsCgroup2UnifiedMode()
+	var paths map[string]string
 	if unified {
 		libcontainerCgroupConfig.Path = m.Name(cgroupConfig.Name)
 	} else {
-		libcontainerCgroupConfig.Paths = m.buildCgroupPaths(cgroupConfig.Name)
+		paths = m.buildCgroupPaths(cgroupConfig.Name)
 	}
 
 	// libcontainer consumes a different field and expects a different syntax
@@ -590,19 +531,29 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	}
 
 	if cgroupConfig.ResourceParameters != nil && cgroupConfig.ResourceParameters.PidsLimit != nil {
-		libcontainerCgroupConfig.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
+		resources.PidsLimit = *cgroupConfig.ResourceParameters.PidsLimit
 	}
 
 	if unified {
-		if err := setResourcesV2(libcontainerCgroupConfig); err != nil {
-			return fmt.Errorf("failed to set resources for cgroup %v: %v", cgroupConfig.Name, err)
+		if err := propagateControllers(libcontainerCgroupConfig.Path); err != nil {
+			return err
 		}
-	} else {
-		if err := setSupportedSubsystemsV1(libcontainerCgroupConfig); err != nil {
-			return fmt.Errorf("failed to set supported cgroup subsystems for cgroup %v: %v", cgroupConfig.Name, err)
+
+		supportedControllers := getSupportedUnifiedControllers()
+		if !supportedControllers.Has("hugetlb") {
+			resources.HugetlbLimit = nil
+			klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 		}
+	} else if _, ok := m.subsystems.MountPoints["hugetlb"]; !ok {
+		resources.HugetlbLimit = nil
+		klog.V(6).InfoS("Optional subsystem not supported: hugetlb")
 	}
-	return nil
+
+	manager, err := m.adapter.newManager(libcontainerCgroupConfig, paths)
+	if err != nil {
+		return fmt.Errorf("failed to create cgroup manager: %v", err)
+	}
+	return manager.Set(resources)
 }
 
 // Create creates the specified cgroup
