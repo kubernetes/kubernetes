@@ -74,6 +74,8 @@ type UpgradeAwareHandler struct {
 	RequireSameHostRedirects bool
 	// UseRequestLocation will use the incoming request URL when talking to the backend server.
 	UseRequestLocation bool
+	// UseRequestQuery will use the incoming request Query when talking to the backend server.
+	UseRequestQuery bool
 	// UseLocationHost overrides the HTTP host header in requests to the backend server to use the Host from Location.
 	// This will override the req.Host field of a request, while UseRequestLocation will override the req.URL field
 	// of a request. The req.URL.Host specifies the server to connect to, while the req.Host field
@@ -282,6 +284,8 @@ func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Reques
 		location = *req.URL
 		location.Scheme = h.Location.Scheme
 		location.Host = h.Location.Host
+	} else if h.UseRequestQuery {
+		location.RawQuery = req.URL.RawQuery
 	}
 
 	clone := utilnet.CloneRequest(req)
