@@ -4424,6 +4424,121 @@ func TestHealthCheckNodePortE2E(t *testing.T) {
 	assert.Equal(t, 0, activeEntries3.Len(), "Expected 0 active entries in KUBE-HEALTH-CHECK-NODE-PORT")
 }
 
+// Test_HealthCheckNodePortWhenTerminating tests that health check node ports are not enabled when all local endpoints are terminating
+func Test_HealthCheckNodePortWhenTerminating(t *testing.T) {
+	ipt := iptablestest.NewFake()
+	ipvs := ipvstest.NewFake()
+	ipset := ipsettest.NewFake(testIPSetVersion)
+	fp := NewFakeProxier(ipt, ipvs, ipset, nil, nil, true, v1.IPv4Protocol)
+	fp.servicesSynced = true
+	fp.endpointsSynced = true
+	fp.endpointSlicesSynced = true
+
+	serviceName := "svc1"
+	namespaceName := "ns1"
+
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "172.20.1.1",
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80), Protocol: v1.ProtocolTCP}},
+		},
+	})
+
+	tcpProtocol := v1.ProtocolTCP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses:  []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses:  []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, { // not ready endpoints should be ignored
+			Addresses:  []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	result := fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 1 {
+		t.Errorf("unexpected number of health check node ports, expected 1 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
+
+	// set all endpoints to terminating
+	endpointSliceTerminating := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name:     utilpointer.StringPtr(""),
+			Port:     utilpointer.Int32Ptr(80),
+			Protocol: &tcpProtocol,
+		}},
+		AddressType: discovery.AddressTypeIPv4,
+		Endpoints: []discovery.Endpoint{{
+			Addresses: []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(false),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses: []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses: []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(true),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}, { // not ready endpoints should be ignored
+			Addresses: []string{"10.0.1.4"},
+			Conditions: discovery.EndpointConditions{
+				Ready:       utilpointer.BoolPtr(false),
+				Serving:     utilpointer.BoolPtr(false),
+				Terminating: utilpointer.BoolPtr(true),
+			},
+			Topology: map[string]string{"kubernetes.io/hostname": testHostname},
+		}},
+	}
+
+	fp.OnEndpointSliceUpdate(endpointSlice, endpointSliceTerminating)
+	result = fp.endpointsMap.Update(fp.endpointsChanges)
+	if len(result.HCEndpointsLocalIPSize) != 0 {
+		t.Errorf("unexpected number of health check node ports, expected 0 but got: %d", len(result.HCEndpointsLocalIPSize))
+	}
+}
+
 func TestFilterCIDRs(t *testing.T) {
 	var cidrList []string
 	var cidrs []string
