@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -491,7 +492,7 @@ func TestDispatchWorkOfCompletedPod(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	var got bool
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: func(options syncPodOptions) error {
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 			got = true
 			return nil
 		},
@@ -570,7 +571,7 @@ func TestDispatchWorkOfActivePod(t *testing.T) {
 	kubelet := testKubelet.kubelet
 	var got bool
 	kubelet.podWorkers = &fakePodWorkers{
-		syncPodFn: func(options syncPodOptions) error {
+		syncPodFn: func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 			got = true
 			return nil
 		},
@@ -1222,11 +1223,7 @@ func TestCreateMirrorPod(t *testing.T) {
 		pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = "file"
 		pods := []*v1.Pod{pod}
 		kl.podManager.SetPods(pods)
-		err := kl.syncPod(syncPodOptions{
-			pod:        pod,
-			podStatus:  &kubecontainer.PodStatus{},
-			updateType: updateType,
-		})
+		err := kl.syncPod(context.Background(), updateType, pod, nil, &kubecontainer.PodStatus{})
 		assert.NoError(t, err)
 		podFullName := kubecontainer.GetPodFullName(pod)
 		assert.True(t, manager.HasPod(podFullName), "Expected mirror pod %q to be created", podFullName)
@@ -1258,12 +1255,7 @@ func TestDeleteOutdatedMirrorPod(t *testing.T) {
 
 	pods := []*v1.Pod{pod, mirrorPod}
 	kl.podManager.SetPods(pods)
-	err := kl.syncPod(syncPodOptions{
-		pod:        pod,
-		mirrorPod:  mirrorPod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
+	err := kl.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, mirrorPod, &kubecontainer.PodStatus{})
 	assert.NoError(t, err)
 	name := kubecontainer.GetPodFullName(pod)
 	creates, deletes := manager.GetCounts(name)
@@ -1420,20 +1412,12 @@ func TestNetworkErrorsWithoutHostNetwork(t *testing.T) {
 	})
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
+	err := kubelet.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
 	assert.Error(t, err, "expected pod with hostNetwork=false to fail when network in error")
 
 	pod.Annotations[kubetypes.ConfigSourceAnnotationKey] = kubetypes.FileSource
 	pod.Spec.HostNetwork = true
-	err = kubelet.syncPod(syncPodOptions{
-		pod:        pod,
-		podStatus:  &kubecontainer.PodStatus{},
-		updateType: kubetypes.SyncPodUpdate,
-	})
+	err = kubelet.syncPod(context.Background(), kubetypes.SyncPodUpdate, pod, nil, &kubecontainer.PodStatus{})
 	assert.NoError(t, err, "expected pod with hostNetwork=true to succeed when network in error")
 }
 
@@ -2266,7 +2250,7 @@ func TestSyncTerminatingPodKillPod(t *testing.T) {
 	kl.podManager.SetPods(pods)
 	podStatus := &kubecontainer.PodStatus{ID: pod.UID}
 	gracePeriodOverride := int64(0)
-	err := kl.syncTerminatingPod(pod, podStatus, nil, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
+	err := kl.syncTerminatingPod(context.Background(), pod, podStatus, nil, &gracePeriodOverride, func(podStatus *v1.PodStatus) {
 		podStatus.Phase = v1.PodFailed
 		podStatus.Reason = "reason"
 		podStatus.Message = "message"

@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -1496,15 +1497,9 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 // This operation writes all events that are dispatched in order to provide
 // the most accurate information possible about an error situation to aid debugging.
 // Callers should not throw an event if this operation returns an error.
-func (kl *Kubelet) syncPod(o syncPodOptions) error {
-	klog.InfoS("DEBUG: syncPod enter", "pod", klog.KObj(o.pod), "podUID", o.pod.UID)
-	defer klog.InfoS("DEBUG: syncPod exit", "pod", klog.KObj(o.pod), "podUID", o.pod.UID)
-
-	// pull out the required options
-	pod := o.pod
-	mirrorPod := o.mirrorPod
-	podStatus := o.podStatus
-	updateType := o.updateType
+func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	klog.InfoS("DEBUG: syncPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
+	defer klog.InfoS("DEBUG: syncPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
 	// Latency measurements for the main workflow are relative to the
 	// first time the pod was seen by the API server.
@@ -1722,7 +1717,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 // syncTerminatingPod is expected to terminate all running containers in a pod. Once this method
 // returns without error, the pod can be safely cleaned up. If runningPod is passed, we perform
 // no status updates.
-func (kl *Kubelet) syncTerminatingPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 	klog.InfoS("DEBUG: syncTerminatingPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.InfoS("DEBUG: syncTerminatingPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 
@@ -1824,7 +1819,7 @@ func (kl *Kubelet) syncTerminatingPod(pod *v1.Pod, podStatus *kubecontainer.PodS
 // The invocations in this call are expected to tear down what PodResourcesAreReclaimed checks (which
 // gates pod deletion). When this method exits the pod is expected to be ready for cleanup.
 // TODO: make this method take a context and exit early
-func (kl *Kubelet) syncTerminatedPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 	klog.InfoS("DEBUG: syncTerminatedPod enter", "pod", klog.KObj(pod), "podUID", pod.UID)
 	defer klog.InfoS("DEBUG: syncTerminatedPod exit", "pod", klog.KObj(pod), "podUID", pod.UID)
 

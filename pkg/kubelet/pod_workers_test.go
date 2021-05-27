@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"sync"
@@ -74,12 +75,7 @@ func (f *fakePodWorkers) UpdatePod(options UpdatePodOptions) {
 	case kubetypes.SyncPodKill:
 		f.triggeredDeletion = append(f.triggeredDeletion, uid)
 	default:
-		if err := f.syncPodFn(syncPodOptions{
-			mirrorPod:  options.MirrorPod,
-			pod:        options.Pod,
-			podStatus:  status,
-			updateType: options.UpdateType,
-		}); err != nil {
+		if err := f.syncPodFn(context.Background(), options.UpdateType, options.Pod, options.MirrorPod, status); err != nil {
 			f.t.Errorf("Unexpected error: %v", err)
 		}
 	}
@@ -147,19 +143,19 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 	fakeRuntime := &containertest.FakeRuntime{}
 	fakeCache := containertest.NewFakeCache(fakeRuntime)
 	w := newPodWorkers(
-		func(options syncPodOptions) error {
+		func(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
-				pod := options.pod
+				pod := pod
 				processed[pod.UID] = append(processed[pod.UID], syncPodRecord{
 					name:       pod.Name,
-					updateType: options.updateType,
+					updateType: updateType,
 				})
 			}()
 			return nil
 		},
-		func(pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+		func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -171,7 +167,7 @@ func createPodWorkers() (*podWorkers, map[types.UID][]syncPodRecord) {
 			}()
 			return nil
 		},
-		func(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+		func(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 			func() {
 				lock.Lock()
 				defer lock.Unlock()
@@ -196,7 +192,7 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 		stillWorking := false
 		podWorkers.podLock.Lock()
 		for i := 0; i < numPods; i++ {
-			if podWorkers.isWorking[types.UID(strconv.Itoa(i))] {
+			if podWorkers.podSyncStatus[types.UID(strconv.Itoa(i))].working {
 				stillWorking = true
 				break
 			}
@@ -213,8 +209,8 @@ func drainAllWorkers(podWorkers *podWorkers) {
 	for {
 		stillWorking := false
 		podWorkers.podLock.Lock()
-		for _, worker := range podWorkers.isWorking {
-			if worker {
+		for _, worker := range podWorkers.podSyncStatus {
+			if worker.working {
 				stillWorking = true
 				break
 			}
@@ -474,22 +470,22 @@ type simpleFakeKubelet struct {
 	wg        sync.WaitGroup
 }
 
-func (kl *simpleFakeKubelet) syncPod(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+func (kl *simpleFakeKubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error {
-	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
+func (kl *simpleFakeKubelet) syncPodWithWaitGroup(ctx context.Context, updateType kubetypes.SyncPodType, pod, mirrorPod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+	kl.pod, kl.mirrorPod, kl.podStatus = pod, mirrorPod, podStatus
 	kl.wg.Done()
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncTerminatingPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
+func (kl *simpleFakeKubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, runningPod *kubecontainer.Pod, gracePeriod *int64, podStatusFn func(*v1.PodStatus)) error {
 	return nil
 }
 
-func (kl *simpleFakeKubelet) syncTerminatedPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
+func (kl *simpleFakeKubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus) error {
 	return nil
 }
 
