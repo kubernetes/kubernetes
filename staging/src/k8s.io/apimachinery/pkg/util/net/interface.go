@@ -206,7 +206,7 @@ func isInterfaceUp(intf *net.Interface) bool {
 		return false
 	}
 	if intf.Flags&net.FlagUp != 0 {
-		klog.V(4).Infof("Interface %v is up", intf.Name)
+		klog.V(4).InfoS("Interface is up", "interfaceName", intf.Name)
 		return true
 	}
 	return false
@@ -221,17 +221,17 @@ func isLoopbackOrPointToPoint(intf *net.Interface) bool {
 func getMatchingGlobalIP(addrs []net.Addr, family AddressFamily) (net.IP, error) {
 	if len(addrs) > 0 {
 		for i := range addrs {
-			klog.V(4).Infof("Checking addr  %s.", addrs[i].String())
+			klog.V(4).InfoS("Checking address", "address", addrs[i].String())
 			ip, _, err := netutils.ParseCIDRSloppy(addrs[i].String())
 			if err != nil {
 				return nil, err
 			}
 			if memberOf(ip, family) {
 				if ip.IsGlobalUnicast() {
-					klog.V(4).Infof("IP found %v", ip)
+					klog.V(4).InfoS("IP found", "IP", ip)
 					return ip, nil
 				} else {
-					klog.V(4).Infof("Non-global unicast address found %v", ip)
+					klog.V(4).InfoS("Non-global unicast address found", "IP", ip)
 				}
 			} else {
 				klog.V(4).InfoS("Unexpected IP version", "IP", ip, "expectedIPVersion", int(family))
@@ -289,7 +289,7 @@ func getIPFromLoopbackInterface(forFamily AddressFamily, nw networkInterfacer) (
 				return nil, err
 			}
 			if matchingIP != nil {
-				klog.V(4).Infof("Found valid IPv%d address %v for interface %q.", int(forFamily), matchingIP, intf.Name)
+				klog.V(4).InfoS("Found valid address for interface", "ipVersion", int(forFamily), "address", matchingIP, "interfaceName", intf.Name)
 				return matchingIP, nil
 			}
 		}
@@ -321,11 +321,11 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 		klog.V(4).InfoS("Looking for system interface with a global address", "ipVersionOfAddress", uint(family))
 		for _, intf := range intfs {
 			if !isInterfaceUp(&intf) {
-				klog.V(4).Infof("Skipping: down interface %q", intf.Name)
+				klog.V(4).InfoS("Skipping: down interface", "interfaceName", intf.Name)
 				continue
 			}
 			if isLoopbackOrPointToPoint(&intf) {
-				klog.V(4).Infof("Skipping: LB or P2P interface %q", intf.Name)
+				klog.V(4).InfoS("Skipping: LB or P2P interface", "interfaceName", intf.Name)
 				continue
 			}
 			addrs, err := nw.Addrs(&intf)
@@ -333,7 +333,7 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 				return nil, err
 			}
 			if len(addrs) == 0 {
-				klog.V(4).Infof("Skipping: no addresses on interface %q", intf.Name)
+				klog.V(4).InfoS("Skipping: no addresses on interface", "interfaceName", intf.Name)
 				continue
 			}
 			for _, addr := range addrs {
@@ -342,15 +342,15 @@ func chooseIPFromHostInterfaces(nw networkInterfacer, addressFamilies AddressFam
 					return nil, fmt.Errorf("Unable to parse CIDR for interface %q: %s", intf.Name, err)
 				}
 				if !memberOf(ip, family) {
-					klog.V(4).Infof("Skipping: no address family match for %q on interface %q.", ip, intf.Name)
+					klog.V(4).InfoS("Skipping: no address family match for IP on interface ", "IP", ip, "interfaceName", intf.Name)
 					continue
 				}
 				// TODO: Decide if should open up to allow IPv6 LLAs in future.
 				if !ip.IsGlobalUnicast() {
-					klog.V(4).Infof("Skipping: non-global address %q on interface %q.", ip, intf.Name)
+					klog.V(4).InfoS("Skipping: non-global address IP on interface", "IP", ip, "interfaceName", intf.Name)
 					continue
 				}
-				klog.V(4).Infof("Found global unicast address %q on interface %q.", ip, intf.Name)
+				klog.V(4).InfoS("Found global unicast address IP on interface", "IP", ip, "interfaceName", intf.Name)
 				return ip, nil
 			}
 		}
@@ -434,13 +434,13 @@ func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer, addressF
 			if route.Family != family {
 				continue
 			}
-			klog.V(4).Infof("Default route transits interface %q", route.Interface)
+			klog.V(4).InfoS("Default route transits interface", "interface", route.Interface)
 			finalIP, err := getIPFromInterface(route.Interface, family, nw)
 			if err != nil {
 				return nil, err
 			}
 			if finalIP != nil {
-				klog.V(4).Infof("Found active IP %v ", finalIP)
+				klog.V(4).InfoS("Found active IP", "finalIP", finalIP)
 				return finalIP, nil
 			}
 			// In case of network setups where default routes are present, but network
@@ -451,12 +451,12 @@ func chooseHostInterfaceFromRoute(routes []Route, nw networkInterfacer, addressF
 				return nil, err
 			}
 			if loopbackIP != nil {
-				klog.V(4).Infof("Found active IP %v on Loopback interface", loopbackIP)
+				klog.V(4).InfoS("Found active IP on Loopback interface", "loopbackIP", loopbackIP)
 				return loopbackIP, nil
 			}
 		}
 	}
-	klog.V(4).Infof("No active IP found by looking at default routes")
+	klog.V(4).InfoS("No active IP found by looking at default routes")
 	return nil, fmt.Errorf("unable to select an IP from default routes.")
 }
 

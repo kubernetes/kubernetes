@@ -133,10 +133,10 @@ func SetTransportDefaults(t *http.Transport) *http.Transport {
 	t = SetOldTransportDefaults(t)
 	// Allow clients to disable http2 if needed.
 	if s := os.Getenv("DISABLE_HTTP2"); len(s) > 0 {
-		klog.Info("HTTP2 has been explicitly disabled")
+		klog.InfoS("HTTP2 has been explicitly disabled")
 	} else if allowsHTTP2(t) {
 		if err := configureHTTP2Transport(t); err != nil {
-			klog.Warningf("Transport failed http2 configuration: %v", err)
+			klog.InfoS("Transport failed http2 configuration", "err", err)
 		}
 	}
 	return t
@@ -493,7 +493,7 @@ redirectLoop:
 		resp, err := http.ReadResponse(respReader, nil)
 		if err != nil {
 			// Unable to read the backend response; let the client handle it.
-			klog.Warningf("Error reading backend response: %v", err)
+			klog.InfoS("Error reading backend response", "err", err)
 			break redirectLoop
 		}
 
