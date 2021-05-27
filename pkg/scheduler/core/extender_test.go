@@ -21,7 +21,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -288,9 +287,9 @@ import (
 // 	}
 // }
 
-func createNode(name string) *v1.Node {
-	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
-}
+// func createNode(name string) *v1.Node {
+// 	return &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name}}
+// }
 
 func TestIsInterested(t *testing.T) {
 	mem := &HTTPExtender{

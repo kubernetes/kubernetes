@@ -19,7 +19,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"testing"
@@ -53,143 +52,143 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var (
-	errPrioritize = fmt.Errorf("priority map encounters an error")
-)
+// var (
+// 	errPrioritize = fmt.Errorf("priority map encounters an error")
+// )
 
-type noPodsFilterPlugin struct{}
+// type noPodsFilterPlugin struct{}
 
 // Name returns name of the plugin.
-func (pl *noPodsFilterPlugin) Name() string {
-	return "NoPodsFilter"
-}
+// func (pl *noPodsFilterPlugin) Name() string {
+// 	return "NoPodsFilter"
+// }
 
-// Filter invoked at the filter extension point.
-func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
-	if len(nodeInfo.Pods) == 0 {
-		return nil
-	}
-	return framework.NewStatus(framework.Unschedulable, st.ErrReasonFake)
-}
+// // Filter invoked at the filter extension point.
+// func (pl *noPodsFilterPlugin) Filter(_ context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *framework.NodeInfo) *framework.Status {
+// 	if len(nodeInfo.Pods) == 0 {
+// 		return nil
+// 	}
+// 	return framework.NewStatus(framework.Unschedulable, st.ErrReasonFake)
+// }
 
 // NewNoPodsFilterPlugin initializes a noPodsFilterPlugin and returns it.
-func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-	return &noPodsFilterPlugin{}, nil
-}
+// func NewNoPodsFilterPlugin(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+// 	return &noPodsFilterPlugin{}, nil
+// }
 
-type numericMapPlugin struct{}
+// type numericMapPlugin struct{}
 
-func newNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &numericMapPlugin{}, nil
-	}
-}
+// func newNumericMapPlugin() frameworkruntime.PluginFactory {
+// 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+// 		return &numericMapPlugin{}, nil
+// 	}
+// }
 
-func (pl *numericMapPlugin) Name() string {
-	return "NumericMap"
-}
+// func (pl *numericMapPlugin) Name() string {
+// 	return "NumericMap"
+// }
 
-func (pl *numericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
-	score, err := strconv.Atoi(nodeName)
-	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error converting nodename to int: %+v", nodeName))
-	}
-	return int64(score), nil
-}
+// func (pl *numericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+// 	score, err := strconv.Atoi(nodeName)
+// 	if err != nil {
+// 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error converting nodename to int: %+v", nodeName))
+// 	}
+// 	return int64(score), nil
+// }
 
-func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
-	return nil
-}
+// func (pl *numericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+// 	return nil
+// }
 
-type reverseNumericMapPlugin struct{}
+// type reverseNumericMapPlugin struct{}
 
-func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &reverseNumericMapPlugin{}, nil
-	}
-}
+// func newReverseNumericMapPlugin() frameworkruntime.PluginFactory {
+// 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+// 		return &reverseNumericMapPlugin{}, nil
+// 	}
+// }
 
-func (pl *reverseNumericMapPlugin) Name() string {
-	return "ReverseNumericMap"
-}
+// func (pl *reverseNumericMapPlugin) Name() string {
+// 	return "ReverseNumericMap"
+// }
 
-func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
-	score, err := strconv.Atoi(nodeName)
-	if err != nil {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error converting nodename to int: %+v", nodeName))
-	}
-	return int64(score), nil
-}
+// func (pl *reverseNumericMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeName string) (int64, *framework.Status) {
+// 	score, err := strconv.Atoi(nodeName)
+// 	if err != nil {
+// 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("Error converting nodename to int: %+v", nodeName))
+// 	}
+// 	return int64(score), nil
+// }
 
-func (pl *reverseNumericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
-	return pl
-}
+// func (pl *reverseNumericMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+// 	return pl
+// }
 
-func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *framework.Status {
-	var maxScore float64
-	minScore := math.MaxFloat64
+// func (pl *reverseNumericMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *framework.Status {
+// 	var maxScore float64
+// 	minScore := math.MaxFloat64
 
-	for _, hostPriority := range nodeScores {
-		maxScore = math.Max(maxScore, float64(hostPriority.Score))
-		minScore = math.Min(minScore, float64(hostPriority.Score))
-	}
-	for i, hostPriority := range nodeScores {
-		nodeScores[i] = framework.NodeScore{
-			Name:  hostPriority.Name,
-			Score: int64(maxScore + minScore - float64(hostPriority.Score)),
-		}
-	}
-	return nil
-}
+// 	for _, hostPriority := range nodeScores {
+// 		maxScore = math.Max(maxScore, float64(hostPriority.Score))
+// 		minScore = math.Min(minScore, float64(hostPriority.Score))
+// 	}
+// 	for i, hostPriority := range nodeScores {
+// 		nodeScores[i] = framework.NodeScore{
+// 			Name:  hostPriority.Name,
+// 			Score: int64(maxScore + minScore - float64(hostPriority.Score)),
+// 		}
+// 	}
+// 	return nil
+// }
 
-type trueMapPlugin struct{}
+// type trueMapPlugin struct{}
 
-func newTrueMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &trueMapPlugin{}, nil
-	}
-}
+// func newTrueMapPlugin() frameworkruntime.PluginFactory {
+// 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+// 		return &trueMapPlugin{}, nil
+// 	}
+// }
 
-func (pl *trueMapPlugin) Name() string {
-	return "TrueMap"
-}
+// func (pl *trueMapPlugin) Name() string {
+// 	return "TrueMap"
+// }
 
-func (pl *trueMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
-	return 1, nil
-}
+// func (pl *trueMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
+// 	return 1, nil
+// }
 
-func (pl *trueMapPlugin) ScoreExtensions() framework.ScoreExtensions {
-	return pl
-}
+// func (pl *trueMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+// 	return pl
+// }
 
-func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *framework.Status {
-	for _, host := range nodeScores {
-		if host.Name == "" {
-			return framework.NewStatus(framework.Error, "unexpected empty host name")
-		}
-	}
-	return nil
-}
+// func (pl *trueMapPlugin) NormalizeScore(_ context.Context, _ *framework.CycleState, _ *v1.Pod, nodeScores framework.NodeScoreList) *framework.Status {
+// 	for _, host := range nodeScores {
+// 		if host.Name == "" {
+// 			return framework.NewStatus(framework.Error, "unexpected empty host name")
+// 		}
+// 	}
+// 	return nil
+// }
 
-type falseMapPlugin struct{}
+// type falseMapPlugin struct{}
 
-func newFalseMapPlugin() frameworkruntime.PluginFactory {
-	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
-		return &falseMapPlugin{}, nil
-	}
-}
+// func newFalseMapPlugin() frameworkruntime.PluginFactory {
+// 	return func(_ runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+// 		return &falseMapPlugin{}, nil
+// 	}
+// }
 
-func (pl *falseMapPlugin) Name() string {
-	return "FalseMap"
-}
+// func (pl *falseMapPlugin) Name() string {
+// 	return "FalseMap"
+// }
 
-func (pl *falseMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
-	return 0, framework.AsStatus(errPrioritize)
-}
+// func (pl *falseMapPlugin) Score(_ context.Context, _ *framework.CycleState, _ *v1.Pod, _ string) (int64, *framework.Status) {
+// 	return 0, framework.AsStatus(errPrioritize)
+// }
 
-func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
-	return nil
-}
+// func (pl *falseMapPlugin) ScoreExtensions() framework.ScoreExtensions {
+// 	return nil
+// }
 
 var emptySnapshot = internalcache.NewEmptySnapshot()
 
