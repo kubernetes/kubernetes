@@ -2206,9 +2206,6 @@ function start-kube-scheduler {
     params+=("--config=/etc/srv/kubernetes/kube-scheduler/config")
   else
     params+=("--kubeconfig=/etc/srv/kubernetes/kube-scheduler/kubeconfig")
-    if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
-      params+=("--algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}")
-    fi
     if [[ -n "${SCHEDULER_POLICY_CONFIG:-}" ]]; then
       create-kubescheduler-policy-config
       params+=("--use-legacy-policy-config")

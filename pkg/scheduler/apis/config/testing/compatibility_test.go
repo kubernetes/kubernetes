@@ -32,7 +32,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 )
@@ -1481,62 +1480,6 @@ func TestAlgorithmProviderCompatibility(t *testing.T) {
 			name:        "DefaultProvider",
 			provider:    config.SchedulerDefaultProviderName,
 			wantPlugins: defaultPlugins,
-		},
-		{
-			name:     "ClusterAutoscalerProvider",
-			provider: algorithmprovider.ClusterAutoscalerProvider,
-			wantPlugins: map[string][]config.Plugin{
-				"QueueSortPlugin": {
-					{Name: "PrioritySort"},
-				},
-				"PreFilterPlugin": {
-					{Name: "NodeResourcesFit"},
-					{Name: "NodePorts"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-					{Name: "VolumeBinding"},
-					{Name: "NodeAffinity"},
-				},
-				"FilterPlugin": {
-					{Name: "NodeUnschedulable"},
-					{Name: "NodeName"},
-					{Name: "TaintToleration"},
-					{Name: "NodeAffinity"},
-					{Name: "NodePorts"},
-					{Name: "NodeResourcesFit"},
-					{Name: "VolumeRestrictions"},
-					{Name: "EBSLimits"},
-					{Name: "GCEPDLimits"},
-					{Name: "NodeVolumeLimits"},
-					{Name: "AzureDiskLimits"},
-					{Name: "VolumeBinding"},
-					{Name: "VolumeZone"},
-					{Name: "PodTopologySpread"},
-					{Name: "InterPodAffinity"},
-				},
-				"PostFilterPlugin": {
-					{Name: "DefaultPreemption"},
-				},
-				"PreScorePlugin": {
-					{Name: "InterPodAffinity"},
-					{Name: "PodTopologySpread"},
-					{Name: "TaintToleration"},
-					{Name: "NodeAffinity"},
-				},
-				"ScorePlugin": {
-					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
-					{Name: "ImageLocality", Weight: 1},
-					{Name: "InterPodAffinity", Weight: 1},
-					{Name: "NodeResourcesMostAllocated", Weight: 1},
-					{Name: "NodeAffinity", Weight: 1},
-					{Name: "NodePreferAvoidPods", Weight: 10000},
-					{Name: "PodTopologySpread", Weight: 2},
-					{Name: "TaintToleration", Weight: 1},
-				},
-				"ReservePlugin": {{Name: "VolumeBinding"}},
-				"PreBindPlugin": {{Name: "VolumeBinding"}},
-				"BindPlugin":    {{Name: "DefaultBinder"}},
-			},
 		},
 	}
 	for _, tc := range testcases {
