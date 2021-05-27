@@ -124,7 +124,7 @@ func TestServiceAffinityEnqueue(t *testing.T) {
 		t.Fatalf("Cannot find the profile for Pod %v", podInfo.Pod.Name)
 	}
 	// Schedule the Pod manually.
-	_, fitError := testCtx.Scheduler.Algorithm.Schedule(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
+	_, fitError := testCtx.Scheduler.Schedule(ctx, fwk, framework.NewCycleState(), podInfo.Pod)
 	// The fitError is expected to be:
 	// 0/2 nodes are available: 1 Too many pods, 1 node(s) didn't match service affinity.
 	if fitError == nil {
