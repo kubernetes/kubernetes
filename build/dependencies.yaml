@@ -127,8 +127,6 @@ dependencies:
     version: v1.16.4-2
     refPaths:
     - path: build/build-image/cross/VERSION
-    - path: test/images/sample-apiserver/Makefile
-      match: k8s\.gcr\.io\/build-image\/kube-cross:v((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)
 
   # Base images
   - name: "k8s.gcr.io/debian-base: dependents"
