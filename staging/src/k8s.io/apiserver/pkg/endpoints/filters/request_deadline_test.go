@@ -440,6 +440,88 @@ func TestWithFailedRequestAudit(t *testing.T) {
 	}
 }
 
+func TestRequestContextWithUpperBound(t *testing.T) {
+	tests := []struct {
+		name       string
+		url        string
+		context    func(r *http.Request) (context.Context, context.CancelFunc)
+		upperBound time.Duration
+		remaining  time.Duration
+	}{
+		{
+			name: "request context has a bound deadline",
+			url:  "/foo",
+			context: func(r *http.Request) (context.Context, context.CancelFunc) {
+				return context.WithTimeout(r.Context(), time.Minute)
+			},
+			upperBound: 30 * time.Second,
+			remaining:  28 * time.Second, // to account for flakes in unit test
+		},
+		{
+			name: "request context does not have any bound deadline, no user specified timeout",
+			url:  "/foo",
+			context: func(r *http.Request) (context.Context, context.CancelFunc) {
+				return context.WithCancel(r.Context())
+			},
+			upperBound: 30 * time.Second,
+			remaining:  28 * time.Second, // to account for flakes in unit test
+
+		},
+		{
+			name: "request context does not have any bound deadline, user specified timeout is malformed",
+			url:  "/foo?timeout=invalid",
+			context: func(r *http.Request) (context.Context, context.CancelFunc) {
+				return context.WithCancel(r.Context())
+			},
+			upperBound: 30 * time.Second,
+			remaining:  28 * time.Second, // to account for flakes in unit test
+
+		},
+		{
+			name: "request context does not have any bound deadline, user specified timeout is zero",
+			url:  "/foo?timeout=0s",
+			context: func(r *http.Request) (context.Context, context.CancelFunc) {
+				return context.WithCancel(r.Context())
+			},
+			upperBound: 30 * time.Second,
+			remaining:  28 * time.Second, // to account for flakes in unit test
+
+		},
+		{
+			name: "request context does not have any bound deadline, user specified timeout is valid",
+			url:  "/foo?timeout=5m2s",
+			context: func(r *http.Request) (context.Context, context.CancelFunc) {
+				return context.WithCancel(r.Context())
+			},
+			upperBound: time.Minute,
+			remaining:  5 * time.Minute, // to account for flakes in unit test
+
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := newRequest(t, test.url)
+
+			parent, parentCancel := test.context(req)
+			defer parentCancel()
+			req = req.WithContext(parent)
+
+			ctx, cancel := RequestContextWithUpperBound(req, test.upperBound)
+			defer cancel()
+
+			deadline, ok := ctx.Deadline()
+			if !ok {
+				t.Errorf("Expected the context to have a deadline, but got: %t", ok)
+			}
+
+			remainingGot := time.Until(deadline)
+			if remainingGot <= test.remaining {
+				t.Errorf("Expected the remaining deadline to be greater, wanted: %s, but got: %s", test.remaining, remainingGot)
+			}
+		})
+	}
+}
+
 func newRequest(t *testing.T, requestURL string) *http.Request {
 	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
