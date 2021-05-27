@@ -50,6 +50,9 @@ func SetupMetricsProxy(c clientset.Interface) error {
 		}
 		var foundComponents []componentInfo
 		for _, pod := range podList.Items {
+			if len(pod.Status.PodIP) == 0 {
+				continue
+			}
 			switch {
 			case strings.HasPrefix(pod.Name, "kube-scheduler-"):
 				foundComponents = append(foundComponents, componentInfo{
