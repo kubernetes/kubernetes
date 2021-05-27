@@ -147,6 +147,11 @@ func newApfServerWithHooks(decision mockDecision, onExecute, postExecute, postEn
 }
 
 func newApfServerWithFilter(flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func(), t *testing.T) *httptest.Server {
+	apfServer := httptest.NewServer(newApfHandlerWithFilter(flowControlFilter, onExecute, postExecute, t))
+	return apfServer
+}
+
+func newApfHandlerWithFilter(flowControlFilter utilflowcontrol.Interface, onExecute, postExecute func(), t *testing.T) http.Handler {
 	requestInfoFactory := &apirequest.RequestInfoFactory{APIPrefixes: sets.NewString("apis", "api"), GrouplessAPIPrefixes: sets.NewString("api")}
 	longRunningRequestCheck := BasicLongRunningRequestCheck(sets.NewString("watch"), sets.NewString("proxy"))
 
@@ -165,8 +170,7 @@ func newApfServerWithFilter(flowControlFilter utilflowcontrol.Interface, onExecu
 		}
 	}), requestInfoFactory)
 
-	apfServer := httptest.NewServer(handler)
-	return apfServer
+	return handler
 }
 
 func TestApfSkipLongRunningRequest(t *testing.T) {
@@ -466,6 +470,58 @@ func TestApfExecuteWatchRequestsWithInitializationSignal(t *testing.T) {
 			}
 		}()
 	}
+	wg.Wait()
+}
+
+func TestApfWatchPanic(t *testing.T) {
+	fakeFilter := &fakeWatchApfFilter{
+		capacity: 1,
+	}
+
+	onExecuteFunc := func() {
+		panic("test panic")
+	}
+	postExecuteFunc := func() {}
+
+	apfHandler := newApfHandlerWithFilter(fakeFilter, onExecuteFunc, postExecuteFunc, t)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err == nil {
+				t.Errorf("expected panic, got %v", err)
+			}
+		}()
+		apfHandler.ServeHTTP(w, r)
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	defer server.Close()
+
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+// TestContextClosesOnRequestProcessed ensures that the request context is cancelled
+// automatically even if the server doesn't cancel is explicitly.
+// This is required to ensure we won't be leaking goroutines that wait for context
+// cancelling (e.g. in queueset::StartRequest method).
+func TestContextClosesOnRequestProcessed(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		// asynchronously wait for context being closed
+		go func() {
+			<-ctx.Done()
+			wg.Done()
+		}()
+	}
+	server := httptest.NewServer(http.HandlerFunc(handler))
+	defer server.Close()
+
+	if err := expectHTTPGet(fmt.Sprintf("%s/api/v1/namespaces/default/pods?watch=true", server.URL), http.StatusOK); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
 	wg.Wait()
 }
 

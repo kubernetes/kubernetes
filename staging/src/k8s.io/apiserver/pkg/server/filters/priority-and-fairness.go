@@ -19,12 +19,11 @@ package filters
 import (
 	"fmt"
 	"net/http"
-	"sync"
+	"runtime"
 	"sync/atomic"
 
 	flowcontrol "k8s.io/api/flowcontrol/v1beta1"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	epmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilflowcontrol "k8s.io/apiserver/pkg/util/flowcontrol"
@@ -112,7 +111,7 @@ func WithPriorityAndFairness(
 				waitingMark.recordReadOnly(int(atomic.AddInt32(&atomicReadOnlyWaiting, delta)))
 			}
 		}
-		wg := sync.WaitGroup{}
+		var resultCh chan interface{}
 		execute := func() {
 			noteExecutingDelta(1)
 			defer noteExecutingDelta(-1)
@@ -130,11 +129,22 @@ func WithPriorityAndFairness(
 			setResponseHeaders(classification, w)
 
 			if isWatchRequest {
-				wg.Add(1)
+				resultCh = make(chan interface{})
 				go func() {
-					defer utilruntime.HandleCrash()
+					defer func() {
+						err := recover()
+						// do not wrap the sentinel ErrAbortHandler panic value
+						if err != nil && err != http.ErrAbortHandler {
+							// Same as stdlib http server code. Manually allocate stack
+							// trace buffer size to prevent excessively large logs
+							const size = 64 << 10
+							buf := make([]byte, size)
+							buf = buf[:runtime.Stack(buf, false)]
+							err = fmt.Sprintf("%v\n%s", err, buf)
+						}
+						resultCh <- err
+					}()
 
-					defer wg.Done()
 					// Protect from the situations when request will not reach storage layer
 					// and the initialization signal will not be send.
 					defer watchInitializationSignal.Signal()
@@ -165,12 +175,17 @@ func WithPriorityAndFairness(
 			}
 			epmetrics.RecordRequestTermination(r, requestInfo, epmetrics.APIServerComponent, http.StatusTooManyRequests)
 			if isWatchRequest {
-				wg.Done()
+				close(resultCh)
 			}
 			tooManyRequests(r, w)
 		}
 		// In case of watch, from P&F POV it already finished, but we need to wait until the request itself finishes.
-		wg.Wait()
+		if isWatchRequest {
+			err := <-resultCh
+			if err != nil {
+				panic(err)
+			}
+		}
 	})
 }
 
