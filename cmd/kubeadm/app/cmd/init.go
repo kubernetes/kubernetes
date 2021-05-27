@@ -350,12 +350,9 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 	cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
 
-	// override node name and CRI socket from the command line options
+	// override node name from the command line option
 	if options.externalInitCfg.NodeRegistration.Name != "" {
 		cfg.NodeRegistration.Name = options.externalInitCfg.NodeRegistration.Name
-	}
-	if options.externalInitCfg.NodeRegistration.CRISocket != "" {
-		cfg.NodeRegistration.CRISocket = options.externalInitCfg.NodeRegistration.CRISocket
 	}
 
 	if err := configutil.VerifyAPIServerBindAddress(cfg.LocalAPIEndpoint.AdvertiseAddress); err != nil {
