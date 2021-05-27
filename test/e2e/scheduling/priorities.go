@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -527,6 +529,9 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 		}
 	}
 
+	errChan := make(chan error, len(nodes))
+	var wg sync.WaitGroup
+
 	// we need the max one to keep the same cpu/mem use rate
 	ratio = math.Max(maxCPUFraction, maxMemFraction)
 	for _, node := range nodes {
@@ -566,13 +571,26 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 				},
 			},
 		}
-
-		err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
-			*initPausePod(f, *podConfig), true, framework.Logf)
-
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err := testutils.StartPods(cs, 1, ns, string(uuid.NewUUID()),
+				*initPausePod(f, *podConfig), true, framework.Logf)
+			if err != nil {
+				errChan <- err
+			}
+		}()
+	}
+	wg.Wait()
+	close(errChan)
+	var errs []error
+	for err := range errChan {
 		if err != nil {
-			return cleanUp, err
+			errs = append(errs, err)
 		}
+	}
+	if len(errs) > 0 {
+		return cleanUp, errors.NewAggregate(errs)
 	}
 
 	nodeNameToPodList = podListForEachNode(cs)
