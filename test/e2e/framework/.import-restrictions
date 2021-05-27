@@ -247,6 +247,7 @@ rules:
       - k8s.io/kubernetes/pkg/apis/certificates/v1beta1
       - k8s.io/kubernetes/pkg/apis/storage/v1
       - k8s.io/kubernetes/pkg/scheduler/internal/cache
+      - k8s.io/kubernetes/pkg/scheduler/testing
   - selectorRegexp: k8s[.]io/kubernetes/test/
     allowedPrefixes:
       - k8s.io/kubernetes/test/e2e/framework

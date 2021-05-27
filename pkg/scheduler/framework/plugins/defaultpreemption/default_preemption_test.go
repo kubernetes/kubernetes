@@ -18,7 +18,6 @@ package defaultpreemption
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sort"
 	"strings"
@@ -38,23 +37,16 @@ import (
 	"k8s.io/client-go/tools/events"
 	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
 	extenderv1 "k8s.io/kube-scheduler/extender/v1"
-	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	configv1beta1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultbinder"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeunschedulable"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
-	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	frameworkruntime "k8s.io/kubernetes/pkg/scheduler/framework/runtime"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/internal/parallelize"
@@ -330,7 +322,7 @@ func TestDryRunPreemption(t *testing.T) {
 		pdbs                    []*policy.PodDisruptionBudget
 		fakeFilterRC            framework.Code // return code for fake filter plugin
 		disableParallelism      bool
-		expected                [][]Candidate
+		expected                [][]helper.Candidate
 		expectedNumFilterCalled []int32
 	}{
 		{
@@ -346,7 +338,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected:                [][]Candidate{{}},
+			expected:                [][]helper.Candidate{{}},
 			expectedNumFilterCalled: []int32{2},
 		},
 		{
@@ -362,7 +354,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected:                [][]Candidate{{}},
+			expected:                [][]helper.Candidate{{}},
 			fakeFilterRC:            framework.Unschedulable,
 			expectedNumFilterCalled: []int32{2},
 		},
@@ -380,7 +372,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Obj(),
 			},
-			expected:                [][]Candidate{{}},
+			expected:                [][]helper.Candidate{{}},
 			fakeFilterRC:            framework.Unschedulable,
 			expectedNumFilterCalled: []int32{2},
 		},
@@ -397,7 +389,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -428,7 +420,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1").UID("p1").Node("node1").Priority(midPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			expected:                [][]Candidate{{}},
+			expected:                [][]helper.Candidate{{}},
 			expectedNumFilterCalled: []int32{0},
 		},
 		{
@@ -445,7 +437,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1.2").UID("p1.2").Node("node1").Priority(midPriority).Req(largeRes).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -479,7 +471,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1.4").UID("p1.4").Node("node1").Priority(highPriority).Req(smallRes).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(highPriority).Req(largeRes).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -510,7 +502,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1.4").UID("p1.4").Node("node1").Priority(highPriority).Req(smallRes).StartTime(epochTime2).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(highPriority).Req(largeRes).StartTime(epochTime1).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -544,7 +536,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p1.3").UID("p1.3").Node("node1").Priority(highPriority).Req(smallRes).Obj(),
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(highPriority).Req(smallRes).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -578,7 +570,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("pod-x1").UID("pod-x1").Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 				st.MakePod().Name("pod-x2").UID("pod-x2").Node("node-x").Label("foo", "").Priority(highPriority).Obj(),
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -610,7 +602,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p2").UID("p2").Node("node2").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			fakeFilterRC:            framework.Unschedulable,
-			expected:                [][]Candidate{{}},
+			expected:                [][]helper.Candidate{{}},
 			expectedNumFilterCalled: []int32{2},
 		},
 		{
@@ -632,7 +624,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1},
 				},
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -667,7 +659,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1, DisruptedPods: map[string]metav1.Time{"p2": {Time: time.Now()}}},
 				},
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -702,7 +694,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1, DisruptedPods: map[string]metav1.Time{"p1.2": {Time: time.Now()}}},
 				},
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -738,7 +730,7 @@ func TestDryRunPreemption(t *testing.T) {
 					Status: policy.PodDisruptionBudgetStatus{DisruptionsAllowed: 1, DisruptedPods: map[string]metav1.Time{"p1.3": {Time: time.Now()}}},
 				},
 			},
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					&candidate{
 						victims: &extenderv1.Victims{
@@ -773,7 +765,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p5").UID("p5").Node("node5").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			disableParallelism: true,
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					// cycle=0 => offset=4 => node5 (yes), node1 (yes)
 					&candidate{
@@ -810,7 +802,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p5").UID("p5").Node("node5").Priority(veryHighPriority).Req(largeRes).Obj(),
 			},
 			disableParallelism: true,
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					// cycle=0 => offset=4 => node5 (no), node1 (yes), node2 (no), node3 (yes)
 					&candidate{
@@ -849,7 +841,7 @@ func TestDryRunPreemption(t *testing.T) {
 				st.MakePod().Name("p5").UID("p5").Node("node5").Priority(midPriority).Req(largeRes).Obj(),
 			},
 			disableParallelism: true,
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					// cycle=0 => offset=4 => node5 (yes), node1 (yes)
 					&candidate{
@@ -922,7 +914,7 @@ func TestDryRunPreemption(t *testing.T) {
 				},
 			},
 			disableParallelism: true,
-			expected: [][]Candidate{
+			expected: [][]helper.Candidate{
 				{
 					// Even though the DefaultPreemptionArgs constraints suggest that the
 					// minimum number of candidates is 2, we get three candidates here
@@ -1037,8 +1029,8 @@ func TestDryRunPreemption(t *testing.T) {
 				if status := fwk.RunPreFilterPlugins(context.Background(), state, pod); !status.IsSuccess() {
 					t.Errorf("cycle %d: Unexpected PreFilter Status: %v", cycle, status)
 				}
-				offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-				got, _ := dryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
+				offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
+				got, _ := pl.DryRunPreemption(context.Background(), fwk, state, pod, nodeInfos, tt.pdbs, offset, numCandidates)
 				// Sort the values (inner victims) and the candidate itself (by its NominatedNodeName).
 				for i := range got {
 					victims := got[i].Victims().Pods
@@ -1248,9 +1240,9 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 
 			pl := &DefaultPreemption{args: *getDefaultDefaultPreemptionArgs()}
-			offset, numCandidates := pl.getOffsetAndNumCandidates(int32(len(nodeInfos)))
-			candidates, _ := dryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
-			s := SelectCandidate(candidates)
+			offset, numCandidates := pl.GetOffsetAndNumCandidates(int32(len(nodeInfos)))
+			candidates, _ := pl.DryRunPreemption(context.Background(), fwk, state, tt.pod, nodeInfos, nil, offset, numCandidates)
+			s := helper.SelectCandidate(candidates, pl)
 			if s == nil || len(s.Name()) == 0 {
 				return
 			}
@@ -1263,173 +1255,6 @@ func TestSelectBestCandidate(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("expect any node in %v, but got %v", tt.expected, s.Name())
-			}
-		})
-	}
-}
-
-func TestPodEligibleToPreemptOthers(t *testing.T) {
-	tests := []struct {
-		name                string
-		pod                 *v1.Pod
-		pods                []*v1.Pod
-		nodes               []string
-		nominatedNodeStatus *framework.Status
-		expected            bool
-	}{
-		{
-			name:                "Pod with nominated node",
-			pod:                 st.MakePod().Name("p_with_nominated_node").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
-			pods:                []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
-			nodes:               []string{"node1"},
-			nominatedNodeStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
-			expected:            true,
-		},
-		{
-			name:                "Pod with nominated node, but without nominated node status",
-			pod:                 st.MakePod().Name("p_without_status").UID("p").Priority(highPriority).NominatedNodeName("node1").Obj(),
-			pods:                []*v1.Pod{st.MakePod().Name("p1").UID("p1").Priority(lowPriority).Node("node1").Terminating().Obj()},
-			nodes:               []string{"node1"},
-			nominatedNodeStatus: nil,
-			expected:            false,
-		},
-		{
-			name:                "Pod without nominated node",
-			pod:                 st.MakePod().Name("p_without_nominated_node").UID("p").Priority(highPriority).Obj(),
-			pods:                []*v1.Pod{},
-			nodes:               []string{},
-			nominatedNodeStatus: nil,
-			expected:            true,
-		},
-		{
-			name:                "Pod with 'PreemptNever' preemption policy",
-			pod:                 st.MakePod().Name("p_with_preempt_never_policy").UID("p").Priority(highPriority).PreemptionPolicy(v1.PreemptNever).Obj(),
-			pods:                []*v1.Pod{},
-			nodes:               []string{},
-			nominatedNodeStatus: nil,
-			expected:            false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			var nodes []*v1.Node
-			for _, n := range test.nodes {
-				nodes = append(nodes, st.MakeNode().Name(n).Obj())
-			}
-			snapshot := internalcache.NewSnapshot(test.pods, nodes)
-			if got := PodEligibleToPreemptOthers(test.pod, snapshot.NodeInfos(), test.nominatedNodeStatus); got != test.expected {
-				t.Errorf("expected %t, got %t for pod: %s", test.expected, got, test.pod.Name)
-			}
-		})
-	}
-}
-
-func TestNodesWherePreemptionMightHelp(t *testing.T) {
-	// Prepare 4 nodes names.
-	nodeNames := []string{"node1", "node2", "node3", "node4"}
-	tests := []struct {
-		name          string
-		nodesStatuses framework.NodeToStatusMap
-		expected      sets.String // set of expected node names.
-	}{
-		{
-			name: "No node should be attempted",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeaffinity.ErrReasonPod),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, tainttoleration.ErrReasonNotMatch),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodelabel.ErrReasonPresenceViolated),
-			},
-			expected: sets.NewString(),
-		},
-		{
-			name: "ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnschedulable),
-			},
-			expected: sets.NewString("node1", "node4"),
-		},
-		{
-			name: "ErrReasonAffinityRulesNotMatch should not be tried as it indicates that the pod is unschedulable due to inter-pod affinity, but ErrReasonAntiAffinityRulesNotMatch should be tried as it indicates that the pod is unschedulable due to inter-pod anti-affinity",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, interpodaffinity.ErrReasonAffinityRulesNotMatch),
-				"node2": framework.NewStatus(framework.Unschedulable, interpodaffinity.ErrReasonAntiAffinityRulesNotMatch),
-			},
-			expected: sets.NewString("node2", "node3", "node4"),
-		},
-		{
-			name: "Mix of failed predicates works fine",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumerestrictions.ErrReasonDiskConflict),
-				"node2": framework.NewStatus(framework.Unschedulable, fmt.Sprintf("Insufficient %v", v1.ResourceMemory)),
-			},
-			expected: sets.NewString("node2", "node3", "node4"),
-		},
-		{
-			name: "Node condition errors should be considered unresolvable",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodeunschedulable.ErrReasonUnknownCondition),
-			},
-			expected: sets.NewString("node2", "node3", "node4"),
-		},
-		{
-			name: "ErrVolume... errors should not be tried as it indicates that the pod is unschedulable due to no matching volumes for pod on node",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.UnschedulableAndUnresolvable, volumezone.ErrReasonConflict),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonNodeConflict)),
-				"node3": framework.NewStatus(framework.UnschedulableAndUnresolvable, string(volumescheduling.ErrReasonBindConflict)),
-			},
-			expected: sets.NewString("node4"),
-		},
-		{
-			name: "ErrReasonConstraintsNotMatch should be tried as it indicates that the pod is unschedulable due to topology spread constraints",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node1": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, nodename.ErrReason),
-				"node3": framework.NewStatus(framework.Unschedulable, podtopologyspread.ErrReasonConstraintsNotMatch),
-			},
-			expected: sets.NewString("node1", "node3", "node4"),
-		},
-		{
-			name: "UnschedulableAndUnresolvable status should be skipped but Unschedulable should be tried",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-				"node3": framework.NewStatus(framework.Unschedulable, ""),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-			},
-			expected: sets.NewString("node1", "node3"),
-		},
-		{
-			name: "ErrReasonNodeLabelNotMatch should not be tried as it indicates that the pod is unschedulable due to node doesn't have the required label",
-			nodesStatuses: framework.NodeToStatusMap{
-				"node2": framework.NewStatus(framework.UnschedulableAndUnresolvable, podtopologyspread.ErrReasonNodeLabelNotMatch),
-				"node3": framework.NewStatus(framework.Unschedulable, ""),
-				"node4": framework.NewStatus(framework.UnschedulableAndUnresolvable, ""),
-			},
-			expected: sets.NewString("node1", "node3"),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var nodeInfos []*framework.NodeInfo
-			for _, name := range nodeNames {
-				ni := framework.NewNodeInfo()
-				ni.SetNode(st.MakeNode().Name(name).Obj())
-				nodeInfos = append(nodeInfos, ni)
-			}
-			nodes, _ := nodesWherePreemptionMightHelp(nodeInfos, tt.nodesStatuses)
-			if len(tt.expected) != len(nodes) {
-				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(tt.expected), len(nodes), nodes)
-			}
-			for _, node := range nodes {
-				name := node.Node().Name
-				if _, found := tt.expected[name]; !found {
-					t.Errorf("node %v is not expected.", name)
-				}
 			}
 		})
 	}
