@@ -159,7 +159,7 @@ func validateStorageVersionCondition(conditions []apiserverinternal.StorageVersi
 	return allErrs
 }
 
-const dns1035LabelFmt string = "^[a-z]([-a-z0-9]*[a-z0-9])?$"
+const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const dns1035LabelErrMsg string = "a DNS-1035 label, which must consist of lower case alphanumeric characters or '-', start with an alphabetic character, and end with an alphanumeric character"
 
 // isValidAPIVersion tests whether the value passed is a valid apiVersion. A
@@ -183,7 +183,7 @@ func isValidAPIVersion(apiVersion string) []string {
 			errs = append(errs, prefixEach(msgs, "group part: ")...)
 		}
 	default:
-		return append(errs, "an apiVersion is "+utilvalidation.RegexError(dns1035LabelErrMsg, dns1035LabelFmt, "my-name", "abc-123")+
+		return append(errs, "an apiVersion is "+utilvalidation.RegexError(dns1035LabelErrMsg, "^"+dns1035LabelFmt+"$", "my-name", "abc-123")+
 			" with an optional DNS subdomain prefix and '/' (e.g. 'example.com/MyVersion')")
 	}
 
