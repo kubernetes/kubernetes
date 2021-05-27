@@ -554,7 +554,7 @@ func (c *Cacher) Get(ctx context.Context, key string, opts storage.GetOptions, o
 	// fresh as the given resourceVersion.
 	getRV, err := c.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return err
+		return errors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 
 	if getRV == 0 && !c.ready.check() {

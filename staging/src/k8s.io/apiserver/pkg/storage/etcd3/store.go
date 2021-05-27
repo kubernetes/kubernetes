@@ -825,7 +825,7 @@ func (s *store) WatchList(ctx context.Context, key string, opts storage.ListOpti
 func (s *store) watch(ctx context.Context, key string, opts storage.ListOptions, recursive bool) (watch.Interface, error) {
 	rev, err := s.versioner.ParseResourceVersion(opts.ResourceVersion)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
 	}
 	key = path.Join(s.pathPrefix, key)
 	return s.watcher.Watch(ctx, key, int64(rev), recursive, opts.ProgressNotify, opts.Predicate)
