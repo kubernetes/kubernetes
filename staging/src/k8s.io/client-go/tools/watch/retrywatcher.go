@@ -126,6 +126,11 @@ func (rw *RetryWatcher) doReceive() (bool, time.Duration) {
 			// Retry
 			return false, 0
 		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			klog.V(5).InfoS("Watch is stopped", "err", err)
+			// Retry
+			return false, 0
+		}
 
 		klog.ErrorS(err, msg)
 		// Retry
