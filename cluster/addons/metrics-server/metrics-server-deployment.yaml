@@ -69,7 +69,7 @@ spec:
         - mountPath: /tmp
           name: tmp-dir
       - name: metrics-server-nanny
-        image: k8s.gcr.io/addon-resizer:1.8.11
+        image: k8s.gcr.io/autoscaling/addon-resizer:1.8.13
         resources:
           limits:
             cpu: 100m

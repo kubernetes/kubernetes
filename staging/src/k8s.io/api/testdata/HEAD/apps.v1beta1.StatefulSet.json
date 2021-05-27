@@ -1638,25 +1638,27 @@
         "partition": -578791744
       }
     },
-    "revisionHistoryLimit": 1747963012
+    "revisionHistoryLimit": 1747963012,
+    "minReadySeconds": 227754708
   },
   "status": {
-    "observedGeneration": 978199023237639818,
-    "replicas": 1835483741,
-    "readyReplicas": -1579944009,
-    "currentReplicas": -1233364344,
-    "updatedReplicas": -906614126,
+    "observedGeneration": 2597642487843996253,
+    "replicas": -1579944009,
+    "readyReplicas": -1233364344,
+    "currentReplicas": -906614126,
+    "updatedReplicas": -741018201,
     "currentRevision": "516",
     "updateRevision": "517",
-    "collisionCount": 2139385164,
+    "collisionCount": -658674406,
     "conditions": [
       {
-        "type": "GƧĪɱ|",
-        "status": "蘞睨函Ɂʟ]mʦ獪霛圦",
-        "lastTransitionTime": "2150-01-03T14:51:04Z",
+        "type": "ƧĪɱ|åȧ$Ĥ龌帲笁銭1ÂơHđ\"",
+        "status": "砽§^Dê婼SƸ炃\u0026-Ƹ绿",
+        "lastTransitionTime": "1998-10-20T01:25:38Z",
         "reason": "518",
         "message": "519"
       }
-    ]
+    ],
+    "availableReplicas": -230316059
   }
 }

@@ -47,6 +47,18 @@ func SetObjectMetaName(name string) SetFunc {
 	}
 }
 
+func SetGenerateName(name string) SetFunc {
+	return func(policy *networkingv1.NetworkPolicy) {
+		policy.ObjectMeta.GenerateName = name
+	}
+}
+
+func SetObjectMetaLabel(targetLabels map[string]string) SetFunc {
+	return func(policy *networkingv1.NetworkPolicy) {
+		policy.ObjectMeta.Labels = targetLabels
+	}
+}
+
 func SetSpecPodSelector(targetSelector metav1.LabelSelector) SetFunc {
 	return func(policy *networkingv1.NetworkPolicy) {
 		policy.Spec.PodSelector = targetSelector

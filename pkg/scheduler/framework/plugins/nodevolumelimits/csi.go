@@ -57,6 +57,7 @@ type CSILimits struct {
 }
 
 var _ framework.FilterPlugin = &CSILimits{}
+var _ framework.EnqueueExtensions = &CSILimits{}
 
 // CSIName is the name of the plugin used in the plugin registry and configurations.
 const CSIName = "NodeVolumeLimits"
@@ -64,6 +65,15 @@ const CSIName = "NodeVolumeLimits"
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *CSILimits) Name() string {
 	return CSIName
+}
+
+// EventsToRegister returns the possible events that may make a Pod
+// failed by this plugin schedulable.
+func (pl *CSILimits) EventsToRegister() []framework.ClusterEvent {
+	return []framework.ClusterEvent{
+		{Resource: framework.CSINode, ActionType: framework.Add},
+		{Resource: framework.Pod, ActionType: framework.Delete},
+	}
 }
 
 // Filter invoked at the filter extension point.
@@ -75,7 +85,7 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return framework.NewStatus(framework.Error, fmt.Sprintf("node not found: %s", node.Name))
+		return framework.NewStatus(framework.Error, "node not found")
 	}
 
 	// If CSINode doesn't exist, the predicate may read the limits from Node object

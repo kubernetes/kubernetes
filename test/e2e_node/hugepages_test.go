@@ -352,12 +352,15 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeSpecialFeature:H
 
 			pod := getHugepagesTestPod(f, limits, mounts, volumes)
 
-			ginkgo.By("by running a guarantee pod that requests hugepages")
+			ginkgo.By("by running a test pod that requests hugepages")
 			testpod = f.PodClient().CreateSync(pod)
 		})
 
 		// we should use JustAfterEach because framework will teardown the client under the AfterEach method
 		ginkgo.JustAfterEach(func() {
+			ginkgo.By(fmt.Sprintf("deleting test pod %s", testpod.Name))
+			f.PodClient().DeleteSync(testpod.Name, metav1.DeleteOptions{}, 2*time.Minute)
+
 			releaseHugepages()
 
 			ginkgo.By("restarting kubelet to pick up pre-allocated hugepages")

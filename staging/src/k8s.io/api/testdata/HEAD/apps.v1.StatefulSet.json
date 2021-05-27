@@ -1638,25 +1638,27 @@
         "partition": -578791744
       }
     },
-    "revisionHistoryLimit": 1747963012
+    "revisionHistoryLimit": 1747963012,
+    "minReadySeconds": 227754708
   },
   "status": {
-    "observedGeneration": -2804094558607818028,
-    "replicas": 604810772,
-    "readyReplicas": -2017431863,
-    "currentReplicas": -1391197036,
-    "updatedReplicas": -819211803,
+    "observedGeneration": 3726357650029194772,
+    "replicas": -2017431863,
+    "readyReplicas": -1391197036,
+    "currentReplicas": -819211803,
+    "updatedReplicas": -644991728,
     "currentRevision": "516",
     "updateRevision": "517",
-    "collisionCount": -741018201,
+    "collisionCount": 318464433,
     "conditions": [
       {
-        "type": "!ĕ輮ř蔨¡蘞睨函Ɂʟ]mʦ獪霛",
-        "status": "Hđ\"-劺bY伂滹Ǽ",
-        "lastTransitionTime": "2019-10-21T13:42:33Z",
+        "type": "ĕ",
+        "status": "Īɱ|åȧ$Ĥ龌帲笁銭1ÂơHđ\"-劺",
+        "lastTransitionTime": "2209-09-04T06:38:38Z",
         "reason": "518",
         "message": "519"
       }
-    ]
+    ],
+    "availableReplicas": 1180728433
   }
 }

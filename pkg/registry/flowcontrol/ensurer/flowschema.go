@@ -46,13 +46,12 @@ type FlowSchemaRemover interface {
 
 // NewSuggestedFlowSchemaEnsurer returns a FlowSchemaEnsurer instance that
 // can be used to ensure a set of suggested FlowSchema configuration objects.
-// shouldCreate indicates whether a missing 'suggested' FlowSchema object should be recreated.
-func NewSuggestedFlowSchemaEnsurer(client flowcontrolclient.FlowSchemaInterface, shouldCreate bool) FlowSchemaEnsurer {
+func NewSuggestedFlowSchemaEnsurer(client flowcontrolclient.FlowSchemaInterface) FlowSchemaEnsurer {
 	wrapper := &flowSchemaWrapper{
 		client: client,
 	}
 	return &fsEnsurer{
-		strategy: newSuggestedEnsureStrategy(wrapper, shouldCreate),
+		strategy: newSuggestedEnsureStrategy(wrapper),
 		wrapper:  wrapper,
 	}
 }

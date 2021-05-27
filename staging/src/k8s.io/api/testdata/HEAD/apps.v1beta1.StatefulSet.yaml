@@ -31,6 +31,7 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
+  minReadySeconds: 227754708
   podManagementPolicy: (DǺM變ǣƆ鄾篏q鴥络@
   replicas: 896585016
   revisionHistoryLimit: 1747963012
@@ -1121,17 +1122,18 @@ spec:
         type: 儲ȃ<Ǆ噻ȁ隞ĻȀ拞抵<躁ĄȐ煷叺
       phase: VǕ酈t史C<镼ƶƭ
 status:
-  collisionCount: 2139385164
+  availableReplicas: -230316059
+  collisionCount: -658674406
   conditions:
-  - lastTransitionTime: "2150-01-03T14:51:04Z"
+  - lastTransitionTime: "1998-10-20T01:25:38Z"
     message: "519"
     reason: "518"
-    status: 蘞睨函Ɂʟ]mʦ獪霛圦
-    type: GƧĪɱ|
-  currentReplicas: -1233364344
+    status: 砽§^Dê婼SƸ炃&-Ƹ绿
+    type: ƧĪɱ|åȧ$Ĥ龌帲笁銭1ÂơHđ"
+  currentReplicas: -906614126
   currentRevision: "516"
-  observedGeneration: 978199023237639818
-  readyReplicas: -1579944009
-  replicas: 1835483741
+  observedGeneration: 2597642487843996253
+  readyReplicas: -1233364344
+  replicas: -1579944009
   updateRevision: "517"
-  updatedReplicas: -906614126
+  updatedReplicas: -741018201

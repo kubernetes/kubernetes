@@ -126,6 +126,9 @@ function gce-metadata-fw-helper {
   iptables -w ${command} OUTPUT -p tcp --dport 80 -d ${METADATA_SERVER_IP} -m owner ${invert:-} --uid-owner=${METADATA_SERVER_ALLOWED_UID_RANGE:-0-2999} -j ${action}
 }
 
+# WARNING: DO NOT USE THE FILTER TABLE! Some implementations of network policy
+# think they own it and will stomp all over your changes. At this time, the
+# mangle table is less contentious so use that if possible.
 function config-ip-firewall {
   echo "Configuring IP firewall rules"
 
@@ -2286,12 +2289,6 @@ function setup-addon-manifests {
       copy-manifests "${psp_dir}" "${dst_dir}"
     fi
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      local -r nth_dir="${src_dir}/${3:-$2}/node-termination-handler"
-      if [[ -d "${nth_dir}" ]]; then
-          copy-manifests "${nth_dir}" "${dst_dir}"
-      fi
-  fi
 }
 
 # A function that downloads extra addons from a URL and puts them in the GCI
@@ -2699,10 +2696,6 @@ EOF
   if [[ "${ENABLE_NVIDIA_GPU_DEVICE_PLUGIN:-}" == "true" ]]; then
     setup-addon-manifests "addons" "device-plugins/nvidia-gpu"
   fi
-  if [[ "${ENABLE_NODE_TERMINATION_HANDLER:-}" == "true" ]]; then
-      setup-addon-manifests "addons" "node-termination-handler"
-      setup-node-termination-handler-manifest ''
-  fi
   # Setting up the konnectivity-agent daemonset
   if [[ "${RUN_KONNECTIVITY_PODS:-false}" == "true" ]]; then
     setup-addon-manifests "addons" "konnectivity-agent"
@@ -2809,13 +2802,6 @@ EOF
   sed -i -e "s@{{runAsUser}}@${KUBE_ADDON_MANAGER_RUNASUSER:-2002}@g" "${src_file}"
   sed -i -e "s@{{runAsGroup}}@${KUBE_ADDON_MANAGER_RUNASGROUP:-2002}@g" "${src_file}"
   cp "${src_file}" /etc/kubernetes/manifests
-}
-
-function setup-node-termination-handler-manifest {
-    local -r nth_manifest="/etc/kubernetes/$1/$2/daemonset.yaml"
-    if [[ -n "${NODE_TERMINATION_HANDLER_IMAGE}" ]]; then
-        sed -i "s|image:.*|image: ${NODE_TERMINATION_HANDLER_IMAGE}|" "${nth_manifest}"
-    fi
 }
 
 function setup-konnectivity-agent-manifest {

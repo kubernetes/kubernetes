@@ -23,13 +23,13 @@ import (
 
 	"github.com/spf13/cobra"
 
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	policyv1 "k8s.io/api/policy/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	resourcecli "k8s.io/cli-runtime/pkg/resource"
-	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
+	policyv1client "k8s.io/client-go/kubernetes/typed/policy/v1"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubectl/pkg/util"
@@ -69,7 +69,7 @@ type PodDisruptionBudgetOpts struct {
 	Namespace        string
 	EnforceNamespace bool
 
-	Client         *policyclient.PolicyV1beta1Client
+	Client         *policyv1client.PolicyV1Client
 	DryRunStrategy cmdutil.DryRunStrategy
 	DryRunVerifier *resourcecli.DryRunVerifier
 
@@ -127,7 +127,7 @@ func (o *PodDisruptionBudgetOpts) Complete(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return err
 	}
-	o.Client, err = policyclient.NewForConfig(restConfig)
+	o.Client, err = policyv1client.NewForConfig(restConfig)
 	if err != nil {
 		return err
 	}
@@ -230,15 +230,15 @@ func (o *PodDisruptionBudgetOpts) Run() error {
 	return o.PrintObj(podDisruptionBudget)
 }
 
-func (o *PodDisruptionBudgetOpts) createPodDisruptionBudgets() (*policyv1beta1.PodDisruptionBudget, error) {
+func (o *PodDisruptionBudgetOpts) createPodDisruptionBudgets() (*policyv1.PodDisruptionBudget, error) {
 	namespace := ""
 	if o.EnforceNamespace {
 		namespace = o.Namespace
 	}
 
-	podDisruptionBudget := &policyv1beta1.PodDisruptionBudget{
+	podDisruptionBudget := &policyv1.PodDisruptionBudget{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: policyv1beta1.SchemeGroupVersion.String(),
+			APIVersion: policyv1.SchemeGroupVersion.String(),
 			Kind:       "PodDisruptionBudget",
 		},
 		ObjectMeta: metav1.ObjectMeta{

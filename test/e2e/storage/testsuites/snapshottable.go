@@ -184,20 +184,25 @@ func (s *snapshottableTestSuite) DefineTests(driver storageframework.TestDriver,
 			nodeName := pod.Spec.NodeName
 			gomega.Expect(nodeName).NotTo(gomega.BeEmpty(), "pod.Spec.NodeName must not be empty")
 
-			ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, pv.Name))
+			// Snapshot tests are only executed for CSI drivers. When CSI drivers
+			// are attached to the node they use VolumeHandle instead of the pv.Name.
+			volumeName := pv.Spec.PersistentVolumeSource.CSI.VolumeHandle
+
+			ginkgo.By(fmt.Sprintf("[init] waiting until the node=%s is not using the volume=%s", nodeName, volumeName))
 			success := storageutils.WaitUntil(framework.Poll, f.Timeouts.PVDelete, func() bool {
 				node, err := cs.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				volumesInUse := node.Status.VolumesInUse
 				framework.Logf("current volumes in use: %+v", volumesInUse)
 				for i := 0; i < len(volumesInUse); i++ {
-					if strings.HasSuffix(string(volumesInUse[i]), pv.Name) {
+					if strings.HasSuffix(string(volumesInUse[i]), volumeName) {
 						return false
 					}
 				}
 				return true
 			})
 			framework.ExpectEqual(success, true)
+
 		}
 
 		cleanup := func() {

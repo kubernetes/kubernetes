@@ -1504,7 +1504,7 @@ func TestFindMatchVolumeWithNode(t *testing.T) {
 			}),
 			node: node3,
 		},
-		"fail-nonavaiable": {
+		"fail-nonavaliable": {
 			expectedMatch: "",
 			claim: makePVC("100G", func(pvc *v1.PersistentVolumeClaim) {
 				pvc.Spec.AccessModes = []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}

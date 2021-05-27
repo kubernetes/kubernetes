@@ -75,21 +75,21 @@ var configDecoder = scheme.Codecs.UniversalDecoder()
 // frameworkImpl is the component responsible for initializing and running scheduler
 // plugins.
 type frameworkImpl struct {
-	registry              Registry
-	snapshotSharedLister  framework.SharedLister
-	waitingPods           *waitingPodsMap
-	pluginNameToWeightMap map[string]int
-	queueSortPlugins      []framework.QueueSortPlugin
-	preFilterPlugins      []framework.PreFilterPlugin
-	filterPlugins         []framework.FilterPlugin
-	postFilterPlugins     []framework.PostFilterPlugin
-	preScorePlugins       []framework.PreScorePlugin
-	scorePlugins          []framework.ScorePlugin
-	reservePlugins        []framework.ReservePlugin
-	preBindPlugins        []framework.PreBindPlugin
-	bindPlugins           []framework.BindPlugin
-	postBindPlugins       []framework.PostBindPlugin
-	permitPlugins         []framework.PermitPlugin
+	registry             Registry
+	snapshotSharedLister framework.SharedLister
+	waitingPods          *waitingPodsMap
+	scorePluginWeight    map[string]int
+	queueSortPlugins     []framework.QueueSortPlugin
+	preFilterPlugins     []framework.PreFilterPlugin
+	filterPlugins        []framework.FilterPlugin
+	postFilterPlugins    []framework.PostFilterPlugin
+	preScorePlugins      []framework.PreScorePlugin
+	scorePlugins         []framework.ScorePlugin
+	reservePlugins       []framework.ReservePlugin
+	preBindPlugins       []framework.PreBindPlugin
+	bindPlugins          []framework.BindPlugin
+	postBindPlugins      []framework.PostBindPlugin
+	permitPlugins        []framework.PermitPlugin
 
 	clientSet       clientset.Interface
 	kubeConfig      *restclient.Config
@@ -258,19 +258,19 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	}
 
 	f := &frameworkImpl{
-		registry:              r,
-		snapshotSharedLister:  options.snapshotSharedLister,
-		pluginNameToWeightMap: make(map[string]int),
-		waitingPods:           newWaitingPodsMap(),
-		clientSet:             options.clientSet,
-		kubeConfig:            options.kubeConfig,
-		eventRecorder:         options.eventRecorder,
-		informerFactory:       options.informerFactory,
-		metricsRecorder:       options.metricsRecorder,
-		runAllFilters:         options.runAllFilters,
-		extenders:             options.extenders,
-		PodNominator:          options.podNominator,
-		parallelizer:          options.parallelizer,
+		registry:             r,
+		snapshotSharedLister: options.snapshotSharedLister,
+		scorePluginWeight:    make(map[string]int),
+		waitingPods:          newWaitingPodsMap(),
+		clientSet:            options.clientSet,
+		kubeConfig:           options.kubeConfig,
+		eventRecorder:        options.eventRecorder,
+		informerFactory:      options.informerFactory,
+		metricsRecorder:      options.metricsRecorder,
+		runAllFilters:        options.runAllFilters,
+		extenders:            options.extenders,
+		PodNominator:         options.podNominator,
+		parallelizer:         options.parallelizer,
 	}
 
 	if profile == nil {
@@ -280,6 +280,22 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	f.profileName = profile.SchedulerName
 	if profile.Plugins == nil {
 		return f, nil
+	}
+
+	var totalPriority int64
+	for _, e := range profile.Plugins.Score.Enabled {
+		// a weight of zero is not permitted, plugins can be disabled explicitly
+		// when configured.
+		f.scorePluginWeight[e.Name] = int(e.Weight)
+		if f.scorePluginWeight[e.Name] == 0 {
+			f.scorePluginWeight[e.Name] = 1
+		}
+
+		// Checks totalPriority against MaxTotalScore to avoid overflow
+		if int64(f.scorePluginWeight[e.Name])*framework.MaxNodeScore > framework.MaxTotalScore-totalPriority {
+			return nil, fmt.Errorf("total score of Score plugins could overflow")
+		}
+		totalPriority += int64(f.scorePluginWeight[e.Name]) * framework.MaxNodeScore
 	}
 
 	// get needed plugins from config
@@ -300,7 +316,6 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	}
 
 	pluginsMap := make(map[string]framework.Plugin)
-	var totalPriority int64
 	for name, factory := range r {
 		// initialize only needed plugins.
 		if _, ok := pg[name]; !ok {
@@ -325,18 +340,6 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 
 		// Update ClusterEventMap in place.
 		fillEventToPluginMap(p, options.clusterEventMap)
-
-		// a weight of zero is not permitted, plugins can be disabled explicitly
-		// when configured.
-		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
-		if f.pluginNameToWeightMap[name] == 0 {
-			f.pluginNameToWeightMap[name] = 1
-		}
-		// Checks totalPriority against MaxTotalScore to avoid overflow
-		if int64(f.pluginNameToWeightMap[name])*framework.MaxNodeScore > framework.MaxTotalScore-totalPriority {
-			return nil, fmt.Errorf("total score of Score plugins could overflow")
-		}
-		totalPriority += int64(f.pluginNameToWeightMap[name]) * framework.MaxNodeScore
 	}
 
 	for _, e := range f.getExtensionPoints(profile.Plugins) {
@@ -348,7 +351,7 @@ func NewFramework(r Registry, profile *config.KubeSchedulerProfile, opts ...Opti
 	// Verifying the score weights again since Plugin.Name() could return a different
 	// value from the one used in the configuration.
 	for _, scorePlugin := range f.scorePlugins {
-		if f.pluginNameToWeightMap[scorePlugin.Name()] == 0 {
+		if f.scorePluginWeight[scorePlugin.Name()] == 0 {
 			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
 		}
 	}
@@ -820,7 +823,7 @@ func (f *frameworkImpl) RunScorePlugins(ctx context.Context, state *framework.Cy
 	f.Parallelizer().Until(ctx, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		// Score plugins' weight has been checked when they are initialized.
-		weight := f.pluginNameToWeightMap[pl.Name()]
+		weight := f.scorePluginWeight[pl.Name()]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
 
 		for i, nodeScore := range nodeScoreList {
@@ -1140,7 +1143,7 @@ func (f *frameworkImpl) ListPlugins() map[string][]config.Plugin {
 			p := config.Plugin{Name: name}
 			if extName == "ScorePlugin" {
 				// Weights apply only to score plugins.
-				p.Weight = int32(f.pluginNameToWeightMap[name])
+				p.Weight = int32(f.scorePluginWeight[name])
 			}
 			cfgs = append(cfgs, p)
 		}

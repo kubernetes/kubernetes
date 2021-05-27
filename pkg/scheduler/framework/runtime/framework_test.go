@@ -134,6 +134,10 @@ func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
 }
 
+func newTestPlugin(injArgs runtime.Object, f framework.Handle) (framework.Plugin, error) {
+	return &TestPlugin{name: testPlugin}, nil
+}
+
 // TestPlugin implements all Plugin interfaces.
 type TestPlugin struct {
 	name string
@@ -329,6 +333,7 @@ var registry = func() Registry {
 	r.Register(scorePlugin1, newScorePlugin1)
 	r.Register(pluginNotImplementingScore, newPluginNotImplementingScore)
 	r.Register(duplicatePluginName, newDuplicatePlugin)
+	r.Register(testPlugin, newTestPlugin)
 	return r
 }()
 
@@ -2357,6 +2362,46 @@ func TestListPlugins(t *testing.T) {
 			plugins := f.ListPlugins()
 			if len(plugins) != tt.pluginSetCount {
 				t.Fatalf("Unexpected pluginSet count: %v", len(plugins))
+			}
+		})
+	}
+}
+
+func TestNewFrameworkPluginWeights(t *testing.T) {
+	tests := []struct {
+		name    string
+		plugins *config.Plugins
+	}{
+		{
+			name: "Extend multiple extension points by same plugin",
+			plugins: &config.Plugins{
+				Score:    config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}}},
+				PostBind: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 6}}},
+			},
+		},
+		{
+			name: "Add multiple score plugins",
+			plugins: &config.Plugins{
+				Score: config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 3}, {Name: scorePlugin1, Weight: 6}}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			profile := config.KubeSchedulerProfile{Plugins: tt.plugins}
+			f, err := newFrameworkWithQueueSortAndBind(registry, profile)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+
+			plugins := f.ListPlugins()
+			if len(plugins["ScorePlugin"]) != len(tt.plugins.Score.Enabled) {
+				t.Fatalf("Expect %d ScorePlugin, got %d from: %v", len(tt.plugins.Score.Enabled), len(plugins["ScorePlugin"]), plugins["ScorePlugin"])
+			}
+
+			if diff := cmp.Diff(tt.plugins.Score.Enabled, plugins["ScorePlugin"]); diff != "" {
+				t.Errorf("unexpected plugin weights (-want,+got):\n%s", diff)
 			}
 		})
 	}

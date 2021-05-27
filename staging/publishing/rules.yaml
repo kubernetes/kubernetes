@@ -1245,6 +1245,23 @@ rules:
     - repository: apimachinery
       branch: release-1.21
 
+- destination: mount-utils
+  library: true
+  branches:
+  - source:
+      branch: master
+      dir: staging/src/k8s.io/mount-utils
+    name: master
+  - source:
+      branch: release-1.20
+      dir: staging/src/k8s.io/mount-utils
+    name: release-1.20
+    go: 1.15.12
+  - source:
+      branch: release-1.21
+      dir: staging/src/k8s.io/mount-utils
+    name: release-1.21
+
 - destination: legacy-cloud-providers
   library: true
   branches:
@@ -1268,6 +1285,8 @@ rules:
     - repository: component-base
       branch: master
     - repository: controller-manager
+      branch: master
+    - repository: mount-utils
       branch: master
   - source:
       branch: release-1.19
@@ -1442,23 +1461,6 @@ rules:
       branch: release-1.21
     - repository: metrics
       branch: release-1.21
-
-- destination: mount-utils
-  library: true
-  branches:
-  - source:
-      branch: master
-      dir: staging/src/k8s.io/mount-utils
-    name: master
-  - source:
-      branch: release-1.20
-      dir: staging/src/k8s.io/mount-utils
-    name: release-1.20
-    go: 1.15.12
-  - source:
-      branch: release-1.21
-      dir: staging/src/k8s.io/mount-utils
-    name: release-1.21
 
 - destination: pod-security-admission
   library: true

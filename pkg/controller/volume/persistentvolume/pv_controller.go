@@ -1223,7 +1223,6 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(volume *v1.Persis
 		klog.V(3).Infof("recycleVolumeOperation [%s]: failed to make recycled volume 'Available' (%v), we will recycle the volume again", volume.Name, err)
 		return
 	}
-	return
 }
 
 // deleteVolumeOperation deletes a volume. This method is running in standalone

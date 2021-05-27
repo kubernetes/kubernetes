@@ -166,9 +166,7 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		}
 
 		if endpointPort.AppProtocol != nil {
-			for _, msg := range validation.IsQualifiedName(*endpointPort.AppProtocol) {
-				allErrs = append(allErrs, field.Invalid(idxPath.Child("appProtocol"), endpointPort.AppProtocol, msg))
-			}
+			allErrs = append(allErrs, apivalidation.ValidateQualifiedName(*endpointPort.AppProtocol, idxPath.Child("appProtocol"))...)
 		}
 	}
 
