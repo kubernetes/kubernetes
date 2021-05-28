@@ -6235,12 +6235,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: sessionAffinityConfig
       type:
         namedType: io.k8s.api.core.v1.SessionAffinityConfig
-    - name: topologyKeys
-      type:
-        list:
-          elementType:
-            scalar: string
-          elementRelationship: atomic
     - name: type
       type:
         scalar: string
