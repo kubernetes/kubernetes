@@ -197,7 +197,7 @@ func checkMinVersion(vstring string) bool {
 
 	minVersion, err := utilversion.ParseGeneric(MinIPSetCheckVersion)
 	if err != nil {
-		klog.ErrorS(err, "Invalid version string MinCheckVersion", "version", MinIPSetCheckVersion)
+		klog.ErrorS(err, "Invalid version string", "minIPSetCheckVersion", MinIPSetCheckVersion)
 		return false
 	}
 	return !version.LessThan(minVersion)
