@@ -34,9 +34,11 @@ type InitConfiguration struct {
 
 	// BootstrapTokens is respected at `kubeadm init` time and describes a set of Bootstrap Tokens to create.
 	// This information IS NOT uploaded to the kubeadm cluster configmap, partly because of its sensitive nature
+	// +optional
 	BootstrapTokens []BootstrapToken `json:"bootstrapTokens,omitempty"`
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
+	// +optional
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
 	// LocalAPIEndpoint represents the endpoint of the API server instance that's deployed on this control plane node
@@ -45,10 +47,12 @@ type InitConfiguration struct {
 	// configuration object lets you customize what IP/DNS name and port the local API server advertises it's accessible
 	// on. By default, kubeadm tries to auto-detect the IP of the default interface and use that, but in case that process
 	// fails you may set the desired value here.
+	// +optional
 	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
+	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 
 	// SkipPhases is a list of phases to skip during command execution.
@@ -65,12 +69,15 @@ type ClusterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Etcd holds configuration for etcd.
+	// +optional
 	Etcd Etcd `json:"etcd,omitempty"`
 
 	// Networking holds configuration for the networking topology of the cluster.
+	// +optional
 	Networking Networking `json:"networking,omitempty"`
 
 	// KubernetesVersion is the target version of the control plane.
+	// +optional
 	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
 
 	// ControlPlaneEndpoint sets a stable IP address or DNS name for the control plane; it
@@ -84,33 +91,42 @@ type ClusterConfiguration struct {
 	// control plane instances.
 	// e.g.  in environments with enforced node recycling, the ControlPlaneEndpoint
 	// could be used for assigning a stable DNS to the control plane.
+	// +optional
 	ControlPlaneEndpoint string `json:"controlPlaneEndpoint,omitempty"`
 
 	// APIServer contains extra settings for the API server control plane component
+	// +optional
 	APIServer APIServer `json:"apiServer,omitempty"`
 
 	// ControllerManager contains extra settings for the controller manager control plane component
+	// +optional
 	ControllerManager ControlPlaneComponent `json:"controllerManager,omitempty"`
 
 	// Scheduler contains extra settings for the scheduler control plane component
+	// +optional
 	Scheduler ControlPlaneComponent `json:"scheduler,omitempty"`
 
 	// DNS defines the options for the DNS add-on installed in the cluster.
+	// +optional
 	DNS DNS `json:"dns,omitempty"`
 
 	// CertificatesDir specifies where to store or look for all required certificates.
+	// +optional
 	CertificatesDir string `json:"certificatesDir,omitempty"`
 
 	// ImageRepository sets the container registry to pull images from.
 	// If empty, `k8s.gcr.io` will be used by default; in case of kubernetes version is a CI build (kubernetes version starts with `ci/` or `ci-cross/`)
 	// `gcr.io/k8s-staging-ci-images` will be used as a default for control plane components and for kube-proxy, while `k8s.gcr.io`
 	// will be used for all the other images.
+	// +optional
 	ImageRepository string `json:"imageRepository,omitempty"`
 
 	// FeatureGates enabled by the user.
+	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
 
 	// The cluster name
+	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 }
 
@@ -119,9 +135,11 @@ type ControlPlaneComponent struct {
 	// ExtraArgs is an extra set of flags to pass to the control plane component.
 	// TODO: This is temporary and ideally we would like to switch all components to
 	// use ComponentConfig + ConfigMaps.
+	// +optional
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
 	// ExtraVolumes is an extra set of host volumes, mounted to the control plane component.
+	// +optional
 	ExtraVolumes []HostPathMount `json:"extraVolumes,omitempty"`
 }
 
@@ -130,9 +148,11 @@ type APIServer struct {
 	ControlPlaneComponent `json:",inline"`
 
 	// CertSANs sets extra Subject Alternative Names for the API Server signing cert.
+	// +optional
 	CertSANs []string `json:"certSANs,omitempty"`
 
 	// TimeoutForControlPlane controls the timeout that we use for API server to appear
+	// +optional
 	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
 }
 
@@ -150,10 +170,12 @@ type DNS struct {
 type ImageMeta struct {
 	// ImageRepository sets the container registry to pull images from.
 	// if not set, the ImageRepository defined in ClusterConfiguration will be used instead.
+	// +optional
 	ImageRepository string `json:"imageRepository,omitempty"`
 
 	// ImageTag allows to specify a tag for the image.
 	// In case this value is set, kubeadm does not change automatically the version of the above components during upgrades.
+	// +optional
 	ImageTag string `json:"imageTag,omitempty"`
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
@@ -162,10 +184,12 @@ type ImageMeta struct {
 // APIEndpoint struct contains elements of API server instance deployed on a node.
 type APIEndpoint struct {
 	// AdvertiseAddress sets the IP address for the API server to advertise.
+	// +optional
 	AdvertiseAddress string `json:"advertiseAddress,omitempty"`
 
 	// BindPort sets the secure port for the API Server to bind to.
 	// Defaults to 6443.
+	// +optional
 	BindPort int32 `json:"bindPort,omitempty"`
 }
 
@@ -175,9 +199,11 @@ type NodeRegistrationOptions struct {
 	// Name is the `.Metadata.Name` field of the Node API object that will be created in this `kubeadm init` or `kubeadm join` operation.
 	// This field is also used in the CommonName field of the kubelet's client certificate to the API server.
 	// Defaults to the hostname of the node if not provided.
+	// +optional
 	Name string `json:"name,omitempty"`
 
 	// CRISocket is used to retrieve container runtime info. This information will be annotated to the Node API object, for later re-use
+	// +optional
 	CRISocket string `json:"criSocket,omitempty"`
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
@@ -188,19 +214,24 @@ type NodeRegistrationOptions struct {
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file
 	// kubeadm writes at runtime for the kubelet to source. This overrides the generic base-level configuration in the kubelet-config-1.X ConfigMap
 	// Flags have higher priority when parsing. These values are local and specific to the node kubeadm is executing on.
+	// +optional
 	KubeletExtraArgs map[string]string `json:"kubeletExtraArgs,omitempty"`
 
 	// IgnorePreflightErrors provides a slice of pre-flight errors to be ignored when the current node is registered.
+	// +optional
 	IgnorePreflightErrors []string `json:"ignorePreflightErrors,omitempty"`
 }
 
 // Networking contains elements describing cluster's networking configuration
 type Networking struct {
 	// ServiceSubnet is the subnet used by k8s services. Defaults to "10.96.0.0/12".
+	// +optional
 	ServiceSubnet string `json:"serviceSubnet,omitempty"`
 	// PodSubnet is the subnet used by pods.
+	// +optional
 	PodSubnet string `json:"podSubnet,omitempty"`
 	// DNSDomain is the dns domain used by k8s services. Defaults to "cluster.local".
+	// +optional
 	DNSDomain string `json:"dnsDomain,omitempty"`
 }
 
@@ -211,18 +242,23 @@ type BootstrapToken struct {
 	Token *BootstrapTokenString `json:"token" datapolicy:"token"`
 	// Description sets a human-friendly message why this token exists and what it's used
 	// for, so other administrators can know its purpose.
+	// +optional
 	Description string `json:"description,omitempty"`
 	// TTL defines the time to live for this token. Defaults to 24h.
 	// Expires and TTL are mutually exclusive.
+	// +optional
 	TTL *metav1.Duration `json:"ttl,omitempty"`
 	// Expires specifies the timestamp when this token expires. Defaults to being set
 	// dynamically at runtime based on the TTL. Expires and TTL are mutually exclusive.
+	// +optional
 	Expires *metav1.Time `json:"expires,omitempty"`
 	// Usages describes the ways in which this token can be used. Can by default be used
 	// for establishing bidirectional trust, but that can be changed here.
+	// +optional
 	Usages []string `json:"usages,omitempty"`
 	// Groups specifies the extra groups that this token will authenticate as when/if
 	// used for authentication
+	// +optional
 	Groups []string `json:"groups,omitempty"`
 }
 
@@ -231,10 +267,12 @@ type Etcd struct {
 
 	// Local provides configuration knobs for configuring the local etcd instance
 	// Local and External are mutually exclusive
+	// +optional
 	Local *LocalEtcd `json:"local,omitempty"`
 
 	// External describes how to connect to an external etcd cluster
 	// Local and External are mutually exclusive
+	// +optional
 	External *ExternalEtcd `json:"external,omitempty"`
 }
 
@@ -249,11 +287,14 @@ type LocalEtcd struct {
 
 	// ExtraArgs are extra arguments provided to the etcd binary
 	// when run inside a static pod.
+	// +optional
 	ExtraArgs map[string]string `json:"extraArgs,omitempty"`
 
 	// ServerCertSANs sets extra Subject Alternative Names for the etcd server signing cert.
+	// +optional
 	ServerCertSANs []string `json:"serverCertSANs,omitempty"`
 	// PeerCertSANs sets extra Subject Alternative Names for the etcd peer signing cert.
+	// +optional
 	PeerCertSANs []string `json:"peerCertSANs,omitempty"`
 }
 
@@ -283,11 +324,13 @@ type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
+	// +optional
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
 	// CACertPath is the path to the SSL certificate authority used to
 	// secure comunications between node and control-plane.
 	// Defaults to "/etc/kubernetes/pki/ca.crt".
+	// +optional
 	CACertPath string `json:"caCertPath,omitempty"`
 
 	// Discovery specifies the options for the kubelet to use during the TLS Bootstrap process
@@ -295,6 +338,7 @@ type JoinConfiguration struct {
 
 	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
 	// If nil, no additional control plane instance will be deployed.
+	// +optional
 	ControlPlane *JoinControlPlane `json:"controlPlane,omitempty"`
 
 	// SkipPhases is a list of phases to skip during command execution.
@@ -307,10 +351,12 @@ type JoinConfiguration struct {
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.
 type JoinControlPlane struct {
 	// LocalAPIEndpoint represents the endpoint of the API server instance to be deployed on this node.
+	// +optional
 	LocalAPIEndpoint APIEndpoint `json:"localAPIEndpoint,omitempty"`
 
 	// CertificateKey is the key that is used for decryption of certificates after they are downloaded from the secret
 	// upon joining a new control plane node. The corresponding encryption key is in the InitConfiguration.
+	// +optional
 	CertificateKey string `json:"certificateKey,omitempty"`
 }
 
@@ -318,18 +364,22 @@ type JoinControlPlane struct {
 type Discovery struct {
 	// BootstrapToken is used to set the options for bootstrap token based discovery
 	// BootstrapToken and File are mutually exclusive
+	// +optional
 	BootstrapToken *BootstrapTokenDiscovery `json:"bootstrapToken,omitempty"`
 
 	// File is used to specify a file or URL to a kubeconfig file from which to load cluster information
 	// BootstrapToken and File are mutually exclusive
+	// +optional
 	File *FileDiscovery `json:"file,omitempty"`
 
 	// TLSBootstrapToken is a token used for TLS bootstrapping.
 	// If .BootstrapToken is set, this field is defaulted to .BootstrapToken.Token, but can be overridden.
 	// If .File is set, this field **must be set** in case the KubeConfigFile does not contain any other authentication information
+	// +optional
 	TLSBootstrapToken string `json:"tlsBootstrapToken,omitempty" datapolicy:"token"`
 
 	// Timeout modifies the discovery timeout
+	// +optional
 	Timeout *metav1.Duration `json:"timeout,omitempty"`
 }
 
@@ -340,6 +390,7 @@ type BootstrapTokenDiscovery struct {
 	Token string `json:"token" datapolicy:"token"`
 
 	// APIServerEndpoint is an IP or domain name to the API server from which info will be fetched.
+	// +optional
 	APIServerEndpoint string `json:"apiServerEndpoint,omitempty"`
 
 	// CACertHashes specifies a set of public key pins to verify
@@ -349,11 +400,13 @@ type BootstrapTokenDiscovery struct {
 	// where the only currently supported type is "sha256". This is a hex-encoded
 	// SHA-256 hash of the Subject Public Key Info (SPKI) object in DER-encoded
 	// ASN.1. These hashes can be calculated using, for example, OpenSSL.
+	// +optional
 	CACertHashes []string `json:"caCertHashes,omitempty" datapolicy:"security-key"`
 
 	// UnsafeSkipCAVerification allows token-based discovery
 	// without CA verification via CACertHashes. This can weaken
 	// the security of kubeadm since other nodes can impersonate the control-plane.
+	// +optional
 	UnsafeSkipCAVerification bool `json:"unsafeSkipCAVerification,omitempty"`
 }
 
@@ -374,7 +427,9 @@ type HostPathMount struct {
 	// MountPath is the path inside the pod where hostPath will be mounted.
 	MountPath string `json:"mountPath"`
 	// ReadOnly controls write access to the volume
+	// +optional
 	ReadOnly bool `json:"readOnly,omitempty"`
 	// PathType is the type of the HostPath.
+	// +optional
 	PathType v1.HostPathType `json:"pathType,omitempty"`
 }
