@@ -365,7 +365,7 @@ func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes
 	return allErrs
 }
 
-const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
+const sysctlPatternSegmentFmt string = "([a-z0-9][-_/a-z0-9]*)?[a-z0-9*]"
 
 // SysctlPatternFmt is a regex used for matching valid sysctl patterns.
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
