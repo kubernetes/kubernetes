@@ -303,9 +303,17 @@ func (t Tag) Extensions() []string {
 // are of the allowed values defined for the Unicode locale extension ('u') in
 // https://www.unicode.org/reports/tr35/#Unicode_Language_and_Locale_Identifiers.
 // TypeForKey will traverse the inheritance chain to get the correct value.
+//
+// If there are multiple types associated with a key, only the first will be
+// returned. If there is no type associated with a key, it returns the empty
+// string.
 func (t Tag) TypeForKey(key string) string {
-	if start, end, _ := t.findTypeForKey(key); end != start {
-		return t.str[start:end]
+	if _, start, end, _ := t.findTypeForKey(key); end != start {
+		s := t.str[start:end]
+		if p := strings.IndexByte(s, '-'); p >= 0 {
+			s = s[:p]
+		}
+		return s
 	}
 	return ""
 }
@@ -329,13 +337,13 @@ func (t Tag) SetTypeForKey(key, value string) (Tag, error) {
 
 	// Remove the setting if value is "".
 	if value == "" {
-		start, end, _ := t.findTypeForKey(key)
-		if start != end {
-			// Remove key tag and leading '-'.
-			start -= 4
-
+		start, sep, end, _ := t.findTypeForKey(key)
+		if start != sep {
 			// Remove a possible empty extension.
-			if (end == len(t.str) || t.str[end+2] == '-') && t.str[start-2] == '-' {
+			switch {
+			case t.str[start-2] != '-': // has previous elements.
+			case end == len(t.str), // end of string
+				end+2 < len(t.str) && t.str[end+2] == '-': // end of extension
 				start -= 2
 			}
 			if start == int(t.pVariant) && end == len(t.str) {
@@ -381,14 +389,14 @@ func (t Tag) SetTypeForKey(key, value string) (Tag, error) {
 		t.str = string(buf[:uStart+len(b)])
 	} else {
 		s := t.str
-		start, end, hasExt := t.findTypeForKey(key)
-		if start == end {
+		start, sep, end, hasExt := t.findTypeForKey(key)
+		if start == sep {
 			if hasExt {
 				b = b[2:]
 			}
-			t.str = fmt.Sprintf("%s-%s%s", s[:start], b, s[end:])
+			t.str = fmt.Sprintf("%s-%s%s", s[:sep], b, s[end:])
 		} else {
-			t.str = fmt.Sprintf("%s%s%s", s[:start], value, s[end:])
+			t.str = fmt.Sprintf("%s-%s%s", s[:start+3], value, s[end:])
 		}
 	}
 	return t, nil
@@ -399,10 +407,10 @@ func (t Tag) SetTypeForKey(key, value string) (Tag, error) {
 // wasn't found. The hasExt return value reports whether an -u extension was present.
 // Note: the extensions are typically very small and are likely to contain
 // only one key-type pair.
-func (t Tag) findTypeForKey(key string) (start, end int, hasExt bool) {
+func (t Tag) findTypeForKey(key string) (start, sep, end int, hasExt bool) {
 	p := int(t.pExt)
 	if len(key) != 2 || p == len(t.str) || p == 0 {
-		return p, p, false
+		return p, p, p, false
 	}
 	s := t.str
 
@@ -410,10 +418,10 @@ func (t Tag) findTypeForKey(key string) (start, end int, hasExt bool) {
 	for p++; s[p] != 'u'; p++ {
 		if s[p] > 'u' {
 			p--
-			return p, p, false
+			return p, p, p, false
 		}
 		if p = nextExtension(s, p); p == len(s) {
-			return len(s), len(s), false
+			return len(s), len(s), len(s), false
 		}
 	}
 	// Proceed to the hyphen following the extension name.
@@ -424,40 +432,28 @@ func (t Tag) findTypeForKey(key string) (start, end int, hasExt bool) {
 
 	// Iterate over keys until we get the end of a section.
 	for {
-		// p points to the hyphen preceding the current token.
-		if p3 := p + 3; s[p3] == '-' {
-			// Found a key.
-			// Check whether we just processed the key that was requested.
-			if curKey == key {
-				return start, p, true
+		end = p
+		for p++; p < len(s) && s[p] != '-'; p++ {
+		}
+		n := p - end - 1
+		if n <= 2 && curKey == key {
+			if sep < end {
+				sep++
 			}
-			// Set to the next key and continue scanning type tokens.
-			curKey = s[p+1 : p3]
+			return start, sep, end, true
+		}
+		switch n {
+		case 0, // invalid string
+			1: // next extension
+			return end, end, end, true
+		case 2:
+			// next key
+			curKey = s[end+1 : p]
 			if curKey > key {
-				return p, p, true
+				return end, end, end, true
 			}
-			// Start of the type token sequence.
-			start = p + 4
-			// A type is at least 3 characters long.
-			p += 7 // 4 + 3
-		} else {
-			// Attribute or type, which is at least 3 characters long.
-			p += 4
-		}
-		// p points past the third character of a type or attribute.
-		max := p + 5 // maximum length of token plus hyphen.
-		if len(s) < max {
-			max = len(s)
-		}
-		for ; p < max && s[p] != '-'; p++ {
-		}
-		// Bail if we have exhausted all tokens or if the next token starts
-		// a new extension.
-		if p == len(s) || s[p+2] == '-' {
-			if curKey == key {
-				return start, p, true
-			}
-			return p, p, true
+			start = end
+			sep = p
 		}
 	}
 }
