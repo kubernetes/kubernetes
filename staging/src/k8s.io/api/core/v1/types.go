@@ -30,8 +30,6 @@ const (
 	NamespaceAll string = ""
 	// NamespaceNodeLease is the namespace where we place node lease objects (used for node heartbeats)
 	NamespaceNodeLease string = "kube-node-lease"
-	// TopologyKeyAny is the service topology key that matches any node
-	TopologyKeyAny string = "*"
 )
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.
@@ -4039,11 +4037,6 @@ type LoadBalancerIngress struct {
 	Ports []PortStatus `json:"ports,omitempty" protobuf:"bytes,4,rep,name=ports"`
 }
 
-const (
-	// MaxServiceTopologyKeys is the largest number of topology keys allowed on a service
-	MaxServiceTopologyKeys = 16
-)
-
 // IPFamily represents the IP Family (IPv4 or IPv6). This type is used
 // to express the family of an IP expressed by a type (e.g. service.spec.ipFamilies).
 type IPFamily string
@@ -4240,22 +4233,8 @@ type ServiceSpec struct {
 	// +optional
 	SessionAffinityConfig *SessionAffinityConfig `json:"sessionAffinityConfig,omitempty" protobuf:"bytes,14,opt,name=sessionAffinityConfig"`
 
-	// topologyKeys is a preference-order list of topology keys which
-	// implementations of services should use to preferentially sort endpoints
-	// when accessing this Service, it can not be used at the same time as
-	// externalTrafficPolicy=Local.
-	// Topology keys must be valid label keys and at most 16 keys may be specified.
-	// Endpoints are chosen based on the first topology key with available backends.
-	// If this field is specified and all entries have no backends that match
-	// the topology of the client, the service has no backends for that client
-	// and connections should fail.
-	// The special value "*" may be used to mean "any topology". This catch-all
-	// value, if used, only makes sense as the last value in the list.
-	// If this is not specified or empty, no topology constraints will be applied.
-	// This field is alpha-level and is only honored by servers that enable the ServiceTopology feature.
-	// This field is deprecated and will be removed in a future version.
-	// +optional
-	TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
+	// TopologyKeys is tombstoned to show why 16 is reserved protobuf tag.
+	//TopologyKeys []string `json:"topologyKeys,omitempty" protobuf:"bytes,16,opt,name=topologyKeys"`
 
 	// IPFamily is tombstoned to show why 15 is a reserved protobuf tag.
 	// IPFamily *IPFamily `json:"ipFamily,omitempty" protobuf:"bytes,15,opt,name=ipFamily,Configcasttype=IPFamily"`

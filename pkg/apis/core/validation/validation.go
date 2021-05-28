@@ -4327,35 +4327,6 @@ func ValidateService(service *core.Service) field.ErrorList {
 		ports[key] = true
 	}
 
-	// Validate TopologyKeys
-	if len(service.Spec.TopologyKeys) > 0 {
-		topoPath := specPath.Child("topologyKeys")
-		// topologyKeys is mutually exclusive with 'externalTrafficPolicy=Local'
-		if service.Spec.ExternalTrafficPolicy == core.ServiceExternalTrafficPolicyTypeLocal {
-			allErrs = append(allErrs, field.Forbidden(topoPath, "may not be specified when `externalTrafficPolicy=Local`"))
-		}
-		if len(service.Spec.TopologyKeys) > core.MaxServiceTopologyKeys {
-			allErrs = append(allErrs, field.TooMany(topoPath, len(service.Spec.TopologyKeys), core.MaxServiceTopologyKeys))
-		}
-		topoKeys := sets.NewString()
-		for i, key := range service.Spec.TopologyKeys {
-			keyPath := topoPath.Index(i)
-			if topoKeys.Has(key) {
-				allErrs = append(allErrs, field.Duplicate(keyPath, key))
-			}
-			topoKeys.Insert(key)
-			// "Any" must be the last value specified
-			if key == v1.TopologyKeyAny && i != len(service.Spec.TopologyKeys)-1 {
-				allErrs = append(allErrs, field.Invalid(keyPath, key, `"*" must be the last value specified`))
-			}
-			if key != v1.TopologyKeyAny {
-				for _, msg := range validation.IsQualifiedName(key) {
-					allErrs = append(allErrs, field.Invalid(keyPath, service.Spec.TopologyKeys, msg))
-				}
-			}
-		}
-	}
-
 	// Validate SourceRange field and annotation
 	_, ok := service.Annotations[core.AnnotationLoadBalancerSourceRangesKey]
 	if len(service.Spec.LoadBalancerSourceRanges) > 0 || ok {

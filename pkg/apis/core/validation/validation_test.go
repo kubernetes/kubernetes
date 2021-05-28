@@ -18,7 +18,6 @@ package validation
 
 import (
 	"bytes"
-	"fmt"
 	"math"
 	"reflect"
 	"strings"
@@ -10253,8 +10252,6 @@ func TestValidatePodEphemeralContainersUpdate(t *testing.T) {
 }
 
 func TestValidateServiceCreate(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceTopology, true)()
-
 	requireDualStack := core.IPFamilyPolicyRequireDualStack
 	singleStack := core.IPFamilyPolicySingleStack
 	preferDualStack := core.IPFamilyPolicyPreferDualStack
@@ -11315,67 +11312,6 @@ func TestValidateServiceCreate(t *testing.T) {
 			numErrs: 0,
 		},
 
-		/* toplogy keys */
-		{
-			name: "valid topology keys",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					"topology.kubernetes.io/zone",
-					"topology.kubernetes.io/region",
-					v1.TopologyKeyAny,
-				}
-			},
-			numErrs: 0,
-		},
-		{
-			name: "invalid topology key",
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{"NoUppercaseOrSpecialCharsLike=Equals"}
-			},
-			numErrs: 1,
-		},
-		{
-			name: "too many topology keys",
-			tweakSvc: func(s *core.Service) {
-				for i := 0; i < core.MaxServiceTopologyKeys+1; i++ {
-					s.Spec.TopologyKeys = append(s.Spec.TopologyKeys, fmt.Sprintf("topologykey-%d", i))
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `"Any" was not the last key`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					v1.TopologyKeyAny,
-					"topology.kubernetes.io/zone",
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `duplicate topology key`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-					"kubernetes.io/hostname",
-					"topology.kubernetes.io/zone",
-				}
-			},
-			numErrs: 1,
-		},
-		{
-			name: `use topology keys with externalTrafficPolicy=Local`,
-			tweakSvc: func(s *core.Service) {
-				s.Spec.ExternalTrafficPolicy = "Local"
-				s.Spec.TopologyKeys = []string{
-					"kubernetes.io/hostname",
-				}
-			},
-			numErrs: 1,
-		},
 		{
 			name: `valid appProtocol`,
 			tweakSvc: func(s *core.Service) {
