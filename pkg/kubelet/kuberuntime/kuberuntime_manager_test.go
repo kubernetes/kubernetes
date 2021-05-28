@@ -533,6 +533,64 @@ func TestSyncPod(t *testing.T) {
 	}
 }
 
+func TestSyncPodWithConvertedPodSysctls(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []v1.Container{
+		{
+			Name:            "foo",
+			Image:           "busybox",
+			ImagePullPolicy: v1.PullIfNotPresent,
+		},
+	}
+
+	securityContext := &v1.PodSecurityContext{
+		Sysctls: []v1.Sysctl{
+			{
+				Name:  "kernel/shm_rmid_forced",
+				Value: "1",
+			},
+			{
+				Name:  "net/ipv4/ip_local_port_range",
+				Value: "1024 65535",
+			},
+		},
+	}
+	exceptSysctls := []v1.Sysctl{
+		{
+			Name:  "kernel.shm_rmid_forced",
+			Value: "1",
+		},
+		{
+			Name:  "net.ipv4.ip_local_port_range",
+			Value: "1024 65535",
+		},
+	}
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: v1.PodSpec{
+			Containers:      containers,
+			SecurityContext: securityContext,
+		},
+	}
+
+	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
+	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	assert.NoError(t, result.Error())
+	assert.Equal(t, exceptSysctls, pod.Spec.SecurityContext.Sysctls)
+	for _, sandbox := range fakeRuntime.Sandboxes {
+		assert.Equal(t, runtimeapi.PodSandboxState_SANDBOX_READY, sandbox.State)
+	}
+	for _, c := range fakeRuntime.Containers {
+		assert.Equal(t, runtimeapi.ContainerState_CONTAINER_RUNNING, c.State)
+	}
+}
+
 func TestPruneInitContainers(t *testing.T) {
 	fakeRuntime, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)

@@ -329,6 +329,20 @@ func usesHugePagesInProjectedEnv(item api.Container) bool {
 	return false
 }
 
+// hasSysctlsWithSlashNames returns true if the sysctl name contains a slash, otherwise it returns false
+func hasSysctlsWithSlashNames(podSpec *api.PodSpec) bool {
+	if podSpec.SecurityContext == nil {
+		return false
+	}
+	securityContext := podSpec.SecurityContext
+	for _, s := range securityContext.Sysctls {
+		if strings.Contains(s.Name, "/") {
+			return true
+		}
+	}
+	return false
+}
+
 func checkContainerUseIndivisibleHugePagesValues(container api.Container) bool {
 	for resourceName, quantity := range container.Resources.Limits {
 		if helper.IsHugePageResourceName(resourceName) {
@@ -420,6 +434,8 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 		AllowExpandedDNSConfig: utilfeature.DefaultFeatureGate.Enabled(features.ExpandedDNSConfig) || haveSameExpandedDNSConfig(podSpec, oldPodSpec),
 		// Allow pod spec to use OS field
 		AllowOSField: utilfeature.DefaultFeatureGate.Enabled(features.IdentifyPodOS),
+		// The default sysctl value does not contain a forward slash, and in 1.24 we intend to relax this to be true by default
+		AllowSysctlRegexContainSlash: false,
 	}
 
 	if oldPodSpec != nil {
@@ -440,6 +456,10 @@ func GetValidationOptionsFromPodSpecAndMeta(podSpec, oldPodSpec *api.PodSpec, po
 
 		// if old spec used non-integer multiple of huge page unit size, we must allow it
 		opts.AllowIndivisibleHugePagesValues = usesIndivisibleHugePagesValues(oldPodSpec)
+
+		// if old spec used use relaxed validation for Update requests where the existing object's sysctl contains a slash, we must allow it.
+		opts.AllowSysctlRegexContainSlash = hasSysctlsWithSlashNames(oldPodSpec)
+
 	}
 	if oldPodMeta != nil && !opts.AllowInvalidPodDeletionCost {
 		// This is an update, so validate only if the existing object was valid.

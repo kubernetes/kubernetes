@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
@@ -801,6 +802,17 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		metrics.StartedPodsTotal.Inc()
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
+
+		// ConvertPodSysctlsVariableToDotsSeparator converts sysctl variable
+		// in the Pod.Spec.SecurityContext.Sysctls slice into a dot as a separator.
+		// runc uses the dot as the separator to verify whether the sysctl variable
+		// is correct in a separate namespace, so when using the slash as the sysctl
+		// variable separator, runc returns an error: "sysctl is not in a separate kernel namespace"
+		// and the podSandBox cannot be successfully created. Therefore, before calling runc,
+		// we need to convert the sysctl variable, the dot is used as a separator to separate the kernel namespace.
+		// When runc supports slash as sysctl separator, this function can no longer be used.
+		sysctl.ConvertPodSysctlsVariableToDotsSeparator(pod.Spec.SecurityContext)
+
 		podSandboxID, msg, err = m.createPodSandbox(pod, podContainerChanges.Attempt)
 		if err != nil {
 			// createPodSandbox can return an error from CNI, CSI,
