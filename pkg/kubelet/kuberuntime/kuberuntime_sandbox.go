@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -36,7 +37,7 @@ import (
 )
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
-func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32) (string, string, error) {
+func (m *kubeGenericRuntimeManager) createPodSandbox(ctx context.Context, pod *v1.Pod, attempt uint32) (string, string, error) {
 	podSandboxConfig, err := m.generatePodSandboxConfig(pod, attempt)
 	if err != nil {
 		message := fmt.Sprintf("Failed to generate sandbox config for pod %q: %v", format.Pod(pod), err)
@@ -64,8 +65,11 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 		}
 	}
 
-	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, runtimeHandler)
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(ctx, podSandboxConfig, runtimeHandler)
 	if err != nil {
+		if err == context.Canceled {
+			return "", "", err
+		}
 		message := fmt.Sprintf("Failed to create sandbox for pod %q: %v", format.Pod(pod), err)
 		klog.ErrorS(err, "Failed to create sandbox for pod", "pod", klog.KObj(pod))
 		return "", message, err

@@ -98,14 +98,14 @@ func (r *remoteRuntimeService) Version(apiVersion string) (*runtimeapi.VersionRe
 
 // RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 // the sandbox is in ready state.
-func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (r *remoteRuntimeService) RunPodSandbox(ctx context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	// Use 2 times longer timeout for sandbox operation (4 mins by default)
 	// TODO: Make the pod sandbox timeout configurable.
 	timeout := r.timeout * 2
 
 	klog.V(10).InfoS("[RemoteRuntimeService] RunPodSandbox", "config", config, "runtimeHandler", runtimeHandler, "timeout", timeout)
 
-	ctx, cancel := getContextWithTimeout(timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	resp, err := r.runtimeClient.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
@@ -113,6 +113,9 @@ func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 		RuntimeHandler: runtimeHandler,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Canceled {
+			return "", context.Canceled
+		}
 		klog.ErrorS(err, "RunPodSandbox from runtime service failed")
 		return "", err
 	}
@@ -131,16 +134,19 @@ func (r *remoteRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig
 
 // StopPodSandbox stops the sandbox. If there are any running containers in the
 // sandbox, they should be forced to termination.
-func (r *remoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
+func (r *remoteRuntimeService) StopPodSandbox(ctx context.Context, podSandBoxID string) error {
 	klog.V(10).InfoS("[RemoteRuntimeService] StopPodSandbox", "podSandboxID", podSandBoxID, "timeout", r.timeout)
 
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	_, err := r.runtimeClient.StopPodSandbox(ctx, &runtimeapi.StopPodSandboxRequest{
 		PodSandboxId: podSandBoxID,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Canceled {
+			return context.Canceled
+		}
 		klog.ErrorS(err, "StopPodSandbox from runtime service failed", "podSandboxID", podSandBoxID)
 		return err
 	}
@@ -152,15 +158,18 @@ func (r *remoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 
 // RemovePodSandbox removes the sandbox. If there are any containers in the
 // sandbox, they should be forcibly removed.
-func (r *remoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
+func (r *remoteRuntimeService) RemovePodSandbox(ctx context.Context, podSandBoxID string) error {
 	klog.V(10).InfoS("[RemoteRuntimeService] RemovePodSandbox", "podSandboxID", podSandBoxID, "timeout", r.timeout)
-	ctx, cancel := getContextWithTimeout(r.timeout)
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
 
 	_, err := r.runtimeClient.RemovePodSandbox(ctx, &runtimeapi.RemovePodSandboxRequest{
 		PodSandboxId: podSandBoxID,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Canceled {
+			return context.Canceled
+		}
 		klog.ErrorS(err, "RemovePodSandbox from runtime service failed", "podSandboxID", podSandBoxID)
 		return err
 	}
@@ -259,12 +268,12 @@ func (r *remoteRuntimeService) StartContainer(containerID string) error {
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (r *remoteRuntimeService) StopContainer(containerID string, timeout int64) error {
+func (r *remoteRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
 	klog.V(10).InfoS("[RemoteRuntimeService] StopContainer", "containerID", containerID, "timeout", timeout)
 	// Use timeout + default timeout (2 minutes) as timeout to leave extra time
 	// for SIGKILL container and request latency.
 	t := r.timeout + time.Duration(timeout)*time.Second
-	ctx, cancel := getContextWithTimeout(t)
+	ctx, cancel := context.WithTimeout(ctx, t)
 	defer cancel()
 
 	r.logReduction.ClearID(containerID)
@@ -273,6 +282,9 @@ func (r *remoteRuntimeService) StopContainer(containerID string, timeout int64) 
 		Timeout:     timeout,
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.Canceled {
+			return context.Canceled
+		}
 		klog.ErrorS(err, "StopContainer from runtime service failed", "containerID", containerID)
 		return err
 	}

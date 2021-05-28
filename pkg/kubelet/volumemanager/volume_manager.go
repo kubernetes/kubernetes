@@ -17,6 +17,7 @@ limitations under the License.
 package volumemanager
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -103,14 +104,14 @@ type VolumeManager interface {
 	// actual state of the world).
 	// An error is returned if all volumes are not attached and mounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForAttachAndMount(pod *v1.Pod) error
+	WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error
 
 	// WaitForUnmount processes the volumes referenced in the specified
 	// pod and blocks until they are all unmounted (reflected in the actual
 	// state of the world).
 	// An error is returned if all volumes are not unmounted within
 	// the duration defined in podAttachAndMountTimeout.
-	WaitForUnmount(pod *v1.Pod) error
+	WaitForUnmount(ctx context.Context, pod *v1.Pod) error
 
 	// GetMountedVolumesForPod returns a VolumeMap containing the volumes
 	// referenced by the specified pod that are successfully attached and
@@ -371,7 +372,7 @@ func (vm *volumeManager) MarkVolumesAsReportedInUse(
 	vm.desiredStateOfWorld.MarkVolumesReportedInUse(volumesReportedAsInUse)
 }
 
-func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
+func (vm *volumeManager) WaitForAttachAndMount(ctx context.Context, pod *v1.Pod) error {
 	if pod == nil {
 		return nil
 	}
@@ -390,12 +391,16 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	// like Downward API, depend on this to update the contents of the volume).
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollImmediate(
+	err := wait.PollImmediateWithContext(
+		ctx,
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesMountedFunc(uniquePodName, expectedVolumes))
 
 	if err != nil {
+		if err == context.Canceled {
+			return err
+		}
 		unmountedVolumes :=
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes for error message
@@ -417,7 +422,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 	return nil
 }
 
-func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
+func (vm *volumeManager) WaitForUnmount(ctx context.Context, pod *v1.Pod) error {
 	if pod == nil {
 		return nil
 	}
@@ -427,12 +432,16 @@ func (vm *volumeManager) WaitForUnmount(pod *v1.Pod) error {
 
 	vm.desiredStateOfWorldPopulator.ReprocessPod(uniquePodName)
 
-	err := wait.PollImmediate(
+	err := wait.PollImmediateWithContext(
+		ctx,
 		podAttachAndMountRetryInterval,
 		podAttachAndMountTimeout,
 		vm.verifyVolumesUnmountedFunc(uniquePodName))
 
 	if err != nil {
+		if err == context.Canceled {
+			return err
+		}
 		var mountedVolumes []string
 		for _, v := range vm.actualStateOfWorld.GetMountedVolumesForPod(uniquePodName) {
 			mountedVolumes = append(mountedVolumes, v.OuterVolumeSpecName)
@@ -467,8 +476,8 @@ func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string
 
 // verifyVolumesMountedFunc returns a method that returns true when all expected
 // volumes are mounted.
-func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionFunc {
-	return func() (done bool, err error) {
+func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, expectedVolumes []string) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (done bool, err error) {
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}
@@ -478,8 +487,8 @@ func (vm *volumeManager) verifyVolumesMountedFunc(podName types.UniquePodName, e
 
 // verifyVolumesUnmountedFunc returns a method that is true when there are no mounted volumes for this
 // pod.
-func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName) wait.ConditionFunc {
-	return func() (done bool, err error) {
+func (vm *volumeManager) verifyVolumesUnmountedFunc(podName types.UniquePodName) wait.ConditionWithContextFunc {
+	return func(ctx context.Context) (done bool, err error) {
 		if errs := vm.desiredStateOfWorld.PopPodErrors(podName); len(errs) > 0 {
 			return true, errors.New(strings.Join(errs, "; "))
 		}

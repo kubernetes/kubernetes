@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"time"
 
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -95,11 +96,11 @@ func (in instrumentedRuntimeService) StartContainer(containerID string) error {
 	return err
 }
 
-func (in instrumentedRuntimeService) StopContainer(containerID string, timeout int64) error {
+func (in instrumentedRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
 	const operation = "stop_container"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StopContainer(containerID, timeout)
+	err := in.service.StopContainer(ctx, containerID, timeout)
 	recordError(operation, err)
 	return err
 }
@@ -176,13 +177,13 @@ func (in instrumentedRuntimeService) Attach(req *runtimeapi.AttachRequest) (*run
 	return resp, err
 }
 
-func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (in instrumentedRuntimeService) RunPodSandbox(ctx context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
 	const operation = "run_podsandbox"
 	startTime := time.Now()
 	defer recordOperation(operation, startTime)
 	defer metrics.RunPodSandboxDuration.WithLabelValues(runtimeHandler).Observe(metrics.SinceInSeconds(startTime))
 
-	out, err := in.service.RunPodSandbox(config, runtimeHandler)
+	out, err := in.service.RunPodSandbox(ctx, config, runtimeHandler)
 	recordError(operation, err)
 	if err != nil {
 		metrics.RunPodSandboxErrors.WithLabelValues(runtimeHandler).Inc()
@@ -190,20 +191,20 @@ func (in instrumentedRuntimeService) RunPodSandbox(config *runtimeapi.PodSandbox
 	return out, err
 }
 
-func (in instrumentedRuntimeService) StopPodSandbox(podSandboxID string) error {
+func (in instrumentedRuntimeService) StopPodSandbox(ctx context.Context, podSandboxID string) error {
 	const operation = "stop_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.StopPodSandbox(podSandboxID)
+	err := in.service.StopPodSandbox(ctx, podSandboxID)
 	recordError(operation, err)
 	return err
 }
 
-func (in instrumentedRuntimeService) RemovePodSandbox(podSandboxID string) error {
+func (in instrumentedRuntimeService) RemovePodSandbox(ctx context.Context, podSandboxID string) error {
 	const operation = "remove_podsandbox"
 	defer recordOperation(operation, time.Now())
 
-	err := in.service.RemovePodSandbox(podSandboxID)
+	err := in.service.RemovePodSandbox(ctx, podSandboxID)
 	recordError(operation, err)
 	return err
 }

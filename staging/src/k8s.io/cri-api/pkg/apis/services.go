@@ -17,6 +17,7 @@ limitations under the License.
 package cri
 
 import (
+	"context"
 	"time"
 
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -36,7 +37,7 @@ type ContainerManager interface {
 	// StartContainer starts the container.
 	StartContainer(containerID string) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
-	StopContainer(containerID string, timeout int64) error
+	StopContainer(ctx context.Context, containerID string, timeout int64) error
 	// RemoveContainer removes the container.
 	RemoveContainer(containerID string) error
 	// ListContainers lists all containers by filters.
@@ -63,13 +64,13 @@ type ContainerManager interface {
 type PodSandboxManager interface {
 	// RunPodSandbox creates and starts a pod-level sandbox. Runtimes should ensure
 	// the sandbox is in ready state.
-	RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error)
+	RunPodSandbox(ctx context.Context, config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error)
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
-	StopPodSandbox(podSandboxID string) error
+	StopPodSandbox(ctx context.Context, podSandboxID string) error
 	// RemovePodSandbox removes the sandbox. If there are running containers in the
 	// sandbox, they should be forcibly removed.
-	RemovePodSandbox(podSandboxID string) error
+	RemovePodSandbox(ctx context.Context, podSandboxID string) error
 	// PodSandboxStatus returns the Status of the PodSandbox.
 	PodSandboxStatus(podSandboxID string) (*runtimeapi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.

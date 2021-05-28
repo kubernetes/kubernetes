@@ -17,6 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -76,7 +77,7 @@ func TestListVolumesForPod(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.TODO(), pod)
 	assert.NoError(t, err)
 
 	podName := util.GetUniquePodName(pod)
@@ -191,7 +192,7 @@ func TestPodVolumesExist(t *testing.T) {
 
 	kubelet.podManager.SetPods(pods)
 	for _, pod := range pods {
-		err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+		err := kubelet.volumeManager.WaitForAttachAndMount(context.TODO(), pod)
 		assert.NoError(t, err)
 	}
 
@@ -234,7 +235,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 	defer close(stopCh)
 
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.TODO(), pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -292,7 +293,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podManager.SetPods([]*v1.Pod{pod})
 
 	// Verify volumes attached
-	err := kubelet.volumeManager.WaitForAttachAndMount(pod)
+	err := kubelet.volumeManager.WaitForAttachAndMount(context.Background(), pod)
 	assert.NoError(t, err)
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
@@ -319,7 +320,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 	kubelet.podWorkers.(*fakePodWorkers).removeRuntime = map[types.UID]bool{pod.UID: true}
 	kubelet.podManager.SetPods([]*v1.Pod{})
 
-	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForUnmount(context.TODO(), pod))
 	if actual := kubelet.volumeManager.GetMountedVolumesForPod(util.GetUniquePodName(pod)); len(actual) > 0 {
 		t.Fatalf("expected volume unmount to wait for no volumes: %v", actual)
 	}
@@ -398,7 +399,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		stopCh,
 		kubelet.volumeManager)
 
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.TODO(), pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))
@@ -477,7 +478,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		kubelet.volumeManager)
 
 	// Verify volumes attached
-	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(pod))
+	assert.NoError(t, kubelet.volumeManager.WaitForAttachAndMount(context.TODO(), pod))
 
 	podVolumes := kubelet.volumeManager.GetMountedVolumesForPod(
 		util.GetUniquePodName(pod))

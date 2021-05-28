@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	goerrors "errors"
 	"fmt"
 	"math"
@@ -24,9 +25,9 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,7 +50,7 @@ type StatsProvider interface {
 type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
-	GarbageCollect() error
+	GarbageCollect(ctx context.Context) error
 
 	// Start async garbage collection of images.
 	Start()
@@ -57,7 +58,7 @@ type ImageGCManager interface {
 	GetImageList() ([]container.Image, error)
 
 	// Delete all unused images.
-	DeleteUnusedImages() error
+	DeleteUnusedImages(ctx context.Context) error
 }
 
 // ImageGCPolicy is a policy for garbage collecting images. Policy defines an allowed band in
@@ -270,7 +271,7 @@ func (im *realImageGCManager) detectImages(detectTime time.Time) (sets.String, e
 	return imagesInUse, nil
 }
 
-func (im *realImageGCManager) GarbageCollect() error {
+func (im *realImageGCManager) GarbageCollect(ctx context.Context) error {
 	// Get disk usage on disk holding images.
 	fsStats, err := im.statsProvider.ImageFsStats()
 	if err != nil {
@@ -317,7 +318,7 @@ func (im *realImageGCManager) GarbageCollect() error {
 	return nil
 }
 
-func (im *realImageGCManager) DeleteUnusedImages() error {
+func (im *realImageGCManager) DeleteUnusedImages(ctx context.Context) error {
 	klog.InfoS("Attempting to delete unused images")
 	_, err := im.freeSpace(math.MaxInt64, time.Now())
 	return err

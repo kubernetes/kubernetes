@@ -17,6 +17,7 @@ limitations under the License.
 package images
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -187,7 +188,7 @@ func TestDeleteUnusedImagesExemptSandboxImage(t *testing.T) {
 		},
 	}
 
-	err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages(context.TODO())
 	assert := assert.New(t)
 	assert.Len(fakeRuntime.ImageList, 1)
 	require.NoError(t, err)
@@ -291,7 +292,7 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 		}},
 	}
 
-	err := manager.DeleteUnusedImages()
+	err := manager.DeleteUnusedImages(context.TODO())
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.Len(fakeRuntime.ImageList, 1)
@@ -387,7 +388,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 		CapacityBytes:  uint64Ptr(1000),
 	}, nil)
 
-	assert.NoError(t, manager.GarbageCollect())
+	assert.NoError(t, manager.GarbageCollect(context.TODO()))
 }
 
 func TestGarbageCollectCadvisorFailure(t *testing.T) {
@@ -398,7 +399,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 	manager, _, mockStatsProvider := newRealImageGCManager(policy)
 
 	mockStatsProvider.On("ImageFsStats").Return(&statsapi.FsStats{}, fmt.Errorf("error"))
-	assert.NotNil(t, manager.GarbageCollect())
+	assert.NotNil(t, manager.GarbageCollect(context.TODO()))
 }
 
 func TestGarbageCollectBelowSuccess(t *testing.T) {
@@ -417,7 +418,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		makeImage(0, 450),
 	}
 
-	assert.NoError(t, manager.GarbageCollect())
+	assert.NoError(t, manager.GarbageCollect(context.TODO()))
 }
 
 func TestGarbageCollectNotEnoughFreed(t *testing.T) {
@@ -436,7 +437,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		makeImage(0, 50),
 	}
 
-	assert.NotNil(t, manager.GarbageCollect())
+	assert.NotNil(t, manager.GarbageCollect(context.TODO()))
 }
 
 func TestGarbageCollectImageNotOldEnough(t *testing.T) {

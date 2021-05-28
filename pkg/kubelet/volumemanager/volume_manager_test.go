@@ -107,7 +107,7 @@ func TestGetMountedVolumesForPodAndGetVolumesInUse(t *testing.T) {
 				stopCh,
 				manager)
 
-			err = manager.WaitForAttachAndMount(pod)
+			err = manager.WaitForAttachAndMount(context.TODO(), pod)
 			if err != nil && !test.expectError {
 				t.Errorf("Expected success: %v", err)
 			}
@@ -171,7 +171,7 @@ func TestInitialPendingVolumesForPodAndGetVolumesInUse(t *testing.T) {
 	go delayClaimBecomesBound(kubeClient, claim.GetNamespace(), claim.ObjectMeta.Name)
 
 	err = wait.Poll(100*time.Millisecond, 1*time.Second, func() (bool, error) {
-		err = manager.WaitForAttachAndMount(pod)
+		err = manager.WaitForAttachAndMount(context.TODO(), pod)
 		if err != nil {
 			// Few "PVC not bound" errors are expected
 			return false, nil
@@ -255,7 +255,7 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 			stopCh,
 			manager)
 
-		err = manager.WaitForAttachAndMount(pod)
+		err = manager.WaitForAttachAndMount(context.TODO(), pod)
 		if err != nil {
 			t.Errorf("Expected success: %v", err)
 			continue

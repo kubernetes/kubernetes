@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -111,18 +112,18 @@ func (a sandboxByCreated) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a sandboxByCreated) Less(i, j int) bool { return a[i].createTime.After(a[j].createTime) }
 
 // enforceMaxContainersPerEvictUnit enforces MaxPerPodContainer for each evictUnit.
-func (cgc *containerGC) enforceMaxContainersPerEvictUnit(evictUnits containersByEvictUnit, MaxContainers int) {
+func (cgc *containerGC) enforceMaxContainersPerEvictUnit(ctx context.Context, evictUnits containersByEvictUnit, MaxContainers int) {
 	for key := range evictUnits {
 		toRemove := len(evictUnits[key]) - MaxContainers
 
 		if toRemove > 0 {
-			evictUnits[key] = cgc.removeOldestN(evictUnits[key], toRemove)
+			evictUnits[key] = cgc.removeOldestN(ctx, evictUnits[key], toRemove)
 		}
 	}
 }
 
 // removeOldestN removes the oldest toRemove containers and returns the resulting slice.
-func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int) []containerGCInfo {
+func (cgc *containerGC) removeOldestN(ctx context.Context, containers []containerGCInfo, toRemove int) []containerGCInfo {
 	// Remove from oldest to newest (last to first).
 	numToKeep := len(containers) - toRemove
 	if numToKeep > 0 {
@@ -137,7 +138,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 				ID:   containers[i].id,
 			}
 			message := "Container is in unknown state, try killing it before removal"
-			if err := cgc.manager.killContainer(nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
+			if err := cgc.manager.killContainer(ctx, nil, id, containers[i].name, message, reasonUnknown, nil); err != nil {
 				klog.ErrorS(err, "Failed to stop container", "containerID", containers[i].id)
 				continue
 			}
@@ -153,7 +154,7 @@ func (cgc *containerGC) removeOldestN(containers []containerGCInfo, toRemove int
 
 // removeOldestNSandboxes removes the oldest inactive toRemove sandboxes and
 // returns the resulting slice.
-func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemove int) {
+func (cgc *containerGC) removeOldestNSandboxes(ctx context.Context, sandboxes []sandboxGCInfo, toRemove int) {
 	numToKeep := len(sandboxes) - toRemove
 	if numToKeep > 0 {
 		sort.Sort(sandboxByCreated(sandboxes))
@@ -161,22 +162,22 @@ func (cgc *containerGC) removeOldestNSandboxes(sandboxes []sandboxGCInfo, toRemo
 	// Remove from oldest to newest (last to first).
 	for i := len(sandboxes) - 1; i >= numToKeep; i-- {
 		if !sandboxes[i].active {
-			cgc.removeSandbox(sandboxes[i].id)
+			cgc.removeSandbox(ctx, sandboxes[i].id)
 		}
 	}
 }
 
 // removeSandbox removes the sandbox by sandboxID.
-func (cgc *containerGC) removeSandbox(sandboxID string) {
+func (cgc *containerGC) removeSandbox(ctx context.Context, sandboxID string) {
 	klog.V(4).InfoS("Removing sandbox", "sandboxID", sandboxID)
 	// In normal cases, kubelet should've already called StopPodSandbox before
 	// GC kicks in. To guard against the rare cases where this is not true, try
 	// stopping the sandbox before removing it.
-	if err := cgc.client.StopPodSandbox(sandboxID); err != nil {
+	if err := cgc.client.StopPodSandbox(ctx, sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to stop sandbox before removing", "sandboxID", sandboxID)
 		return
 	}
-	if err := cgc.client.RemovePodSandbox(sandboxID); err != nil {
+	if err := cgc.client.RemovePodSandbox(ctx, sandboxID); err != nil {
 		klog.ErrorS(err, "Failed to remove sandbox", "sandboxID", sandboxID)
 	}
 }
@@ -220,7 +221,7 @@ func (cgc *containerGC) evictableContainers(minAge time.Duration) (containersByE
 }
 
 // evict all containers that are evictable
-func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatingPods bool) error {
+func (cgc *containerGC) evictContainers(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatingPods bool) error {
 	// Separate containers by evict units.
 	evictUnits, err := cgc.evictableContainers(gcPolicy.MinAge)
 	if err != nil {
@@ -231,7 +232,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 	if allSourcesReady {
 		for key, unit := range evictUnits {
 			if cgc.podStateProvider.ShouldPodContentBeRemoved(key.uid) || (evictTerminatingPods && cgc.podStateProvider.ShouldPodContainersBeTerminating(key.uid)) {
-				cgc.removeOldestN(unit, len(unit)) // Remove all.
+				cgc.removeOldestN(ctx, unit, len(unit)) // Remove all.
 				delete(evictUnits, key)
 			}
 		}
@@ -239,7 +240,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 
 	// Enforce max containers per evict unit.
 	if gcPolicy.MaxPerPodContainer >= 0 {
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, gcPolicy.MaxPerPodContainer)
+		cgc.enforceMaxContainersPerEvictUnit(ctx, evictUnits, gcPolicy.MaxPerPodContainer)
 	}
 
 	// Enforce max total number of containers.
@@ -249,7 +250,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 		if numContainersPerEvictUnit < 1 {
 			numContainersPerEvictUnit = 1
 		}
-		cgc.enforceMaxContainersPerEvictUnit(evictUnits, numContainersPerEvictUnit)
+		cgc.enforceMaxContainersPerEvictUnit(ctx, evictUnits, numContainersPerEvictUnit)
 
 		// If we still need to evict, evict oldest first.
 		numContainers := evictUnits.NumContainers()
@@ -260,7 +261,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 			}
 			sort.Sort(byCreated(flattened))
 
-			cgc.removeOldestN(flattened, numContainers-gcPolicy.MaxContainers)
+			cgc.removeOldestN(ctx, flattened, numContainers-gcPolicy.MaxContainers)
 		}
 	}
 	return nil
@@ -272,7 +273,7 @@ func (cgc *containerGC) evictContainers(gcPolicy kubecontainer.GCPolicy, allSour
 //   2. contains no containers.
 //   3. belong to a non-existent (i.e., already removed) pod, or is not the
 //      most recently created sandbox for the pod.
-func (cgc *containerGC) evictSandboxes(evictTerminatingPods bool) error {
+func (cgc *containerGC) evictSandboxes(ctx context.Context, evictTerminatingPods bool) error {
 	containers, err := cgc.manager.getKubeletContainers(true)
 	if err != nil {
 		return err
@@ -315,10 +316,10 @@ func (cgc *containerGC) evictSandboxes(evictTerminatingPods bool) error {
 			// Remove all evictable sandboxes if the pod has been removed.
 			// Note that the latest dead sandbox is also removed if there is
 			// already an active one.
-			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes))
+			cgc.removeOldestNSandboxes(ctx, sandboxes, len(sandboxes))
 		} else {
 			// Keep latest one if the pod still exists.
-			cgc.removeOldestNSandboxes(sandboxes, len(sandboxes)-1)
+			cgc.removeOldestNSandboxes(ctx, sandboxes, len(sandboxes)-1)
 		}
 	}
 	return nil
@@ -398,15 +399,15 @@ func (cgc *containerGC) evictPodLogsDirectories(allSourcesReady bool) error {
 // * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
 // * gets evictable sandboxes which are not ready and contains no containers.
 // * removes evictable sandboxes.
-func (cgc *containerGC) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatingPods bool) error {
+func (cgc *containerGC) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictTerminatingPods bool) error {
 	errors := []error{}
 	// Remove evictable containers
-	if err := cgc.evictContainers(gcPolicy, allSourcesReady, evictTerminatingPods); err != nil {
+	if err := cgc.evictContainers(ctx, gcPolicy, allSourcesReady, evictTerminatingPods); err != nil {
 		errors = append(errors, err)
 	}
 
 	// Remove sandboxes with zero containers
-	if err := cgc.evictSandboxes(evictTerminatingPods); err != nil {
+	if err := cgc.evictSandboxes(ctx, evictTerminatingPods); err != nil {
 		errors = append(errors, err)
 	}
 

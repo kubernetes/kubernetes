@@ -226,7 +226,7 @@ func (f *FakeRuntime) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return pods, f.Err
 }
 
-func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (f *FakeRuntime) SyncPod(ctx context.Context, pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -242,7 +242,7 @@ func (f *FakeRuntime) SyncPod(pod *v1.Pod, _ *kubecontainer.PodStatus, _ []v1.Se
 	return
 }
 
-func (f *FakeRuntime) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (f *FakeRuntime) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	f.Lock()
 	defer f.Unlock()
 
@@ -350,7 +350,7 @@ func (f *FakeRuntime) RemoveImage(image kubecontainer.ImageSpec) error {
 	return f.Err
 }
 
-func (f *FakeRuntime) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (f *FakeRuntime) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	f.Lock()
 	defer f.Unlock()
 

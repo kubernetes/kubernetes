@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -175,7 +176,7 @@ func TestSandboxGC(t *testing.T) {
 			fakeRuntime.SetFakeSandboxes(fakeSandboxes)
 			fakeRuntime.SetFakeContainers(fakeContainers)
 
-			err := m.containerGC.evictSandboxes(test.evictTerminatingPods)
+			err := m.containerGC.evictSandboxes(context.TODO(), test.evictTerminatingPods)
 			assert.NoError(t, err)
 			realRemain, err := fakeRuntime.ListPodSandbox(nil)
 			assert.NoError(t, err)
@@ -403,7 +404,7 @@ func TestContainerGC(t *testing.T) {
 			if test.policy == nil {
 				test.policy = &defaultGCPolicy
 			}
-			err := m.containerGC.evictContainers(*test.policy, test.allSourcesReady, test.evictTerminatingPods)
+			err := m.containerGC.evictContainers(context.TODO(), *test.policy, test.allSourcesReady, test.evictTerminatingPods)
 			assert.NoError(t, err)
 			realRemain, err := fakeRuntime.ListContainers(nil)
 			assert.NoError(t, err)
@@ -472,7 +473,7 @@ func TestUnknownStateContainerGC(t *testing.T) {
 	})
 	fakeRuntime.SetFakeContainers(fakeContainers)
 
-	err = m.containerGC.evictContainers(defaultGCPolicy, true, false)
+	err = m.containerGC.evictContainers(context.TODO(), defaultGCPolicy, true, false)
 	assert.NoError(t, err)
 
 	assert.Contains(t, fakeRuntime.GetCalls(), "StopContainer", "RemoveContainer",

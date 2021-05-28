@@ -1288,7 +1288,7 @@ func (kl *Kubelet) setupDataDirs() error {
 func (kl *Kubelet) StartGarbageCollection() {
 	loggedContainerGCFailure := false
 	go wait.Until(func() {
-		if err := kl.containerGC.GarbageCollect(); err != nil {
+		if err := kl.containerGC.GarbageCollect(context.Background()); err != nil {
 			klog.ErrorS(err, "Container garbage collection failed")
 			kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.ContainerGCFailed, err.Error())
 			loggedContainerGCFailure = true
@@ -1311,7 +1311,7 @@ func (kl *Kubelet) StartGarbageCollection() {
 
 	prevImageGCFailed := false
 	go wait.Until(func() {
-		if err := kl.imageManager.GarbageCollect(); err != nil {
+		if err := kl.imageManager.GarbageCollect(context.Background()); err != nil {
 			if prevImageGCFailed {
 				klog.ErrorS(err, "Image garbage collection failed multiple times in a row")
 				// Only create an event for repeated failures
@@ -1570,12 +1570,19 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Pods that are not runnable must be stopped - return a typed error to the pod worker
 	if !runnable.Admit {
 		klog.V(2).InfoS("Pod is not runnable and must have running containers stopped", "pod", klog.KObj(pod), "podUID", pod.UID, "message", runnable.Message)
 		var syncErr error
 		p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-		if err := kl.killPod(pod, p, nil); err != nil {
+		if err := kl.killPod(ctx, pod, p, nil); err != nil {
+			if err == context.Canceled {
+				return err
+			}
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 			syncErr = fmt.Errorf("error killing pod: %v", err)
 			utilruntime.HandleError(syncErr)
@@ -1591,6 +1598,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	if err := kl.runtimeState.networkErrors(); err != nil && !kubecontainer.IsHostNetworkPod(pod) {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.NetworkNotReady, "%s: %v", NetworkNotReadyErrorMsg, err)
 		return fmt.Errorf("%s: %v", NetworkNotReadyErrorMsg, err)
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Create Cgroups for the pod and apply resource parameters
@@ -1617,9 +1628,12 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		podKilled := false
 		if !pcm.Exists(pod) && !firstSync {
 			p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-			if err := kl.killPod(pod, p, nil); err == nil {
+			if err := kl.killPod(ctx, pod, p, nil); err == nil {
 				podKilled = true
 			} else {
+				if err == context.Canceled {
+					return err
+				}
 				klog.ErrorS(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 			}
 		}
@@ -1641,6 +1655,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 				}
 			}
 		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	// Create Mirror Pod for Static Pod if it doesn't already exist
@@ -1674,6 +1692,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 		}
 	}
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Make data directories for the pod
 	if err := kl.makePodDataDirs(pod); err != nil {
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToMakePodDataDirectories, "error making pod data directories: %v", err)
@@ -1685,7 +1707,10 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	// TODO: once context cancellation is added this check can be removed
 	if !kl.podWorkers.IsPodTerminationRequested(pod.UID) {
 		// Wait for volumes to attach/mount
-		if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+		if err := kl.volumeManager.WaitForAttachAndMount(ctx, pod); err != nil {
+			if err == context.Canceled {
+				return err
+			}
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedMountVolume, "Unable to attach or mount volumes: %v", err)
 			klog.ErrorS(err, "Unable to attach or mount volumes for pod; skipping pod", "pod", klog.KObj(pod))
 			return err
@@ -1696,9 +1721,13 @@ func (kl *Kubelet) syncPod(ctx context.Context, updateType kubetypes.SyncPodType
 	pullSecrets := kl.getPullSecretsForPod(pod)
 
 	// Call the container runtime's SyncPod callback
-	result := kl.containerRuntime.SyncPod(pod, podStatus, pullSecrets, kl.backOff)
+	result := kl.containerRuntime.SyncPod(ctx, pod, podStatus, pullSecrets, kl.backOff)
+	err := result.Error()
+	if err == context.Canceled {
+		return err
+	}
 	kl.reasonCache.Update(pod.UID, result)
-	if err := result.Error(); err != nil {
+	if err != nil {
 		// Do not return error if the only failures were pods in backoff
 		for _, r := range result.SyncResults {
 			if r.Error != kubecontainer.ErrCrashLoopBackOff && r.Error != images.ErrImagePullBackOff {
@@ -1731,7 +1760,7 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		} else {
 			klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 		}
-		if err := kl.killPod(pod, *runningPod, gracePeriod); err != nil {
+		if err := kl.killPod(ctx, pod, *runningPod, gracePeriod); err != nil {
 			kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 			// there was an error killing the pod, so we return that error directly
 			utilruntime.HandleError(err)
@@ -1770,7 +1799,10 @@ func (kl *Kubelet) syncTerminatingPod(ctx context.Context, pod *v1.Pod, podStatu
 		klog.V(4).InfoS("Pod terminating with grace period", "pod", klog.KObj(pod), "podUID", pod.UID, "gracePeriod", nil)
 	}
 	p := kubecontainer.ConvertPodStatusToRunningPod(kl.getRuntime().Type(), podStatus)
-	if err := kl.killPod(pod, p, gracePeriod); err != nil {
+	if err := kl.killPod(ctx, pod, p, gracePeriod); err != nil {
+		if err == context.Canceled {
+			return err
+		}
 		kl.recorder.Eventf(pod, v1.EventTypeWarning, events.FailedToKillPod, "error killing pod: %v", err)
 		// there was an error killing the pod, so we return that error directly
 		utilruntime.HandleError(err)
@@ -1829,7 +1861,7 @@ func (kl *Kubelet) syncTerminatedPod(ctx context.Context, pod *v1.Pod, podStatus
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// wait for volumes to unmount
-	if err := kl.volumeManager.WaitForUnmount(pod); err != nil {
+	if err := kl.volumeManager.WaitForUnmount(ctx, pod); err != nil {
 		return err
 	}
 	klog.V(4).InfoS("Pod termination unmounted volumes", "pod", klog.KObj(pod), "podUID", pod.UID)

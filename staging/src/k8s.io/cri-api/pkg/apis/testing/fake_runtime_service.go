@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sync"
@@ -244,7 +245,7 @@ func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, 
 }
 
 // StopPodSandbox emulates the stop of pod sandbox in the FakeRuntimeService.
-func (r *FakeRuntimeService) StopPodSandbox(podSandboxID string) error {
+func (r *FakeRuntimeService) StopPodSandbox(ctx context.Context, podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
@@ -405,7 +406,7 @@ func (r *FakeRuntimeService) StartContainer(containerID string) error {
 }
 
 // StopContainer emulates stop of a container in the FakeRuntimeService.
-func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) error {
+func (r *FakeRuntimeService) StopContainer(ctx context.Context, containerID string, timeout int64) error {
 	r.Lock()
 	defer r.Unlock()
 

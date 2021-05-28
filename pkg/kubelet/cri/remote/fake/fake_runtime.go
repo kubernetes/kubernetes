@@ -99,7 +99,7 @@ func (f *RemoteRuntime) RunPodSandbox(ctx context.Context, req *kubeapi.RunPodSa
 // If there are any running containers in the sandbox, they must be forcibly
 // terminated.
 func (f *RemoteRuntime) StopPodSandbox(ctx context.Context, req *kubeapi.StopPodSandboxRequest) (*kubeapi.StopPodSandboxResponse, error) {
-	err := f.RuntimeService.StopPodSandbox(req.PodSandboxId)
+	err := f.RuntimeService.StopPodSandbox(ctx, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func (f *RemoteRuntime) StopPodSandbox(ctx context.Context, req *kubeapi.StopPod
 // This call is idempotent, and must not return an error if the sandbox has
 // already been removed.
 func (f *RemoteRuntime) RemovePodSandbox(ctx context.Context, req *kubeapi.RemovePodSandboxRequest) (*kubeapi.RemovePodSandboxResponse, error) {
-	err := f.RuntimeService.StopPodSandbox(req.PodSandboxId)
+	err := f.RuntimeService.StopPodSandbox(ctx, req.PodSandboxId)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +165,7 @@ func (f *RemoteRuntime) StartContainer(ctx context.Context, req *kubeapi.StartCo
 // This call is idempotent, and must not return an error if the container has
 // already been stopped.
 func (f *RemoteRuntime) StopContainer(ctx context.Context, req *kubeapi.StopContainerRequest) (*kubeapi.StopContainerResponse, error) {
-	err := f.RuntimeService.StopContainer(req.ContainerId, req.Timeout)
+	err := f.RuntimeService.StopContainer(ctx, req.ContainerId, req.Timeout)
 	if err != nil {
 		return nil, err
 	}

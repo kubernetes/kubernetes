@@ -17,6 +17,7 @@ limitations under the License.
 package container
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -100,6 +101,15 @@ type PodSyncResult struct {
 	SyncResults []*SyncResult
 	// Error encountered in SyncPod() and KillPod() that is not already included in SyncResults
 	SyncError error
+	// Was the sync cancelled?
+	Canceled bool
+}
+
+// Cancel indicates the sync was canceled and the result is inconclusive
+func (r *PodSyncResult) Cancel() PodSyncResult {
+	r.Canceled = true
+	r.SyncError = context.Canceled
+	return *r
 }
 
 // AddSyncResult adds multiple SyncResult to current PodSyncResult

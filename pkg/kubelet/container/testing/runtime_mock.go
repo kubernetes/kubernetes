@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/mock"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/util/flowcontrol"
@@ -72,13 +72,13 @@ func (r *Mock) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return args.Get(0).([]*kubecontainer.Pod), args.Error(1)
 }
 
-func (r *Mock) SyncPod(pod *v1.Pod, status *kubecontainer.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) kubecontainer.PodSyncResult {
+func (r *Mock) SyncPod(ctx context.Context, pod *v1.Pod, status *kubecontainer.PodStatus, secrets []v1.Secret, backOff *flowcontrol.Backoff) kubecontainer.PodSyncResult {
 	args := r.Called(pod, status, secrets, backOff)
 	return args.Get(0).(kubecontainer.PodSyncResult)
 }
 
-func (r *Mock) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	args := r.Called(pod, runningPod, gracePeriodOverride)
+func (r *Mock) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	args := r.Called(ctx, pod, runningPod, gracePeriodOverride)
 	return args.Error(0)
 }
 
@@ -137,7 +137,7 @@ func (r *Mock) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWr
 	return args.Error(0)
 }
 
-func (r *Mock) GarbageCollect(gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
+func (r *Mock) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, ready bool, evictNonDeletedPods bool) error {
 	args := r.Called(gcPolicy, ready, evictNonDeletedPods)
 	return args.Error(0)
 }

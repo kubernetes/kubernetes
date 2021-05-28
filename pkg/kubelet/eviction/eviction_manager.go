@@ -17,6 +17,7 @@ limitations under the License.
 package eviction
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"sync"
@@ -177,7 +178,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, podCleanedUpFunc PodCleanedUpFunc, monitoringInterval time.Duration) {
 	thresholdHandler := func(message string) {
 		klog.InfoS(message)
-		m.synchronize(diskInfoProvider, podFunc)
+		m.synchronize(context.Background(), diskInfoProvider, podFunc)
 	}
 	if m.config.KernelMemcgNotification {
 		for _, threshold := range m.config.Thresholds {
@@ -195,7 +196,7 @@ func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePod
 	// start the eviction manager monitoring
 	go func() {
 		for {
-			if evictedPods := m.synchronize(diskInfoProvider, podFunc); evictedPods != nil {
+			if evictedPods := m.synchronize(context.Background(), diskInfoProvider, podFunc); evictedPods != nil {
 				klog.InfoS("Eviction manager: pods evicted, waiting for pod to be cleaned up", "pods", format.Pods(evictedPods))
 				m.waitForPodsCleanup(podCleanedUpFunc, evictedPods)
 			} else {
@@ -228,7 +229,7 @@ func (m *managerImpl) IsUnderPIDPressure() bool {
 
 // synchronize is the main control loop that enforces eviction thresholds.
 // Returns the pod that was killed, or nil if no pod was killed.
-func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
+func (m *managerImpl) synchronize(ctx context.Context, diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) []*v1.Pod {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
@@ -342,7 +343,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.recorder.Eventf(m.nodeRef, v1.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
-	if m.reclaimNodeLevelResources(thresholdToReclaim.Signal, resourceToReclaim) {
+	if m.reclaimNodeLevelResources(ctx, thresholdToReclaim.Signal, resourceToReclaim) {
 		klog.InfoS("Eviction manager: able to reduce resource pressure without evicting pods.", "resourceName", resourceToReclaim)
 		return nil
 	}
@@ -417,11 +418,11 @@ func (m *managerImpl) waitForPodsCleanup(podCleanedUpFunc PodCleanedUpFunc, pods
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
-func (m *managerImpl) reclaimNodeLevelResources(signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName) bool {
+func (m *managerImpl) reclaimNodeLevelResources(ctx context.Context, signalToReclaim evictionapi.Signal, resourceToReclaim v1.ResourceName) bool {
 	nodeReclaimFuncs := m.signalToNodeReclaimFuncs[signalToReclaim]
 	for _, nodeReclaimFunc := range nodeReclaimFuncs {
 		// attempt to reclaim the pressured resource.
-		if err := nodeReclaimFunc(); err != nil {
+		if err := nodeReclaimFunc(ctx); err != nil {
 			klog.InfoS("Eviction manager: unexpected error when attempting to reduce resource pressure", "resourceName", resourceToReclaim, "err", err)
 		}
 

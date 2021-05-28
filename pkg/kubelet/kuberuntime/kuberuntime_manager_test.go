@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -476,7 +477,7 @@ func TestKillPod(t *testing.T) {
 		},
 	}
 
-	err = m.KillPod(pod, runningPod, nil)
+	err = m.KillPod(context.TODO(), pod, runningPod, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
@@ -516,7 +517,7 @@ func TestSyncPod(t *testing.T) {
 	}
 
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	result := m.SyncPod(pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, &kubecontainer.PodStatus{}, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 2, len(fakeImage.Images))
@@ -606,7 +607,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 1. should only create the init container.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected := []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_RUNNING},
@@ -616,7 +617,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	// 2. should not create app container because init container is still running.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
@@ -627,11 +628,11 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	sandboxID := sandboxIDs[0]
 	initID0, err := fakeRuntime.GetContainerID(sandboxID, initContainers[0].Name, 0)
 	require.NoError(t, err)
-	fakeRuntime.StopContainer(initID0, 0)
+	fakeRuntime.StopContainer(context.TODO(), initID0, 0)
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		{name: initContainers[0].Name, attempt: 0, state: runtimeapi.ContainerState_CONTAINER_EXITED},
@@ -642,11 +643,11 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 
 	// 4. should restart the init container if needed to create a new podsandbox
 	// Stop the pod sandbox.
-	fakeRuntime.StopPodSandbox(sandboxID)
+	fakeRuntime.StopPodSandbox(context.TODO(), sandboxID)
 	// Sync again.
 	podStatus, err = m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result = m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result = m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	assert.NoError(t, result.Error())
 	expected = []*cRecord{
 		// The first init container instance is purged and no longer visible.
@@ -1406,7 +1407,7 @@ func TestSyncPodWithSandboxAndDeletedPod(t *testing.T) {
 	// the fakePodProvider so they are 'deleted'.
 	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 	assert.NoError(t, err)
-	result := m.SyncPod(pod, podStatus, []v1.Secret{}, backOff)
+	result := m.SyncPod(context.TODO(), pod, podStatus, []v1.Secret{}, backOff)
 	// This will return an error if the pod has _not_ been deleted.
 	assert.NoError(t, result.Error())
 }

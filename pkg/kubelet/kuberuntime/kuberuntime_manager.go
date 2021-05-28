@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -700,7 +701,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  5. Create ephemeral containers.
 //  6. Create init containers.
 //  7. Create normal containers.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
+func (m *kubeGenericRuntimeManager) SyncPod(ctx context.Context, pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
 	klog.V(3).InfoS("computePodActions got for pod", "podActions", podContainerChanges, "pod", klog.KObj(pod))
@@ -724,10 +725,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.V(4).InfoS("Stopping PodSandbox for pod, because all other containers are dead", "pod", klog.KObj(pod))
 		}
 
-		killResult := m.killPodWithSyncResult(pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
+		killResult := m.killPodWithSyncResult(ctx, pod, kubecontainer.ConvertPodStatusToRunningPod(m.runtimeName, podStatus), nil)
 		result.AddPodSyncResult(killResult)
-		if killResult.Error() != nil {
-			klog.ErrorS(killResult.Error(), "killPodWithSyncResult failed")
+		if err := killResult.Error(); err != nil {
+			if err == context.Canceled {
+				return result.Cancel()
+			}
+			klog.ErrorS(err, "killPodWithSyncResult failed")
 			return
 		}
 
@@ -740,7 +744,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			klog.V(3).InfoS("Killing unwanted container for pod", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerInfo.name)
 			result.AddSyncResult(killContainerResult)
-			if err := m.killContainer(pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil); err != nil {
+			if err := m.killContainer(ctx, pod, containerID, containerInfo.name, containerInfo.message, containerInfo.reason, nil); err != nil {
+				if err == context.Canceled {
+					return result.Cancel()
+				}
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				klog.ErrorS(err, "killContainer for pod failed", "containerName", containerInfo.name, "containerID", containerID, "pod", klog.KObj(pod))
 				return
@@ -777,16 +784,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		klog.V(4).InfoS("Creating PodSandbox for pod", "pod", klog.KObj(pod))
 		createSandboxResult := kubecontainer.NewSyncResult(kubecontainer.CreatePodSandbox, format.Pod(pod))
 		result.AddSyncResult(createSandboxResult)
-		podSandboxID, msg, err = m.createPodSandbox(pod, podContainerChanges.Attempt)
+		podSandboxID, msg, err = m.createPodSandbox(ctx, pod, podContainerChanges.Attempt)
 		if err != nil {
-			// createPodSandbox can return an error from CNI, CSI,
-			// or CRI if the Pod has been deleted while the POD is
-			// being created. If the pod has been deleted then it's
-			// not a real error.
-			// TODO: this is probably not needed now that termination is part of the sync loop
-			if m.podStateProvider.ShouldPodContentBeRemoved(pod.UID) {
-				klog.V(4).InfoS("Pod was deleted and sandbox failed to be created", "pod", klog.KObj(pod), "podUID", pod.UID)
-				return
+			if err == context.Canceled {
+				return result.Cancel()
 			}
 			createSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			klog.ErrorS(err, "CreatePodSandbox for pod failed", "pod", klog.KObj(pod))
@@ -828,6 +829,10 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		podIP = podIPs[0]
 	}
 
+	if err := ctx.Err(); err != nil {
+		return result.Cancel()
+	}
+
 	// Get podSandboxConfig for containers to start.
 	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
 	result.AddSyncResult(configPodSandboxResult)
@@ -855,7 +860,11 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 		klog.V(4).InfoS("Creating container in pod", "containerType", typeName, "container", spec.container, "pod", klog.KObj(pod))
 		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
+		if msg, err := m.startContainer(ctx, podSandboxID, podSandboxConfig, spec, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
+			if err != context.Canceled {
+				result.Cancel()
+				return err
+			}
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
@@ -894,7 +903,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		start("container", containerStartSpec(&pod.Spec.Containers[idx]))
+		if err := start("container", containerStartSpec(&pod.Spec.Containers[idx])); err == context.Canceled {
+			return
+		}
 	}
 
 	return
@@ -937,15 +948,15 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) KillPod(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+	err := m.killPodWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
 	return err.Error()
 }
 
 // killPodWithSyncResult kills a runningPod and returns SyncResult.
 // Note: The pod passed in could be *nil* when kubelet restarted.
-func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
-	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride)
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(ctx context.Context, pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	killContainerResults := m.killContainersWithSyncResult(ctx, pod, runningPod, gracePeriodOverride)
 	for _, containerResult := range killContainerResults {
 		result.AddSyncResult(containerResult)
 	}
@@ -955,7 +966,10 @@ func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *v1.Pod, runningPo
 	result.AddSyncResult(killSandboxResult)
 	// Stop all sandboxes belongs to same pod
 	for _, podSandbox := range runningPod.Sandboxes {
-		if err := m.runtimeService.StopPodSandbox(podSandbox.ID.ID); err != nil {
+		if err := m.runtimeService.StopPodSandbox(ctx, podSandbox.ID.ID); err != nil {
+			if err == context.Canceled {
+				return
+			}
 			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
 			klog.ErrorS(nil, "Failed to stop sandbox", "podSandboxID", podSandbox.ID)
 		}
@@ -1034,8 +1048,8 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy.
-func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
-	return m.containerGC.GarbageCollect(gcPolicy, allSourcesReady, evictNonDeletedPods)
+func (m *kubeGenericRuntimeManager) GarbageCollect(ctx context.Context, gcPolicy kubecontainer.GCPolicy, allSourcesReady bool, evictNonDeletedPods bool) error {
+	return m.containerGC.GarbageCollect(ctx, gcPolicy, allSourcesReady, evictNonDeletedPods)
 }
 
 // UpdatePodCIDR is just a passthrough method to update the runtimeConfig of the shim
