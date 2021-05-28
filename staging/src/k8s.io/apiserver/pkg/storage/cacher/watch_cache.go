@@ -343,18 +343,24 @@ func (w *watchCache) updateCache(event *watchCacheEvent) {
 }
 
 // resizeCacheLocked resizes the cache if necessary:
-// - increases capacity by 2x if cache is full and all cached events occurred within last eventFreshDuration.
-// - decreases capacity by 2x when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
+// - increases capacity by [ eventFreshDuration / (eventTime - 1st event's timestamp) ]
+// 	 if cache is full and all cached events occurred within last eventFreshDuration.
+// - decreases capacity by [ eventFreshDuration / (eventTime - recent quarter event's timestamp) ] / 2
+//   when recent quarter of events occurred outside of eventFreshDuration(protect watchCache from flapping).
 func (w *watchCache) resizeCacheLocked(eventTime time.Time) {
 	if w.isCacheFullLocked() && eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime) < eventFreshDuration {
-		capacity := min(w.capacity*2, w.upperBoundCapacity)
+		timeDiff := float64(eventFreshDuration) / float64(eventTime.Sub(w.cache[w.startIndex%w.capacity].RecordTime))
+		increase := max(int(timeDiff), 2)
+		capacity := min(w.capacity*increase, w.upperBoundCapacity)
 		if capacity > w.capacity {
 			w.doCacheResizeLocked(capacity)
 		}
 		return
 	}
 	if w.isCacheFullLocked() && eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime) > eventFreshDuration {
-		capacity := max(w.capacity/2, w.lowerBoundCapacity)
+		timeDiff := float64(eventFreshDuration) / float64(eventTime.Sub(w.cache[(w.endIndex-w.capacity/4)%w.capacity].RecordTime))
+		decrease := max(int(timeDiff), 2)
+		capacity := max(w.capacity/int(decrease), w.lowerBoundCapacity)
 		if capacity < w.capacity {
 			w.doCacheResizeLocked(capacity)
 		}
