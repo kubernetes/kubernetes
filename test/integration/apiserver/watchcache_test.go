@@ -55,7 +55,7 @@ func multiEtcdSetup(t testing.TB) (clientset.Interface, framework.CloseFunc) {
 	etcdOptions.EnableWatchCache = true
 
 	opts := framework.MasterConfigOptions{EtcdOptions: etcdOptions}
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
+	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	// Switch off endpoints reconciler to avoid unnecessary operations.
 	masterConfig.ExtraConfig.EndpointReconcilerType = reconcilers.NoneEndpointReconcilerType
 	_, s, stopMaster := framework.RunAMaster(masterConfig)

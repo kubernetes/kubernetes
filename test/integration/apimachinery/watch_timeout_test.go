@@ -36,7 +36,7 @@ import (
 )
 
 func TestWatchClientTimeout(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

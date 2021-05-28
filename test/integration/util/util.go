@@ -62,7 +62,7 @@ func StartApiserver() (string, ShutdownFunc) {
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	_, _, closeFn := framework.RunAnApiserverUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAnApiserverUsingServer(framework.NewIntegrationTestControlPlaneConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
@@ -336,7 +336,7 @@ func InitTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 
 	if admission != nil {
 		masterConfig.GenericConfig.AdmissionControl = admission

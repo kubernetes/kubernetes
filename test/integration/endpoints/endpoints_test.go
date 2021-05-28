@@ -33,7 +33,7 @@ import (
 )
 
 func TestEndpointUpdates(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	_, server, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
 

@@ -55,7 +55,7 @@ func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 }
 
 func TestSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
@@ -146,7 +146,7 @@ func TestSubjectAccessReview(t *testing.T) {
 
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
 			User: &user.DefaultInfo{Name: username},
@@ -229,7 +229,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 }
 
 func TestLocalSubjectAccessReview(t *testing.T) {
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
