@@ -90,8 +90,6 @@ type ServicePort interface {
 	NodeLocalInternal() bool
 	// InternalTrafficPolicy returns service InternalTrafficPolicy
 	InternalTrafficPolicy() *v1.ServiceInternalTrafficPolicyType
-	// TopologyKeys returns service TopologyKeys as a string array.
-	TopologyKeys() []string
 	// HintsAnnotation returns the value of the v1.AnnotationTopologyAwareHints annotation.
 	HintsAnnotation() string
 }
