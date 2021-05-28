@@ -165,7 +165,11 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		if host == "" {
 			host = status.PodIP
 		}
-		port, err := extractPort(p.HTTPGet.Port, container, v1.ProtocolTCP)
+		var protocol v1.Protocol
+		if scheme == "http" {
+			protocol = v1.ProtocolTCP
+		}
+		port, err := extractPort(p.HTTPGet.Port, container, protocol)
 		if err != nil {
 			return probe.Unknown, "", err
 		}
