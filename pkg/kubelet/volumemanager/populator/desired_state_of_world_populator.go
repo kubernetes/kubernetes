@@ -169,15 +169,16 @@ func (dswp *desiredStateOfWorldPopulator) HasAddedPods() bool {
 func (dswp *desiredStateOfWorldPopulator) populatorLoop() {
 	dswp.findAndAddNewPods()
 
+	// Not anymore!
 	// findAndRemoveDeletedPods() calls out to the container runtime to
 	// determine if the containers for a given pod are terminated. This is
 	// an expensive operation, therefore we limit the rate that
 	// findAndRemoveDeletedPods() is called independently of the main
 	// populator loop.
-	if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
-		klog.V(5).InfoS("Skipping findAndRemoveDeletedPods(). ", "nextRetryTime", dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration), "retryDuration", dswp.getPodStatusRetryDuration)
-		return
-	}
+	// if time.Since(dswp.timeOfLastGetPodStatus) < dswp.getPodStatusRetryDuration {
+	// 	klog.V(5).InfoS("Skipping findAndRemoveDeletedPods(). ", "nextRetryTime", dswp.timeOfLastGetPodStatus.Add(dswp.getPodStatusRetryDuration), "retryDuration", dswp.getPodStatusRetryDuration)
+	// 	return
+	// }
 
 	dswp.findAndRemoveDeletedPods()
 }
@@ -214,7 +215,6 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 	for _, volumeToMount := range dswp.desiredStateOfWorld.GetVolumesToMount() {
 		pod, podExists := dswp.podManager.GetPodByUID(volumeToMount.Pod.UID)
 		if podExists {
-
 			// check if the attachability has changed for this volume
 			if volumeToMount.PluginIsAttachable {
 				attachableVolumePlugin, err := dswp.volumePluginMgr.FindAttachablePluginBySpec(volumeToMount.VolumeSpec)
@@ -235,25 +235,27 @@ func (dswp *desiredStateOfWorldPopulator) findAndRemoveDeletedPods() {
 			if dswp.keepTerminatedPodVolumes {
 				continue
 			}
+		} else {
+			// Once a pod has been deleted from kubelet pod manager, do not delete
+			// it immediately from volume manager. Instead, check the kubelet
+			// pod state provider to verify that all containers in the pod have been
+			// terminated.
+			if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
+				klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
+				continue
+			}
 		}
 
-		// Once a pod has been deleted from kubelet pod manager, do not delete
-		// it immediately from volume manager. Instead, check the kubelet
-		// pod state provider to verify that all containers in the pod have been
-		// terminated.
-		if !dswp.podStateProvider.ShouldPodRuntimeBeRemoved(volumeToMount.Pod.UID) {
-			klog.V(4).InfoS("Pod still has one or more containers in the non-exited state and will not be removed from desired state", "pod", klog.KObj(volumeToMount.Pod))
-			continue
-		}
-		exists, _, _ := dswp.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
+		// exists, _, _ := dswp.actualStateOfWorld.PodExistsInVolume(volumeToMount.PodName, volumeToMount.VolumeName)
 		var volumeToMountSpecName string
 		if volumeToMount.VolumeSpec != nil {
 			volumeToMountSpecName = volumeToMount.VolumeSpec.Name()
 		}
-		if !exists && podExists {
-			klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
-			continue
-		}
+		// TODO: what is this defending against?  races between dswp? debugging without
+		// if !exists && podExists {
+		// 	klog.V(4).InfoS("Actual state does not yet have volume mount information and pod still exists in pod manager, skip removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
+		// 	continue
+		// }
 		klog.V(4).InfoS("Removing volume from desired state", "pod", klog.KObj(volumeToMount.Pod), "podUID", volumeToMount.Pod.UID, "volumeName", volumeToMountSpecName)
 
 		dswp.desiredStateOfWorld.DeletePodFromVolume(
