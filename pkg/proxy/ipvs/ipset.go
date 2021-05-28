@@ -110,7 +110,7 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 		if strings.HasPrefix(name, "KUBE-") {
 			name = strings.Replace(name, "KUBE-", "KUBE-6-", 1)
 			if len(name) > 31 {
-				klog.InfoS("Truncated ipset name", "ipsetNameOld", name, "ipsetNameNew", name[:31])
+				klog.InfoS("Truncated ip set name", "ipsetNameOld", name, "ipsetNameNew", name[:31])
 				name = name[:31]
 			}
 		}
