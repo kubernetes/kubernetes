@@ -770,7 +770,7 @@ func (config *RCConfig) start() error {
 		maxContainerFailures = *config.MaxContainerFailures
 	}
 
-	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": config.Name}))
+	label := labels.SelectorFromSet(map[string]string{"name": config.Name})
 
 	ps, err := NewPodStore(config.Client, config.Namespace, label, fields.Everything())
 	if err != nil {
@@ -877,7 +877,7 @@ func StartPods(c clientset.Interface, replicas int, namespace string, podNamePre
 	}
 	logFunc("Waiting for running...")
 	if waitForRunning {
-		label := labels.SelectorFromSet(labels.Set(map[string]string{"startPodsID": startPodsID}))
+		label := labels.SelectorFromSet(map[string]string{"startPodsID": startPodsID})
 		err := WaitForPodsWithLabelRunning(c, namespace, label)
 		if err != nil {
 			return fmt.Errorf("Error waiting for %d pods to be running - probably a timeout: %v", replicas, err)
