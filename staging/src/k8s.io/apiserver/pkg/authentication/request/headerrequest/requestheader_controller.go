@@ -167,7 +167,7 @@ func (c *RequestHeaderAuthRequestController) Run(workers int, stopCh <-chan stru
 	defer c.queue.ShutDown()
 
 	klog.InfoS("Starting", "controllerName", c.name)
-	defer klog.InfoS("Shutting down", c.name)
+	defer klog.InfoS("Shutting down", "controllerName", c.name)
 
 	go c.configmapInformer.Run(stopCh)
 
