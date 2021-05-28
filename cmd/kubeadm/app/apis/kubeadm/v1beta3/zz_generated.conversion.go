@@ -626,6 +626,7 @@ func autoConvert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *Init
 		return err
 	}
 	out.CertificateKey = in.CertificateKey
+	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	return nil
 }
 
@@ -639,6 +640,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kube
 		return err
 	}
 	out.CertificateKey = in.CertificateKey
+	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	return nil
 }
 
@@ -651,6 +653,7 @@ func autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Join
 		return err
 	}
 	out.ControlPlane = (*kubeadm.JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
+	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	return nil
 }
 
@@ -668,6 +671,7 @@ func autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kube
 		return err
 	}
 	out.ControlPlane = (*JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
+	out.SkipPhases = *(*[]string)(unsafe.Pointer(&in.SkipPhases))
 	return nil
 }
 

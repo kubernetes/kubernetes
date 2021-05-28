@@ -38,3 +38,8 @@ func Convert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 func Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
 	return autoConvert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s)
 }
+
+// Convert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration is required since v1beta2 does not have SkipPhases in JoinConfiguration
+func Convert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
+	return autoConvert_kubeadm_JoinConfiguration_To_v1beta2_JoinConfiguration(in, out, s)
+}
