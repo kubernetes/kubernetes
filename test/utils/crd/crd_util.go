@@ -48,7 +48,7 @@ type Option func(crd *apiextensionsv1.CustomResourceDefinition)
 func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Option) (*TestCrd, error) {
 	suffix := framework.RandomSuffix()
 	name := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
-	kind := fmt.Sprintf("E2e-test-%s-%s-crd", f.BaseName, suffix)
+	kind := fmt.Sprintf("e2e-test-%s-%s-crd", f.BaseName, suffix)
 	testcrd := &TestCrd{}
 
 	// Creating a custom resource definition for use by assorted tests.
