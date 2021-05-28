@@ -437,7 +437,7 @@ func ExponentialBackoff(backoff Backoff, condition ConditionFunc) error {
 //
 // If you want to Poll something forever, see PollInfinite.
 func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
-	return PollWithContext(context.Background(), interval, timeout, condition.WithContext())
+	return poll(context.Background(), false, poller(interval, timeout), condition.WithContext(), false)
 }
 
 // PollWithContext tries a condition func until it returns true, an error,
@@ -452,7 +452,7 @@ func Poll(interval, timeout time.Duration, condition ConditionFunc) error {
 //
 // If you want to Poll something forever, see PollInfinite.
 func PollWithContext(ctx context.Context, interval, timeout time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, false, poller(interval, timeout), condition)
+	return poll(ctx, false, poller(interval, timeout), condition, true)
 }
 
 // PollUntil tries a condition func until it returns true, an error or stopCh is
@@ -463,7 +463,7 @@ func PollWithContext(ctx context.Context, interval, timeout time.Duration, condi
 func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	ctx, cancel := contextForChannel(stopCh)
 	defer cancel()
-	return PollUntilWithContext(ctx, interval, condition.WithContext())
+	return poll(ctx, false, poller(interval, 0), condition.WithContext(), false)
 }
 
 // PollUntilWithContext tries a condition func until it returns true,
@@ -472,7 +472,7 @@ func PollUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan st
 // PollUntilWithContext always waits interval before the first run of 'condition'.
 // 'condition' will always be invoked at least once.
 func PollUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, false, poller(interval, 0), condition)
+	return poll(ctx, false, poller(interval, 0), condition, true)
 }
 
 // PollInfinite tries a condition func until it returns true or an error
@@ -492,7 +492,7 @@ func PollInfinite(interval time.Duration, condition ConditionFunc) error {
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollInfiniteWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, false, poller(interval, 0), condition)
+	return poll(ctx, false, poller(interval, 0), condition, true)
 }
 
 // PollImmediate tries a condition func until it returns true, an error, or the timeout
@@ -506,7 +506,7 @@ func PollInfiniteWithContext(ctx context.Context, interval time.Duration, condit
 //
 // If you want to immediately Poll something forever, see PollImmediateInfinite.
 func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) error {
-	return PollImmediateWithContext(context.Background(), interval, timeout, condition.WithContext())
+	return poll(context.Background(), true, poller(interval, timeout), condition.WithContext(), false)
 }
 
 // PollImmediateWithContext tries a condition func until it returns true, an error,
@@ -520,7 +520,7 @@ func PollImmediate(interval, timeout time.Duration, condition ConditionFunc) err
 //
 // If you want to immediately Poll something forever, see PollImmediateInfinite.
 func PollImmediateWithContext(ctx context.Context, interval, timeout time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, true, poller(interval, timeout), condition)
+	return poll(ctx, true, poller(interval, timeout), condition, true)
 }
 
 // PollImmediateUntil tries a condition func until it returns true, an error or stopCh is closed.
@@ -530,7 +530,7 @@ func PollImmediateWithContext(ctx context.Context, interval, timeout time.Durati
 func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh <-chan struct{}) error {
 	ctx, cancel := contextForChannel(stopCh)
 	defer cancel()
-	return PollImmediateUntilWithContext(ctx, interval, condition.WithContext())
+	return poll(ctx, true, poller(interval, 0), condition.WithContext(), false)
 }
 
 // PollImmediateUntilWithContext tries a condition func until it returns true,
@@ -539,7 +539,7 @@ func PollImmediateUntil(interval time.Duration, condition ConditionFunc, stopCh 
 // PollImmediateUntilWithContext runs the 'condition' before waiting for the interval.
 // 'condition' will always be invoked at least once.
 func PollImmediateUntilWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, true, poller(interval, 0), condition)
+	return poll(ctx, true, poller(interval, 0), condition, true)
 }
 
 // PollImmediateInfinite tries a condition func until it returns true or an error
@@ -549,7 +549,7 @@ func PollImmediateUntilWithContext(ctx context.Context, interval time.Duration, 
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) error {
-	return PollImmediateInfiniteWithContext(context.Background(), interval, condition.WithContext())
+	return poll(context.Background(), true, poller(interval, 0), condition.WithContext(), false)
 }
 
 // PollImmediateInfiniteWithContext tries a condition func until it returns true
@@ -560,7 +560,7 @@ func PollImmediateInfinite(interval time.Duration, condition ConditionFunc) erro
 // Some intervals may be missed if the condition takes too long or the time
 // window is too short.
 func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duration, condition ConditionWithContextFunc) error {
-	return poll(ctx, true, poller(interval, 0), condition)
+	return poll(ctx, true, poller(interval, 0), condition, true)
 }
 
 // Internally used, each of the the public 'Poll*' function defined in this
@@ -572,7 +572,7 @@ func PollImmediateInfiniteWithContext(ctx context.Context, interval time.Duratio
 // wait: user specified WaitFunc function that controls at what interval the condition
 // function should be invoked periodically and whether it is bound by a timeout.
 // condition: user specified ConditionWithContextFunc function.
-func poll(ctx context.Context, immediate bool, wait WaitWithContextFunc, condition ConditionWithContextFunc) error {
+func poll(ctx context.Context, immediate bool, wait WaitWithContextFunc, condition ConditionWithContextFunc, returnContextErr bool) error {
 	if immediate {
 		done, err := runConditionWithCrashProtectionWithContext(ctx, condition)
 		if err != nil {
@@ -585,10 +585,12 @@ func poll(ctx context.Context, immediate bool, wait WaitWithContextFunc, conditi
 
 	select {
 	case <-ctx.Done():
-		// returning ctx.Err() will break backward compatibility
+		if returnContextErr {
+			return ctx.Err()
+		}
 		return ErrWaitTimeout
 	default:
-		return WaitForWithContext(ctx, wait, condition)
+		return waitForWithContext(ctx, wait, condition, returnContextErr)
 	}
 }
 
@@ -628,7 +630,7 @@ type WaitWithContextFunc func(ctx context.Context) <-chan struct{}
 func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 	ctx, cancel := contextForChannel(done)
 	defer cancel()
-	return WaitForWithContext(ctx, wait.WithContext(), fn.WithContext())
+	return waitForWithContext(ctx, wait.WithContext(), fn.WithContext(), false)
 }
 
 // WaitForWithContext continually checks 'fn' as driven by 'wait'.
@@ -648,6 +650,12 @@ func WaitFor(wait WaitFunc, fn ConditionFunc, done <-chan struct{}) error {
 // "uniform pseudo-random", the `fn` might still run one or multiple times,
 // though eventually `WaitForWithContext` will return.
 func WaitForWithContext(ctx context.Context, wait WaitWithContextFunc, fn ConditionWithContextFunc) error {
+	return waitForWithContext(ctx, wait, fn, true)
+}
+
+// Internally used;  the context error is returned if the context is canceled when returnContextErr is true, otherwise
+// ErrWaitTimeout is returned.
+func waitForWithContext(ctx context.Context, wait WaitWithContextFunc, fn ConditionWithContextFunc, returnContextErr bool) error {
 	waitCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := wait(waitCtx)
@@ -665,7 +673,9 @@ func WaitForWithContext(ctx context.Context, wait WaitWithContextFunc, fn Condit
 				return ErrWaitTimeout
 			}
 		case <-ctx.Done():
-			// returning ctx.Err() will break backward compatibility
+			if returnContextErr {
+				return ctx.Err()
+			}
 			return ErrWaitTimeout
 		}
 	}

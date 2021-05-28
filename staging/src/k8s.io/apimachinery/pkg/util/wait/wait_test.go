@@ -346,7 +346,7 @@ func TestPoll(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := poll(ctx, false, fp.GetWaitFunc().WithContext(), f.WithContext()); err != nil {
+	if err := poll(ctx, false, fp.GetWaitFunc().WithContext(), f.WithContext(), true); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	fp.wg.Wait()
@@ -368,7 +368,7 @@ func TestPollError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := poll(ctx, false, fp.GetWaitFunc().WithContext(), f.WithContext()); err == nil || err != expectedError {
+	if err := poll(ctx, false, fp.GetWaitFunc().WithContext(), f.WithContext(), true); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	fp.wg.Wait()
@@ -388,7 +388,7 @@ func TestPollImmediate(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := poll(ctx, true, fp.GetWaitFunc().WithContext(), f.WithContext()); err != nil {
+	if err := poll(ctx, true, fp.GetWaitFunc().WithContext(), f.WithContext(), false); err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
@@ -410,7 +410,7 @@ func TestPollImmediateError(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if err := poll(ctx, true, fp.GetWaitFunc().WithContext(), f.WithContext()); err == nil || err != expectedError {
+	if err := poll(ctx, true, fp.GetWaitFunc().WithContext(), f.WithContext(), false); err == nil || err != expectedError {
 		t.Fatalf("Expected error %v, got none %v", expectedError, err)
 	}
 	// We don't need to wait for fp.wg, as pollImmediate shouldn't call WaitFunc at all.
@@ -938,7 +938,7 @@ func TestPollImmediateUntilWithContext(t *testing.T) {
 				defer cancel()
 				return ctx, cancel
 			},
-			errExpected:      ErrWaitTimeout,
+			errExpected:      context.Canceled,
 			attemptsExpected: 1,
 		},
 		{
@@ -969,7 +969,7 @@ func TestPollImmediateUntilWithContext(t *testing.T) {
 				return context.WithCancel(context.Background())
 			},
 			cancelContextAfterNthAttempt: 4,
-			errExpected:                  ErrWaitTimeout,
+			errExpected:                  context.Canceled,
 			attemptsExpected:             4,
 		},
 	}
@@ -1068,7 +1068,7 @@ func TestWaitForWithContext(t *testing.T) {
 				}
 			},
 			attemptsExpected: 0,
-			errExpected:      ErrWaitTimeout,
+			errExpected:      context.Canceled,
 		},
 	}
 
@@ -1106,6 +1106,7 @@ func TestPollInternal(t *testing.T) {
 		immediate          bool
 		waitFunc           func() WaitFunc
 		condition          ConditionWithContextFunc
+		contextErr         bool
 		cancelContextAfter int
 		attemptsExpected   int
 		errExpected        error
@@ -1299,6 +1300,31 @@ func TestPollInternal(t *testing.T) {
 			attemptsExpected:   2,
 			errExpected:        ErrWaitTimeout,
 		},
+		{
+			name:       "context is cancelled after N attempts, context error expected",
+			immediate:  false,
+			contextErr: true,
+			context: func() (context.Context, context.CancelFunc) {
+				return context.WithCancel(context.Background())
+			},
+			condition: ConditionWithContextFunc(func(context.Context) (bool, error) {
+				return false, nil
+			}),
+			waitFunc: func() WaitFunc {
+				return func(done <-chan struct{}) <-chan struct{} {
+					ch := make(chan struct{})
+					// just tick twice
+					go func() {
+						ch <- struct{}{}
+						ch <- struct{}{}
+					}()
+					return ch
+				}
+			},
+			cancelContextAfter: 2,
+			attemptsExpected:   2,
+			errExpected:        context.Canceled,
+		},
 	}
 
 	for _, test := range tests {
@@ -1326,7 +1352,7 @@ func TestPollInternal(t *testing.T) {
 					return test.condition(ctx)
 				}
 
-				return poll(ctx, test.immediate, ticker.WithContext(), conditionWrapper)
+				return poll(ctx, test.immediate, ticker.WithContext(), conditionWrapper, test.contextErr)
 			}()
 
 			if test.errExpected != err {
