@@ -241,7 +241,7 @@ func (c *RequestHeaderAuthRequestController) syncConfigMap(configMap *corev1.Con
 	}
 	if hasChanged {
 		c.exportedRequestHeaderBundle.Store(newRequestHeaderBundle)
-		klog.V(2).InfoS("Loaded new request header values", "name", c.name)
+		klog.V(2).InfoS("Loaded new request header values", "controllerName", c.name)
 	}
 	return nil
 }
