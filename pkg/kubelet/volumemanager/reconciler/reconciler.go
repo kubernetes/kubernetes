@@ -580,7 +580,7 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 		// volume.volumeSpecName is actually InnerVolumeSpecName. It will not be used
 		// for volume cleanup.
 		// TODO: in case pod is added back before reconciler starts to unmount, we can update this field from desired state information
-		outerVolumeSpecName: volume.volumeSpecName,
+		outerVolumeSpecName: volumeSpec.Name(),
 		pod:                 pod,
 		deviceMounter:       deviceMounter,
 		volumeGidValue:      "",
