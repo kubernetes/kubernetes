@@ -34,7 +34,7 @@ dependencies:
 
   # CNI plugins
   - name: "cni"
-    version: 0.8.7
+    version: 0.9.1
     refPaths:
     - path: cluster/gce/gci/configure.sh
       match: DEFAULT_CNI_VERSION=
