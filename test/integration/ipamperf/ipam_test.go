@@ -65,7 +65,7 @@ func setupAllocator(apiURL string, config *Config, clusterCIDR, serviceCIDR *net
 
 func runTest(t *testing.T, apiURL string, config *Config, clusterCIDR, serviceCIDR *net.IPNet, subnetMaskSize int) (*Results, error) {
 	t.Helper()
-	klog.Infof("Running test %s", t.Name())
+	klog.InfoS("Running test", "name", t.Name())
 
 	defer deleteNodes(apiURL, config) // cleanup nodes on after controller shutdown
 
@@ -85,7 +85,7 @@ func runTest(t *testing.T, apiURL string, config *Config, clusterCIDR, serviceCI
 	}
 
 	results := o.Results(t.Name(), config)
-	klog.Infof("Results: %s", results)
+	klog.InfoS("Results", results)
 	if !results.Succeeded {
 		t.Errorf("%s: Not allocations succeeded", t.Name())
 	}
@@ -99,12 +99,12 @@ func logResults(allResults []*Results) {
 		return
 	}
 	if resultsLogFile != "" {
-		klog.Infof("Logging results to %s", resultsLogFile)
+		klog.InfoS("Logging results to file", "resultsLogFile", resultsLogFile)
 		if err := ioutil.WriteFile(resultsLogFile, jStr, os.FileMode(0644)); err != nil {
 			klog.Errorf("Error logging results to %s: %v", resultsLogFile, err)
 		}
 	}
-	klog.Infof("AllResults:\n%s", string(jStr))
+	klog.InfoS("AllResults", string(jStr))
 }
 
 func TestPerformance(t *testing.T) {
