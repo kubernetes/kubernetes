@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -60,6 +61,14 @@ var (
 		},
 		[]string{"resource"},
 	)
+	objectDecodeCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "etcd_object_decode",
+			Help:           "Counter of stored objects which is decoded for each group, version and kind.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"group", "version", "kind", "registered"},
+	)
 	dbTotalSize = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
 			Name:           "etcd_db_total_size_in_bytes",
@@ -96,6 +105,7 @@ func Register() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
 		legacyregistry.MustRegister(etcdObjectCounts)
+		legacyregistry.MustRegister(objectDecodeCounter)
 		legacyregistry.MustRegister(dbTotalSize)
 		legacyregistry.MustRegister(etcdBookmarkCounts)
 		legacyregistry.MustRegister(etcdLeaseObjectCounts)
@@ -106,6 +116,11 @@ func Register() {
 func UpdateObjectCount(resourcePrefix string, count int64) {
 	objectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
 	etcdObjectCounts.WithLabelValues(resourcePrefix).Set(float64(count))
+}
+
+// RecordObjectDecodeCount sets the etcd_object_decode metric.
+func RecordObjectDecodeCount(group, version, kind string, registered bool, count int64) {
+	objectDecodeCounter.WithLabelValues(group, version, kind, strconv.FormatBool(registered)).Add(float64(count))
 }
 
 // RecordEtcdRequestLatency sets the etcd_request_duration_seconds metrics.

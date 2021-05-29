@@ -946,10 +946,17 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 	if _, err := conversion.EnforcePtr(objPtr); err != nil {
 		return fmt.Errorf("unable to convert output object to pointer: %v", err)
 	}
-	_, _, err := codec.Decode(value, nil, objPtr)
+	_, gvk, err := codec.Decode(value, nil, objPtr)
 	if err != nil {
+		if runtime.IsNotRegisteredError(err) && gvk != nil {
+			metrics.RecordObjectDecodeCount(gvk.Group, gvk.Version, gvk.Kind, false, 1)
+		}
 		return err
 	}
+	if gvk != nil {
+		metrics.RecordObjectDecodeCount(gvk.Group, gvk.Version, gvk.Kind, true, 1)
+	}
+
 	// being unable to set the version does not prevent the object from being extracted
 	if err := versioner.UpdateObject(objPtr, uint64(rev)); err != nil {
 		klog.Errorf("failed to update object version: %v", err)
@@ -959,9 +966,15 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // appendListItem decodes and appends the object (if it passes filter) to v, which must be a slice.
 func appendListItem(v reflect.Value, data []byte, rev uint64, pred storage.SelectionPredicate, codec runtime.Codec, versioner storage.Versioner, newItemFunc func() runtime.Object) error {
-	obj, _, err := codec.Decode(data, nil, newItemFunc())
+	obj, gvk, err := codec.Decode(data, nil, newItemFunc())
 	if err != nil {
+		if runtime.IsNotRegisteredError(err) && gvk != nil {
+			metrics.RecordObjectDecodeCount(gvk.Group, gvk.Version, gvk.Kind, false, 1)
+		}
 		return err
+	}
+	if gvk != nil {
+		metrics.RecordObjectDecodeCount(gvk.Group, gvk.Version, gvk.Kind, true, 1)
 	}
 	// being unable to set the version does not prevent the object from being extracted
 	if err := versioner.UpdateObject(obj, rev); err != nil {
