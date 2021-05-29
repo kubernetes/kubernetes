@@ -117,7 +117,7 @@ func SetPodTerminationReason(ctx context.Context, kubeClient clientset.Interface
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
 func MarkPodsNotReady(ctx context.Context, kubeClient clientset.Interface, recorder record.EventRecorder, pods []*v1.Pod, nodeName string) error {
-	klog.V(2).InfoS("Update ready status of pods on node", "node", nodeName)
+	klog.V(2).InfoS("Update ready status of pods on node", "node", klog.KRef("", nodeName))
 
 	errs := []error{}
 	for i := range pods {
@@ -165,7 +165,7 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 		UID:        types.UID(nodeUID),
 		Namespace:  "",
 	}
-	klog.V(2).InfoS("Recording event message for node", "event", event, "node", nodeName)
+	klog.V(2).InfoS("Recording event message for node", "event", event, "node", klog.KRef("", nodeName))
 	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
 }
 
