@@ -109,7 +109,7 @@ func verifyStatusCode(t *testing.T, verb, URL, body string, expectedStatusCode i
 		t.Fatalf("unexpected error: %v in sending req with verb: %s, URL: %s and body: %s", err, verb, URL, body)
 	}
 	transport := http.DefaultTransport
-	klog.Infof("Sending request: %v", req)
+	klog.InfoS("Sending request", "request", req)
 	resp, err := transport.RoundTrip(req)
 	if err != nil {
 		t.Fatalf("unexpected error: %v in req: %v", err, req)
