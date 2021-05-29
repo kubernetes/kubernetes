@@ -6,44 +6,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
-)
 
-// SYS_SETNS syscall allows changing the namespace of the current process.
-var SYS_SETNS = map[string]uintptr{
-	"386":     346,
-	"amd64":   308,
-	"arm64":   268,
-	"arm":     375,
-	"mips":    4344,
-	"mipsle":  4344,
-	"ppc64":   350,
-	"ppc64le": 350,
-	"s390x":   339,
-}[runtime.GOARCH]
+	"golang.org/x/sys/unix"
+)
 
 // Deprecated: use syscall pkg instead (go >= 1.5 needed).
 const (
-	CLONE_NEWUTS  = 0x04000000 /* New utsname group? */
-	CLONE_NEWIPC  = 0x08000000 /* New ipcs */
-	CLONE_NEWUSER = 0x10000000 /* New user namespace */
-	CLONE_NEWPID  = 0x20000000 /* New pid namespace */
-	CLONE_NEWNET  = 0x40000000 /* New network namespace */
-	CLONE_IO      = 0x80000000 /* Get io context */
+	CLONE_NEWUTS  = 0x04000000   /* New utsname group? */
+	CLONE_NEWIPC  = 0x08000000   /* New ipcs */
+	CLONE_NEWUSER = 0x10000000   /* New user namespace */
+	CLONE_NEWPID  = 0x20000000   /* New pid namespace */
+	CLONE_NEWNET  = 0x40000000   /* New network namespace */
+	CLONE_IO      = 0x80000000   /* Get io context */
+	bindMountPath = "/run/netns" /* Bind mount path for named netns */
 )
 
 // Setns sets namespace using syscall. Note that this should be a method
 // in syscall but it has not been added.
 func Setns(ns NsHandle, nstype int) (err error) {
-	_, _, e1 := syscall.Syscall(SYS_SETNS, uintptr(ns), uintptr(nstype), 0)
-	if e1 != 0 {
-		err = e1
-	}
-	return
+	return unix.Setns(int(ns), nstype)
 }
 
 // Set sets the current network namespace to the namespace represented
@@ -52,23 +38,67 @@ func Set(ns NsHandle) (err error) {
 	return Setns(ns, CLONE_NEWNET)
 }
 
-// New creates a new network namespace and returns a handle to it.
+// New creates a new network namespace, sets it as current and returns
+// a handle to it.
 func New() (ns NsHandle, err error) {
-	if err := syscall.Unshare(CLONE_NEWNET); err != nil {
+	if err := unix.Unshare(CLONE_NEWNET); err != nil {
 		return -1, err
 	}
 	return Get()
 }
 
+// NewNamed creates a new named network namespace and returns a handle to it
+func NewNamed(name string) (NsHandle, error) {
+	if _, err := os.Stat(bindMountPath); os.IsNotExist(err) {
+		err = os.MkdirAll(bindMountPath, 0755)
+		if err != nil {
+			return None(), err
+		}
+	}
+
+	newNs, err := New()
+	if err != nil {
+		return None(), err
+	}
+
+	namedPath := path.Join(bindMountPath, name)
+
+	f, err := os.OpenFile(namedPath, os.O_CREATE|os.O_EXCL, 0444)
+	if err != nil {
+		return None(), err
+	}
+	f.Close()
+
+	nsPath := fmt.Sprintf("/proc/%d/task/%d/ns/net", os.Getpid(), syscall.Gettid())
+	err = syscall.Mount(nsPath, namedPath, "bind", syscall.MS_BIND, "")
+	if err != nil {
+		return None(), err
+	}
+
+	return newNs, nil
+}
+
+// DeleteNamed deletes a named network namespace
+func DeleteNamed(name string) error {
+	namedPath := path.Join(bindMountPath, name)
+
+	err := syscall.Unmount(namedPath, syscall.MNT_DETACH)
+	if err != nil {
+		return err
+	}
+
+	return os.Remove(namedPath)
+}
+
 // Get gets a handle to the current threads network namespace.
 func Get() (NsHandle, error) {
-	return GetFromThread(os.Getpid(), syscall.Gettid())
+	return GetFromThread(os.Getpid(), unix.Gettid())
 }
 
 // GetFromPath gets a handle to a network namespace
 // identified by the path
 func GetFromPath(path string) (NsHandle, error) {
-	fd, err := syscall.Open(path, syscall.O_RDONLY, 0)
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return -1, err
 	}
@@ -190,6 +220,10 @@ func getPidForContainer(id string) (int, error) {
 		filepath.Join(cgroupRoot, "..", "systemd", "docker", id, "tasks"),
 		// Kubernetes with docker and CNI is even more different
 		filepath.Join(cgroupRoot, "..", "systemd", "kubepods", "*", "pod*", id, "tasks"),
+		// Another flavor of containers location in recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, cgroupThis, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
+		// When runs inside of a container with recent kubernetes 1.11+
+		filepath.Join(cgroupRoot, "kubepods.slice", "kubepods-besteffort.slice", "*", "docker-"+id+".scope", "tasks"),
 	}
 
 	var filename string

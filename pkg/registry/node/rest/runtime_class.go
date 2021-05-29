@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	nodev1 "k8s.io/api/node/v1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -32,34 +33,67 @@ import (
 type RESTStorageProvider struct{}
 
 // NewRESTStorage returns a RESTStorageProvider
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(nodeinternal.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 
 	if apiResourceConfigSource.VersionEnabled(nodev1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[nodev1alpha1.SchemeGroupVersion.Version] = p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.v1alpha1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[nodev1alpha1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
 	if apiResourceConfigSource.VersionEnabled(nodev1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[nodev1beta1.SchemeGroupVersion.Version] = p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.v1beta1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[nodev1beta1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
-	return apiGroupInfo, true
+	if apiResourceConfigSource.VersionEnabled(nodev1.SchemeGroupVersion) {
+		if storageMap, err := p.v1Storage(apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[nodev1.SchemeGroupVersion.Version] = storageMap
+		}
+	}
+
+	return apiGroupInfo, true, nil
 }
 
-func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	s := runtimeclassstorage.NewREST(restOptionsGetter)
+	s, err := runtimeclassstorage.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
 	storage["runtimeclasses"] = s
 
-	return storage
+	return storage, err
 }
 
-func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) v1beta1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	s := runtimeclassstorage.NewREST(restOptionsGetter)
+	s, err := runtimeclassstorage.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
 	storage["runtimeclasses"] = s
 
-	return storage
+	return storage, err
+}
+
+func (p RESTStorageProvider) v1Storage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
+	storage := map[string]rest.Storage{}
+	s, err := runtimeclassstorage.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	storage["runtimeclasses"] = s
+
+	return storage, err
 }
 
 // GroupName is the group name for the storage provider

@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -25,8 +27,8 @@ import (
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/pkg/jsonmessage"
 
-	"k8s.io/klog"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -52,7 +54,7 @@ func (ds *dockerService) ListImages(_ context.Context, r *runtimeapi.ListImagesR
 	for _, i := range images {
 		apiImage, err := imageToRuntimeAPIImage(&i)
 		if err != nil {
-			klog.V(5).Infof("Failed to convert docker API image %+v to runtime API image: %v", i, err)
+			klog.V(5).InfoS("Failed to convert docker API image to runtime API image", "image", i, "err", err)
 			continue
 		}
 		result = append(result, apiImage)
@@ -66,10 +68,16 @@ func (ds *dockerService) ImageStatus(_ context.Context, r *runtimeapi.ImageStatu
 
 	imageInspect, err := ds.client.InspectImageByRef(image.Image)
 	if err != nil {
-		if libdocker.IsImageNotFoundError(err) {
-			return &runtimeapi.ImageStatusResponse{}, nil
+		if !libdocker.IsImageNotFoundError(err) {
+			return nil, err
 		}
-		return nil, err
+		imageInspect, err = ds.client.InspectImageByID(image.Image)
+		if err != nil {
+			if libdocker.IsImageNotFoundError(err) {
+				return &runtimeapi.ImageStatusResponse{}, nil
+			}
+			return nil, err
+		}
 	}
 
 	imageStatus, err := imageInspectToRuntimeAPIImage(imageInspect)

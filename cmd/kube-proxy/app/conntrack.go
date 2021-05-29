@@ -22,9 +22,9 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sysctl"
 )
 
@@ -129,7 +129,7 @@ func isSysFSWritable() (bool, error) {
 		return false, errReadOnlySysFS
 	}
 
-	return false, errors.New("No sysfs mounted")
+	return false, errors.New("no sysfs mounted")
 }
 
 func readIntStringFile(filename string) (int, error) {

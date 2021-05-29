@@ -29,17 +29,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/cadvisor/accelerators"
 	"github.com/google/cadvisor/cache/memory"
 	"github.com/google/cadvisor/collector"
 	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
-	"github.com/google/cadvisor/info/v2"
+	v2 "github.com/google/cadvisor/info/v2"
+	"github.com/google/cadvisor/stats"
 	"github.com/google/cadvisor/summary"
 	"github.com/google/cadvisor/utils/cpuload"
 
-	units "github.com/docker/go-units"
-	"k8s.io/klog"
+	"github.com/docker/go-units"
+	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
 )
 
@@ -47,9 +47,14 @@ import (
 var enableLoadReader = flag.Bool("enable_load_reader", false, "Whether to enable cpu load reader")
 var HousekeepingInterval = flag.Duration("housekeeping_interval", 1*time.Second, "Interval between container housekeepings")
 
+// TODO: replace regular expressions with something simpler, such as strings.Split().
 // cgroup type chosen to fetch the cgroup path of a process.
-// Memory has been chosen, as it is one of the default cgroups that is enabled for most containers.
-var cgroupPathRegExp = regexp.MustCompile(`memory[^:]*:(.*?)[,;$]`)
+// Memory has been chosen, as it is one of the default cgroups that is enabled for most containers...
+var cgroupMemoryPathRegExp = regexp.MustCompile(`memory[^:]*:(.*?)[,;$]`)
+
+// ... but there are systems (e.g. Raspberry Pi 4) where memory cgroup controller is disabled by default.
+// We should check cpu cgroup then.
+var cgroupCPUPathRegExp = regexp.MustCompile(`cpu[^:]*:(.*?)[,;$]`)
 
 type containerInfo struct {
 	info.ContainerReference
@@ -81,7 +86,7 @@ type containerData struct {
 	logUsage bool
 
 	// Tells the container to stop.
-	stop chan bool
+	stop chan struct{}
 
 	// Tells the container to immediately collect stats
 	onDemandChan chan chan struct{}
@@ -90,7 +95,13 @@ type containerData struct {
 	collectorManager collector.CollectorManager
 
 	// nvidiaCollector updates stats for Nvidia GPUs attached to the container.
-	nvidiaCollector accelerators.AcceleratorCollector
+	nvidiaCollector stats.Collector
+
+	// perfCollector updates stats for perf_event cgroup controller.
+	perfCollector stats.Collector
+
+	// resctrlCollector updates stats for resctrl controller.
+	resctrlCollector stats.Collector
 }
 
 // jitter returns a time.Duration between duration and duration + maxFactor * duration,
@@ -104,23 +115,24 @@ func jitter(duration time.Duration, maxFactor float64) time.Duration {
 	return wait
 }
 
-func (c *containerData) Start() error {
-	go c.housekeeping()
+func (cd *containerData) Start() error {
+	go cd.housekeeping()
 	return nil
 }
 
-func (c *containerData) Stop() error {
-	err := c.memoryCache.RemoveContainer(c.info.Name)
+func (cd *containerData) Stop() error {
+	err := cd.memoryCache.RemoveContainer(cd.info.Name)
 	if err != nil {
 		return err
 	}
-	c.stop <- true
+	close(cd.stop)
+	cd.perfCollector.Destroy()
 	return nil
 }
 
-func (c *containerData) allowErrorLogging() bool {
-	if c.clock.Since(c.lastErrorTime) > time.Minute {
-		c.lastErrorTime = c.clock.Now()
+func (cd *containerData) allowErrorLogging() bool {
+	if cd.clock.Since(cd.lastErrorTime) > time.Minute {
+		cd.lastErrorTime = cd.clock.Now()
 		return true
 	}
 	return false
@@ -130,22 +142,25 @@ func (c *containerData) allowErrorLogging() bool {
 // It is designed to be used in conjunction with periodic housekeeping, and will cause the timer for
 // periodic housekeeping to reset.  This should be used sparingly, as calling OnDemandHousekeeping frequently
 // can have serious performance costs.
-func (c *containerData) OnDemandHousekeeping(maxAge time.Duration) {
-	if c.clock.Since(c.statsLastUpdatedTime) > maxAge {
+func (cd *containerData) OnDemandHousekeeping(maxAge time.Duration) {
+	cd.lock.Lock()
+	timeSinceStatsLastUpdate := cd.clock.Since(cd.statsLastUpdatedTime)
+	cd.lock.Unlock()
+	if timeSinceStatsLastUpdate > maxAge {
 		housekeepingFinishedChan := make(chan struct{})
-		c.onDemandChan <- housekeepingFinishedChan
+		cd.onDemandChan <- housekeepingFinishedChan
 		select {
-		case <-c.stop:
+		case <-cd.stop:
 		case <-housekeepingFinishedChan:
 		}
 	}
 }
 
 // notifyOnDemand notifies all calls to OnDemandHousekeeping that housekeeping is finished
-func (c *containerData) notifyOnDemand() {
+func (cd *containerData) notifyOnDemand() {
 	for {
 		select {
-		case finishedChan := <-c.onDemandChan:
+		case finishedChan := <-cd.onDemandChan:
 			close(finishedChan)
 		default:
 			return
@@ -153,51 +168,69 @@ func (c *containerData) notifyOnDemand() {
 	}
 }
 
-func (c *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo, error) {
+func (cd *containerData) GetInfo(shouldUpdateSubcontainers bool) (*containerInfo, error) {
 	// Get spec and subcontainers.
-	if c.clock.Since(c.infoLastUpdatedTime) > 5*time.Second {
-		err := c.updateSpec()
+	if cd.clock.Since(cd.infoLastUpdatedTime) > 5*time.Second || shouldUpdateSubcontainers {
+		err := cd.updateSpec()
 		if err != nil {
 			return nil, err
 		}
 		if shouldUpdateSubcontainers {
-			err = c.updateSubcontainers()
+			err = cd.updateSubcontainers()
 			if err != nil {
 				return nil, err
 			}
 		}
-		c.infoLastUpdatedTime = c.clock.Now()
+		cd.infoLastUpdatedTime = cd.clock.Now()
 	}
-	// Make a copy of the info for the user.
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	return &c.info, nil
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
+	cInfo := containerInfo{
+		Subcontainers: cd.info.Subcontainers,
+		Spec:          cd.info.Spec,
+	}
+	cInfo.Id = cd.info.Id
+	cInfo.Name = cd.info.Name
+	cInfo.Aliases = cd.info.Aliases
+	cInfo.Namespace = cd.info.Namespace
+	return &cInfo, nil
 }
 
-func (c *containerData) DerivedStats() (v2.DerivedStats, error) {
-	if c.summaryReader == nil {
-		return v2.DerivedStats{}, fmt.Errorf("derived stats not enabled for container %q", c.info.Name)
+func (cd *containerData) DerivedStats() (v2.DerivedStats, error) {
+	if cd.summaryReader == nil {
+		return v2.DerivedStats{}, fmt.Errorf("derived stats not enabled for container %q", cd.info.Name)
 	}
-	return c.summaryReader.DerivedStats()
+	return cd.summaryReader.DerivedStats()
 }
 
-func (c *containerData) getCgroupPath(cgroups string) (string, error) {
+func (cd *containerData) getCgroupPath(cgroups string) string {
 	if cgroups == "-" {
-		return "/", nil
+		return "/"
 	}
-	matches := cgroupPathRegExp.FindSubmatch([]byte(cgroups))
+	if strings.HasPrefix(cgroups, "0::") {
+		return cgroups[3:]
+	}
+	matches := cgroupMemoryPathRegExp.FindSubmatch([]byte(cgroups))
 	if len(matches) != 2 {
-		klog.V(3).Infof("failed to get memory cgroup path from %q", cgroups)
-		// return root in case of failures - memory hierarchy might not be enabled.
-		return "/", nil
+		klog.V(3).Infof(
+			"failed to get memory cgroup path from %q, will try to get cpu cgroup path",
+			cgroups,
+		)
+		// On some systems (e.g. Raspberry PI 4) cgroup memory controlled is disabled by default.
+		matches = cgroupCPUPathRegExp.FindSubmatch([]byte(cgroups))
+		if len(matches) != 2 {
+			klog.V(3).Infof("failed to get cpu cgroup path from %q; assuming root cgroup", cgroups)
+			// return root in case of failures - memory hierarchy might not be enabled.
+			return "/"
+		}
 	}
-	return string(matches[1]), nil
+	return string(matches[1])
 }
 
 // Returns contents of a file inside the container root.
 // Takes in a path relative to container root.
-func (c *containerData) ReadFile(filepath string, inHostNamespace bool) ([]byte, error) {
-	pids, err := c.getContainerPids(inHostNamespace)
+func (cd *containerData) ReadFile(filepath string, inHostNamespace bool) ([]byte, error) {
+	pids, err := cd.getContainerPids(inHostNamespace)
 	if err != nil {
 		return nil, err
 	}
@@ -215,11 +248,11 @@ func (c *containerData) ReadFile(filepath string, inHostNamespace bool) ([]byte,
 		}
 	}
 	// No process paths could be found. Declare config non-existent.
-	return nil, fmt.Errorf("file %q does not exist.", filepath)
+	return nil, fmt.Errorf("file %q does not exist", filepath)
 }
 
 // Return output for ps command in host /proc with specified format
-func (c *containerData) getPsOutput(inHostNamespace bool, format string) ([]byte, error) {
+func (cd *containerData) getPsOutput(inHostNamespace bool, format string) ([]byte, error) {
 	args := []string{}
 	command := "ps"
 	if !inHostNamespace {
@@ -236,9 +269,9 @@ func (c *containerData) getPsOutput(inHostNamespace bool, format string) ([]byte
 
 // Get pids of processes in this container.
 // A slightly lighterweight call than GetProcessList if other details are not required.
-func (c *containerData) getContainerPids(inHostNamespace bool) ([]string, error) {
+func (cd *containerData) getContainerPids(inHostNamespace bool) ([]string, error) {
 	format := "pid,cgroup"
-	out, err := c.getPsOutput(inHostNamespace, format)
+	out, err := cd.getPsOutput(inHostNamespace, format)
 	if err != nil {
 		return nil, err
 	}
@@ -254,110 +287,137 @@ func (c *containerData) getContainerPids(inHostNamespace bool) ([]string, error)
 			return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
 		}
 		pid := fields[0]
-		cgroup, err := c.getCgroupPath(fields[1])
-		if err != nil {
-			return nil, fmt.Errorf("could not parse cgroup path from %q: %v", fields[1], err)
-		}
-		if c.info.Name == cgroup {
+		cgroup := cd.getCgroupPath(fields[1])
+		if cd.info.Name == cgroup {
 			pids = append(pids, pid)
 		}
 	}
 	return pids, nil
 }
 
-func (c *containerData) GetProcessList(cadvisorContainer string, inHostNamespace bool) ([]v2.ProcessInfo, error) {
-	// report all processes for root.
-	isRoot := c.info.Name == "/"
+func (cd *containerData) GetProcessList(cadvisorContainer string, inHostNamespace bool) ([]v2.ProcessInfo, error) {
+	format := "user,pid,ppid,stime,pcpu,pmem,rss,vsz,stat,time,comm,psr,cgroup"
+	out, err := cd.getPsOutput(inHostNamespace, format)
+	if err != nil {
+		return nil, err
+	}
+	return cd.parseProcessList(cadvisorContainer, inHostNamespace, out)
+}
+
+func (cd *containerData) parseProcessList(cadvisorContainer string, inHostNamespace bool, out []byte) ([]v2.ProcessInfo, error) {
 	rootfs := "/"
 	if !inHostNamespace {
 		rootfs = "/rootfs"
 	}
-	format := "user,pid,ppid,stime,pcpu,pmem,rss,vsz,stat,time,comm,cgroup"
-	out, err := c.getPsOutput(inHostNamespace, format)
-	if err != nil {
-		return nil, err
-	}
-	expectedFields := 12
 	processes := []v2.ProcessInfo{}
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines[1:] {
-		if len(line) == 0 {
+		processInfo, err := cd.parsePsLine(line, cadvisorContainer, inHostNamespace)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse line %s: %v", line, err)
+		}
+		if processInfo == nil {
 			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < expectedFields {
-			return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
-		}
-		pid, err := strconv.Atoi(fields[1])
-		if err != nil {
-			return nil, fmt.Errorf("invalid pid %q: %v", fields[1], err)
-		}
-		ppid, err := strconv.Atoi(fields[2])
-		if err != nil {
-			return nil, fmt.Errorf("invalid ppid %q: %v", fields[2], err)
-		}
-		percentCpu, err := strconv.ParseFloat(fields[4], 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid cpu percent %q: %v", fields[4], err)
-		}
-		percentMem, err := strconv.ParseFloat(fields[5], 32)
-		if err != nil {
-			return nil, fmt.Errorf("invalid memory percent %q: %v", fields[5], err)
-		}
-		rss, err := strconv.ParseUint(fields[6], 0, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid rss %q: %v", fields[6], err)
-		}
-		// convert to bytes
-		rss *= 1024
-		vs, err := strconv.ParseUint(fields[7], 0, 64)
-		if err != nil {
-			return nil, fmt.Errorf("invalid virtual size %q: %v", fields[7], err)
-		}
-		// convert to bytes
-		vs *= 1024
-		cgroup, err := c.getCgroupPath(fields[11])
-		if err != nil {
-			return nil, fmt.Errorf("could not parse cgroup path from %q: %v", fields[11], err)
-		}
-		// Remove the ps command we just ran from cadvisor container.
-		// Not necessary, but makes the cadvisor page look cleaner.
-		if !inHostNamespace && cadvisorContainer == cgroup && fields[10] == "ps" {
-			continue
-		}
-		var cgroupPath string
-		if isRoot {
-			cgroupPath = cgroup
 		}
 
 		var fdCount int
-		dirPath := path.Join(rootfs, "/proc", strconv.Itoa(pid), "fd")
+		dirPath := path.Join(rootfs, "/proc", strconv.Itoa(processInfo.Pid), "fd")
 		fds, err := ioutil.ReadDir(dirPath)
 		if err != nil {
 			klog.V(4).Infof("error while listing directory %q to measure fd count: %v", dirPath, err)
 			continue
 		}
 		fdCount = len(fds)
+		processInfo.FdCount = fdCount
 
-		if isRoot || c.info.Name == cgroup {
-			processes = append(processes, v2.ProcessInfo{
-				User:          fields[0],
-				Pid:           pid,
-				Ppid:          ppid,
-				StartTime:     fields[3],
-				PercentCpu:    float32(percentCpu),
-				PercentMemory: float32(percentMem),
-				RSS:           rss,
-				VirtualSize:   vs,
-				Status:        fields[8],
-				RunningTime:   fields[9],
-				Cmd:           fields[10],
-				CgroupPath:    cgroupPath,
-				FdCount:       fdCount,
-			})
-		}
+		processes = append(processes, *processInfo)
 	}
 	return processes, nil
+}
+
+func (cd *containerData) isRoot() bool {
+	return cd.info.Name == "/"
+}
+
+func (cd *containerData) parsePsLine(line, cadvisorContainer string, inHostNamespace bool) (*v2.ProcessInfo, error) {
+	const expectedFields = 13
+	if len(line) == 0 {
+		return nil, nil
+	}
+
+	info := v2.ProcessInfo{}
+	var err error
+
+	fields := strings.Fields(line)
+	if len(fields) < expectedFields {
+		return nil, fmt.Errorf("expected at least %d fields, found %d: output: %q", expectedFields, len(fields), line)
+	}
+	info.User = fields[0]
+	info.StartTime = fields[3]
+	info.Status = fields[8]
+	info.RunningTime = fields[9]
+
+	info.Pid, err = strconv.Atoi(fields[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid pid %q: %v", fields[1], err)
+	}
+	info.Ppid, err = strconv.Atoi(fields[2])
+	if err != nil {
+		return nil, fmt.Errorf("invalid ppid %q: %v", fields[2], err)
+	}
+
+	percentCPU, err := strconv.ParseFloat(fields[4], 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cpu percent %q: %v", fields[4], err)
+	}
+	info.PercentCpu = float32(percentCPU)
+	percentMem, err := strconv.ParseFloat(fields[5], 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid memory percent %q: %v", fields[5], err)
+	}
+	info.PercentMemory = float32(percentMem)
+
+	info.RSS, err = strconv.ParseUint(fields[6], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid rss %q: %v", fields[6], err)
+	}
+	info.VirtualSize, err = strconv.ParseUint(fields[7], 0, 64)
+	if err != nil {
+		return nil, fmt.Errorf("invalid virtual size %q: %v", fields[7], err)
+	}
+	// convert to bytes
+	info.RSS *= 1024
+	info.VirtualSize *= 1024
+
+	// According to `man ps`: The following user-defined format specifiers may contain spaces: args, cmd, comm, command,
+	// fname, ucmd, ucomm, lstart, bsdstart, start.
+	// Therefore we need to be able to parse comm that consists of multiple space-separated parts.
+	info.Cmd = strings.Join(fields[10:len(fields)-2], " ")
+
+	// These are last two parts of the line. We create a subslice of `fields` to handle comm that includes spaces.
+	lastTwoFields := fields[len(fields)-2:]
+	info.Psr, err = strconv.Atoi(lastTwoFields[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid psr %q: %v", lastTwoFields[0], err)
+	}
+	info.CgroupPath = cd.getCgroupPath(lastTwoFields[1])
+
+	// Remove the ps command we just ran from cadvisor container.
+	// Not necessary, but makes the cadvisor page look cleaner.
+	if !inHostNamespace && cadvisorContainer == info.CgroupPath && info.Cmd == "ps" {
+		return nil, nil
+	}
+
+	// Do not report processes from other containers when non-root container requested.
+	if !cd.isRoot() && info.CgroupPath != cd.info.Name {
+		return nil, nil
+	}
+
+	// Remove cgroup information when non-root container requested.
+	if !cd.isRoot() {
+		info.CgroupPath = ""
+	}
+	return &info, nil
 }
 
 func newContainerData(containerName string, memoryCache *memory.InMemoryCache, handler container.ContainerHandler, logUsage bool, collectorManager collector.CollectorManager, maxHousekeepingInterval time.Duration, allowDynamicHousekeeping bool, clock clock.Clock) (*containerData, error) {
@@ -380,10 +440,13 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 		allowDynamicHousekeeping: allowDynamicHousekeeping,
 		logUsage:                 logUsage,
 		loadAvg:                  -1.0, // negative value indicates uninitialized.
-		stop:                     make(chan bool, 1),
+		stop:                     make(chan struct{}),
 		collectorManager:         collectorManager,
 		onDemandChan:             make(chan chan struct{}, 100),
 		clock:                    clock,
+		perfCollector:            &stats.NoopCollector{},
+		nvidiaCollector:          &stats.NoopCollector{},
+		resctrlCollector:         &stats.NoopCollector{},
 	}
 	cont.info.ContainerReference = ref
 
@@ -406,52 +469,52 @@ func newContainerData(containerName string, memoryCache *memory.InMemoryCache, h
 	cont.summaryReader, err = summary.New(cont.info.Spec)
 	if err != nil {
 		cont.summaryReader = nil
-		klog.Warningf("Failed to create summary reader for %q: %v", ref.Name, err)
+		klog.V(5).Infof("Failed to create summary reader for %q: %v", ref.Name, err)
 	}
 
 	return cont, nil
 }
 
 // Determine when the next housekeeping should occur.
-func (self *containerData) nextHousekeepingInterval() time.Duration {
-	if self.allowDynamicHousekeeping {
+func (cd *containerData) nextHousekeepingInterval() time.Duration {
+	if cd.allowDynamicHousekeeping {
 		var empty time.Time
-		stats, err := self.memoryCache.RecentStats(self.info.Name, empty, empty, 2)
+		stats, err := cd.memoryCache.RecentStats(cd.info.Name, empty, empty, 2)
 		if err != nil {
-			if self.allowErrorLogging() {
-				klog.Warningf("Failed to get RecentStats(%q) while determining the next housekeeping: %v", self.info.Name, err)
+			if cd.allowErrorLogging() {
+				klog.Warningf("Failed to get RecentStats(%q) while determining the next housekeeping: %v", cd.info.Name, err)
 			}
 		} else if len(stats) == 2 {
 			// TODO(vishnuk): Use no processes as a signal.
 			// Raise the interval if usage hasn't changed in the last housekeeping.
-			if stats[0].StatsEq(stats[1]) && (self.housekeepingInterval < self.maxHousekeepingInterval) {
-				self.housekeepingInterval *= 2
-				if self.housekeepingInterval > self.maxHousekeepingInterval {
-					self.housekeepingInterval = self.maxHousekeepingInterval
+			if stats[0].StatsEq(stats[1]) && (cd.housekeepingInterval < cd.maxHousekeepingInterval) {
+				cd.housekeepingInterval *= 2
+				if cd.housekeepingInterval > cd.maxHousekeepingInterval {
+					cd.housekeepingInterval = cd.maxHousekeepingInterval
 				}
-			} else if self.housekeepingInterval != *HousekeepingInterval {
+			} else if cd.housekeepingInterval != *HousekeepingInterval {
 				// Lower interval back to the baseline.
-				self.housekeepingInterval = *HousekeepingInterval
+				cd.housekeepingInterval = *HousekeepingInterval
 			}
 		}
 	}
 
-	return jitter(self.housekeepingInterval, 1.0)
+	return jitter(cd.housekeepingInterval, 1.0)
 }
 
 // TODO(vmarmol): Implement stats collecting as a custom collector.
-func (c *containerData) housekeeping() {
-	// Start any background goroutines - must be cleaned up in c.handler.Cleanup().
-	c.handler.Start()
-	defer c.handler.Cleanup()
+func (cd *containerData) housekeeping() {
+	// Start any background goroutines - must be cleaned up in cd.handler.Cleanup().
+	cd.handler.Start()
+	defer cd.handler.Cleanup()
 
-	// Initialize cpuload reader - must be cleaned up in c.loadReader.Stop()
-	if c.loadReader != nil {
-		err := c.loadReader.Start()
+	// Initialize cpuload reader - must be cleaned up in cd.loadReader.Stop()
+	if cd.loadReader != nil {
+		err := cd.loadReader.Start()
 		if err != nil {
-			klog.Warningf("Could not start cpu load stat collector for %q: %s", c.info.Name, err)
+			klog.Warningf("Could not start cpu load stat collector for %q: %s", cd.info.Name, err)
 		}
-		defer c.loadReader.Stop()
+		defer cd.loadReader.Stop()
 	}
 
 	// Long housekeeping is either 100ms or half of the housekeeping interval.
@@ -461,11 +524,11 @@ func (c *containerData) housekeeping() {
 	}
 
 	// Housekeep every second.
-	klog.V(3).Infof("Start housekeeping for container %q\n", c.info.Name)
-	houseKeepingTimer := c.clock.NewTimer(0 * time.Second)
+	klog.V(3).Infof("Start housekeeping for container %q\n", cd.info.Name)
+	houseKeepingTimer := cd.clock.NewTimer(0 * time.Second)
 	defer houseKeepingTimer.Stop()
 	for {
-		if !c.housekeepingTick(houseKeepingTimer.C(), longHousekeeping) {
+		if !cd.housekeepingTick(houseKeepingTimer.C(), longHousekeeping) {
 			return
 		}
 		// Stop and drain the timer so that it is safe to reset it
@@ -476,74 +539,76 @@ func (c *containerData) housekeeping() {
 			}
 		}
 		// Log usage if asked to do so.
-		if c.logUsage {
+		if cd.logUsage {
 			const numSamples = 60
 			var empty time.Time
-			stats, err := c.memoryCache.RecentStats(c.info.Name, empty, empty, numSamples)
+			stats, err := cd.memoryCache.RecentStats(cd.info.Name, empty, empty, numSamples)
 			if err != nil {
-				if c.allowErrorLogging() {
-					klog.Warningf("[%s] Failed to get recent stats for logging usage: %v", c.info.Name, err)
+				if cd.allowErrorLogging() {
+					klog.Warningf("[%s] Failed to get recent stats for logging usage: %v", cd.info.Name, err)
 				}
 			} else if len(stats) < numSamples {
 				// Ignore, not enough stats yet.
 			} else {
-				usageCpuNs := uint64(0)
+				usageCPUNs := uint64(0)
 				for i := range stats {
 					if i > 0 {
-						usageCpuNs += (stats[i].Cpu.Usage.Total - stats[i-1].Cpu.Usage.Total)
+						usageCPUNs += stats[i].Cpu.Usage.Total - stats[i-1].Cpu.Usage.Total
 					}
 				}
 				usageMemory := stats[numSamples-1].Memory.Usage
 
 				instantUsageInCores := float64(stats[numSamples-1].Cpu.Usage.Total-stats[numSamples-2].Cpu.Usage.Total) / float64(stats[numSamples-1].Timestamp.Sub(stats[numSamples-2].Timestamp).Nanoseconds())
-				usageInCores := float64(usageCpuNs) / float64(stats[numSamples-1].Timestamp.Sub(stats[0].Timestamp).Nanoseconds())
+				usageInCores := float64(usageCPUNs) / float64(stats[numSamples-1].Timestamp.Sub(stats[0].Timestamp).Nanoseconds())
 				usageInHuman := units.HumanSize(float64(usageMemory))
 				// Don't set verbosity since this is already protected by the logUsage flag.
-				klog.Infof("[%s] %.3f cores (average: %.3f cores), %s of memory", c.info.Name, instantUsageInCores, usageInCores, usageInHuman)
+				klog.Infof("[%s] %.3f cores (average: %.3f cores), %s of memory", cd.info.Name, instantUsageInCores, usageInCores, usageInHuman)
 			}
 		}
-		houseKeepingTimer.Reset(c.nextHousekeepingInterval())
+		houseKeepingTimer.Reset(cd.nextHousekeepingInterval())
 	}
 }
 
-func (c *containerData) housekeepingTick(timer <-chan time.Time, longHousekeeping time.Duration) bool {
+func (cd *containerData) housekeepingTick(timer <-chan time.Time, longHousekeeping time.Duration) bool {
 	select {
-	case <-c.stop:
+	case <-cd.stop:
 		// Stop housekeeping when signaled.
 		return false
-	case finishedChan := <-c.onDemandChan:
+	case finishedChan := <-cd.onDemandChan:
 		// notify the calling function once housekeeping has completed
 		defer close(finishedChan)
 	case <-timer:
 	}
-	start := c.clock.Now()
-	err := c.updateStats()
+	start := cd.clock.Now()
+	err := cd.updateStats()
 	if err != nil {
-		if c.allowErrorLogging() {
-			klog.Warningf("Failed to update stats for container \"%s\": %s", c.info.Name, err)
+		if cd.allowErrorLogging() {
+			klog.Warningf("Failed to update stats for container \"%s\": %s", cd.info.Name, err)
 		}
 	}
 	// Log if housekeeping took too long.
-	duration := c.clock.Since(start)
+	duration := cd.clock.Since(start)
 	if duration >= longHousekeeping {
-		klog.V(3).Infof("[%s] Housekeeping took %s", c.info.Name, duration)
+		klog.V(3).Infof("[%s] Housekeeping took %s", cd.info.Name, duration)
 	}
-	c.notifyOnDemand()
-	c.statsLastUpdatedTime = c.clock.Now()
+	cd.notifyOnDemand()
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
+	cd.statsLastUpdatedTime = cd.clock.Now()
 	return true
 }
 
-func (c *containerData) updateSpec() error {
-	spec, err := c.handler.GetSpec()
+func (cd *containerData) updateSpec() error {
+	spec, err := cd.handler.GetSpec()
 	if err != nil {
 		// Ignore errors if the container is dead.
-		if !c.handler.Exists() {
+		if !cd.handler.Exists() {
 			return nil
 		}
 		return err
 	}
 
-	customMetrics, err := c.collectorManager.GetSpec()
+	customMetrics, err := cd.collectorManager.GetSpec()
 	if err != nil {
 		return err
 	}
@@ -551,28 +616,28 @@ func (c *containerData) updateSpec() error {
 		spec.HasCustomMetrics = true
 		spec.CustomMetrics = customMetrics
 	}
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.info.Spec = spec
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
+	cd.info.Spec = spec
 	return nil
 }
 
 // Calculate new smoothed load average using the new sample of runnable threads.
 // The decay used ensures that the load will stabilize on a new constant value within
 // 10 seconds.
-func (c *containerData) updateLoad(newLoad uint64) {
-	if c.loadAvg < 0 {
-		c.loadAvg = float64(newLoad) // initialize to the first seen sample for faster stabilization.
+func (cd *containerData) updateLoad(newLoad uint64) {
+	if cd.loadAvg < 0 {
+		cd.loadAvg = float64(newLoad) // initialize to the first seen sample for faster stabilization.
 	} else {
-		c.loadAvg = c.loadAvg*c.loadDecay + float64(newLoad)*(1.0-c.loadDecay)
+		cd.loadAvg = cd.loadAvg*cd.loadDecay + float64(newLoad)*(1.0-cd.loadDecay)
 	}
 }
 
-func (c *containerData) updateStats() error {
-	stats, statsErr := c.handler.GetStats()
+func (cd *containerData) updateStats() error {
+	stats, statsErr := cd.handler.GetStats()
 	if statsErr != nil {
 		// Ignore errors if the container is dead.
-		if !c.handler.Exists() {
+		if !cd.handler.Exists() {
 			return nil
 		}
 
@@ -582,32 +647,32 @@ func (c *containerData) updateStats() error {
 	if stats == nil {
 		return statsErr
 	}
-	if c.loadReader != nil {
+	if cd.loadReader != nil {
 		// TODO(vmarmol): Cache this path.
-		path, err := c.handler.GetCgroupPath("cpu")
+		path, err := cd.handler.GetCgroupPath("cpu")
 		if err == nil {
-			loadStats, err := c.loadReader.GetCpuLoad(c.info.Name, path)
+			loadStats, err := cd.loadReader.GetCpuLoad(cd.info.Name, path)
 			if err != nil {
-				return fmt.Errorf("failed to get load stat for %q - path %q, error %s", c.info.Name, path, err)
+				return fmt.Errorf("failed to get load stat for %q - path %q, error %s", cd.info.Name, path, err)
 			}
 			stats.TaskStats = loadStats
-			c.updateLoad(loadStats.NrRunning)
+			cd.updateLoad(loadStats.NrRunning)
 			// convert to 'milliLoad' to avoid floats and preserve precision.
-			stats.Cpu.LoadAverage = int32(c.loadAvg * 1000)
+			stats.Cpu.LoadAverage = int32(cd.loadAvg * 1000)
 		}
 	}
-	if c.summaryReader != nil {
-		err := c.summaryReader.AddSample(*stats)
+	if cd.summaryReader != nil {
+		err := cd.summaryReader.AddSample(*stats)
 		if err != nil {
 			// Ignore summary errors for now.
-			klog.V(2).Infof("Failed to add summary stats for %q: %v", c.info.Name, err)
+			klog.V(2).Infof("Failed to add summary stats for %q: %v", cd.info.Name, err)
 		}
 	}
 	var customStatsErr error
-	cm := c.collectorManager.(*collector.GenericCollectorManager)
+	cm := cd.collectorManager.(*collector.GenericCollectorManager)
 	if len(cm.Collectors) > 0 {
-		if cm.NextCollectionTime.Before(c.clock.Now()) {
-			customStats, err := c.updateCustomStats()
+		if cm.NextCollectionTime.Before(cd.clock.Now()) {
+			customStats, err := cd.updateCustomStats()
 			if customStats != nil {
 				stats.CustomMetrics = customStats
 			}
@@ -618,15 +683,19 @@ func (c *containerData) updateStats() error {
 	}
 
 	var nvidiaStatsErr error
-	if c.nvidiaCollector != nil {
+	if cd.nvidiaCollector != nil {
 		// This updates the Accelerators field of the stats struct
-		nvidiaStatsErr = c.nvidiaCollector.UpdateStats(stats)
+		nvidiaStatsErr = cd.nvidiaCollector.UpdateStats(stats)
 	}
 
-	ref, err := c.handler.ContainerReference()
+	perfStatsErr := cd.perfCollector.UpdateStats(stats)
+
+	resctrlStatsErr := cd.resctrlCollector.UpdateStats(stats)
+
+	ref, err := cd.handler.ContainerReference()
 	if err != nil {
 		// Ignore errors if the container is dead.
-		if !c.handler.Exists() {
+		if !cd.handler.Exists() {
 			return nil
 		}
 		return err
@@ -636,7 +705,7 @@ func (c *containerData) updateStats() error {
 		ContainerReference: ref,
 	}
 
-	err = c.memoryCache.AddStats(&cInfo, stats)
+	err = cd.memoryCache.AddStats(&cInfo, stats)
 	if err != nil {
 		return err
 	}
@@ -644,15 +713,24 @@ func (c *containerData) updateStats() error {
 		return statsErr
 	}
 	if nvidiaStatsErr != nil {
+		klog.Errorf("error occurred while collecting nvidia stats for container %s: %s", cInfo.Name, err)
 		return nvidiaStatsErr
+	}
+	if perfStatsErr != nil {
+		klog.Errorf("error occurred while collecting perf stats for container %s: %s", cInfo.Name, err)
+		return perfStatsErr
+	}
+	if resctrlStatsErr != nil {
+		klog.Errorf("error occurred while collecting resctrl stats for container %s: %s", cInfo.Name, err)
+		return resctrlStatsErr
 	}
 	return customStatsErr
 }
 
-func (c *containerData) updateCustomStats() (map[string][]info.MetricVal, error) {
-	_, customStats, customStatsErr := c.collectorManager.Collect()
+func (cd *containerData) updateCustomStats() (map[string][]info.MetricVal, error) {
+	_, customStats, customStatsErr := cd.collectorManager.Collect()
 	if customStatsErr != nil {
-		if !c.handler.Exists() {
+		if !cd.handler.Exists() {
 			return customStats, nil
 		}
 		customStatsErr = fmt.Errorf("%v, continuing to push custom stats", customStatsErr)
@@ -660,19 +738,19 @@ func (c *containerData) updateCustomStats() (map[string][]info.MetricVal, error)
 	return customStats, customStatsErr
 }
 
-func (c *containerData) updateSubcontainers() error {
+func (cd *containerData) updateSubcontainers() error {
 	var subcontainers info.ContainerReferenceSlice
-	subcontainers, err := c.handler.ListContainers(container.ListSelf)
+	subcontainers, err := cd.handler.ListContainers(container.ListSelf)
 	if err != nil {
 		// Ignore errors if the container is dead.
-		if !c.handler.Exists() {
+		if !cd.handler.Exists() {
 			return nil
 		}
 		return err
 	}
 	sort.Sort(subcontainers)
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.info.Subcontainers = subcontainers
+	cd.lock.Lock()
+	defer cd.lock.Unlock()
+	cd.info.Subcontainers = subcontainers
 	return nil
 }

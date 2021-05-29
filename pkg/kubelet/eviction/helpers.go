@@ -23,15 +23,15 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	corev1helpers "k8s.io/component-helpers/scheduling/corev1"
+	"k8s.io/klog/v2"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	schedulerutils "k8s.io/kubernetes/pkg/scheduler/util"
+	volumeutils "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -97,6 +97,17 @@ func validSignal(signal evictionapi.Signal) bool {
 	return found
 }
 
+// getReclaimableThreshold finds the threshold and resource to reclaim
+func getReclaimableThreshold(thresholds []evictionapi.Threshold) (evictionapi.Threshold, v1.ResourceName, bool) {
+	for _, thresholdToReclaim := range thresholds {
+		if resourceToReclaim, ok := signalToResource[thresholdToReclaim.Signal]; ok {
+			return thresholdToReclaim, resourceToReclaim, true
+		}
+		klog.V(3).InfoS("Eviction manager: threshold was crossed, but reclaim is not implemented for this threshold.", "threshold", thresholdToReclaim.Signal)
+	}
+	return evictionapi.Threshold{}, "", false
+}
+
 // ParseThresholdConfig parses the flags for thresholds.
 func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim map[string]string) ([]evictionapi.Threshold, error) {
 	results := []evictionapi.Threshold{}
@@ -127,11 +138,8 @@ func ParseThresholdConfig(allocatableConfig []string, evictionHard, evictionSoft
 	}
 	results = append(results, softThresholds...)
 	for i := range results {
-		for signal, minReclaim := range minReclaims {
-			if results[i].Signal == signal {
-				results[i].MinReclaim = &minReclaim
-				break
-			}
+		if minReclaim, ok := minReclaims[results[i].Signal]; ok {
+			results[i].MinReclaim = &minReclaim
 		}
 	}
 	for _, key := range allocatableConfig {
@@ -156,7 +164,7 @@ func addAllocatableThresholds(thresholds []evictionapi.Threshold) []evictionapi.
 			})
 		}
 	}
-	return append(thresholds, additionalThresholds...)
+	return append(append([]evictionapi.Threshold{}, thresholds...), additionalThresholds...)
 }
 
 // parseThresholdStatements parses the input statements into a list of Threshold objects.
@@ -196,7 +204,8 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionap
 		if percentage < 0 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be >= 0%%: %s", signal, val)
 		}
-		if percentage > 100 {
+		// percentage is a float and should not be greater than 1 (100%)
+		if percentage > 1 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be <= 100%%: %s", signal, val)
 		}
 		return &evictionapi.Threshold{
@@ -320,15 +329,22 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
+// processUsage converts working set into a process count.
+func processUsage(processStats *statsapi.ProcessStats) uint64 {
+	if processStats == nil || processStats.ProcessCount == nil {
+		return 0
+	}
+	usage := uint64(*processStats.ProcessCount)
+	return usage
+}
+
 // localVolumeNames returns the set of volumes for the pod that are local
-// TODO: sumamry API should report what volumes consume local storage rather than hard-code here.
+// TODO: summary API should report what volumes consume local storage rather than hard-code here.
 func localVolumeNames(pod *v1.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
 		if volume.HostPath != nil ||
-			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-			volume.ConfigMap != nil ||
-			volume.GitRepo != nil {
+			volumeutils.IsLocalEphemeralVolume(volume) {
 			result = append(result, volume.Name)
 		}
 	}
@@ -395,51 +411,9 @@ func podDiskUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsSt
 	}, nil
 }
 
-// localEphemeralVolumeNames returns the set of ephemeral volumes for the pod that are local
-func localEphemeralVolumeNames(pod *v1.Pod) []string {
-	result := []string{}
-	for _, volume := range pod.Spec.Volumes {
-		if volume.GitRepo != nil ||
-			(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
-			volume.ConfigMap != nil || volume.DownwardAPI != nil {
-			result = append(result, volume.Name)
-		}
-	}
-	return result
-}
-
-// podLocalEphemeralStorageUsage aggregates pod local ephemeral storage usage and inode consumption for the specified stats to measure.
-func podLocalEphemeralStorageUsage(podStats statsapi.PodStats, pod *v1.Pod, statsToMeasure []fsStatsType) (v1.ResourceList, error) {
-	disk := resource.Quantity{Format: resource.BinarySI}
-	inodes := resource.Quantity{Format: resource.DecimalSI}
-
-	containerUsageList := containerUsage(podStats, statsToMeasure)
-	disk.Add(containerUsageList[v1.ResourceEphemeralStorage])
-	inodes.Add(containerUsageList[resourceInodes])
-
-	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
-		volumeNames := localEphemeralVolumeNames(pod)
-		podLocalVolumeUsageList := podLocalVolumeUsage(volumeNames, podStats)
-		disk.Add(podLocalVolumeUsageList[v1.ResourceEphemeralStorage])
-		inodes.Add(podLocalVolumeUsageList[resourceInodes])
-	}
-	return v1.ResourceList{
-		v1.ResourceEphemeralStorage: disk,
-		resourceInodes:              inodes,
-	}, nil
-}
-
 // formatThreshold formats a threshold for logging.
 func formatThreshold(threshold evictionapi.Threshold) string {
 	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, threshold.Operator, evictionapi.ThresholdValue(threshold.Value), threshold.GracePeriod)
-}
-
-// formatevictionapi.ThresholdValue formats a thresholdValue for logging.
-func formatThresholdValue(value evictionapi.ThresholdValue) string {
-	if value.Quantity != nil {
-		return value.Quantity.String()
-	}
-	return fmt.Sprintf("%f%%", value.Percentage*float32(100))
 }
 
 // cachedStatsFunc returns a statsFunc based on the provided pod stats.
@@ -514,12 +488,8 @@ func (ms *multiSorter) Less(i, j int) bool {
 
 // priority compares pods by Priority, if priority is enabled.
 func priority(p1, p2 *v1.Pod) int {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
-		// If priority is not enabled, all pods are equal.
-		return 0
-	}
-	priority1 := schedulerutils.GetPodPriority(p1)
-	priority2 := schedulerutils.GetPodPriority(p2)
+	priority1 := corev1helpers.PodPriority(p1)
+	priority2 := corev1helpers.PodPriority(p2)
 	if priority1 == priority2 {
 		return 0
 	}
@@ -541,8 +511,8 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 
 		p1Memory := memoryUsage(p1Stats.Memory)
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p1ExceedsRequests := p1Memory.Cmp(podRequest(p1, v1.ResourceMemory)) == 1
-		p2ExceedsRequests := p2Memory.Cmp(podRequest(p2, v1.ResourceMemory)) == 1
+		p1ExceedsRequests := p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
+		p2ExceedsRequests := p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
@@ -560,11 +530,11 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := memoryUsage(p1Stats.Memory)
-		p1Request := podRequest(p1, v1.ResourceMemory)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
 		p1Memory.Sub(p1Request)
 
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p2Request := podRequest(p2, v1.ResourceMemory)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
 		p2Memory.Sub(p2Request)
 
 		// prioritize evicting the pod which has the larger consumption of memory
@@ -572,39 +542,21 @@ func memory(stats statsFunc) cmpFunc {
 	}
 }
 
-// podRequest returns the total resource request of a pod which is the
-// max(max of init container requests, sum of container requests)
-func podRequest(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	containerValue := resource.Quantity{Format: resource.BinarySI}
-	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
-		return containerValue
-	}
-	for i := range pod.Spec.Containers {
-		switch resourceName {
-		case v1.ResourceMemory:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.Memory())
-		case v1.ResourceEphemeralStorage:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.StorageEphemeral())
+// process compares pods by largest consumer of process number relative to request.
+func process(stats statsFunc) cmpFunc {
+	return func(p1, p2 *v1.Pod) int {
+		p1Stats, p1Found := stats(p1)
+		p2Stats, p2Found := stats(p2)
+		if !p1Found || !p2Found {
+			// prioritize evicting the pod for which no stats were found
+			return cmpBool(!p1Found, !p2Found)
 		}
+
+		p1Process := processUsage(p1Stats.ProcessStats)
+		p2Process := processUsage(p2Stats.ProcessStats)
+		// prioritize evicting the pod which has the larger consumption of process
+		return int(p2Process - p1Process)
 	}
-	initValue := resource.Quantity{Format: resource.BinarySI}
-	for i := range pod.Spec.InitContainers {
-		switch resourceName {
-		case v1.ResourceMemory:
-			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.Memory()) < 0 {
-				initValue = *pod.Spec.InitContainers[i].Resources.Requests.Memory()
-			}
-		case v1.ResourceEphemeralStorage:
-			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()) < 0 {
-				initValue = *pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()
-			}
-		}
-	}
-	if containerValue.Cmp(initValue) > 0 {
-		return containerValue
-	}
-	return initValue
 }
 
 // exceedDiskRequests compares whether or not pods' disk usage exceeds their requests
@@ -626,8 +578,8 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 
 		p1Disk := p1Usage[diskResource]
 		p2Disk := p2Usage[diskResource]
-		p1ExceedsRequests := p1Disk.Cmp(podRequest(p1, diskResource)) == 1
-		p2ExceedsRequests := p2Disk.Cmp(podRequest(p2, diskResource)) == 1
+		p1ExceedsRequests := p1Disk.Cmp(v1resource.GetResourceRequestQuantity(p1, diskResource)) == 1
+		p2ExceedsRequests := p2Disk.Cmp(v1resource.GetResourceRequestQuantity(p2, diskResource)) == 1
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
@@ -652,9 +604,9 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Disk := p1Usage[diskResource]
 		p2Disk := p2Usage[diskResource]
-		p1Request := podRequest(p1, v1.ResourceEphemeralStorage)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceEphemeralStorage)
 		p1Disk.Sub(p1Request)
-		p2Request := podRequest(p2, v1.ResourceEphemeralStorage)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceEphemeralStorage)
 		p2Disk.Sub(p2Request)
 		// prioritize evicting the pod which has the larger consumption of disk
 		return p2Disk.Cmp(p1Disk)
@@ -681,7 +633,7 @@ func rankMemoryPressure(pods []*v1.Pod, stats statsFunc) {
 
 // rankPIDPressure orders the input pods by priority in response to PID pressure.
 func rankPIDPressure(pods []*v1.Pod, stats statsFunc) {
-	orderedBy(priority).Sort(pods)
+	orderedBy(priority, process(stats)).Sort(pods)
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
@@ -718,7 +670,7 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 		}
 	}
 	if allocatableContainer, err := getSysContainer(summary.Node.SystemContainers, statsapi.SystemContainerPods); err != nil {
-		klog.Errorf("eviction manager: failed to construct signal: %q error: %v", evictionapi.SignalAllocatableMemoryAvailable, err)
+		klog.ErrorS(err, "Eviction manager: failed to construct signal", "signal", evictionapi.SignalAllocatableMemoryAvailable)
 	} else {
 		if memory := allocatableContainer.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
 			result[evictionapi.SignalAllocatableMemoryAvailable] = signalObservation{
@@ -766,8 +718,8 @@ func makeSignalObservations(summary *statsapi.Summary) (signalObservations, stat
 		if rlimit.NumOfRunningProcesses != nil && rlimit.MaxPID != nil {
 			available := int64(*rlimit.MaxPID) - int64(*rlimit.NumOfRunningProcesses)
 			result[evictionapi.SignalPIDAvailable] = signalObservation{
-				available: resource.NewQuantity(available, resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.BinarySI),
+				available: resource.NewQuantity(available, resource.DecimalSI),
+				capacity:  resource.NewQuantity(int64(*rlimit.MaxPID), resource.DecimalSI),
 				time:      rlimit.Time,
 			}
 		}
@@ -791,7 +743,7 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.Warningf("eviction manager: no observation found for eviction signal %v", threshold.Signal)
+			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		// determine if we have met the specified threshold
@@ -814,20 +766,20 @@ func thresholdsMet(thresholds []evictionapi.Threshold, observations signalObserv
 }
 
 func debugLogObservations(logPrefix string, observations signalObservations) {
-	if !klog.V(3) {
+	if !klog.V(3).Enabled() {
 		return
 	}
 	for k, v := range observations {
 		if !v.time.IsZero() {
-			klog.Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v, time: %v", logPrefix, k, v.available, v.capacity, v.time)
+			klog.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity, "time", v.time)
 		} else {
-			klog.Infof("eviction manager: %v: signal=%v, available: %v, capacity: %v", logPrefix, k, v.available, v.capacity)
+			klog.InfoS("Eviction manager:", "log", logPrefix, "signal", k, "resourceName", v.available, "capacity", v.capacity)
 		}
 	}
 }
 
 func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionapi.Threshold, observations signalObservations) {
-	if !klog.V(3) {
+	if !klog.V(3).Enabled() {
 		return
 	}
 	for i := range thresholds {
@@ -835,9 +787,9 @@ func debugLogThresholdsWithObservation(logPrefix string, thresholds []evictionap
 		observed, found := observations[threshold.Signal]
 		if found {
 			quantity := evictionapi.GetThresholdQuantity(threshold.Value, observed.capacity)
-			klog.Infof("eviction manager: %v: threshold [signal=%v, quantity=%v] observed %v", logPrefix, threshold.Signal, quantity, observed.available)
+			klog.InfoS("Eviction manager: threshold observed resource", "log", logPrefix, "signal", threshold.Signal, "quantity", quantity, "resource", observed.available)
 		} else {
-			klog.Infof("eviction manager: %v: threshold [signal=%v] had no observation", logPrefix, threshold.Signal)
+			klog.InfoS("Eviction manager: threshold had no observation", "log", logPrefix, "signal", threshold.Signal)
 		}
 	}
 }
@@ -848,7 +800,7 @@ func thresholdsUpdatedStats(thresholds []evictionapi.Threshold, observations, la
 		threshold := thresholds[i]
 		observed, found := observations[threshold.Signal]
 		if !found {
-			klog.Warningf("eviction manager: no observation found for eviction signal %v", threshold.Signal)
+			klog.InfoS("Eviction manager: no observation found for eviction signal", "signal", threshold.Signal)
 			continue
 		}
 		last, found := lastObservations[threshold.Signal]
@@ -878,7 +830,7 @@ func thresholdsMetGracePeriod(observedAt thresholdsObservedAt, now time.Time) []
 	for threshold, at := range observedAt {
 		duration := now.Sub(at)
 		if duration < threshold.GracePeriod {
-			klog.V(2).Infof("eviction manager: eviction criteria not yet met for %v, duration: %v", formatThreshold(threshold), duration)
+			klog.V(2).InfoS("Eviction manager: eviction criteria not yet met", "threshold", formatThreshold(threshold), "duration", duration)
 			continue
 		}
 		results = append(results, threshold)

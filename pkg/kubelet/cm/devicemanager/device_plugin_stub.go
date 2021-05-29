@@ -18,7 +18,6 @@ package devicemanager
 
 import (
 	"context"
-	"log"
 	"net"
 	"os"
 	"path"
@@ -27,16 +26,19 @@ import (
 
 	"google.golang.org/grpc"
 
-	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
-	watcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	watcherapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 )
 
 // Stub implementation for DevicePlugin.
 type Stub struct {
-	devs                  []*pluginapi.Device
-	socket                string
-	resourceName          string
-	preStartContainerFlag bool
+	devs                       []*pluginapi.Device
+	socket                     string
+	resourceName               string
+	preStartContainerFlag      bool
+	getPreferredAllocationFlag bool
 
 	stop   chan interface{}
 	wg     sync.WaitGroup
@@ -47,12 +49,24 @@ type Stub struct {
 	// allocFunc is used for handling allocation request
 	allocFunc stubAllocFunc
 
+	// getPreferredAllocFunc is used for handling getPreferredAllocation request
+	getPreferredAllocFunc stubGetPreferredAllocFunc
+
 	registrationStatus chan watcherapi.RegistrationStatus // for testing
 	endpoint           string                             // for testing
 
 }
 
-// stubAllocFunc is the function called when receive an allocation request from Kubelet
+// stubGetPreferredAllocFunc is the function called when a getPreferredAllocation request is received from Kubelet
+type stubGetPreferredAllocFunc func(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error)
+
+func defaultGetPreferredAllocFunc(r *pluginapi.PreferredAllocationRequest, devs map[string]pluginapi.Device) (*pluginapi.PreferredAllocationResponse, error) {
+	var response pluginapi.PreferredAllocationResponse
+
+	return &response, nil
+}
+
+// stubAllocFunc is the function called when an allocation request is received from Kubelet
 type stubAllocFunc func(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error)
 
 func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.Device) (*pluginapi.AllocateResponse, error) {
@@ -62,18 +76,25 @@ func defaultAllocFunc(r *pluginapi.AllocateRequest, devs map[string]pluginapi.De
 }
 
 // NewDevicePluginStub returns an initialized DevicePlugin Stub.
-func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool) *Stub {
+func NewDevicePluginStub(devs []*pluginapi.Device, socket string, name string, preStartContainerFlag bool, getPreferredAllocationFlag bool) *Stub {
 	return &Stub{
-		devs:                  devs,
-		socket:                socket,
-		resourceName:          name,
-		preStartContainerFlag: preStartContainerFlag,
+		devs:                       devs,
+		socket:                     socket,
+		resourceName:               name,
+		preStartContainerFlag:      preStartContainerFlag,
+		getPreferredAllocationFlag: getPreferredAllocationFlag,
 
 		stop:   make(chan interface{}),
 		update: make(chan []*pluginapi.Device),
 
-		allocFunc: defaultAllocFunc,
+		allocFunc:             defaultAllocFunc,
+		getPreferredAllocFunc: defaultGetPreferredAllocFunc,
 	}
+}
+
+// SetGetPreferredAllocFunc sets allocFunc of the device plugin
+func (m *Stub) SetGetPreferredAllocFunc(f stubGetPreferredAllocFunc) {
+	m.getPreferredAllocFunc = f
 }
 
 // SetAllocFunc sets allocFunc of the device plugin
@@ -103,13 +124,22 @@ func (m *Stub) Start() error {
 		defer m.wg.Done()
 		m.server.Serve(sock)
 	}()
-	_, conn, err := dial(m.socket)
-	if err != nil {
-		return err
-	}
-	conn.Close()
-	log.Println("Starting to serve on", m.socket)
 
+	var lastDialErr error
+	wait.PollImmediate(1*time.Second, 10*time.Second, func() (bool, error) {
+		var conn *grpc.ClientConn
+		_, conn, lastDialErr = dial(m.socket)
+		if lastDialErr != nil {
+			return false, nil
+		}
+		conn.Close()
+		return true, nil
+	})
+	if lastDialErr != nil {
+		return lastDialErr
+	}
+
+	klog.InfoS("Starting to serve on socket", "socket", m.socket)
 	return nil
 }
 
@@ -130,7 +160,7 @@ func (m *Stub) Stop() error {
 
 // GetInfo is the RPC which return pluginInfo
 func (m *Stub) GetInfo(ctx context.Context, req *watcherapi.InfoRequest) (*watcherapi.PluginInfo, error) {
-	log.Println("GetInfo")
+	klog.InfoS("GetInfo")
 	return &watcherapi.PluginInfo{
 		Type:              watcherapi.DevicePlugin,
 		Name:              m.resourceName,
@@ -144,7 +174,7 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 		m.registrationStatus <- *status
 	}
 	if !status.PluginRegistered {
-		log.Println("Registration failed: ", status.Error)
+		klog.InfoS("Registration failed", "err", status.Error)
 	}
 	return &watcherapi.RegistrationStatusResponse{}, nil
 }
@@ -153,17 +183,17 @@ func (m *Stub) NotifyRegistrationStatus(ctx context.Context, status *watcherapi.
 func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir string) error {
 	if pluginSockDir != "" {
 		if _, err := os.Stat(pluginSockDir + "DEPRECATION"); err == nil {
-			log.Println("Deprecation file found. Skip registration.")
+			klog.InfoS("Deprecation file found. Skip registration")
 			return nil
 		}
 	}
-	log.Println("Deprecation file not found. Invoke registration")
+	klog.InfoS("Deprecation file not found. Invoke registration")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}))
 	if err != nil {
 		return err
@@ -174,7 +204,10 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 		Version:      pluginapi.Version,
 		Endpoint:     path.Base(m.socket),
 		ResourceName: resourceName,
-		Options:      &pluginapi.DevicePluginOptions{PreStartRequired: m.preStartContainerFlag},
+		Options: &pluginapi.DevicePluginOptions{
+			PreStartRequired:                m.preStartContainerFlag,
+			GetPreferredAllocationAvailable: m.getPreferredAllocationFlag,
+		},
 	}
 
 	_, err = client.Register(context.Background(), reqt)
@@ -186,18 +219,22 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 
 // GetDevicePluginOptions returns DevicePluginOptions settings for the device plugin.
 func (m *Stub) GetDevicePluginOptions(ctx context.Context, e *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
-	return &pluginapi.DevicePluginOptions{PreStartRequired: m.preStartContainerFlag}, nil
+	options := &pluginapi.DevicePluginOptions{
+		PreStartRequired:                m.preStartContainerFlag,
+		GetPreferredAllocationAvailable: m.getPreferredAllocationFlag,
+	}
+	return options, nil
 }
 
 // PreStartContainer resets the devices received
 func (m *Stub) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
-	log.Printf("PreStartContainer, %+v", r)
+	klog.InfoS("PreStartContainer", "request", r)
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
 // ListAndWatch lists devices and update that list according to the Update call
 func (m *Stub) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	log.Println("ListAndWatch")
+	klog.InfoS("ListAndWatch")
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: m.devs})
 
@@ -216,9 +253,22 @@ func (m *Stub) Update(devs []*pluginapi.Device) {
 	m.update <- devs
 }
 
+// GetPreferredAllocation gets the preferred allocation from a set of available devices
+func (m *Stub) GetPreferredAllocation(ctx context.Context, r *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+	klog.InfoS("GetPreferredAllocation", "request", r)
+
+	devs := make(map[string]pluginapi.Device)
+
+	for _, dev := range m.devs {
+		devs[dev.ID] = *dev
+	}
+
+	return m.getPreferredAllocFunc(r, devs)
+}
+
 // Allocate does a mock allocation
 func (m *Stub) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
-	log.Printf("Allocate, %+v", r)
+	klog.InfoS("Allocate", "request", r)
 
 	devs := make(map[string]pluginapi.Device)
 

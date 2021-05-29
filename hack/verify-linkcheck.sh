@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script extracts the links from types.go and .md files in pkg/api/,
+# pkg/apis/ and docs/ directories, checks the status code of the response, and
+# output the list of invalid links.
+# Usage: `hack/verify-linkcheck.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

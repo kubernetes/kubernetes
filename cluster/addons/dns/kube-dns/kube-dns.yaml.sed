@@ -82,13 +82,26 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        prometheus.io/port: "10054"
+        prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                  - key: k8s-app
+                    operator: In
+                    values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"
@@ -97,16 +110,18 @@ spec:
         configMap:
           name: kube-dns
           optional: true
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - name: kubedns
-        image: k8s.gcr.io/k8s-dns-kube-dns:1.14.13
+        image: k8s.gcr.io/dns/k8s-dns-kube-dns:1.17.3
         resources:
           # TODO: Set memory limits when we've profiled the container for large
           # clusters, then set request = limit to keep this container in
           # guaranteed class. Currently, this container falls into the
           # "burstable" category so the kubelet doesn't backoff from restarting it.
           limits:
-            memory: 170Mi
+            memory: $DNS_MEMORY_LIMIT
           requests:
             cpu: 100m
             memory: 70Mi
@@ -149,8 +164,13 @@ spec:
         volumeMounts:
         - name: kube-dns-config
           mountPath: /kube-dns-config
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 1001
       - name: dnsmasq
-        image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
+        image: k8s.gcr.io/dns/k8s-dns-dnsmasq-nanny:1.17.3
         livenessProbe:
           httpGet:
             path: /healthcheck/dnsmasq
@@ -189,8 +209,15 @@ spec:
         volumeMounts:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
+        securityContext:
+          capabilities:
+            drop:
+              - all
+            add:
+              - NET_BIND_SERVICE
+              - SETGID
       - name: sidecar
-        image: k8s.gcr.io/k8s-dns-sidecar:1.14.13
+        image: k8s.gcr.io/dns/k8s-dns-sidecar:1.17.3
         livenessProbe:
           httpGet:
             path: /metrics
@@ -213,5 +240,10 @@ spec:
           requests:
             memory: 20Mi
             cpu: 10m
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 1001
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns

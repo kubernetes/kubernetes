@@ -17,6 +17,7 @@ limitations under the License.
 package kubeletconfig
 
 import (
+	"k8s.io/klog/v2"
 	"math/rand"
 	"time"
 
@@ -24,11 +25,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 // newSharedNodeInformer returns a shared informer that uses `client` to watch the Node with
@@ -38,26 +36,14 @@ func newSharedNodeInformer(client clientset.Interface, nodeName string,
 	updateFunc func(oldObj interface{}, newObj interface{}),
 	deleteFunc func(deletedObj interface{})) cache.SharedInformer {
 	// select nodes by name
-	fieldselector := fields.OneTermEqualSelector("metadata.name", nodeName)
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
 
 	// add some randomness to resync period, which can help avoid controllers falling into lock-step
 	minResyncPeriod := 15 * time.Minute
 	factor := rand.Float64() + 1
 	resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-			return client.CoreV1().Nodes().List(metav1.ListOptions{
-				FieldSelector: fieldselector.String(),
-			})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Nodes().Watch(metav1.ListOptions{
-				FieldSelector:   fieldselector.String(),
-				ResourceVersion: options.ResourceVersion,
-			})
-		},
-	}
+	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "nodes", metav1.NamespaceAll, fieldSelector)
 
 	handler := cache.ResourceEventHandlerFuncs{
 		AddFunc:    addFunc,
@@ -81,22 +67,22 @@ func (cc *Controller) onAddNodeEvent(newObj interface{}) {
 func (cc *Controller) onUpdateNodeEvent(oldObj interface{}, newObj interface{}) {
 	newNode, ok := newObj.(*apiv1.Node)
 	if !ok {
-		utillog.Errorf("failed to cast new object to Node, couldn't handle event")
+		klog.ErrorS(nil, "Kubelet config controller failed to cast new object to Node, couldn't handle event")
 		return
 	}
 	if oldObj == nil {
 		// Node was just added, need to sync
-		utillog.Infof("initial Node watch event")
+		klog.InfoS("Kubelet config controller initial Node watch event")
 		cc.pokeConfigSourceWorker()
 		return
 	}
 	oldNode, ok := oldObj.(*apiv1.Node)
 	if !ok {
-		utillog.Errorf("failed to cast old object to Node, couldn't handle event")
+		klog.ErrorS(nil, "Kubelet config controller failed to cast old object to Node, couldn't handle event")
 		return
 	}
 	if !apiequality.Semantic.DeepEqual(oldNode.Spec.ConfigSource, newNode.Spec.ConfigSource) {
-		utillog.Infof("Node.Spec.ConfigSource was updated")
+		klog.InfoS("Kubelet config controller Node.Spec.ConfigSource was updated")
 		cc.pokeConfigSourceWorker()
 	}
 }
@@ -110,7 +96,7 @@ func (cc *Controller) onDeleteNodeEvent(deletedObj interface{}) {
 	// For this case, we just log the event.
 	// We don't want to poke the worker, because a temporary deletion isn't worth reporting an error for.
 	// If the Node is deleted because the VM is being deleted, then the Kubelet has nothing to do.
-	utillog.Infof("Node was deleted")
+	klog.InfoS("Kubelet config controller Node was deleted")
 }
 
 // onAddRemoteConfigSourceEvent calls onUpdateConfigMapEvent with the new object and a nil old object
@@ -124,22 +110,22 @@ func (cc *Controller) onUpdateRemoteConfigSourceEvent(oldObj interface{}, newObj
 	// since ConfigMap is currently the only source type, we handle that here
 	newConfigMap, ok := newObj.(*apiv1.ConfigMap)
 	if !ok {
-		utillog.Errorf("failed to cast new object to ConfigMap, couldn't handle event")
+		klog.ErrorS(nil, "Kubelet config controller failed to cast new object to ConfigMap, couldn't handle event")
 		return
 	}
 	if oldObj == nil {
 		// ConfigMap was just added, need to sync
-		utillog.Infof("initial ConfigMap watch event")
+		klog.InfoS("Kubelet config controller initial ConfigMap watch event")
 		cc.pokeConfigSourceWorker()
 		return
 	}
 	oldConfigMap, ok := oldObj.(*apiv1.ConfigMap)
 	if !ok {
-		utillog.Errorf("failed to cast old object to ConfigMap, couldn't handle event")
+		klog.ErrorS(nil, "Kubelet config controller failed to cast old object to ConfigMap, couldn't handle event")
 		return
 	}
 	if !apiequality.Semantic.DeepEqual(oldConfigMap, newConfigMap) {
-		utillog.Infof("assigned ConfigMap was updated")
+		klog.InfoS("Kubelet config controller assigned ConfigMap was updated")
 		cc.pokeConfigSourceWorker()
 	}
 }
@@ -149,6 +135,6 @@ func (cc *Controller) onDeleteRemoteConfigSourceEvent(deletedObj interface{}) {
 	// If the ConfigMap we're watching is deleted, we log the event and poke the sync worker.
 	// This requires a sync, because if the Node is still configured to use the deleted ConfigMap,
 	// the Kubelet should report a DownloadError.
-	utillog.Infof("assigned ConfigMap was deleted")
+	klog.InfoS("Kubelet config controller assigned ConfigMap was deleted")
 	cc.pokeConfigSourceWorker()
 }

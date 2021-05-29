@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
@@ -44,9 +45,28 @@ func legacyLogSymlink(containerID string, containerName, podName, podNamespace s
 		containerName, containerID)
 }
 
-func logSymlink(containerLogsDir, podFullName, containerName, dockerID string) string {
+// getContainerIDFromLegacyLogSymlink returns error if container Id cannot be parsed
+func getContainerIDFromLegacyLogSymlink(logSymlink string) (string, error) {
+	parts := strings.Split(logSymlink, "-")
+	if len(parts) == 0 {
+		return "", fmt.Errorf("unable to find separator in %q", logSymlink)
+	}
+	containerIDWithSuffix := parts[len(parts)-1]
 	suffix := fmt.Sprintf(".%s", legacyLogSuffix)
-	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerID)
+	if !strings.HasSuffix(containerIDWithSuffix, suffix) {
+		return "", fmt.Errorf("%q doesn't end with %q", logSymlink, suffix)
+	}
+	containerIDWithoutSuffix := strings.TrimSuffix(containerIDWithSuffix, suffix)
+	// container can be retrieved with container Id as short as 6 characters
+	if len(containerIDWithoutSuffix) < 6 {
+		return "", fmt.Errorf("container Id %q is too short", containerIDWithoutSuffix)
+	}
+	return containerIDWithoutSuffix, nil
+}
+
+func logSymlink(containerLogsDir, podFullName, containerName, containerID string) string {
+	suffix := fmt.Sprintf(".%s", legacyLogSuffix)
+	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, containerID)
 	// Length of a filename cannot exceed 255 characters in ext4 on Linux.
 	if len(logPath) > ext4MaxFileNameLen-len(suffix) {
 		logPath = logPath[:ext4MaxFileNameLen-len(suffix)]

@@ -160,6 +160,12 @@ func buildByImageSize() ByImageSize {
 			RepoDigests: []string{"foo-rd31", "foo-rd32"},
 			Size:        3,
 		},
+		{
+			ID:          "4",
+			RepoTags:    []string{"foo-tag41", "foo-tag42"},
+			RepoDigests: []string{"foo-rd41", "foo-rd42"},
+			Size:        3,
+		},
 	}
 }
 
@@ -169,7 +175,7 @@ func TestByImageSizeLen(t *testing.T) {
 		el     int
 	}{
 		{[]kubecontainer.Image{}, 0},
-		{buildByImageSize(), 3},
+		{buildByImageSize(), 4},
 		{nil, 0},
 	}
 
@@ -211,6 +217,7 @@ func TestByImageSizeLess(t *testing.T) {
 		// descending order
 		{buildByImageSize(), 0, 2, false},
 		{buildByImageSize(), 1, 0, true},
+		{buildByImageSize(), 3, 2, true},
 	}
 
 	for _, fooTest := range fooTests {

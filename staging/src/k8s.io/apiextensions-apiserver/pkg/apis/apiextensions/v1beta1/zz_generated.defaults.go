@@ -38,6 +38,13 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 func SetObjectDefaults_CustomResourceDefinition(in *CustomResourceDefinition) {
 	SetDefaults_CustomResourceDefinition(in)
 	SetDefaults_CustomResourceDefinitionSpec(&in.Spec)
+	if in.Spec.Conversion != nil {
+		if in.Spec.Conversion.WebhookClientConfig != nil {
+			if in.Spec.Conversion.WebhookClientConfig.Service != nil {
+				SetDefaults_ServiceReference(in.Spec.Conversion.WebhookClientConfig.Service)
+			}
+		}
+	}
 }
 
 func SetObjectDefaults_CustomResourceDefinitionList(in *CustomResourceDefinitionList) {

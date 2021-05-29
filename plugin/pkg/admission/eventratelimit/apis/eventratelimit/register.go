@@ -24,7 +24,7 @@ import (
 var (
 	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme is a global function that registers this API group & version to a scheme
+	// AddToScheme is used to register the types to API encoding/decoding machinery
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 

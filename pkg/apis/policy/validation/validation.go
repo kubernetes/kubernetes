@@ -19,12 +19,14 @@ package validation
 import (
 	"fmt"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 
+	"k8s.io/api/core/v1"
+	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	appsvalidation "k8s.io/kubernetes/pkg/apis/apps/validation"
@@ -36,27 +38,15 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 )
 
+// ValidatePodDisruptionBudget validates a PodDisruptionBudget and returns an ErrorList
+// with any errors.
 func ValidatePodDisruptionBudget(pdb *policy.PodDisruptionBudget) field.ErrorList {
 	allErrs := ValidatePodDisruptionBudgetSpec(pdb.Spec, field.NewPath("spec"))
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
 	return allErrs
 }
 
-func ValidatePodDisruptionBudgetUpdate(pdb, oldPdb *policy.PodDisruptionBudget) field.ErrorList {
-	allErrs := field.ErrorList{}
-
-	restoreGeneration := pdb.Generation
-	pdb.Generation = oldPdb.Generation
-
-	if !reflect.DeepEqual(pdb.Spec, oldPdb.Spec) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to poddisruptionbudget spec are forbidden."))
-	}
-	allErrs = append(allErrs, ValidatePodDisruptionBudgetStatus(pdb.Status, field.NewPath("status"))...)
-
-	pdb.Generation = restoreGeneration
-	return allErrs
-}
-
+// ValidatePodDisruptionBudgetSpec validates a PodDisruptionBudgetSpec and returns an ErrorList
+// with any errors.
 func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
@@ -79,9 +69,17 @@ func ValidatePodDisruptionBudgetSpec(spec policy.PodDisruptionBudgetSpec, fldPat
 	return allErrs
 }
 
-func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, fldPath *field.Path) field.ErrorList {
+// ValidatePodDisruptionBudgetStatusUpdate validates a PodDisruptionBudgetStatus and returns an ErrorList
+// with any errors.
+func ValidatePodDisruptionBudgetStatusUpdate(status, oldStatus policy.PodDisruptionBudgetStatus, fldPath *field.Path, apiVersion schema.GroupVersion) field.ErrorList {
 	allErrs := field.ErrorList{}
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.PodDisruptionsAllowed), fldPath.Child("podDisruptionsAllowed"))...)
+	allErrs = append(allErrs, unversionedvalidation.ValidateConditions(status.Conditions, fldPath.Child("conditions"))...)
+	// Don't run other validations for v1beta1 since we don't want to introduce
+	// new validations retroactively.
+	if apiVersion == policyapiv1beta1.SchemeGroupVersion {
+		return allErrs
+	}
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DisruptionsAllowed), fldPath.Child("disruptionsAllowed"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentHealthy), fldPath.Child("currentHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredHealthy), fldPath.Child("desiredHealthy"))...)
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.ExpectedPods), fldPath.Child("expectedPods"))...)
@@ -94,15 +92,26 @@ func ValidatePodDisruptionBudgetStatus(status policy.PodDisruptionBudgetStatus, 
 // trailing dashes are allowed.
 var ValidatePodSecurityPolicyName = apimachineryvalidation.NameIsDNSSubdomain
 
-func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy) field.ErrorList {
+// PodSecurityPolicyValidationOptions contains additional parameters for ValidatePodSecurityPolicy.
+type PodSecurityPolicyValidationOptions struct {
+	// AllowEphemeralVolumeType determines whether Ephemeral is a valid entry
+	// in PodSecurityPolicySpec.Volumes.
+	AllowEphemeralVolumeType bool
+}
+
+// ValidatePodSecurityPolicy validates a PodSecurityPolicy and returns an ErrorList
+// with any errors.
+func ValidatePodSecurityPolicy(psp *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&psp.ObjectMeta, false, ValidatePodSecurityPolicyName, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(psp.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&psp.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 
-func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *field.Path) field.ErrorList {
+// ValidatePodSecurityPolicySpec validates a PodSecurityPolicySpec and returns an ErrorList
+// with any errors.
+func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, opts PodSecurityPolicyValidationOptions, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validatePSPRunAsUser(fldPath.Child("runAsUser"), &spec.RunAsUser)...)
@@ -110,7 +119,7 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePSPSELinux(fldPath.Child("seLinux"), &spec.SELinux)...)
 	allErrs = append(allErrs, validatePSPSupplementalGroup(fldPath.Child("supplementalGroups"), &spec.SupplementalGroups)...)
 	allErrs = append(allErrs, validatePSPFSGroup(fldPath.Child("fsGroup"), &spec.FSGroup)...)
-	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(fldPath, spec.Volumes)...)
+	allErrs = append(allErrs, validatePodSecurityPolicyVolumes(opts, fldPath, spec.Volumes)...)
 	if len(spec.RequiredDropCapabilities) > 0 && hasCap(policy.AllowAllCapabilities, spec.AllowedCapabilities) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("requiredDropCapabilities"), spec.RequiredDropCapabilities,
 			"must be empty when all capabilities are allowed by a wildcard"))
@@ -125,22 +134,25 @@ func ValidatePodSecurityPolicySpec(spec *policy.PodSecurityPolicySpec, fldPath *
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("allowedUnsafeSysctls"), spec.AllowedUnsafeSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctls(fldPath.Child("forbiddenSysctls"), spec.ForbiddenSysctls)...)
 	allErrs = append(allErrs, validatePodSecurityPolicySysctlListsDoNotOverlap(fldPath.Child("allowedUnsafeSysctls"), fldPath.Child("forbiddenSysctls"), spec.AllowedUnsafeSysctls, spec.ForbiddenSysctls)...)
+	allErrs = append(allErrs, validateRuntimeClassStrategy(fldPath.Child("runtimeClass"), spec.RuntimeClass)...)
 
 	return allErrs
 }
 
+// ValidatePodSecurityPolicySpecificAnnotations validates annotations and returns an ErrorList
+// with any errors.
 func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	if p := annotations[apparmor.DefaultProfileAnnotationKey]; p != "" {
+	if p := annotations[v1.AppArmorBetaDefaultProfileAnnotationKey]; p != "" {
 		if err := apparmor.ValidateProfileFormat(p); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.DefaultProfileAnnotationKey), p, err.Error()))
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaDefaultProfileAnnotationKey), p, err.Error()))
 		}
 	}
-	if allowed := annotations[apparmor.AllowedProfilesAnnotationKey]; allowed != "" {
+	if allowed := annotations[v1.AppArmorBetaAllowedProfilesAnnotationKey]; allowed != "" {
 		for _, p := range strings.Split(allowed, ",") {
 			if err := apparmor.ValidateProfileFormat(p); err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Key(apparmor.AllowedProfilesAnnotationKey), allowed, err.Error()))
+				allErrs = append(allErrs, field.Invalid(fldPath.Key(v1.AppArmorBetaAllowedProfilesAnnotationKey), allowed, err.Error()))
 			}
 		}
 	}
@@ -315,11 +327,15 @@ func validatePSPSupplementalGroup(fldPath *field.Path, groupOptions *policy.Supp
 }
 
 // validatePodSecurityPolicyVolumes validates the volume fields of PodSecurityPolicy.
-func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
+func validatePodSecurityPolicyVolumes(opts PodSecurityPolicyValidationOptions, fldPath *field.Path, volumes []policy.FSType) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allowed := psputil.GetAllFSTypesAsSet()
 	// add in the * value since that is a pseudo type that is not included by default
 	allowed.Insert(string(policy.All))
+	// Ephemeral may or may not be allowed.
+	if !opts.AllowEphemeralVolumeType {
+		allowed.Delete(string(policy.Ephemeral))
+	}
 	for _, v := range volumes {
 		if !allowed.Has(string(v)) {
 			allErrs = append(allErrs, field.NotSupported(fldPath.Child("volumes"), v, allowed.List()))
@@ -350,10 +366,13 @@ func validatePSPAllowedProcMountTypes(fldPath *field.Path, allowedProcMountTypes
 }
 
 const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
+
+// SysctlPatternFmt is a regex used for matching valid sysctl patterns.
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
 var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
+// IsValidSysctlPattern checks if name is a valid sysctl pattern.
 func IsValidSysctlPattern(name string) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
 		return false
@@ -413,7 +432,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	coversAll := false
 	for i, s := range sysctls {
 		if len(s) == 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("empty sysctl not allowed")))
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i), sysctls[i], "empty sysctl not allowed"))
 		} else if !IsValidSysctlPattern(string(s)) {
 			allErrs = append(
 				allErrs,
@@ -428,7 +447,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 	}
 
 	if coversAll && len(sysctls) > 1 {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), fmt.Sprintf("if '*' is present, must not specify other sysctls")))
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("items"), "if '*' is present, must not specify other sysctls"))
 	}
 
 	return allErrs
@@ -476,12 +495,46 @@ func validatePSPCapsAgainstDrops(requiredDrops []core.Capability, capsToCheck []
 	return allErrs
 }
 
+// validateRuntimeClassStrategy ensures all the RuntimeClass restrictions are valid.
+func validateRuntimeClassStrategy(fldPath *field.Path, rc *policy.RuntimeClassStrategyOptions) field.ErrorList {
+	if rc == nil {
+		return nil
+	}
+
+	var allErrs field.ErrorList
+
+	allowed := map[string]bool{}
+	for i, name := range rc.AllowedRuntimeClassNames {
+		if name != policy.AllowAllRuntimeClassNames {
+			allErrs = append(allErrs, apivalidation.ValidateRuntimeClassName(name, fldPath.Child("allowedRuntimeClassNames").Index(i))...)
+		}
+		if allowed[name] {
+			allErrs = append(allErrs, field.Duplicate(fldPath.Child("allowedRuntimeClassNames").Index(i), name))
+		}
+		allowed[name] = true
+	}
+
+	if rc.DefaultRuntimeClassName != nil {
+		allErrs = append(allErrs, apivalidation.ValidateRuntimeClassName(*rc.DefaultRuntimeClassName, fldPath.Child("defaultRuntimeClassName"))...)
+		if !allowed[*rc.DefaultRuntimeClassName] && !allowed[policy.AllowAllRuntimeClassNames] {
+			allErrs = append(allErrs, field.Required(fldPath.Child("allowedRuntimeClassNames"),
+				fmt.Sprintf("default %q must be allowed", *rc.DefaultRuntimeClassName)))
+		}
+	}
+
+	if allowed[policy.AllowAllRuntimeClassNames] && len(rc.AllowedRuntimeClassNames) > 1 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("allowedRuntimeClassNames"), rc.AllowedRuntimeClassNames, "if '*' is present, must not specify other RuntimeClass names"))
+	}
+
+	return allErrs
+}
+
 // ValidatePodSecurityPolicyUpdate validates a PSP for updates.
-func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy) field.ErrorList {
+func ValidatePodSecurityPolicyUpdate(old *policy.PodSecurityPolicy, new *policy.PodSecurityPolicy, opts PodSecurityPolicyValidationOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&new.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	allErrs = append(allErrs, ValidatePodSecurityPolicySpecificAnnotations(new.Annotations, field.NewPath("metadata").Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, field.NewPath("spec"))...)
+	allErrs = append(allErrs, ValidatePodSecurityPolicySpec(&new.Spec, opts, field.NewPath("spec"))...)
 	return allErrs
 }
 

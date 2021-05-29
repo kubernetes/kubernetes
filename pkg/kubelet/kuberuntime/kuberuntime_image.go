@@ -17,12 +17,11 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/credentialprovider"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog/v2"
 	credentialprovidersecrets "k8s.io/kubernetes/pkg/credentialprovider/secrets"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
@@ -41,14 +40,15 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return "", err
 	}
 
-	imgSpec := &runtimeapi.ImageSpec{Image: img}
+	imgSpec := toRuntimeAPIImageSpec(image)
+
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
-		klog.V(3).Infof("Pulling image %q without credentials", img)
+		klog.V(3).InfoS("Pulling image without credentials", "image", img)
 
 		imageRef, err := m.imageService.PullImage(imgSpec, nil, podSandboxConfig)
 		if err != nil {
-			klog.Errorf("Pull image %q failed: %v", img, err)
+			klog.ErrorS(err, "Failed to pull image", "image", img)
 			return "", err
 		}
 
@@ -57,14 +57,13 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := credentialprovider.LazyProvide(currentCreds)
 		auth := &runtimeapi.AuthConfig{
-			Username:      authConfig.Username,
-			Password:      authConfig.Password,
-			Auth:          authConfig.Auth,
-			ServerAddress: authConfig.ServerAddress,
-			IdentityToken: authConfig.IdentityToken,
-			RegistryToken: authConfig.RegistryToken,
+			Username:      currentCreds.Username,
+			Password:      currentCreds.Password,
+			Auth:          currentCreds.Auth,
+			ServerAddress: currentCreds.ServerAddress,
+			IdentityToken: currentCreds.IdentityToken,
+			RegistryToken: currentCreds.RegistryToken,
 		}
 
 		imageRef, err := m.imageService.PullImage(imgSpec, auth, podSandboxConfig)
@@ -82,9 +81,9 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 // GetImageRef gets the ID of the image which has already been in
 // the local storage. It returns ("", nil) if the image isn't in the local storage.
 func (m *kubeGenericRuntimeManager) GetImageRef(image kubecontainer.ImageSpec) (string, error) {
-	status, err := m.imageService.ImageStatus(&runtimeapi.ImageSpec{Image: image.Image})
+	status, err := m.imageService.ImageStatus(toRuntimeAPIImageSpec(image))
 	if err != nil {
-		klog.Errorf("ImageStatus for image %q failed: %v", image, err)
+		klog.ErrorS(err, "Failed to get image status", "image", image.Image)
 		return "", err
 	}
 	if status == nil {
@@ -99,7 +98,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 
 	allImages, err := m.imageService.ListImages(nil)
 	if err != nil {
-		klog.Errorf("ListImages failed: %v", err)
+		klog.ErrorS(err, "Failed to list images")
 		return nil, err
 	}
 
@@ -109,6 +108,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 			Size:        int64(img.Size_),
 			RepoTags:    img.RepoTags,
 			RepoDigests: img.RepoDigests,
+			Spec:        toKubeContainerImageSpec(img),
 		})
 	}
 
@@ -119,7 +119,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	err := m.imageService.RemoveImage(&runtimeapi.ImageSpec{Image: image.Image})
 	if err != nil {
-		klog.Errorf("Remove image %q failed: %v", image.Image, err)
+		klog.ErrorS(err, "Failed to remove image", "image", image.Image)
 		return err
 	}
 
@@ -133,7 +133,7 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
 	allImages, err := m.imageService.ListImages(nil)
 	if err != nil {
-		klog.Errorf("ListImages failed: %v", err)
+		klog.ErrorS(err, "Failed to list images")
 		return nil, err
 	}
 	stats := &kubecontainer.ImageStats{}

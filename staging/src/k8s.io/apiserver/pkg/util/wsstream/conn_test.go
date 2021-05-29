@@ -238,7 +238,7 @@ func TestVersionedConn(t *testing.T) {
 			conn := NewConn(supportedProtocols)
 			// note that it's not enough to wait for conn.ready to avoid a race here. Hence,
 			// we use a channel.
-			selectedProtocol := make(chan string, 0)
+			selectedProtocol := make(chan string)
 			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				p, _, _ := conn.Open(w, req)
 				selectedProtocol <- p

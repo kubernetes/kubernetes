@@ -14,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script generates `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/api.pb.go`
+# from the protobuf file `/staging/src/k8s.io/kubelet/pkg/apis/podresources/v1/api.proto`
+# for pods.
+# Usage: `hack/update-generated-pod-resources.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail

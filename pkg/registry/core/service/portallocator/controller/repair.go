@@ -17,15 +17,16 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
@@ -55,7 +56,7 @@ const numRepairsBeforeLeakCleanup = 3
 func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient corev1client.EventsGetter, portRange net.PortRange, alloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: eventClient.Events("")})
-	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "portallocator-repair-controller"})
+	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, corev1.EventSource{Component: "portallocator-repair-controller"})
 
 	return &Repair{
 		interval:      interval,
@@ -117,12 +118,15 @@ func (c *Repair) runOnce() error {
 	// the service collection. The caching layer keeps per-collection RVs,
 	// and this is proper, since in theory the collections could be hosted
 	// in separate etcd (or even non-etcd) instances.
-	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(metav1.ListOptions{})
+	list, err := c.serviceClient.Services(metav1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the port block: %v", err)
 	}
 
-	rebuilt := portallocator.NewPortAllocator(c.portRange)
+	rebuilt, err := portallocator.NewPortAllocator(c.portRange)
+	if err != nil {
+		return fmt.Errorf("unable to create port allocator: %v", err)
+	}
 	// Check every Service's ports, and rebuild the state as we think it should be.
 	for i := range list.Items {
 		svc := &list.Items[i]
@@ -139,24 +143,24 @@ func (c *Repair) runOnce() error {
 					stored.Release(port)
 				} else {
 					// doesn't seem to be allocated
-					c.recorder.Eventf(svc, v1.EventTypeWarning, "PortNotAllocated", "Port %d is not allocated; repairing", port)
+					c.recorder.Eventf(svc, corev1.EventTypeWarning, "PortNotAllocated", "Port %d is not allocated; repairing", port)
 					runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s is not allocated; repairing", port, svc.Name, svc.Namespace))
 				}
 				delete(c.leaks, port) // it is used, so it can't be leaked
 			case portallocator.ErrAllocated:
 				// port is duplicate, reallocate
-				c.recorder.Eventf(svc, v1.EventTypeWarning, "PortAlreadyAllocated", "Port %d was assigned to multiple services; please recreate service", port)
+				c.recorder.Eventf(svc, corev1.EventTypeWarning, "PortAlreadyAllocated", "Port %d was assigned to multiple services; please recreate service", port)
 				runtime.HandleError(fmt.Errorf("the node port %d for service %s/%s was assigned to multiple services; please recreate", port, svc.Name, svc.Namespace))
 			case err.(*portallocator.ErrNotInRange):
 				// port is out of range, reallocate
-				c.recorder.Eventf(svc, v1.EventTypeWarning, "PortOutOfRange", "Port %d is not within the port range %s; please recreate service", port, c.portRange)
+				c.recorder.Eventf(svc, corev1.EventTypeWarning, "PortOutOfRange", "Port %d is not within the port range %s; please recreate service", port, c.portRange)
 				runtime.HandleError(fmt.Errorf("the port %d for service %s/%s is not within the port range %s; please recreate", port, svc.Name, svc.Namespace, c.portRange))
 			case portallocator.ErrFull:
 				// somehow we are out of ports
-				c.recorder.Eventf(svc, v1.EventTypeWarning, "PortRangeFull", "Port range %s is full; you must widen the port range in order to create new services", c.portRange)
+				c.recorder.Eventf(svc, corev1.EventTypeWarning, "PortRangeFull", "Port range %s is full; you must widen the port range in order to create new services", c.portRange)
 				return fmt.Errorf("the port range %s is full; you must widen the port range in order to create new services", c.portRange)
 			default:
-				c.recorder.Eventf(svc, v1.EventTypeWarning, "UnknownError", "Unable to allocate port %d due to an unknown error", port)
+				c.recorder.Eventf(svc, corev1.EventTypeWarning, "UnknownError", "Unable to allocate port %d due to an unknown error", port)
 				return fmt.Errorf("unable to allocate port %d for service %s/%s due to an unknown error, exiting: %v", port, svc.Name, svc.Namespace, err)
 			}
 		}
@@ -197,17 +201,39 @@ func (c *Repair) runOnce() error {
 	return nil
 }
 
+// collectServiceNodePorts returns nodePorts specified in the Service.
+// Please note that:
+//   1. same nodePort with *same* protocol will be duplicated as it is
+//   2. same nodePort with *different* protocol will be deduplicated
 func collectServiceNodePorts(service *corev1.Service) []int {
-	servicePorts := []int{}
-	for i := range service.Spec.Ports {
-		servicePort := &service.Spec.Ports[i]
-		if servicePort.NodePort != 0 {
-			servicePorts = append(servicePorts, int(servicePort.NodePort))
+	var servicePorts []int
+	// map from nodePort to set of protocols
+	seen := make(map[int]sets.String)
+	for _, port := range service.Spec.Ports {
+		nodePort := int(port.NodePort)
+		if nodePort == 0 {
+			continue
 		}
+		proto := string(port.Protocol)
+		s := seen[nodePort]
+		if s == nil { // have not seen this nodePort before
+			s = sets.NewString(proto)
+			servicePorts = append(servicePorts, nodePort)
+		} else if s.Has(proto) { // same nodePort with same protocol
+			servicePorts = append(servicePorts, nodePort)
+		} else { // same nodePort with different protocol
+			s.Insert(proto)
+		}
+		seen[nodePort] = s
 	}
 
-	if service.Spec.HealthCheckNodePort != 0 {
-		servicePorts = append(servicePorts, int(service.Spec.HealthCheckNodePort))
+	healthPort := int(service.Spec.HealthCheckNodePort)
+	if healthPort != 0 {
+		s := seen[healthPort]
+		// TODO: is it safe to assume the protocol is always TCP?
+		if s == nil || s.Has(string(corev1.ProtocolTCP)) {
+			servicePorts = append(servicePorts, healthPort)
+		}
 	}
 
 	return servicePorts

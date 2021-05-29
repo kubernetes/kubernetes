@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import "context"
 
@@ -8,6 +8,6 @@ func (cli *Client) ConfigRemove(ctx context.Context, id string) error {
 		return err
 	}
 	resp, err := cli.delete(ctx, "/configs/"+id, nil, nil)
-	ensureReaderClosed(resp)
+	defer ensureReaderClosed(resp)
 	return wrapResponseError(err, resp, "config", id)
 }

@@ -21,7 +21,7 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -29,6 +29,8 @@ import (
 )
 
 // DeprecatedInsecureServingInfo is the main context object for the insecure http server.
+// HTTP does NOT include authentication or authorization.
+// You shouldn't be using this.  It makes sig-auth sad.
 type DeprecatedInsecureServingInfo struct {
 	// Listener is the secure server network listener.
 	Listener net.Listener

@@ -19,13 +19,12 @@ package flexvolume
 import (
 	"encoding/json"
 
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetesting "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/test/utils/harness"
 	"k8s.io/utils/exec"
-	fakeexec "k8s.io/utils/exec/testing"
+	exectesting "k8s.io/utils/exec/testing"
 )
 
 func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
@@ -34,13 +33,13 @@ func testPlugin(h *harness.Harness) (*flexVolumeAttachablePlugin, string) {
 		flexVolumePlugin: &flexVolumePlugin{
 			driverName:          "test",
 			execPath:            "/plugin",
-			host:                volumetesting.NewFakeVolumeHost(rootDir, nil, nil),
+			host:                volumetesting.NewFakeVolumeHost(h.T, rootDir, nil, nil),
 			unsupportedCommands: []string{},
 		},
 	}, rootDir
 }
 
-func assertDriverCall(t *harness.Harness, output fakeexec.FakeCombinedOutputAction, expectedCommand string, expectedArgs ...string) fakeexec.FakeCommandAction {
+func assertDriverCall(t *harness.Harness, output exectesting.FakeAction, expectedCommand string, expectedArgs ...string) exectesting.FakeCommandAction {
 	return func(cmd string, args ...string) exec.Cmd {
 		if cmd != "/plugin/test" {
 			t.Errorf("Wrong executable called: got %v, expected %v", cmd, "/plugin/test")
@@ -52,34 +51,34 @@ func assertDriverCall(t *harness.Harness, output fakeexec.FakeCombinedOutputActi
 		if !sameArgs(cmdArgs, expectedArgs) {
 			t.Errorf("Wrong args for %s: got %v, expected %v", args[0], cmdArgs, expectedArgs)
 		}
-		return &fakeexec.FakeCmd{
+		return &exectesting.FakeCmd{
 			Argv:                 args,
-			CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{output},
+			CombinedOutputScript: []exectesting.FakeAction{output},
 		}
 	}
 }
 
-func fakeRunner(fakeCommands ...fakeexec.FakeCommandAction) exec.Interface {
-	return &fakeexec.FakeExec{
+func fakeRunner(fakeCommands ...exectesting.FakeCommandAction) exec.Interface {
+	return &exectesting.FakeExec{
 		CommandScript: fakeCommands,
 	}
 }
 
-func fakeResultOutput(result interface{}) fakeexec.FakeCombinedOutputAction {
-	return func() ([]byte, error) {
+func fakeResultOutput(result interface{}) exectesting.FakeAction {
+	return func() ([]byte, []byte, error) {
 		bytes, err := json.Marshal(result)
 		if err != nil {
 			panic("Unable to marshal result: " + err.Error())
 		}
-		return bytes, nil
+		return bytes, nil, nil
 	}
 }
 
-func successOutput() fakeexec.FakeCombinedOutputAction {
+func successOutput() exectesting.FakeAction {
 	return fakeResultOutput(&DriverStatus{StatusSuccess, "", "", "", true, nil, 0})
 }
 
-func notSupportedOutput() fakeexec.FakeCombinedOutputAction {
+func notSupportedOutput() exectesting.FakeAction {
 	return fakeResultOutput(&DriverStatus{StatusNotSupported, "", "", "", false, nil, 0})
 }
 
@@ -106,23 +105,6 @@ func fakeVolumeSpec() *volume.Spec {
 		},
 	}
 	return volume.NewSpecFromVolume(vol)
-}
-
-func fakePersistentVolumeSpec() *volume.Spec {
-	vol := &v1.PersistentVolume{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "vol1",
-		},
-		Spec: v1.PersistentVolumeSpec{
-			PersistentVolumeSource: v1.PersistentVolumeSource{
-				FlexVolume: &v1.FlexPersistentVolumeSource{
-					Driver:   "kubernetes.io/fakeAttacher",
-					ReadOnly: false,
-				},
-			},
-		},
-	}
-	return volume.NewSpecFromPersistentVolume(vol, false)
 }
 
 func specJSON(plugin *flexVolumeAttachablePlugin, spec *volume.Spec, extraOptions map[string]string) string {

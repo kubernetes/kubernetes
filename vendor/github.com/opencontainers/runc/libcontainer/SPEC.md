@@ -21,16 +21,17 @@ Minimum requirements:
 
 ### Namespaces
 
-|     Flag      | Enabled | 
-| ------------  | ------- |
-| CLONE_NEWPID  |    1    |
-| CLONE_NEWUTS  |    1    |
-| CLONE_NEWIPC  |    1    |
-| CLONE_NEWNET  |    1    |
-| CLONE_NEWNS   |    1    |
-| CLONE_NEWUSER |    1    |
+|     Flag        | Enabled |
+| --------------- | ------- |
+| CLONE_NEWPID    |    1    |
+| CLONE_NEWUTS    |    1    |
+| CLONE_NEWIPC    |    1    |
+| CLONE_NEWNET    |    1    |
+| CLONE_NEWNS     |    1    |
+| CLONE_NEWUSER   |    1    |
+| CLONE_NEWCGROUP |    1    |
 
-Namespaces are created for the container via the `clone` syscall.  
+Namespaces are created for the container via the `unshare` syscall.
 
 
 ### Filesystem
@@ -167,7 +168,8 @@ service (CLOS) and each CLOS has a capacity bitmask (CBM).
 
 Memory Bandwidth Allocation (MBA) provides indirect and approximate throttle
 over memory bandwidth for the software. A user controls the resource by
-indicating the percentage of maximum memory bandwidth.
+indicating the percentage of maximum memory bandwidth or memory bandwidth limit
+in MBps unit if MBA Software Controller is enabled.
 
 It can be used to handle L3 cache and memory bandwidth resources allocation
 for containers if hardware and kernel support Intel RDT CAT and MBA features.
@@ -236,7 +238,7 @@ set in a group: 0xf, 0xf0, 0x3ff, 0x1f00 and etc.
 
 Memory bandwidth schema:
 It has allocation values for memory bandwidth on each socket, which contains
-L3 cache id and memory bandwidth percentage.
+L3 cache id and memory bandwidth.
 ```
 	Format: "MB:<cache_id0>=bandwidth0;<cache_id1>=bandwidth1;..."
 ```
@@ -248,6 +250,18 @@ that is allocated is also dependent on the CPU model and can be looked up at
 "info/MB/bandwidth_gran". The available bandwidth control steps are:
 min_bw + N * bw_gran. Intermediate values are rounded to the next control
 step available on the hardware.
+
+If MBA Software Controller is enabled through mount option "-o mba_MBps"
+mount -t resctrl resctrl -o mba_MBps /sys/fs/resctrl
+We could specify memory bandwidth in "MBps" (Mega Bytes per second) unit
+instead of "percentages". The kernel underneath would use a software feedback
+mechanism or a "Software Controller" which reads the actual bandwidth using
+MBM counters and adjust the memory bandwidth percentages to ensure:
+"actual memory bandwidth < user specified memory bandwidth".
+
+For example, on a two-socket machine, the schema line could be
+"MB:0=5000;1=7000" which means 5000 MBps memory bandwidth limit on socket 0
+and 7000 MBps memory bandwidth limit on socket 1.
 
 For more information about Intel RDT kernel interface:  
 https://www.kernel.org/doc/Documentation/x86/intel_rdt_ui.txt

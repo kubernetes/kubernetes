@@ -19,6 +19,7 @@ limitations under the License.
 package v1
 
 import (
+	"context"
 	time "time"
 
 	crv1 "k8s.io/apiextensions-apiserver/examples/client-go/pkg/apis/cr/v1"
@@ -61,13 +62,13 @@ func NewFilteredExampleInformer(client versioned.Interface, namespace string, re
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrV1().Examples(namespace).List(options)
+				return client.CrV1().Examples(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.CrV1().Examples(namespace).Watch(options)
+				return client.CrV1().Examples(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&crv1.Example{},

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // deploymentStrategy implements behavior for Deployments.
@@ -68,6 +68,18 @@ func (deploymentStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (deploymentStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	deployment := obj.(*apps.Deployment)
@@ -80,9 +92,14 @@ func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 // Validate validates a new deployment.
 func (deploymentStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	deployment := obj.(*apps.Deployment)
-	allErrs := validation.ValidateDeployment(deployment)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&deployment.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&deployment.Spec.Template, nil)
+	return validation.ValidateDeployment(deployment, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (deploymentStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newDeployment := obj.(*apps.Deployment)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -115,8 +132,9 @@ func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime
 func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
-	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	allErrs := validation.ValidateDeploymentUpdate(newDeployment, oldDeployment, opts)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -137,6 +155,17 @@ func (deploymentStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.O
 	return allErrs
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (deploymentStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newDeployment := obj.(*apps.Deployment)
+	oldDeployment := old.(*apps.Deployment)
+	if newDeployment.Generation != oldDeployment.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	}
+	return warnings
+}
+
 func (deploymentStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -147,6 +176,17 @@ type deploymentStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = deploymentStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (deploymentStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+			fieldpath.MakePathOrDie("metadata", "labels"),
+		),
+	}
+}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -159,4 +199,9 @@ func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old r
 // ValidateUpdate is the default update validation for an end user updating status
 func (deploymentStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateDeploymentStatusUpdate(obj.(*apps.Deployment), old.(*apps.Deployment))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (deploymentStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

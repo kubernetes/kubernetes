@@ -44,7 +44,10 @@ func Example() {
 	// This will hold incoming changes. Note how we pass downstream in as a
 	// KeyLister, that way resync operations will result in the correct set
 	// of update/delete deltas.
-	fifo := NewDeltaFIFO(MetaNamespaceKeyFunc, downstream)
+	fifo := NewDeltaFIFOWithOptions(DeltaFIFOOptions{
+		KeyFunction:  MetaNamespaceKeyFunc,
+		KnownObjects: downstream,
+	})
 
 	// Let's do threadsafe output to get predictable test results.
 	deletionCounter := make(chan string, 1000)
@@ -242,16 +245,15 @@ func TestHammerController(t *testing.T) {
 			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
-			r := rand.New(rs) // Mustn't use r and f concurrently!
 			for i := 0; i < 100; i++ {
 				var name string
 				var isNew bool
-				if currentNames.Len() == 0 || r.Intn(3) == 1 {
+				if currentNames.Len() == 0 || rand.Intn(3) == 1 {
 					f.Fuzz(&name)
 					isNew = true
 				} else {
 					l := currentNames.List()
-					name = l[r.Intn(len(l))]
+					name = l[rand.Intn(len(l))]
 				}
 
 				pod := &v1.Pod{}
@@ -266,7 +268,7 @@ func TestHammerController(t *testing.T) {
 					source.Add(pod)
 					continue
 				}
-				switch r.Intn(2) {
+				switch rand.Intn(2) {
 				case 0:
 					currentNames.Insert(name)
 					source.Modify(pod)
@@ -402,4 +404,50 @@ func TestUpdate(t *testing.T) {
 	// Let's wait for the controller to process the things we just added.
 	testDoneWG.Wait()
 	close(stop)
+}
+
+func TestPanicPropagated(t *testing.T) {
+	// source simulates an apiserver object endpoint.
+	source := fcache.NewFakeControllerSource()
+
+	// Make a controller that just panic if the AddFunc is called.
+	_, controller := NewInformer(
+		source,
+		&v1.Pod{},
+		time.Millisecond*100,
+		ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				// Create a panic.
+				panic("Just panic.")
+			},
+		},
+	)
+
+	// Run the controller and run it until we close stop.
+	stop := make(chan struct{})
+	defer close(stop)
+
+	propagated := make(chan interface{})
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				propagated <- r
+			}
+		}()
+		controller.Run(stop)
+	}()
+	// Let's add a object to the source. It will trigger a panic.
+	source.Add(&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test"}})
+
+	// Check if the panic propagated up.
+	select {
+	case p := <-propagated:
+		if p == "Just panic." {
+			t.Logf("Test Passed")
+		} else {
+			t.Errorf("unrecognized panic in controller run: %v", p)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timeout: the panic failed to propagate from the controller run method!")
+	}
 }

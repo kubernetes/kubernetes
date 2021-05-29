@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -27,10 +28,10 @@ import (
 )
 
 type conditionMergeTestCase struct {
-	description    string
-	pvc            *v1.PersistentVolumeClaim
-	newConditions  []v1.PersistentVolumeClaimCondition
-	finalCondtions []v1.PersistentVolumeClaimCondition
+	description     string
+	pvc             *v1.PersistentVolumeClaim
+	newConditions   []v1.PersistentVolumeClaimCondition
+	finalConditions []v1.PersistentVolumeClaimCondition
 }
 
 func TestMergeResizeCondition(t *testing.T) {
@@ -51,10 +52,10 @@ func TestMergeResizeCondition(t *testing.T) {
 
 	testCases := []conditionMergeTestCase{
 		{
-			description:    "when removing all conditions",
-			pvc:            pvc.DeepCopy(),
-			newConditions:  []v1.PersistentVolumeClaimCondition{},
-			finalCondtions: []v1.PersistentVolumeClaimCondition{},
+			description:     "when removing all conditions",
+			pvc:             pvc.DeepCopy(),
+			newConditions:   []v1.PersistentVolumeClaimCondition{},
+			finalConditions: []v1.PersistentVolumeClaimCondition{},
 		},
 		{
 			description: "adding new condition",
@@ -65,7 +66,7 @@ func TestMergeResizeCondition(t *testing.T) {
 					Status: v1.ConditionTrue,
 				},
 			},
-			finalCondtions: []v1.PersistentVolumeClaimCondition{
+			finalConditions: []v1.PersistentVolumeClaimCondition{
 				{
 					Type:   v1.PersistentVolumeClaimFileSystemResizePending,
 					Status: v1.ConditionTrue,
@@ -82,7 +83,7 @@ func TestMergeResizeCondition(t *testing.T) {
 					LastTransitionTime: newTime,
 				},
 			},
-			finalCondtions: []v1.PersistentVolumeClaimCondition{
+			finalConditions: []v1.PersistentVolumeClaimCondition{
 				{
 					Type:               v1.PersistentVolumeClaimResizing,
 					Status:             v1.ConditionTrue,
@@ -100,7 +101,7 @@ func TestMergeResizeCondition(t *testing.T) {
 					LastTransitionTime: conditionFalseTime,
 				},
 			},
-			finalCondtions: []v1.PersistentVolumeClaimCondition{
+			finalConditions: []v1.PersistentVolumeClaimCondition{
 				{
 					Type:               v1.PersistentVolumeClaimResizing,
 					Status:             v1.ConditionFalse,
@@ -118,7 +119,7 @@ func TestMergeResizeCondition(t *testing.T) {
 					LastTransitionTime: currentTime,
 				},
 			},
-			finalCondtions: []v1.PersistentVolumeClaimCondition{
+			finalConditions: []v1.PersistentVolumeClaimCondition{
 				{
 					Type:               v1.PersistentVolumeClaimResizing,
 					Status:             v1.ConditionTrue,
@@ -132,13 +133,45 @@ func TestMergeResizeCondition(t *testing.T) {
 		updatePVC := MergeResizeConditionOnPVC(testcase.pvc, testcase.newConditions)
 
 		updateConditions := updatePVC.Status.Conditions
-		if !reflect.DeepEqual(updateConditions, testcase.finalCondtions) {
+		if !reflect.DeepEqual(updateConditions, testcase.finalConditions) {
 			t.Errorf("Expected updated conditions for test %s to be %v but got %v",
 				testcase.description,
-				testcase.finalCondtions, updateConditions)
+				testcase.finalConditions, updateConditions)
 		}
 	}
 
+}
+
+func TestCreatePVCPatch(t *testing.T) {
+	pvc1 := getPVC([]v1.PersistentVolumeClaimCondition{
+		{
+			Type:               v1.PersistentVolumeClaimFileSystemResizePending,
+			Status:             v1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+		},
+	})
+	pvc1.SetResourceVersion("10")
+	pvc2 := pvc1.DeepCopy()
+	pvc2.Status.Capacity = v1.ResourceList{
+		v1.ResourceName("size"): resource.MustParse("10G"),
+	}
+	patchBytes, err := createPVCPatch(pvc1, pvc2)
+	if err != nil {
+		t.Errorf("error creating patch bytes %v", err)
+	}
+	var patchMap map[string]interface{}
+	err = json.Unmarshal(patchBytes, &patchMap)
+	if err != nil {
+		t.Errorf("error unmarshalling json patch : %v", err)
+	}
+	metadata, ok := patchMap["metadata"].(map[string]interface{})
+	if !ok {
+		t.Errorf("error converting metadata to version map")
+	}
+	resourceVersion, _ := metadata["resourceVersion"].(string)
+	if resourceVersion != "10" {
+		t.Errorf("expected resource version to 10 got %s", resourceVersion)
+	}
 }
 
 func getPVC(conditions []v1.PersistentVolumeClaimCondition) *v1.PersistentVolumeClaim {

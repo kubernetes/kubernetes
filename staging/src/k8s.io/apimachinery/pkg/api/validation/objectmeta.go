@@ -30,9 +30,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+// FieldImmutableErrorMsg is a error message for field is immutable.
 const FieldImmutableErrorMsg string = `field is immutable`
 
-const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
+const TotalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[schema.GroupVersionKind]struct{}{
@@ -45,17 +46,26 @@ var ValidateClusterName = NameIsDNS1035Label
 // ValidateAnnotations validates that a set of annotations are correctly defined.
 func ValidateAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	var totalSize int64
-	for k, v := range annotations {
+	for k := range annotations {
 		for _, msg := range validation.IsQualifiedName(strings.ToLower(k)) {
 			allErrs = append(allErrs, field.Invalid(fldPath, k, msg))
 		}
-		totalSize += (int64)(len(k)) + (int64)(len(v))
 	}
-	if totalSize > (int64)(totalAnnotationSizeLimitB) {
-		allErrs = append(allErrs, field.TooLong(fldPath, "", totalAnnotationSizeLimitB))
+	if err := ValidateAnnotationsSize(annotations); err != nil {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", TotalAnnotationSizeLimitB))
 	}
 	return allErrs
+}
+
+func ValidateAnnotationsSize(annotations map[string]string) error {
+	var totalSize int64
+	for k, v := range annotations {
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+	if totalSize > (int64)(TotalAnnotationSizeLimitB) {
+		return fmt.Errorf("annotations size %d is larger than limit %d", totalSize, TotalAnnotationSizeLimitB)
+	}
+	return nil
 }
 
 func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
@@ -80,6 +90,7 @@ func validateOwnerReference(ownerReference metav1.OwnerReference, fldPath *field
 	return allErrs
 }
 
+// ValidateOwnerReferences validates that a set of owner references are correctly defined.
 func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	controllerName := ""
@@ -97,7 +108,7 @@ func ValidateOwnerReferences(ownerReferences []metav1.OwnerReference, fldPath *f
 	return allErrs
 }
 
-// Validate finalizer names
+// ValidateFinalizerName validates finalizer names.
 func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for _, msg := range validation.IsQualifiedName(stringValue) {
@@ -107,6 +118,7 @@ func ValidateFinalizerName(stringValue string, fldPath *field.Path) field.ErrorL
 	return allErrs
 }
 
+// ValidateNoNewFinalizers validates the new finalizers has no new finalizers compare to old finalizers.
 func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	extra := sets.NewString(newFinalizers...).Difference(sets.NewString(oldFinalizers...))
@@ -116,6 +128,7 @@ func ValidateNoNewFinalizers(newFinalizers []string, oldFinalizers []string, fld
 	return allErrs
 }
 
+// ValidateImmutableField validates the new value and the old value are deeply equal.
 func ValidateImmutableField(newVal, oldVal interface{}, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !apiequality.Semantic.DeepEqual(oldVal, newVal) {
@@ -137,7 +150,7 @@ func ValidateObjectMeta(objMeta *metav1.ObjectMeta, requiresNamespace bool, name
 	return ValidateObjectMetaAccessor(metadata, requiresNamespace, nameFn, fldPath)
 }
 
-// ValidateObjectMeta validates an object's metadata on creation. It expects that name generation has already
+// ValidateObjectMetaAccessor validates an object's metadata on creation. It expects that name generation has already
 // been performed.
 // It doesn't return an error for rootscoped resources with namespace, because namespace should already be cleared before.
 func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, nameFn ValidateNameFunc, fldPath *field.Path) field.ErrorList {
@@ -176,14 +189,13 @@ func ValidateObjectMetaAccessor(meta metav1.Object, requiresNamespace bool, name
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("clusterName"), meta.GetClusterName(), msg))
 		}
 	}
-	for _, entry := range meta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
+
 	allErrs = append(allErrs, ValidateNonnegativeField(meta.GetGeneration(), fldPath.Child("generation"))...)
 	allErrs = append(allErrs, v1validation.ValidateLabels(meta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(meta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(meta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
 	allErrs = append(allErrs, ValidateFinalizers(meta.GetFinalizers(), fldPath.Child("finalizers"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(meta.GetManagedFields(), fldPath.Child("managedFields"))...)
 	return allErrs
 }
 
@@ -207,7 +219,7 @@ func ValidateFinalizers(finalizers []string, fldPath *field.Path) field.ErrorLis
 	return allErrs
 }
 
-// ValidateObjectMetaUpdate validates an object's metadata when updated
+// ValidateObjectMetaUpdate validates an object's metadata when updated.
 func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *field.Path) field.ErrorList {
 	newMetadata, err := meta.Accessor(newMeta)
 	if err != nil {
@@ -224,6 +236,7 @@ func ValidateObjectMetaUpdate(newMeta, oldMeta *metav1.ObjectMeta, fldPath *fiel
 	return ValidateObjectMetaAccessorUpdate(newMetadata, oldMetadata, fldPath)
 }
 
+// ValidateObjectMetaAccessorUpdate validates an object's metadata when updated.
 func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -242,9 +255,6 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("generation"), newMeta.GetGeneration(), "must not be decremented"))
 	}
 
-	for _, entry := range newMeta.GetManagedFields() {
-		allErrs = append(allErrs, v1validation.ValidateFieldManager(entry.Manager, fldPath.Child("fieldManager"))...)
-	}
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetName(), oldMeta.GetName(), fldPath.Child("name"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetNamespace(), oldMeta.GetNamespace(), fldPath.Child("namespace"))...)
 	allErrs = append(allErrs, ValidateImmutableField(newMeta.GetUID(), oldMeta.GetUID(), fldPath.Child("uid"))...)
@@ -256,6 +266,7 @@ func ValidateObjectMetaAccessorUpdate(newMeta, oldMeta metav1.Object, fldPath *f
 	allErrs = append(allErrs, v1validation.ValidateLabels(newMeta.GetLabels(), fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(newMeta.GetAnnotations(), fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidateOwnerReferences(newMeta.GetOwnerReferences(), fldPath.Child("ownerReferences"))...)
+	allErrs = append(allErrs, v1validation.ValidateManagedFields(newMeta.GetManagedFields(), fldPath.Child("managedFields"))...)
 
 	return allErrs
 }

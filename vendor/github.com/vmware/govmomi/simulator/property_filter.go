@@ -47,9 +47,18 @@ func (f *PropertyFilter) DestroyPropertyFilter(ctx *Context, c *types.DestroyPro
 
 // matches returns true if the change matches one of the filter Spec.PropSet
 func (f *PropertyFilter) matches(ctx *Context, ref types.ManagedObjectReference, change *types.PropertyChange) bool {
+	var kind reflect.Type
+
 	for _, p := range f.Spec.PropSet {
 		if p.Type != ref.Type {
-			continue
+			if kind == nil {
+				kind = getManagedObject(ctx.Map.Get(ref)).Type()
+			}
+			// e.g. ManagedEntity, ComputeResource
+			field, ok := kind.FieldByName(p.Type)
+			if !(ok && field.Anonymous) {
+				continue
+			}
 		}
 
 		if isTrue(p.All) {

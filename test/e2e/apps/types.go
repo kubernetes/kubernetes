@@ -23,16 +23,20 @@ import (
 
 // NOTE(claudiub): These constants should NOT be used as Pod Container Images.
 const (
-	NginxImageName = "nginx"
-	RedisImageName = "redis"
+	WebserverImageName = "httpd"
+	AgnhostImageName   = "agnhost"
 )
 
 var (
-	CronJobGroupVersionResourceAlpha = schema.GroupVersionResource{Group: "batch", Version: "v2alpha1", Resource: "cronjobs"}
-	CronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
-	NautilusImage                    = imageutils.GetE2EImage(imageutils.Nautilus)
-	KittenImage                      = imageutils.GetE2EImage(imageutils.Kitten)
-	NginxImage                       = imageutils.GetE2EImage(imageutils.Nginx)
-	NewNginxImage                    = imageutils.GetE2EImage(imageutils.NginxNew)
-	RedisImage                       = imageutils.GetE2EImage(imageutils.Redis)
+	// CronJobGroupVersionResourceBeta unambiguously identifies a resource of cronjob with beta status
+	CronJobGroupVersionResourceBeta = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
+
+	// WebserverImage is the fully qualified URI to the Httpd image
+	WebserverImage = imageutils.GetE2EImage(imageutils.Httpd)
+
+	// NewWebserverImage is the fully qualified URI to the HttpdNew image
+	NewWebserverImage = imageutils.GetE2EImage(imageutils.HttpdNew)
+
+	// AgnhostImage is the fully qualified URI to the Agnhost image
+	AgnhostImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )

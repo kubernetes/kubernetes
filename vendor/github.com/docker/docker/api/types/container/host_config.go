@@ -1,4 +1,4 @@
-package container
+package container // import "github.com/docker/docker/api/types/container"
 
 import (
 	"strings"
@@ -7,8 +7,31 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/go-connections/nat"
-	"github.com/docker/go-units"
+	units "github.com/docker/go-units"
 )
+
+// CgroupnsMode represents the cgroup namespace mode of the container
+type CgroupnsMode string
+
+// IsPrivate indicates whether the container uses its own private cgroup namespace
+func (c CgroupnsMode) IsPrivate() bool {
+	return c == "private"
+}
+
+// IsHost indicates whether the container shares the host's cgroup namespace
+func (c CgroupnsMode) IsHost() bool {
+	return c == "host"
+}
+
+// IsEmpty indicates whether the container cgroup namespace mode is unset
+func (c CgroupnsMode) IsEmpty() bool {
+	return c == ""
+}
+
+// Valid indicates whether the cgroup namespace mode is valid
+func (c CgroupnsMode) Valid() bool {
+	return c.IsEmpty() || c.IsPrivate() || c.IsHost()
+}
 
 // Isolation represents the isolation technology of a container. The supported
 // values are platform specific
@@ -122,7 +145,7 @@ func (n NetworkMode) ConnectedContainer() string {
 	return ""
 }
 
-//UserDefined indicates user-created network
+// UserDefined indicates user-created network
 func (n NetworkMode) UserDefined() string {
 	if n.IsUserDefined() {
 		return string(n)
@@ -244,6 +267,16 @@ func (n PidMode) Container() string {
 	return ""
 }
 
+// DeviceRequest represents a request for devices from a device driver.
+// Used by GPU device drivers.
+type DeviceRequest struct {
+	Driver       string            // Name of device driver
+	Count        int               // Number of devices to request (-1 = All)
+	DeviceIDs    []string          // List of device IDs as recognizable by the device driver
+	Capabilities [][]string        // An OR list of AND lists of device capabilities (e.g. "gpu")
+	Options      map[string]string // Options to pass onto the device driver
+}
+
 // DeviceMapping represents the device mapping between the host and the container.
 type DeviceMapping struct {
 	PathOnHost        string
@@ -327,13 +360,14 @@ type Resources struct {
 	CpusetMems           string          // CpusetMems 0-2, 0,1
 	Devices              []DeviceMapping // List of devices to map inside the container
 	DeviceCgroupRules    []string        // List of rule to be added to the device cgroup
-	DiskQuota            int64           // Disk limit (in bytes)
-	KernelMemory         int64           // Kernel memory limit (in bytes)
+	DeviceRequests       []DeviceRequest // List of device requests for device drivers
+	KernelMemory         int64           // Kernel memory limit (in bytes), Deprecated: kernel 5.4 deprecated kmem.limit_in_bytes
+	KernelMemoryTCP      int64           // Hard limit for kernel TCP buffer memory (in bytes)
 	MemoryReservation    int64           // Memory soft limit (in bytes)
 	MemorySwap           int64           // Total memory usage (memory + swap); set `-1` to enable unlimited swap
 	MemorySwappiness     *int64          // Tuning container memory swappiness behaviour
 	OomKillDisable       *bool           // Whether to disable OOM Killer or not
-	PidsLimit            int64           // Setting pids limit for a container
+	PidsLimit            *int64          // Setting PIDs limit for a container; Set `0` or `-1` for unlimited, or `null` to not change.
 	Ulimits              []*units.Ulimit // List of ulimits to be set in the container
 
 	// Applicable to Windows
@@ -369,6 +403,7 @@ type HostConfig struct {
 	// Applicable to UNIX platforms
 	CapAdd          strslice.StrSlice // List of kernel capabilities to add to the container
 	CapDrop         strslice.StrSlice // List of kernel capabilities to remove from the container
+	CgroupnsMode    CgroupnsMode      // Cgroup namespace mode to use for the container
 	DNS             []string          `json:"Dns"`        // List of DNS server to lookup
 	DNSOptions      []string          `json:"DnsOptions"` // List of DNSOption to look for
 	DNSSearch       []string          `json:"DnsSearch"`  // List of DNSSearch to look for

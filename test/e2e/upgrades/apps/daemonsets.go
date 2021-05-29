@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package upgrades
+package apps
 
 import (
+	"context"
 	"github.com/onsi/ginkgo"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -32,7 +33,7 @@ import (
 // DaemonSetUpgradeTest tests that a DaemonSet is running before and after
 // a cluster upgrade.
 type DaemonSetUpgradeTest struct {
-	daemonSet *apps.DaemonSet
+	daemonSet *appsv1.DaemonSet
 }
 
 // Name returns the tracking name of the test.
@@ -46,12 +47,12 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ns := f.Namespace
 
-	t.daemonSet = &apps.DaemonSet{
+	t.daemonSet = &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ns.Name,
 			Name:      daemonSetName,
 		},
-		Spec: apps.DaemonSetSpec{
+		Spec: appsv1.DaemonSetSpec{
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labelSet,
 			},
@@ -65,9 +66,11 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 					},
 					Containers: []v1.Container{
 						{
-							Name:  daemonSetName,
-							Image: image,
-							Ports: []v1.ContainerPort{{ContainerPort: 9376}},
+							Name:            daemonSetName,
+							Image:           image,
+							Args:            []string{"serve-hostname"},
+							Ports:           []v1.ContainerPort{{ContainerPort: 9376}},
+							SecurityContext: &v1.SecurityContext{},
 						},
 					},
 				},
@@ -77,7 +80,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 
 	ginkgo.By("Creating a DaemonSet")
 	var err error
-	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
+	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(context.TODO(), t.daemonSet, metav1.CreateOptions{}); err != nil {
 		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
@@ -124,7 +127,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 }
 
 func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector map[string]string) (bool, error) {
-	nodeList, err := f.ClientSet.CoreV1().Nodes().List(metav1.ListOptions{})
+	nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}
@@ -144,7 +147,7 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet map[string]string, nodeNames []string) (bool, error) {
 	selector := labels.Set(labelSet).AsSelector()
 	options := metav1.ListOptions{LabelSelector: selector.String()}
-	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(options)
+	podList, err := f.ClientSet.CoreV1().Pods(namespace).List(context.TODO(), options)
 	if err != nil {
 		return false, err
 	}
@@ -173,7 +176,7 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 }
 
 func checkDaemonStatus(f *framework.Framework, namespace string, dsName string) (bool, error) {
-	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(dsName, metav1.GetOptions{})
+	ds, err := f.ClientSet.AppsV1().DaemonSets(namespace).Get(context.TODO(), dsName, metav1.GetOptions{})
 	if err != nil {
 		return false, err
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"context"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -25,9 +26,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericapiserveroptions "k8s.io/apiserver/pkg/server/options"
@@ -36,14 +38,21 @@ import (
 	"k8s.io/client-go/util/cert"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
-	"k8s.io/kubernetes/pkg/master"
+	"k8s.io/kubernetes/pkg/controlplane"
+	"k8s.io/kubernetes/test/utils"
 )
+
+// This key is for testing purposes only and is not considered secure.
+const ecdsaPrivateKey = `-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEZmTmUhuanLjPA2CLquXivuwBDHTt5XYwgIr/kA1LtRoAoGCCqGSM49
+AwEHoUQDQgAEH6cuzP8XuD5wal6wf9M6xDljTOPLX2i8uIp/C/ASqiIGUeeKQtX0
+/IR3qCXyThP/dbCiHrF3v1cuhBOHY8CLVg==
+-----END EC PRIVATE KEY-----`
 
 // TestServerSetup holds configuration information for a kube-apiserver test server.
 type TestServerSetup struct {
 	ModifyServerRunOptions func(*options.ServerRunOptions)
-	ModifyServerConfig     func(*master.Config)
+	ModifyServerConfig     func(*controlplane.Config)
 }
 
 // StartTestServer runs a kube-apiserver, optionally calling out to the setup.ModifyServerRunOptions and setup.ModifyServerConfig functions
@@ -55,7 +64,7 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	}()
 
 	_, defaultServiceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
-	proxySigningKey, err := pkiutil.NewPrivateKey()
+	proxySigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,10 +73,10 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	proxyCACertFile, _ := ioutil.TempFile(certDir, "proxy-ca.crt")
-	if err := ioutil.WriteFile(proxyCACertFile.Name(), pkiutil.EncodeCertPEM(proxySigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(proxyCACertFile.Name(), utils.EncodeCertPEM(proxySigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
-	clientSigningKey, err := pkiutil.NewPrivateKey()
+	clientSigningKey, err := utils.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,28 +85,40 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		t.Fatal(err)
 	}
 	clientCACertFile, _ := ioutil.TempFile(certDir, "client-ca.crt")
-	if err := ioutil.WriteFile(clientCACertFile.Name(), pkiutil.EncodeCertPEM(clientSigningCert), 0644); err != nil {
+	if err := ioutil.WriteFile(clientCACertFile.Name(), utils.EncodeCertPEM(clientSigningCert), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0")
+	listener, _, err := genericapiserveroptions.CreateListener("tcp", "127.0.0.1:0", net.ListenConfig{})
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	saSigningKeyFile, err := ioutil.TempFile("/tmp", "insecure_test_key")
+	if err != nil {
+		t.Fatalf("create temp file failed: %v", err)
+	}
+	defer os.RemoveAll(saSigningKeyFile.Name())
+	if err = ioutil.WriteFile(saSigningKeyFile.Name(), []byte(ecdsaPrivateKey), 0666); err != nil {
+		t.Fatalf("write file %s failed: %v", saSigningKeyFile.Name(), err)
 	}
 
 	kubeAPIServerOptions := options.NewServerRunOptions()
 	kubeAPIServerOptions.SecureServing.Listener = listener
 	kubeAPIServerOptions.SecureServing.BindAddress = net.ParseIP("127.0.0.1")
 	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
-	kubeAPIServerOptions.InsecureServing.BindPort = 0
-	kubeAPIServerOptions.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New(), "registry")
+	kubeAPIServerOptions.ServiceAccountSigningKeyFile = saSigningKeyFile.Name()
+	kubeAPIServerOptions.Etcd.StorageConfig.Prefix = path.Join("/", uuid.New().String(), "registry")
 	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{GetEtcdURL()}
-	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+	kubeAPIServerOptions.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
 	kubeAPIServerOptions.Authentication.RequestHeader.UsernameHeaders = []string{"X-Remote-User"}
 	kubeAPIServerOptions.Authentication.RequestHeader.GroupHeaders = []string{"X-Remote-Group"}
 	kubeAPIServerOptions.Authentication.RequestHeader.ExtraHeaderPrefixes = []string{"X-Remote-Extra-"}
 	kubeAPIServerOptions.Authentication.RequestHeader.AllowedNames = []string{"kube-aggregator"}
 	kubeAPIServerOptions.Authentication.RequestHeader.ClientCAFile = proxyCACertFile.Name()
+	kubeAPIServerOptions.Authentication.APIAudiences = []string{"https://foo.bar.example.com"}
+	kubeAPIServerOptions.Authentication.ServiceAccounts.Issuers = []string{"https://foo.bar.example.com"}
+	kubeAPIServerOptions.Authentication.ServiceAccounts.KeyFiles = []string{saSigningKeyFile.Name()}
 	kubeAPIServerOptions.Authentication.ClientCert.ClientCA = clientCACertFile.Name()
 	kubeAPIServerOptions.Authorization.Modes = []string{"Node", "RBAC"}
 
@@ -109,11 +130,16 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if errs := completedOptions.Validate(); len(errs) != 0 {
+		t.Fatalf("failed to validate ServerRunOptions: %v", utilerrors.NewAggregate(errs))
+	}
+
 	tunneler, proxyTransport, err := app.CreateNodeDialer(completedOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+	kubeAPIServerConfig, _, _, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,13 +147,13 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 	if setup.ModifyServerConfig != nil {
 		setup.ModifyServerConfig(kubeAPIServerConfig)
 	}
-	kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate(), admissionPostStartHook)
+	kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		t.Fatal(err)
 	}
 	go func() {
 		if err := kubeAPIServer.GenericAPIServer.PrepareRun().Run(stopCh); err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 	}()
 
@@ -150,15 +176,15 @@ func StartTestServer(t *testing.T, stopCh <-chan struct{}, setup TestServerSetup
 		}
 
 		healthStatus := 0
-		kubeClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do().StatusCode(&healthStatus)
+		kubeClient.Discovery().RESTClient().Get().AbsPath("/healthz").Do(context.TODO()).StatusCode(&healthStatus)
 		if healthStatus != http.StatusOK {
 			return false, nil
 		}
 
-		if _, err := kubeClient.CoreV1().Namespaces().Get("default", metav1.GetOptions{}); err != nil {
+		if _, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "default", metav1.GetOptions{}); err != nil {
 			return false, nil
 		}
-		if _, err := kubeClient.CoreV1().Namespaces().Get("kube-system", metav1.GetOptions{}); err != nil {
+		if _, err := kubeClient.CoreV1().Namespaces().Get(context.TODO(), "kube-system", metav1.GetOptions{}); err != nil {
 			return false, nil
 		}
 

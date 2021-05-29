@@ -24,6 +24,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func newJob(completionTime, failedTime metav1.Time, ttl *int32) *batch.Job {
@@ -74,10 +75,6 @@ func durationPointer(n int) *time.Duration {
 	return &s
 }
 
-func int32Ptr(n int32) *int32 {
-	return &n
-}
-
 func TestTimeLeft(t *testing.T) {
 	now := metav1.Now()
 
@@ -90,10 +87,11 @@ func TestTimeLeft(t *testing.T) {
 		expectErr        bool
 		expectErrStr     string
 		expectedTimeLeft *time.Duration
+		expectedExpireAt time.Time
 	}{
 		{
 			name:         "Error case: Job unfinished",
-			ttl:          int32Ptr(100),
+			ttl:          utilpointer.Int32Ptr(100),
 			since:        &now.Time,
 			expectErr:    true,
 			expectErrStr: "should not be cleaned up",
@@ -108,23 +106,26 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job completed now, 0s TTL",
 			completionTime:   now,
-			ttl:              int32Ptr(0),
+			ttl:              utilpointer.Int32Ptr(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
+			expectedExpireAt: now.Time,
 		},
 		{
 			name:             "Job completed now, 10s TTL",
 			completionTime:   now,
-			ttl:              int32Ptr(10),
+			ttl:              utilpointer.Int32Ptr(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
+			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
 			name:             "Job completed 10s ago, 15s TTL",
 			completionTime:   metav1.NewTime(now.Add(-10 * time.Second)),
-			ttl:              int32Ptr(15),
+			ttl:              utilpointer.Int32Ptr(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
+			expectedExpireAt: now.Add(5 * time.Second),
 		},
 		{
 			name:         "Error case: Job failed now, no TTL",
@@ -136,29 +137,32 @@ func TestTimeLeft(t *testing.T) {
 		{
 			name:             "Job failed now, 0s TTL",
 			failedTime:       now,
-			ttl:              int32Ptr(0),
+			ttl:              utilpointer.Int32Ptr(0),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(0),
+			expectedExpireAt: now.Time,
 		},
 		{
 			name:             "Job failed now, 10s TTL",
 			failedTime:       now,
-			ttl:              int32Ptr(10),
+			ttl:              utilpointer.Int32Ptr(10),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(10),
+			expectedExpireAt: now.Add(10 * time.Second),
 		},
 		{
 			name:             "Job failed 10s ago, 15s TTL",
 			failedTime:       metav1.NewTime(now.Add(-10 * time.Second)),
-			ttl:              int32Ptr(15),
+			ttl:              utilpointer.Int32Ptr(15),
 			since:            &now.Time,
 			expectedTimeLeft: durationPointer(5),
+			expectedExpireAt: now.Add(5 * time.Second),
 		},
 	}
 
 	for _, tc := range testCases {
 		job := newJob(tc.completionTime, tc.failedTime, tc.ttl)
-		gotTimeLeft, gotErr := timeLeft(job, tc.since)
+		gotTimeLeft, gotExpireAt, gotErr := timeLeft(job, tc.since)
 		if tc.expectErr != (gotErr != nil) {
 			t.Errorf("%s: expected error is %t, got %t, error: %v", tc.name, tc.expectErr, gotErr != nil, gotErr)
 		}
@@ -171,6 +175,9 @@ func TestTimeLeft(t *testing.T) {
 		if !tc.expectErr {
 			if *gotTimeLeft != *tc.expectedTimeLeft {
 				t.Errorf("%s: expected time left %v, got %v", tc.name, tc.expectedTimeLeft, gotTimeLeft)
+			}
+			if *gotExpireAt != tc.expectedExpireAt {
+				t.Errorf("%s: expected expire at %v, got %v", tc.name, tc.expectedExpireAt, *gotExpireAt)
 			}
 		}
 	}

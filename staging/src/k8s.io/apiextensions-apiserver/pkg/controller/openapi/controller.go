@@ -22,18 +22,21 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-openapi/spec"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kube-openapi/pkg/handler"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
 // Controller watches CustomResourceDefinitions and publishes validation schema
@@ -89,6 +92,29 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 		return
 	}
 
+	// create initial spec to avoid merging once per CRD on startup
+	crds, err := c.crdLister.List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to initially list all CRDs: %v", err))
+		return
+	}
+	for _, crd := range crds {
+		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
+			continue
+		}
+		newSpecs, changed, err := buildVersionSpecs(crd, nil)
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("failed to build OpenAPI spec of CRD %s: %v", crd.Name, err))
+		} else if !changed {
+			continue
+		}
+		c.crdSpecs[crd.Name] = newSpecs
+	}
+	if err := c.updateSpecLocked(); err != nil {
+		utilruntime.HandleError(fmt.Errorf("failed to initially create OpenAPI spec for CRDs: %v", err))
+		return
+	}
+
 	// only start one worker thread since its a slow moving API
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
@@ -137,25 +163,48 @@ func (c *Controller) sync(name string) error {
 	}
 
 	// do we have to remove all specs of this CRD?
-	if errors.IsNotFound(err) || !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensionsv1.Established) {
 		if _, found := c.crdSpecs[name]; !found {
 			return nil
 		}
 		delete(c.crdSpecs, name)
+		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", name)
+		regenerationCounter.With(map[string]string{"crd": name, "reason": "remove"})
 		return c.updateSpecLocked()
 	}
 
 	// compute CRD spec and see whether it changed
-	oldSpecs := c.crdSpecs[crd.Name]
+	oldSpecs, updated := c.crdSpecs[crd.Name]
+	newSpecs, changed, err := buildVersionSpecs(crd, oldSpecs)
+	if err != nil {
+		return err
+	}
+	if !changed {
+		return nil
+	}
+
+	// update specs of this CRD
+	c.crdSpecs[crd.Name] = newSpecs
+	klog.V(2).Infof("Updating CRD OpenAPI spec because %s changed", name)
+	reason := "add"
+	if updated {
+		reason = "update"
+	}
+	regenerationCounter.With(map[string]string{"crd": name, "reason": reason})
+	return c.updateSpecLocked()
+}
+
+func buildVersionSpecs(crd *apiextensionsv1.CustomResourceDefinition, oldSpecs map[string]*spec.Swagger) (map[string]*spec.Swagger, bool, error) {
 	newSpecs := map[string]*spec.Swagger{}
 	anyChanged := false
 	for _, v := range crd.Spec.Versions {
 		if !v.Served {
 			continue
 		}
-		spec, err := BuildSwagger(crd, v.Name)
+		// Defaults are not pruned here, but before being served.
+		spec, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: true})
 		if err != nil {
-			return err
+			return nil, false, err
 		}
 		newSpecs[v.Name] = spec
 		if oldSpecs[v.Name] == nil || !reflect.DeepEqual(oldSpecs[v.Name], spec) {
@@ -163,12 +212,10 @@ func (c *Controller) sync(name string) error {
 		}
 	}
 	if !anyChanged && len(oldSpecs) == len(newSpecs) {
-		return nil
+		return newSpecs, false, nil
 	}
 
-	// update specs of this CRD
-	c.crdSpecs[crd.Name] = newSpecs
-	return c.updateSpecLocked()
+	return newSpecs, true, nil
 }
 
 // updateSpecLocked aggregates all OpenAPI specs and updates openAPIService.
@@ -180,30 +227,34 @@ func (c *Controller) updateSpecLocked() error {
 			crdSpecs = append(crdSpecs, s)
 		}
 	}
-	return c.openAPIService.UpdateSpec(mergeSpecs(c.staticSpec, crdSpecs...))
+	mergedSpec, err := builder.MergeSpecs(c.staticSpec, crdSpecs...)
+	if err != nil {
+		return fmt.Errorf("failed to merge specs: %v", err)
+	}
+	return c.openAPIService.UpdateSpec(mergedSpec)
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {
-	castObj := obj.(*apiextensions.CustomResourceDefinition)
+	castObj := obj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Adding customresourcedefinition %s", castObj.Name)
 	c.enqueue(castObj)
 }
 
 func (c *Controller) updateCustomResourceDefinition(oldObj, newObj interface{}) {
-	castNewObj := newObj.(*apiextensions.CustomResourceDefinition)
+	castNewObj := newObj.(*apiextensionsv1.CustomResourceDefinition)
 	klog.V(4).Infof("Updating customresourcedefinition %s", castNewObj.Name)
 	c.enqueue(castNewObj)
 }
 
 func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
-	castObj, ok := obj.(*apiextensions.CustomResourceDefinition)
+	castObj, ok := obj.(*apiextensionsv1.CustomResourceDefinition)
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
 			klog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
-		castObj, ok = tombstone.Obj.(*apiextensions.CustomResourceDefinition)
+		castObj, ok = tombstone.Obj.(*apiextensionsv1.CustomResourceDefinition)
 		if !ok {
 			klog.Errorf("Tombstone contained object that is not expected %#v", obj)
 			return
@@ -213,6 +264,6 @@ func (c *Controller) deleteCustomResourceDefinition(obj interface{}) {
 	c.enqueue(castObj)
 }
 
-func (c *Controller) enqueue(obj *apiextensions.CustomResourceDefinition) {
+func (c *Controller) enqueue(obj *apiextensionsv1.CustomResourceDefinition) {
 	c.queue.Add(obj.Name)
 }

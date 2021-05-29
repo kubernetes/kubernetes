@@ -20,19 +20,23 @@ package v1
 
 import (
 	v1 "k8s.io/api/batch/v1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
 type BatchV1Interface interface {
 	RESTClient() rest.Interface
+	CronJobsGetter
 	JobsGetter
 }
 
 // BatchV1Client is used to interact with features provided by the batch group.
 type BatchV1Client struct {
 	restClient rest.Interface
+}
+
+func (c *BatchV1Client) CronJobs(namespace string) CronJobInterface {
+	return newCronJobs(c, namespace)
 }
 
 func (c *BatchV1Client) Jobs(namespace string) JobInterface {
@@ -71,7 +75,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

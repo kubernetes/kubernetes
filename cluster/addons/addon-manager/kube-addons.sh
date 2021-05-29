@@ -28,32 +28,42 @@
 
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
 KUBECTL_OPTS=${KUBECTL_OPTS:-}
-# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by
-# default.
+# KUBECTL_PRUNE_WHITELIST is a list of resources whitelisted by default.
 # This is currently the same with the default in:
-# https://github.com/kubernetes/kubernetes/blob/master/pkg/kubectl/cmd/apply.go
-KUBECTL_PRUNE_WHITELIST=(
-  core/v1/ConfigMap
-  core/v1/Endpoints
-  core/v1/Namespace
-  core/v1/PersistentVolumeClaim
-  core/v1/PersistentVolume
-  core/v1/Pod
-  core/v1/ReplicationController
-  core/v1/Secret
-  core/v1/Service
-  batch/v1/Job
-  batch/v1beta1/CronJob
-  apps/v1/DaemonSet
-  apps/v1/Deployment
-  apps/v1/ReplicaSet
-  apps/v1/StatefulSet
-  extensions/v1beta1/Ingress
-)
+# https://github.com/kubernetes/kubectl/blob/master/pkg/cmd/apply/prune.go.
+# To override the default list with other values, set
+# KUBECTL_PRUNE_WHITELIST_OVERRIDE environment variable to space-separated
+# names of resources to whitelist.
+if [ -z "${KUBECTL_PRUNE_WHITELIST_OVERRIDE:-}" ]; then
+  KUBECTL_PRUNE_WHITELIST=(
+    core/v1/ConfigMap
+    core/v1/Endpoints
+    core/v1/Namespace
+    core/v1/PersistentVolumeClaim
+    core/v1/PersistentVolume
+    core/v1/Pod
+    core/v1/ReplicationController
+    core/v1/Secret
+    core/v1/Service
+    batch/v1/Job
+    batch/v1beta1/CronJob
+    apps/v1/DaemonSet
+    apps/v1/Deployment
+    apps/v1/ReplicaSet
+    apps/v1/StatefulSet
+    networking.k8s.io/v1/Ingress
+  )
+else
+  read -ra KUBECTL_PRUNE_WHITELIST <<< "${KUBECTL_PRUNE_WHITELIST_OVERRIDE}"
+fi
 
+# This variable is unused in this file, but not in those that source it.
+# shellcheck disable=SC2034
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 ADDON_PATH=${ADDON_PATH:-/etc/kubernetes/addons}
 
+# This variable is unused in this file, but not in those that source it.
+# shellcheck disable=SC2034
 SYSTEM_NAMESPACE=kube-system
 
 # Addons could use this label with two modes:
@@ -106,9 +116,13 @@ function log() {
 
 # Generate kubectl prune-whitelist flags from provided resource list.
 function generate_prune_whitelist_flags() {
-  local -r resources=($@)
+  local -r resources=( "$@" )
   for resource in "${resources[@]}"; do
-    printf "%s" "--prune-whitelist ${resource} "
+    # Check if $resource isn't composed just of whitespaces by replacing ' '
+    # with '' and checking whether the resulting string is not empty.
+    if [[ -n "${resource// /}" ]]; then
+      printf "%s" "--prune-whitelist ${resource} "
+    fi
   done
 }
 
@@ -116,10 +130,10 @@ function generate_prune_whitelist_flags() {
 # besides the default ones.
 extra_prune_whitelist=
 if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
-  extra_prune_whitelist=( ${KUBECTL_EXTRA_PRUNE_WHITELIST:-} )
+  read -ra extra_prune_whitelist <<< "${KUBECTL_EXTRA_PRUNE_WHITELIST}"
 fi
-prune_whitelist=( ${KUBECTL_PRUNE_WHITELIST[@]}  ${extra_prune_whitelist[@]} )
-prune_whitelist_flags=$(generate_prune_whitelist_flags ${prune_whitelist[@]})
+prune_whitelist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_whitelist[@]}" )
+prune_whitelist_flags=$(generate_prune_whitelist_flags "${prune_whitelist[@]}")
 
 log INFO "== Generated kubectl prune whitelist flags: $prune_whitelist_flags =="
 
@@ -133,7 +147,7 @@ function start_addon() {
   local -r delay=$3;
   local -r namespace=$4
 
-  create_resource_from_string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}" "${namespace}"
+  create_resource_from_string "$(cat "${addon_filename}")" "${tries}" "${delay}" "${addon_filename}" "${namespace}"
 }
 
 # $1 string with json or yaml.
@@ -147,14 +161,71 @@ function create_resource_from_string() {
   local -r delay=$3;
   local -r config_name=$4;
   local -r namespace=$5;
-  while [ ${tries} -gt 0 ]; do
-    echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} --namespace="${namespace}" apply -f - && \
+  while [ "${tries}" -gt 0 ]; do
+    reconcile_resource_from_string "${config_string}" "${config_name}" "${namespace}" && \
+      ensure_resource_from_string "${config_string}" "${config_name}" "${namespace}" && \
+      return 0;
+    (( tries-- ))
+    log WRN "== Failed to start ${config_name} in namespace ${namespace} at $(date -Is). ${tries} tries remaining. =="
+    sleep "${delay}";
+  done
+  return 1;
+}
+
+# Creates resources with addon mode Reconcile for create_resource_from_string.
+# Does not perform pruning.
+# $1 string with json or yaml.
+# $2 name of this object for logging
+# $3 namespace for the object
+function reconcile_resource_from_string() {
+  local -r config_string=$1;
+  local -r config_name=$2;
+  local -r namespace=$3;
+
+  # kubectl_output must be declared ahead of time to allow capturing kubectl's exit code and not local's exit code.
+  local kubectl_output;
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+  kubectl_output=$(echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} apply -f - \
+    --namespace="${namespace}" -l ${ADDON_MANAGER_LABEL}=Reconcile 2>&1) && \
+      log INFO "== Successfully reconciled ${config_name} in namespace ${namespace} at $(date -Is)" && \
+      return 0;
+  if echo "${kubectl_output}" | grep --silent "no objects"; then
+    # Nothing to do.
+    return 0;
+  fi
+  echo "${kubectl_output}" # for visibility of errors
+  return 1;
+}
+
+# Creates resources with addon mode EnsureExists for create_resource_from_string.
+# Does not perform pruning.
+# $1 string with json or yaml.
+# $2 name of this object for logging
+# $3 namespace for the object
+function ensure_resource_from_string() {
+  local -r config_string=$1;
+  local -r config_name=$2;
+  local -r namespace=$3;
+
+  # Resources that are set to the addon mode EnsureExists should not be overwritten if they already exist.
+  local kubectl_output;
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+  kubectl_output=$(echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} create -f - \
+    --namespace="${namespace}" -l ${ADDON_MANAGER_LABEL}=EnsureExists 2>&1) && \
       log INFO "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
       return 0;
-    let tries=tries-1;
-    log WRN "== Failed to start ${config_name} in namespace ${namespace} at $(date -Is). ${tries} tries remaining. =="
-    sleep ${delay};
-  done
+  # Detect an already exists failure for creating EnsureExists resources.
+  # All other errors should result in a retry.
+  if echo "${kubectl_output}" | grep --silent "AlreadyExists"; then
+    log INFO "== Skipping start ${config_name} in namespace ${namespace}, already exists at $(date -Is)"
+    return 0;
+  elif echo "${kubectl_output}" | grep --silent "no objects"; then
+    # Nothing to do.
+    return 0;
+  fi
+  echo "${kubectl_output}" # for visibility of errors
   return 1;
 }
 
@@ -165,11 +236,15 @@ function reconcile_addons() {
   # Filter out `configured` message to not noisily log.
   # `created`, `pruned` and errors will be logged.
   log INFO "== Reconciling with deprecated label =="
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
     --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
     --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
@@ -180,6 +255,8 @@ function reconcile_addons() {
 function ensure_addons() {
   # Create objects already exist should fail.
   # Filter out `AlreadyExists` message to not noisily log.
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} create -f ${ADDON_PATH} \
     -l ${ADDON_MANAGER_LABEL}=EnsureExists --recursive 2>&1 | grep -v AlreadyExists
 
@@ -194,63 +271,24 @@ function is_leader() {
     log INFO "Leader election disabled."
     return 0;
   fi
-  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
-    -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
-  # If there was any problem with getting the leader election results, var will
-  # be empty. Since it's better to have multiple addon managers than no addon
-  # managers at all, we're going to assume that we're the leader in such case.
-  log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
-  [[ "$KUBE_CONTROLLER_MANAGER_LEADER" == "" ||
-     "$HOSTNAME" == "$KUBE_CONTROLLER_MANAGER_LEADER" ]]
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get leases.v1.coordination.k8s.io kube-controller-manager -o "jsonpath={.spec.holderIdentity}")
+
+  case "${KUBE_CONTROLLER_MANAGER_LEADER}" in
+  "")
+    log ERR "No leader election info found."
+    return 1
+    ;;
+
+  "${HOSTNAME}"_*)
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER"
+    return 0
+    ;;
+
+  *)
+    log INFO "Leader is $KUBE_CONTROLLER_MANAGER_LEADER, not ${HOSTNAME}_*"
+    return 1
+    ;;
+  esac
 }
-
-# The business logic for whether a given object should be created
-# was already enforced by salt, and /etc/kubernetes/addons is the
-# managed result of that. Start everything below that directory.
-log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_INTERVAL_SEC=${ADDON_CHECK_INTERVAL_SEC} =="
-
-# Create the namespace that will be used to host the cluster-level add-ons.
-start_addon /opt/namespace.yaml 100 10 "" &
-
-# Wait for the default service account to be created in the kube-system namespace.
-token_found=""
-while [ -z "${token_found}" ]; do
-  sleep .5
-  token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}")
-  if [[ $? -ne 0 ]]; then
-    token_found="";
-    log WRN "== Error getting default service account, retry in 0.5 second =="
-  fi
-done
-
-log INFO "== Default service account in the ${SYSTEM_NAMESPACE} namespace has token ${token_found} =="
-
-# Create admission_control objects if defined before any other addon services. If the limits
-# are defined in a namespace other than default, we should still create the limits for the
-# default namespace.
-for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
-  start_addon "${obj}" 100 10 default &
-  log INFO "++ obj ${obj} is created ++"
-done
-
-# Start the apply loop.
-# Check if the configuration has changed recently - in case the user
-# created/updated/deleted the files on the master.
-log INFO "== Entering periodical apply loop at $(date -Is) =="
-while true; do
-  start_sec=$(date +"%s")
-  if is_leader; then
-    ensure_addons
-    reconcile_addons
-  else
-    log INFO "Not elected leader, going back to sleep."
-  fi
-  end_sec=$(date +"%s")
-  len_sec=$((${end_sec}-${start_sec}))
-  # subtract the time passed from the sleep time
-  if [[ ${len_sec} -lt ${ADDON_CHECK_INTERVAL_SEC} ]]; then
-    sleep_time=$((${ADDON_CHECK_INTERVAL_SEC}-${len_sec}))
-    sleep ${sleep_time}
-  fi
-done

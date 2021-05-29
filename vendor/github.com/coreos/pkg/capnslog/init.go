@@ -32,7 +32,7 @@ import (
 func init() {
 	initHijack()
 
-	// Go `log` pacakge uses os.Stderr.
+	// Go `log` package uses os.Stderr.
 	SetFormatter(NewDefaultFormatter(os.Stderr))
 	SetGlobalLogLevel(INFO)
 }

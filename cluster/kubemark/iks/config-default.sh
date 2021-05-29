@@ -25,8 +25,16 @@ CLUSTER_LOCATION="${CLUSTER_LOCATION:-wdc06}"
 REGISTRY_LOGIN_URL="${REGISTRY_LOGIN_URL:-https://api.ng.bluemix.net}"
 
 # User defined
+# number of real workers in spawnTester cluster
 NUM_NODES="${NUM_NODES:-2}"
+# spec of real workers in spawnTester cluster
+NODE_SIZE=${NODE_SIZE:-u2c.2x4}
 DESIRED_NODES="${DESIRED_NODES:-10}"
+# number of hollow nodes
+# TODO: once IKS supports `kubetest`, i.e. the base cluster provisioning implemented in `kubetest`
+# we can use NUM_NODES=${KUBEMARK_NUM_NODES:-10} to avoid usage of KUBEMARK_NUM_NODES
+# more context, see https://github.com/kubernetes/kubernetes/pull/76909#discussion_r277735942
+KUBEMARK_NUM_NODES="${KUBEMARK_NUM_NODES:-10}"
 ENABLE_KUBEMARK_CLUSTER_AUTOSCALER="${ENABLE_KUBEMARK_CLUSTER_AUTOSCALER:-true}"
 ENABLE_KUBEMARK_KUBE_DNS="${ENABLE_KUBEMARK_KUBE_DNS:-false}"
 KUBELET_TEST_LOG_LEVEL="${KUBELET_TEST_LOG_LEVEL:-"--v=2"}"

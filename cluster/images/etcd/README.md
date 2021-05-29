@@ -26,7 +26,7 @@ server.
 
 `migrate` writes a `version.txt` file to track the "current" version
 of etcd that was used to persist data to disk. A "target" version may also be provided
-by the `TARGET_STORAGE` (e.g. "etcd3") and `TARGET_VERSION` (e.g. "3.3.10" )
+by the `TARGET_STORAGE` (e.g. "etcd3") and `TARGET_VERSION` (e.g. "3.4.13" )
 environment variables. If the persisted version differs from the target version,
 `migrate-if-needed.sh` will migrate the data from the current to the target
 version.
@@ -34,7 +34,7 @@ version.
 Upgrades to any target version are supported. The data will be automatically upgraded
 in steps to each minor version until the target version is reached.
 
-Downgrades to the previous minor version of the 3.x series and from 3.0 to 2.3.7 are supported.
+Downgrades to the previous minor version of the 3.x series is supported.
 
 #### Permissions
 
@@ -73,6 +73,3 @@ $ make build ARCH=ppc64le
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/etcd/README.md?pixel)]()

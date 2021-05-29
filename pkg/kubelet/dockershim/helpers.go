@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,23 +19,26 @@ limitations under the License.
 package dockershim
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerfilters "github.com/docker/docker/api/types/filters"
 	dockernat "github.com/docker/go-connections/nat"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
@@ -43,13 +48,13 @@ const (
 )
 
 var (
-	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container ([0-9a-z]+)`)
+	conflictRE = regexp.MustCompile(`Conflict. (?:.)+ is already in use by container \"?([0-9a-z]+)\"?`)
 
 	// this is hacky, but extremely common.
 	// if a container starts but the executable file is not found, runc gives a message that matches
 	startRE = regexp.MustCompile(`\\\\\\\"(.*)\\\\\\\": executable file not found`)
 
-	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
+	defaultSeccompOpt = []dockerOpt{{"seccomp", v1.SeccompProfileNameUnconfined, ""}}
 )
 
 // generateEnvList converts KeyValue list to a list of strings, in the form of
@@ -142,7 +147,7 @@ func generateMountBindings(mounts []*runtimeapi.Mount) []string {
 		case runtimeapi.MountPropagation_PROPAGATION_HOST_TO_CONTAINER:
 			attrs = append(attrs, "rslave")
 		default:
-			klog.Warningf("unknown propagation mode for hostPath %q", m.HostPath)
+			klog.InfoS("Unknown propagation mode for hostPath", "path", m.HostPath)
 			// Falls back to "private"
 		}
 
@@ -175,7 +180,7 @@ func makePortsAndBindings(pm []*runtimeapi.PortMapping) (dockernat.PortSet, map[
 		case runtimeapi.Protocol_SCTP:
 			protocol = "/sctp"
 		default:
-			klog.Warningf("Unknown protocol %q: defaulting to TCP", port.Protocol)
+			klog.InfoS("Unknown protocol, defaulting to TCP", "protocol", port.Protocol)
 			protocol = "/tcp"
 		}
 
@@ -283,21 +288,21 @@ func recoverFromCreationConflictIfNeeded(client libdocker.Interface, createConfi
 	}
 
 	id := matches[1]
-	klog.Warningf("Unable to create pod sandbox due to conflict. Attempting to remove sandbox %q", id)
-	if rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true}); rmErr == nil {
-		klog.V(2).Infof("Successfully removed conflicting container %q", id)
+	klog.InfoS("Unable to create pod sandbox due to conflict. Attempting to remove sandbox", "containerID", id)
+	rmErr := client.RemoveContainer(id, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+	if rmErr == nil {
+		klog.V(2).InfoS("Successfully removed conflicting container", "containerID", id)
 		return nil, err
-	} else {
-		klog.Errorf("Failed to remove the conflicting container %q: %v", id, rmErr)
-		// Return if the error is not container not found error.
-		if !libdocker.IsContainerNotFoundError(rmErr) {
-			return nil, err
-		}
+	}
+	klog.ErrorS(rmErr, "Failed to remove the conflicting container", "containerID", id)
+	// Return if the error is not container not found error.
+	if !libdocker.IsContainerNotFoundError(rmErr) {
+		return nil, err
 	}
 
 	// randomize the name to avoid conflict.
 	createConfig.Name = randomizeName(createConfig.Name)
-	klog.V(2).Infof("Create the container with randomized name %s", createConfig.Name)
+	klog.V(2).InfoS("Create the container with the randomized name", "containerName", createConfig.Name)
 	return client.CreateContainer(createConfig)
 }
 
@@ -332,7 +337,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 	keyring := credentialprovider.NewDockerKeyring()
 	creds, withCredentials := keyring.Lookup(repoToPull)
 	if !withCredentials {
-		klog.V(3).Infof("Pulling image %q without credentials", image)
+		klog.V(3).InfoS("Pulling the image without credentials", "image", image)
 
 		err := client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
 		if err != nil {
@@ -344,7 +349,7 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 
 	var pullErrs []error
 	for _, currentCreds := range creds {
-		authConfig := dockertypes.AuthConfig(credentialprovider.LazyProvide(currentCreds))
+		authConfig := dockertypes.AuthConfig(currentCreds)
 		err := client.PullImage(image, authConfig, dockertypes.ImagePullOptions{})
 		// If there was no error, return success
 		if err == nil {
@@ -358,18 +363,18 @@ func ensureSandboxImageExists(client libdocker.Interface, image string) error {
 }
 
 func getAppArmorOpts(profile string) ([]dockerOpt, error) {
-	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
+	if profile == "" || profile == v1.AppArmorBetaProfileRuntimeDefault {
 		// The docker applies the default profile by default.
 		return nil, nil
 	}
 
 	// Return unconfined profile explicitly
-	if profile == apparmor.ProfileNameUnconfined {
-		return []dockerOpt{{"apparmor", apparmor.ProfileNameUnconfined, ""}}, nil
+	if profile == v1.AppArmorBetaProfileNameUnconfined {
+		return []dockerOpt{{"apparmor", v1.AppArmorBetaProfileNameUnconfined, ""}}, nil
 	}
 
 	// Assume validation has already happened.
-	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	profileName := strings.TrimPrefix(profile, v1.AppArmorBetaProfileNamePrefix)
 	return []dockerOpt{{"apparmor", profileName, ""}}, nil
 }
 
@@ -393,3 +398,44 @@ type dockerOpt struct {
 func (d dockerOpt) GetKV() (string, string) {
 	return d.key, d.value
 }
+
+// sharedWriteLimiter limits the total output written across one or more streams.
+type sharedWriteLimiter struct {
+	delegate io.Writer
+	limit    *int64
+}
+
+func (w sharedWriteLimiter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+	limit := atomic.LoadInt64(w.limit)
+	if limit <= 0 {
+		return 0, errMaximumWrite
+	}
+	var truncated bool
+	if limit < int64(len(p)) {
+		p = p[0:limit]
+		truncated = true
+	}
+	n, err := w.delegate.Write(p)
+	if n > 0 {
+		atomic.AddInt64(w.limit, -1*int64(n))
+	}
+	if err == nil && truncated {
+		err = errMaximumWrite
+	}
+	return n, err
+}
+
+func sharedLimitWriter(w io.Writer, limit *int64) io.Writer {
+	if w == nil {
+		return nil
+	}
+	return &sharedWriteLimiter{
+		delegate: w,
+		limit:    limit,
+	}
+}
+
+var errMaximumWrite = errors.New("maximum write")

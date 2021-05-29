@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -22,9 +22,9 @@ import (
 	"context"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/winstats"
 )
 
@@ -32,14 +32,14 @@ import (
 func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
 	info, err := ds.client.Info()
 	if err != nil {
-		klog.Errorf("Failed to get docker info: %v", err)
+		klog.ErrorS(err, "Failed to get docker info")
 		return nil, err
 	}
 
 	statsClient := &winstats.StatsClient{}
 	fsinfo, err := statsClient.GetDirFsInfo(info.DockerRootDir)
 	if err != nil {
-		klog.Errorf("Failed to get dir fsInfo for %q: %v", info.DockerRootDir, err)
+		klog.ErrorS(err, "Failed to get fsInfo for dockerRootDir", "path", info.DockerRootDir)
 		return nil, err
 	}
 

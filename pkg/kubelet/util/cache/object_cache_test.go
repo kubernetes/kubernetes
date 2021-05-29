@@ -32,7 +32,7 @@ type testObject struct {
 
 // A fake objectCache for unit test.
 func NewFakeObjectCache(f func() (interface{}, error), ttl time.Duration, clock clock.Clock) *ObjectCache {
-	ttlPolicy := &expirationcache.TTLPolicy{Ttl: ttl, Clock: clock}
+	ttlPolicy := &expirationcache.TTLPolicy{TTL: ttl, Clock: clock}
 	deleteChan := make(chan string, 1)
 	return &ObjectCache{
 		updater: f,

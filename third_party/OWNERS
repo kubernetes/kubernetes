@@ -1,10 +1,12 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
+  - dims
   - lavalamp
   - smarterclayton
   - thockin
 approvers:
+  - dep-approvers
   - lavalamp
   - smarterclayton
   - thockin

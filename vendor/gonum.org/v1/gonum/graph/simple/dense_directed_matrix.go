@@ -9,7 +9,17 @@ import (
 
 	"gonum.org/v1/gonum/graph"
 	"gonum.org/v1/gonum/graph/internal/ordered"
+	"gonum.org/v1/gonum/graph/iterator"
 	"gonum.org/v1/gonum/mat"
+)
+
+var (
+	dm *DirectedMatrix
+
+	_ graph.Graph        = dm
+	_ graph.Directed     = dm
+	_ edgeSetter         = dm
+	_ weightedEdgeSetter = dm
 )
 
 // DirectedMatrix represents a directed graph using an adjacency
@@ -63,44 +73,14 @@ func NewDirectedMatrixFrom(nodes []graph.Node, init, self, absent float64) *Dire
 	return g
 }
 
-// Node returns the node in the graph with the given ID.
-func (g *DirectedMatrix) Node(id int64) graph.Node {
-	if !g.has(id) {
-		return nil
-	}
-	if g.nodes == nil {
-		return Node(id)
-	}
-	return g.nodes[id]
-}
-
-// Has returns whether the node exists within the graph.
-func (g *DirectedMatrix) Has(id int64) bool {
-	return g.has(id)
-}
-
-func (g *DirectedMatrix) has(id int64) bool {
-	r, _ := g.mat.Dims()
-	return 0 <= id && id < int64(r)
-}
-
-// Nodes returns all the nodes in the graph.
-func (g *DirectedMatrix) Nodes() []graph.Node {
-	if g.nodes != nil {
-		nodes := make([]graph.Node, len(g.nodes))
-		copy(nodes, g.nodes)
-		return nodes
-	}
-	r, _ := g.mat.Dims()
-	nodes := make([]graph.Node, r)
-	for i := 0; i < r; i++ {
-		nodes[i] = Node(i)
-	}
-	return nodes
+// Edge returns the edge from u to v if such an edge exists and nil otherwise.
+// The node v must be directly reachable from u as defined by the From method.
+func (g *DirectedMatrix) Edge(uid, vid int64) graph.Edge {
+	return g.WeightedEdge(uid, vid)
 }
 
 // Edges returns all the edges in the graph.
-func (g *DirectedMatrix) Edges() []graph.Edge {
+func (g *DirectedMatrix) Edges() graph.Edges {
 	var edges []graph.Edge
 	r, _ := g.mat.Dims()
 	for i := 0; i < r; i++ {
@@ -113,15 +93,18 @@ func (g *DirectedMatrix) Edges() []graph.Edge {
 			}
 		}
 	}
-	return edges
+	if len(edges) == 0 {
+		return graph.Empty
+	}
+	return iterator.NewOrderedEdges(edges)
 }
 
 // From returns all nodes in g that can be reached directly from n.
-func (g *DirectedMatrix) From(id int64) []graph.Node {
+func (g *DirectedMatrix) From(id int64) graph.Nodes {
 	if !g.has(id) {
-		return nil
+		return graph.Empty
 	}
-	var neighbors []graph.Node
+	var nodes []graph.Node
 	_, c := g.mat.Dims()
 	for j := 0; j < c; j++ {
 		if int64(j) == id {
@@ -129,29 +112,13 @@ func (g *DirectedMatrix) From(id int64) []graph.Node {
 		}
 		// id is not greater than maximum int by this point.
 		if !isSame(g.mat.At(int(id), j), g.absent) {
-			neighbors = append(neighbors, g.Node(int64(j)))
+			nodes = append(nodes, g.Node(int64(j)))
 		}
 	}
-	return neighbors
-}
-
-// To returns all nodes in g that can reach directly to n.
-func (g *DirectedMatrix) To(id int64) []graph.Node {
-	if !g.has(id) {
-		return nil
+	if len(nodes) == 0 {
+		return graph.Empty
 	}
-	var neighbors []graph.Node
-	r, _ := g.mat.Dims()
-	for i := 0; i < r; i++ {
-		if int64(i) == id {
-			continue
-		}
-		// id is not greater than maximum int by this point.
-		if !isSame(g.mat.At(i, int(id)), g.absent) {
-			neighbors = append(neighbors, g.Node(int64(i)))
-		}
-	}
-	return neighbors
+	return iterator.NewOrderedNodes(nodes)
 }
 
 // HasEdgeBetween returns whether an edge exists between nodes x and y without
@@ -167,22 +134,6 @@ func (g *DirectedMatrix) HasEdgeBetween(xid, yid int64) bool {
 	return xid != yid && (!isSame(g.mat.At(int(xid), int(yid)), g.absent) || !isSame(g.mat.At(int(yid), int(xid)), g.absent))
 }
 
-// Edge returns the edge from u to v if such an edge exists and nil otherwise.
-// The node v must be directly reachable from u as defined by the From method.
-func (g *DirectedMatrix) Edge(uid, vid int64) graph.Edge {
-	return g.WeightedEdge(uid, vid)
-}
-
-// WeightedEdge returns the weighted edge from u to v if such an edge exists and nil otherwise.
-// The node v must be directly reachable from u as defined by the From method.
-func (g *DirectedMatrix) WeightedEdge(uid, vid int64) graph.WeightedEdge {
-	if g.HasEdgeFromTo(uid, vid) {
-		// xid and yid are not greater than maximum int by this point.
-		return WeightedEdge{F: g.Node(uid), T: g.Node(vid), W: g.mat.At(int(uid), int(vid))}
-	}
-	return nil
-}
-
 // HasEdgeFromTo returns whether an edge exists in the graph from u to v.
 func (g *DirectedMatrix) HasEdgeFromTo(uid, vid int64) bool {
 	if !g.has(uid) {
@@ -195,47 +146,37 @@ func (g *DirectedMatrix) HasEdgeFromTo(uid, vid int64) bool {
 	return uid != vid && !isSame(g.mat.At(int(uid), int(vid)), g.absent)
 }
 
-// Weight returns the weight for the edge between x and y if Edge(x, y) returns a non-nil Edge.
-// If x and y are the same node or there is no joining edge between the two nodes the weight
-// value returned is either the graph's absent or self value. Weight returns true if an edge
-// exists between x and y or if x and y have the same ID, false otherwise.
-func (g *DirectedMatrix) Weight(xid, yid int64) (w float64, ok bool) {
-	if xid == yid {
-		return g.self, true
-	}
-	if g.has(xid) && g.has(yid) {
-		// xid and yid are not greater than maximum int by this point.
-		return g.mat.At(int(xid), int(yid)), true
-	}
-	return g.absent, false
+// Matrix returns the mat.Matrix representation of the graph. The orientation
+// of the matrix is such that the matrix entry at G_{ij} is the weight of the edge
+// from node i to node j.
+func (g *DirectedMatrix) Matrix() mat.Matrix {
+	// Prevent alteration of dimensions of the returned matrix.
+	m := *g.mat
+	return &m
 }
 
-// SetEdge sets e, an edge from one node to another with unit weight. If the ends of the edge
-// are not in g or the edge is a self loop, SetEdge panics.
-func (g *DirectedMatrix) SetEdge(e graph.Edge) {
-	g.setWeightedEdge(e, 1)
+// Node returns the node with the given ID if it exists in the graph,
+// and nil otherwise.
+func (g *DirectedMatrix) Node(id int64) graph.Node {
+	if !g.has(id) {
+		return nil
+	}
+	if g.nodes == nil {
+		return Node(id)
+	}
+	return g.nodes[id]
 }
 
-// SetWeightedEdge sets e, an edge from one node to another. If the ends of the edge are not in g
-// or the edge is a self loop, SetWeightedEdge panics.
-func (g *DirectedMatrix) SetWeightedEdge(e graph.WeightedEdge) {
-	g.setWeightedEdge(e, e.Weight())
-}
-
-func (g *DirectedMatrix) setWeightedEdge(e graph.Edge, weight float64) {
-	fid := e.From().ID()
-	tid := e.To().ID()
-	if fid == tid {
-		panic("simple: set illegal edge")
+// Nodes returns all the nodes in the graph.
+func (g *DirectedMatrix) Nodes() graph.Nodes {
+	if g.nodes != nil {
+		nodes := make([]graph.Node, len(g.nodes))
+		copy(nodes, g.nodes)
+		return iterator.NewOrderedNodes(nodes)
 	}
-	if int64(int(fid)) != fid {
-		panic("simple: unavailable from node ID for dense graph")
-	}
-	if int64(int(tid)) != tid {
-		panic("simple: unavailable to node ID for dense graph")
-	}
-	// fid and tid are not greater than maximum int by this point.
-	g.mat.Set(int(fid), int(tid), weight)
+	r, _ := g.mat.Dims()
+	// Matrix graphs must have at least one node.
+	return iterator.NewImplicitNodes(0, r, newSimpleNode)
 }
 
 // RemoveEdge removes the edge with the given end point nodes from the graph, leaving the terminal
@@ -251,39 +192,110 @@ func (g *DirectedMatrix) RemoveEdge(fid, tid int64) {
 	g.mat.Set(int(fid), int(tid), g.absent)
 }
 
-// Degree returns the in+out degree of n in g.
-func (g *DirectedMatrix) Degree(id int64) int {
-	if !g.has(id) {
-		return 0
+// SetEdge sets e, an edge from one node to another with unit weight. If the ends of the edge
+// are not in g or the edge is a self loop, SetEdge panics. SetEdge will store the nodes of
+// e in the graph if it was initialized with NewDirectedMatrixFrom.
+func (g *DirectedMatrix) SetEdge(e graph.Edge) {
+	g.setWeightedEdge(e, 1)
+}
+
+// SetWeightedEdge sets e, an edge from one node to another. If the ends of the edge are not in g
+// or the edge is a self loop, SetWeightedEdge panics. SetWeightedEdge will store the nodes of
+// e in the graph if it was initialized with NewDirectedMatrixFrom.
+func (g *DirectedMatrix) SetWeightedEdge(e graph.WeightedEdge) {
+	g.setWeightedEdge(e, e.Weight())
+}
+
+func (g *DirectedMatrix) setWeightedEdge(e graph.Edge, weight float64) {
+	from := e.From()
+	fid := from.ID()
+	to := e.To()
+	tid := to.ID()
+	if fid == tid {
+		panic("simple: set illegal edge")
 	}
-	var deg int
-	r, c := g.mat.Dims()
+	if int64(int(fid)) != fid {
+		panic("simple: unavailable from node ID for dense graph")
+	}
+	if int64(int(tid)) != tid {
+		panic("simple: unavailable to node ID for dense graph")
+	}
+	if g.nodes != nil {
+		g.nodes[fid] = from
+		g.nodes[tid] = to
+	}
+	// fid and tid are not greater than maximum int by this point.
+	g.mat.Set(int(fid), int(tid), weight)
+}
+
+// To returns all nodes in g that can reach directly to n.
+func (g *DirectedMatrix) To(id int64) graph.Nodes {
+	if !g.has(id) {
+		return graph.Empty
+	}
+	var nodes []graph.Node
+	r, _ := g.mat.Dims()
 	for i := 0; i < r; i++ {
 		if int64(i) == id {
 			continue
 		}
 		// id is not greater than maximum int by this point.
-		if !isSame(g.mat.At(int(id), i), g.absent) {
-			deg++
-		}
-	}
-	for i := 0; i < c; i++ {
-		if int64(i) == id {
-			continue
-		}
-		// id is not greater than maximum int by this point.
 		if !isSame(g.mat.At(i, int(id)), g.absent) {
-			deg++
+			nodes = append(nodes, g.Node(int64(i)))
 		}
 	}
-	return deg
+	if len(nodes) == 0 {
+		return graph.Empty
+	}
+	return iterator.NewOrderedNodes(nodes)
 }
 
-// Matrix returns the mat.Matrix representation of the graph. The orientation
-// of the matrix is such that the matrix entry at G_{ij} is the weight of the edge
-// from node i to node j.
-func (g *DirectedMatrix) Matrix() mat.Matrix {
-	// Prevent alteration of dimensions of the returned matrix.
-	m := *g.mat
-	return &m
+// Weight returns the weight for the edge between x and y if Edge(x, y) returns a non-nil Edge.
+// If x and y are the same node or there is no joining edge between the two nodes the weight
+// value returned is either the graph's absent or self value. Weight returns true if an edge
+// exists between x and y or if x and y have the same ID, false otherwise.
+func (g *DirectedMatrix) Weight(xid, yid int64) (w float64, ok bool) {
+	if xid == yid {
+		return g.self, true
+	}
+	if g.HasEdgeFromTo(xid, yid) {
+		// xid and yid are not greater than maximum int by this point.
+		return g.mat.At(int(xid), int(yid)), true
+	}
+	return g.absent, false
+}
+
+// WeightedEdge returns the weighted edge from u to v if such an edge exists and nil otherwise.
+// The node v must be directly reachable from u as defined by the From method.
+func (g *DirectedMatrix) WeightedEdge(uid, vid int64) graph.WeightedEdge {
+	if g.HasEdgeFromTo(uid, vid) {
+		// xid and yid are not greater than maximum int by this point.
+		return WeightedEdge{F: g.Node(uid), T: g.Node(vid), W: g.mat.At(int(uid), int(vid))}
+	}
+	return nil
+}
+
+// WeightedEdges returns all the edges in the graph.
+func (g *DirectedMatrix) WeightedEdges() graph.WeightedEdges {
+	var edges []graph.WeightedEdge
+	r, _ := g.mat.Dims()
+	for i := 0; i < r; i++ {
+		for j := 0; j < r; j++ {
+			if i == j {
+				continue
+			}
+			if w := g.mat.At(i, j); !isSame(w, g.absent) {
+				edges = append(edges, WeightedEdge{F: g.Node(int64(i)), T: g.Node(int64(j)), W: w})
+			}
+		}
+	}
+	if len(edges) == 0 {
+		return graph.Empty
+	}
+	return iterator.NewOrderedWeightedEdges(edges)
+}
+
+func (g *DirectedMatrix) has(id int64) bool {
+	r, _ := g.mat.Dims()
+	return 0 <= id && id < int64(r)
 }

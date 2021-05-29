@@ -17,12 +17,15 @@ limitations under the License.
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.13
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // RuntimeClass defines a class of container runtime supported in the cluster.
 // The RuntimeClass is used to determine which container runtime is used to run
@@ -30,10 +33,10 @@ import (
 // user or cluster provisioner, and referenced in the PodSpec. The Kubelet is
 // responsible for resolving the RuntimeClassName reference before running the
 // pod.  For more details, see
-// https://git.k8s.io/enhancements/keps/sig-node/runtime-class.md
+// https://git.k8s.io/enhancements/keps/sig-node/585-runtime-class
 type RuntimeClass struct {
 	metav1.TypeMeta `json:",inline"`
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -45,18 +48,61 @@ type RuntimeClass struct {
 	// For example, a handler called "runc" might specify that the runc OCI
 	// runtime (using native Linux containers) will be used to run the containers
 	// in a pod.
-	// The Handler must conform to the DNS Label (RFC 1123) requirements, and is
-	// immutable.
+	// The Handler must be lowercase, conform to the DNS Label (RFC 1123) requirements,
+	// and is immutable.
 	Handler string `json:"handler" protobuf:"bytes,2,opt,name=handler"`
+
+	// Overhead represents the resource overhead associated with running a pod for a
+	// given RuntimeClass. For more details, see
+	// https://git.k8s.io/enhancements/keps/sig-node/688-pod-overhead/README.md
+	// This field is beta-level as of Kubernetes v1.18, and is only honored by servers that enable the PodOverhead feature.
+	// +optional
+	Overhead *Overhead `json:"overhead,omitempty" protobuf:"bytes,3,opt,name=overhead"`
+
+	// Scheduling holds the scheduling constraints to ensure that pods running
+	// with this RuntimeClass are scheduled to nodes that support it.
+	// If scheduling is nil, this RuntimeClass is assumed to be supported by all
+	// nodes.
+	// +optional
+	Scheduling *Scheduling `json:"scheduling,omitempty" protobuf:"bytes,4,opt,name=scheduling"`
+}
+
+// Overhead structure represents the resource overhead associated with running a pod.
+type Overhead struct {
+	// PodFixed represents the fixed resource overhead associated with running a pod.
+	// +optional
+	PodFixed corev1.ResourceList `json:"podFixed,omitempty" protobuf:"bytes,1,opt,name=podFixed,casttype=k8s.io/api/core/v1.ResourceList,castkey=k8s.io/api/core/v1.ResourceName,castvalue=k8s.io/apimachinery/pkg/api/resource.Quantity"`
+}
+
+// Scheduling specifies the scheduling constraints for nodes supporting a
+// RuntimeClass.
+type Scheduling struct {
+	// nodeSelector lists labels that must be present on nodes that support this
+	// RuntimeClass. Pods using this RuntimeClass can only be scheduled to a
+	// node matched by this selector. The RuntimeClass nodeSelector is merged
+	// with a pod's existing nodeSelector. Any conflicts will cause the pod to
+	// be rejected in admission.
+	// +optional
+	// +mapType=atomic
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" protobuf:"bytes,1,opt,name=nodeSelector"`
+
+	// tolerations are appended (excluding duplicates) to pods running with this
+	// RuntimeClass during admission, effectively unioning the set of nodes
+	// tolerated by the pod and the RuntimeClass.
+	// +optional
+	// +listType=atomic
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty" protobuf:"bytes,2,rep,name=tolerations"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.13
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // RuntimeClassList is a list of RuntimeClass objects.
 type RuntimeClassList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

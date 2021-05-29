@@ -27,7 +27,7 @@ if kube::test::if_supports_resource "${replicasets}" ; then
 fi
 ```
 
-Be sure to validate any supported resouces required for the test by using the `kube::test::if_supports_resource` function. 
+Be sure to validate any supported resources required for the test by using the `kube::test::if_supports_resource` function. 
 
 
 ### New File

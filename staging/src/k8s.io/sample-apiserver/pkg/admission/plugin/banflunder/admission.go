@@ -17,6 +17,7 @@ limitations under the License.
 package banflunder
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -37,6 +38,7 @@ func Register(plugins *admission.Plugins) {
 	})
 }
 
+// DisallowFlunder is a ban flunder admission plugin
 type DisallowFlunder struct {
 	*admission.Handler
 	lister listers.FischerLister
@@ -47,7 +49,7 @@ var _ = wardleinitializer.WantsInternalWardleInformerFactory(&DisallowFlunder{})
 // Admit ensures that the object in-flight is of kind Flunder.
 // In addition checks that the Name is not on the banned list.
 // The list is stored in Fischers API objects.
-func (d *DisallowFlunder) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (d *DisallowFlunder) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	// we are only interested in flunders
 	if a.GetKind().GroupKind() != wardle.Kind("Flunder") {
 		return nil

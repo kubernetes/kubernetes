@@ -71,12 +71,14 @@ func (f AttrFunc) WithFieldMutation(fieldMutator FieldMutationFunc) AttrFunc {
 
 // SelectionPredicate is used to represent the way to select objects from api storage.
 type SelectionPredicate struct {
-	Label       labels.Selector
-	Field       fields.Selector
-	GetAttrs    AttrFunc
-	IndexFields []string
-	Limit       int64
-	Continue    string
+	Label               labels.Selector
+	Field               fields.Selector
+	GetAttrs            AttrFunc
+	IndexLabels         []string
+	IndexFields         []string
+	Limit               int64
+	Continue            string
+	AllowWatchBookmarks bool
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -123,21 +125,35 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 	return "", false
 }
 
+// Empty returns true if the predicate performs no filtering.
+func (s *SelectionPredicate) Empty() bool {
+	return s.Label.Empty() && s.Field.Empty()
+}
+
 // For any index defined by IndexFields, if a matcher can match only (a subset)
 // of objects that return <value> for a given index, a pair (<index name>, <value>)
 // wil be returned.
-// TODO: Consider supporting also labels.
 func (s *SelectionPredicate) MatcherIndex() []MatchValue {
 	var result []MatchValue
 	for _, field := range s.IndexFields {
 		if value, ok := s.Field.RequiresExactMatch(field); ok {
-			result = append(result, MatchValue{IndexName: field, Value: value})
+			result = append(result, MatchValue{IndexName: FieldIndex(field), Value: value})
+		}
+	}
+	for _, label := range s.IndexLabels {
+		if value, ok := s.Label.RequiresExactMatch(label); ok {
+			result = append(result, MatchValue{IndexName: LabelIndex(label), Value: value})
 		}
 	}
 	return result
 }
 
-// Empty returns true if the predicate performs no filtering.
-func (s *SelectionPredicate) Empty() bool {
-	return s.Label.Empty() && s.Field.Empty()
+// LabelIndex add prefix for label index.
+func LabelIndex(label string) string {
+	return "l:" + label
+}
+
+// FiledIndex add prefix for field index.
+func FieldIndex(field string) string {
+	return "f:" + field
 }

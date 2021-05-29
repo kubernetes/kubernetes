@@ -58,14 +58,20 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over maxPerCore and min.
-	Max *int32
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
 	MaxPerCore *int32
@@ -87,7 +93,7 @@ type KubeProxyWinkernelConfiguration struct {
 	// networkName is the name of the network kube-proxy will use
 	// to create endpoints and policies
 	NetworkName string
-	// sourceVip is the IP address of the source VIP endoint used for
+	// sourceVip is the IP address of the source VIP endpoint used for
 	// NAT when loadbalancing
 	SourceVip string
 	// enableDSR tells kube-proxy whether HNS policies should be created
@@ -114,6 +120,8 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string
+	// BindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
+	BindAddressHardFail bool
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool
@@ -138,9 +146,6 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string
-	// resourceContainer is the absolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout metav1.Duration
@@ -159,10 +164,15 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode
 }
 
-// Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
-// (newer, faster), 'ipvs'(newest, better in performance and scalability).
+// ProxyMode represents modes used by the Kubernetes proxy server. Currently, three modes of proxy are available in
+// Linux platform: 'userspace' (older, going to be EOL), 'iptables' (newer, faster), 'ipvs'(newest, better in performance
+// and scalability).
 //
 // Two modes of proxy are available in Windows platform: 'userspace'(older, stable) and 'kernelspace' (newer, faster).
 //
@@ -170,7 +180,7 @@ type KubeProxyConfiguration struct {
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
-
+//
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
@@ -181,6 +191,15 @@ const (
 	ProxyModeIPTables    ProxyMode = "iptables"
 	ProxyModeIPVS        ProxyMode = "ipvs"
 	ProxyModeKernelspace ProxyMode = "kernelspace"
+)
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string
+
+// Currently supported modes for LocalMode
+const (
+	LocalModeClusterCIDR LocalMode = "ClusterCIDR"
+	LocalModeNodeCIDR    LocalMode = "NodeCIDR"
 )
 
 // IPVSSchedulerMethod is the algorithm for allocating TCP connections and
@@ -239,6 +258,22 @@ func (m *ProxyMode) String() string {
 
 func (m *ProxyMode) Type() string {
 	return "ProxyMode"
+}
+
+func (m *LocalMode) Set(s string) error {
+	*m = LocalMode(s)
+	return nil
+}
+
+func (m *LocalMode) String() string {
+	if m != nil {
+		return string(*m)
+	}
+	return ""
+}
+
+func (m *LocalMode) Type() string {
+	return "LocalMode"
 }
 
 type ConfigurationMap map[string]string

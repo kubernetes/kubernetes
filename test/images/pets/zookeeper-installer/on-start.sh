@@ -36,7 +36,7 @@ MY_ID_FILE=/tmp/zookeeper/myid
 HOSTNAME=$(hostname)
 
 while read -ra LINE; do
-    PEERS=("${PEERS[@]}" $LINE)
+    PEERS=("${PEERS[@]}" "${LINE[0]}")
 done
 
 # Don't add the first member as an observer
@@ -56,11 +56,11 @@ echo "" > "${CFG_BAK}"
 i=0
 LEADER=$HOSTNAME
 for peer in "${PEERS[@]}"; do
-    let i=i+1
+    (( i=i+1 ))
     if [[ "${peer}" == *"${HOSTNAME}"* ]]; then
       MY_ID=$i
       MY_NAME=${peer}
-      echo $i > "${MY_ID_FILE}"
+      echo "$i" > "${MY_ID_FILE}"
       echo "server.${i}=${peer}:2888:3888:observer;2181" >> "${CFG_BAK}"
     else
       if [[ $(echo srvr | /opt/nc "${peer}" 2181 | grep Mode) = "Mode: leader" ]]; then
@@ -94,11 +94,11 @@ ADD_SERVER="server.$MY_ID=$MY_NAME:2888:3888:participant;0.0.0.0:2181"
 
 # Prove that we've actually joined the running cluster
 ITERATION=0
-until $(echo config | /opt/nc localhost 2181 | grep "${ADD_SERVER}" > /dev/null); do
-  echo $ITERATION] waiting for updated config to sync back to localhost
+until echo config | /opt/nc localhost 2181 | grep "${ADD_SERVER}" > /dev/null; do
+  echo "$ITERATION"] waiting for updated config to sync back to localhost
   sleep 1
-  let ITERATION=ITERATION+1
-  if [ $ITERATION -eq 20 ]; then
+  (( ITERATION=ITERATION+1 ))
+  if [ "$ITERATION" -eq 20 ]; then
     exit 1
   fi
 done

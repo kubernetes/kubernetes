@@ -23,9 +23,14 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestInstallHandler(t *testing.T) {
@@ -89,29 +94,29 @@ func TestInstallPathHandler(t *testing.T) {
 
 }
 
-func testMultipleChecks(path string, t *testing.T) {
+func testMultipleChecks(path, name string, t *testing.T) {
 	tests := []struct {
 		path             string
 		expectedResponse string
 		expectedStatus   int
 		addBadCheck      bool
 	}{
-		{"?verbose", "[+]ping ok\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n%s check passed\n", name), http.StatusOK, false},
 		{"?exclude=dontexist", "ok", http.StatusOK, false},
 		{"?exclude=bad", "ok", http.StatusOK, true},
-		{"?verbose=true&exclude=bad", "[+]ping ok\n[+]bad excluded: ok\nhealthz check passed\n", http.StatusOK, true},
-		{"?verbose=true&exclude=dontexist", "[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\nhealthz check passed\n", http.StatusOK, false},
+		{"?verbose=true&exclude=bad", fmt.Sprintf("[+]ping ok\n[+]bad excluded: ok\n%s check passed\n", name), http.StatusOK, true},
+		{"?verbose=true&exclude=dontexist", fmt.Sprintf("[+]ping ok\nwarn: some health checks cannot be excluded: no matches for \"dontexist\"\n%s check passed\n", name), http.StatusOK, false},
 		{"/ping", "ok", http.StatusOK, false},
 		{"", "ok", http.StatusOK, false},
-		{"?verbose", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 		{"/ping", "ok", http.StatusOK, true},
 		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
-		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"", fmt.Sprintf("[+]ping ok\n[-]bad failed: reason withheld\n%s check failed\n", name), http.StatusInternalServerError, true},
 	}
 
 	for i, test := range tests {
 		mux := http.NewServeMux()
-		checks := []HealthzChecker{PingHealthz}
+		checks := []HealthChecker{PingHealthz}
 		if test.addBadCheck {
 			checks = append(checks, NamedCheck("bad", func(_ *http.Request) error {
 				return errors.New("this will fail")
@@ -143,11 +148,11 @@ func testMultipleChecks(path string, t *testing.T) {
 }
 
 func TestMultipleChecks(t *testing.T) {
-	testMultipleChecks("", t)
+	testMultipleChecks("", "healthz", t)
 }
 
 func TestMultiplePathChecks(t *testing.T) {
-	testMultipleChecks("/ready", t)
+	testMultipleChecks("/ready", "ready", t)
 }
 
 func TestCheckerNames(t *testing.T) {
@@ -158,14 +163,14 @@ func TestCheckerNames(t *testing.T) {
 
 	testCases := []struct {
 		desc string
-		have []HealthzChecker
+		have []HealthChecker
 		want []string
 	}{
-		{"no checker", []HealthzChecker{}, []string{}},
-		{"one checker", []HealthzChecker{c1}, []string{n1}},
-		{"other checker", []HealthzChecker{c2}, []string{n2}},
-		{"checker order", []HealthzChecker{c1, c2}, []string{n1, n2}},
-		{"different checker order", []HealthzChecker{c2, c1}, []string{n2, n1}},
+		{"no checker", []HealthChecker{}, []string{}},
+		{"one checker", []HealthChecker{c1}, []string{n1}},
+		{"other checker", []HealthChecker{c2}, []string{n2}},
+		{"checker order", []HealthChecker{c1, c2}, []string{n1, n2}},
+		{"different checker order", []HealthChecker{c2, c1}, []string{n2, n1}},
 	}
 
 	for _, tc := range testCases {
@@ -202,9 +207,6 @@ func TestFormatQuoted(t *testing.T) {
 }
 
 func TestGetExcludedChecks(t *testing.T) {
-	type args struct {
-		r *http.Request
-	}
 	tests := []struct {
 		name string
 		r    *http.Request
@@ -232,6 +234,35 @@ func TestGetExcludedChecks(t *testing.T) {
 	}
 }
 
+func TestMetrics(t *testing.T) {
+	mux := http.NewServeMux()
+	InstallHandler(mux)
+	InstallLivezHandler(mux)
+	InstallReadyzHandler(mux)
+	metrics.Register()
+	metrics.Reset()
+
+	paths := []string{"/healthz", "/livez", "/readyz"}
+	for _, path := range paths {
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s", path), nil)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+		mux.ServeHTTP(httptest.NewRecorder(), req)
+	}
+
+	expected := strings.NewReader(`
+        # HELP apiserver_request_total [STABLE] Counter of apiserver requests broken out for each verb, dry run value, group, version, resource, scope, component, and HTTP response code.
+        # TYPE apiserver_request_total counter
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/livez",verb="GET",version=""} 1
+        apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 1
+`)
+	if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, expected, "apiserver_request_total"); err != nil {
+		t.Error(err)
+	}
+}
+
 func createGetRequestWithUrl(rawUrlString string) *http.Request {
 	url, _ := url.Parse(rawUrlString)
 	return &http.Request{
@@ -239,4 +270,44 @@ func createGetRequestWithUrl(rawUrlString string) *http.Request {
 		Proto:  "HTTP/1.1",
 		URL:    url,
 	}
+}
+
+func TestInformerSyncHealthChecker(t *testing.T) {
+	t.Run("test that check returns nil when all informers are started", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}): true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err != nil {
+			t.Errorf("Got %v, expected no error", err)
+		}
+	})
+
+	t.Run("test that check returns err when there is not started informer", func(t *testing.T) {
+		healthChecker := NewInformerSyncHealthz(cacheSyncWaiterStub{
+			startedByInformerType: map[reflect.Type]bool{
+				reflect.TypeOf(corev1.Pod{}):     true,
+				reflect.TypeOf(corev1.Service{}): false,
+				reflect.TypeOf(corev1.Node{}):    true,
+			},
+		})
+
+		err := healthChecker.Check(nil)
+		if err == nil {
+			t.Errorf("expected error, got: %v", err)
+		}
+	})
+}
+
+type cacheSyncWaiterStub struct {
+	startedByInformerType map[reflect.Type]bool
+}
+
+// WaitForCacheSync is a stub implementation of the corresponding func
+// that simply returns the value passed during stub initialization.
+func (s cacheSyncWaiterStub) WaitForCacheSync(_ <-chan struct{}) map[reflect.Type]bool {
+	return s.startedByInformerType
 }

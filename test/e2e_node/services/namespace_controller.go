@@ -19,12 +19,13 @@ package services
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/client-go/dynamic"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -49,7 +50,13 @@ func NewNamespaceController(host string) *NamespaceController {
 
 // Start starts the namespace controller.
 func (n *NamespaceController) Start() error {
-	config := restclient.AddUserAgent(&restclient.Config{Host: n.host}, ncName)
+	config := restclient.AddUserAgent(&restclient.Config{
+		Host:        n.host,
+		BearerToken: framework.TestContext.BearerToken,
+		TLSClientConfig: restclient.TLSClientConfig{
+			Insecure: true,
+		},
+	}, ncName)
 
 	// the namespace cleanup controller is very chatty.  It makes lots of discovery calls and then it makes lots of delete calls.
 	config.QPS = 50
@@ -59,7 +66,7 @@ func (n *NamespaceController) Start() error {
 	if err != nil {
 		return err
 	}
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return err
 	}
@@ -67,7 +74,7 @@ func (n *NamespaceController) Start() error {
 	informerFactory := informers.NewSharedInformerFactory(client, ncResyncPeriod)
 	nc := namespacecontroller.NewNamespaceController(
 		client,
-		dynamicClient,
+		metadataClient,
 		discoverResourcesFn,
 		informerFactory.Core().V1().Namespaces(),
 		ncResyncPeriod, v1.FinalizerKubernetes,

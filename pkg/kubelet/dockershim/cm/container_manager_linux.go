@@ -1,4 +1,4 @@
-// +build linux
+// +build linux,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -25,32 +25,38 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	libcontainerdevices "github.com/opencontainers/runc/libcontainer/devices"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecm "k8s.io/kubernetes/pkg/kubelet/cm"
-	"k8s.io/kubernetes/pkg/kubelet/qos"
 
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
 const (
-	// The percent of the machine memory capacity.
-	dockerMemoryLimitThresholdPercent = kubecm.DockerMemoryLimitThresholdPercent
+	// The percent of the machine memory capacity. The value is used to calculate
+	// docker memory resource container's hardlimit to workaround docker memory
+	// leakage issue. Please see kubernetes/issues/9881 for more detail.
+	dockerMemoryLimitThresholdPercent = 70
 
-	// The minimum memory limit allocated to docker container.
-	minDockerMemoryLimit = kubecm.MinDockerMemoryLimit
+	// The minimum memory limit allocated to docker container: 150Mi
+	minDockerMemoryLimit = 150 * 1024 * 1024
 
-	// The Docker OOM score adjustment.
-	dockerOOMScoreAdj = qos.DockerOOMScoreAdj
+	// The OOM score adjustment for the docker process (i.e. the docker
+	// daemon). Essentially, makes docker very unlikely to experience an oom
+	// kill.
+	dockerOOMScoreAdj = -999
 )
 
 var (
 	memoryCapacityRegexp = regexp.MustCompile(`MemTotal:\s*([0-9]+) kB`)
 )
 
+// NewContainerManager creates a new instance of ContainerManager
 func NewContainerManager(cgroupsName string, client libdocker.Interface) ContainerManager {
 	return &containerManager{
 		cgroupsName: cgroupsName,
@@ -64,7 +70,7 @@ type containerManager struct {
 	// Name of the cgroups.
 	cgroupsName string
 	// Manager for the cgroups.
-	cgroupsManager *fs.Manager
+	cgroupsManager cgroups.Manager
 }
 
 func (m *containerManager) Start() error {
@@ -83,28 +89,28 @@ func (m *containerManager) Start() error {
 func (m *containerManager) doWork() {
 	v, err := m.client.Version()
 	if err != nil {
-		klog.Errorf("Unable to get docker version: %v", err)
+		klog.ErrorS(err, "Unable to get docker version")
 		return
 	}
 	version, err := utilversion.ParseGeneric(v.APIVersion)
 	if err != nil {
-		klog.Errorf("Unable to parse docker version %q: %v", v.APIVersion, err)
+		klog.ErrorS(err, "Unable to parse docker version", "dockerVersion", v.APIVersion)
 		return
 	}
 	// EnsureDockerInContainer does two things.
 	//   1. Ensure processes run in the cgroups if m.cgroupsManager is not nil.
 	//   2. Ensure processes have the OOM score applied.
 	if err := kubecm.EnsureDockerInContainer(version, dockerOOMScoreAdj, m.cgroupsManager); err != nil {
-		klog.Errorf("Unable to ensure the docker processes run in the desired containers: %v", err)
+		klog.ErrorS(err, "Unable to ensure the docker processes run in the desired containers")
 	}
 }
 
-func createCgroupManager(name string) (*fs.Manager, error) {
+func createCgroupManager(name string) (cgroups.Manager, error) {
 	var memoryLimit uint64
 
 	memoryCapacity, err := getMemoryCapacity()
 	if err != nil {
-		klog.Errorf("Failed to get the memory capacity on machine: %v", err)
+		klog.ErrorS(err, "Failed to get the memory capacity on machine")
 	} else {
 		memoryLimit = memoryCapacity * dockerMemoryLimitThresholdPercent / 100
 	}
@@ -112,21 +118,27 @@ func createCgroupManager(name string) (*fs.Manager, error) {
 	if err != nil || memoryLimit < minDockerMemoryLimit {
 		memoryLimit = minDockerMemoryLimit
 	}
-	klog.V(2).Infof("Configure resource-only container %q with memory limit: %d", name, memoryLimit)
+	klog.V(2).InfoS("Configure resource-only container with memory limit", "containerName", name, "memoryLimit", memoryLimit)
 
-	allowAllDevices := true
-	cm := &fs.Manager{
-		Cgroups: &configs.Cgroup{
-			Parent: "/",
-			Name:   name,
-			Resources: &configs.Resources{
-				Memory:          int64(memoryLimit),
-				MemorySwap:      -1,
-				AllowAllDevices: &allowAllDevices,
+	cg := &configs.Cgroup{
+		Parent: "/",
+		Name:   name,
+		Resources: &configs.Resources{
+			Memory:      int64(memoryLimit),
+			MemorySwap:  -1,
+			SkipDevices: true,
+			Devices: []*libcontainerdevices.Rule{
+				{
+					Minor:       libcontainerdevices.Wildcard,
+					Major:       libcontainerdevices.Wildcard,
+					Type:        'a',
+					Permissions: "rwm",
+					Allow:       true,
+				},
 			},
 		},
 	}
-	return cm, nil
+	return cgroupfs.NewManager(cg, nil, false), nil
 }
 
 // getMemoryCapacity returns the memory capacity on the machine in bytes.

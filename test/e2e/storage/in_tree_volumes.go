@@ -17,14 +17,15 @@ limitations under the License.
 package storage
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
+	storageframework "k8s.io/kubernetes/test/e2e/storage/framework"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 // List of testDrivers to be executed in below loop
-var testDrivers = []func() testsuites.TestDriver{
+var testDrivers = []func() storageframework.TestDriver{
 	drivers.InitNFSDriver,
 	drivers.InitGlusterFSDriver,
 	drivers.InitISCSIDriver,
@@ -35,8 +36,9 @@ var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitEmptydirDriver,
 	drivers.InitCinderDriver,
 	drivers.InitGcePdDriver,
+	drivers.InitWindowsGcePdDriver,
 	drivers.InitVSphereDriver,
-	drivers.InitAzureDriver,
+	drivers.InitAzureDiskDriver,
 	drivers.InitAwsDriver,
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectory),
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeDirectoryLink),
@@ -48,22 +50,13 @@ var testDrivers = []func() testsuites.TestDriver{
 	drivers.InitLocalDriverWithVolumeType(utils.LocalVolumeGCELocalSSD),
 }
 
-// List of testSuites to be executed in below loop
-var testSuites = []func() testsuites.TestSuite{
-	testsuites.InitVolumesTestSuite,
-	testsuites.InitVolumeIOTestSuite,
-	testsuites.InitVolumeModeTestSuite,
-	testsuites.InitSubPathTestSuite,
-	testsuites.InitProvisioningTestSuite,
-}
-
 // This executes testSuites for in-tree volumes.
 var _ = utils.SIGDescribe("In-tree Volumes", func() {
 	for _, initDriver := range testDrivers {
 		curDriver := initDriver()
 
-		Context(testsuites.GetDriverNameWithFeatureTags(curDriver), func() {
-			testsuites.DefineTestSuite(curDriver, testSuites)
+		ginkgo.Context(storageframework.GetDriverNameWithFeatureTags(curDriver), func() {
+			storageframework.DefineTestSuites(curDriver, testsuites.BaseSuites)
 		})
 	}
 })

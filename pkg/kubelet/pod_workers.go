@@ -25,14 +25,14 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 )
 
@@ -72,7 +72,7 @@ type UpdatePodOptions struct {
 // PodWorkers is an abstract interface for testability.
 type PodWorkers interface {
 	UpdatePod(options *UpdatePodOptions)
-	ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty)
+	ForgetNonExistingPodWorkers(desiredPods map[types.UID]sets.Empty)
 	ForgetWorker(uid types.UID)
 }
 
@@ -187,13 +187,13 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 		}
 		if err != nil {
 			// IMPORTANT: we do not log errors here, the syncPodFn is responsible for logging errors
-			klog.Errorf("Error syncing pod %s (%q), skipping: %v", update.Pod.UID, format.Pod(update.Pod), err)
+			klog.ErrorS(err, "Error syncing pod, skipping", "pod", klog.KObj(update.Pod), "podUID", update.Pod.UID)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}
 }
 
-// Apply the new setting to the specified pod.
+// UpdatePod apply the new setting to the specified pod.
 // If the options provide an OnCompleteFunc, the function is invoked if the update is accepted.
 // Update requests are ignored if a kill pod request is pending.
 func (p *podWorkers) UpdatePod(options *UpdatePodOptions) {
@@ -240,9 +240,7 @@ func (p *podWorkers) removeWorker(uid types.UID) {
 		// If there is an undelivered work update for this pod we need to remove it
 		// since per-pod goroutine won't be able to put it to the already closed
 		// channel when it finishes processing the current work update.
-		if _, cached := p.lastUndeliveredWorkUpdate[uid]; cached {
-			delete(p.lastUndeliveredWorkUpdate, uid)
-		}
+		delete(p.lastUndeliveredWorkUpdate, uid)
 	}
 }
 func (p *podWorkers) ForgetWorker(uid types.UID) {
@@ -251,7 +249,7 @@ func (p *podWorkers) ForgetWorker(uid types.UID) {
 	p.removeWorker(uid)
 }
 
-func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {
+func (p *podWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]sets.Empty) {
 	p.podLock.Lock()
 	defer p.podLock.Unlock()
 	for key := range p.podUpdates {

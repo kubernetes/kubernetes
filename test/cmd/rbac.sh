@@ -29,7 +29,21 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterroles/cluster-admin "{{.metadata.name}}" 'cluster-admin'
   kube::test::get_object_assert clusterrolebindings/cluster-admin "{{.metadata.name}}" 'cluster-admin'
 
+  # Pre-condition: no ClusterRole pod-admin exists
+  output_message=$(! kubectl get clusterrole pod-admin 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'clusterroles.rbac.authorization.k8s.io "pod-admin" not found'
+  # Dry-run test `kubectl create clusterrole`
+  kubectl create "${kube_flags[@]:?}" clusterrole pod-admin --dry-run=client --verb=* --resource=pods
+  kubectl create "${kube_flags[@]:?}" clusterrole pod-admin --dry-run=server --verb=* --resource=pods
+  output_message=$(! kubectl get clusterrole pod-admin 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'clusterroles.rbac.authorization.k8s.io "pod-admin" not found'
   # test `kubectl create clusterrole`
+  kubectl create "${kube_flags[@]:?}" clusterrole pod-admin --verb=* --resource=pods
+  kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
+  output_message=$(kubectl delete clusterrole pod-admin -n test 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'warning: deleting cluster-scoped resources'
+  kube::test::if_has_string "${output_message}" 'clusterrole.rbac.authorization.k8s.io "pod-admin" deleted'
+
   kubectl create "${kube_flags[@]}" clusterrole pod-admin --verb=* --resource=pods
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
   kube::test::get_object_assert clusterrole/pod-admin "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods:'
@@ -47,11 +61,22 @@ run_clusterroles_tests() {
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:'
   kube::test::get_object_assert clusterrole/url-reader "{{range.rules}}{{range.nonResourceURLs}}{{.}}:{{end}}{{end}}" '/logs/\*:/healthz/\*:'
   kubectl create "${kube_flags[@]}" clusterrole aggregation-reader --aggregation-rule="foo1=foo2"
-  kube::test::get_object_assert clusterrole/aggregation-reader "{{$id_field}}" 'aggregation-reader'
+  kube::test::get_object_assert clusterrole/aggregation-reader "{{${id_field:?}}}" 'aggregation-reader'
 
+  # Pre-condition: no ClusterRoleBinding super-admin exists
+  output_message=$(! kubectl get clusterrolebinding super-admin 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'clusterrolebindings.rbac.authorization.k8s.io "super-admin" not found'
+  # Dry-run test `kubectl create clusterrolebinding`
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=client --clusterrole=admin --user=super-admin
+  kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --dry-run=server --clusterrole=admin --user=super-admin
+  output_message=$(! kubectl get clusterrolebinding super-admin 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" 'clusterrolebindings.rbac.authorization.k8s.io "super-admin" not found'
   # test `kubectl create clusterrolebinding`
   # test `kubectl set subject clusterrolebinding`
   kubectl create "${kube_flags[@]}" clusterrolebinding super-admin --clusterrole=admin --user=super-admin
+  kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
+  kubectl set subject --dry-run=client "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
+  kubectl set subject --dry-run=server "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:'
   kubectl set subject "${kube_flags[@]}" clusterrolebinding super-admin --user=foo
   kube::test::get_object_assert clusterrolebinding/super-admin "{{range.subjects}}{{.name}}:{{end}}" 'super-admin:foo:'
@@ -80,6 +105,10 @@ run_clusterroles_tests() {
 
   # test `kubectl create rolebinding`
   # test `kubectl set subject rolebinding`
+  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=client --clusterrole=admin --user=default-admin
+  kubectl create "${kube_flags[@]}" rolebinding admin --dry-run=server --clusterrole=admin --user=default-admin
+  output_message=$(! kubectl get rolebinding/admin 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
   kubectl create "${kube_flags[@]}" rolebinding admin --clusterrole=admin --user=default-admin
   kube::test::get_object_assert rolebinding/admin "{{.roleRef.kind}}" 'ClusterRole'
   kube::test::get_object_assert rolebinding/admin "{{range.subjects}}{{.name}}:{{end}}" 'default-admin:'
@@ -105,6 +134,10 @@ run_clusterroles_tests() {
   kube::test::get_object_assert rolebinding/localrole "{{range.subjects}}{{.name}}:{{end}}" 'the-group:foo:test-all-user:'
   kube::test::get_object_assert rolebinding/sarole "{{range.subjects}}{{.name}}:{{end}}" 'sa-name:foo:test-all-user:'
 
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert clusterrolebindings
+  kube::test::describe_resource_chunk_size_assert clusterroles
+
   set +o nounset
   set +o errexit
 }
@@ -116,6 +149,11 @@ run_role_tests() {
   create_and_use_new_namespace
   kube::log::status "Testing role"
 
+  # Dry-run create
+  kubectl create "${kube_flags[@]}" role pod-admin --dry-run=client --verb=* --resource=pods
+  kubectl create "${kube_flags[@]}" role pod-admin --dry-run=server --verb=* --resource=pods
+  output_message=$(! kubectl get role/pod-admin 2>&1 "${kube_flags[@]}")
+  kube::test::if_has_string "${output_message}" ' not found'
   # Create Role from command (only resource)
   kubectl create "${kube_flags[@]}" role pod-admin --verb=* --resource=pods
   kube::test::get_object_assert role/pod-admin "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" '\*:'
@@ -153,6 +191,10 @@ run_role_tests() {
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.verbs}}{{.}}:{{end}}{{end}}" 'get:list:get:list:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.resources}}{{.}}:{{end}}{{end}}" 'pods/status:deployments:'
   kube::test::get_object_assert role/resource-reader "{{range.rules}}{{range.apiGroups}}{{.}}:{{end}}{{end}}" ':apps:'
+
+  # Describe command should respect the chunk size parameter
+  kube::test::describe_resource_chunk_size_assert roles
+  kube::test::describe_resource_chunk_size_assert rolebindings
 
   set +o nounset
   set +o errexit

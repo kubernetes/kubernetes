@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"strconv"
 	"strings"
@@ -29,7 +30,7 @@ import (
 
 // Quantity is a fixed-point representation of a number.
 // It provides convenient marshaling/unmarshaling in JSON and YAML,
-// in addition to String() and Int64() accessors.
+// in addition to String() and AsInt64() accessors.
 //
 // The serialization format is:
 //
@@ -120,7 +121,7 @@ const (
 )
 
 // MustParse turns the given string into a quantity or panics; for tests
-// or others cases where you know the string is valid.
+// or other cases where you know the string is valid.
 func MustParse(str string) Quantity {
 	q, err := ParseQuantity(str)
 	if err != nil {
@@ -442,6 +443,36 @@ func (q *Quantity) CanonicalizeBytes(out []byte) (result, suffix []byte) {
 	}
 }
 
+// AsApproximateFloat64 returns a float64 representation of the quantity which may
+// lose precision. If the value of the quantity is outside the range of a float64
+// +Inf/-Inf will be returned.
+func (q *Quantity) AsApproximateFloat64() float64 {
+	var base float64
+	var exponent int
+	if q.d.Dec != nil {
+		base, _ = big.NewFloat(0).SetInt(q.d.Dec.UnscaledBig()).Float64()
+		exponent = int(-q.d.Dec.Scale())
+	} else {
+		base = float64(q.i.value)
+		exponent = int(q.i.scale)
+	}
+	if exponent == 0 {
+		return base
+	}
+
+	// multiply by the appropriate exponential scale
+	switch q.Format {
+	case DecimalExponent, DecimalSI:
+		return base * math.Pow10(exponent)
+	default:
+		// fast path for exponents that can fit in 64 bits
+		if exponent > 0 && exponent < 7 {
+			return base * float64(int64(1)<<(exponent*10))
+		}
+		return base * math.Pow(2, float64(exponent*10))
+	}
+}
+
 // AsInt64 returns a representation of the current value as an int64 if a fast conversion
 // is possible. If false is returned, callers must use the inf.Dec form of this quantity.
 func (q *Quantity) AsInt64() (int64, bool) {
@@ -584,6 +615,12 @@ func (q *Quantity) Neg() {
 	q.d.Dec.Neg(q.d.Dec)
 }
 
+// Equal checks equality of two Quantities. This is useful for testing with
+// cmp.Equal.
+func (q Quantity) Equal(v Quantity) bool {
+	return q.Cmp(v) == 0
+}
+
 // int64QuantityExpectedBytes is the expected width in bytes of the canonical string representation
 // of most Quantity values.
 const int64QuantityExpectedBytes = 18
@@ -592,6 +629,9 @@ const int64QuantityExpectedBytes = 18
 // String is an expensive operation and caching this result significantly reduces the cost of
 // normal parse / marshal operations on Quantity.
 func (q *Quantity) String() string {
+	if q == nil {
+		return "<nil>"
+	}
 	if len(q.s) == 0 {
 		result := make([]byte, 0, int64QuantityExpectedBytes)
 		number, suffix := q.CanonicalizeBytes(result)
@@ -628,6 +668,11 @@ func (q Quantity) MarshalJSON() ([]byte, error) {
 	return result, nil
 }
 
+// ToUnstructured implements the value.UnstructuredConverter interface.
+func (q Quantity) ToUnstructured() interface{} {
+	return q.String()
+}
+
 // UnmarshalJSON implements the json.Unmarshaller interface.
 // TODO: Remove support for leading/trailing whitespace
 func (q *Quantity) UnmarshalJSON(value []byte) error {
@@ -649,6 +694,15 @@ func (q *Quantity) UnmarshalJSON(value []byte) error {
 	// This copy is safe because parsed will not be referred to again.
 	*q = parsed
 	return nil
+}
+
+// NewDecimalQuantity returns a new Quantity representing the given
+// value in the given format.
+func NewDecimalQuantity(b inf.Dec, format Format) *Quantity {
+	return &Quantity{
+		d:      infDecAmount{&b},
+		Format: format,
+	}
 }
 
 // NewQuantity returns a new Quantity representing the given
@@ -691,7 +745,9 @@ func (q *Quantity) MilliValue() int64 {
 	return q.ScaledValue(Milli)
 }
 
-// ScaledValue returns the value of ceil(q * 10^scale); this could overflow an int64.
+// ScaledValue returns the value of ceil(q / 10^scale).
+// For example, NewQuantity(1, DecimalSI).ScaledValue(Milli) returns 1000.
+// This could overflow an int64.
 // To detect overflow, call Value() first and verify the expected magnitude.
 func (q *Quantity) ScaledValue(scale Scale) int64 {
 	if q.d.Dec == nil {
@@ -717,22 +773,4 @@ func (q *Quantity) SetScaled(value int64, scale Scale) {
 	q.s = ""
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
-}
-
-// Copy is a convenience function that makes a deep copy for you. Non-deep
-// copies of quantities share pointers and you will regret that.
-func (q *Quantity) Copy() *Quantity {
-	if q.d.Dec == nil {
-		return &Quantity{
-			s:      q.s,
-			i:      q.i,
-			Format: q.Format,
-		}
-	}
-	tmp := &inf.Dec{}
-	return &Quantity{
-		s:      q.s,
-		d:      infDecAmount{tmp.Set(q.d.Dec)},
-		Format: q.Format,
-	}
 }

@@ -17,12 +17,14 @@ limitations under the License.
 package util
 
 import (
+	"errors"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"path"
 	"strings"
 	"testing"
+	"time"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
 func TestEmptyVersion(t *testing.T) {
@@ -50,7 +52,7 @@ func TestValidVersion(t *testing.T) {
 	}
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
-			ver, err := KubernetesReleaseVersion(s)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
 				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
@@ -72,7 +74,7 @@ func TestInvalidVersion(t *testing.T) {
 	}
 	for _, s := range invalidVersions {
 		t.Run(s, func(t *testing.T) {
-			ver, err := KubernetesReleaseVersion(s)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Invalid: ", s, ver, err)
 			if err == nil {
 				t.Errorf("KubernetesReleaseVersion error expected for version %q, but returned successfully", s)
@@ -92,7 +94,7 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 	}
 	for _, s := range validVersions {
 		t.Run(s, func(t *testing.T) {
-			ver, err := KubernetesReleaseVersion(s)
+			ver, err := kubernetesReleaseVersion(s, errorFetcher)
 			t.Log("Valid: ", s, ver, err)
 			if err != nil {
 				t.Errorf("KubernetesReleaseVersion unexpected error for version %q: %v", s, err)
@@ -106,37 +108,40 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 
 func TestVersionFromNetwork(t *testing.T) {
 	type T struct {
-		Content       string
-		Status        int
-		Expected      string
-		ErrorExpected bool
+		Content              string
+		Expected             string
+		FetcherErrorExpected bool
+		ErrorExpected        bool
 	}
-	cases := map[string]T{
-		"stable":     {"stable-1", http.StatusOK, "v1.4.6", false}, // recursive pointer to stable-1
-		"stable-1":   {"v1.4.6", http.StatusOK, "v1.4.6", false},
-		"stable-1.3": {"v1.3.10", http.StatusOK, "v1.3.10", false},
-		"latest":     {"v1.6.0-alpha.0", http.StatusOK, "v1.6.0-alpha.0", false},
-		"latest-1.3": {"v1.3.11-beta.0", http.StatusOK, "v1.3.11-beta.0", false},
-		"empty":      {"", http.StatusOK, "", true},
-		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", http.StatusOK, "", true},
-		"unknown":    {"The requested URL was not found on this server.", http.StatusNotFound, "", true},
-	}
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := strings.TrimSuffix(path.Base(r.URL.Path), ".txt")
-		res, found := cases[key]
-		if found {
-			http.Error(w, res.Content, res.Status)
-		} else {
-			http.Error(w, "Unknown test case key!", http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
 
-	kubeReleaseBucketURL = server.URL
+	currentVersion := normalizedBuildVersion(constants.CurrentKubernetesVersion.String())
+
+	cases := map[string]T{
+		"stable":          {"stable-1", "v1.4.6", false, false}, // recursive pointer to stable-1
+		"stable-1":        {"v1.4.6", "v1.4.6", false, false},
+		"stable-1.3":      {"v1.3.10", "v1.3.10", false, false},
+		"latest":          {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false, false},
+		"latest-1.3":      {"v1.3.11-beta.0", "v1.3.11-beta.0", false, false},
+		"latest-1.5":      {"", currentVersion, true, false}, // fallback to currentVersion on fetcher error
+		"invalid-version": {"", "", false, true},             // invalid version cannot be parsed
+	}
 
 	for k, v := range cases {
 		t.Run(k, func(t *testing.T) {
-			ver, err := KubernetesReleaseVersion(k)
+
+			fileFetcher := func(url string, timeout time.Duration) (string, error) {
+				key := strings.TrimSuffix(path.Base(url), ".txt")
+				res, found := cases[key]
+				if found {
+					if v.FetcherErrorExpected {
+						return "error", errors.New("expected error")
+					}
+					return res.Content, nil
+				}
+				return "Unknown test case key!", errors.New("unknown test case key")
+			}
+
+			ver, err := kubernetesReleaseVersion(k, fileFetcher)
 			t.Logf("Key: %q. Result: %q, Error: %v", k, ver, err)
 			switch {
 			case err != nil && !v.ErrorExpected:
@@ -190,19 +195,14 @@ func TestSplitVersion(t *testing.T) {
 		{"v1.8.0-alpha.2.1231+afabd012389d53a", "https://dl.k8s.io/release", "v1.8.0-alpha.2.1231+afabd012389d53a", true},
 		{"release/v1.7.0", "https://dl.k8s.io/release", "v1.7.0", true},
 		{"release/latest-1.7", "https://dl.k8s.io/release", "latest-1.7", true},
-		// CI builds area, lookup actual builds at ci-cross/*.txt
-		{"ci/latest", "https://dl.k8s.io/ci", "latest", true},
-		{"ci-cross/latest", "https://dl.k8s.io/ci-cross", "latest", true},
-		{"ci/latest-1.7", "https://dl.k8s.io/ci", "latest-1.7", true},
-		{"ci-cross/latest-1.7", "https://dl.k8s.io/ci-cross", "latest-1.7", true},
+		// CI builds area
+		{"ci/latest", "https://storage.googleapis.com/k8s-release-dev/ci", "latest", true},
+		{"ci/latest-1.7", "https://storage.googleapis.com/k8s-release-dev/ci", "latest-1.7", true},
 		// unknown label in default (release) area: splitVersion validate only areas.
 		{"unknown-1", "https://dl.k8s.io/release", "unknown-1", true},
 		// unknown area, not valid input.
 		{"unknown/latest-1", "", "", false},
 	}
-	// kubeReleaseBucketURL can be overridden during network tests, thus ensure
-	// it will contain value corresponding to expected outcome for this unit test
-	kubeReleaseBucketURL = "https://dl.k8s.io"
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/label:%s", tc.input, tc.label), func(t *testing.T) {
@@ -233,9 +233,7 @@ func TestKubernetesIsCIVersion(t *testing.T) {
 		{"release/v1.0.0", false},
 		// CI builds
 		{"ci/latest-1", true},
-		{"ci-cross/latest", true},
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 	}
 
 	for _, tc := range cases {
@@ -264,15 +262,21 @@ func TestCIBuildVersion(t *testing.T) {
 		{"release/0invalid", "", false},
 		// CI or custom builds
 		{"ci/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/v1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
-		{"ci-cross/1.9.0-alpha.1.123+acbcbfd53bfa0a", "v1.9.0-alpha.1.123+acbcbfd53bfa0a", true},
 		{"ci/0invalid", "", false},
 	}
 
 	for _, tc := range cases {
 		t.Run(fmt.Sprintf("input:%s/expected:%s", tc.input, tc.expected), func(t *testing.T) {
-			ver, err := KubernetesReleaseVersion(tc.input)
+
+			fileFetcher := func(url string, timeout time.Duration) (string, error) {
+				if tc.valid {
+					return tc.expected, nil
+				}
+				return "Unknown test case key!", errors.New("unknown test case key")
+			}
+
+			ver, err := kubernetesReleaseVersion(tc.input, fileFetcher)
 			t.Logf("Input: %q. Result: %q, Error: %v", tc.input, ver, err)
 			switch {
 			case err != nil && tc.valid:
@@ -468,4 +472,8 @@ func TestValidateStableVersion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func errorFetcher(url string, timeout time.Duration) (string, error) {
+	return "should not make internet calls", fmt.Errorf("should not make internet calls, tried to request url: %s", url)
 }

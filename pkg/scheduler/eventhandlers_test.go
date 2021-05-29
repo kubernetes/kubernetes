@@ -17,115 +17,26 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
-
-	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
+	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-func TestSkipPodUpdate(t *testing.T) {
-	table := []struct {
-		pod              *v1.Pod
-		isAssumedPodFunc func(*v1.Pod) bool
-		getPodFunc       func(*v1.Pod) *v1.Pod
-		expected         bool
-		name             string
-	}{
-		{
-			name: "Non-assumed pod",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "pod-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool { return false },
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "pod-0",
-					},
-				}
-			},
-			expected: false,
-		},
-		{
-			name: "with changes on ResourceVersion, Spec.NodeName and/or Annotations",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            "pod-0",
-					Annotations:     map[string]string{"a": "b"},
-					ResourceVersion: "0",
-				},
-				Spec: v1.PodSpec{
-					NodeName: "node-0",
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:            "pod-0",
-						Annotations:     map[string]string{"c": "d"},
-						ResourceVersion: "1",
-					},
-					Spec: v1.PodSpec{
-						NodeName: "node-1",
-					},
-				}
-			},
-			expected: true,
-		},
-		{
-			name: "with changes on Labels",
-			pod: &v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "pod-0",
-					Labels: map[string]string{"a": "b"},
-				},
-			},
-			isAssumedPodFunc: func(*v1.Pod) bool {
-				return true
-			},
-			getPodFunc: func(*v1.Pod) *v1.Pod {
-				return &v1.Pod{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:   "pod-0",
-						Labels: map[string]string{"c": "d"},
-					},
-				}
-			},
-			expected: false,
-		},
-	}
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			c := NewFromConfig(&factory.Config{
-				SchedulerCache: &fakecache.Cache{
-					IsAssumedPodFunc: test.isAssumedPodFunc,
-					GetPodFunc:       test.getPodFunc,
-				},
-			},
-			)
-			got := c.skipPodUpdate(test.pod)
-			if got != test.expected {
-				t.Errorf("skipPodUpdate() = %t, expected = %t", got, test.expected)
-			}
-		})
-	}
-}
 
 func TestNodeAllocatableChanged(t *testing.T) {
 	newQuantity := func(value int64) resource.Quantity {
 		return *resource.NewQuantity(value, resource.BinarySI)
 	}
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name           string
 		Changed        bool
 		OldAllocatable v1.ResourceList
@@ -144,17 +55,19 @@ func TestNodeAllocatableChanged(t *testing.T) {
 			NewAllocatable: v1.ResourceList{v1.ResourceMemory: newQuantity(1024), v1.ResourceStorage: newQuantity(1024)},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.OldAllocatable}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: c.NewAllocatable}}
-		changed := nodeAllocatableChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("nodeAllocatableChanged should be %t, got %t", c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.OldAllocatable}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Allocatable: test.NewAllocatable}}
+			changed := nodeAllocatableChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("nodeAllocatableChanged should be %t, got %t", test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeLabelsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldLabels map[string]string
@@ -174,17 +87,19 @@ func TestNodeLabelsChanged(t *testing.T) {
 			NewLabels: map[string]string{"foo": "bar", "test": "value"},
 		},
 	} {
-		oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.OldLabels}}
-		newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: c.NewLabels}}
-		changed := nodeLabelsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.OldLabels}}
+			newNode := &v1.Node{ObjectMeta: metav1.ObjectMeta{Labels: test.NewLabels}}
+			changed := nodeLabelsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
 func TestNodeTaintsChanged(t *testing.T) {
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name      string
 		Changed   bool
 		OldTaints []v1.Taint
@@ -203,12 +118,14 @@ func TestNodeTaintsChanged(t *testing.T) {
 			NewTaints: []v1.Taint{{Key: "key", Value: "value2"}},
 		},
 	} {
-		oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.OldTaints}}
-		newNode := &v1.Node{Spec: v1.NodeSpec{Taints: c.NewTaints}}
-		changed := nodeTaintsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, not %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.OldTaints}}
+			newNode := &v1.Node{Spec: v1.NodeSpec{Taints: test.NewTaints}}
+			changed := nodeTaintsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, not %t", test.Name, test.Changed, changed)
+			}
+		})
 	}
 }
 
@@ -218,7 +135,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 		t.Errorf("NodeCondition type has changed. The nodeConditionsChanged() function must be reevaluated.")
 	}
 
-	for _, c := range []struct {
+	for _, test := range []struct {
 		Name          string
 		Changed       bool
 		OldConditions []v1.NodeCondition
@@ -227,14 +144,14 @@ func TestNodeConditionsChanged(t *testing.T) {
 		{
 			Name:          "no condition changed",
 			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
 		},
 		{
 			Name:          "only LastHeartbeatTime changed",
 			Changed:       false,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
-			NewConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(1, 0)}},
+			NewConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue, LastHeartbeatTime: metav1.Unix(2, 0)}},
 		},
 		{
 			Name:          "new node has more healthy conditions",
@@ -245,7 +162,7 @@ func TestNodeConditionsChanged(t *testing.T) {
 		{
 			Name:          "new node has less unhealthy conditions",
 			Changed:       true,
-			OldConditions: []v1.NodeCondition{{Type: v1.NodeOutOfDisk, Status: v1.ConditionTrue}},
+			OldConditions: []v1.NodeCondition{{Type: v1.NodeDiskPressure, Status: v1.ConditionTrue}},
 			NewConditions: []v1.NodeCondition{},
 		},
 		{
@@ -255,11 +172,165 @@ func TestNodeConditionsChanged(t *testing.T) {
 			NewConditions: []v1.NodeCondition{{Type: v1.NodeReady, Status: v1.ConditionTrue}},
 		},
 	} {
-		oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.OldConditions}}
-		newNode := &v1.Node{Status: v1.NodeStatus{Conditions: c.NewConditions}}
-		changed := nodeConditionsChanged(newNode, oldNode)
-		if changed != c.Changed {
-			t.Errorf("Test case %q failed: should be %t, got %t", c.Name, c.Changed, changed)
-		}
+		t.Run(test.Name, func(t *testing.T) {
+			oldNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.OldConditions}}
+			newNode := &v1.Node{Status: v1.NodeStatus{Conditions: test.NewConditions}}
+			changed := nodeConditionsChanged(newNode, oldNode)
+			if changed != test.Changed {
+				t.Errorf("Test case %q failed: should be %t, got %t", test.Name, test.Changed, changed)
+			}
+		})
+	}
+}
+
+func TestUpdatePodInCache(t *testing.T) {
+	ttl := 10 * time.Second
+	nodeName := "node"
+
+	tests := []struct {
+		name   string
+		oldObj interface{}
+		newObj interface{}
+	}{
+		{
+			name:   "pod updated with the same UID",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("oldUID", nodeName, 8080), "pod"),
+		},
+		{
+			name:   "pod updated with different UIDs",
+			oldObj: withPodName(podWithPort("oldUID", nodeName, 80), "pod"),
+			newObj: withPodName(podWithPort("newUID", nodeName, 8080), "pod"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			schedulerCache := cache.New(ttl, ctx.Done())
+			schedulerQueue := queue.NewTestQueue(ctx, nil)
+			sched := &Scheduler{
+				SchedulerCache:  schedulerCache,
+				SchedulingQueue: schedulerQueue,
+			}
+			sched.addPodToCache(tt.oldObj)
+			sched.updatePodInCache(tt.oldObj, tt.newObj)
+			pod, err := sched.SchedulerCache.GetPod(tt.newObj.(*v1.Pod))
+			if err != nil {
+				t.Errorf("Failed to get pod from scheduler: %v", err)
+			}
+			if pod.UID != tt.newObj.(*v1.Pod).UID {
+				t.Errorf("Want pod UID %v, got %v", tt.newObj.(*v1.Pod).UID, pod.UID)
+			}
+		})
+	}
+}
+
+func withPodName(pod *v1.Pod, name string) *v1.Pod {
+	pod.Name = name
+	return pod
+}
+
+func TestPreCheckForNode(t *testing.T) {
+	cpu4 := map[v1.ResourceName]string{v1.ResourceCPU: "4"}
+	cpu8 := map[v1.ResourceName]string{v1.ResourceCPU: "8"}
+	cpu16 := map[v1.ResourceName]string{v1.ResourceCPU: "16"}
+	tests := []struct {
+		name               string
+		nodeFn             func() *v1.Node
+		existingPods, pods []*v1.Pod
+		want               []bool
+	}{
+		{
+			name: "regular node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).Obj(),
+				st.MakePod().Name("p3").Req(cpu4).Req(cpu8).Obj(),
+				st.MakePod().Name("p4").NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p5").NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p6").Obj(),
+				st.MakePod().Name("p7").Node("invalid-node").Obj(),
+				st.MakePod().Name("p8").HostPort(8080).Obj(),
+				st.MakePod().Name("p9").HostPort(80).Obj(),
+			},
+			want: []bool{true, false, false, true, false, true, false, true, false},
+		},
+		{
+			name: "tainted node, pods with a single constraint",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Obj(),
+				st.MakePod().Name("p2").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Toleration("bar").Obj(),
+				st.MakePod().Name("p4").Toleration("bar").Toleration("foo").Obj(),
+			},
+			want: []bool{false, true, false, true},
+		},
+		{
+			name: "regular node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				return st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+			},
+			existingPods: []*v1.Pod{
+				st.MakePod().Name("p").HostPort(80).Obj(),
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).NodeAffinityNotIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p2").Req(cpu16).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p3").Req(cpu8).NodeAffinityIn("hostname", []string{"fake-node"}).Obj(),
+				st.MakePod().Name("p4").HostPort(8080).Node("invalid-node").Obj(),
+				st.MakePod().Name("p5").Req(cpu4).NodeAffinityIn("hostname", []string{"fake-node"}).HostPort(80).Obj(),
+			},
+			want: []bool{false, false, true, false, false},
+		},
+		{
+			name: "tainted node, pods with multiple constraints",
+			nodeFn: func() *v1.Node {
+				node := st.MakeNode().Name("fake-node").Label("hostname", "fake-node").Capacity(cpu8).Obj()
+				node.Spec.Taints = []v1.Taint{
+					{Key: "foo", Effect: v1.TaintEffectNoSchedule},
+					{Key: "bar", Effect: v1.TaintEffectPreferNoSchedule},
+				}
+				return node
+			},
+			pods: []*v1.Pod{
+				st.MakePod().Name("p1").Req(cpu4).Toleration("bar").Obj(),
+				st.MakePod().Name("p2").Req(cpu4).Toleration("bar").Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("foo").Obj(),
+				st.MakePod().Name("p3").Req(cpu16).Toleration("bar").Obj(),
+			},
+			want: []bool{false, true, false, false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			nodeInfo := framework.NewNodeInfo(tt.existingPods...)
+			nodeInfo.SetNode(tt.nodeFn())
+			preCheckFn := preCheckForNode(nodeInfo)
+
+			var got []bool
+			for _, pod := range tt.pods {
+				got = append(got, preCheckFn(pod))
+			}
+
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("Unexpected diff (-want, +got):\n%s", diff)
+			}
+		})
 	}
 }

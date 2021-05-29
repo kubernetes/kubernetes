@@ -23,7 +23,9 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
-	"k8s.io/api/core/v1"
+	"k8s.io/mount-utils"
+
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
@@ -43,9 +45,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	statustest "k8s.io/kubernetes/pkg/kubelet/status/testing"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -63,7 +65,7 @@ func TestRunOnce(t *testing.T) {
 	fakeSecretManager := secret.NewFakeManager()
 	fakeConfigMapManager := configmap.NewFakeManager()
 	podManager := kubepod.NewBasicPodManager(
-		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager, podtest.NewMockCheckpointManager())
+		podtest.NewFakeMirrorClient(), fakeSecretManager, fakeConfigMapManager)
 	fakeRuntime := &containertest.FakeRuntime{}
 	basePath, err := utiltesting.MkTmpdir("kubelet")
 	if err != nil {
@@ -74,7 +76,7 @@ func TestRunOnce(t *testing.T) {
 		rootDirectory:    basePath,
 		recorder:         &record.FakeRecorder{},
 		cadvisor:         cadvisor,
-		nodeInfo:         testNodeInfo{},
+		nodeLister:       testNodeLister{},
 		statusManager:    status.NewManager(nil, podManager, &statustest.FakePodDeletionSafetyProvider{}),
 		podManager:       podManager,
 		os:               &containertest.FakeOS{},
@@ -85,6 +87,7 @@ func TestRunOnce(t *testing.T) {
 		hostname:         testKubeletHostname,
 		nodeName:         testKubeletHostname,
 		runtimeState:     newRuntimeState(time.Second),
+		hostutil:         hostutil.NewFakeHostUtil(nil),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
@@ -103,14 +106,16 @@ func TestRunOnce(t *testing.T) {
 		kb.volumePluginMgr,
 		fakeRuntime,
 		kb.mounter,
+		kb.hostutil,
 		kb.getPodsDir(),
 		kb.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount */
-		false /* keepTerminatedPodVolumes */)
+		false, /* keepTerminatedPodVolumes */
+		volumetest.NewBlockVolumePathHandler())
 
-	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
+	// TODO: Factor out "stats.Provider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
-	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod)
+	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.recorder)
 	nodeRef := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      string(kb.nodeName),
@@ -125,7 +130,7 @@ func TestRunOnce(t *testing.T) {
 
 	kb.evictionManager = evictionManager
 	kb.admitHandlers.AddPodAdmitHandler(evictionAdmitHandler)
-	kb.mounter = &mount.FakeMounter{}
+	kb.mounter = mount.NewFakeMounter(nil)
 	if err := kb.setupDataDirs(); err != nil {
 		t.Errorf("Failed to init data dirs: %v", err)
 	}
@@ -152,7 +157,7 @@ func TestRunOnce(t *testing.T) {
 	// because runonce is never used in kubernetes now, we should deprioritize the cleanup work.
 	// TODO(random-liu) Fix the test, make it meaningful.
 	fakeRuntime.PodStatus = kubecontainer.PodStatus{
-		ContainerStatuses: []*kubecontainer.ContainerStatus{
+		ContainerStatuses: []*kubecontainer.Status{
 			{
 				Name:  "bar",
 				State: kubecontainer.ContainerStateRunning,

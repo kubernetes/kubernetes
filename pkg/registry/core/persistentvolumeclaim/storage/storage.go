@@ -29,14 +29,16 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/core/persistentvolumeclaim"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
+// REST implements a RESTStorage for persistent volume claims.
 type REST struct {
 	*genericregistry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.PersistentVolumeClaim{} },
 		NewListFunc:              func() runtime.Object { return &api.PersistentVolumeClaimList{} },
@@ -47,18 +49,20 @@ func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 		UpdateStrategy:      persistentvolumeclaim.Strategy,
 		DeleteStrategy:      persistentvolumeclaim.Strategy,
 		ReturnDeletedObject: true,
+		ResetFieldsStrategy: persistentvolumeclaim.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: persistentvolumeclaim.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = persistentvolumeclaim.StatusStrategy
+	statusStore.ResetFieldsStrategy = persistentvolumeclaim.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement ShortNamesProvider
@@ -74,6 +78,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new PersistentVolumeClaim object.
 func (r *StatusREST) New() runtime.Object {
 	return &api.PersistentVolumeClaim{}
 }
@@ -88,4 +93,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

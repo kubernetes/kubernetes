@@ -21,11 +21,10 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // DataDirectory provides utilities for initializing and backing up an
@@ -88,7 +87,7 @@ func (d *DataDirectory) Backup() error {
 	if err != nil {
 		return err
 	}
-	err = exec.Command("cp", "-r", d.path, backupDir).Run()
+	err = copyDirectory(d.path, backupDir)
 	if err != nil {
 		return err
 	}
@@ -116,7 +115,7 @@ func (d *DataDirectory) String() string {
 }
 
 // VersionFile provides utilities for reading and writing version.txt files
-// to etcd "data-dir" for tracking the etcd server and storage verions
+// to etcd "data-dir" for tracking the etcd server and storage versions
 // of the data in the directory.
 type VersionFile struct {
 	path string

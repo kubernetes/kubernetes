@@ -17,7 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -33,8 +33,12 @@ type PodDisruptionBudgetSpec struct {
 
 	// Label query over pods whose evictions are managed by the disruption
 	// budget.
+	// A null selector selects no pods.
+	// An empty selector ({}) also selects no pods, which differs from standard behavior of selecting all pods.
+	// In policy/v1, an empty selector will select all pods in the namespace.
+	// +patchStrategy=replace
 	// +optional
-	Selector *metav1.LabelSelector `json:"selector,omitempty" protobuf:"bytes,2,opt,name=selector"`
+	Selector *metav1.LabelSelector `json:"selector,omitempty" patchStrategy:"replace" protobuf:"bytes,2,opt,name=selector"`
 
 	// An eviction is allowed if at most "maxUnavailable" pods selected by
 	// "selector" are unavailable after the eviction, i.e. even in absence of
@@ -47,8 +51,8 @@ type PodDisruptionBudgetSpec struct {
 // PodDisruptionBudgetStatus represents information about the status of a
 // PodDisruptionBudget. Status may trail the actual state of a system.
 type PodDisruptionBudgetStatus struct {
-	// Most recent generation observed when updating this PDB status. PodDisruptionsAllowed and other
-	// status informatio is valid only if observedGeneration equals to PDB's object generation.
+	// Most recent generation observed when updating this PDB status. DisruptionsAllowed and other
+	// status information is valid only if observedGeneration equals to PDB's object generation.
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,1,opt,name=observedGeneration"`
 
@@ -67,7 +71,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
+	DisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`
@@ -77,14 +81,57 @@ type PodDisruptionBudgetStatus struct {
 
 	// total number of pods counted by this disruption budget
 	ExpectedPods int32 `json:"expectedPods" protobuf:"varint,6,opt,name=expectedPods"`
+
+	// Conditions contain conditions for PDB. The disruption controller sets the
+	// DisruptionAllowed condition. The following are known values for the reason field
+	// (additional reasons could be added in the future):
+	// - SyncFailed: The controller encountered an error and wasn't able to compute
+	//               the number of allowed disruptions. Therefore no disruptions are
+	//               allowed and the status of the condition will be False.
+	// - InsufficientPods: The number of pods are either at or below the number
+	//                     required by the PodDisruptionBudget. No disruptions are
+	//                     allowed and the status of the condition will be False.
+	// - SufficientPods: There are more pods than required by the PodDisruptionBudget.
+	//                   The condition will be True, and the number of allowed
+	//                   disruptions are provided by the disruptionsAllowed property.
+	//
+	// +optional
+	// +patchMergeKey=type
+	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,7,rep,name=conditions"`
 }
+
+const (
+	// DisruptionAllowedCondition is a condition set by the disruption controller
+	// that signal whether any of the pods covered by the PDB can be disrupted.
+	DisruptionAllowedCondition = "DisruptionAllowed"
+
+	// SyncFailedReason is set on the DisruptionAllowed condition if reconcile
+	// of the PDB failed and therefore disruption of pods are not allowed.
+	SyncFailedReason = "SyncFailed"
+	// SufficientPodsReason is set on the DisruptionAllowed condition if there are
+	// more pods covered by the PDB than required and at least one can be disrupted.
+	SufficientPodsReason = "SufficientPods"
+	// InsufficientPodsReason is set on the DisruptionAllowed condition if the number
+	// of pods are equal to or fewer than required by the PDB.
+	InsufficientPodsReason = "InsufficientPods"
+)
 
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudget
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -97,18 +144,28 @@ type PodDisruptionBudget struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
+// +k8s:prerelease-lifecycle-gen:replacement=policy,v1,PodDisruptionBudgetList
 
 // PodDisruptionBudgetList is a collection of PodDisruptionBudgets.
 type PodDisruptionBudgetList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
-	Items           []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+	// items list individual PodDisruptionBudget objects
+	Items []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
 // +genclient
 // +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.5
+// +k8s:prerelease-lifecycle-gen:deprecated=1.22
 
 // Eviction evicts a pod from its node subject to certain policies and safety constraints.
 // This is a subresource of Pod.  A request to cause such an eviction is
@@ -128,13 +185,17 @@ type Eviction struct {
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
 
 // PodSecurityPolicy governs the ability to make requests that affect the Security Context
 // that will be applied to a pod and container.
+// Deprecated in 1.21.
 type PodSecurityPolicy struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
@@ -163,7 +224,7 @@ type PodSecurityPolicySpec struct {
 	// You must not list a capability in both allowedCapabilities and requiredDropCapabilities.
 	// +optional
 	AllowedCapabilities []v1.Capability `json:"allowedCapabilities,omitempty" protobuf:"bytes,4,rep,name=allowedCapabilities,casttype=k8s.io/api/core/v1.Capability"`
-	// volumes is a white list of allowed volume plugins. Empty indicates that
+	// volumes is an allowlist of volume plugins. Empty indicates that
 	// no volumes may be used. To allow all volumes you may use '*'.
 	// +optional
 	Volumes []FSType `json:"volumes,omitempty" protobuf:"bytes,5,rep,name=volumes,casttype=FSType"`
@@ -207,23 +268,24 @@ type PodSecurityPolicySpec struct {
 	// privilege escalation. If unspecified, defaults to true.
 	// +optional
 	AllowPrivilegeEscalation *bool `json:"allowPrivilegeEscalation,omitempty" protobuf:"varint,16,opt,name=allowPrivilegeEscalation"`
-	// allowedHostPaths is a white list of allowed host paths. Empty indicates
+	// allowedHostPaths is an allowlist of host paths. Empty indicates
 	// that all host paths may be used.
 	// +optional
 	AllowedHostPaths []AllowedHostPath `json:"allowedHostPaths,omitempty" protobuf:"bytes,17,rep,name=allowedHostPaths"`
-	// allowedFlexVolumes is a whitelist of allowed Flexvolumes.  Empty or nil indicates that all
+	// allowedFlexVolumes is an allowlist of Flexvolumes.  Empty or nil indicates that all
 	// Flexvolumes may be used.  This parameter is effective only when the usage of the Flexvolumes
 	// is allowed in the "volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
-	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-	// An empty value means no CSI drivers can run inline within a pod spec.
+	// AllowedCSIDrivers is an allowlist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
+	// This is a beta field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
 	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
-	// Kubelet has to whitelist all allowed unsafe sysctls explicitly to avoid rejection.
+	// Kubelet has to allowlist all allowed unsafe sysctls explicitly to avoid rejection.
 	//
 	// Examples:
 	// e.g. "foo/*" allows "foo/bar", "foo/baz", etc.
@@ -239,11 +301,16 @@ type PodSecurityPolicySpec struct {
 	// e.g. "foo.*" forbids "foo.bar", "foo.baz", etc.
 	// +optional
 	ForbiddenSysctls []string `json:"forbiddenSysctls,omitempty" protobuf:"bytes,20,rep,name=forbiddenSysctls"`
-	// AllowedProcMountTypes is a whitelist of allowed ProcMountTypes.
+	// AllowedProcMountTypes is an allowlist of allowed ProcMountTypes.
 	// Empty or nil indicates that only the DefaultProcMountType may be used.
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
+	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
+	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
+	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.
+	// +optional
+	RuntimeClass *RuntimeClassStrategyOptions `json:"runtimeClass,omitempty" protobuf:"bytes,24,opt,name=runtimeClass"`
 }
 
 // AllowedHostPath defines the host volume conditions that will be enabled by a policy
@@ -270,7 +337,7 @@ var AllowAllCapabilities v1.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
-var (
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
@@ -299,6 +366,7 @@ var (
 	PortworxVolume        FSType = "portworxVolume"
 	ScaleIO               FSType = "scaleIO"
 	CSI                   FSType = "csi"
+	Ephemeral             FSType = "ephemeral"
 	All                   FSType = "*"
 )
 
@@ -449,13 +517,35 @@ const (
 	SupplementalGroupsStrategyRunAsAny SupplementalGroupsStrategyType = "RunAsAny"
 )
 
+// RuntimeClassStrategyOptions define the strategy that will dictate the allowable RuntimeClasses
+// for a pod.
+type RuntimeClassStrategyOptions struct {
+	// allowedRuntimeClassNames is an allowlist of RuntimeClass names that may be specified on a pod.
+	// A value of "*" means that any RuntimeClass name is allowed, and must be the only item in the
+	// list. An empty list requires the RuntimeClassName field to be unset.
+	AllowedRuntimeClassNames []string `json:"allowedRuntimeClassNames" protobuf:"bytes,1,rep,name=allowedRuntimeClassNames"`
+	// defaultRuntimeClassName is the default RuntimeClassName to set on the pod.
+	// The default MUST be allowed by the allowedRuntimeClassNames list.
+	// A value of nil does not mutate the Pod.
+	// +optional
+	DefaultRuntimeClassName *string `json:"defaultRuntimeClassName,omitempty" protobuf:"bytes,2,opt,name=defaultRuntimeClassName"`
+}
+
+// AllowAllRuntimeClassNames can be used as a value for the
+// RuntimeClassStrategyOptions.AllowedRuntimeClassNames field and means that any RuntimeClassName is
+// allowed.
+const AllowAllRuntimeClassNames = "*"
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.10
+// +k8s:prerelease-lifecycle-gen:deprecated=1.21
+// +k8s:prerelease-lifecycle-gen:removed=1.25
 
 // PodSecurityPolicyList is a list of PodSecurityPolicy objects.
 type PodSecurityPolicyList struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard list metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 

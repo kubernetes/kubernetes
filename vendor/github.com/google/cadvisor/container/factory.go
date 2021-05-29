@@ -18,9 +18,11 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/cadvisor/manager/watcher"
+	"github.com/google/cadvisor/fs"
+	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/watcher"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type ContainerHandlerFactory interface {
@@ -41,20 +43,53 @@ type ContainerHandlerFactory interface {
 type MetricKind string
 
 const (
-	CpuUsageMetrics         MetricKind = "cpu"
-	ProcessSchedulerMetrics MetricKind = "sched"
-	PerCpuUsageMetrics      MetricKind = "percpu"
-	MemoryUsageMetrics      MetricKind = "memory"
-	CpuLoadMetrics          MetricKind = "cpuLoad"
-	DiskIOMetrics           MetricKind = "diskIO"
-	DiskUsageMetrics        MetricKind = "disk"
-	NetworkUsageMetrics     MetricKind = "network"
-	NetworkTcpUsageMetrics  MetricKind = "tcp"
-	NetworkUdpUsageMetrics  MetricKind = "udp"
-	AcceleratorUsageMetrics MetricKind = "accelerator"
-	AppMetrics              MetricKind = "app"
-	ProcessMetrics          MetricKind = "process"
+	CpuUsageMetrics                MetricKind = "cpu"
+	ProcessSchedulerMetrics        MetricKind = "sched"
+	PerCpuUsageMetrics             MetricKind = "percpu"
+	MemoryUsageMetrics             MetricKind = "memory"
+	MemoryNumaMetrics              MetricKind = "memory_numa"
+	CpuLoadMetrics                 MetricKind = "cpuLoad"
+	DiskIOMetrics                  MetricKind = "diskIO"
+	DiskUsageMetrics               MetricKind = "disk"
+	NetworkUsageMetrics            MetricKind = "network"
+	NetworkTcpUsageMetrics         MetricKind = "tcp"
+	NetworkAdvancedTcpUsageMetrics MetricKind = "advtcp"
+	NetworkUdpUsageMetrics         MetricKind = "udp"
+	AcceleratorUsageMetrics        MetricKind = "accelerator"
+	AppMetrics                     MetricKind = "app"
+	ProcessMetrics                 MetricKind = "process"
+	HugetlbUsageMetrics            MetricKind = "hugetlb"
+	PerfMetrics                    MetricKind = "perf_event"
+	ReferencedMemoryMetrics        MetricKind = "referenced_memory"
+	CPUTopologyMetrics             MetricKind = "cpu_topology"
+	ResctrlMetrics                 MetricKind = "resctrl"
+	CPUSetMetrics                  MetricKind = "cpuset"
 )
+
+// AllMetrics represents all kinds of metrics that cAdvisor supported.
+var AllMetrics = MetricSet{
+	CpuUsageMetrics:                struct{}{},
+	ProcessSchedulerMetrics:        struct{}{},
+	PerCpuUsageMetrics:             struct{}{},
+	MemoryUsageMetrics:             struct{}{},
+	MemoryNumaMetrics:              struct{}{},
+	CpuLoadMetrics:                 struct{}{},
+	DiskIOMetrics:                  struct{}{},
+	AcceleratorUsageMetrics:        struct{}{},
+	DiskUsageMetrics:               struct{}{},
+	NetworkUsageMetrics:            struct{}{},
+	NetworkTcpUsageMetrics:         struct{}{},
+	NetworkAdvancedTcpUsageMetrics: struct{}{},
+	NetworkUdpUsageMetrics:         struct{}{},
+	ProcessMetrics:                 struct{}{},
+	AppMetrics:                     struct{}{},
+	HugetlbUsageMetrics:            struct{}{},
+	PerfMetrics:                    struct{}{},
+	ReferencedMemoryMetrics:        struct{}{},
+	CPUTopologyMetrics:             struct{}{},
+	ResctrlMetrics:                 struct{}{},
+	CPUSetMetrics:                  struct{}{},
+}
 
 func (mk MetricKind) String() string {
 	return string(mk)
@@ -69,6 +104,71 @@ func (ms MetricSet) Has(mk MetricKind) bool {
 
 func (ms MetricSet) Add(mk MetricKind) {
 	ms[mk] = struct{}{}
+}
+
+func (ms MetricSet) Difference(ms1 MetricSet) MetricSet {
+	result := MetricSet{}
+	for kind := range ms {
+		if !ms1.Has(kind) {
+			result.Add(kind)
+		}
+	}
+	return result
+}
+
+// All registered auth provider plugins.
+var pluginsLock sync.Mutex
+var plugins = make(map[string]Plugin)
+
+type Plugin interface {
+	// InitializeFSContext is invoked when populating an fs.Context object for a new manager.
+	// A returned error here is fatal.
+	InitializeFSContext(context *fs.Context) error
+
+	// Register is invoked when starting a manager. It can optionally return a container watcher.
+	// A returned error is logged, but is not fatal.
+	Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics MetricSet) (watcher.ContainerWatcher, error)
+}
+
+func RegisterPlugin(name string, plugin Plugin) error {
+	pluginsLock.Lock()
+	defer pluginsLock.Unlock()
+	if _, found := plugins[name]; found {
+		return fmt.Errorf("Plugin %q was registered twice", name)
+	}
+	klog.V(4).Infof("Registered Plugin %q", name)
+	plugins[name] = plugin
+	return nil
+}
+
+func InitializeFSContext(context *fs.Context) error {
+	pluginsLock.Lock()
+	defer pluginsLock.Unlock()
+	for name, plugin := range plugins {
+		err := plugin.InitializeFSContext(context)
+		if err != nil {
+			klog.V(5).Infof("Initialization of the %s context failed: %v", name, err)
+			return err
+		}
+	}
+	return nil
+}
+
+func InitializePlugins(factory info.MachineInfoFactory, fsInfo fs.FsInfo, includedMetrics MetricSet) []watcher.ContainerWatcher {
+	pluginsLock.Lock()
+	defer pluginsLock.Unlock()
+
+	containerWatchers := []watcher.ContainerWatcher{}
+	for name, plugin := range plugins {
+		watcher, err := plugin.Register(factory, fsInfo, includedMetrics)
+		if err != nil {
+			klog.V(5).Infof("Registration of the %s container factory failed: %v", name, err)
+		}
+		if watcher != nil {
+			containerWatchers = append(containerWatchers, watcher)
+		}
+	}
+	return containerWatchers
 }
 
 // TODO(vmarmol): Consider not making this global.
@@ -116,9 +216,8 @@ func NewContainerHandler(name string, watchType watcher.ContainerWatchSource, in
 			klog.V(3).Infof("Using factory %q for container %q", factory, name)
 			handle, err := factory.NewContainerHandler(name, inHostNamespace)
 			return handle, canAccept, err
-		} else {
-			klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 		}
+		klog.V(4).Infof("Factory %q was unable to handle container %q", factory, name)
 	}
 
 	return nil, false, fmt.Errorf("no known factory can handle creation of container")

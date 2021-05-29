@@ -18,6 +18,7 @@ package upgrade
 
 import (
 	"crypto/sha256"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -27,20 +28,25 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/pkg/transport"
 
+	"k8s.io/client-go/tools/clientcmd"
+	certutil "k8s.io/client-go/util/cert"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
+	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	controlplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	etcdphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/etcd"
+	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	certstestutil "k8s.io/kubernetes/cmd/kubeadm/app/util/certs"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
+	pkiutiltesting "k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil/testing"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -48,9 +54,10 @@ const (
 	waitForHashes        = "wait-for-hashes"
 	waitForHashChange    = "wait-for-hash-change"
 	waitForPodsWithLabel = "wait-for-pods-with-label"
+)
 
-	testConfiguration = `
-apiVersion: kubeadm.k8s.io/v1beta1
+var testConfiguration = fmt.Sprintf(`
+apiVersion: %s
 kind: InitConfiguration
 nodeRegistration:
   name: foo
@@ -62,26 +69,24 @@ bootstrapTokens:
 - token: ce3aa5.5ec8455bb76b379f
   ttl: 24h
 ---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: %[1]s
 kind: ClusterConfiguration
 
 apiServer:
   certSANs: null
   extraArgs: null
-certificatesDir: %s
+certificatesDir: %%s
 etcd:
   local:
-    dataDir: %s
+    dataDir: %%s
     image: ""
 imageRepository: k8s.gcr.io
-kubernetesVersion: %s
+kubernetesVersion: %%s
 networking:
   dnsDomain: cluster.local
   podSubnet: ""
   serviceSubnet: 10.96.0.0/12
-useHyperKubeImage: false
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 // fakeWaiter is a fake apiclient.Waiter that returns errors it was initialized with
 type fakeWaiter struct {
@@ -139,6 +144,7 @@ func (w *fakeWaiter) WaitForKubeletAndFunc(f func() error) error {
 
 type fakeStaticPodPathManager struct {
 	kubernetesDir     string
+	patchesDir        string
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
@@ -190,6 +196,10 @@ func (spm *fakeStaticPodPathManager) KubernetesDir() string {
 	return spm.kubernetesDir
 }
 
+func (spm *fakeStaticPodPathManager) PatchesDir() string {
+	return spm.patchesDir
+}
+
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
 	return constants.GetStaticPodFilepath(component, spm.realManifestDir)
 }
@@ -227,30 +237,19 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {
-			Version: "3.1.12",
-		}}, nil
-}
-
-func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
-	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
-	}, nil
-}
-
-func (c fakeTLSEtcdClient) GetVersion() (string, error) {
-	return "3.1.12", nil
+func (c fakeTLSEtcdClient) CheckClusterHealth() error {
+	return nil
 }
 
 func (c fakeTLSEtcdClient) Sync() error { return nil }
+
+func (c fakeTLSEtcdClient) ListMembers() ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
 
 func (c fakeTLSEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
@@ -266,13 +265,11 @@ func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
-func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -280,26 +277,14 @@ func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.Stat
 		TrustedCAFile: filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
 	}
 	_, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {Version: "3.1.12"},
-	}, nil
-}
-
-func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {
-	return map[string]string{
-		"https://1.2.3.4:2379": "3.1.12",
-	}, nil
-}
-
-func (c fakePodManifestEtcdClient) GetVersion() (string, error) {
-	return "3.1.12", nil
+	return err
 }
 
 func (c fakePodManifestEtcdClient) Sync() error { return nil }
+
+func (c fakePodManifestEtcdClient) ListMembers() ([]etcdutil.Member, error) {
+	return []etcdutil.Member{}, nil
+}
 
 func (c fakePodManifestEtcdClient) AddMember(name string, peerAddrs string) ([]etcdutil.Member, error) {
 	return []etcdutil.Member{}, nil
@@ -318,6 +303,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 		description          string
 		waitErrsToReturn     map[string]error
 		moveFileFunc         func(string, string) error
+		skipKubeConfig       string
 		expectedErr          bool
 		manifestShouldChange bool
 	}{
@@ -335,7 +321,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: true,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 1",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        errors.New("boo! failed"),
 				waitForHashChange:    nil,
@@ -348,7 +334,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 2",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    errors.New("boo! failed"),
@@ -361,7 +347,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any wait error should result in a rollback and an abort",
+			description: "any wait error should result in a rollback and an abort 3",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -374,7 +360,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any path-moving error should result in a rollback and an abort",
+			description: "any path-moving error should result in a rollback and an abort 1",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -391,7 +377,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 			manifestShouldChange: false,
 		},
 		{
-			description: "any path-moving error should result in a rollback and an abort",
+			description: "any path-moving error should result in a rollback and an abort 2",
 			waitErrsToReturn: map[string]error{
 				waitForHashes:        nil,
 				waitForHashChange:    nil,
@@ -424,17 +410,47 @@ func TestStaticPodControlPlane(t *testing.T) {
 			expectedErr:          true,
 			manifestShouldChange: false,
 		},
+		{
+			description: "any cert renew error should result in a rollback and an abort; even though this is the last component (kube-apiserver and kube-controller-manager healthy)",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			moveFileFunc: func(oldPath, newPath string) error {
+				return os.Rename(oldPath, newPath)
+			},
+			skipKubeConfig:       constants.SchedulerKubeConfigFileName,
+			expectedErr:          true,
+			manifestShouldChange: false,
+		},
+		{
+			description: "any cert renew error should result in a rollback and an abort; even though this is admin.conf (kube-apiserver and kube-controller-manager and kube-scheduler healthy)",
+			waitErrsToReturn: map[string]error{
+				waitForHashes:        nil,
+				waitForHashChange:    nil,
+				waitForPodsWithLabel: nil,
+			},
+			moveFileFunc: func(oldPath, newPath string) error {
+				return os.Rename(oldPath, newPath)
+			},
+			skipKubeConfig:       constants.AdminKubeConfigFileName,
+			expectedErr:          true,
+			manifestShouldChange: false,
+		},
 	}
 
-	for _, rt := range tests {
+	for i := range tests {
+		rt := tests[i]
 		t.Run(rt.description, func(t *testing.T) {
+			pkiutiltesting.Reset()
 			waiter := NewFakeStaticPodWaiter(rt.waitErrsToReturn)
 			pathMgr, err := NewFakeStaticPodPathManager(rt.moveFileFunc)
 			if err != nil {
 				t.Fatalf("couldn't run NewFakeStaticPodPathManager: %v", err)
 			}
 			defer os.RemoveAll(pathMgr.(*fakeStaticPodPathManager).KubernetesDir())
-			constants.KubernetesDir = pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
+			tmpKubernetesDir := pathMgr.(*fakeStaticPodPathManager).KubernetesDir()
 
 			tempCertsDir, err := ioutil.TempDir("", "kubeadm-certs")
 			if err != nil {
@@ -461,14 +477,25 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't get create cert tree: %v", err)
 			}
 
-			t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
+			for _, kubeConfig := range []string{
+				constants.AdminKubeConfigFileName,
+				constants.SchedulerKubeConfigFileName,
+				constants.ControllerManagerKubeConfigFileName,
+			} {
+				if rt.skipKubeConfig == kubeConfig {
+					continue
+				}
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpKubernetesDir, oldcfg); err != nil {
+					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
+				}
+			}
 
 			// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg)
 			if err != nil {
 				t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 			}
-			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
+			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), pathMgr.PatchesDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
 			if err != nil {
 				t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
 			}
@@ -484,15 +511,15 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			// create the kubeadm etcd certs
-			caCert, caKey, err := certsphase.KubeadmCertEtcdCA.CreateAsCA(newcfg)
+			caCert, caKey, err := certsphase.KubeadmCertEtcdCA().CreateAsCA(newcfg)
 			if err != nil {
 				t.Fatalf("couldn't create new CA certificate: %v", err)
 			}
 			for _, cert := range []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
-				&certsphase.KubeadmCertEtcdHealthcheck,
-				&certsphase.KubeadmCertEtcdAPIClient,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
+				certsphase.KubeadmCertEtcdHealthcheck(),
+				certsphase.KubeadmCertEtcdAPIClient(),
 			} {
 				if err := cert.CreateFromCA(newcfg, caCert, caKey); err != nil {
 					t.Fatalf("couldn't create certificate %s: %v", cert.Name, err)
@@ -504,6 +531,7 @@ func TestStaticPodControlPlane(t *testing.T) {
 				waiter,
 				pathMgr,
 				newcfg,
+				true,
 				true,
 				fakeTLSEtcdClient{
 					TLS: false,
@@ -591,7 +619,7 @@ func TestCleanupDirs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			realManifestDir, cleanup := getTempDir(t, "realManifestDir")
+			realKubernetesDir, cleanup := getTempDir(t, "realKubernetesDir")
 			defer cleanup()
 
 			tempManifestDir, cleanup := getTempDir(t, "tempManifestDir")
@@ -603,7 +631,7 @@ func TestCleanupDirs(t *testing.T) {
 			backupEtcdDir, cleanup := getTempDir(t, "backupEtcdDir")
 			defer cleanup()
 
-			mgr := NewKubeStaticPodPathManager(realManifestDir, tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
+			mgr := NewKubeStaticPodPathManager(realKubernetesDir, "", tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
 			err := mgr.CleanupDirs()
 			if err != nil {
 				t.Errorf("unexpected error cleaning up: %v", err)
@@ -637,57 +665,106 @@ func TestCleanupDirs(t *testing.T) {
 	}
 }
 
-func TestRenewCerts(t *testing.T) {
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
-	t.Run("all certs exist, should be rotated", func(t *testing.T) {
-	})
+func TestRenewCertsByComponent(t *testing.T) {
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
+
 	tests := []struct {
-		name               string
-		component          string
-		skipCreateCA       bool
-		shouldErrorOnRenew bool
-		certsShouldExist   []*certsphase.KubeadmCert
+		name                  string
+		component             string
+		externalCA            bool
+		externalFrontProxyCA  bool
+		skipCreateEtcdCA      bool
+		shouldErrorOnRenew    bool
+		certsShouldExist      []*certsphase.KubeadmCert
+		certsShouldBeRenewed  []*certsphase.KubeadmCert // NB. If empty, it will assume certsShouldBeRenewed == certsShouldExist
+		kubeConfigShouldExist []string
 	}{
 		{
-			name:      "all certs exist, should be rotated",
+			name:      "all CA exist, all certs should be rotated for etcd",
 			component: constants.Etcd,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
-				&certsphase.KubeadmCertEtcdHealthcheck,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
+				certsphase.KubeadmCertEtcdHealthcheck(),
 			},
 		},
 		{
-			name:      "just renew API cert",
+			name:      "all CA exist, all certs should be rotated for apiserver",
 			component: constants.KubeAPIServer,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdAPIClient,
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
 			},
 		},
 		{
-			name:         "ignores other compnonents",
-			skipCreateCA: true,
-			component:    constants.KubeScheduler,
+			name:      "external CA, renew only certificates not signed by CA for apiserver",
+			component: constants.KubeAPIServer,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+			},
+			certsShouldBeRenewed: []*certsphase.KubeadmCert{
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+			},
+			externalCA: true,
+		},
+		{
+			name:      "external front-proxy-CA, renew only certificates not signed by front-proxy-CA for apiserver",
+			component: constants.KubeAPIServer,
+			certsShouldExist: []*certsphase.KubeadmCert{
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertFrontProxyClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+			},
+			certsShouldBeRenewed: []*certsphase.KubeadmCert{
+				certsphase.KubeadmCertEtcdAPIClient(),
+				certsphase.KubeadmCertAPIServer(),
+				certsphase.KubeadmCertKubeletClient(),
+			},
+			externalFrontProxyCA: true,
+		},
+		{
+			name:      "all CA exist, should be rotated for scheduler",
+			component: constants.KubeScheduler,
+			kubeConfigShouldExist: []string{
+				constants.SchedulerKubeConfigFileName,
+			},
+		},
+		{
+			name:      "all CA exist, should be rotated for controller manager",
+			component: constants.KubeControllerManager,
+			kubeConfigShouldExist: []string{
+				constants.ControllerManagerKubeConfigFileName,
+			},
 		},
 		{
 			name:               "missing a cert to renew",
 			component:          constants.Etcd,
 			shouldErrorOnRenew: true,
 			certsShouldExist: []*certsphase.KubeadmCert{
-				&certsphase.KubeadmCertEtcdServer,
-				&certsphase.KubeadmCertEtcdPeer,
+				certsphase.KubeadmCertEtcdServer(),
+				certsphase.KubeadmCertEtcdPeer(),
 			},
 		},
 		{
 			name:               "no CA, cannot continue",
 			component:          constants.Etcd,
-			skipCreateCA:       true,
+			skipCreateEtcdCA:   true,
 			shouldErrorOnRenew: true,
 		},
 	}
 
-	for _, test := range tests {
+	for i := range tests {
+		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			pkiutiltesting.Reset()
+
 			// Setup up basic requities
 			tmpDir := testutil.SetupTempDir(t)
 			defer os.RemoveAll(tmpDir)
@@ -695,31 +772,59 @@ func TestRenewCerts(t *testing.T) {
 			cfg := testutil.GetDefaultInternalConfig(t)
 			cfg.CertificatesDir = tmpDir
 
-			if !test.skipCreateCA {
+			if err := pkiutil.WriteCertAndKey(tmpDir, constants.CACertAndKeyBaseName, caCert, caKey); err != nil {
+				t.Fatalf("couldn't write out CA: %v", err)
+			}
+			if test.externalCA {
+				os.Remove(filepath.Join(tmpDir, constants.CAKeyName))
+			}
+			if err := pkiutil.WriteCertAndKey(tmpDir, constants.FrontProxyCACertAndKeyBaseName, caCert, caKey); err != nil {
+				t.Fatalf("couldn't write out front-proxy-CA: %v", err)
+			}
+			if test.externalFrontProxyCA {
+				os.Remove(filepath.Join(tmpDir, constants.FrontProxyCAKeyName))
+			}
+			if !test.skipCreateEtcdCA {
 				if err := pkiutil.WriteCertAndKey(tmpDir, constants.EtcdCACertAndKeyBaseName, caCert, caKey); err != nil {
-					t.Fatalf("couldn't write out CA: %v", err)
+					t.Fatalf("couldn't write out etcd-CA: %v", err)
 				}
 			}
 
-			// Create expected certs
+			certMaps := make(map[string]big.Int)
+
+			// Create expected certs and load to recorde the serial numbers
 			for _, kubeCert := range test.certsShouldExist {
 				if err := kubeCert.CreateFromCA(cfg, caCert, caKey); err != nil {
-					t.Fatalf("couldn't renew certificate %q: %v", kubeCert.Name, err)
+					t.Fatalf("couldn't create certificate %q: %v", kubeCert.Name, err)
 				}
-			}
 
-			// Load expected certs to check if serial numbers changes
-			certMaps := make(map[*certsphase.KubeadmCert]big.Int)
-			for _, kubeCert := range test.certsShouldExist {
 				cert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
 				if err != nil {
 					t.Fatalf("couldn't load certificate %q: %v", kubeCert.Name, err)
 				}
-				certMaps[kubeCert] = *cert.SerialNumber
+				certMaps[kubeCert.Name] = *cert.SerialNumber
+			}
+
+			// Create expected kubeconfigs
+			for _, kubeConfig := range test.kubeConfigShouldExist {
+				if err := kubeconfigphase.CreateKubeConfigFile(kubeConfig, tmpDir, cfg); err != nil {
+					t.Fatalf("couldn't create kubeconfig %q: %v", kubeConfig, err)
+				}
+
+				newCerts, err := getEmbeddedCerts(tmpDir, kubeConfig)
+				if err != nil {
+					t.Fatalf("error reading embedded certs from %s: %v", kubeConfig, err)
+				}
+				certMaps[kubeConfig] = *newCerts[0].SerialNumber
 			}
 
 			// Renew everything
-			err := renewCerts(cfg, test.component)
+			rm, err := renewal.NewManager(&cfg.ClusterConfiguration, tmpDir)
+			if err != nil {
+				t.Fatalf("Failed to create the certificate renewal manager: %v", err)
+			}
+
+			err = renewCertsByComponent(cfg, test.component, rm)
 			if test.shouldErrorOnRenew {
 				if err == nil {
 					t.Fatal("expected renewal error, got nothing")
@@ -732,17 +837,182 @@ func TestRenewCerts(t *testing.T) {
 			}
 
 			// See if the certificate serial numbers change
-			for kubeCert, cert := range certMaps {
+			for _, kubeCert := range test.certsShouldExist {
 				newCert, err := pkiutil.TryLoadCertFromDisk(tmpDir, kubeCert.BaseName)
 				if err != nil {
 					t.Errorf("couldn't load new certificate %q: %v", kubeCert.Name, err)
 					continue
 				}
-				if cert.Cmp(newCert.SerialNumber) == 0 {
-					t.Errorf("certifitate %v was not reissued", kubeCert.Name)
+				oldSerial := certMaps[kubeCert.Name]
+
+				shouldBeRenewed := true
+				if test.certsShouldBeRenewed != nil {
+					shouldBeRenewed = false
+					for _, x := range test.certsShouldBeRenewed {
+						if x.Name == kubeCert.Name {
+							shouldBeRenewed = true
+						}
+					}
+				}
+
+				if shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) == 0 {
+					t.Errorf("certifitate %v was not reissued when expected", kubeCert.Name)
+				}
+				if !shouldBeRenewed && oldSerial.Cmp(newCert.SerialNumber) != 0 {
+					t.Errorf("certifitate %v was reissued when not expected", kubeCert.Name)
+				}
+			}
+
+			// See if the embedded certificate serial numbers change
+			for _, kubeConfig := range test.kubeConfigShouldExist {
+				newCerts, err := getEmbeddedCerts(tmpDir, kubeConfig)
+				if err != nil {
+					t.Fatalf("error reading embedded certs from %s: %v", kubeConfig, err)
+				}
+				oldSerial := certMaps[kubeConfig]
+				if oldSerial.Cmp(newCerts[0].SerialNumber) == 0 {
+					t.Errorf("certifitate %v was not reissued", kubeConfig)
 				}
 			}
 		})
 
+	}
+}
+
+func getEmbeddedCerts(tmpDir, kubeConfig string) ([]*x509.Certificate, error) {
+	kubeconfigPath := filepath.Join(tmpDir, kubeConfig)
+	newConfig, err := clientcmd.LoadFromFile(kubeconfigPath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to load kubeconfig file %s", kubeconfigPath)
+	}
+
+	authInfoName := newConfig.Contexts[newConfig.CurrentContext].AuthInfo
+	authInfo := newConfig.AuthInfos[authInfoName]
+
+	return certutil.ParseCertsPEM(authInfo.ClientCertificateData)
+}
+
+func TestGetPathManagerForUpgrade(t *testing.T) {
+
+	externalEtcd := &kubeadmapi.InitConfiguration{
+		ClusterConfiguration: kubeadmapi.ClusterConfiguration{
+			Etcd: kubeadmapi.Etcd{
+				External: &kubeadmapi.ExternalEtcd{
+					Endpoints: []string{"10.100.0.1:2379", "10.100.0.2:2379", "10.100.0.3:2379"},
+				},
+			},
+		},
+	}
+
+	stackedEtcd := &kubeadmapi.InitConfiguration{}
+
+	tests := []struct {
+		name             string
+		cfg              *kubeadmapi.InitConfiguration
+		etcdUpgrade      bool
+		shouldDeleteEtcd bool
+	}{
+		{
+			name:             "external etcd but no etcd upgrade",
+			cfg:              externalEtcd,
+			etcdUpgrade:      false,
+			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "external etcd with etcd upgrade",
+			cfg:              externalEtcd,
+			etcdUpgrade:      true,
+			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "stacked etcd but no etcd upgrade",
+			cfg:              stackedEtcd,
+			etcdUpgrade:      false,
+			shouldDeleteEtcd: true,
+		},
+		{
+			name:             "stacked etcd with etcd upgrade",
+			cfg:              stackedEtcd,
+			etcdUpgrade:      true,
+			shouldDeleteEtcd: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Use a temporary directory
+			tmpdir, err := ioutil.TempDir("", "TestGetPathManagerForUpgrade")
+			if err != nil {
+				t.Fatalf("unexpected error making temporary directory: %v", err)
+			}
+			defer func() {
+				os.RemoveAll(tmpdir)
+			}()
+
+			pathmgr, err := GetPathManagerForUpgrade(tmpdir, "", test.cfg, test.etcdUpgrade)
+			if err != nil {
+				t.Fatalf("unexpected error creating path manager: %v", err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
+				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
+				t.Errorf("expected etcd dir %s to exist, but it did not (%v)", pathmgr.BackupEtcdDir(), err)
+			}
+
+			if err := pathmgr.CleanupDirs(); err != nil {
+				t.Fatalf("unexpected error cleaning up directories: %v", err)
+			}
+
+			if _, err := os.Stat(pathmgr.BackupManifestDir()); os.IsNotExist(err) {
+				t.Errorf("expected manifest dir %s to exist, but it did not (%v)", pathmgr.BackupManifestDir(), err)
+			}
+
+			if test.shouldDeleteEtcd {
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); !os.IsNotExist(err) {
+					t.Errorf("expected etcd dir %s not to exist, but it did (%v)", pathmgr.BackupEtcdDir(), err)
+				}
+			} else {
+				if _, err := os.Stat(pathmgr.BackupEtcdDir()); os.IsNotExist(err) {
+					t.Errorf("expected etcd dir %s to exist, but it did not", pathmgr.BackupEtcdDir())
+				}
+			}
+		})
+	}
+
+}
+
+func TestGetEtcdImageTagFromStaticPod(t *testing.T) {
+	const expectedEtcdVersion = "3.1.12"
+	const etcdStaticPod = `apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    component: etcd
+    tier: control-plane
+  name: etcd
+  namespace: kube-system
+spec:
+  containers:
+  - name: etcd
+    image: k8s.gcr.io/etcd:` + expectedEtcdVersion
+
+	manifestsDir, err := ioutil.TempDir("", "GetEtcdImageTagFromStaticPod-test-manifests")
+	if err != nil {
+		t.Fatalf("Unable to create temporary directory: %v", err)
+	}
+	defer os.RemoveAll(manifestsDir)
+
+	if err = ioutil.WriteFile(constants.GetStaticPodFilepath(constants.Etcd, manifestsDir), []byte(etcdStaticPod), 0644); err != nil {
+		t.Fatalf("Unable to create test static pod manifest: %v", err)
+	}
+
+	got, err := GetEtcdImageTagFromStaticPod(manifestsDir)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	} else if got != expectedEtcdVersion {
+		t.Errorf("unexpected result:\n\tgot: %q\n\texpected: %q", got, expectedEtcdVersion)
 	}
 }

@@ -21,20 +21,6 @@ import (
 	"testing"
 )
 
-func TestBitCount(t *testing.T) {
-	for i, c := range bitCounts {
-		actual := 0
-		for j := 0; j < 8; j++ {
-			if ((1 << uint(j)) & i) != 0 {
-				actual++
-			}
-		}
-		if actual != int(c) {
-			t.Errorf("%d should have %d bits but recorded as %d", i, actual, c)
-		}
-	}
-}
-
 func TestCountBits(t *testing.T) {
 	tests := []struct {
 		n        *big.Int

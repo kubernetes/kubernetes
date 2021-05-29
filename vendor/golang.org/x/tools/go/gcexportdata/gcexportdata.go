@@ -18,7 +18,7 @@
 // Go 1.8 export data files, so they will work before and after the
 // Go update. (See discussion at https://golang.org/issue/15651.)
 //
-package gcexportdata
+package gcexportdata // import "golang.org/x/tools/go/gcexportdata"
 
 import (
 	"bufio"
@@ -100,7 +100,7 @@ func Read(in io.Reader, fset *token.FileSet, imports map[string]*types.Package, 
 // Write writes encoded type information for the specified package to out.
 // The FileSet provides file position information for named objects.
 func Write(out io.Writer, fset *token.FileSet, pkg *types.Package) error {
-	b, err := gcimporter.BExportData(fset, pkg)
+	b, err := gcimporter.IExportData(fset, pkg)
 	if err != nil {
 		return err
 	}

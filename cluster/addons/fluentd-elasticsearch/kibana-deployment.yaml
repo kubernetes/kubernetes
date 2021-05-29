@@ -2,10 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kibana-logging
-  namespace: kube-system
+  namespace: logging
   labels:
     k8s-app: kibana-logging
-    kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   replicas: 1
@@ -16,24 +15,41 @@ spec:
     metadata:
       labels:
         k8s-app: kibana-logging
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: kibana-logging
-        image: docker.elastic.co/kibana/kibana-oss:6.6.1
-        resources:
-          # need more cpu upon initialization, therefore burstable class
-          limits:
-            cpu: 1000m
-          requests:
-            cpu: 100m
-        env:
-          - name: ELASTICSEARCH_URL
-            value: http://elasticsearch-logging:9200
-          - name: SERVER_BASEPATH
-            value: /api/v1/namespaces/kube-system/services/kibana-logging/proxy
-        ports:
-        - containerPort: 5601
-          name: ui
-          protocol: TCP
+        - name: kibana-logging
+          image: docker.elastic.co/kibana/kibana-oss:7.10.2
+          resources:
+            # need more cpu upon initialization, therefore burstable class
+            limits:
+              cpu: 1000m
+            requests:
+              cpu: 100m
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: http://elasticsearch-logging:9200
+            - name: SERVER_NAME
+              value: kibana-logging
+            - name: SERVER_BASEPATH
+              value: /api/v1/namespaces/logging/services/kibana-logging/proxy
+            - name: SERVER_REWRITEBASEPATH
+              value: "false"
+          ports:
+            - containerPort: 5601
+              name: ui
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: ui
+            initialDelaySeconds: 5
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: ui
+            initialDelaySeconds: 5
+            timeoutSeconds: 10

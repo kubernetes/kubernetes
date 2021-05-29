@@ -26,123 +26,36 @@ import (
 // ValidateConditionalService validates conditionally valid fields.
 func ValidateConditionalService(service, oldService *api.Service) field.ErrorList {
 	var errs field.ErrorList
-	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(serviceSCTPFields(oldService)) == 0 {
-		for _, f := range serviceSCTPFields(service) {
-			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-		}
-	}
+
+	errs = append(errs, validateMixedProtocolLBService(service, oldService)...)
+
 	return errs
 }
 
-func serviceSCTPFields(service *api.Service) []*field.Path {
+// validateMixedProtocolLBService checks if the old Service has type=LoadBalancer and whether the Service has different Protocols
+// on its ports. If the MixedProtocolLBService feature flag is disabled the usage of different Protocols in the new Service is
+// valid only if the old Service has different Protocols, too.
+func validateMixedProtocolLBService(service, oldService *api.Service) (errs field.ErrorList) {
+	if service.Spec.Type != api.ServiceTypeLoadBalancer {
+		return
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.MixedProtocolLBService) {
+		return
+	}
+
+	if serviceHasMixedProtocols(service) && !serviceHasMixedProtocols(oldService) {
+		errs = append(errs, field.Invalid(field.NewPath("spec", "ports"), service.Spec.Ports, "may not contain more than 1 protocol when type is 'LoadBalancer'"))
+	}
+	return
+}
+
+func serviceHasMixedProtocols(service *api.Service) bool {
 	if service == nil {
-		return nil
+		return false
 	}
-	fields := []*field.Path{}
-	for pIndex, p := range service.Spec.Ports {
-		if p.Protocol == api.ProtocolSCTP {
-			fields = append(fields, field.NewPath("spec.ports").Index(pIndex).Child("protocol"))
-		}
+	protos := map[string]bool{}
+	for _, port := range service.Spec.Ports {
+		protos[string(port.Protocol)] = true
 	}
-	return fields
-}
-
-// ValidateConditionalEndpoints validates conditionally valid fields.
-func ValidateConditionalEndpoints(endpoints, oldEndpoints *api.Endpoints) field.ErrorList {
-	var errs field.ErrorList
-	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(endpointsSCTPFields(oldEndpoints)) == 0 {
-		for _, f := range endpointsSCTPFields(endpoints) {
-			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-		}
-	}
-	return errs
-}
-
-func endpointsSCTPFields(endpoints *api.Endpoints) []*field.Path {
-	if endpoints == nil {
-		return nil
-	}
-	fields := []*field.Path{}
-	for sIndex, s := range endpoints.Subsets {
-		for pIndex, p := range s.Ports {
-			if p.Protocol == api.ProtocolSCTP {
-				fields = append(fields, field.NewPath("subsets").Index(sIndex).Child("ports").Index(pIndex).Child("protocol"))
-			}
-		}
-	}
-	return fields
-}
-
-// ValidateConditionalPodTemplate validates conditionally valid fields.
-// This should be called from Validate/ValidateUpdate for all resources containing a PodTemplateSpec
-func ValidateConditionalPodTemplate(podTemplate, oldPodTemplate *api.PodTemplateSpec, fldPath *field.Path) field.ErrorList {
-	var (
-		podSpec    *api.PodSpec
-		oldPodSpec *api.PodSpec
-	)
-	if podTemplate != nil {
-		podSpec = &podTemplate.Spec
-	}
-	if oldPodTemplate != nil {
-		oldPodSpec = &oldPodTemplate.Spec
-	}
-	return validateConditionalPodSpec(podSpec, oldPodSpec, fldPath.Child("spec"))
-}
-
-// ValidateConditionalPod validates conditionally valid fields.
-// This should be called from Validate/ValidateUpdate for all resources containing a Pod
-func ValidateConditionalPod(pod, oldPod *api.Pod, fldPath *field.Path) field.ErrorList {
-	var (
-		podSpec    *api.PodSpec
-		oldPodSpec *api.PodSpec
-	)
-	if pod != nil {
-		podSpec = &pod.Spec
-	}
-	if oldPod != nil {
-		oldPodSpec = &oldPod.Spec
-	}
-	return validateConditionalPodSpec(podSpec, oldPodSpec, fldPath.Child("spec"))
-}
-
-func validateConditionalPodSpec(podSpec, oldPodSpec *api.PodSpec, fldPath *field.Path) field.ErrorList {
-	// Always make sure we have a non-nil current pod spec
-	if podSpec == nil {
-		podSpec = &api.PodSpec{}
-	}
-
-	errs := field.ErrorList{}
-
-	// If the SCTPSupport feature is disabled, and the old object isn't using the SCTP feature, prevent the new object from using it
-	if !utilfeature.DefaultFeatureGate.Enabled(features.SCTPSupport) && len(podSCTPFields(oldPodSpec, nil)) == 0 {
-		for _, f := range podSCTPFields(podSpec, fldPath) {
-			errs = append(errs, field.NotSupported(f, api.ProtocolSCTP, []string{string(api.ProtocolTCP), string(api.ProtocolUDP)}))
-		}
-	}
-
-	return errs
-}
-
-func podSCTPFields(podSpec *api.PodSpec, fldPath *field.Path) []*field.Path {
-	if podSpec == nil {
-		return nil
-	}
-	fields := []*field.Path{}
-	for cIndex, c := range podSpec.InitContainers {
-		for pIndex, p := range c.Ports {
-			if p.Protocol == api.ProtocolSCTP {
-				fields = append(fields, fldPath.Child("initContainers").Index(cIndex).Child("ports").Index(pIndex).Child("protocol"))
-			}
-		}
-	}
-	for cIndex, c := range podSpec.Containers {
-		for pIndex, p := range c.Ports {
-			if p.Protocol == api.ProtocolSCTP {
-				fields = append(fields, fldPath.Child("containers").Index(cIndex).Child("ports").Index(pIndex).Child("protocol"))
-			}
-		}
-	}
-	return fields
+	return len(protos) > 1
 }

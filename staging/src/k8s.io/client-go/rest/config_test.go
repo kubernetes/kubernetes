@@ -23,6 +23,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -32,12 +33,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 )
@@ -155,6 +156,59 @@ func TestRESTClientRequires(t *testing.T) {
 	}
 }
 
+func TestRESTClientLimiter(t *testing.T) {
+	testCases := []struct {
+		Name    string
+		Config  Config
+		Limiter flowcontrol.RateLimiter
+	}{
+		{
+			Config:  Config{},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(5, 10),
+		},
+		{
+			Config:  Config{QPS: 10},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(10, 10),
+		},
+		{
+			Config:  Config{QPS: -1},
+			Limiter: nil,
+		},
+		{
+			Config: Config{
+				RateLimiter: flowcontrol.NewTokenBucketRateLimiter(11, 12),
+			},
+			Limiter: flowcontrol.NewTokenBucketRateLimiter(11, 12),
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run("Versioned_"+testCase.Name, func(t *testing.T) {
+			config := testCase.Config
+			config.Host = "127.0.0.1"
+			config.ContentConfig = ContentConfig{GroupVersion: &v1.SchemeGroupVersion, NegotiatedSerializer: scheme.Codecs}
+			client, err := RESTClientFor(&config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
+				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+			}
+		})
+		t.Run("Unversioned_"+testCase.Name, func(t *testing.T) {
+			config := testCase.Config
+			config.Host = "127.0.0.1"
+			config.ContentConfig = ContentConfig{GroupVersion: &v1.SchemeGroupVersion, NegotiatedSerializer: scheme.Codecs}
+			client, err := UnversionedRESTClientFor(&config)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(testCase.Limiter, client.rateLimiter) {
+				t.Fatalf("unexpected rate limiter: %#v", client.rateLimiter)
+			}
+		})
+	}
+}
+
 type fakeLimiter struct {
 	FakeSaturation float64
 	FakeQPS        float32
@@ -172,6 +226,10 @@ func (t *fakeLimiter) QPS() float32 {
 	return t.FakeQPS
 }
 
+func (t *fakeLimiter) Wait(ctx context.Context) error {
+	return nil
+}
+
 func (t *fakeLimiter) Stop() {}
 
 func (t *fakeLimiter) Accept() {}
@@ -186,6 +244,10 @@ func (c *fakeCodec) Encode(obj runtime.Object, stream io.Writer) error {
 	return nil
 }
 
+func (c *fakeCodec) Identifier() runtime.Identifier {
+	return runtime.Identifier("fake")
+}
+
 type fakeRoundTripper struct{}
 
 func (r *fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
@@ -195,6 +257,10 @@ func (r *fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
 var fakeWrapperFunc = func(http.RoundTripper) http.RoundTripper {
 	return &fakeRoundTripper{}
 }
+
+type fakeWarningHandler struct{}
+
+func (f fakeWarningHandler) HandleWarningHeader(code int, agent string, message string) {}
 
 type fakeNegotiatedSerializer struct{}
 
@@ -213,7 +279,12 @@ func (n *fakeNegotiatedSerializer) DecoderToVersion(serializer runtime.Decoder, 
 var fakeDialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
 	return nil, fakeDialerError
 }
+
 var fakeDialerError = errors.New("fakedialer")
+
+func fakeProxyFunc(*http.Request) (*url.URL, error) {
+	return nil, errors.New("fakeproxy")
+}
 
 type fakeAuthProviderConfigPersister struct{}
 
@@ -252,13 +323,25 @@ func TestAnonymousConfig(t *testing.T) {
 			f.Fuzz(limiter)
 			*r = limiter
 		},
+		func(h *WarningHandler, f fuzz.Continue) {
+			*h = &fakeWarningHandler{}
+		},
 		// Authentication does not require fuzzer
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {},
 		func(r *clientcmdapi.AuthProviderConfig, f fuzz.Continue) {
 			r.Config = map[string]string{}
 		},
-		// Dial does not require fuzzer
-		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {},
+		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
+			*r = fakeDialFunc
+		},
+		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
+			*r = fakeProxyFunc
+		},
+		func(r *runtime.Object, f fuzz.Continue) {
+			unknown := &runtime.Unknown{}
+			f.Fuzz(unknown)
+			*r = unknown
+		},
 	)
 	for i := 0; i < 20; i++ {
 		original := &Config{}
@@ -280,28 +363,31 @@ func TestAnonymousConfig(t *testing.T) {
 		expected.TLSClientConfig.CertFile = ""
 		expected.TLSClientConfig.KeyData = nil
 		expected.TLSClientConfig.KeyFile = ""
+		expected.Transport = nil
+		expected.WrapTransport = nil
 
-		// The DeepEqual cannot handle the func comparison, so we just verify if the
-		// function return the expected object.
-		if actual.WrapTransport == nil || !reflect.DeepEqual(expected.WrapTransport(nil), &fakeRoundTripper{}) {
-			t.Fatalf("AnonymousClientConfig dropped the WrapTransport field")
-		} else {
-			actual.WrapTransport = nil
-			expected.WrapTransport = nil
-		}
 		if actual.Dial != nil {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")
 			if !reflect.DeepEqual(expectedError, actualError) {
-				t.Fatalf("CopyConfig dropped the Dial field")
+				t.Fatalf("AnonymousClientConfig dropped the Dial field")
 			}
-		} else {
-			actual.Dial = nil
-			expected.Dial = nil
 		}
+		actual.Dial = nil
+		expected.Dial = nil
 
-		if !reflect.DeepEqual(*actual, expected) {
-			t.Fatalf("AnonymousClientConfig dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectGoPrintDiff(expected, actual))
+		if actual.Proxy != nil {
+			_, actualError := actual.Proxy(nil)
+			_, expectedError := expected.Proxy(nil)
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("AnonymousClientConfig dropped the Proxy field")
+			}
+		}
+		actual.Proxy = nil
+		expected.Proxy = nil
+
+		if diff := cmp.Diff(*actual, expected); diff != "" {
+			t.Fatalf("AnonymousClientConfig dropped unexpected fields, identify whether they are security related or not (-got, +want): %s", diff)
 		}
 	}
 }
@@ -335,11 +421,22 @@ func TestCopyConfig(t *testing.T) {
 			f.Fuzz(limiter)
 			*r = limiter
 		},
+		func(h *WarningHandler, f fuzz.Continue) {
+			*h = &fakeWarningHandler{}
+		},
 		func(r *AuthProviderConfigPersister, f fuzz.Continue) {
 			*r = fakeAuthProviderConfigPersister{}
 		},
 		func(r *func(ctx context.Context, network, addr string) (net.Conn, error), f fuzz.Continue) {
 			*r = fakeDialFunc
+		},
+		func(r *func(*http.Request) (*url.URL, error), f fuzz.Continue) {
+			*r = fakeProxyFunc
+		},
+		func(r *runtime.Object, f fuzz.Continue) {
+			unknown := &runtime.Unknown{}
+			f.Fuzz(unknown)
+			*r = unknown
 		},
 	)
 	for i := 0; i < 20; i++ {
@@ -355,10 +452,10 @@ func TestCopyConfig(t *testing.T) {
 		// function return the expected object.
 		if actual.WrapTransport == nil || !reflect.DeepEqual(expected.WrapTransport(nil), &fakeRoundTripper{}) {
 			t.Fatalf("CopyConfig dropped the WrapTransport field")
-		} else {
-			actual.WrapTransport = nil
-			expected.WrapTransport = nil
 		}
+		actual.WrapTransport = nil
+		expected.WrapTransport = nil
+
 		if actual.Dial != nil {
 			_, actualError := actual.Dial(context.Background(), "", "")
 			_, expectedError := expected.Dial(context.Background(), "", "")
@@ -368,6 +465,7 @@ func TestCopyConfig(t *testing.T) {
 		}
 		actual.Dial = nil
 		expected.Dial = nil
+
 		if actual.AuthConfigPersister != nil {
 			actualError := actual.AuthConfigPersister.Persist(nil)
 			expectedError := expected.AuthConfigPersister.Persist(nil)
@@ -378,8 +476,18 @@ func TestCopyConfig(t *testing.T) {
 		actual.AuthConfigPersister = nil
 		expected.AuthConfigPersister = nil
 
-		if !reflect.DeepEqual(*actual, expected) {
-			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectReflectDiff(expected, *actual))
+		if actual.Proxy != nil {
+			_, actualError := actual.Proxy(nil)
+			_, expectedError := expected.Proxy(nil)
+			if !reflect.DeepEqual(expectedError, actualError) {
+				t.Fatalf("CopyConfig  dropped the Proxy field")
+			}
+		}
+		actual.Proxy = nil
+		expected.Proxy = nil
+
+		if diff := cmp.Diff(*actual, expected); diff != "" {
+			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not (-got, +want): %s", diff)
 		}
 	}
 }
@@ -427,8 +535,9 @@ func TestConfigStringer(t *testing.T) {
 					Config: map[string]string{"secret": "s3cr3t"},
 				},
 				ExecProvider: &clientcmdapi.ExecConfig{
-					Args: []string{"secret"},
-					Env:  []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+					Args:   []string{"secret"},
+					Env:    []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+					Config: &runtime.Unknown{Raw: []byte("here is some config data")},
 				},
 			},
 			expectContent: []string{
@@ -447,6 +556,8 @@ func TestConfigStringer(t *testing.T) {
 				formatBytes([]byte("fake key")),
 				"secret",
 				"s3cr3t",
+				"here is some config data",
+				formatBytes([]byte("super secret password")),
 			},
 		},
 	}
@@ -490,28 +601,33 @@ func TestConfigSprint(t *testing.T) {
 		},
 		AuthConfigPersister: fakeAuthProviderConfigPersister{},
 		ExecProvider: &clientcmdapi.ExecConfig{
-			Command: "sudo",
-			Args:    []string{"secret"},
-			Env:     []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+			Command:            "sudo",
+			Args:               []string{"secret"},
+			Env:                []clientcmdapi.ExecEnvVar{{Name: "secret", Value: "s3cr3t"}},
+			ProvideClusterInfo: true,
+			Config:             &runtime.Unknown{Raw: []byte("super secret password")},
 		},
 		TLSClientConfig: TLSClientConfig{
-			CertFile: "a.crt",
-			KeyFile:  "a.key",
-			CertData: []byte("fake cert"),
-			KeyData:  []byte("fake key"),
+			CertFile:   "a.crt",
+			KeyFile:    "a.key",
+			CertData:   []byte("fake cert"),
+			KeyData:    []byte("fake key"),
+			NextProtos: []string{"h2", "http/1.1"},
 		},
-		UserAgent:     "gobot",
-		Transport:     &fakeRoundTripper{},
-		WrapTransport: fakeWrapperFunc,
-		QPS:           1,
-		Burst:         2,
-		RateLimiter:   &fakeLimiter{},
-		Timeout:       3 * time.Second,
-		Dial:          fakeDialFunc,
+		UserAgent:      "gobot",
+		Transport:      &fakeRoundTripper{},
+		WrapTransport:  fakeWrapperFunc,
+		QPS:            1,
+		Burst:          2,
+		RateLimiter:    &fakeLimiter{},
+		WarningHandler: fakeWarningHandler{},
+		Timeout:        3 * time.Second,
+		Dial:           fakeDialFunc,
+		Proxy:          fakeProxyFunc,
 	}
 	want := fmt.Sprintf(
-		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.AuthProviderConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: ""}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil)}, UserAgent:"gobot", Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p)}`,
-		c.Transport, fakeWrapperFunc, c.RateLimiter, fakeDialFunc,
+		`&rest.Config{Host:"localhost:8080", APIPath:"v1", ContentConfig:rest.ContentConfig{AcceptContentTypes:"application/json", ContentType:"application/json", GroupVersion:(*schema.GroupVersion)(nil), NegotiatedSerializer:runtime.NegotiatedSerializer(nil)}, Username:"gopher", Password:"--- REDACTED ---", BearerToken:"--- REDACTED ---", BearerTokenFile:"", Impersonate:rest.ImpersonationConfig{UserName:"gopher2", Groups:[]string(nil), Extra:map[string][]string(nil)}, AuthProvider:api.AuthProviderConfig{Name: "gopher", Config: map[string]string{--- REDACTED ---}}, AuthConfigPersister:rest.AuthProviderConfigPersister(--- REDACTED ---), ExecProvider:api.ExecConfig{Command: "sudo", Args: []string{"--- REDACTED ---"}, Env: []ExecEnvVar{--- REDACTED ---}, APIVersion: "", ProvideClusterInfo: true, Config: runtime.Object(--- REDACTED ---)}, TLSClientConfig:rest.sanitizedTLSClientConfig{Insecure:false, ServerName:"", CertFile:"a.crt", KeyFile:"a.key", CAFile:"", CertData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x54, 0x52, 0x55, 0x4e, 0x43, 0x41, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, KeyData:[]uint8{0x2d, 0x2d, 0x2d, 0x20, 0x52, 0x45, 0x44, 0x41, 0x43, 0x54, 0x45, 0x44, 0x20, 0x2d, 0x2d, 0x2d}, CAData:[]uint8(nil), NextProtos:[]string{"h2", "http/1.1"}}, UserAgent:"gobot", DisableCompression:false, Transport:(*rest.fakeRoundTripper)(%p), WrapTransport:(transport.WrapperFunc)(%p), QPS:1, Burst:2, RateLimiter:(*rest.fakeLimiter)(%p), WarningHandler:rest.fakeWarningHandler{}, Timeout:3000000000, Dial:(func(context.Context, string, string) (net.Conn, error))(%p), Proxy:(func(*http.Request) (*url.URL, error))(%p)}`,
+		c.Transport, fakeWrapperFunc, c.RateLimiter, fakeDialFunc, fakeProxyFunc,
 	)
 
 	for _, f := range []string{"%s", "%v", "%+v", "%#v"} {

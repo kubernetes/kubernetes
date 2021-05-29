@@ -72,7 +72,7 @@ func TestEqualities(t *testing.T) {
 	}
 }
 
-func TestDerivates(t *testing.T) {
+func TestDerivatives(t *testing.T) {
 	e := Equalities{}
 	type Bar struct {
 		X int

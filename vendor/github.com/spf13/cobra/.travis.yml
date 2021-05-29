@@ -1,21 +1,29 @@
 language: go
 
-matrix:
-  include:
-    - go: 1.7.6
-    - go: 1.8.3
-    - go: tip
-  allow_failures:
-    - go: tip
+stages:
+  - diff
+  - test
+  - build
+
+go:
+  - 1.12.x
+  - 1.13.x
+  - tip
 
 before_install:
-  - mkdir -p bin
-  - curl -Lso bin/shellcheck https://github.com/caarlos0/shellcheck-docker/releases/download/v0.4.3/shellcheck
-  - chmod +x bin/shellcheck
-script:
-  - PATH=$PATH:$PWD/bin go test -v ./...
-  - go build
-  - diff -u <(echo -n) <(gofmt -d -s .)
-  - if [ -z $NOVET ]; then
-      diff -u <(echo -n) <(go tool vet . 2>&1 | grep -vE 'ExampleCommand|bash_completions.*Fprint');
-    fi
+  - go get -u github.com/kyoh86/richgo
+  - go get -u github.com/mitchellh/gox
+
+matrix:
+  allow_failures:
+    - go: tip
+  include:
+    - stage: diff
+      go: 1.13.x
+      script: make fmt
+    - stage: build
+      go: 1.13.x
+      script: make cobra_generator
+
+script: 
+ - make test

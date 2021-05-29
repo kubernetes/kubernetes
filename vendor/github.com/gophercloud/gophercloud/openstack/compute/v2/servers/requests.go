@@ -183,12 +183,22 @@ type CreateOpts struct {
 	// AccessIPv4 specifies an IPv4 address for the instance.
 	AccessIPv4 string `json:"accessIPv4,omitempty"`
 
-	// AccessIPv6 pecifies an IPv6 address for the instance.
+	// AccessIPv6 specifies an IPv6 address for the instance.
 	AccessIPv6 string `json:"accessIPv6,omitempty"`
+
+	// Min specifies Minimum number of servers to launch.
+	Min int `json:"min_count,omitempty"`
+
+	// Max specifies Maximum number of servers to launch.
+	Max int `json:"max_count,omitempty"`
 
 	// ServiceClient will allow calls to be made to retrieve an image or
 	// flavor ID by name.
 	ServiceClient *gophercloud.ServiceClient `json:"-"`
+
+	// Tags allows a server to be tagged with single-word metadata.
+	// Requires microversion 2.52 or later.
+	Tags []string `json:"tags,omitempty"`
 }
 
 // ToServerCreateMap assembles a request body based on the contents of a
@@ -270,6 +280,14 @@ func (opts CreateOpts) ToServerCreateMap() (map[string]interface{}, error) {
 			return nil, err
 		}
 		b["flavorRef"] = flavorID
+	}
+
+	if opts.Min != 0 {
+		b["min_count"] = opts.Min
+	}
+
+	if opts.Max != 0 {
+		b["max_count"] = opts.Max
 	}
 
 	return map[string]interface{}{"server": b}, nil

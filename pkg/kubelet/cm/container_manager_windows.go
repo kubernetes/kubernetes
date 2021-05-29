@@ -24,23 +24,27 @@ package cm
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
+	internalapi "k8s.io/cri-api/pkg/apis"
+	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	internalapi "k8s.io/kubernetes/pkg/kubelet/apis/cri"
-	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/status"
-	"k8s.io/kubernetes/pkg/kubelet/util/pluginwatcher"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/util/mount"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type containerManagerImpl struct {
@@ -50,6 +54,18 @@ type containerManagerImpl struct {
 	cadvisorInterface cadvisor.Interface
 	// Config of this node.
 	nodeConfig NodeConfig
+	// Interface for exporting and allocating devices reported by device plugins.
+	deviceManager devicemanager.Manager
+	// Interface for Topology resource co-ordination
+	topologyManager topologymanager.Manager
+}
+
+type noopWindowsResourceAllocator struct{}
+
+func (ra *noopWindowsResourceAllocator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	return lifecycle.PodAdmitResult{
+		Admit: true,
+	}
 }
 
 func (cm *containerManagerImpl) Start(node *v1.Node,
@@ -57,7 +73,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 	sourcesReady config.SourcesReady,
 	podStatusProvider status.PodStatusProvider,
 	runtimeService internalapi.RuntimeService) error {
-	klog.V(2).Infof("Starting Windows container manager")
+	klog.V(2).InfoS("Starting Windows container manager")
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LocalStorageCapacityIsolation) {
 		rootfs, err := cm.cadvisorInterface.RootFsInfo()
@@ -69,12 +85,16 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
+	// Starts device manager.
+	if err := cm.deviceManager.Start(devicemanager.ActivePodsFunc(activePods), sourcesReady); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // NewContainerManager creates windows container manager.
 func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.Interface, nodeConfig NodeConfig, failSwapOn bool, devicePluginEnabled bool, recorder record.EventRecorder) (ContainerManager, error) {
-	var capacity = v1.ResourceList{}
 	// It is safe to invoke `MachineInfo` on cAdvisor before logically initializing cAdvisor here because
 	// machine info is computed and cached once as part of cAdvisor object creation.
 	// But `RootFsInfo` and `ImagesFsInfo` are not available at this moment so they will be called later during manager starts
@@ -82,13 +102,28 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if err != nil {
 		return nil, err
 	}
-	capacity = cadvisor.CapacityFromMachineInfo(machineInfo)
+	capacity := cadvisor.CapacityFromMachineInfo(machineInfo)
 
-	return &containerManagerImpl{
+	cm := &containerManagerImpl{
 		capacity:          capacity,
 		nodeConfig:        nodeConfig,
 		cadvisorInterface: cadvisorInterface,
-	}, nil
+	}
+
+	cm.topologyManager = topologymanager.NewFakeManager()
+
+	klog.InfoS("Creating device plugin manager", "devicePluginEnabled", devicePluginEnabled)
+	if devicePluginEnabled {
+		cm.deviceManager, err = devicemanager.NewManagerImpl(nil, cm.topologyManager)
+		cm.topologyManager.AddHintProvider(cm.deviceManager)
+	} else {
+		cm.deviceManager, err = devicemanager.NewManagerStub()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return cm, nil
 }
 
 func (cm *containerManagerImpl) SystemCgroupsLimit() v1.ResourceList {
@@ -140,12 +175,12 @@ func (cm *containerManagerImpl) GetCapacity() v1.ResourceList {
 	return cm.capacity
 }
 
-func (cm *containerManagerImpl) GetPluginRegistrationHandler() pluginwatcher.PluginHandler {
-	return nil
+func (cm *containerManagerImpl) GetPluginRegistrationHandler() cache.PluginHandler {
+	return cm.deviceManager.GetWatcherHandler()
 }
 
 func (cm *containerManagerImpl) GetDevicePluginResourceCapacity() (v1.ResourceList, v1.ResourceList, []string) {
-	return nil, nil, []string{}
+	return cm.deviceManager.GetCapacity()
 }
 
 func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
@@ -153,21 +188,58 @@ func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
 }
 
 func (cm *containerManagerImpl) GetResources(pod *v1.Pod, container *v1.Container) (*kubecontainer.RunContainerOptions, error) {
-	return &kubecontainer.RunContainerOptions{}, nil
+	opts := &kubecontainer.RunContainerOptions{}
+	// Allocate should already be called during predicateAdmitHandler.Admit(),
+	// just try to fetch device runtime information from cached state here
+	devOpts, err := cm.deviceManager.GetDeviceRunContainerOptions(pod, container)
+	if err != nil {
+		return nil, err
+	} else if devOpts == nil {
+		return opts, nil
+	}
+	opts.Devices = append(opts.Devices, devOpts.Devices...)
+	opts.Mounts = append(opts.Mounts, devOpts.Mounts...)
+	opts.Envs = append(opts.Envs, devOpts.Envs...)
+	opts.Annotations = append(opts.Annotations, devOpts.Annotations...)
+	return opts, nil
 }
 
-func (cm *containerManagerImpl) UpdatePluginResources(*schedulernodeinfo.NodeInfo, *lifecycle.PodAdmitAttributes) error {
-	return nil
+func (cm *containerManagerImpl) UpdatePluginResources(node *schedulerframework.NodeInfo, attrs *lifecycle.PodAdmitAttributes) error {
+	return cm.deviceManager.UpdatePluginResources(node, attrs)
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), memorymanager.NewFakeManager(), topologymanager.NewFakeManager()}
 }
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
 	return ""
 }
 
-func (cm *containerManagerImpl) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
+func (cm *containerManagerImpl) GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices {
+	return containerDevicesFromResourceDeviceInstances(cm.deviceManager.GetDevices(podUID, containerName))
+}
+
+func (cm *containerManagerImpl) GetAllocatableDevices() []*podresourcesapi.ContainerDevices {
+	return nil
+}
+
+func (cm *containerManagerImpl) ShouldResetExtendedResourceCapacity() bool {
+	return cm.deviceManager.ShouldResetExtendedResourceCapacity()
+}
+
+func (cm *containerManagerImpl) GetAllocateResourcesPodAdmitHandler() lifecycle.PodAdmitHandler {
+	return &noopWindowsResourceAllocator{}
+}
+
+func (cm *containerManagerImpl) UpdateAllocatedDevices() {
+	return
+}
+
+func (cm *containerManagerImpl) GetCPUs(_, _ string) []int64 {
+	return nil
+}
+
+func (cm *containerManagerImpl) GetAllocatableCPUs() []int64 {
 	return nil
 }

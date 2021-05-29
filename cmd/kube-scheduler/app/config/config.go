@@ -19,18 +19,16 @@ package config
 import (
 	apiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/informers"
-	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/record"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // Config has all the context to run a Scheduler
 type Config struct {
-	// config is the scheduler server's configuration object.
+	// ComponentConfig is the scheduler server's configuration object.
 	ComponentConfig kubeschedulerconfig.KubeSchedulerConfiguration
 
 	// LoopbackClientConfig is a config for a privileged loopback connection
@@ -43,11 +41,11 @@ type Config struct {
 	SecureServing          *apiserver.SecureServingInfo
 
 	Client          clientset.Interface
+	KubeConfig      *restclient.Config
 	InformerFactory informers.SharedInformerFactory
-	PodInformer     coreinformers.PodInformer
-	EventClient     v1core.EventsGetter
-	Recorder        record.EventRecorder
-	Broadcaster     record.EventBroadcaster
+
+	//lint:ignore SA1019 this deprecated field still needs to be used for now. It will be removed once the migration is done.
+	EventBroadcaster events.EventBroadcasterAdapter
 
 	// LeaderElection is optional.
 	LeaderElection *leaderelection.LeaderElectionConfig

@@ -17,12 +17,17 @@ limitations under the License.
 package v1beta1
 
 import (
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.11
+// +k8s:prerelease-lifecycle-gen:deprecated=1.14
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=scheduling.k8s.io,v1,PriorityClass
 
 // DEPRECATED - This group version of PriorityClass is deprecated by scheduling.k8s.io/v1/PriorityClass.
 // PriorityClass defines mapping from a priority class name to the priority
@@ -50,9 +55,20 @@ type PriorityClass struct {
 	// when this priority class should be used.
 	// +optional
 	Description string `json:"description,omitempty" protobuf:"bytes,4,opt,name=description"`
+
+	// PreemptionPolicy is the Policy for preempting pods with lower priority.
+	// One of Never, PreemptLowerPriority.
+	// Defaults to PreemptLowerPriority if unset.
+	// This field is beta-level, gated by the NonPreemptingPriority feature-gate.
+	// +optional
+	PreemptionPolicy *apiv1.PreemptionPolicy `json:"preemptionPolicy,omitempty" protobuf:"bytes,5,opt,name=preemptionPolicy"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.11
+// +k8s:prerelease-lifecycle-gen:deprecated=1.14
+// +k8s:prerelease-lifecycle-gen:removed=1.22
+// +k8s:prerelease-lifecycle-gen:replacement=scheduling.k8s.io,v1,PriorityClassList
 
 // PriorityClassList is a collection of priority classes.
 type PriorityClassList struct {

@@ -1,4 +1,4 @@
-package mount
+package mount // import "github.com/docker/docker/api/types/mount"
 
 import (
 	"os"
@@ -79,7 +79,8 @@ const (
 
 // BindOptions defines options specific to mounts of type "bind".
 type BindOptions struct {
-	Propagation Propagation `json:",omitempty"`
+	Propagation  Propagation `json:",omitempty"`
+	NonRecursive bool        `json:",omitempty"`
 }
 
 // VolumeOptions represents the options for a mount of type volume.
@@ -112,7 +113,7 @@ type TmpfsOptions struct {
 	// TODO(stevvooe): There are several more tmpfs flags, specified in the
 	// daemon, that are accepted. Only the most basic are added for now.
 	//
-	// From docker/docker/pkg/mount/flags.go:
+	// From https://github.com/moby/sys/blob/mount/v0.1.1/mount/flags.go#L47-L56
 	//
 	// var validFlags = map[string]bool{
 	// 	"":          true,

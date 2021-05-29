@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+// Factory is a func which operates provider specific behavior.
 type Factory func() (ProviderInterface, error)
 
 var (
@@ -112,45 +113,67 @@ type ProviderInterface interface {
 // which doesn't do anything.
 type NullProvider struct{}
 
+// FrameworkBeforeEach is a base implementation which does BeforeEach.
 func (n NullProvider) FrameworkBeforeEach(f *Framework) {}
-func (n NullProvider) FrameworkAfterEach(f *Framework)  {}
 
+// FrameworkAfterEach is a base implementation which does AfterEach.
+func (n NullProvider) FrameworkAfterEach(f *Framework) {}
+
+// ResizeGroup is a base implementation which resizes group.
 func (n NullProvider) ResizeGroup(string, int32) error {
 	return fmt.Errorf("Provider does not support InstanceGroups")
 }
+
+// GetGroupNodes is a base implementation which returns group nodes.
 func (n NullProvider) GetGroupNodes(group string) ([]string, error) {
 	return nil, fmt.Errorf("provider does not support InstanceGroups")
 }
+
+// GroupSize returns the size of an instance group
 func (n NullProvider) GroupSize(group string) (int, error) {
 	return -1, fmt.Errorf("provider does not support InstanceGroups")
 }
 
+// DeleteNode is a base implementation which deletes a node.
 func (n NullProvider) DeleteNode(node *v1.Node) error {
 	return fmt.Errorf("provider does not support DeleteNode")
 }
 
+// CreatePD is a base implementation which creates PD.
 func (n NullProvider) CreatePD(zone string) (string, error) {
 	return "", fmt.Errorf("provider does not support volume creation")
 }
+
+// DeletePD is a base implementation which deletes PD.
 func (n NullProvider) DeletePD(pdName string) error {
 	return fmt.Errorf("provider does not support volume deletion")
 }
+
+// CreatePVSource is a base implementation which creates PV source.
 func (n NullProvider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSource, error) {
 	return nil, fmt.Errorf("Provider not supported")
 }
+
+// DeletePVSource is a base implementation which deletes PV source.
 func (n NullProvider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
 	return fmt.Errorf("Provider not supported")
 }
 
+// CleanupServiceResources is a base implementation which cleans up service resources.
 func (n NullProvider) CleanupServiceResources(c clientset.Interface, loadBalancerName, region, zone string) {
 }
 
+// EnsureLoadBalancerResourcesDeleted is a base implementation which ensures load balancer is deleted.
 func (n NullProvider) EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
 	return nil
 }
+
+// LoadBalancerSrcRanges is a base implementation which returns the ranges of ips used by load balancers.
 func (n NullProvider) LoadBalancerSrcRanges() []string {
 	return nil
 }
+
+// EnableAndDisableInternalLB is a base implementation which returns functions for enabling/disabling an internal LB.
 func (n NullProvider) EnableAndDisableInternalLB() (enable, disable func(svc *v1.Service)) {
 	nop := func(svc *v1.Service) {}
 	return nop, nop

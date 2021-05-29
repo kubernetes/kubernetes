@@ -30,9 +30,8 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -44,7 +43,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/controller"
@@ -56,7 +54,7 @@ import (
 
 const (
 	rootUserName = "root"
-	rootToken    = "root-user-token"
+	rootToken    = "root-user-token" // Fake value for testing.
 
 	readOnlyServiceAccountName  = "ro"
 	readWriteServiceAccountName = "rw"
@@ -72,7 +70,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	ns := "test-service-account-creation"
 
 	// Create namespace
-	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
@@ -84,7 +82,7 @@ func TestServiceAccountAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.CoreV1().ServiceAccounts(ns).Delete(defaultUser.Name, nil)
+	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), defaultUser.Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Could not delete default serviceaccount: %v", err)
 	}
@@ -110,13 +108,13 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	name := "my-service-account"
 
 	// Create namespace
-	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create service account
-	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	_, err = c.CoreV1().ServiceAccounts(ns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: name}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -128,7 +126,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete token
-	err = c.CoreV1().Secrets(ns).Delete(token1Name, nil)
+	err = c.CoreV1().Secrets(ns).Delete(context.TODO(), token1Name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("Could not delete token: %v", err)
 	}
@@ -146,12 +144,12 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Trigger creation of a new referenced token
-	serviceAccount, err = c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+	serviceAccount, err := c.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	serviceAccount.Secrets = []v1.ObjectReference{}
-	_, err = c.CoreV1().ServiceAccounts(ns).Update(serviceAccount)
+	_, err = c.CoreV1().ServiceAccounts(ns).Update(context.TODO(), serviceAccount, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +167,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	}
 
 	// Delete service account
-	err = c.CoreV1().ServiceAccounts(ns).Delete(name, nil)
+	err = c.CoreV1().ServiceAccounts(ns).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +176,7 @@ func TestServiceAccountTokenAutoCreate(t *testing.T) {
 	tokensToCleanup := sets.NewString(token1Name, token2Name, token3Name)
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
 		// Get all secrets in the namespace
-		secrets, err := c.CoreV1().Secrets(ns).List(metav1.ListOptions{})
+		secrets, err := c.CoreV1().Secrets(ns).List(context.TODO(), metav1.ListOptions{})
 		// Retrieval errors should fail
 		if err != nil {
 			return false, err
@@ -207,15 +205,9 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 	ns := "auto-mount-ns"
 
 	// Create "my" namespace
-	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}}, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
-	}
-
-	// Get default token
-	defaultTokenName, _, err := getReferencedServiceAccountToken(c, ns, serviceaccountadmission.DefaultServiceAccountName, true)
-	if err != nil {
-		t.Fatal(err)
 	}
 
 	// Pod to create
@@ -224,58 +216,24 @@ func TestServiceAccountTokenAutoMount(t *testing.T) {
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
-					Name:  "container-1",
-					Image: "container-1-image",
-				},
-				{
-					Name:  "container-2",
-					Image: "container-2-image",
-					VolumeMounts: []v1.VolumeMount{
-						{Name: "empty-dir", MountPath: serviceaccountadmission.DefaultAPITokenMountPath},
-					},
-				},
-			},
-			Volumes: []v1.Volume{
-				{
-					Name:         "empty-dir",
-					VolumeSource: v1.VolumeSource{EmptyDir: &v1.EmptyDirVolumeSource{}},
+					Name:  "container",
+					Image: "container-image",
 				},
 			},
 		},
 	}
 
-	// Pod we expect to get created
-	defaultMode := int32(0644)
-	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
-	expectedVolumes := append(protoPod.Spec.Volumes, v1.Volume{
-		Name: defaultTokenName,
-		VolumeSource: v1.VolumeSource{
-			Secret: &v1.SecretVolumeSource{
-				SecretName:  defaultTokenName,
-				DefaultMode: &defaultMode,
-			},
-		},
-	})
-	expectedContainer1VolumeMounts := []v1.VolumeMount{
-		{Name: defaultTokenName, MountPath: serviceaccountadmission.DefaultAPITokenMountPath, ReadOnly: true},
-	}
-	expectedContainer2VolumeMounts := protoPod.Spec.Containers[1].VolumeMounts
-
-	createdPod, err := c.CoreV1().Pods(ns).Create(&protoPod)
+	createdPod, err := c.CoreV1().Pods(ns).Create(context.TODO(), &protoPod, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	expectedServiceAccount := serviceaccountadmission.DefaultServiceAccountName
 	if createdPod.Spec.ServiceAccountName != expectedServiceAccount {
 		t.Fatalf("Expected %s, got %s", expectedServiceAccount, createdPod.Spec.ServiceAccountName)
 	}
-	if !apiequality.Semantic.DeepEqual(&expectedVolumes, &createdPod.Spec.Volumes) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedVolumes, createdPod.Spec.Volumes)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer1VolumeMounts, &createdPod.Spec.Containers[0].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer1VolumeMounts, createdPod.Spec.Containers[0].VolumeMounts)
-	}
-	if !apiequality.Semantic.DeepEqual(&expectedContainer2VolumeMounts, &createdPod.Spec.Containers[1].VolumeMounts) {
-		t.Fatalf("Expected\n\t%#v\n\tgot\n\t%#v", expectedContainer2VolumeMounts, createdPod.Spec.Containers[1].VolumeMounts)
+	if len(createdPod.Spec.Volumes) == 0 || createdPod.Spec.Volumes[0].Projected == nil {
+		t.Fatal("Expected projected volume for service account token inserted")
 	}
 }
 
@@ -290,19 +248,19 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	otherns := "other-ns"
 
 	// Create "my" namespace
-	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: myns}}, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "other" namespace
-	_, err = c.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: otherns}})
-	if err != nil && !errors.IsAlreadyExists(err) {
+	_, err = c.CoreV1().Namespaces().Create(context.TODO(), &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: otherns}}, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		t.Fatalf("could not create namespace: %v", err)
 	}
 
 	// Create "ro" user in myns
-	_, err = c.CoreV1().ServiceAccounts(myns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}})
+	_, err = c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readOnlyServiceAccountName}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -315,13 +273,13 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	roClient := clientset.NewForConfigOrDie(&roClientConfig)
 	doServiceAccountAPIRequests(t, roClient, myns, true, true, false)
 	doServiceAccountAPIRequests(t, roClient, otherns, true, false, false)
-	err = c.CoreV1().Secrets(myns).Delete(roTokenName, nil)
+	err = c.CoreV1().Secrets(myns).Delete(context.TODO(), roTokenName, metav1.DeleteOptions{})
 	if err != nil {
 		t.Fatalf("could not delete token: %v", err)
 	}
 	// wait for delete to be observed and reacted to via watch
 	wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
-		sa, err := c.CoreV1().ServiceAccounts(myns).Get(readOnlyServiceAccountName, metav1.GetOptions{})
+		sa, err := c.CoreV1().ServiceAccounts(myns).Get(context.TODO(), readOnlyServiceAccountName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -335,7 +293,7 @@ func TestServiceAccountTokenAuthentication(t *testing.T) {
 	doServiceAccountAPIRequests(t, roClient, myns, false, false, false)
 
 	// Create "rw" user in myns
-	_, err = c.CoreV1().ServiceAccounts(myns).Create(&v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readWriteServiceAccountName}})
+	_, err = c.CoreV1().ServiceAccounts(myns).Create(context.TODO(), &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: readWriteServiceAccountName}}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatalf("Service Account not created: %v", err)
 	}
@@ -375,7 +333,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
 	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
-	externalRootClientset := kubernetes.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
+	externalRootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}, BearerToken: rootToken})
 
 	externalInformers := informers.NewSharedInformerFactory(externalRootClientset, controller.NoResyncPeriodFunc())
 	informers := informers.NewSharedInformerFactory(rootClientset, controller.NoResyncPeriodFunc())
@@ -396,7 +354,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 		externalInformers.Core().V1().ServiceAccounts().Lister(),
 		externalInformers.Core().V1().Pods().Lister(),
 	)
-	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator(serviceaccount.LegacyIssuer, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
+	serviceAccountTokenAuth := serviceaccount.JWTTokenAuthenticator([]string{serviceaccount.LegacyIssuer}, []interface{}{&serviceAccountKey.PublicKey}, nil, serviceaccount.NewLegacyValidator(true, serviceAccountTokenGetter))
 	authenticator := union.New(
 		bearertoken.New(rootTokenAuth),
 		bearertoken.New(serviceAccountTokenAuth),
@@ -406,7 +364,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// 1. The "root" user is allowed to do anything
 	// 2. ServiceAccounts named "ro" are allowed read-only operations in their namespace
 	// 3. ServiceAccounts named "rw" are allowed any operation in their namespace
-	authorizer := authorizer.AuthorizerFunc(func(attrs authorizer.Attributes) (authorizer.Decision, string, error) {
+	authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, attrs authorizer.Attributes) (authorizer.Decision, string, error) {
 		username := ""
 		if user := attrs.GetUser(); user != nil {
 			username = user.GetName()
@@ -447,12 +405,13 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer
 	masterConfig.GenericConfig.AdmissionControl = serviceAccountAdmission
-	framework.RunAMasterUsingServer(masterConfig, apiServer, h)
+	_, _, kubeAPIServerCloseFn := framework.RunAnApiserverUsingServer(masterConfig, apiServer, h)
 
 	// Start the service account and service account token controllers
 	stopCh := make(chan struct{})
 	stop := func() {
 		close(stopCh)
+		kubeAPIServerCloseFn()
 		apiServer.Close()
 	}
 
@@ -489,14 +448,14 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 
 func getServiceAccount(c *clientset.Clientset, ns string, name string, shouldWait bool) (*v1.ServiceAccount, error) {
 	if !shouldWait {
-		return c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
+		return c.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
 	}
 
 	var user *v1.ServiceAccount
 	var err error
 	err = wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
-		user, err = c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		user, err = c.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -512,8 +471,8 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 	token := ""
 
 	findToken := func() (bool, error) {
-		user, err := c.CoreV1().ServiceAccounts(ns).Get(name, metav1.GetOptions{})
-		if errors.IsNotFound(err) {
+		user, err := c.CoreV1().ServiceAccounts(ns).Get(context.TODO(), name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
@@ -521,8 +480,8 @@ func getReferencedServiceAccountToken(c *clientset.Clientset, ns string, name st
 		}
 
 		for _, ref := range user.Secrets {
-			secret, err := c.CoreV1().Secrets(ns).Get(ref.Name, metav1.GetOptions{})
-			if errors.IsNotFound(err) {
+			secret, err := c.CoreV1().Secrets(ns).Get(context.TODO(), ref.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
 				continue
 			}
 			if err != nil {
@@ -571,23 +530,28 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	readOps := []testOperation{
 		func() error {
-			_, err := c.CoreV1().Secrets(ns).List(metav1.ListOptions{})
+			_, err := c.CoreV1().Secrets(ns).List(context.TODO(), metav1.ListOptions{})
 			return err
 		},
 		func() error {
-			_, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
+			_, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{})
 			return err
 		},
 	}
 	writeOps := []testOperation{
-		func() error { _, err := c.CoreV1().Secrets(ns).Create(testSecret); return err },
-		func() error { return c.CoreV1().Secrets(ns).Delete(testSecret.Name, nil) },
+		func() error {
+			_, err := c.CoreV1().Secrets(ns).Create(context.TODO(), testSecret, metav1.CreateOptions{})
+			return err
+		},
+		func() error {
+			return c.CoreV1().Secrets(ns).Delete(context.TODO(), testSecret.Name, metav1.DeleteOptions{})
+		},
 	}
 
 	for _, op := range readOps {
 		err := op()
-		unauthorizedError := errors.IsUnauthorized(err)
-		forbiddenError := errors.IsForbidden(err)
+		unauthorizedError := apierrors.IsUnauthorized(err)
+		forbiddenError := apierrors.IsForbidden(err)
 
 		switch {
 		case !authenticated && !unauthorizedError:
@@ -603,8 +567,8 @@ func doServiceAccountAPIRequests(t *testing.T, c *clientset.Clientset, ns string
 
 	for _, op := range writeOps {
 		err := op()
-		unauthorizedError := errors.IsUnauthorized(err)
-		forbiddenError := errors.IsForbidden(err)
+		unauthorizedError := apierrors.IsUnauthorized(err)
+		forbiddenError := apierrors.IsForbidden(err)
 
 		switch {
 		case !authenticated && !unauthorizedError:

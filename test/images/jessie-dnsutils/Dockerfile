@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM BASEIMAGE
+ARG BASEIMAGE
+FROM $BASEIMAGE
 
 CROSS_BUILD_COPY qemu-QEMUARCH-static /usr/bin/
 
@@ -24,5 +25,8 @@ COPY fixup-apt-list.sh /
 RUN ["/fixup-apt-list.sh"]
 
 RUN apt-get -q update && \
-    apt-get install -y dnsutils && \
+    apt-get install -y --force-yes dnsutils && \
     apt-get clean
+
+ADD https://github.com/coredns/coredns/releases/download/v1.5.0/coredns_1.5.0_linux_BASEARCH.tgz /coredns.tgz
+RUN tar -xzvf /coredns.tgz && rm -f /coredns.tgz

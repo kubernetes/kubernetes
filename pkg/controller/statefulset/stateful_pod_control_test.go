@@ -20,6 +20,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/client-go/tools/record"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -128,6 +130,42 @@ func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
 		}
 	}
 }
+func TestStatefulPodControlCreatePodPvcDeleting(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	fakeClient := &fake.Clientset{}
+	pvcs := getPersistentVolumeClaims(set, pod)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	deleteTime := time.Date(2019, time.January, 1, 0, 0, 0, 0, time.UTC)
+	for k := range pvcs {
+		pvc := pvcs[k]
+		pvc.DeletionTimestamp = &metav1.Time{Time: deleteTime}
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	if err := control.CreateStatefulPod(set, pod); err == nil {
+		t.Error("Failed to produce error on deleting PVC")
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 1 {
+		t.Errorf("Deleting PVC: got %d events, but want 1", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeWarning) {
+			t.Errorf("Found unexpected non-warning event %s", events[i])
+		}
+	}
+}
 
 type fakeIndexer struct {
 	cache.Indexer
@@ -205,7 +243,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 	control := NewRealStatefulPodControl(fakeClient, nil, nil, nil, recorder)
 	fakeClient.AddReactor("*", "*", func(action core.Action) (bool, runtime.Object, error) {
 		t.Error("no-op update should not make any client invocation")
-		return true, nil, apierrors.NewInternalError(errors.New("If we are here we have a problem"))
+		return true, nil, apierrors.NewInternalError(errors.New("if we are here we have a problem"))
 	})
 	if err := control.UpdateStatefulPod(set, pod); err != nil {
 		t.Errorf("Error returned on no-op update error: %s", err)
@@ -374,9 +412,9 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 		if !conflict {
 			conflict = true
 			return true, update.GetObject(), apierrors.NewConflict(action.GetResource().GroupResource(), pod.Name, errors.New("conflict"))
-		} else {
-			return true, update.GetObject(), nil
 		}
+		return true, update.GetObject(), nil
+
 	})
 	pod.Name = "goo-0"
 	if err := control.UpdateStatefulPod(set, pod); err != nil {

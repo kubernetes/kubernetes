@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+// In Go 1.13, the ed25519 package was promoted to the standard library as
+// crypto/ed25519, and this package became a wrapper for the standard library one.
+//
+//go:build !go1.13
+// +build !go1.13
+
 // Package ed25519 implements the Ed25519 signature algorithm. See
 // https://ed25519.cr.yp.to/.
 //

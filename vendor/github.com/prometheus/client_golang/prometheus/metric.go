@@ -17,12 +17,14 @@ import (
 	"strings"
 	"time"
 
+	//lint:ignore SA1019 Need to keep deprecated package for compatibility.
 	"github.com/golang/protobuf/proto"
+	"github.com/prometheus/common/model"
 
 	dto "github.com/prometheus/client_model/go"
 )
 
-const separatorByte byte = 255
+var separatorByteSlice = []byte{model.SeparatorByte} // For convenient use with xxhash.
 
 // A Metric models a single sample value with its meta data being exported to
 // Prometheus. Implementations of Metric in this package are Gauge, Counter,

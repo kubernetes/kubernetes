@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -23,7 +25,7 @@ import (
 
 	dockertypes "github.com/docker/docker/api/types"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
 )
 
@@ -69,7 +71,7 @@ func toPullableImageID(id string, image *dockertypes.ImageInspect) string {
 	// Default to the image ID, but if RepoDigests is not empty, use
 	// the first digest instead.
 	imageID := DockerImageIDPrefix + id
-	if len(image.RepoDigests) > 0 {
+	if image != nil && len(image.RepoDigests) > 0 {
 		imageID = DockerPullableImageIDPrefix + image.RepoDigests[0]
 	}
 	return imageID
@@ -164,7 +166,7 @@ func containerToRuntimeAPISandbox(c *dockertypes.Container) (*runtimeapi.PodSand
 	}, nil
 }
 
-func checkpointToRuntimeAPISandbox(id string, checkpoint DockershimCheckpoint) *runtimeapi.PodSandbox {
+func checkpointToRuntimeAPISandbox(id string, checkpoint ContainerCheckpoint) *runtimeapi.PodSandbox {
 	state := runtimeapi.PodSandboxState_SANDBOX_NOTREADY
 	_, name, namespace, _, _ := checkpoint.GetData()
 	return &runtimeapi.PodSandbox{

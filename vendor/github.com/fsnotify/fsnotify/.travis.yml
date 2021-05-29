@@ -2,29 +2,35 @@ sudo: false
 language: go
 
 go:
-  - 1.8.x
-  - 1.9.x
-  - tip
+  - "stable"
+  - "1.11.x"
+  - "1.10.x"
+  - "1.9.x"
 
 matrix:
+  include:
+    - go: "stable"
+      env: GOLINT=true
   allow_failures:
     - go: tip
   fast_finish: true
 
-before_script:
-  - go get -u github.com/golang/lint/golint
+
+before_install:
+  - if [ ! -z "${GOLINT}" ]; then go get -u golang.org/x/lint/golint; fi
 
 script:
-  - go test -v --race ./...
+  - go test --race ./...
 
 after_script:
   - test -z "$(gofmt -s -l -w . | tee /dev/stderr)"
-  - test -z "$(golint ./...     | tee /dev/stderr)"
+  - if [ ! -z  "${GOLINT}" ]; then echo running golint; golint --set_exit_status  ./...; else echo skipping golint; fi
   - go vet ./...
 
 os:
   - linux
   - osx
+  - windows
 
 notifications:
   email: false

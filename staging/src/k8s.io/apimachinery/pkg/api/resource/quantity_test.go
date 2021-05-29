@@ -18,6 +18,8 @@ package resource
 
 import (
 	"encoding/json"
+	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"testing"
@@ -27,11 +29,6 @@ import (
 
 	inf "gopkg.in/inf.v0"
 )
-
-func amount(i int64, exponent int) infDecAmount {
-	// See the below test-- scale is the negative of an exponent.
-	return infDecAmount{inf.NewDec(i, inf.Scale(-exponent))}
-}
 
 func dec(i int64, exponent int) infDecAmount {
 	// See the below test-- scale is the negative of an exponent.
@@ -94,11 +91,11 @@ func TestQuantityAddZeroPreservesSuffix(t *testing.T) {
 	zero := MustParse("0")
 	for _, testValue := range testValues {
 		value := MustParse(testValue)
-		v1 := *value.Copy()
+		v1 := value.DeepCopy()
 		// ensure non-zero + zero = non-zero (suffix preserved)
 		v1.Add(zero)
 		// ensure zero + non-zero = non-zero (suffix preserved)
-		v2 := *zero.Copy()
+		v2 := zero.DeepCopy()
 		v2.Add(value)
 
 		if v1.String() != testValue {
@@ -118,7 +115,7 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 	zero := MustParse("0")
 	for _, testValue := range testValues {
 		value := MustParse(testValue)
-		v1 := *value.Copy()
+		v1 := value.DeepCopy()
 		// ensure non-zero - zero = non-zero (suffix preserved)
 		v1.Sub(zero)
 		// ensure we preserved the input value
@@ -127,9 +124,9 @@ func TestQuantitySubZeroPreservesSuffix(t *testing.T) {
 		}
 
 		// ensure zero - non-zero = -non-zero (suffix preserved)
-		v2 := *zero.Copy()
+		v2 := zero.DeepCopy()
 		v2.Sub(value)
-		negVal := *value.Copy()
+		negVal := value.DeepCopy()
 		negVal.Neg()
 		if v2.String() != negVal.String() {
 			t.Errorf("Expected %v, actual %v", negVal.String(), v2.String())
@@ -395,6 +392,16 @@ func TestQuantityParse(t *testing.T) {
 				got.AsDec()
 			}
 
+			for _, format := range []Format{DecimalSI, BinarySI, DecimalExponent} {
+				// ensure we are not simply checking pointer equality by creating a new inf.Dec
+				var copied inf.Dec
+				copied.Add(inf.NewDec(0, inf.Scale(0)), got.AsDec())
+				q := NewDecimalQuantity(copied, format)
+				if c := q.Cmp(got); c != 0 {
+					t.Errorf("%v: round trip from decimal back to quantity is not comparable: %d: %#v vs %#v", item.input, c, got, q)
+				}
+			}
+
 			// verify that we can decompose the input and get the same result by building up from the base.
 			positive, _, num, denom, suffix, err := parseQuantityString(item.input)
 			if err != nil {
@@ -523,7 +530,7 @@ func TestQuantityRoundUp(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			expect := *item.expect.Copy()
+			expect := item.expect.DeepCopy()
 			if asDec {
 				got.AsDec()
 			}
@@ -580,7 +587,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 	}
 
 	for _, item := range table {
-		a, b := *item.a.Copy(), *item.b.Copy()
+		a, b := item.a.DeepCopy(), item.b.DeepCopy()
 		a.AsDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
@@ -591,7 +598,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 	}
 
 	for _, item := range table {
-		a, b := *item.a.Copy(), *item.b.Copy()
+		a, b := item.a.DeepCopy(), item.b.DeepCopy()
 		b.AsDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
 			t.Errorf("%#v: unexpected Cmp: %d", item, cmp)
@@ -602,7 +609,7 @@ func TestQuantityCmpInt64AndDec(t *testing.T) {
 	}
 
 	for _, item := range table {
-		a, b := *item.a.Copy(), *item.b.Copy()
+		a, b := item.a.DeepCopy(), item.b.DeepCopy()
 		a.AsDec()
 		b.AsDec()
 		if cmp := a.Cmp(b); cmp != item.cmp {
@@ -624,7 +631,7 @@ func TestQuantityNeg(t *testing.T) {
 	}
 
 	for i, item := range table {
-		out := *item.a.Copy()
+		out := item.a.DeepCopy()
 		out.Neg()
 		if out.Cmp(item.a) == 0 {
 			t.Errorf("%d: negating an item should not mutate the source: %s", i, out.String())
@@ -1029,6 +1036,7 @@ func TestScaledValue(t *testing.T) {
 		{0, Micro, 1000 * 1000},
 		{0, Milli, 1000},
 		{0, 0, 1},
+		{2, -2, 100 * 100},
 	}
 
 	for _, item := range table {
@@ -1044,14 +1052,14 @@ func TestUninitializedNoCrash(t *testing.T) {
 
 	q.Value()
 	q.MilliValue()
-	q.Copy()
+	q.DeepCopy()
 	_ = q.String()
 	q.MarshalJSON()
 }
 
-func TestCopy(t *testing.T) {
+func TestDeepCopy(t *testing.T) {
 	q := NewQuantity(5, DecimalSI)
-	c := q.Copy()
+	c := q.DeepCopy()
 	c.Set(6)
 	if q.Value() == 6 {
 		t.Errorf("Copy didn't")
@@ -1096,7 +1104,7 @@ func TestNeg(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		a := test.a.Copy()
+		a := test.a.DeepCopy()
 		a.Neg()
 		// ensure value is same
 		if a.Cmp(test.expected) != 0 {
@@ -1171,7 +1179,7 @@ func TestNegateRoundTrip(t *testing.T) {
 					q.AsDec()
 				}
 
-				b := q.Copy()
+				b := q.DeepCopy()
 				b.Neg()
 				b.Neg()
 				if b.Cmp(q) != 0 {
@@ -1181,6 +1189,77 @@ func TestNegateRoundTrip(t *testing.T) {
 		}
 	}
 }
+
+func TestQuantityAsApproximateFloat64(t *testing.T) {
+	table := []struct {
+		in  Quantity
+		out float64
+	}{
+		{decQuantity(0, 0, DecimalSI), 0.0},
+		{decQuantity(0, 0, DecimalExponent), 0.0},
+		{decQuantity(0, 0, BinarySI), 0.0},
+
+		{decQuantity(1, 0, DecimalSI), 1},
+		{decQuantity(1, 0, DecimalExponent), 1},
+		{decQuantity(1, 0, BinarySI), 1},
+
+		// Binary suffixes
+		{decQuantity(1024, 0, BinarySI), 1024},
+		{decQuantity(8*1024, 0, BinarySI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, BinarySI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, BinarySI), (7 * 1024 * 1024) * 1024},
+		{decQuantity(7*1024*1024, 4, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024)},
+		{decQuantity(7*1024*1024, 8, BinarySI), (7 * 1024 * 1024) * (1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024)},
+		{decQuantity(7*1024*1024, -1, BinarySI), (7 * 1024 * 1024) / float64(1024)},
+		{decQuantity(7*1024*1024, -8, BinarySI), (7 * 1024 * 1024) / float64(1024*1024*1024*1024*1024*1024*1024*1024)},
+
+		{decQuantity(1024, 0, DecimalSI), 1024},
+		{decQuantity(8*1024, 0, DecimalSI), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalSI), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalSI), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalSI), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalSI), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalSI), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, DecimalSI), (7 * 1024 * 1024) / float64(100000000)},
+
+		{decQuantity(1024, 0, DecimalExponent), 1024},
+		{decQuantity(8*1024, 0, DecimalExponent), 8 * 1024},
+		{decQuantity(7*1024*1024, 0, DecimalExponent), 7 * 1024 * 1024},
+		{decQuantity(7*1024*1024, 1, DecimalExponent), (7 * 1024 * 1024) * 10},
+		{decQuantity(7*1024*1024, 4, DecimalExponent), (7 * 1024 * 1024) * 10000},
+		{decQuantity(7*1024*1024, 8, DecimalExponent), (7 * 1024 * 1024) * 100000000},
+		{decQuantity(7*1024*1024, -1, DecimalExponent), (7 * 1024 * 1024) * math.Pow10(-1)}, // '* Pow10' and '/ float(10)' do not round the same way
+		{decQuantity(7*1024*1024, -8, DecimalExponent), (7 * 1024 * 1024) / float64(100000000)},
+
+		// very large numbers
+		{Quantity{d: maxAllowed, Format: DecimalSI}, math.MaxInt64},
+		{Quantity{d: maxAllowed, Format: BinarySI}, math.MaxInt64},
+		{decQuantity(12, 18, DecimalSI), 1.2e19},
+
+		// infinities caused due to float64 overflow
+		{decQuantity(12, 500, DecimalSI), math.Inf(0)},
+		{decQuantity(-12, 500, DecimalSI), math.Inf(-1)},
+	}
+
+	for _, item := range table {
+		t.Run(fmt.Sprintf("%s %s", item.in.Format, item.in.String()), func(t *testing.T) {
+			out := item.in.AsApproximateFloat64()
+			if out != item.out {
+				t.Fatalf("expected %v, got %v", item.out, out)
+			}
+			if item.in.d.Dec != nil {
+				if i, ok := item.in.AsInt64(); ok {
+					q := intQuantity(i, 0, item.in.Format)
+					out := q.AsApproximateFloat64()
+					if out != item.out {
+						t.Fatalf("as int quantity: expected %v, got %v", item.out, out)
+					}
+				}
+			}
+		})
+	}
+}
+
 func benchmarkQuantities() []Quantity {
 	return []Quantity{
 		intQuantity(1024*1024*1024, 0, BinarySI),
@@ -1321,7 +1400,7 @@ func BenchmarkQuantityCopy(b *testing.B) {
 	values := benchmarkQuantities()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		values[i%len(values)].Copy()
+		values[i%len(values)].DeepCopy()
 	}
 	b.StopTimer()
 }
@@ -1345,6 +1424,18 @@ func BenchmarkQuantityCmp(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
 		if q.Cmp(q) != 0 {
+			b.Fatal(q)
+		}
+	}
+	b.StopTimer()
+}
+
+func BenchmarkQuantityAsApproximateFloat64(b *testing.B) {
+	values := benchmarkQuantities()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		q := values[i%len(values)]
+		if q.AsApproximateFloat64() == -1 {
 			b.Fatal(q)
 		}
 	}

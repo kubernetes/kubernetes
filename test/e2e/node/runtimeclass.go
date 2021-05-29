@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,112 +17,155 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
-	"time"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/api/core/v1"
+	nodev1 "k8s.io/api/node/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
-	imageutils "k8s.io/kubernetes/test/utils/image"
-	utilpointer "k8s.io/utils/pointer"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/scheduling"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("RuntimeClass", func() {
 	f := framework.NewDefaultFramework("runtimeclass")
 
-	It("should reject a Pod requesting a non-existent RuntimeClass", func() {
-		rcName := f.Namespace.Name + "-nonexistent"
-		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+	ginkgo.It("should reject a Pod requesting a RuntimeClass with conflicting node selector", func() {
+		labelFooName := "foo-" + string(uuid.NewUUID())
+
+		scheduling := &nodev1.Scheduling{
+			NodeSelector: map[string]string{
+				labelFooName: "conflict",
+			},
+		}
+
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass.Scheduling = scheduling
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod.Spec.NodeSelector = map[string]string{
+			labelFooName: "bar",
+		}
+		_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(context.TODO(), pod, metav1.CreateOptions{})
+		framework.ExpectError(err, "should be forbidden")
+		framework.ExpectEqual(apierrors.IsForbidden(err), true, "should be forbidden error")
 	})
 
-	It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
-		handler := f.Namespace.Name + "-handler"
-		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
-		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, handler)
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling with taints [Serial] ", func() {
+		labelFooName := "foo-" + string(uuid.NewUUID())
+		labelFizzName := "fizz-" + string(uuid.NewUUID())
+
+		nodeName := scheduling.GetNodeThatCanRunPod(f)
+		nodeSelector := map[string]string{
+			labelFooName:  "bar",
+			labelFizzName: "buzz",
+		}
+		tolerations := []v1.Toleration{
+			{
+				Key:      labelFooName,
+				Operator: v1.TolerationOpEqual,
+				Value:    "bar",
+				Effect:   v1.TaintEffectNoSchedule,
+			},
+		}
+		scheduling := &nodev1.Scheduling{
+			NodeSelector: nodeSelector,
+			Tolerations:  tolerations,
+		}
+
+		ginkgo.By("Trying to apply a label on the found node.")
+		for key, value := range nodeSelector {
+			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+		}
+
+		ginkgo.By("Trying to apply taint on the found node.")
+		taint := v1.Taint{
+			Key:    labelFooName,
+			Value:  "bar",
+			Effect: v1.TaintEffectNoSchedule,
+		}
+		e2enode.AddOrUpdateTaintOnNode(f.ClientSet, nodeName, taint)
+		framework.ExpectNodeHasTaint(f.ClientSet, nodeName, &taint)
+		defer e2enode.RemoveTaintOffNode(f.ClientSet, nodeName, taint)
+
+		ginkgo.By("Trying to create runtimeclass and pod")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass.Scheduling = scheduling
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod.Spec.NodeSelector = map[string]string{
+			labelFooName: "bar",
+		}
+		pod = f.PodClient().Create(pod)
+
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
+
+		// check that pod got scheduled on specified node.
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
+		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
+		gomega.Expect(pod.Spec.Tolerations).To(gomega.ContainElement(tolerations[0]))
 	})
 
-	It("should reject a Pod requesting a deleted RuntimeClass", func() {
-		rcName := createRuntimeClass(f, "delete-me", "runc")
-		rcClient := f.ClientSet.NodeV1beta1().RuntimeClasses()
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling without taints ", func() {
+		labelFooName := "foo-" + string(uuid.NewUUID())
+		labelFizzName := "fizz-" + string(uuid.NewUUID())
 
-		By("Deleting RuntimeClass "+rcName, func() {
-			err := rcClient.Delete(rcName, nil)
-			framework.ExpectNoError(err, "failed to delete RuntimeClass %s", rcName)
+		nodeName := scheduling.GetNodeThatCanRunPod(f)
+		nodeSelector := map[string]string{
+			labelFooName:  "bar",
+			labelFizzName: "buzz",
+		}
+		scheduling := &nodev1.Scheduling{
+			NodeSelector: nodeSelector,
+		}
 
-			By("Waiting for the RuntimeClass to disappear")
-			framework.ExpectNoError(wait.PollImmediate(framework.Poll, time.Minute, func() (bool, error) {
-				_, err := rcClient.Get(rcName, metav1.GetOptions{})
-				if errors.IsNotFound(err) {
-					return true, nil // done
-				}
-				if err != nil {
-					return true, err // stop wait with error
-				}
-				return false, nil
-			}))
-		})
+		ginkgo.By("Trying to apply a label on the found node.")
+		for key, value := range nodeSelector {
+			framework.AddOrUpdateLabelOnNode(f.ClientSet, nodeName, key, value)
+			framework.ExpectNodeHasLabel(f.ClientSet, nodeName, key, value)
+			defer framework.RemoveLabelOffNode(f.ClientSet, nodeName, key)
+		}
 
-		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+		ginkgo.By("Trying to create runtimeclass and pod")
+		runtimeClass := newRuntimeClass(f.Namespace.Name, "non-conflict-runtimeclass", framework.TestContext.ContainerRuntime)
+		runtimeClass.Scheduling = scheduling
+		rc, err := f.ClientSet.NodeV1().RuntimeClasses().Create(context.TODO(), runtimeClass, metav1.CreateOptions{})
+		framework.ExpectNoError(err, "failed to create RuntimeClass resource")
+
+		pod := e2enode.NewRuntimeClassPod(rc.GetName())
+		pod.Spec.NodeSelector = map[string]string{
+			labelFooName: "bar",
+		}
+		pod = f.PodClient().Create(pod)
+
+		framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, f.Namespace.Name, pod.Name))
+
+		// check that pod got scheduled on specified node.
+		scheduledPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), pod.Name, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(nodeName, scheduledPod.Spec.NodeName)
+		framework.ExpectEqual(nodeSelector, pod.Spec.NodeSelector)
 	})
-
-	// TODO(tallclair): Test an actual configured non-default runtimeHandler.
 })
 
-// createRuntimeClass generates a RuntimeClass with the desired handler and a "namespaced" name,
-// synchronously creates it, and returns the generated name.
-func createRuntimeClass(f *framework.Framework, name, handler string) string {
-	uniqueName := fmt.Sprintf("%s-%s", f.Namespace.Name, name)
-	rc := runtimeclasstest.NewRuntimeClass(uniqueName, handler)
-	rc, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Create(rc)
-	framework.ExpectNoError(err, "failed to create RuntimeClass resource")
-	return rc.GetName()
-}
-
-// createRuntimeClass creates a test pod with the given runtimeClassName.
-func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.Pod {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),
-		},
-		Spec: v1.PodSpec{
-			RuntimeClassName: &runtimeClassName,
-			Containers: []v1.Container{{
-				Name:    "test",
-				Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-				Command: []string{"true"},
-			}},
-			RestartPolicy:                v1.RestartPolicyNever,
-			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
-		},
-	}
-	return f.PodClient().Create(pod)
-}
-
-// expectPodSuccess waits for the given pod to terminate successfully.
-func expectPodSuccess(f *framework.Framework, pod *v1.Pod) {
-	framework.ExpectNoError(framework.WaitForPodSuccessInNamespace(
-		f.ClientSet, pod.Name, f.Namespace.Name))
-}
-
-// expectSandboxFailureEvent polls for an event with reason "FailedCreatePodSandBox" containing the
-// expected message string.
-func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) {
-	eventSelector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      pod.Name,
-		"involvedObject.namespace": f.Namespace.Name,
-		"reason":                   events.FailedCreatePodSandBox,
-	}.AsSelector().String()
-	framework.ExpectNoError(framework.WaitTimeoutForPodEvent(
-		f.ClientSet, pod.Name, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
+// newRuntimeClass returns a test runtime class.
+func newRuntimeClass(namespace, name, handler string) *nodev1.RuntimeClass {
+	uniqueName := fmt.Sprintf("%s-%s", namespace, name)
+	return runtimeclasstest.NewRuntimeClass(uniqueName, e2enode.PreconfiguredRuntimeClassHandler(handler))
 }

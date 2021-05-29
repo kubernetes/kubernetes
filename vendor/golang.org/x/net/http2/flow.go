@@ -8,6 +8,8 @@ package http2
 
 // flow is the flow control window's size.
 type flow struct {
+	_ incomparable
+
 	// n is the number of DATA bytes we're allowed to send.
 	// A flow is kept both on a conn and a per-stream.
 	n int32

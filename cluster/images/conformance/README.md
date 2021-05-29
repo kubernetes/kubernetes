@@ -7,7 +7,7 @@
 
 ```console
 # First, build the binaries by running make from the root directory
-$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl"
+$ make WHAT="test/e2e/e2e.test vendor/github.com/onsi/ginkgo/ginkgo cmd/kubectl cluster/images/conformance/go-runner"
 
 # Build for linux/amd64 (default)
 # export REGISTRY=$HOST/$ORG to switch from k8s.gcr.io
@@ -38,4 +38,3 @@ If you don't want to push the images, run `make` or `make build` instead
 kubectl create -f conformance-e2e.yaml
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/images/conformance/README.md?pixel)]()

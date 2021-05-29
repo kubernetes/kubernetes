@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -44,12 +44,12 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 		t.Errorf("expected empty webhooks, but got %v", configurations)
 	}
 
-	webhookConfiguration := &v1beta1.ValidatingWebhookConfiguration{
+	webhookConfiguration := &v1.ValidatingWebhookConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: "webhook1"},
-		Webhooks:   []v1beta1.Webhook{{Name: "webhook1.1"}},
+		Webhooks:   []v1.ValidatingWebhook{{Name: "webhook1.1"}},
 	}
 
-	validatingInformer := informerFactory.Admissionregistration().V1beta1().ValidatingWebhookConfigurations()
+	validatingInformer := informerFactory.Admissionregistration().V1().ValidatingWebhookConfigurations()
 	validatingInformer.Informer().GetIndexer().Add(webhookConfiguration)
 	if validatingConfig, ok := manager.(*validatingWebhookConfigurationManager); ok {
 		validatingConfig.updateConfiguration()
@@ -59,7 +59,14 @@ func TestGetValidatingWebhookConfig(t *testing.T) {
 	if len(configurations) == 0 {
 		t.Errorf("expected non empty webhooks")
 	}
-	if !reflect.DeepEqual(configurations, webhookConfiguration.Webhooks) {
-		t.Errorf("Expected\n%#v\ngot\n%#v", webhookConfiguration.Webhooks, configurations)
+	for i := range configurations {
+		h, ok := configurations[i].GetValidatingWebhook()
+		if !ok {
+			t.Errorf("Expected validating webhook")
+			continue
+		}
+		if !reflect.DeepEqual(h, &webhookConfiguration.Webhooks[i]) {
+			t.Errorf("Expected\n%#v\ngot\n%#v", &webhookConfiguration.Webhooks[i], h)
+		}
 	}
 }

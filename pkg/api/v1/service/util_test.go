@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -53,13 +53,13 @@ func TestGetLoadBalancerSourceRanges(t *testing.T) {
 		annotations[v1.AnnotationLoadBalancerSourceRangesKey] = v
 		svc := v1.Service{}
 		svc.Annotations = annotations
-		cidrs, err := GetLoadBalancerSourceRanges(&svc)
+		_, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
 		svc = v1.Service{}
 		svc.Spec.LoadBalancerSourceRanges = strings.Split(v, ",")
-		cidrs, err = GetLoadBalancerSourceRanges(&svc)
+		cidrs, err := GetLoadBalancerSourceRanges(&svc)
 		if err != nil {
 			t.Errorf("Unexpected error parsing: %q", v)
 		}
@@ -211,6 +211,33 @@ func TestNeedsHealthCheck(t *testing.T) {
 		Spec: v1.ServiceSpec{
 			Type:                  v1.ServiceTypeLoadBalancer,
 			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+	})
+}
+
+func TestRequestsOnlyLocalTrafficForInternal(t *testing.T) {
+	checkRequestsOnlyLocalTrafficForInternal := func(expected bool, service *v1.Service) {
+		res := RequestsOnlyLocalTrafficForInternal(service)
+		if res != expected {
+			t.Errorf("Expected internal local traffic = %v, got %v",
+				expected, res)
+		}
+	}
+
+	// default InternalTrafficPolicy is nil
+	checkRequestsOnlyLocalTrafficForInternal(false, &v1.Service{})
+
+	local := v1.ServiceInternalTrafficPolicyLocal
+	checkRequestsOnlyLocalTrafficForInternal(true, &v1.Service{
+		Spec: v1.ServiceSpec{
+			InternalTrafficPolicy: &local,
+		},
+	})
+
+	cluster := v1.ServiceInternalTrafficPolicyCluster
+	checkRequestsOnlyLocalTrafficForInternal(false, &v1.Service{
+		Spec: v1.ServiceSpec{
+			InternalTrafficPolicy: &cluster,
 		},
 	})
 }

@@ -4,6 +4,7 @@ approvers:
 - lavalamp
 - smarterclayton
 reviewers:
+- dims
 - lavalamp
 - smarterclayton
 - wojtek-t
@@ -11,6 +12,5 @@ reviewers:
 - caesarxuchao
 - mikedanese
 - liggitt
-- nikhiljindal
 - sttts
 - krousey

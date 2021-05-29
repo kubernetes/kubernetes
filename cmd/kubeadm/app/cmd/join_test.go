@@ -17,16 +17,19 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
+	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
 
-const (
-	testJoinConfig = `apiVersion: kubeadm.k8s.io/v1beta1
+var testJoinConfig = fmt.Sprintf(`apiVersion: %s
 kind: JoinConfiguration
 discovery:
   bootstrapToken:
@@ -36,8 +39,10 @@ discovery:
 nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
-`
-)
+  ignorePreflightErrors:
+    - c
+    - d
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewJoinData(t *testing.T) {
 	// create temp directory
@@ -46,6 +51,11 @@ func TestNewJoinData(t *testing.T) {
 		t.Errorf("Unable to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+
+	// create kubeconfig
+	kubeconfigFilePath := filepath.Join(tmpDir, "test-kubeconfig-file")
+	kubeconfig := kubeconfigutil.CreateBasic("", "", "", []byte{})
+	kubeconfigutil.WriteToDisk(kubeconfigFilePath, kubeconfig)
 
 	// create config file
 	configFilePath := filepath.Join(tmpDir, "test-config-file")
@@ -215,12 +225,37 @@ func TestNewJoinData(t *testing.T) {
 			},
 			expectError: true,
 		},
+
+		// Pre-flight errors:
+		{
+			name: "pre-flights errors from CLI args only",
+			flags: map[string]string{
+				options.IgnorePreflightErrors: "a,b",
+				options.FileDiscovery:         "https://foo", //required only to pass discovery validation
+			},
+			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b")),
+		},
+		{
+			name: "pre-flights errors from JoinConfiguration only",
+			flags: map[string]string{
+				options.CfgPath: configFilePath,
+			},
+			validate: expectedJoinIgnorePreflightErrors(sets.NewString("c", "d")),
+		},
+		{
+			name: "pre-flights errors from both CLI args and JoinConfiguration",
+			flags: map[string]string{
+				options.CfgPath:               configFilePath,
+				options.IgnorePreflightErrors: "a,b",
+			},
+			validate: expectedJoinIgnorePreflightErrors(sets.NewString("a", "b", "c", "d")),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external join option and inject it to the join cmd
 			joinOptions := newJoinOptions()
-			cmd := NewCmdJoin(nil, joinOptions)
+			cmd := newCmdJoin(nil, joinOptions)
 
 			// sets cmd flags (that will be reflected on the join options)
 			for f, v := range tc.flags {
@@ -228,7 +263,7 @@ func TestNewJoinData(t *testing.T) {
 			}
 
 			// test newJoinData method
-			data, err := newJoinData(cmd, tc.args, joinOptions, nil)
+			data, err := newJoinData(cmd, tc.args, joinOptions, nil, kubeconfigFilePath)
 			if err != nil && !tc.expectError {
 				t.Fatalf("newJoinData returned unexpected error: %v", err)
 			}
@@ -241,5 +276,16 @@ func TestNewJoinData(t *testing.T) {
 				tc.validate(t, data)
 			}
 		})
+	}
+}
+
+func expectedJoinIgnorePreflightErrors(expected sets.String) func(t *testing.T, data *joinData) {
+	return func(t *testing.T, data *joinData) {
+		if !expected.Equal(data.ignorePreflightErrors) {
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+		}
+		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
+			t.Errorf("Invalid ignore preflight errors in JoinConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+		}
 	}
 }

@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Microsoft/hcsshim"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"net"
 	"strings"
 )
@@ -33,7 +33,7 @@ type HostNetworkService interface {
 	getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error)
 	createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error)
 	deleteEndpoint(hnsID string) error
-	getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
+	getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error)
 	deleteLoadBalancer(hnsID string) error
 }
 
@@ -65,6 +65,11 @@ func (hns hnsV1) getEndpointByID(id string) (*endpointsInfo, error) {
 		macAddress: hnsendpoint.MacAddress,
 		hnsID:      hnsendpoint.Id,
 		hns:        hns,
+
+		// only ready and not terminating endpoints were added to HNS
+		ready:       true,
+		serving:     true,
+		terminating: false,
 	}, nil
 }
 func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpointsInfo, error) {
@@ -75,6 +80,9 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	}
 
 	endpoints, err := hcsshim.HNSListEndpointRequest()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+	}
 	for _, endpoint := range endpoints {
 		equal := false
 		if endpoint.IPAddress != nil {
@@ -87,6 +95,11 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
 				hns:        hns,
+
+				// only ready and not terminating endpoints were added to HNS
+				ready:       true,
+				serving:     true,
+				terminating: false,
 			}, nil
 		}
 	}
@@ -96,7 +109,7 @@ func (hns hnsV1) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcsshim.GetHNSNetworkByName(networkName)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find network %s: %v", networkName, err)
+		return nil, err
 	}
 	hnsEndpoint := &hcsshim.HNSEndpoint{
 		MacAddress: ep.macAddress,
@@ -112,13 +125,13 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 			}
 			paPolicyJson, err := json.Marshal(paPolicy)
 			if err != nil {
-				return nil, fmt.Errorf("PA Policy creation failed: %v", err)
+				return nil, err
 			}
 			hnsEndpoint.Policies = append(hnsEndpoint.Policies, paPolicyJson)
 		}
 		createdEndpoint, err = hnsNetwork.CreateRemoteEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Remote endpoint creation failed: %v", err)
+			return nil, err
 		}
 
 	} else {
@@ -134,6 +147,10 @@ func (hns hnsV1) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		hnsID:           createdEndpoint.Id,
 		providerAddress: ep.providerAddress, //TODO get from createdEndpoint
 		hns:             hns,
+
+		ready:       ep.ready,
+		serving:     ep.serving,
+		terminating: ep.terminating,
 	}, nil
 }
 func (hns hnsV1) deleteEndpoint(hnsID string) error {
@@ -148,13 +165,13 @@ func (hns hnsV1) deleteEndpoint(hnsID string) error {
 	return err
 }
 
-func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	plists, err := hcsshim.HNSListPolicyListRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	if isDSR {
+	if flags.isDSR {
 		klog.V(3).Info("DSR is not supported in V1. Using non DSR instead")
 	}
 
@@ -167,13 +184,15 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 		if err = json.Unmarshal(plist.Policies[0], &elbPolicy); err != nil {
 			continue
 		}
-		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == isILB {
+		if elbPolicy.Protocol == protocol && elbPolicy.InternalPort == internalPort && elbPolicy.ExternalPort == externalPort && elbPolicy.ILB == flags.isILB {
 			if len(vip) > 0 {
 				if len(elbPolicy.VIPs) == 0 || elbPolicy.VIPs[0] != vip {
 					continue
 				}
+			} else if len(elbPolicy.VIPs) != 0 {
+				continue
 			}
-			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
 				hnsID: plist.ID,
 			}, nil
@@ -190,7 +209,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 	}
 	lb, err := hcsshim.AddLoadBalancer(
 		hnsEndpoints,
-		isILB,
+		flags.isILB,
 		sourceVip,
 		vip,
 		protocol,
@@ -199,7 +218,7 @@ func (hns hnsV1) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 	)
 
 	if err == nil {
-		LogJson(lb, "Hns loadbalancer policy resource", 1)
+		LogJson("policyList", lb, "Hns loadbalancer policy resource", 1)
 	} else {
 		return nil, err
 	}
@@ -218,7 +237,7 @@ func (hns hnsV1) deleteLoadBalancer(hnsID string) error {
 	if err != nil {
 		return err
 	}
-	LogJson(hnsloadBalancer, "Removing Policy", 2)
+	LogJson("policyList", hnsloadBalancer, "Removing Policy", 2)
 
 	_, err = hnsloadBalancer.Delete()
 	return err

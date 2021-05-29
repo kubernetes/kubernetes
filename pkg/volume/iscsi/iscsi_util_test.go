@@ -17,47 +17,22 @@ limitations under the License.
 package iscsi
 
 import (
-	"errors"
-	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util/mount"
+	testingexec "k8s.io/utils/exec/testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
-func TestGetDevicePrefixRefCount(t *testing.T) {
-	fm := &mount.FakeMounter{
-		MountPoints: []mount.MountPoint{
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-1"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-2"},
-			{Device: "/dev/sdb",
-				Path: "/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-3"},
-		},
-	}
-
-	tests := []struct {
-		devicePrefix string
-		expectedRefs int
-	}{
-		{
-			"/127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00",
-			4,
-		},
-	}
-
-	for i, test := range tests {
-		if refs, err := getDevicePrefixRefCount(fm, test.devicePrefix); err != nil || test.expectedRefs != refs {
-			t.Errorf("%d. GetDevicePrefixRefCount(%s) = %d, %v; expected %d, nil", i, test.devicePrefix, refs, err, test.expectedRefs)
-		}
-	}
-}
+const (
+	TestIface = "192.168.1.10:pv0001"
+)
 
 func TestExtractDeviceAndPrefix(t *testing.T) {
 	devicePath := "127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00"
@@ -181,7 +156,7 @@ func TestWaitForPathToExist(t *testing.T) {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
 
-	exist = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
+	_ = waitForPathToExistInternal(&devicePath[1], 1, "fake_iface", os.Stat, fakeFilepathGlob2)
 	if devicePath[1] != fpath {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}
@@ -246,28 +221,28 @@ func TestParseIscsiadmShow(t *testing.T) {
 }
 
 func TestClonedIface(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		switch cmdCount {
-		case 1:
-			// iscsiadm -m iface -I <iface> -o show
-			return []byte("iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n"), nil
-
-		case 2:
-			// iscsiadm -m iface -I <newIface> -o new
-			return []byte("New interface 192.168.1.10:pv0001 added"), nil
-		case 3:
-			// iscsiadm -m iface -I <newIface> -o update -n <key> -v <val>
-			return []byte(""), nil
-		case 4:
-			return []byte(""), nil
-		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
-	})
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:    "iscsiadm",
+			Args:   []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output: "iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n",
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "new"},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.initiatorname", "-v", ""},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.transport_name", "-v", "tcp"},
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -276,27 +251,32 @@ func TestClonedIface(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
-	if cmdCount != 4 {
-		t.Errorf("expected 4 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
 	}
-
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 4 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
+	}
 }
 
 func TestClonedIfaceShowError(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		// iscsiadm -m iface -I <iface> -o show, return test error
-		return []byte(""), errors.New("test error")
-	})
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:        "iscsiadm",
+			Args:       []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output:     "test error",
+			ReturnCode: 1,
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
+
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -305,43 +285,49 @@ func TestClonedIfaceShowError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
-	if cmdCount != 1 {
-		t.Errorf("expected 1 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err == nil {
+		t.Errorf("expect to receive error, nil received")
+	}
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 1 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
 
 }
 
 func TestClonedIfaceUpdateError(t *testing.T) {
-	cmdCount := 0
-	fakeExec := mount.NewFakeExec(func(cmd string, args ...string) ([]byte, error) {
-		cmdCount++
-		if cmd != "iscsiadm" {
-			t.Errorf("iscsiadm command expected, got %q", cmd)
-		}
-		switch cmdCount {
-		case 1:
-			// iscsiadm -m iface -I <iface> -o show
-			return []byte("iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n"), nil
+	fakeExec := &testingexec.FakeExec{}
+	scripts := []volumetest.CommandScript{
+		{
+			Cmd:    "iscsiadm",
+			Args:   []string{"-m", "iface", "-I", "", "-o", "show"},
+			Output: "iface.ipaddress = <empty>\niface.transport_name = tcp\niface.initiatorname = <empty>\n",
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "new"},
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.initiatorname", "-v", ""},
+		},
+		{
+			Cmd:        "iscsiadm",
+			Args:       []string{"-m", "iface", "-I", TestIface, "-o", "update", "-n", "iface.transport_name", "-v", "tcp"},
+			ReturnCode: 1,
+		},
+		{
+			Cmd:  "iscsiadm",
+			Args: []string{"-m", "iface", "-I", TestIface, "-o", "delete"},
+		},
+	}
+	volumetest.ScriptCommands(fakeExec, scripts)
+	fakeExec.ExactOrder = true
 
-		case 2:
-			// iscsiadm -m iface -I <newIface> -o new
-			return []byte("New interface 192.168.1.10:pv0001 added"), nil
-		case 3:
-			// iscsiadm -m iface -I <newIface> -o update -n <key> -v <val>
-			return []byte(""), nil
-		case 4:
-			return []byte(""), errors.New("test error")
-		case 5:
-			// iscsiadm -m iface -I <newIface> -o delete
-			return []byte(""), nil
-		}
-		return nil, fmt.Errorf("Unexpected exec call nr %d: %s", cmdCount, cmd)
-	})
 	plugins := []volume.VolumePlugin{
 		&iscsiPlugin{
 			host: nil,
@@ -350,13 +336,122 @@ func TestClonedIfaceUpdateError(t *testing.T) {
 	plugin := plugins[0]
 	fakeMounter := iscsiDiskMounter{
 		iscsiDisk: &iscsiDisk{
+			Iface:  TestIface,
 			plugin: plugin.(*iscsiPlugin)},
 		exec: fakeExec,
 	}
-	newIface := "192.168.1.10:pv0001"
-	cloneIface(fakeMounter, newIface)
-	if cmdCount != 5 {
-		t.Errorf("expected 5 CombinedOutput() calls, got %d", cmdCount)
+	err := cloneIface(fakeMounter)
+	if err == nil {
+		t.Errorf("expect to receive error, nil received")
+	}
+	if fakeExec.CommandCalls != len(scripts) {
+		t.Errorf("expected 5 CombinedOutput() calls, got %d", fakeExec.CommandCalls)
 	}
 
+}
+
+func TestGetVolCount(t *testing.T) {
+	// This will create a dir structure like this:
+	// /tmp/refcounter555814673
+	// +-- iface-127.0.0.1:3260:pv1
+	// |   +-- 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3
+	// +-- iface-127.0.0.1:3260:pv2
+	// |   +-- 127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2
+	// |   +-- 192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1
+	// +-- volumeDevices
+	//     +-- 192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4
+	//     +-- 192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5
+
+	baseDir, err := createFakePluginDirs()
+	if err != nil {
+		t.Errorf("error creating fake plugin dir: %v", err)
+	}
+
+	defer os.RemoveAll(baseDir)
+
+	testCases := []struct {
+		name    string
+		baseDir string
+		portal  string
+		iqn     string
+		count   int
+	}{
+		{
+			name:    "wrong portal, no volumes",
+			baseDir: baseDir,
+			portal:  "192.168.0.2:3260", // incorrect IP address
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   0,
+		},
+		{
+			name:    "wrong iqn, no volumes",
+			baseDir: baseDir,
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-3", // incorrect volume
+			count:   0,
+		},
+		{
+			name:    "single volume",
+			baseDir: baseDir,
+			portal:  "192.168.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   1,
+		},
+		{
+			name:    "two volumes",
+			baseDir: baseDir,
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1",
+			count:   2,
+		},
+		{
+			name:    "volumeDevices (block) volume",
+			baseDir: filepath.Join(baseDir, config.DefaultKubeletVolumeDevicesDirName),
+			portal:  "192.168.0.2:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.volume-1-lun-4",
+			count:   1,
+		},
+		{
+			name:    "nonexistent path",
+			baseDir: filepath.Join(baseDir, "this_path_should_not_exist"),
+			portal:  "127.0.0.1:3260",
+			iqn:     "iqn.2003-01.io.k8s:e2e.unknown",
+			count:   0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			count, err := getVolCount(tc.baseDir, tc.portal, tc.iqn)
+			if err != nil {
+				t.Errorf("expected no error, got %v", err)
+			}
+			if count != tc.count {
+				t.Errorf("expected %d volumes, got %d", tc.count, count)
+			}
+		})
+	}
+}
+
+func createFakePluginDirs() (string, error) {
+	dir, err := ioutil.TempDir("", "refcounter")
+	if err != nil {
+		return "", err
+	}
+
+	subdirs := []string{
+		"iface-127.0.0.1:3260:pv1/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-3",
+		"iface-127.0.0.1:3260:pv2/127.0.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-2",
+		"iface-127.0.0.1:3260:pv2/192.168.0.1:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-1",
+		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.2:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-4"),
+		filepath.Join(config.DefaultKubeletVolumeDevicesDirName, "iface-127.0.0.1:3260/192.168.0.3:3260-iqn.2003-01.io.k8s:e2e.volume-1-lun-5"),
+	}
+
+	for _, d := range subdirs {
+		if err := os.MkdirAll(filepath.Join(dir, d), os.ModePerm); err != nil {
+			return dir, err
+		}
+	}
+
+	return dir, err
 }

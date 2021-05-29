@@ -52,7 +52,7 @@ func WithFailedAuthenticationAudit(failedHandler http.Handler, sink audit.Sink, 
 		ev.ResponseStatus.Message = getAuthMethods(req)
 		ev.Stage = auditinternal.StageResponseStarted
 
-		rw := decorateResponseWriter(w, ev, sink, omitStages)
+		rw := decorateResponseWriter(req.Context(), w, ev, sink, omitStages)
 		failedHandler.ServeHTTP(rw, req)
 	})
 }

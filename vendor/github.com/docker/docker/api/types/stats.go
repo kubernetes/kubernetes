@@ -1,6 +1,6 @@
 // Package types is used for API stability in the types and response to the
 // consumers of the API stats endpoint.
-package types
+package types // import "github.com/docker/docker/api/types"
 
 import "time"
 
@@ -120,7 +120,7 @@ type NetworkStats struct {
 	RxBytes uint64 `json:"rx_bytes"`
 	// Packets received. Windows and Linux.
 	RxPackets uint64 `json:"rx_packets"`
-	// Received errors. Not used on Windows. Note that we dont `omitempty` this
+	// Received errors. Not used on Windows. Note that we don't `omitempty` this
 	// field as it is expected in the >=v1.21 API stats structure.
 	RxErrors uint64 `json:"rx_errors"`
 	// Incoming packets dropped. Windows and Linux.
@@ -129,7 +129,7 @@ type NetworkStats struct {
 	TxBytes uint64 `json:"tx_bytes"`
 	// Packets sent. Windows and Linux.
 	TxPackets uint64 `json:"tx_packets"`
-	// Sent errors. Not used on Windows. Note that we dont `omitempty` this
+	// Sent errors. Not used on Windows. Note that we don't `omitempty` this
 	// field as it is expected in the >=v1.21 API stats structure.
 	TxErrors uint64 `json:"tx_errors"`
 	// Outgoing packets dropped. Windows and Linux.

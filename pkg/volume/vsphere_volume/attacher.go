@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -19,17 +21,19 @@ package vsphere_volume
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"runtime"
 	"time"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	"k8s.io/utils/keymutex"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	"k8s.io/utils/keymutex"
+	"k8s.io/legacy-cloud-providers/vsphere"
 )
 
 type vsphereVMDKAttacher struct {
@@ -90,7 +94,7 @@ func (attacher *vsphereVMDKAttacher) Attach(spec *volume.Spec, nodeName types.No
 		return "", err
 	}
 
-	return path.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
+	return filepath.Join(diskByIDPath, diskSCSIPrefix+diskUUID), nil
 }
 
 func (attacher *vsphereVMDKAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {
@@ -157,7 +161,7 @@ func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath
 	}
 
 	if devicePath == "" {
-		return "", fmt.Errorf("WaitForAttach failed for VMDK %q: devicePath is empty.", volumeSource.VolumePath)
+		return "", fmt.Errorf("WaitForAttach failed for VMDK %q: devicePath is empty", volumeSource.VolumePath)
 	}
 
 	ticker := time.NewTicker(checkSleepDuration)
@@ -180,7 +184,7 @@ func (attacher *vsphereVMDKAttacher) WaitForAttach(spec *volume.Spec, devicePath
 				return path, nil
 			}
 		case <-timer.C:
-			return "", fmt.Errorf("Could not find attached VMDK %q. Timeout waiting for mount paths to be created.", volumeSource.VolumePath)
+			return "", fmt.Errorf("could not find attached VMDK %q. Timeout waiting for mount paths to be created", volumeSource.VolumePath)
 		}
 	}
 }
@@ -205,12 +209,17 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 
 // MountDevice mounts device to global mount point.
 func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	klog.Infof("vsphere MountDevice mount %s to %s", devicePath, deviceMountPath)
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
-				klog.Errorf("Failed to create directory at %#v. err: %s", deviceMountPath, err)
+			dir := deviceMountPath
+			if runtime.GOOS == "windows" {
+				dir = filepath.Dir(deviceMountPath)
+			}
+			if err := os.MkdirAll(dir, 0750); err != nil {
+				klog.Errorf("Failed to create directory at %#v. err: %s", dir, err)
 				return err
 			}
 			notMnt = true
@@ -266,9 +275,8 @@ func (plugin *vsphereVolumePlugin) NewDeviceUnmounter() (volume.DeviceUnmounter,
 
 // Detach the given device from the given node.
 func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.NodeName) error {
-
 	volPath := getVolPathfromVolumeName(volumeName)
-	attached, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
+	attached, newVolumePath, err := detacher.vsphereVolumes.DiskIsAttached(volPath, nodeName)
 	if err != nil {
 		// Log error and continue with detach
 		klog.Errorf(
@@ -284,7 +292,7 @@ func (detacher *vsphereVMDKDetacher) Detach(volumeName string, nodeName types.No
 
 	attachdetachMutex.LockKey(string(nodeName))
 	defer attachdetachMutex.UnlockKey(string(nodeName))
-	if err := detacher.vsphereVolumes.DetachDisk(volPath, nodeName); err != nil {
+	if err := detacher.vsphereVolumes.DetachDisk(newVolumePath, nodeName); err != nil {
 		klog.Errorf("Error detaching volume %q: %v", volPath, err)
 		return err
 	}
@@ -295,8 +303,12 @@ func (detacher *vsphereVMDKDetacher) UnmountDevice(deviceMountPath string) error
 	return mount.CleanupMountPoint(deviceMountPath, detacher.mounter, false)
 }
 
-func (plugin *vsphereVolumePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *vsphereVolumePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *vsphereVolumePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 func setNodeVolume(

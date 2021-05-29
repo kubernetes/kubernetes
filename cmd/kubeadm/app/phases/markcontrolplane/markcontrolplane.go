@@ -25,12 +25,26 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 )
 
+var labelsToAdd = []string{
+	// TODO: remove this label:
+	// https://github.com/kubernetes/kubeadm/issues/2200
+	constants.LabelNodeRoleOldControlPlane,
+	constants.LabelNodeRoleControlPlane,
+	constants.LabelExcludeFromExternalLB,
+}
+
 // MarkControlPlane taints the control-plane and sets the control-plane label
 func MarkControlPlane(client clientset.Interface, controlPlaneName string, taints []v1.Taint) error {
+	// TODO: remove this "deprecated" amend and pass "labelsToAdd" directly:
+	// https://github.com/kubernetes/kubeadm/issues/2200
+	labels := make([]string, len(labelsToAdd))
+	copy(labels, labelsToAdd)
+	labels[0] = constants.LabelNodeRoleOldControlPlane + "(deprecated)"
 
-	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the label \"%s=''\"\n", controlPlaneName, constants.LabelNodeRoleMaster)
+	fmt.Printf("[mark-control-plane] Marking the node %s as control-plane by adding the labels: %v\n",
+		controlPlaneName, labels)
 
-	if taints != nil && len(taints) > 0 {
+	if len(taints) > 0 {
 		taintStrs := []string{}
 		for _, taint := range taints {
 			taintStrs = append(taintStrs, taint.ToString())
@@ -54,7 +68,9 @@ func taintExists(taint v1.Taint, taints []v1.Taint) bool {
 }
 
 func markControlPlaneNode(n *v1.Node, taints []v1.Taint) {
-	n.ObjectMeta.Labels[constants.LabelNodeRoleMaster] = ""
+	for _, label := range labelsToAdd {
+		n.ObjectMeta.Labels[label] = ""
+	}
 
 	for _, nt := range n.Spec.Taints {
 		if !taintExists(nt, taints) {

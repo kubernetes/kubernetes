@@ -36,9 +36,6 @@ const (
 	ImpersonateUserExtraHeaderPrefix = "Impersonate-Extra-"
 )
 
-// +genclient
-// +genclient:nonNamespaced
-// +genclient:noVerbs
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TokenReview attempts to authenticate a token to a known user.
@@ -58,7 +55,7 @@ type TokenReview struct {
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
-	Token string
+	Token string `datapolicy:"token"`
 	// Audiences is a list of the identifiers that the resource server presented
 	// with the token identifies as. Audience-aware token authenticators will
 	// verify that the token was intended for at least one of the audiences in
@@ -145,7 +142,7 @@ type TokenRequestSpec struct {
 // TokenRequestStatus is the result of a token request.
 type TokenRequestStatus struct {
 	// Token is the opaque bearer token.
-	Token string
+	Token string `datapolicy:"token"`
 	// ExpirationTimestamp is the time of expiration of the returned token.
 	ExpirationTimestamp metav1.Time
 }

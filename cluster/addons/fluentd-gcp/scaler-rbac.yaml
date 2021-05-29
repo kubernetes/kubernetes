@@ -17,7 +17,7 @@ metadata:
     addonmanager.kubernetes.io/mode: Reconcile
 rules:
 - apiGroups:
-  - "extensions"
+  - "apps"
   resources:
   - daemonsets
   verbs:

@@ -74,7 +74,9 @@ type frozenConfig struct {
 	disallowUnknownFields         bool
 	decoderCache                  *concurrent.Map
 	encoderCache                  *concurrent.Map
-	extensions                    []Extension
+	encoderExtension              Extension
+	decoderExtension              Extension
+	extraExtensions               []Extension
 	streamPool                    *sync.Pool
 	iteratorPool                  *sync.Pool
 	caseSensitive                 bool
@@ -158,22 +160,21 @@ func (cfg Config) Froze() API {
 	if cfg.ValidateJsonRawMessage {
 		api.validateJsonRawMessage(encoderExtension)
 	}
-	if len(encoderExtension) > 0 {
-		api.extensions = append(api.extensions, encoderExtension)
-	}
-	if len(decoderExtension) > 0 {
-		api.extensions = append(api.extensions, decoderExtension)
-	}
+	api.encoderExtension = encoderExtension
+	api.decoderExtension = decoderExtension
 	api.configBeforeFrozen = cfg
 	return api
 }
 
-func (cfg Config) frozeWithCacheReuse() *frozenConfig {
+func (cfg Config) frozeWithCacheReuse(extraExtensions []Extension) *frozenConfig {
 	api := getFrozenConfigFromCache(cfg)
 	if api != nil {
 		return api
 	}
 	api = cfg.Froze().(*frozenConfig)
+	for _, extension := range extraExtensions {
+		api.RegisterExtension(extension)
+	}
 	addFrozenConfigToCache(cfg, api)
 	return api
 }
@@ -182,15 +183,15 @@ func (cfg *frozenConfig) validateJsonRawMessage(extension EncoderExtension) {
 	encoder := &funcEncoder{func(ptr unsafe.Pointer, stream *Stream) {
 		rawMessage := *(*json.RawMessage)(ptr)
 		iter := cfg.BorrowIterator([]byte(rawMessage))
+		defer cfg.ReturnIterator(iter)
 		iter.Read()
-		if iter.Error != nil {
+		if iter.Error != nil && iter.Error != io.EOF {
 			stream.WriteRaw("null")
 		} else {
-			cfg.ReturnIterator(iter)
 			stream.WriteRaw(string(rawMessage))
 		}
 	}, func(ptr unsafe.Pointer) bool {
-		return false
+		return len(*((*json.RawMessage)(ptr))) == 0
 	}}
 	extension[reflect2.TypeOfPtr((*json.RawMessage)(nil)).Elem()] = encoder
 	extension[reflect2.TypeOfPtr((*RawMessage)(nil)).Elem()] = encoder
@@ -219,7 +220,9 @@ func (cfg *frozenConfig) getTagKey() string {
 }
 
 func (cfg *frozenConfig) RegisterExtension(extension Extension) {
-	cfg.extensions = append(cfg.extensions, extension)
+	cfg.extraExtensions = append(cfg.extraExtensions, extension)
+	copied := cfg.configBeforeFrozen
+	cfg.configBeforeFrozen = copied
 }
 
 type lossyFloat32Encoder struct {
@@ -314,7 +317,7 @@ func (cfg *frozenConfig) MarshalIndent(v interface{}, prefix, indent string) ([]
 	}
 	newCfg := cfg.configBeforeFrozen
 	newCfg.IndentionStep = len(indent)
-	return newCfg.frozeWithCacheReuse().Marshal(v)
+	return newCfg.frozeWithCacheReuse(cfg.extraExtensions).Marshal(v)
 }
 
 func (cfg *frozenConfig) UnmarshalFromString(str string, v interface{}) error {

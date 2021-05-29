@@ -25,7 +25,7 @@ import (
 
 	"github.com/golang/groupcache/lru"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -153,7 +153,8 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 // localKey - key that makes this event in the local group
 type EventAggregatorKeyFunc func(event *v1.Event) (aggregateKey string, localKey string)
 
-// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type and event.Reason
+// EventAggregatorByReasonFunc aggregates events by exact match on event.Source, event.InvolvedObject, event.Type,
+// event.Reason, event.ReportingController and event.ReportingInstance
 func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 	return strings.Join([]string{
 		event.Source.Component,
@@ -165,6 +166,8 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 		event.InvolvedObject.APIVersion,
 		event.Type,
 		event.Reason,
+		event.ReportingController,
+		event.ReportingInstance,
 	},
 		""), event.Message
 }
@@ -172,7 +175,7 @@ func EventAggregatorByReasonFunc(event *v1.Event) (string, string) {
 // EventAggregatorMessageFunc is responsible for producing an aggregation message
 type EventAggregatorMessageFunc func(event *v1.Event) string
 
-// EventAggregratorByReasonMessageFunc returns an aggregate message by prefixing the incoming message
+// EventAggregatorByReasonMessageFunc returns an aggregate message by prefixing the incoming message
 func EventAggregatorByReasonMessageFunc(event *v1.Event) string {
 	return "(combined from similar events): " + event.Message
 }
@@ -417,7 +420,7 @@ type EventCorrelateResult struct {
 // prior to interacting with the API server to record the event.
 //
 // The default behavior is as follows:
-//   * Aggregation is performed if a similar event is recorded 10 times in a
+//   * Aggregation is performed if a similar event is recorded 10 times
 //     in a 10 minute rolling interval.  A similar event is an event that varies only by
 //     the Event.Message field.  Rather than recording the precise event, aggregation
 //     will create a new event whose message reports that it has combined events with
@@ -441,6 +444,52 @@ func NewEventCorrelator(clock clock.Clock) *EventCorrelator {
 
 		logger: newEventLogger(cacheSize, clock),
 	}
+}
+
+func NewEventCorrelatorWithOptions(options CorrelatorOptions) *EventCorrelator {
+	optionsWithDefaults := populateDefaults(options)
+	spamFilter := NewEventSourceObjectSpamFilter(optionsWithDefaults.LRUCacheSize,
+		optionsWithDefaults.BurstSize, optionsWithDefaults.QPS, optionsWithDefaults.Clock)
+	return &EventCorrelator{
+		filterFunc: spamFilter.Filter,
+		aggregator: NewEventAggregator(
+			optionsWithDefaults.LRUCacheSize,
+			optionsWithDefaults.KeyFunc,
+			optionsWithDefaults.MessageFunc,
+			optionsWithDefaults.MaxEvents,
+			optionsWithDefaults.MaxIntervalInSeconds,
+			optionsWithDefaults.Clock),
+		logger: newEventLogger(optionsWithDefaults.LRUCacheSize, optionsWithDefaults.Clock),
+	}
+}
+
+// populateDefaults populates the zero value options with defaults
+func populateDefaults(options CorrelatorOptions) CorrelatorOptions {
+	if options.LRUCacheSize == 0 {
+		options.LRUCacheSize = maxLruCacheEntries
+	}
+	if options.BurstSize == 0 {
+		options.BurstSize = defaultSpamBurst
+	}
+	if options.QPS == 0 {
+		options.QPS = defaultSpamQPS
+	}
+	if options.KeyFunc == nil {
+		options.KeyFunc = EventAggregatorByReasonFunc
+	}
+	if options.MessageFunc == nil {
+		options.MessageFunc = EventAggregatorByReasonMessageFunc
+	}
+	if options.MaxEvents == 0 {
+		options.MaxEvents = defaultAggregateMaxEvents
+	}
+	if options.MaxIntervalInSeconds == 0 {
+		options.MaxIntervalInSeconds = defaultAggregateIntervalInSeconds
+	}
+	if options.Clock == nil {
+		options.Clock = clock.RealClock{}
+	}
+	return options
 }
 
 // EventCorrelate filters, aggregates, counts, and de-duplicates all incoming events

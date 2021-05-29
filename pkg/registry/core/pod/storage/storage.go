@@ -23,6 +23,7 @@ import (
 	"net/url"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -31,29 +32,34 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
-	policyclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/policy/internalversion"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	"k8s.io/kubernetes/pkg/registry/core/pod"
+	registrypod "k8s.io/kubernetes/pkg/registry/core/pod"
 	podrest "k8s.io/kubernetes/pkg/registry/core/pod/rest"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // PodStorage includes storage for pods and all sub resources
 type PodStorage struct {
-	Pod         *REST
-	Binding     *BindingREST
-	Eviction    *EvictionREST
-	Status      *StatusREST
-	Log         *podrest.LogREST
-	Proxy       *podrest.ProxyREST
-	Exec        *podrest.ExecREST
-	Attach      *podrest.AttachREST
-	PortForward *podrest.PortForwardREST
+	Pod                 *REST
+	Binding             *BindingREST
+	LegacyBinding       *LegacyBindingREST
+	Eviction            *EvictionREST
+	Status              *StatusREST
+	EphemeralContainers *EphemeralContainersREST
+	Log                 *podrest.LogREST
+	Proxy               *podrest.ProxyREST
+	Exec                *podrest.ExecREST
+	Attach              *podrest.AttachREST
+	PortForward         *podrest.PortForwardREST
 }
 
 // REST implements a RESTStorage for pods
@@ -63,40 +69,52 @@ type REST struct {
 }
 
 // NewStorage returns a RESTStorage object that will work against pods.
-func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) PodStorage {
+func NewStorage(optsGetter generic.RESTOptionsGetter, k client.ConnectionInfoGetter, proxyTransport http.RoundTripper, podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter) (PodStorage, error) {
 
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &api.Pod{} },
 		NewListFunc:              func() runtime.Object { return &api.PodList{} },
-		PredicateFunc:            pod.MatchPod,
+		PredicateFunc:            registrypod.MatchPod,
 		DefaultQualifiedResource: api.Resource("pods"),
 
-		CreateStrategy:      pod.Strategy,
-		UpdateStrategy:      pod.Strategy,
-		DeleteStrategy:      pod.Strategy,
+		CreateStrategy:      registrypod.Strategy,
+		UpdateStrategy:      registrypod.Strategy,
+		DeleteStrategy:      registrypod.Strategy,
+		ResetFieldsStrategy: registrypod.Strategy,
 		ReturnDeletedObject: true,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
-	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: pod.GetAttrs, TriggerFunc: pod.NodeNameTriggerFunc}
+	options := &generic.StoreOptions{
+		RESTOptions: optsGetter,
+		AttrFunc:    registrypod.GetAttrs,
+		TriggerFunc: map[string]storage.IndexerFunc{"spec.nodeName": registrypod.NodeNameTriggerFunc},
+		Indexers:    registrypod.Indexers(),
+	}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return PodStorage{}, err
 	}
 
 	statusStore := *store
-	statusStore.UpdateStrategy = pod.StatusStrategy
+	statusStore.UpdateStrategy = registrypod.StatusStrategy
+	statusStore.ResetFieldsStrategy = registrypod.StatusStrategy
+	ephemeralContainersStore := *store
+	ephemeralContainersStore.UpdateStrategy = registrypod.EphemeralContainersStrategy
 
+	bindingREST := &BindingREST{store: store}
 	return PodStorage{
-		Pod:         &REST{store, proxyTransport},
-		Binding:     &BindingREST{store: store},
-		Eviction:    newEvictionStorage(store, podDisruptionBudgetClient),
-		Status:      &StatusREST{store: &statusStore},
-		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
-		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
-		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
-		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
-		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},
-	}
+		Pod:                 &REST{store, proxyTransport},
+		Binding:             &BindingREST{store: store},
+		LegacyBinding:       &LegacyBindingREST{bindingREST},
+		Eviction:            newEvictionStorage(store, podDisruptionBudgetClient),
+		Status:              &StatusREST{store: &statusStore},
+		EphemeralContainers: &EphemeralContainersREST{store: &ephemeralContainersStore},
+		Log:                 &podrest.LogREST{Store: store, KubeletConn: k},
+		Proxy:               &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
+		Exec:                &podrest.ExecREST{Store: store, KubeletConn: k},
+		Attach:              &podrest.AttachREST{Store: store, KubeletConn: k},
+		PortForward:         &podrest.PortForwardREST{Store: store, KubeletConn: k},
+	}, nil
 }
 
 // Implement Redirector.
@@ -104,7 +122,7 @@ var _ = rest.Redirector(&REST{})
 
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx context.Context, name string) (*url.URL, http.RoundTripper, error) {
-	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
+	return registrypod.ResourceLocation(ctx, r, r.proxyTransport, name)
 }
 
 // Implement ShortNamesProvider
@@ -138,15 +156,28 @@ func (r *BindingREST) New() runtime.Object {
 	return &api.Binding{}
 }
 
-var _ = rest.Creater(&BindingREST{})
+var _ = rest.NamedCreater(&BindingREST{})
 
 // Create ensures a pod is bound to a specific host.
-func (r *BindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
-	binding := obj.(*api.Binding)
+func (r *BindingREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	binding, ok := obj.(*api.Binding)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %#v", obj))
+	}
+
+	if name != binding.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in Binding object")
+	}
 
 	// TODO: move me to a binding strategy
 	if errs := validation.ValidatePodBinding(binding); len(errs) != 0 {
 		return nil, errs.ToAggregate()
+	}
+
+	if createValidation != nil {
+		if err := createValidation(ctx, binding.DeepCopyObject()); err != nil {
+			return nil, err
+		}
 	}
 
 	err = r.assignPod(ctx, binding.Name, binding.Target.Name, binding.Annotations, dryrun.IsDryRun(options.DryRun))
@@ -186,7 +217,7 @@ func (r *BindingREST) setPodHostAndAnnotations(ctx context.Context, podID, oldMa
 		})
 		finalPod = pod
 		return pod, nil
-	}), dryRun)
+	}), dryRun, nil)
 	return finalPod, err
 }
 
@@ -200,6 +231,32 @@ func (r *BindingREST) assignPod(ctx context.Context, podID string, machine strin
 		}
 	}
 	return
+}
+
+var _ = rest.Creater(&LegacyBindingREST{})
+
+// LegacyBindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
+type LegacyBindingREST struct {
+	bindingRest *BindingREST
+}
+
+// NamespaceScoped fulfill rest.Scoper
+func (r *LegacyBindingREST) NamespaceScoped() bool {
+	return r.bindingRest.NamespaceScoped()
+}
+
+// New creates a new binding resource
+func (r *LegacyBindingREST) New() runtime.Object {
+	return r.bindingRest.New()
+}
+
+// Create ensures a pod is bound to a specific host.
+func (r *LegacyBindingREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (out runtime.Object, err error) {
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Binding object: %T", obj))
+	}
+	return r.bindingRest.Create(ctx, metadata.GetName(), obj, createValidation, options)
 }
 
 // StatusREST implements the REST endpoint for changing the status of a pod.
@@ -219,6 +276,43 @@ func (r *StatusREST) Get(ctx context.Context, name string, options *metav1.GetOp
 
 // Update alters the status subset of an object.
 func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
+	// subresources should never allow create on update.
+	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
+}
+
+// EphemeralContainersREST implements the REST endpoint for adding EphemeralContainers
+type EphemeralContainersREST struct {
+	store *genericregistry.Store
+}
+
+var _ = rest.Patcher(&EphemeralContainersREST{})
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *EphemeralContainersREST) Get(ctx context.Context, name string, options *metav1.GetOptions) (runtime.Object, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return nil, errors.NewBadRequest("feature EphemeralContainers disabled")
+	}
+
+	return r.store.Get(ctx, name, options)
+}
+
+// New creates a new pod resource
+func (r *EphemeralContainersREST) New() runtime.Object {
+	return &api.Pod{}
+}
+
+// Update alters the EphemeralContainers field in PodSpec
+func (r *EphemeralContainersREST) Update(ctx context.Context, name string, objInfo rest.UpdatedObjectInfo, createValidation rest.ValidateObjectFunc, updateValidation rest.ValidateObjectUpdateFunc, forceAllowCreate bool, options *metav1.UpdateOptions) (runtime.Object, bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		return nil, false, errors.NewBadRequest("feature EphemeralContainers disabled")
+	}
+
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)

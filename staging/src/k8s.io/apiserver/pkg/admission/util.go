@@ -18,11 +18,30 @@ package admission
 
 import "k8s.io/apimachinery/pkg/runtime"
 
-type SchemeBasedObjectInterfaces struct {
-	Scheme *runtime.Scheme
+type RuntimeObjectInterfaces struct {
+	runtime.ObjectCreater
+	runtime.ObjectTyper
+	runtime.ObjectDefaulter
+	runtime.ObjectConvertor
+	runtime.EquivalentResourceMapper
 }
 
-func (r *SchemeBasedObjectInterfaces) GetObjectCreater() runtime.ObjectCreater     { return r.Scheme }
-func (r *SchemeBasedObjectInterfaces) GetObjectTyper() runtime.ObjectTyper         { return r.Scheme }
-func (r *SchemeBasedObjectInterfaces) GetObjectDefaulter() runtime.ObjectDefaulter { return r.Scheme }
-func (r *SchemeBasedObjectInterfaces) GetObjectConvertor() runtime.ObjectConvertor { return r.Scheme }
+func NewObjectInterfacesFromScheme(scheme *runtime.Scheme) ObjectInterfaces {
+	return &RuntimeObjectInterfaces{scheme, scheme, scheme, scheme, runtime.NewEquivalentResourceRegistry()}
+}
+
+func (r *RuntimeObjectInterfaces) GetObjectCreater() runtime.ObjectCreater {
+	return r.ObjectCreater
+}
+func (r *RuntimeObjectInterfaces) GetObjectTyper() runtime.ObjectTyper {
+	return r.ObjectTyper
+}
+func (r *RuntimeObjectInterfaces) GetObjectDefaulter() runtime.ObjectDefaulter {
+	return r.ObjectDefaulter
+}
+func (r *RuntimeObjectInterfaces) GetObjectConvertor() runtime.ObjectConvertor {
+	return r.ObjectConvertor
+}
+func (r *RuntimeObjectInterfaces) GetEquivalentResourceMapper() runtime.EquivalentResourceMapper {
+	return r.EquivalentResourceMapper
+}

@@ -75,7 +75,7 @@ type NamedCertKeyArray struct {
 	changed bool
 }
 
-var _ flag.Value = &NamedCertKey{}
+var _ flag.Value = &NamedCertKeyArray{}
 
 // NewNamedKeyCertArray creates a new NamedCertKeyArray with the internal value
 // pointing to p.

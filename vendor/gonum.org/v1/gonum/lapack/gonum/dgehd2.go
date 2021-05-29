@@ -7,13 +7,13 @@ package gonum
 import "gonum.org/v1/gonum/blas"
 
 // Dgehd2 reduces a block of a general n×n matrix A to upper Hessenberg form H
-// by an orthogonal similarity transformation Q^T * A * Q = H.
+// by an orthogonal similarity transformation Qᵀ * A * Q = H.
 //
 // The matrix Q is represented as a product of (ihi-ilo) elementary
 // reflectors
 //  Q = H_{ilo} H_{ilo+1} ... H_{ihi-1}.
 // Each H_i has the form
-//  H_i = I - tau[i] * v * v^T
+//  H_i = I - tau[i] * v * vᵀ
 // where v is a real vector with v[0:i+1] = 0, v[i+1] = 1 and v[ihi+1:n] = 0.
 // v[i+2:ihi+1] is stored on exit in A[i+2:ihi+1,i].
 //
@@ -56,16 +56,29 @@ import "gonum.org/v1/gonum/blas"
 //
 // Dgehd2 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgehd2(n, ilo, ihi int, a []float64, lda int, tau, work []float64) {
-	checkMatrix(n, n, a, lda)
 	switch {
-	case ilo < 0 || ilo > max(0, n-1):
+	case n < 0:
+		panic(nLT0)
+	case ilo < 0 || max(0, n-1) < ilo:
 		panic(badIlo)
-	case ihi < min(ilo, n-1) || ihi >= n:
+	case ihi < min(ilo, n-1) || n <= ihi:
 		panic(badIhi)
+	case lda < max(1, n):
+		panic(badLdA)
+	}
+
+	// Quick return if possible.
+	if n == 0 {
+		return
+	}
+
+	switch {
+	case len(a) < (n-1)*lda+n:
+		panic(shortA)
 	case len(tau) != n-1:
-		panic(badTau)
+		panic(badLenTau)
 	case len(work) < n:
-		panic(badWork)
+		panic(shortWork)
 	}
 
 	for i := ilo; i < ihi; i++ {

@@ -1,20 +1,20 @@
 ---
 name: Failing Test
-about: Report test failures in Kubernetes CI jobs
+about: Report continuously failing tests or jobs in Kubernetes CI
 labels: kind/failing-test
 
 ---
 
-<!-- Please only use this template for submitting reports about failing tests in Kubernetes CI jobs -->
+<!-- Please only use this template for submitting reports about continuously failing tests or jobs in Kubernetes CI -->
 
-**Which jobs are failing**:
+#### Which jobs are failing:
 
-**Which test(s) are failing**:
+#### Which test(s) are failing:
 
-**Since when has it been failing**:
+#### Since when has it been failing:
 
-**Testgrid link**:
+#### Testgrid link:
 
-**Reason for failure**:
+#### Reason for failure:
 
-**Anything else we need to know**:
+#### Anything else we need to know:

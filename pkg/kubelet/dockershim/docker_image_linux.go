@@ -1,4 +1,4 @@
-// +build linux
+// +build linux,!dockerless
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -20,12 +20,58 @@ package dockershim
 
 import (
 	"context"
-	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/klog/v2"
+
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // ImageFsInfo returns information of the filesystem that is used to store images.
-func (ds *dockerService) ImageFsInfo(_ context.Context, r *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+func (ds *dockerService) ImageFsInfo(_ context.Context, _ *runtimeapi.ImageFsInfoRequest) (*runtimeapi.ImageFsInfoResponse, error) {
+	info, err := ds.client.Info()
+	if err != nil {
+		klog.ErrorS(err, "Failed to get docker info")
+		return nil, err
+	}
+
+	bytes, inodes, err := dirSize(filepath.Join(info.DockerRootDir, "image"))
+	if err != nil {
+		return nil, err
+	}
+
+	return &runtimeapi.ImageFsInfoResponse{
+		ImageFilesystems: []*runtimeapi.FilesystemUsage{
+			{
+				Timestamp: time.Now().Unix(),
+				FsId: &runtimeapi.FilesystemIdentifier{
+					Mountpoint: info.DockerRootDir,
+				},
+				UsedBytes: &runtimeapi.UInt64Value{
+					Value: uint64(bytes),
+				},
+				InodesUsed: &runtimeapi.UInt64Value{
+					Value: uint64(inodes),
+				},
+			},
+		},
+	}, nil
+}
+
+func dirSize(path string) (int64, int64, error) {
+	bytes := int64(0)
+	inodes := int64(0)
+	err := filepath.Walk(path, func(dir string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		inodes++
+		if !info.IsDir() {
+			bytes += info.Size()
+		}
+		return nil
+	})
+	return bytes, inodes, err
 }

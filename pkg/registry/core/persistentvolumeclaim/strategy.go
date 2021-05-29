@@ -33,6 +33,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/features"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // persistentvolumeclaimStrategy implements behavior for PersistentVolumeClaim objects
@@ -49,6 +50,18 @@ func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 	return true
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (persistentvolumeclaimStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
 func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pvc := obj.(*api.PersistentVolumeClaim)
@@ -60,6 +73,11 @@ func (persistentvolumeclaimStrategy) PrepareForCreate(ctx context.Context, obj r
 func (persistentvolumeclaimStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pvc := obj.(*api.PersistentVolumeClaim)
 	return validation.ValidatePersistentVolumeClaim(pvc)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (persistentvolumeclaimStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -84,6 +102,11 @@ func (persistentvolumeclaimStrategy) ValidateUpdate(ctx context.Context, obj, ol
 	return append(errorList, validation.ValidatePersistentVolumeClaimUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))...)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (persistentvolumeclaimStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
+}
+
 func (persistentvolumeclaimStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
@@ -93,6 +116,18 @@ type persistentvolumeclaimStatusStrategy struct {
 }
 
 var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (persistentvolumeclaimStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
@@ -106,6 +141,11 @@ func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx context.Context,
 
 func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidatePersistentVolumeClaimStatusUpdate(obj.(*api.PersistentVolumeClaim), old.(*api.PersistentVolumeClaim))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (persistentvolumeclaimStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // GetAttrs returns labels and fields of a given object for filtering purposes.

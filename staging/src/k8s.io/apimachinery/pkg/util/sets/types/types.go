@@ -20,6 +20,7 @@ limitations under the License.
 package types
 
 //go:generate set-gen -i k8s.io/kubernetes/pkg/util/sets/types
+//lint:file-ignore U1000 Ignore unused fields
 
 type ReferenceSetTypes struct {
 	// These types all cause files to be generated.
@@ -29,4 +30,5 @@ type ReferenceSetTypes struct {
 	b int
 	c byte
 	d string
+	e int32
 }

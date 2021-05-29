@@ -17,17 +17,19 @@ limitations under the License.
 package etcd3
 
 import (
-	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/mvcc/mvccpb"
+	"fmt"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/mvcc/mvccpb"
 )
 
 type event struct {
-	key       string
-	value     []byte
-	prevValue []byte
-	rev       int64
-	isDeleted bool
-	isCreated bool
+	key              string
+	value            []byte
+	prevValue        []byte
+	rev              int64
+	isDeleted        bool
+	isCreated        bool
+	isProgressNotify bool
 }
 
 // parseKV converts a KeyValue retrieved from an initial sync() listing to a synthetic isCreated event.
@@ -42,7 +44,12 @@ func parseKV(kv *mvccpb.KeyValue) *event {
 	}
 }
 
-func parseEvent(e *clientv3.Event) *event {
+func parseEvent(e *clientv3.Event) (*event, error) {
+	if !e.IsCreate() && e.PrevKv == nil {
+		// If the previous value is nil, error. One example of how this is possible is if the previous value has been compacted already.
+		return nil, fmt.Errorf("etcd event received with PrevKv=nil (key=%q, modRevision=%d, type=%s)", string(e.Kv.Key), e.Kv.ModRevision, e.Type.String())
+
+	}
 	ret := &event{
 		key:       string(e.Kv.Key),
 		value:     e.Kv.Value,
@@ -53,5 +60,12 @@ func parseEvent(e *clientv3.Event) *event {
 	if e.PrevKv != nil {
 		ret.prevValue = e.PrevKv.Value
 	}
-	return ret
+	return ret, nil
+}
+
+func progressNotifyEvent(rev int64) *event {
+	return &event{
+		rev:              rev,
+		isProgressNotify: true,
+	}
 }

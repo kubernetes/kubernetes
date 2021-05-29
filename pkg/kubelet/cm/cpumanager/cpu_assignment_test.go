@@ -175,6 +175,12 @@ func TestCPUAccumulatorFreeCPUs(t *testing.T) {
 			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			[]int{2, 8, 4, 10, 1, 7, 3, 9, 5, 11},
 		},
+		{
+			"triple socket HT, 12 cpus free",
+			topoTripleSocketHT,
+			cpuset.NewCPUSet(0, 1, 2, 3, 6, 7, 8, 9, 10, 11, 12, 13),
+			[]int{12, 13, 0, 1, 2, 3, 6, 7, 8, 9, 10, 11},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -356,7 +362,7 @@ func TestTakeByTopology(t *testing.T) {
 			cpuset.NewCPUSet(2, 6),
 		},
 		{
-			"take three cpus from dual socket with HT - core from Socket 0",
+			"take one cpu from dual socket with HT - core from Socket 0",
 			topoDualSocketHT,
 			cpuset.NewCPUSet(1, 2, 3, 4, 5, 7, 8, 9, 10, 11),
 			1,

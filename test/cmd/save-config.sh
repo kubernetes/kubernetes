@@ -28,11 +28,11 @@ run_save_config_tests() {
   ## 1. kubectl create --save-config should generate configuration annotation
   # Pre-Condition: no POD exists
   create_and_use_new_namespace
-  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
   # Command: create a pod "test-pod"
-  kubectl create -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
+  kubectl create -f hack/testdata/pod.yaml --save-config "${kube_flags[@]:?}"
   # Post-Condition: pod "test-pod" has configuration annotation
-  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")"
   # Clean up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 2. kubectl edit --save-config should generate configuration annotation
@@ -40,14 +40,14 @@ run_save_config_tests() {
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
-  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")" || exit 1
   # Command: edit the pod "test-pod"
   temp_editor="${KUBE_TEMP}/tmp-editor.sh"
   echo -e "#!/usr/bin/env bash\n${SED} -i \"s/test-pod-label/test-pod-label-edited/g\" \$@" > "${temp_editor}"
   chmod +x "${temp_editor}"
   EDITOR=${temp_editor} kubectl edit pod test-pod --save-config "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" has configuration annotation
-  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")"
   # Clean up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 3. kubectl replace --save-config should generate configuration annotation
@@ -55,38 +55,38 @@ run_save_config_tests() {
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
-  ! [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")" || exit 1
   # Command: replace the pod "test-pod"
   kubectl replace -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" has configuration annotation
-  [[ "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")"
   # Clean up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]}"
   ## 4. kubectl run --save-config should generate configuration annotation
-  # Pre-Condition: no RC exists
-  kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
-  # Command: create the rc "nginx" with image nginx
-  kubectl run nginx "--image=$IMAGE_NGINX" --save-config --generator=run/v1 "${kube_flags[@]}"
-  # Post-Condition: rc "nginx" has configuration annotation
-  [[ "$(kubectl get rc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  # Pre-Condition: no pods exists
+  kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create the pod "nginx" with image nginx
+  kubectl run nginx "--image=$IMAGE_NGINX" --save-config "${kube_flags[@]}"
+  # Post-Condition: pod "nginx" has configuration annotation
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pod nginx -o yaml "${kube_flags[@]}")"
   ## 5. kubectl expose --save-config should generate configuration annotation
   # Pre-Condition: no service exists
   kube::test::get_object_assert svc "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command: expose the rc "nginx"
-  kubectl expose rc nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
+  kubectl expose pod nginx --save-config --port=80 --target-port=8000 "${kube_flags[@]}"
   # Post-Condition: service "nginx" has configuration annotation
-  [[ "$(kubectl get svc nginx -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get svc nginx -o yaml "${kube_flags[@]}")"
   # Clean up
-  kubectl delete rc,svc nginx
+  kubectl delete pod,svc nginx
   ## 6. kubectl autoscale --save-config should generate configuration annotation
   # Pre-Condition: no RC exists, then create the rc "frontend", which shouldn't have configuration annotation
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
-  ! [[ "$(kubectl get rc frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get rc frontend -o yaml "${kube_flags[@]}")" || exit 1
   # Command: autoscale rc "frontend"
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
-  [[ "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}" | grep kubectl.kubernetes.io/last-applied-configuration)" ]]
+  grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get hpa frontend -o yaml "${kube_flags[@]}")"
   # Ensure we can interact with HPA objects in lists through autoscaling/v1 APIs
   output_message=$(kubectl get hpa -o=jsonpath='{.items[0].apiVersion}' 2>&1 "${kube_flags[@]}")
   kube::test::if_has_string "${output_message}" 'autoscaling/v1'

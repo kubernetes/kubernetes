@@ -66,6 +66,8 @@ spec:
       value: "skeleton"
     - name: E2E_PARALLEL
       value: "false"
+    - name: E2E_VERBOSITY
+      value: "4"
     volumeMounts:
     - name: output-volume
       mountPath: /tmp/results

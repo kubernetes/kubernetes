@@ -133,8 +133,8 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 }
 
 func TestRunHandlerHttp(t *testing.T) {
-	fakeHttp := fakeHTTP{}
-	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+	fakeHTTPGetter := fakeHTTP{}
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil)
 
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	containerName := "containerFoo"
@@ -160,8 +160,8 @@ func TestRunHandlerHttp(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("unexpected url: %s", fakeHttp.url)
+	if fakeHTTPGetter.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
 	}
 }
 
@@ -227,8 +227,8 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	expectedResp := http.Response{
 		Body: ioutil.NopCloser(strings.NewReader(expectedErr.Error())),
 	}
-	fakeHttp := fakeHTTP{err: expectedErr, resp: &expectedResp}
-	handlerRunner := NewHandlerRunner(&fakeHttp, &fakeContainerCommandRunner{}, nil)
+	fakeHTTPGetter := fakeHTTP{err: expectedErr, resp: &expectedResp}
+	handlerRunner := NewHandlerRunner(&fakeHTTPGetter, &fakeContainerCommandRunner{}, nil)
 	containerName := "containerFoo"
 	containerID := kubecontainer.ContainerID{Type: "test", ID: "abc1234"}
 	container := v1.Container{
@@ -247,7 +247,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	pod.ObjectMeta.Name = "podFoo"
 	pod.ObjectMeta.Namespace = "nsFoo"
 	pod.Spec.Containers = []v1.Container{container}
-	expectedErrMsg := fmt.Sprintf("Http lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", "bar", containerName, format.Pod(&pod), expectedErr, expectedErr.Error())
+	expectedErrMsg := fmt.Sprintf("HTTP lifecycle hook (%s) for Container %q in Pod %q failed - error: %v, message: %q", "bar", containerName, format.Pod(&pod), expectedErr, expectedErr.Error())
 	msg, err := handlerRunner.Run(containerID, &pod, &container, container.Lifecycle.PostStart)
 	if err == nil {
 		t.Errorf("expected error: %v", expectedErr)
@@ -255,7 +255,7 @@ func TestRunHandlerHttpFailure(t *testing.T) {
 	if msg != expectedErrMsg {
 		t.Errorf("unexpected error message: %q; expected %q", msg, expectedErrMsg)
 	}
-	if fakeHttp.url != "http://foo:8080/bar" {
-		t.Errorf("unexpected url: %s", fakeHttp.url)
+	if fakeHTTPGetter.url != "http://foo:8080/bar" {
+		t.Errorf("unexpected url: %s", fakeHTTPGetter.url)
 	}
 }

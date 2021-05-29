@@ -22,7 +22,7 @@ import (
 // The matrix Q is represented as a product of elementary reflectors
 //  Q = H_0 H_1 . . . H_{min(m,n)-1}.
 // Each H(i) has the form
-//  H_i = I - tau_i * v * v^T
+//  H_i = I - tau_i * v * vᵀ
 // where v is a vector with v[0:n-k+i-1] stored in A[m-k+i, 0:n-k+i-1],
 // v[n-k+i:n] = 0 and v[n-k+i] = 1.
 //
@@ -32,36 +32,37 @@ import (
 //
 // Dgerqf is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dgerqf(m, n int, a []float64, lda int, tau, work []float64, lwork int) {
-	checkMatrix(m, n, a, lda)
-
-	if len(work) < max(1, lwork) {
+	switch {
+	case m < 0:
+		panic(mLT0)
+	case n < 0:
+		panic(nLT0)
+	case lda < max(1, n):
+		panic(badLdA)
+	case lwork < max(1, m) && lwork != -1:
+		panic(badLWork)
+	case len(work) < max(1, lwork):
 		panic(shortWork)
 	}
-	if lwork != -1 && lwork < max(1, m) {
-		panic(badWork)
-	}
 
+	// Quick return if possible.
 	k := min(m, n)
-	if len(tau) != k {
-		panic(badTau)
-	}
-
-	var nb, lwkopt int
 	if k == 0 {
-		lwkopt = 1
-	} else {
-		nb = impl.Ilaenv(1, "DGERQF", " ", m, n, -1, -1)
-		lwkopt = m * nb
+		work[0] = 1
+		return
 	}
-	work[0] = float64(lwkopt)
 
+	nb := impl.Ilaenv(1, "DGERQF", " ", m, n, -1, -1)
 	if lwork == -1 {
+		work[0] = float64(m * nb)
 		return
 	}
 
-	// Return quickly if possible.
-	if k == 0 {
-		return
+	if len(a) < (m-1)*lda+n {
+		panic(shortA)
+	}
+	if len(tau) != k {
+		panic(badLenTau)
 	}
 
 	nbmin := 2

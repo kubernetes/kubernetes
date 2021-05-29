@@ -1,18 +1,7 @@
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"bytes"
@@ -191,6 +180,47 @@ func (b *Blob) PutBlockWithLength(blockID string, size uint64, blob io.Reader, o
 	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), query)
 
 	resp, err := b.Container.bsc.client.exec(http.MethodPut, uri, headers, blob, b.Container.bsc.auth)
+	if err != nil {
+		return err
+	}
+	return b.respondCreation(resp, BlobTypeBlock)
+}
+
+// PutBlockFromURLOptions includes the options for a put block from URL operation
+type PutBlockFromURLOptions struct {
+	PutBlockOptions
+
+	SourceContentMD5   string `header:"x-ms-source-content-md5"`
+	SourceContentCRC64 string `header:"x-ms-source-content-crc64"`
+}
+
+// PutBlockFromURL copy data of exactly specified size from specified URL to
+// the block blob with given ID. It is an alternative to PutBlocks where data
+// comes from a remote URL and the offset and length is known in advance.
+//
+// The API rejects requests with size > 100 MiB (but this limit is not
+// checked by the SDK).
+//
+// See https://docs.microsoft.com/en-us/rest/api/storageservices/put-block-from-url
+func (b *Blob) PutBlockFromURL(blockID string, blobURL string, offset int64, size uint64, options *PutBlockFromURLOptions) error {
+	query := url.Values{
+		"comp":    {"block"},
+		"blockid": {blockID},
+	}
+	headers := b.Container.bsc.client.getStandardHeaders()
+	// The value of this header must be set to zero.
+	// When the length is not zero, the operation will fail with the status code 400 (Bad Request).
+	headers["Content-Length"] = "0"
+	headers["x-ms-copy-source"] = blobURL
+	headers["x-ms-source-range"] = fmt.Sprintf("bytes=%d-%d", offset, uint64(offset)+size-1)
+
+	if options != nil {
+		query = addTimeout(query, options.Timeout)
+		headers = mergeHeaders(headers, headersFromStruct(*options))
+	}
+	uri := b.Container.bsc.client.getEndpoint(blobServiceName, b.buildPath(), query)
+
+	resp, err := b.Container.bsc.client.exec(http.MethodPut, uri, headers, nil, b.Container.bsc.auth)
 	if err != nil {
 		return err
 	}

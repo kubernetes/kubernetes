@@ -48,7 +48,15 @@ func LinkSetVfVlan(link Link, vf, vlan int) error {
 	return ErrNotImplemented
 }
 
+func LinkSetVfVlanQos(link Link, vf, vlan, qos int) error {
+	return ErrNotImplemented
+}
+
 func LinkSetVfTxRate(link Link, vf, rate int) error {
+	return ErrNotImplemented
+}
+
+func LinkSetVfRate(link Link, vf, minRate, maxRate int) error {
 	return ErrNotImplemented
 }
 
@@ -149,6 +157,10 @@ func LinkList() ([]Link, error) {
 }
 
 func AddrAdd(link Link, addr *Addr) error {
+	return ErrNotImplemented
+}
+
+func AddrReplace(link Link, addr *Addr) error {
 	return ErrNotImplemented
 }
 

@@ -19,10 +19,11 @@ limitations under the License.
 package replicaset
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 			fmt.Sprintf("sequence No: %v->%v", rs.Status.ObservedGeneration, newStatus.ObservedGeneration))
 
 		rs.Status = newStatus
-		updatedRS, updateErr = c.UpdateStatus(rs)
+		updatedRS, updateErr = c.UpdateStatus(context.TODO(), rs, metav1.UpdateOptions{})
 		if updateErr == nil {
 			return updatedRS, nil
 		}
@@ -72,7 +73,7 @@ func updateReplicaSetStatus(c appsclient.ReplicaSetInterface, rs *apps.ReplicaSe
 			break
 		}
 		// Update the ReplicaSet with the latest resource version for the next poll
-		if rs, getErr = c.Get(rs.Name, metav1.GetOptions{}); getErr != nil {
+		if rs, getErr = c.Get(context.TODO(), rs.Name, metav1.GetOptions{}); getErr != nil {
 			// If the GET fails we can't trust status.Replicas anymore. This error
 			// is bound to be more interesting than the update failure.
 			return nil, getErr

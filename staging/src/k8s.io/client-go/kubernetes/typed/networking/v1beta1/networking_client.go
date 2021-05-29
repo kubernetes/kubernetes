@@ -20,7 +20,6 @@ package v1beta1
 
 import (
 	v1beta1 "k8s.io/api/networking/v1beta1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -28,6 +27,7 @@ import (
 type NetworkingV1beta1Interface interface {
 	RESTClient() rest.Interface
 	IngressesGetter
+	IngressClassesGetter
 }
 
 // NetworkingV1beta1Client is used to interact with features provided by the networking.k8s.io group.
@@ -37,6 +37,10 @@ type NetworkingV1beta1Client struct {
 
 func (c *NetworkingV1beta1Client) Ingresses(namespace string) IngressInterface {
 	return newIngresses(c, namespace)
+}
+
+func (c *NetworkingV1beta1Client) IngressClasses() IngressClassInterface {
+	return newIngressClasses(c)
 }
 
 // NewForConfig creates a new NetworkingV1beta1Client for the given config.
@@ -71,7 +75,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1beta1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

@@ -7,12 +7,13 @@ import (
 )
 
 const (
-	NEWNET  NamespaceType = "NEWNET"
-	NEWPID  NamespaceType = "NEWPID"
-	NEWNS   NamespaceType = "NEWNS"
-	NEWUTS  NamespaceType = "NEWUTS"
-	NEWIPC  NamespaceType = "NEWIPC"
-	NEWUSER NamespaceType = "NEWUSER"
+	NEWNET    NamespaceType = "NEWNET"
+	NEWPID    NamespaceType = "NEWPID"
+	NEWNS     NamespaceType = "NEWNS"
+	NEWUTS    NamespaceType = "NEWUTS"
+	NEWIPC    NamespaceType = "NEWIPC"
+	NEWUSER   NamespaceType = "NEWUSER"
+	NEWCGROUP NamespaceType = "NEWCGROUP"
 )
 
 var (
@@ -35,6 +36,8 @@ func NsName(ns NamespaceType) string {
 		return "user"
 	case NEWUTS:
 		return "uts"
+	case NEWCGROUP:
+		return "cgroup"
 	}
 	return ""
 }
@@ -53,7 +56,7 @@ func IsNamespaceSupported(ns NamespaceType) bool {
 	if nsFile == "" {
 		return false
 	}
-	_, err := os.Stat(fmt.Sprintf("/proc/self/ns/%s", nsFile))
+	_, err := os.Stat("/proc/self/ns/" + nsFile)
 	// a namespace is supported if it exists and we have permissions to read it
 	supported = err == nil
 	supportedNamespaces[ns] = supported
@@ -68,6 +71,7 @@ func NamespaceTypes() []NamespaceType {
 		NEWNET,
 		NEWPID,
 		NEWNS,
+		NEWCGROUP,
 	}
 }
 

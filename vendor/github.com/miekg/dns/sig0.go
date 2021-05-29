@@ -2,7 +2,6 @@ package dns
 
 import (
 	"crypto"
-	"crypto/dsa"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/binary"
@@ -21,15 +20,11 @@ func (rr *SIG) Sign(k crypto.Signer, m *Msg) ([]byte, error) {
 	if rr.KeyTag == 0 || len(rr.SignerName) == 0 || rr.Algorithm == 0 {
 		return nil, ErrKey
 	}
-	rr.Header().Rrtype = TypeSIG
-	rr.Header().Class = ClassANY
-	rr.Header().Ttl = 0
-	rr.Header().Name = "."
-	rr.OrigTtl = 0
-	rr.TypeCovered = 0
-	rr.Labels = 0
 
-	buf := make([]byte, m.Len()+rr.len())
+	rr.Hdr = RR_Header{Name: ".", Rrtype: TypeSIG, Class: ClassANY, Ttl: 0}
+	rr.OrigTtl, rr.TypeCovered, rr.Labels = 0, 0, 0
+
+	buf := make([]byte, m.Len()+Len(rr))
 	mbuf, err := m.PackBuffer(buf)
 	if err != nil {
 		return nil, err
@@ -60,16 +55,15 @@ func (rr *SIG) Sign(k crypto.Signer, m *Msg) ([]byte, error) {
 	}
 
 	rr.Signature = toBase64(signature)
-	sig := string(signature)
 
-	buf = append(buf, sig...)
+	buf = append(buf, signature...)
 	if len(buf) > int(^uint16(0)) {
 		return nil, ErrBuf
 	}
 	// Adjust sig data length
 	rdoff := len(mbuf) + 1 + 2 + 2 + 4
 	rdlen := binary.BigEndian.Uint16(buf[rdoff:])
-	rdlen += uint16(len(sig))
+	rdlen += uint16(len(signature))
 	binary.BigEndian.PutUint16(buf[rdoff:], rdlen)
 	// Adjust additional count
 	adc := binary.BigEndian.Uint16(buf[10:])
@@ -90,7 +84,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 
 	var hash crypto.Hash
 	switch rr.Algorithm {
-	case DSA, RSASHA1:
+	case RSASHA1:
 		hash = crypto.SHA1
 	case RSASHA256, ECDSAP256SHA256:
 		hash = crypto.SHA256
@@ -108,7 +102,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	anc := binary.BigEndian.Uint16(buf[6:])
 	auc := binary.BigEndian.Uint16(buf[8:])
 	adc := binary.BigEndian.Uint16(buf[10:])
-	offset := 12
+	offset := headerSize
 	var err error
 	for i := uint16(0); i < qdc && offset < buflen; i++ {
 		_, offset, err = UnpackDomainName(buf, offset)
@@ -128,8 +122,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 		if offset+1 >= buflen {
 			continue
 		}
-		var rdlen uint16
-		rdlen = binary.BigEndian.Uint16(buf[offset:])
+		rdlen := binary.BigEndian.Uint16(buf[offset:])
 		offset += 2
 		offset += int(rdlen)
 	}
@@ -169,7 +162,7 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	}
 	// If key has come from the DNS name compression might
 	// have mangled the case of the name
-	if strings.ToLower(signername) != strings.ToLower(k.Header().Name) {
+	if !strings.EqualFold(signername, k.Header().Name) {
 		return &Error{err: "signer name doesn't match key name"}
 	}
 	sigend := offset
@@ -184,19 +177,6 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 	hashed := hasher.Sum(nil)
 	sig := buf[sigend:]
 	switch k.Algorithm {
-	case DSA:
-		pk := k.publicKeyDSA()
-		sig = sig[1:]
-		r := big.NewInt(0)
-		r.SetBytes(sig[:len(sig)/2])
-		s := big.NewInt(0)
-		s.SetBytes(sig[len(sig)/2:])
-		if pk != nil {
-			if dsa.Verify(pk, hashed, r, s) {
-				return nil
-			}
-			return ErrSig
-		}
 	case RSASHA1, RSASHA256, RSASHA512:
 		pk := k.publicKeyRSA()
 		if pk != nil {
@@ -204,10 +184,8 @@ func (rr *SIG) Verify(k *KEY, buf []byte) error {
 		}
 	case ECDSAP256SHA256, ECDSAP384SHA384:
 		pk := k.publicKeyECDSA()
-		r := big.NewInt(0)
-		r.SetBytes(sig[:len(sig)/2])
-		s := big.NewInt(0)
-		s.SetBytes(sig[len(sig)/2:])
+		r := new(big.Int).SetBytes(sig[:len(sig)/2])
+		s := new(big.Int).SetBytes(sig[len(sig)/2:])
 		if pk != nil {
 			if ecdsa.Verify(pk, hashed, r, s) {
 				return nil

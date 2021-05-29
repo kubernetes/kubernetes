@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -371,7 +371,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 `, b.t)
 
 	if len(options) > 0 {
-		sort.Sort(sort.StringSlice(options))
+		sort.Strings(options)
 		for _, s := range options {
 			fmt.Fprintf(out, "  option %s;\n", s)
 		}
@@ -399,7 +399,7 @@ func (b bodyGen) doStruct(sw *generator.SnippetWriter) error {
 				}
 				extras = append(extras, fmt.Sprintf("%s = %s", k, v))
 			}
-			sort.Sort(sort.StringSlice(extras))
+			sort.Strings(extras)
 			if len(extras) > 0 {
 				fmt.Fprintf(out, " [")
 				fmt.Fprint(out, strings.Join(extras, ", "))
@@ -740,7 +740,7 @@ func formatProtoFile(source []byte) ([]byte, error) {
 func assembleProtoFile(w io.Writer, f *generator.File) {
 	w.Write(f.Header)
 
-	fmt.Fprint(w, "syntax = 'proto2';\n\n")
+	fmt.Fprint(w, "syntax = \"proto2\";\n\n")
 
 	if len(f.PackageName) > 0 {
 		fmt.Fprintf(w, "package %s;\n\n", f.PackageName)

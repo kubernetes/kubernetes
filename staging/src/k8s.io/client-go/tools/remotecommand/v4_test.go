@@ -18,6 +18,7 @@ package remotecommand
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -36,7 +37,7 @@ func TestV4ErrorDecoder(t *testing.T) {
 		},
 		{
 			message: "{",
-			err:     "error stream protocol error: unexpected end of JSON input in \"{\"",
+			err:     "unexpected end of JSON input in \"{\"",
 		},
 		{
 			message: `{"status": "Success" }`,
@@ -64,7 +65,7 @@ func TestV4ErrorDecoder(t *testing.T) {
 		if want == "" {
 			want = "<nil>"
 		}
-		if got := fmt.Sprintf("%v", err); got != want {
+		if got := fmt.Sprintf("%v", err); !strings.Contains(got, want) {
 			t.Errorf("wrong error for message %q: want=%q, got=%q", test.message, want, got)
 		}
 	}

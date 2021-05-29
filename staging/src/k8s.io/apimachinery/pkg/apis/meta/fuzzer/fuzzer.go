@@ -186,15 +186,17 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
 			j.UID = types.UID(c.RandString())
 
-			var sec, nsec int64
+			// Fuzzing sec and nsec in a smaller range (uint32 instead of int64),
+			// so that the result Unix time is a valid date and can be parsed into RFC3339 format.
+			var sec, nsec uint32
 			c.Fuzz(&sec)
 			c.Fuzz(&nsec)
-			j.CreationTimestamp = metav1.Unix(sec, nsec).Rfc3339Copy()
+			j.CreationTimestamp = metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 
 			if j.DeletionTimestamp != nil {
 				c.Fuzz(&sec)
 				c.Fuzz(&nsec)
-				t := metav1.Unix(sec, nsec).Rfc3339Copy()
+				t := metav1.Unix(int64(sec), int64(nsec)).Rfc3339Copy()
 				j.DeletionTimestamp = &t
 			}
 
@@ -215,8 +217,9 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 				j.Finalizers = nil
 			}
 		},
-		func(j *metav1.Initializers, c fuzz.Continue) {
-			j = nil
+		func(j *metav1.ResourceVersionMatch, c fuzz.Continue) {
+			matches := []metav1.ResourceVersionMatch{"", metav1.ResourceVersionMatchExact, metav1.ResourceVersionMatchNotOlderThan}
+			*j = matches[c.Rand.Intn(len(matches))]
 		},
 		func(j *metav1.ListMeta, c fuzz.Continue) {
 			j.ResourceVersion = strconv.FormatUint(c.RandUint64(), 10)
@@ -275,9 +278,7 @@ func v1FuzzerFuncs(codecs runtimeserializer.CodecFactory) []interface{} {
 		},
 		func(j *metav1.ManagedFieldsEntry, c fuzz.Continue) {
 			c.FuzzNoCustom(j)
-			if j.Fields != nil && len(j.Fields.Map) == 0 {
-				j.Fields = nil
-			}
+			j.FieldsV1 = nil
 		},
 	}
 }

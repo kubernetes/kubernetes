@@ -30,6 +30,21 @@ import (
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+type DelayConfig struct {
+	// Delay specifies the number of milliseconds to delay serving a SOAP call. 0 means no delay.
+	// This can be used to simulate a poorly performing vCenter or network lag.
+	Delay int
+
+	// Delay specifies the number of milliseconds to delay serving a specific method.
+	// Each entry in the map represents the name of a method and its associated delay in milliseconds,
+	// This can be used to simulate a poorly performing vCenter or network lag.
+	MethodDelay map[string]int
+
+	// DelayJitter defines the delay jitter as a coefficient of variation (stddev/mean).
+	// This can be used to simulate unpredictable delay. 0 means no jitter, i.e. all invocations get the same delay.
+	DelayJitter float64
+}
+
 // Model is used to populate a Model with an initial set of managed entities.
 // This is a simple helper for tests running against a simulator, to populate an inventory
 // with commonly used models.
@@ -79,6 +94,9 @@ type Model struct {
 	// Pod specifies the number of StoragePod to create per Cluster
 	Pod int
 
+	// Delay configurations
+	DelayConfig DelayConfig
+
 	// total number of inventory objects, set by Count()
 	total int
 
@@ -93,6 +111,11 @@ func ESX() *Model {
 		Autostart:      true,
 		Datastore:      1,
 		Machine:        2,
+		DelayConfig: DelayConfig{
+			Delay:       0,
+			DelayJitter: 0,
+			MethodDelay: nil,
+		},
 	}
 }
 
@@ -109,6 +132,11 @@ func VPX() *Model {
 		ClusterHost:    3,
 		Datastore:      1,
 		Machine:        2,
+		DelayConfig: DelayConfig{
+			Delay:       0,
+			DelayJitter: 0,
+			MethodDelay: nil,
+		},
 	}
 }
 
@@ -453,6 +481,9 @@ func (m *Model) Create() error {
 			return err
 		}
 	}
+
+	// Turn on delay AFTER we're done building the service content
+	m.Service.delay = &m.DelayConfig
 
 	return nil
 }

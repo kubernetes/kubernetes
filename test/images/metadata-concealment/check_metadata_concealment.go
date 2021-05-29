@@ -32,8 +32,6 @@ var (
 		"http://metadata.google.internal",
 		"http://169.254.169.254/",
 		"http://metadata.google.internal/",
-		"http://metadata.google.internal/0.1",
-		"http://metadata.google.internal/0.1/",
 		"http://metadata.google.internal/computeMetadata",
 		"http://metadata.google.internal/computeMetadata/v1",
 		// Allowed API versions.
@@ -48,19 +46,6 @@ var (
 		"http://metadata.google.internal/computeMetadata/v1/instance/tags?wait_for_change=true&timeout_sec=0",
 		"http://metadata.google.internal/computeMetadata/v1/instance/tags?wait_for_change=true&last_etag=d34db33f",
 	}
-	legacySuccessEndpoints = []string{
-		// Discovery
-		"http://metadata.google.internal/0.1/meta-data",
-		"http://metadata.google.internal/computeMetadata/v1beta1",
-		// Allowed API versions.
-		"http://metadata.google.internal/0.1/meta-data/",
-		"http://metadata.google.internal/computeMetadata/v1beta1/",
-		// Service account token endpoints.
-		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/acquire",
-		"http://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/token",
-		// Known query params.
-		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/acquire?scopes",
-	}
 	noKubeEnvEndpoints = []string{
 		// Check that these don't get a recursive result.
 		"http://metadata.google.internal/computeMetadata/v1/instance/?recursive%3Dtrue",   // urlencoded
@@ -71,12 +56,8 @@ var (
 		"http://metadata.google.internal/0.2/",
 		"http://metadata.google.internal/computeMetadata/v2/",
 		// kube-env.
-		"http://metadata.google.internal/0.1/meta-data/attributes/kube-env",
-		"http://metadata.google.internal/computeMetadata/v1beta1/instance/attributes/kube-env",
 		"http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env",
 		// VM identity.
-		"http://metadata.google.internal/0.1/meta-data/service-accounts/default/identity",
-		"http://metadata.google.internal/computeMetadata/v1beta1/instance/service-accounts/default/identity",
 		"http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
 		// Forbidden recursive queries.
 		"http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true",
@@ -111,18 +92,6 @@ func main() {
 	}
 	for _, e := range failureEndpoints {
 		if err := checkURL(e, h, 403, "", ""); err != nil {
-			log.Printf("Wrong response for %v: %v", e, err)
-			success = 1
-		}
-	}
-
-	legacyEndpointExpectedStatus := 200
-	if err := checkURL("http://metadata.google.internal/computeMetadata/v1/instance/attributes/disable-legacy-endpoints", h, 200, "true", ""); err == nil {
-		// If `disable-legacy-endpoints` is set to true, queries to unconcealed legacy endpoints will return a 403.
-		legacyEndpointExpectedStatus = 403
-	}
-	for _, e := range legacySuccessEndpoints {
-		if err := checkURL(e, h, legacyEndpointExpectedStatus, "", ""); err != nil {
 			log.Printf("Wrong response for %v: %v", e, err)
 			success = 1
 		}

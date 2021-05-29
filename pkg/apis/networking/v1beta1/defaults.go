@@ -17,9 +17,17 @@ limitations under the License.
 package v1beta1
 
 import (
+	networkingv1beta1 "k8s.io/api/networking/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
+}
+
+func SetDefaults_HTTPIngressPath(obj *networkingv1beta1.HTTPIngressPath) {
+	var defaultPathType = networkingv1beta1.PathTypeImplementationSpecific
+	if obj.PathType == nil {
+		obj.PathType = &defaultPathType
+	}
 }

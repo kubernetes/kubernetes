@@ -17,6 +17,7 @@ limitations under the License.
 package audit
 
 import (
+	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -61,15 +62,15 @@ type Stage string
 const (
 	// The stage for events generated as soon as the audit handler receives the request, and before it
 	// is delegated down the handler chain.
-	StageRequestReceived = "RequestReceived"
+	StageRequestReceived Stage = "RequestReceived"
 	// The stage for events generated once the response headers are sent, but before the response body
 	// is sent. This stage is only generated for long-running requests (e.g. watch).
-	StageResponseStarted = "ResponseStarted"
+	StageResponseStarted Stage = "ResponseStarted"
 	// The stage for events generated once the response body has been completed, and no more bytes
 	// will be sent.
-	StageResponseComplete = "ResponseComplete"
+	StageResponseComplete Stage = "ResponseComplete"
 	// The stage for events generated when a panic occurred.
-	StagePanic = "Panic"
+	StagePanic Stage = "Panic"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -92,10 +93,10 @@ type Event struct {
 	// For non-resource requests, this is the lower-cased HTTP method.
 	Verb string
 	// Authenticated user information.
-	User UserInfo
+	User authnv1.UserInfo
 	// Impersonated user information.
 	// +optional
-	ImpersonatedUser *UserInfo
+	ImpersonatedUser *authnv1.UserInfo
 	// Source IPs, from where the request originated and intermediate proxies.
 	// +optional
 	SourceIPs []string
@@ -283,21 +284,3 @@ type ObjectReference struct {
 	// +optional
 	Subresource string
 }
-
-// UserInfo holds the information about the user needed to implement the
-// user.Info interface.
-type UserInfo struct {
-	// The name that uniquely identifies this user among all active users.
-	Username string
-	// A unique value that identifies this user across time. If this user is
-	// deleted and another user by the same name is added, they will have
-	// different UIDs.
-	UID string
-	// The names of groups this user is a part of.
-	Groups []string
-	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue
-}
-
-// ExtraValue masks the value so protobuf can generate
-type ExtraValue []string

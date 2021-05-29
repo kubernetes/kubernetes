@@ -28,7 +28,7 @@ type String map[string]Empty
 
 // NewString creates a String from a list of values.
 func NewString(items ...string) String {
-	ss := String{}
+	ss := make(String, len(items))
 	ss.Insert(items...)
 	return ss
 }
@@ -46,17 +46,19 @@ func StringKeySet(theMap interface{}) String {
 }
 
 // Insert adds items to the set.
-func (s String) Insert(items ...string) {
+func (s String) Insert(items ...string) String {
 	for _, item := range items {
 		s[item] = Empty{}
 	}
+	return s
 }
 
 // Delete removes all items from the set.
-func (s String) Delete(items ...string) {
+func (s String) Delete(items ...string) String {
 	for _, item := range items {
 		delete(s, item)
 	}
+	return s
 }
 
 // Has returns true if and only if item is contained in the set.

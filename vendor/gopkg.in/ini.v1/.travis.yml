@@ -1,0 +1,20 @@
+sudo: false
+language: go
+go:
+  - 1.6.x
+  - 1.7.x
+  - 1.8.x
+  - 1.9.x
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
+  - 1.13.x
+
+install: skip
+script:
+  - go get golang.org/x/tools/cmd/cover
+  - go get github.com/smartystreets/goconvey
+  - mkdir -p $HOME/gopath/src/gopkg.in
+  - ln -s $HOME/gopath/src/github.com/go-ini/ini $HOME/gopath/src/gopkg.in/ini.v1
+  - cd $HOME/gopath/src/gopkg.in/ini.v1
+  - go test -v -cover -race

@@ -16,10 +16,11 @@ limitations under the License.
 
 package certificates
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
+)
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Describes a certificate signing request
@@ -43,6 +44,29 @@ type CertificateSigningRequest struct {
 type CertificateSigningRequestSpec struct {
 	// Base64-encoded PKCS#10 CSR data
 	Request []byte
+
+	// signerName indicates the requested signer, and is a qualified name.
+	//
+	// List/watch requests for CertificateSigningRequests can filter on this field using a "spec.signerName=NAME" fieldSelector.
+	//
+	// Well-known Kubernetes signers are:
+	//  1. "kubernetes.io/kube-apiserver-client": issues client certificates that can be used to authenticate to kube-apiserver.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  2. "kubernetes.io/kube-apiserver-client-kubelet": issues client certificates that kubelets use to authenticate to kube-apiserver.
+	//   Requests for this signer can be auto-approved by the "csrapproving" controller in kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//  3. "kubernetes.io/kubelet-serving" issues serving certificates that kubelets use to serve TLS endpoints, which kube-apiserver can connect to securely.
+	//   Requests for this signer are never auto-approved by kube-controller-manager, and can be issued by the "csrsigning" controller in kube-controller-manager.
+	//
+	// More details are available at https://k8s.io/docs/reference/access-authn-authz/certificate-signing-requests/#kubernetes-signers
+	//
+	// Custom signerNames can also be specified. The signer defines:
+	//  1. Trust distribution: how trust (CA bundles) are distributed.
+	//  2. Permitted subjects: and behavior when a disallowed subject is requested.
+	//  3. Required, permitted, or forbidden x509 extensions in the request (including whether subjectAltNames are allowed, which types, restrictions on allowed values) and behavior when a disallowed extension is requested.
+	//  4. Required, permitted, or forbidden key usages / extended key usages.
+	//  5. Expiration/certificate lifetime: whether it is fixed by the signer, configurable by the admin.
+	//  6. Whether or not requests for CA certificates are allowed.
+	SignerName string
 
 	// usages specifies a set of usage contexts the key will be
 	// valid for.
@@ -68,6 +92,28 @@ type CertificateSigningRequestSpec struct {
 	Extra map[string]ExtraValue
 }
 
+// Built in signerName values that are honoured by kube-controller-manager.
+// None of these usages are related to ServiceAccount token secrets
+// `.data[ca.crt]` in any way.
+const (
+	// Signs certificates that will be honored as client-certs by the
+	// kube-apiserver. Never auto-approved by kube-controller-manager.
+	KubeAPIServerClientSignerName = "kubernetes.io/kube-apiserver-client"
+
+	// Signs client certificates that will be honored as client-certs by the
+	// kube-apiserver for a kubelet.
+	// May be auto-approved by kube-controller-manager.
+	KubeAPIServerClientKubeletSignerName = "kubernetes.io/kube-apiserver-client-kubelet"
+
+	// Signs serving certificates that are honored as a valid kubelet serving
+	// certificate by the kube-apiserver, but has no other guarantees.
+	KubeletServingSignerName = "kubernetes.io/kubelet-serving"
+
+	// Has no guarantees for trust at all. Some distributions may honor these
+	// as client certs, but that behavior is not standard kubernetes behavior.
+	LegacyUnknownSignerName = "kubernetes.io/legacy-unknown"
+)
+
 // ExtraValue masks the value so protobuf can generate
 type ExtraValue []string
 
@@ -87,11 +133,17 @@ type RequestConditionType string
 const (
 	CertificateApproved RequestConditionType = "Approved"
 	CertificateDenied   RequestConditionType = "Denied"
+	CertificateFailed   RequestConditionType = "Failed"
 )
 
 type CertificateSigningRequestCondition struct {
-	// request approval state, currently Approved or Denied.
+	// type of the condition. Known conditions include "Approved", "Denied", and "Failed".
 	Type RequestConditionType
+	// Status of the condition, one of True, False, Unknown.
+	// Approved, Denied, and Failed conditions may not be "False" or "Unknown".
+	// If unset, should be treated as "True".
+	// +optional
+	Status api.ConditionStatus
 	// brief reason for the request state
 	// +optional
 	Reason string
@@ -101,6 +153,9 @@ type CertificateSigningRequestCondition struct {
 	// timestamp for the last update to this condition
 	// +optional
 	LastUpdateTime metav1.Time
+	// lastTransitionTime is the time the condition last transitioned from one status to another.
+	// +optional
+	LastTransitionTime metav1.Time
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -120,27 +175,27 @@ type CertificateSigningRequestList struct {
 type KeyUsage string
 
 const (
-	UsageSigning            KeyUsage = "signing"
-	UsageDigitalSignature   KeyUsage = "digital signature"
-	UsageContentCommittment KeyUsage = "content commitment"
-	UsageKeyEncipherment    KeyUsage = "key encipherment"
-	UsageKeyAgreement       KeyUsage = "key agreement"
-	UsageDataEncipherment   KeyUsage = "data encipherment"
-	UsageCertSign           KeyUsage = "cert sign"
-	UsageCRLSign            KeyUsage = "crl sign"
-	UsageEncipherOnly       KeyUsage = "encipher only"
-	UsageDecipherOnly       KeyUsage = "decipher only"
-	UsageAny                KeyUsage = "any"
-	UsageServerAuth         KeyUsage = "server auth"
-	UsageClientAuth         KeyUsage = "client auth"
-	UsageCodeSigning        KeyUsage = "code signing"
-	UsageEmailProtection    KeyUsage = "email protection"
-	UsageSMIME              KeyUsage = "s/mime"
-	UsageIPsecEndSystem     KeyUsage = "ipsec end system"
-	UsageIPsecTunnel        KeyUsage = "ipsec tunnel"
-	UsageIPsecUser          KeyUsage = "ipsec user"
-	UsageTimestamping       KeyUsage = "timestamping"
-	UsageOCSPSigning        KeyUsage = "ocsp signing"
-	UsageMicrosoftSGC       KeyUsage = "microsoft sgc"
-	UsageNetscapSGC         KeyUsage = "netscape sgc"
+	UsageSigning           KeyUsage = "signing"
+	UsageDigitalSignature  KeyUsage = "digital signature"
+	UsageContentCommitment KeyUsage = "content commitment"
+	UsageKeyEncipherment   KeyUsage = "key encipherment"
+	UsageKeyAgreement      KeyUsage = "key agreement"
+	UsageDataEncipherment  KeyUsage = "data encipherment"
+	UsageCertSign          KeyUsage = "cert sign"
+	UsageCRLSign           KeyUsage = "crl sign"
+	UsageEncipherOnly      KeyUsage = "encipher only"
+	UsageDecipherOnly      KeyUsage = "decipher only"
+	UsageAny               KeyUsage = "any"
+	UsageServerAuth        KeyUsage = "server auth"
+	UsageClientAuth        KeyUsage = "client auth"
+	UsageCodeSigning       KeyUsage = "code signing"
+	UsageEmailProtection   KeyUsage = "email protection"
+	UsageSMIME             KeyUsage = "s/mime"
+	UsageIPsecEndSystem    KeyUsage = "ipsec end system"
+	UsageIPsecTunnel       KeyUsage = "ipsec tunnel"
+	UsageIPsecUser         KeyUsage = "ipsec user"
+	UsageTimestamping      KeyUsage = "timestamping"
+	UsageOCSPSigning       KeyUsage = "ocsp signing"
+	UsageMicrosoftSGC      KeyUsage = "microsoft sgc"
+	UsageNetscapeSGC       KeyUsage = "netscape sgc"
 )

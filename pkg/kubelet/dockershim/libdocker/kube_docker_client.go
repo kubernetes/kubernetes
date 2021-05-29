@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -28,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
@@ -85,15 +87,12 @@ func newKubeDockerClient(dockerClient *dockerapi.Client, requestTimeout, imagePu
 		timeout:                   requestTimeout,
 		imagePullProgressDeadline: imagePullProgressDeadline,
 	}
+
 	// Notice that this assumes that docker is running before kubelet is started.
-	v, err := k.Version()
-	if err != nil {
-		klog.Errorf("failed to retrieve docker version: %v", err)
-		klog.Warningf("Using empty version for docker client, this may sometimes cause compatibility issue.")
-	} else {
-		// Update client version with real api version.
-		dockerClient.NegotiateAPIVersionPing(dockertypes.Ping{APIVersion: v.APIVersion})
-	}
+	ctx, cancel := k.getTimeoutContext()
+	defer cancel()
+	dockerClient.NegotiateAPIVersion(ctx)
+
 	return k
 }
 
@@ -146,7 +145,7 @@ func (d *kubeDockerClient) CreateContainer(opts dockertypes.ContainerCreateConfi
 	if opts.HostConfig != nil && opts.HostConfig.ShmSize <= 0 {
 		opts.HostConfig.ShmSize = defaultShmSize
 	}
-	createResp, err := d.client.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, opts.Name)
+	createResp, err := d.client.ContainerCreate(ctx, opts.Config, opts.HostConfig, opts.NetworkingConfig, nil, opts.Name)
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
@@ -338,14 +337,14 @@ func (p *progressReporter) start() {
 				progress, timestamp := p.progress.get()
 				// If there is no progress for p.imagePullProgressDeadline, cancel the operation.
 				if time.Since(timestamp) > p.imagePullProgressDeadline {
-					klog.Errorf("Cancel pulling image %q because of no progress for %v, latest progress: %q", p.image, p.imagePullProgressDeadline, progress)
+					klog.ErrorS(nil, "Cancel pulling image because of exceed image pull deadline, record latest progress", "image", p.image, "deadline", p.imagePullProgressDeadline, "progress", progress)
 					p.cancel()
 					return
 				}
-				klog.V(2).Infof("Pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Pulling image", "image", p.image, "progress", progress)
 			case <-p.stopCh:
 				progress, _ := p.progress.get()
-				klog.V(2).Infof("Stop pulling image %q: %q", p.image, progress)
+				klog.V(2).InfoS("Stop pulling image", "image", p.image, "progress", progress)
 				return
 			}
 		}
@@ -399,7 +398,7 @@ func (d *kubeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	if ctxErr := contextError(ctx); ctxErr != nil {
 		return nil, ctxErr
 	}
-	if isImageNotFoundError(err) {
+	if dockerapi.IsErrNotFound(err) {
 		return nil, ImageNotFoundError{ID: image}
 	}
 	return resp, err

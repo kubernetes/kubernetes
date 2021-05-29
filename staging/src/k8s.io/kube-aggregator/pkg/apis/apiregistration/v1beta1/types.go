@@ -19,12 +19,19 @@ package v1beta1
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.7
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=apiregistration.k8s.io,v1,APIServiceList
 
 // APIServiceList is a list of APIService objects.
 type APIServiceList struct {
 	metav1.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
+	// Items is the list of APIService
 	Items []APIService `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
@@ -34,16 +41,22 @@ type ServiceReference struct {
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,1,opt,name=namespace"`
 	// Name is the name of the service
 	Name string `json:"name,omitempty" protobuf:"bytes,2,opt,name=name"`
+	// If specified, the port on the service that hosting webhook.
+	// Default to 443 for backward compatibility.
+	// `port` should be a valid port number (1-65535, inclusive).
+	// +optional
+	Port *int32 `json:"port,omitempty" protobuf:"varint,3,opt,name=port"`
 }
 
 // APIServiceSpec contains information for locating and communicating with a server.
 // Only https is supported, though you are able to disable certificate verification.
 type APIServiceSpec struct {
 	// Service is a reference to the service for this API server.  It must communicate
-	// on port 443
+	// on port 443.
 	// If the Service is nil, that means the handling for the API groupversion is handled locally on this server.
 	// The call will simply delegate to the normal handler chain to be fulfilled.
-	Service *ServiceReference `json:"service" protobuf:"bytes,1,opt,name=service"`
+	// +optional
+	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 	// Group is the API group name this server hosts
 	Group string `json:"group,omitempty" protobuf:"bytes,2,opt,name=group"`
 	// Version is the API version this server hosts.  For example, "v1"
@@ -54,6 +67,7 @@ type APIServiceSpec struct {
 	InsecureSkipTLSVerify bool `json:"insecureSkipTLSVerify,omitempty" protobuf:"varint,4,opt,name=insecureSkipTLSVerify"`
 	// CABundle is a PEM encoded CA bundle which will be used to validate an API server's serving certificate.
 	// If unspecified, system trust roots on the apiserver are used.
+	// +listType=atomic
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,5,opt,name=caBundle"`
 
@@ -126,17 +140,25 @@ type APIServiceStatus struct {
 	// +optional
 	// +patchMergeKey=type
 	// +patchStrategy=merge
+	// +listType=map
+	// +listMapKey=type
 	Conditions []APIServiceCondition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }
 
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:prerelease-lifecycle-gen:introduced=1.7
+// +k8s:prerelease-lifecycle-gen:deprecated=1.19
+// +k8s:prerelease-lifecycle-gen:replacement=apiregistration.k8s.io,v1,APIService
 
 // APIService represents a server for a particular GroupVersion.
 // Name must be "version.group".
 type APIService struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+	// Standard object's metadata.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec contains information for locating and communicating with a server

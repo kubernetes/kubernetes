@@ -9,8 +9,19 @@
 
 package hcsschema
 
-type Device struct {
+type DeviceType string
 
-	//  The interface class guid of the device to assign to container.
+const (
+	ClassGUID      DeviceType = "ClassGuid"
+	DeviceInstance            = "DeviceInstance"
+	GPUMirror                 = "GpuMirror"
+)
+
+type Device struct {
+	//  The type of device to assign to the container.
+	Type DeviceType `json:"Type,omitempty"`
+	//  The interface class guid of the device interfaces to assign to the  container.  Only used when Type is ClassGuid.
 	InterfaceClassGuid string `json:"InterfaceClassGuid,omitempty"`
+	//  The location path of the device to assign to the container.  Only used when Type is DeviceInstance.
+	LocationPath string `json:"LocationPath,omitempty"`
 }

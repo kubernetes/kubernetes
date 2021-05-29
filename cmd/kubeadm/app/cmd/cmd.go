@@ -21,8 +21,9 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/alpha"
+	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/upgrade"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	// Register the kubeadm configuration types because CLI flag generation
@@ -67,7 +68,8 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			    You can then repeat the second step on as many other machines as you like.
 
 		`),
-
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if rootfsPath != "" {
 				if err := kubeadmutil.Chroot(rootfsPath); err != nil {
@@ -80,25 +82,18 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 
 	cmds.ResetFlags()
 
-	cmds.AddCommand(NewCmdCompletion(out, ""))
-	cmds.AddCommand(NewCmdConfig(out))
-	cmds.AddCommand(NewCmdInit(out, nil))
-	cmds.AddCommand(NewCmdJoin(out, nil))
-	cmds.AddCommand(NewCmdReset(in, out))
-	cmds.AddCommand(NewCmdVersion(out))
-	cmds.AddCommand(NewCmdToken(out, err))
+	cmds.AddCommand(newCmdCertsUtility(out))
+	cmds.AddCommand(newCmdCompletion(out, ""))
+	cmds.AddCommand(newCmdConfig(out))
+	cmds.AddCommand(newCmdInit(out, nil))
+	cmds.AddCommand(newCmdJoin(out, nil))
+	cmds.AddCommand(newCmdReset(in, out, nil))
+	cmds.AddCommand(newCmdVersion(out))
+	cmds.AddCommand(newCmdToken(out, err))
 	cmds.AddCommand(upgrade.NewCmdUpgrade(out))
-	cmds.AddCommand(alpha.NewCmdAlpha(in, out))
-
-	AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+	cmds.AddCommand(alpha.NewCmdAlpha())
+	options.AddKubeadmOtherFlags(cmds.PersistentFlags(), &rootfsPath)
+	cmds.AddCommand(newCmdKubeConfigUtility(out))
 
 	return cmds
-}
-
-// AddKubeadmOtherFlags adds flags that are not bound to a configuration file to the given flagset
-func AddKubeadmOtherFlags(flagSet *pflag.FlagSet, rootfsPath *string) {
-	flagSet.StringVar(
-		rootfsPath, "rootfs", *rootfsPath,
-		"[EXPERIMENTAL] The path to the 'real' host root filesystem.",
-	)
 }

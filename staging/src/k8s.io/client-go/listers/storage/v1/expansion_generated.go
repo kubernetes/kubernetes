@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1
 
+// CSIDriverListerExpansion allows custom methods to be added to
+// CSIDriverLister.
+type CSIDriverListerExpansion interface{}
+
+// CSINodeListerExpansion allows custom methods to be added to
+// CSINodeLister.
+type CSINodeListerExpansion interface{}
+
 // StorageClassListerExpansion allows custom methods to be added to
 // StorageClassLister.
 type StorageClassListerExpansion interface{}

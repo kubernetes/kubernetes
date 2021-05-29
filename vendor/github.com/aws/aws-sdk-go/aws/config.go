@@ -20,7 +20,7 @@ type RequestRetryer interface{}
 // A Config provides service configuration for service clients. By default,
 // all clients will use the defaults.DefaultConfig structure.
 //
-//     // Create Session with MaxRetry configuration to be shared by multiple
+//     // Create Session with MaxRetries configuration to be shared by multiple
 //     // service clients.
 //     sess := session.Must(session.NewSession(&aws.Config{
 //         MaxRetries: aws.Int(3),
@@ -43,7 +43,7 @@ type Config struct {
 
 	// An optional endpoint URL (hostname only or fully qualified URI)
 	// that overrides the default generated endpoint for a client. Set this
-	// to `""` to use the default generated endpoint.
+	// to `nil` or the value to `""` to use the default generated endpoint.
 	//
 	// Note: You must still provide a `Region` value when specifying an
 	// endpoint for a client.
@@ -138,7 +138,7 @@ type Config struct {
 	// `ExpectContinueTimeout` for information on adjusting the continue wait
 	// timeout. https://golang.org/pkg/net/http/#Transport
 	//
-	// You should use this flag to disble 100-Continue if you experience issues
+	// You should use this flag to disable 100-Continue if you experience issues
 	// with proxies or third party S3 compatible services.
 	S3Disable100Continue *bool
 
@@ -161,6 +161,17 @@ type Config struct {
 	// on GetObject API calls.
 	S3DisableContentMD5Validation *bool
 
+	// Set this to `true` to have the S3 service client to use the region specified
+	// in the ARN, when an ARN is provided as an argument to a bucket parameter.
+	S3UseARNRegion *bool
+
+	// Set this to `true` to enable the SDK to unmarshal API response header maps to
+	// normalized lower case map keys.
+	//
+	// For example S3's X-Amz-Meta prefixed header will be unmarshaled to lower case
+	// Metadata member's map keys. The value of the header in the map is unaffected.
+	LowerCaseHeaderMaps *bool
+
 	// Set this to `true` to disable the EC2Metadata client from overriding the
 	// default http.Client's Timeout. This is helpful if you do not want the
 	// EC2Metadata client to create a new http.Client. This options is only
@@ -172,7 +183,7 @@ type Config struct {
 	//
 	// Example:
 	//    sess := session.Must(session.NewSession(aws.NewConfig()
-	//       .WithEC2MetadataDiableTimeoutOverride(true)))
+	//       .WithEC2MetadataDisableTimeoutOverride(true)))
 	//
 	//    svc := s3.New(sess)
 	//
@@ -183,7 +194,7 @@ type Config struct {
 	// both IPv4 and IPv6 addressing.
 	//
 	// Setting this for a service which does not support dual stack will fail
-	// to make requets. It is not recommended to set this value on the session
+	// to make requests. It is not recommended to set this value on the session
 	// as it will apply to all service clients created with the session. Even
 	// services which don't support dual stack endpoints.
 	//
@@ -227,6 +238,7 @@ type Config struct {
 
 	// EnableEndpointDiscovery will allow for endpoint discovery on operations that
 	// have the definition in its model. By default, endpoint discovery is off.
+	// To use EndpointDiscovery, Endpoint should be unset or set to an empty string.
 	//
 	// Example:
 	//    sess := session.Must(session.NewSession(&aws.Config{
@@ -246,12 +258,18 @@ type Config struct {
 	// Disabling this feature is useful when you want to use local endpoints
 	// for testing that do not support the modeled host prefix pattern.
 	DisableEndpointHostPrefix *bool
+
+	// STSRegionalEndpoint will enable regional or legacy endpoint resolving
+	STSRegionalEndpoint endpoints.STSRegionalEndpoint
+
+	// S3UsEast1RegionalEndpoint will enable regional or legacy endpoint resolving
+	S3UsEast1RegionalEndpoint endpoints.S3UsEast1RegionalEndpoint
 }
 
 // NewConfig returns a new Config pointer that can be chained with builder
 // methods to set multiple configuration values inline without using pointers.
 //
-//     // Create Session with MaxRetry configuration to be shared by multiple
+//     // Create Session with MaxRetries configuration to be shared by multiple
 //     // service clients.
 //     sess := session.Must(session.NewSession(aws.NewConfig().
 //         WithMaxRetries(3),
@@ -379,6 +397,13 @@ func (c *Config) WithS3DisableContentMD5Validation(enable bool) *Config {
 
 }
 
+// WithS3UseARNRegion sets a config S3UseARNRegion value and
+// returning a Config pointer for chaining
+func (c *Config) WithS3UseARNRegion(enable bool) *Config {
+	c.S3UseARNRegion = &enable
+	return c
+}
+
 // WithUseDualStack sets a config UseDualStack value returning a Config
 // pointer for chaining.
 func (c *Config) WithUseDualStack(enable bool) *Config {
@@ -418,6 +443,20 @@ func (c *Config) MergeIn(cfgs ...*Config) {
 	for _, other := range cfgs {
 		mergeInConfig(c, other)
 	}
+}
+
+// WithSTSRegionalEndpoint will set whether or not to use regional endpoint flag
+// when resolving the endpoint for a service
+func (c *Config) WithSTSRegionalEndpoint(sre endpoints.STSRegionalEndpoint) *Config {
+	c.STSRegionalEndpoint = sre
+	return c
+}
+
+// WithS3UsEast1RegionalEndpoint will set whether or not to use regional endpoint flag
+// when resolving the endpoint for a service
+func (c *Config) WithS3UsEast1RegionalEndpoint(sre endpoints.S3UsEast1RegionalEndpoint) *Config {
+	c.S3UsEast1RegionalEndpoint = sre
+	return c
 }
 
 func mergeInConfig(dst *Config, other *Config) {
@@ -493,6 +532,10 @@ func mergeInConfig(dst *Config, other *Config) {
 		dst.S3DisableContentMD5Validation = other.S3DisableContentMD5Validation
 	}
 
+	if other.S3UseARNRegion != nil {
+		dst.S3UseARNRegion = other.S3UseARNRegion
+	}
+
 	if other.UseDualStack != nil {
 		dst.UseDualStack = other.UseDualStack
 	}
@@ -519,6 +562,14 @@ func mergeInConfig(dst *Config, other *Config) {
 
 	if other.DisableEndpointHostPrefix != nil {
 		dst.DisableEndpointHostPrefix = other.DisableEndpointHostPrefix
+	}
+
+	if other.STSRegionalEndpoint != endpoints.UnsetSTSEndpoint {
+		dst.STSRegionalEndpoint = other.STSRegionalEndpoint
+	}
+
+	if other.S3UsEast1RegionalEndpoint != endpoints.UnsetS3UsEast1Endpoint {
+		dst.S3UsEast1RegionalEndpoint = other.S3UsEast1RegionalEndpoint
 	}
 }
 

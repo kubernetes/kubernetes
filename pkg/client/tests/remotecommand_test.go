@@ -31,6 +31,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -40,7 +41,7 @@ import (
 	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
+	"k8s.io/kubernetes/pkg/kubelet/cri/streaming/remotecommand"
 )
 
 type fakeExecutor struct {
@@ -184,33 +185,6 @@ func TestStream(t *testing.T) {
 			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name},
 		},
-		{
-			// 1.0 kubectl, 1.0 kubelet
-			TestName:        "unversioned client, unversioned server",
-			Stdout:          "b",
-			Stderr:          "c",
-			MessageCount:    1,
-			ClientProtocols: []string{},
-			ServerProtocols: []string{},
-		},
-		{
-			// 1.0 kubectl, 1.1+ kubelet
-			TestName:        "unversioned client, versioned server",
-			Stdout:          "b",
-			Stderr:          "c",
-			MessageCount:    1,
-			ClientProtocols: []string{},
-			ServerProtocols: []string{remotecommandconsts.StreamProtocolV2Name, remotecommandconsts.StreamProtocolV1Name},
-		},
-		{
-			// 1.1+ kubectl, 1.0 kubelet
-			TestName:        "versioned client, unversioned server",
-			Stdout:          "b",
-			Stderr:          "c",
-			MessageCount:    1,
-			ClientProtocols: []string{remotecommandconsts.StreamProtocolV2Name, remotecommandconsts.StreamProtocolV1Name},
-			ServerProtocols: []string{},
-		},
 	}
 
 	for _, testCase := range testCases {
@@ -232,11 +206,11 @@ func TestStream(t *testing.T) {
 			server := httptest.NewServer(fakeServer(t, requestReceived, name, exec, testCase.Stdin, testCase.Stdout, testCase.Stderr, testCase.Error, testCase.Tty, testCase.MessageCount, testCase.ServerProtocols))
 
 			url, _ := url.ParseRequestURI(server.URL)
-			config := restclient.ContentConfig{
-				GroupVersion:         &schema.GroupVersion{Group: "x"},
-				NegotiatedSerializer: legacyscheme.Codecs,
+			config := restclient.ClientContentConfig{
+				GroupVersion: schema.GroupVersion{Group: "x"},
+				Negotiator:   runtime.NewClientNegotiator(legacyscheme.Codecs.WithoutConversion(), schema.GroupVersion{Group: "x"}),
 			}
-			c, err := restclient.NewRESTClient(url, "", config, -1, -1, nil, nil)
+			c, err := restclient.NewRESTClient(url, "", config, nil, nil)
 			if err != nil {
 				t.Fatalf("failed to create a client: %v", err)
 			}

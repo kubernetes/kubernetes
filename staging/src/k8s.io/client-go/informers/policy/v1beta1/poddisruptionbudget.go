@@ -19,6 +19,7 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
 	time "time"
 
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -61,13 +62,13 @@ func NewFilteredPodDisruptionBudgetInformer(client kubernetes.Interface, namespa
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).List(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(options)
+				return client.PolicyV1beta1().PodDisruptionBudgets(namespace).Watch(context.TODO(), options)
 			},
 		},
 		&policyv1beta1.PodDisruptionBudget{},

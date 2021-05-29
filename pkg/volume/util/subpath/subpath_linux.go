@@ -28,10 +28,9 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-
-	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -101,7 +100,7 @@ func safeOpenSubPath(mounter mount.Interface, subpath Subpath) (int, error) {
 func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, string, error) {
 	// Early check for already bind-mounted subpath.
 	bindPathTarget := getSubpathBindTarget(subpath)
-	notMount, err := mounter.IsNotMountPoint(bindPathTarget)
+	notMount, err := mount.IsNotMountPoint(mounter, bindPathTarget)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			return false, "", fmt.Errorf("error checking path %s for mount: %s", bindPathTarget, err)
@@ -110,9 +109,21 @@ func prepareSubpathTarget(mounter mount.Interface, subpath Subpath) (bool, strin
 		notMount = true
 	}
 	if !notMount {
-		// It's already mounted
-		klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
-		return true, bindPathTarget, nil
+		linuxHostUtil := hostutil.NewHostUtil()
+		mntInfo, err := linuxHostUtil.FindMountInfo(bindPathTarget)
+		if err != nil {
+			return false, "", fmt.Errorf("error calling findMountInfo for %s: %s", bindPathTarget, err)
+		}
+		if mntInfo.Root != subpath.Path {
+			// It's already mounted but not what we want, unmount it
+			if err = mounter.Unmount(bindPathTarget); err != nil {
+				return false, "", fmt.Errorf("error ummounting %s: %s", bindPathTarget, err)
+			}
+		} else {
+			// It's already mounted
+			klog.V(5).Infof("Skipping bind-mounting subpath %s: already mounted", bindPathTarget)
+			return true, bindPathTarget, nil
+		}
 	}
 
 	// bindPathTarget is in /var/lib/kubelet and thus reachable without any
@@ -199,7 +210,7 @@ func doBindSubPath(mounter mount.Interface, subpath Subpath) (hostPath string, e
 	// Do the bind mount
 	options := []string{"bind"}
 	klog.V(5).Infof("bind mounting %q at %q", mountSource, bindPathTarget)
-	if err = mounter.Mount(mountSource, bindPathTarget, "" /*fstype*/, options); err != nil {
+	if err = mounter.MountSensitiveWithoutSystemd(mountSource, bindPathTarget, "" /*fstype*/, options, nil); err != nil {
 		return "", fmt.Errorf("error mounting %s: %s", subpath.Path, err)
 	}
 	success = true
@@ -231,7 +242,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
-		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, err error) error {
+		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, _ error) error {
 			if path == fullContainerDirPath {
 				// Skip top level directory
 				return nil
@@ -241,6 +252,13 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 			if err = doCleanSubPath(mounter, fullContainerDirPath, filepath.Base(path)); err != nil {
 				return err
 			}
+
+			// We need to check that info is not nil. This may happen when the incoming err is not nil due to stale mounts or permission errors.
+			if info != nil && info.IsDir() {
+				// skip subdirs of the volume: it only matters the first level to unmount, otherwise it would try to unmount subdir of the volume
+				return filepath.SkipDir
+			}
+
 			return nil
 		})
 		if err != nil {
@@ -398,7 +416,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
 		}
 		// Dive into the created directory
-		childFD, err := syscall.Openat(parentFD, dir, nofollowFlags, 0)
+		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}
@@ -415,29 +433,29 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 		}
 		parentFD = childFD
 		childFD = -1
+
+		// Everything was created. mkdirat(..., perm) above was affected by current
+		// umask and we must apply the right permissions to the all created directory.
+		// (that's the one that will be available to the container as subpath)
+		// so user can read/write it.
+		// parentFD is the last created directory.
+
+		// Translate perm (os.FileMode) to uint32 that fchmod() expects
+		kernelPerm := uint32(perm & os.ModePerm)
+		if perm&os.ModeSetgid > 0 {
+			kernelPerm |= syscall.S_ISGID
+		}
+		if perm&os.ModeSetuid > 0 {
+			kernelPerm |= syscall.S_ISUID
+		}
+		if perm&os.ModeSticky > 0 {
+			kernelPerm |= syscall.S_ISVTX
+		}
+		if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
+			return fmt.Errorf("chmod %q failed: %s", currentPath, err)
+		}
 	}
 
-	// Everything was created. mkdirat(..., perm) above was affected by current
-	// umask and we must apply the right permissions to the last directory
-	// (that's the one that will be available to the container as subpath)
-	// so user can read/write it. This is the behavior of previous code.
-	// TODO: chmod all created directories, not just the last one.
-	// parentFD is the last created directory.
-
-	// Translate perm (os.FileMode) to uint32 that fchmod() expects
-	kernelPerm := uint32(perm & os.ModePerm)
-	if perm&os.ModeSetgid > 0 {
-		kernelPerm |= syscall.S_ISGID
-	}
-	if perm&os.ModeSetuid > 0 {
-		kernelPerm |= syscall.S_ISUID
-	}
-	if perm&os.ModeSticky > 0 {
-		kernelPerm |= syscall.S_ISVTX
-	}
-	if err = syscall.Fchmod(parentFD, kernelPerm); err != nil {
-		return fmt.Errorf("chmod %q failed: %s", currentPath, err)
-	}
 	return nil
 }
 
@@ -454,7 +472,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	// This should be faster than looping through all dirs and calling os.Stat()
 	// on each of them, as the symlinks are resolved only once with OpenAt().
 	currentPath := base
-	fd, err := syscall.Open(currentPath, syscall.O_RDONLY, 0)
+	fd, err := syscall.Open(currentPath, syscall.O_RDONLY|syscall.O_CLOEXEC, 0)
 	if err != nil {
 		return pathname, nil, fmt.Errorf("error opening %s: %s", currentPath, err)
 	}
@@ -466,7 +484,7 @@ func findExistingPrefix(base, pathname string) (string, []string, error) {
 	for i, dir := range dirs {
 		// Using O_PATH here will prevent hangs in case user replaces directory with
 		// fifo
-		childFD, err := syscall.Openat(fd, dir, unix.O_PATH, 0)
+		childFD, err := syscall.Openat(fd, dir, unix.O_PATH|unix.O_CLOEXEC, 0)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return currentPath, dirs[i:], nil
@@ -499,7 +517,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 
 	// Assumption: base is the only directory that we have under control.
 	// Base dir is not allowed to be a symlink.
-	parentFD, err := syscall.Open(base, nofollowFlags, 0)
+	parentFD, err := syscall.Open(base, nofollowFlags|unix.O_CLOEXEC, 0)
 	if err != nil {
 		return -1, fmt.Errorf("cannot open directory %s: %s", base, err)
 	}
@@ -531,7 +549,7 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		}
 
 		klog.V(5).Infof("Opening path %s", currentPath)
-		childFD, err = syscall.Openat(parentFD, seg, openFDFlags, 0)
+		childFD, err = syscall.Openat(parentFD, seg, openFDFlags|unix.O_CLOEXEC, 0)
 		if err != nil {
 			return -1, fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}
@@ -539,11 +557,11 @@ func doSafeOpen(pathname string, base string) (int, error) {
 		var deviceStat unix.Stat_t
 		err := unix.Fstat(childFD, &deviceStat)
 		if err != nil {
-			return -1, fmt.Errorf("Error running fstat on %s with %v", currentPath, err)
+			return -1, fmt.Errorf("error running fstat on %s with %v", currentPath, err)
 		}
 		fileFmt := deviceStat.Mode & syscall.S_IFMT
 		if fileFmt == syscall.S_IFLNK {
-			return -1, fmt.Errorf("Unexpected symlink found %s", currentPath)
+			return -1, fmt.Errorf("unexpected symlink found %s", currentPath)
 		}
 
 		// Close parentFD

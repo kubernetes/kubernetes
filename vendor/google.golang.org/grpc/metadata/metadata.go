@@ -19,13 +19,12 @@
 // Package metadata define the structure of the metadata supported by gRPC library.
 // Please refer to https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
 // for more information about custom-metadata.
-package metadata
+package metadata // import "google.golang.org/grpc/metadata"
 
 import (
+	"context"
 	"fmt"
 	"strings"
-
-	"golang.org/x/net/context"
 )
 
 // DecodeKeyValue returns k, v, nil.

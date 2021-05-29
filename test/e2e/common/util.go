@@ -18,85 +18,86 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"text/template"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2erc "k8s.io/kubernetes/test/e2e/framework/rc"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 )
 
+// TODO: Cleanup this file.
+
+// Suite represents test suite.
 type Suite string
 
 const (
-	E2E     Suite = "e2e"
+	// E2E represents a test suite for e2e.
+	E2E Suite = "e2e"
+	// NodeE2E represents a test suite for node e2e.
 	NodeE2E Suite = "node e2e"
 )
 
+// CurrentSuite represents current test suite.
 var CurrentSuite Suite
 
-// CommonImageWhiteList is the list of images used in common test. These images should be prepulled
-// before a tests starts, so that the tests won't fail due image pulling flakes. Currently, this is
-// only used by node e2e test.
+// PrePulledImages are a list of images used in e2e/common tests. These images should be prepulled
+// before tests starts, so that the tests won't fail due image pulling flakes.
+// Currently, this is only used by node e2e test.
+// See also updateImageAllowList() in ../../e2e_node/image_list.go
 // TODO(random-liu): Change the image puller pod to use similar mechanism.
-var CommonImageWhiteList = sets.NewString(
-	imageutils.GetE2EImage(imageutils.AuditProxy),
+var PrePulledImages = sets.NewString(
+	imageutils.GetE2EImage(imageutils.Agnhost),
 	imageutils.GetE2EImage(imageutils.BusyBox),
-	imageutils.GetE2EImage(imageutils.EntrypointTester),
 	imageutils.GetE2EImage(imageutils.IpcUtils),
-	imageutils.GetE2EImage(imageutils.Liveness),
-	imageutils.GetE2EImage(imageutils.Mounttest),
-	imageutils.GetE2EImage(imageutils.MounttestUser),
-	imageutils.GetE2EImage(imageutils.Netexec),
 	imageutils.GetE2EImage(imageutils.Nginx),
-	imageutils.GetE2EImage(imageutils.ServeHostname),
-	imageutils.GetE2EImage(imageutils.TestWebserver),
-	imageutils.GetE2EImage(imageutils.Hostexec),
+	imageutils.GetE2EImage(imageutils.Httpd),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
-	imageutils.GetE2EImage(imageutils.Net),
+	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
 type testImagesStruct struct {
-	BusyBoxImage      string
-	GBFrontendImage   string
-	GBRedisSlaveImage string
-	KittenImage       string
-	LivenessImage     string
-	MounttestImage    string
-	NautilusImage     string
-	NginxImage        string
-	NginxNewImage     string
-	PauseImage        string
-	RedisImage        string
+	AgnhostImage  string
+	BusyBoxImage  string
+	KittenImage   string
+	NautilusImage string
+	NginxImage    string
+	NginxNewImage string
+	HttpdImage    string
+	HttpdNewImage string
+	PauseImage    string
+	RedisImage    string
 }
 
 var testImages testImagesStruct
 
 func init() {
 	testImages = testImagesStruct{
+		imageutils.GetE2EImage(imageutils.Agnhost),
 		imageutils.GetE2EImage(imageutils.BusyBox),
-		imageutils.GetE2EImage(imageutils.GBFrontend),
-		imageutils.GetE2EImage(imageutils.GBRedisSlave),
 		imageutils.GetE2EImage(imageutils.Kitten),
-		imageutils.GetE2EImage(imageutils.Liveness),
-		imageutils.GetE2EImage(imageutils.Mounttest),
 		imageutils.GetE2EImage(imageutils.Nautilus),
 		imageutils.GetE2EImage(imageutils.Nginx),
 		imageutils.GetE2EImage(imageutils.NginxNew),
+		imageutils.GetE2EImage(imageutils.Httpd),
+		imageutils.GetE2EImage(imageutils.HttpdNew),
 		imageutils.GetE2EImage(imageutils.Pause),
 		imageutils.GetE2EImage(imageutils.Redis),
 	}
 }
 
+// SubstituteImageName replaces image name in content.
 func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)
 	tmpl, err := template.New("imagemanifest").Parse(content)
@@ -128,26 +129,35 @@ func svcByName(name string, port int) *v1.Service {
 	}
 }
 
+// NewSVCByName creates a service by name.
 func NewSVCByName(c clientset.Interface, ns, name string) error {
 	const testPort = 9376
-	_, err := c.CoreV1().Services(ns).Create(svcByName(name, testPort))
+	_, err := c.CoreV1().Services(ns).Create(context.TODO(), svcByName(name, testPort), metav1.CreateOptions{})
 	return err
 }
 
 // NewRCByName creates a replication controller with a selector by name of name.
-func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64) (*v1.ReplicationController, error) {
-	By(fmt.Sprintf("creating replication controller %s", name))
-	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
-		name, replicas, framework.ServeHostnameImage, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
+func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePeriod *int64, containerArgs []string) (*v1.ReplicationController, error) {
+	ginkgo.By(fmt.Sprintf("creating replication controller %s", name))
+
+	if containerArgs == nil {
+		containerArgs = []string{"serve-hostname"}
+	}
+
+	return c.CoreV1().ReplicationControllers(ns).Create(context.TODO(), rcByNamePort(
+		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod), metav1.CreateOptions{})
 }
 
+// RestartNodes restarts specific nodes.
 func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Build mapping from zone to nodes in that zone.
 	nodeNamesByZone := make(map[string][]string)
 	for i := range nodes {
 		node := &nodes[i]
 		zone := framework.TestContext.CloudConfig.Zone
-		if z, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
+		if z, ok := node.Labels[v1.LabelFailureDomainBetaZone]; ok {
+			zone = z
+		} else if z, ok := node.Labels[v1.LabelTopologyZone]; ok {
 			zone = z
 		}
 		nodeNamesByZone[zone] = append(nodeNamesByZone[zone], node.Name)
@@ -172,8 +182,8 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 	// Wait for their boot IDs to change.
 	for i := range nodes {
 		node := &nodes[i]
-		if err := wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
-			newNode, err := c.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+		if err := wait.Poll(30*time.Second, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
+			newNode, err := c.CoreV1().Nodes().Get(context.TODO(), node.Name, metav1.GetOptions{})
 			if err != nil {
 				return false, fmt.Errorf("error getting node info after reboot: %s", err)
 			}
@@ -183,4 +193,16 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		}
 	}
 	return nil
+}
+
+// rcByNamePort returns a ReplicationController with specified name and port
+func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+
+	return e2erc.ByNameContainer(name, replicas, labels, v1.Container{
+		Name:  name,
+		Image: image,
+		Args:  containerArgs,
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+	}, gracePeriod)
 }

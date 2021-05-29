@@ -54,7 +54,7 @@ func TestInputStreamReader(t *testing.T) {
 		return
 	}
 	defer readCloser.Close()
-	result, err := ioutil.ReadAll(readCloser)
+	result, _ := ioutil.ReadAll(readCloser)
 	if string(result) != resultString {
 		t.Errorf("Stream content does not match. Got: %s. Expected: %s.", string(result), resultString)
 	}
@@ -75,7 +75,6 @@ func TestInputStreamNullLocation(t *testing.T) {
 
 type testTransport struct {
 	body string
-	err  error
 }
 
 func (tt *testTransport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -118,7 +117,7 @@ func TestInputStreamTransport(t *testing.T) {
 		return
 	}
 	defer readCloser.Close()
-	result, err := ioutil.ReadAll(readCloser)
+	result, _ := ioutil.ReadAll(readCloser)
 	if string(result) != message {
 		t.Errorf("Stream content does not match. Got: %s. Expected: %s.", string(result), message)
 	}

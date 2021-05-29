@@ -14,6 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script verifies that the expected results are obtained when creating each
+# type of file(e.g. codegen tool itself, a file in a package that needs codegen,
+# and etc.) for verification and then generating the code(executes
+# `make generated_files`).
+# Usage: `hack/verify-generated-files-remake.sh`.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -24,13 +30,11 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 kube::util::ensure_clean_working_dir
 
 _tmpdir="$(kube::realpath "$(mktemp -d -t verify-generated-files.XXXXXX)")"
-kube::util::trap_add "rm -rf ${_tmpdir}" EXIT
-
 _tmp_gopath="${_tmpdir}/go"
 _tmp_kuberoot="${_tmp_gopath}/src/k8s.io/kubernetes"
 mkdir -p "${_tmp_kuberoot}/.."
-cp -a "${KUBE_ROOT}" "${_tmp_kuberoot}/.."
-
+git worktree add "${_tmp_kuberoot}"
+kube::util::trap_add "git worktree remove -f ${_tmp_kuberoot} && rm -rf ${_tmpdir}" EXIT
 cd "${_tmp_kuberoot}"
 
 # clean out anything from the temp dir that's not checked in
@@ -56,7 +60,7 @@ function newer() {
         if [[ "${F}" -nt "$2" ]]; then
             echo "${F}"
         fi
-    done
+    done | LC_ALL=C sort
 }
 
 # $1 = filename pattern as in "zz_generated.$1.go"
@@ -66,7 +70,7 @@ function older() {
         if [[ "$2" -nt "${F}" ]]; then
             echo "${F}"
         fi
-    done
+    done | LC_ALL=C sort
 }
 
 function assert_clean() {
@@ -286,12 +290,33 @@ if [[ -n "${X}" ]]; then
 fi
 
 #
-# Test when we touch a file in a package that needs codegen.
+# Test when we touch a file in a package that needs codegen for all openapi specs.
 #
 
 assert_clean
 
-touch "staging/src/k8s.io/api/core/v1/types.go"
+touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
+touch "${STAMP}"
+make generated_files >/dev/null
+X="$(newer openapi "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
+    echo "Wrong generated openapi files changed after touching src file:"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
+    exit 1
+fi
+
+#
+# Test when we touch a file in a package that needs codegen for only the main openapi spec.
+#
+
+assert_clean
+
+touch "staging/src/k8s.io/api/apps/v1/types.go"
 touch "${STAMP}"
 make generated_files >/dev/null
 X="$(newer openapi "${STAMP}")"
@@ -301,6 +326,41 @@ if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go" ]];
     echo ""
     exit 1
 fi
+
+#
+# Test when we touch a file, modify the violation file it should fail, and UPDATE_API_KNOWN_VIOLATIONS=true updates it.
+#
+
+assert_clean
+
+touch "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/types.go"
+echo > api/api-rules/violation_exceptions.list
+echo > api/api-rules/codegen_violation_exceptions.list
+if make generated_files >/dev/null 2>&1; then
+    echo "Expected make generated_files to fail with API violations."
+    echo ""
+    exit 1
+fi
+touch "${STAMP}"
+make generated_files UPDATE_API_KNOWN_VIOLATIONS=true >/dev/null
+X="$(newer openapi "${STAMP}")"
+if [[ -z "${X}" || ${X} != "./pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/apiextensions-apiserver/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/code-generator/examples/apiserver/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/kube-aggregator/pkg/generated/openapi/zz_generated.openapi.go
+./staging/src/k8s.io/sample-apiserver/pkg/generated/openapi/zz_generated.openapi.go" ]]; then
+    echo "Wrong generated openapi files changed after updating violation files:"
+    echo "  ${X:-(none)}" | tr '\n' ' '
+    echo ""
+    exit 1
+fi
+for f in api/api-rules/violation_exceptions.list api/api-rules/codegen_violation_exceptions.list; do
+    if ! git diff --quiet "$f"; then
+        echo "Violation file \"$f\" was not updated with UPDATE_API_KNOWN_VIOLATIONS=true."
+        echo ""
+        exit 1
+    fi
+done
 
 #
 # Test when the codegen tool itself changes: openapi

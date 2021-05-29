@@ -60,7 +60,7 @@ var ResourcePool = mo.ResourcePool{
 				DynamicData:           types.DynamicData{},
 				Reservation:           types.NewInt64(4121),
 				ExpandableReservation: types.NewBool(false),
-				Limit: types.NewInt64(4121),
+				Limit:                 types.NewInt64(4121),
 				Shares: &types.SharesInfo{
 					DynamicData: types.DynamicData{},
 					Shares:      9000,
@@ -72,7 +72,7 @@ var ResourcePool = mo.ResourcePool{
 				DynamicData:           types.DynamicData{},
 				Reservation:           types.NewInt64(961),
 				ExpandableReservation: types.NewBool(false),
-				Limit: types.NewInt64(961),
+				Limit:                 types.NewInt64(961),
 				Shares: &types.SharesInfo{
 					DynamicData: types.DynamicData{},
 					Shares:      9000,
@@ -140,7 +140,7 @@ var ResourcePool = mo.ResourcePool{
 			DynamicData:           types.DynamicData{},
 			Reservation:           types.NewInt64(4121),
 			ExpandableReservation: types.NewBool(false),
-			Limit: types.NewInt64(4121),
+			Limit:                 types.NewInt64(4121),
 			Shares: &types.SharesInfo{
 				DynamicData: types.DynamicData{},
 				Shares:      9000,
@@ -152,7 +152,7 @@ var ResourcePool = mo.ResourcePool{
 			DynamicData:           types.DynamicData{},
 			Reservation:           types.NewInt64(961),
 			ExpandableReservation: types.NewBool(false),
-			Limit: types.NewInt64(961),
+			Limit:                 types.NewInt64(961),
 			Shares: &types.SharesInfo{
 				DynamicData: types.DynamicData{},
 				Shares:      9000,

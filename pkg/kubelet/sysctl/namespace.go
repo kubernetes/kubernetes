@@ -25,28 +25,28 @@ type Namespace string
 
 const (
 	// the Linux IPC namespace
-	IpcNamespace = Namespace("ipc")
+	ipcNamespace = Namespace("ipc")
 
 	// the network namespace
-	NetNamespace = Namespace("net")
+	netNamespace = Namespace("net")
 
 	// the zero value if no namespace is known
-	UnknownNamespace = Namespace("")
+	unknownNamespace = Namespace("")
 )
 
 var namespaces = map[string]Namespace{
-	"kernel.sem": IpcNamespace,
+	"kernel.sem": ipcNamespace,
 }
 
 var prefixNamespaces = map[string]Namespace{
-	"kernel.shm": IpcNamespace,
-	"kernel.msg": IpcNamespace,
-	"fs.mqueue.": IpcNamespace,
-	"net.":       NetNamespace,
+	"kernel.shm": ipcNamespace,
+	"kernel.msg": ipcNamespace,
+	"fs.mqueue.": ipcNamespace,
+	"net.":       netNamespace,
 }
 
 // NamespacedBy returns the namespace of the Linux kernel for a sysctl, or
-// UnknownNamespace if the sysctl is not known to be namespaced.
+// unknownNamespace if the sysctl is not known to be namespaced.
 func NamespacedBy(val string) Namespace {
 	if ns, found := namespaces[val]; found {
 		return ns
@@ -56,5 +56,5 @@ func NamespacedBy(val string) Namespace {
 			return ns
 		}
 	}
-	return UnknownNamespace
+	return unknownNamespace
 }

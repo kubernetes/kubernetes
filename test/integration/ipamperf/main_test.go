@@ -20,7 +20,7 @@ import (
 	"flag"
 	"testing"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/test/integration/framework"
 )

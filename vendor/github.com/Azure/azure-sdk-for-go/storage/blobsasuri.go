@@ -1,18 +1,7 @@
 package storage
 
-// Copyright 2017 Microsoft Corporation
-//
-//  Licensed under the Apache License, Version 2.0 (the "License");
-//  you may not use this file except in compliance with the License.
-//  You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-//  Unless required by applicable law or agreed to in writing, software
-//  distributed under the License is distributed on an "AS IS" BASIS,
-//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-//  See the License for the specific language governing permissions and
-//  limitations under the License.
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See License.txt in the project root for license information.
 
 import (
 	"errors"
@@ -107,7 +96,7 @@ func (c *Client) blobAndFileSASURI(options SASOptions, uri, permissions, canonic
 	if options.UseHTTPS {
 		protocols = "https"
 	}
-	stringToSign, err := blobSASStringToSign(permissions, start, expiry, canonicalizedResource, options.Identifier, options.IP, protocols, c.apiVersion, headers)
+	stringToSign, err := blobSASStringToSign(permissions, start, expiry, canonicalizedResource, options.Identifier, options.IP, protocols, c.apiVersion, signedResource, "", headers)
 	if err != nil {
 		return "", err
 	}
@@ -149,7 +138,7 @@ func (c *Client) blobAndFileSASURI(options SASOptions, uri, permissions, canonic
 	return sasURL.String(), nil
 }
 
-func blobSASStringToSign(signedPermissions, signedStart, signedExpiry, canonicalizedResource, signedIdentifier, signedIP, protocols, signedVersion string, headers OverrideHeaders) (string, error) {
+func blobSASStringToSign(signedPermissions, signedStart, signedExpiry, canonicalizedResource, signedIdentifier, signedIP, protocols, signedVersion, signedResource, signedSnapshotTime string, headers OverrideHeaders) (string, error) {
 	rscc := headers.CacheControl
 	rscd := headers.ContentDisposition
 	rsce := headers.ContentEncoding
@@ -158,6 +147,11 @@ func blobSASStringToSign(signedPermissions, signedStart, signedExpiry, canonical
 
 	if signedVersion >= "2015-02-21" {
 		canonicalizedResource = "/blob" + canonicalizedResource
+	}
+
+	// https://docs.microsoft.com/en-us/rest/api/storageservices/constructing-a-service-sas
+	if signedVersion >= "2018-11-09" {
+		return fmt.Sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s", signedPermissions, signedStart, signedExpiry, canonicalizedResource, signedIdentifier, signedIP, protocols, signedVersion, signedResource, signedSnapshotTime, rscc, rscd, rsce, rscl, rsct), nil
 	}
 
 	// https://msdn.microsoft.com/en-us/library/azure/dn140255.aspx#Anchor_12

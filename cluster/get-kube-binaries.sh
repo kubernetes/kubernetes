@@ -29,6 +29,21 @@
 #    * ppc64le
 #    * s390x
 #
+#  Set KUBERNETES_CLIENT_OS to choose the client OS to download:
+#    * current OS [default]
+#    * linux
+#    * darwin
+#    * windows
+#
+#  Set KUBERNETES_CLIENT_ARCH to choose the client architecture to download:
+#    * current architecture [default]
+#    * amd64
+#    * arm
+#    * arm64
+#    * ppc64le
+#    * s390x
+#    * windows
+#
 #  Set KUBERNETES_SKIP_CONFIRM to skip the installation confirmation prompt.
 #  Set KUBERNETES_RELEASE_URL to choose where to download binaries from.
 #    (Defaults to https://storage.googleapis.com/kubernetes-release/release).
@@ -59,48 +74,60 @@ function detect_kube_release() {
 }
 
 function detect_client_info() {
-  local kernel machine
-  kernel="$(uname -s)"
-  case "${kernel}" in
-    Darwin)
-      CLIENT_PLATFORM="darwin"
-      ;;
-    Linux)
-      CLIENT_PLATFORM="linux"
-      ;;
-    *)
-      echo "Unknown, unsupported platform: ${kernel}." >&2
-      echo "Supported platforms: Linux, Darwin." >&2
-      echo "Bailing out." >&2
-      exit 2
-  esac
+  if [ -n "${KUBERNETES_CLIENT_OS-}" ]; then
+    CLIENT_PLATFORM="${KUBERNETES_CLIENT_OS}"
+  else
+    local kernel
+    kernel="$(uname -s)"
+    case "${kernel}" in
+      Darwin)
+        CLIENT_PLATFORM="darwin"
+        ;;
+      Linux)
+        CLIENT_PLATFORM="linux"
+        ;;
+      *)
+        echo "Unknown, unsupported platform: ${kernel}." >&2
+        echo "Supported platforms: Linux, Darwin." >&2
+        echo "Bailing out." >&2
+        exit 2
+    esac
+  fi
 
-  # TODO: migrate the kube::util::host_platform function out of hack/lib and
-  # use it here.
-  machine="$(uname -m)"
-  case "${machine}" in
-    x86_64*|i?86_64*|amd64*)
-      CLIENT_ARCH="amd64"
-      ;;
-    aarch64*|arm64*)
-      CLIENT_ARCH="arm64"
-      ;;
-    arm*)
-      CLIENT_ARCH="arm"
-      ;;
-    i?86*)
-      CLIENT_ARCH="386"
-      ;;
-    s390x*)
-      CLIENT_ARCH="s390x"
-      ;;
-    *)
-      echo "Unknown, unsupported architecture (${machine})." >&2
-      echo "Supported architectures x86_64, i686, arm, arm64, s390x." >&2
-      echo "Bailing out." >&2
-      exit 3
-      ;;
-  esac
+  if [ -n "${KUBERNETES_CLIENT_ARCH-}" ]; then
+    CLIENT_ARCH="${KUBERNETES_CLIENT_ARCH}"
+  else
+    # TODO: migrate the kube::util::host_platform function out of hack/lib and
+    # use it here.
+    local machine
+    machine="$(uname -m)"
+    case "${machine}" in
+      x86_64*|i?86_64*|amd64*)
+        CLIENT_ARCH="amd64"
+        ;;
+      aarch64*|arm64*)
+        CLIENT_ARCH="arm64"
+        ;;
+      arm*)
+        CLIENT_ARCH="arm"
+        ;;
+      i?86*)
+        CLIENT_ARCH="386"
+        ;;
+      ppc64le*)
+        CLIENT_ARCH="ppc64le"
+        ;;
+      s390x*)
+        CLIENT_ARCH="s390x"
+        ;;
+      *)
+        echo "Unknown, unsupported architecture (${machine})." >&2
+        echo "Supported architectures x86_64, i686, arm, arm64, ppc64le, s390x." >&2
+        echo "Bailing out." >&2
+        exit 3
+        ;;
+    esac
+  fi
 }
 
 function md5sum_file() {
@@ -111,35 +138,52 @@ function md5sum_file() {
   fi
 }
 
-function sha1sum_file() {
-  if which sha1sum >/dev/null 2>&1; then
-    sha1sum "$1" | awk '{ print $1 }'
+function sha512sum_file() {
+  if which sha512sum >/dev/null 2>&1; then
+    sha512sum "$1" | awk '{ print $1 }'
   else
-    shasum -a1 "$1" | awk '{ print $1 }'
+    shasum -a512 "$1" | awk '{ print $1 }'
   fi
 }
 
 function download_tarball() {
   local -r download_path="$1"
   local -r file="$2"
+  local trace_on="off"
+  if [[ -o xtrace ]]; then
+    trace_on="on"
+    set +x
+  fi
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
-  if [[ $(which curl) ]]; then
-    curl -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
+
+  if [[ $(which gsutil) ]] && [[ "$url" =~ ^https://storage.googleapis.com/.* ]]; then
+    gsutil cp "${url//'https://storage.googleapis.com/'/gs://}" "${download_path}/${file}"
+  elif [[ $(which curl) ]]; then
+    # if the url belongs to GCS API we should use oauth2_token in the headers
+    curl_headers=""
+    if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
+       [[ "$url" =~ ^https://storage.googleapis.com.* ]]; then
+      curl_headers="Authorization: Bearer $(gcloud auth print-access-token)"
+    fi
+    curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
   elif [[ $(which wget) ]]; then
     wget "${url}" -O "${download_path}/${file}"
   else
-    echo "Couldn't find curl or wget.  Bailing out." >&2
+    echo "Couldn't find gsutil, curl, or wget.  Bailing out." >&2
     exit 4
   fi
   echo
-  local md5sum sha1sum
+  local md5sum sha512sum
   md5sum=$(md5sum_file "${download_path}/${file}")
   echo "md5sum(${file})=${md5sum}"
-  sha1sum=$(sha1sum_file "${download_path}/${file}")
-  echo "sha1sum(${file})=${sha1sum}"
+  sha512sum=$(sha512sum_file "${download_path}/${file}")
+  echo "sha512sum(${file})=${sha512sum}"
   echo
   # TODO: add actual verification
+  if [[ "${trace_on}" == "on" ]]; then
+    set -x
+  fi
 }
 
 function extract_arch_tarball() {
@@ -171,7 +215,11 @@ CLIENT_TAR="kubernetes-client-${CLIENT_PLATFORM}-${CLIENT_ARCH}.tar.gz"
 
 echo "Kubernetes release: ${KUBE_VERSION}"
 echo "Server: ${SERVER_PLATFORM}/${SERVER_ARCH}  (to override, set KUBERNETES_SERVER_ARCH)"
-echo "Client: ${CLIENT_PLATFORM}/${CLIENT_ARCH}  (autodetected)"
+printf "Client: %s/%s" "${CLIENT_PLATFORM}" "${CLIENT_ARCH}"
+if [ -z "${KUBERNETES_CLIENT_OS-}" ] && [ -z "${KUBERNETES_CLIENT_ARCH-}" ]; then
+  printf "  (autodetected)"
+fi
+echo "  (to override, set KUBERNETES_CLIENT_OS and/or KUBERNETES_CLIENT_ARCH)"
 echo
 
 echo "Will download ${SERVER_TAR} from ${DOWNLOAD_URL_PREFIX}"

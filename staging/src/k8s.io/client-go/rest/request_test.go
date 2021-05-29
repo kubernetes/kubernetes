@@ -31,19 +31,19 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -57,24 +57,30 @@ import (
 )
 
 func TestNewRequestSetsAccept(t *testing.T) {
-	r := NewRequest(nil, "get", &url.URL{Path: "/path/"}, "", ContentConfig{}, Serializers{}, nil, nil, 0)
+	r := NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{}, nil).Verb("get")
 	if r.headers.Get("Accept") != "" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
-	r = NewRequest(nil, "get", &url.URL{Path: "/path/"}, "", ContentConfig{ContentType: "application/other"}, Serializers{}, nil, nil, 0)
+	r = NewRequestWithClient(&url.URL{Path: "/path/"}, "", ClientContentConfig{ContentType: "application/other"}, nil).Verb("get")
 	if r.headers.Get("Accept") != "application/other, */*" {
 		t.Errorf("unexpected headers: %#v", r.headers)
 	}
 }
 
+func clientForFunc(fn clientFunc) *http.Client {
+	return &http.Client{
+		Transport: fn,
+	}
+}
+
 type clientFunc func(req *http.Request) (*http.Response, error)
 
-func (f clientFunc) Do(req *http.Request) (*http.Response, error) {
+func (f clientFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
 func TestRequestSetsHeaders(t *testing.T) {
-	server := clientFunc(func(req *http.Request) (*http.Response, error) {
+	server := clientForFunc(func(req *http.Request) (*http.Response, error) {
 		if req.Header.Get("Accept") != "application/other, */*" {
 			t.Errorf("unexpected headers: %#v", req.Header)
 		}
@@ -85,20 +91,22 @@ func TestRequestSetsHeaders(t *testing.T) {
 	})
 	config := defaultContentConfig()
 	config.ContentType = "application/other"
-	serializers := defaultSerializers(t)
-	r := NewRequest(server, "get", &url.URL{Path: "/path"}, "", config, serializers, nil, nil, 0)
+	r := NewRequestWithClient(&url.URL{Path: "/path"}, "", config, nil).Verb("get")
+	r.c.Client = server
 
 	// Check if all "issue" methods are setting headers.
-	_ = r.Do()
-	_, _ = r.Watch()
-	_, _ = r.Stream()
+	_ = r.Do(context.Background())
+	_, _ = r.Watch(context.Background())
+	_, _ = r.Stream(context.Background())
 }
 
 func TestRequestWithErrorWontChange(t *testing.T) {
 	gvCopy := v1.SchemeGroupVersion
 	original := Request{
-		err:     errors.New("test"),
-		content: ContentConfig{GroupVersion: &gvCopy},
+		err: errors.New("test"),
+		c: &RESTClient{
+			content: ClientContentConfig{GroupVersion: gvCopy},
+		},
 	}
 	r := original
 	changed := r.Param("foo", "bar").
@@ -119,26 +127,26 @@ func TestRequestWithErrorWontChange(t *testing.T) {
 }
 
 func TestRequestPreservesBaseTrailingSlash(t *testing.T) {
-	r := &Request{baseURL: &url.URL{}, pathPrefix: "/path/"}
+	r := &Request{c: &RESTClient{base: &url.URL{}}, pathPrefix: "/path/"}
 	if s := r.URL().String(); s != "/path/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathPreservesTrailingSlash(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r := (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 
-	r = (&Request{baseURL: &url.URL{}}).AbsPath("/foo/")
+	r = (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("/foo/")
 	if s := r.URL().String(); s != "/foo/" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
 }
 
 func TestRequestAbsPathJoins(t *testing.T) {
-	r := (&Request{baseURL: &url.URL{}}).AbsPath("foo/bar", "baz")
+	r := (&Request{c: &RESTClient{base: &url.URL{}}}).AbsPath("foo/bar", "baz")
 	if s := r.URL().String(); s != "foo/bar/baz" {
 		t.Errorf("trailing slash should be preserved: %s", s)
 	}
@@ -146,9 +154,7 @@ func TestRequestAbsPathJoins(t *testing.T) {
 
 func TestRequestSetsNamespace(t *testing.T) {
 	r := (&Request{
-		baseURL: &url.URL{
-			Path: "/",
-		},
+		c: &RESTClient{base: &url.URL{Path: "/"}},
 	}).Namespace("foo")
 	if r.namespace == "" {
 		t.Errorf("namespace should be set: %#v", r)
@@ -161,7 +167,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 
 func TestRequestOrdersNamespaceInPath(t *testing.T) {
 	r := (&Request{
-		baseURL:    &url.URL{},
+		c:          &RESTClient{base: &url.URL{}},
 		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar" {
@@ -171,7 +177,7 @@ func TestRequestOrdersNamespaceInPath(t *testing.T) {
 
 func TestRequestOrdersSubResource(t *testing.T) {
 	r := (&Request{
-		baseURL:    &url.URL{},
+		c:          &RESTClient{base: &url.URL{}},
 		pathPrefix: "/test/",
 	}).Name("bar").Resource("baz").Namespace("foo").Suffix("test").SubResource("a", "b")
 	if s := r.URL().String(); s != "/test/namespaces/foo/baz/bar/a/b/test" {
@@ -227,7 +233,7 @@ func TestRequestParam(t *testing.T) {
 }
 
 func TestRequestVersionedParams(t *testing.T) {
-	r := (&Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}).Param("foo", "a")
+	r := (&Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}).Param("foo", "a")
 	if !reflect.DeepEqual(r.params, url.Values{"foo": []string{"a"}}) {
 		t.Errorf("should have set a param: %#v", r)
 	}
@@ -243,7 +249,7 @@ func TestRequestVersionedParams(t *testing.T) {
 }
 
 func TestRequestVersionedParamsFromListOptions(t *testing.T) {
-	r := &Request{content: ContentConfig{GroupVersion: &v1.SchemeGroupVersion}}
+	r := &Request{c: &RESTClient{content: ClientContentConfig{GroupVersion: v1.SchemeGroupVersion}}}
 	r.VersionedParams(&metav1.ListOptions{ResourceVersion: "1"}, scheme.ParameterCodec)
 	if !reflect.DeepEqual(r.params, url.Values{
 		"resourceVersion": []string{"1"},
@@ -278,22 +284,13 @@ type NotAnAPIObject struct{}
 func (obj NotAnAPIObject) GroupVersionKind() *schema.GroupVersionKind       { return nil }
 func (obj NotAnAPIObject) SetGroupVersionKind(gvk *schema.GroupVersionKind) {}
 
-func defaultContentConfig() ContentConfig {
+func defaultContentConfig() ClientContentConfig {
 	gvCopy := v1.SchemeGroupVersion
-	return ContentConfig{
-		ContentType:          "application/json",
-		GroupVersion:         &gvCopy,
-		NegotiatedSerializer: serializer.DirectCodecFactory{CodecFactory: scheme.Codecs},
+	return ClientContentConfig{
+		ContentType:  "application/json",
+		GroupVersion: gvCopy,
+		Negotiator:   runtime.NewClientNegotiator(scheme.Codecs.WithoutConversion(), gvCopy),
 	}
-}
-
-func defaultSerializers(t *testing.T) Serializers {
-	config := defaultContentConfig()
-	serializers, err := createSerializers(config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	return *serializers
 }
 
 func TestRequestBody(t *testing.T) {
@@ -316,7 +313,7 @@ func TestRequestBody(t *testing.T) {
 	}
 
 	// test unencodable api object
-	r = (&Request{content: defaultContentConfig()}).Body(&NotAnAPIObject{})
+	r = (&Request{c: &RESTClient{content: defaultContentConfig()}}).Body(&NotAnAPIObject{})
 	if r.err == nil || r.body != nil {
 		t.Errorf("should have set err and left body nil: %#v", r)
 	}
@@ -341,6 +338,7 @@ func TestResultIntoWithNoBodyReturnsErr(t *testing.T) {
 
 func TestURLTemplate(t *testing.T) {
 	uri, _ := url.Parse("http://localhost/some/base/url/path")
+	uriSingleSlash, _ := url.Parse("http://localhost/")
 	testCases := []struct {
 		Request          *Request
 		ExpectedFullURL  string
@@ -348,14 +346,14 @@ func TestURLTemplate(t *testing.T) {
 	}{
 		{
 			// non dynamic client
-			Request: NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("POST").
 				Prefix("api", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/nm?p0=v0",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D",
 		},
 		{
 			// non dynamic client with wrong api group
-			Request: NewRequest(nil, "POST", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("POST").
 				Prefix("pre1", "v1").Resource("r1").Namespace("ns").Name("nm").Param("p0", "v0"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/v1/namespaces/ns/r1/nm?p0=v0",
 			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
@@ -363,7 +361,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with core group + namespace + resourceResource (with name)
 			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/api/v1/namespaces/ns/r1/name1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1/name1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
@@ -371,7 +369,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/g1/v1/namespaces/ns/r1/name1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1/name1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D",
@@ -379,7 +377,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with core group + namespace + resourceResource (with NO name)
 			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/api/v1/namespaces/ns/r1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r1",
@@ -387,7 +385,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with NO name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/g1/v1/namespaces/ns/r1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/namespaces/ns/r1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/namespaces/%7Bnamespace%7D/r1",
@@ -395,7 +393,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with core group + resourceResource (with name)
 			// /api/$RESOURCEVERSION/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/api/v1/r1/name1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/r1/name1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/r1/%7Bname%7D",
@@ -403,7 +401,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + resourceResource (with name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/g1/v1/r1/name1"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/g1/v1/r1/name1",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/g1/v1/r1/%7Bname%7D",
@@ -411,7 +409,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D/finalize",
@@ -419,7 +417,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/%7Bname%7D",
@@ -427,7 +425,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/finalize",
@@ -435,7 +433,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with NO name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%SUBRESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces/status",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces/status",
@@ -443,7 +441,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + namespace + resourceResource (with no name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/namespaces"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/namespaces",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bnamespace%7D/namespaces",
@@ -451,7 +449,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + resourceResource (with name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/finalize",
@@ -459,7 +457,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + resourceResource (with name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces/status"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces/status",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D/status",
@@ -467,7 +465,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + resourceResource (with name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces/namespaces"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/namespaces",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces/%7Bname%7D",
@@ -475,7 +473,7 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with named group + resourceResource (with no name)
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/$RESOURCE/%NAME
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/apis/namespaces/namespaces/namespaces"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
 			ExpectedFinalURL: "http://localhost/some/base/url/path/apis/namespaces/namespaces/namespaces",
@@ -483,10 +481,42 @@ func TestURLTemplate(t *testing.T) {
 		{
 			// dynamic client with wrong api group + namespace + resourceResource (with name) + subresource
 			// /apis/$NAMEDGROUPNAME/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME/$SUBRESOURCE
-			Request: NewRequest(nil, "DELETE", uri, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
 				Prefix("/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize"),
 			ExpectedFullURL:  "http://localhost/some/base/url/path/pre1/namespaces/namespaces/namespaces/namespaces/namespaces/namespaces/finalize",
 			ExpectedFinalURL: "http://localhost/%7Bprefix%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is a single /
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r2/name1"),
+			ExpectedFullURL:  "http://localhost/api/v1/namespaces/ns/r2/name1",
+			ExpectedFinalURL: "http://localhost/api/v1/namespaces/%7Bnamespace%7D/r2/%7Bname%7D",
+		},
+		{
+			// dynamic client with core group + namespace + resourceResource (with name) where baseURL is 'some/base/url/path'
+			// /api/$RESOURCEVERSION/namespaces/$NAMESPACE/$RESOURCE/%NAME
+			Request: NewRequestWithClient(uri, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/api/v1/namespaces/ns/r3/name1"),
+			ExpectedFullURL:  "http://localhost/some/base/url/path/api/v1/namespaces/ns/r3/name1",
+			ExpectedFinalURL: "http://localhost/some/base/url/path/api/v1/namespaces/%7Bnamespace%7D/r3/%7Bname%7D",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/"),
+			ExpectedFullURL:  "http://localhost/",
+			ExpectedFinalURL: "http://localhost/",
+		},
+		{
+			// dynamic client where baseURL is a single /
+			// /version
+			Request: NewRequestWithClient(uriSingleSlash, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("DELETE").
+				Prefix("/version"),
+			ExpectedFullURL:  "http://localhost/version",
+			ExpectedFinalURL: "http://localhost/version",
 		},
 	}
 	for i, testCase := range testCases {
@@ -516,17 +546,17 @@ func TestTransformResponse(t *testing.T) {
 		Error    bool
 		ErrFn    func(err error) bool
 	}{
-		{Response: &http.Response{StatusCode: 200}, Data: []byte{}},
-		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
+		{Response: &http.Response{StatusCode: http.StatusOK}, Data: []byte{}},
+		{Response: &http.Response{StatusCode: http.StatusCreated}, Data: []byte{}, Created: true},
 		{Response: &http.Response{StatusCode: 199}, Error: true},
-		{Response: &http.Response{StatusCode: 500}, Error: true},
-		{Response: &http.Response{StatusCode: 422}, Error: true},
-		{Response: &http.Response{StatusCode: 409}, Error: true},
-		{Response: &http.Response{StatusCode: 404}, Error: true},
-		{Response: &http.Response{StatusCode: 401}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusInternalServerError}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusUnprocessableEntity}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusConflict}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusNotFound}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusUnauthorized}, Error: true},
 		{
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -537,7 +567,7 @@ func TestTransformResponse(t *testing.T) {
 		},
 		{
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -546,12 +576,12 @@ func TestTransformResponse(t *testing.T) {
 				return strings.Contains(err.Error(), "server has asked for the client to provide") && apierrors.IsUnauthorized(err)
 			},
 		},
-		{Response: &http.Response{StatusCode: 403}, Error: true},
-		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
-		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusForbidden}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
-		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(t), nil, nil, 0)
+		r := NewRequestWithClient(uri, "", defaultContentConfig(), nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -590,11 +620,19 @@ type renegotiator struct {
 	err         error
 }
 
-func (r *renegotiator) invoke(contentType string, params map[string]string) (runtime.Decoder, error) {
+func (r *renegotiator) Decoder(contentType string, params map[string]string) (runtime.Decoder, error) {
 	r.called = true
 	r.contentType = contentType
 	r.params = params
 	return r.decoder, r.err
+}
+
+func (r *renegotiator) Encoder(contentType string, params map[string]string) (runtime.Encoder, error) {
+	return nil, fmt.Errorf("UNIMPLEMENTED")
+}
+
+func (r *renegotiator) StreamDecoder(contentType string, params map[string]string) (runtime.Decoder, runtime.Serializer, runtime.Framer, error) {
+	return nil, nil, nil, fmt.Errorf("UNIMPLEMENTED")
 }
 
 func TestTransformResponseNegotiate(t *testing.T) {
@@ -616,11 +654,13 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Error: true,
+			Called:            true,
+			ExpectContentType: "application/json",
+			Error:             true,
 			ErrFn: func(err error) bool {
 				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
 			},
@@ -628,7 +668,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -645,7 +685,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 500,
+				StatusCode: http.StatusInternalServerError,
 				Header:     http.Header{"Content-Type": []string{"application/,others"}},
 			},
 			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
@@ -656,28 +696,32 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			},
 		},
 		{
-			// no negotiation when no content type specified
+			// negotiate when no content type specified
 			Response: &http.Response{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder:           scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Called:            true,
+			ExpectContentType: "text/any",
 		},
 		{
-			// no negotiation when no response content type specified
+			// negotiate when no response content type specified
 			ContentType: "text/any",
 			Response: &http.Response{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
-			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Decoder:           scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
+			Called:            true,
+			ExpectContentType: "text/any",
 		},
 		{
 			// unrecognized content type is not handled
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 404,
+				StatusCode: http.StatusNotFound,
 				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -694,15 +738,14 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		},
 	}
 	for i, test := range testCases {
-		serializers := defaultSerializers(t)
+		contentConfig := defaultContentConfig()
+		contentConfig.ContentType = test.ContentType
 		negotiator := &renegotiator{
 			decoder: test.Decoder,
 			err:     test.NegotiateErr,
 		}
-		serializers.RenegotiatedDecoder = negotiator.invoke
-		contentConfig := defaultContentConfig()
-		contentConfig.ContentType = test.ContentType
-		r := NewRequest(nil, "", uri, "", contentConfig, serializers, nil, nil, 0)
+		contentConfig.Negotiator = negotiator
+		r := NewRequestWithClient(uri, "", contentConfig, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
@@ -829,59 +872,69 @@ func TestTransformUnstructuredError(t *testing.T) {
 		},
 	}
 
-	for i, testCase := range testCases {
-		r := &Request{
-			content:      defaultContentConfig(),
-			serializers:  defaultSerializers(t),
-			resourceName: testCase.Name,
-			resource:     testCase.Resource,
-		}
-		result := r.transformResponse(testCase.Res, testCase.Req)
-		err := result.err
-		if !testCase.ErrFn(err) {
-			t.Errorf("unexpected error: %v", err)
-			continue
-		}
-		if !apierrors.IsUnexpectedServerError(err) {
-			t.Errorf("%d: unexpected error type: %v", i, err)
-		}
-		if len(testCase.Name) != 0 && !strings.Contains(err.Error(), testCase.Name) {
-			t.Errorf("unexpected error string: %s", err)
-		}
-		if len(testCase.Resource) != 0 && !strings.Contains(err.Error(), testCase.Resource) {
-			t.Errorf("unexpected error string: %s", err)
-		}
+	for _, testCase := range testCases {
+		t.Run("", func(t *testing.T) {
+			r := &Request{
+				c: &RESTClient{
+					content: defaultContentConfig(),
+				},
+				resourceName: testCase.Name,
+				resource:     testCase.Resource,
+			}
+			result := r.transformResponse(testCase.Res, testCase.Req)
+			err := result.err
+			if !testCase.ErrFn(err) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !apierrors.IsUnexpectedServerError(err) {
+				t.Errorf("unexpected error type: %v", err)
+			}
+			if len(testCase.Name) != 0 && !strings.Contains(err.Error(), testCase.Name) {
+				t.Errorf("unexpected error string: %s", err)
+			}
+			if len(testCase.Resource) != 0 && !strings.Contains(err.Error(), testCase.Resource) {
+				t.Errorf("unexpected error string: %s", err)
+			}
 
-		// verify Error() properly transforms the error
-		transformed := result.Error()
-		expect := testCase.Transformed
-		if expect == nil {
-			expect = err
-		}
-		if !reflect.DeepEqual(expect, transformed) {
-			t.Errorf("%d: unexpected Error(): %s", i, diff.ObjectReflectDiff(expect, transformed))
-		}
+			// verify Error() properly transforms the error
+			transformed := result.Error()
+			expect := testCase.Transformed
+			if expect == nil {
+				expect = err
+			}
+			if !reflect.DeepEqual(expect, transformed) {
+				t.Errorf("unexpected Error(): %s", diff.ObjectReflectDiff(expect, transformed))
+			}
 
-		// verify result.Get properly transforms the error
-		if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
-			t.Errorf("%d: unexpected error on Get(): %s", i, diff.ObjectReflectDiff(expect, err))
-		}
+			// verify result.Get properly transforms the error
+			if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
+				t.Errorf("unexpected error on Get(): %s", diff.ObjectReflectDiff(expect, err))
+			}
 
-		// verify result.Into properly handles the error
-		if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
-			t.Errorf("%d: unexpected error on Into(): %s", i, diff.ObjectReflectDiff(expect, err))
-		}
+			// verify result.Into properly handles the error
+			if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
+				t.Errorf("unexpected error on Into(): %s", diff.ObjectReflectDiff(expect, err))
+			}
 
-		// verify result.Raw leaves the error in the untransformed state
-		if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
-			t.Errorf("%d: unexpected error on Raw(): %s", i, diff.ObjectReflectDiff(expect, err))
-		}
+			// verify result.Raw leaves the error in the untransformed state
+			if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
+				t.Errorf("unexpected error on Raw(): %s", diff.ObjectReflectDiff(expect, err))
+			}
+		})
 	}
 }
+
+type errorReader struct {
+	err error
+}
+
+func (r errorReader) Read(data []byte) (int, error) { return 0, r.err }
+func (r errorReader) Close() error                  { return nil }
 
 func TestRequestWatch(t *testing.T) {
 	testCases := []struct {
 		Request *Request
+		Expect  []watch.Event
 		Err     bool
 		ErrFn   func(error) bool
 		Empty   bool
@@ -891,29 +944,55 @@ func TestRequestWatch(t *testing.T) {
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{c: &RESTClient{base: &url.URL{}}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
 			Request: &Request{
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, errors.New("err")
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, errors.New("err")
+					}),
+					base: &url.URL{},
+				},
 			},
 			Err: true,
 		},
 		{
 			Request: &Request{
-				content:     defaultContentConfig(),
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusForbidden,
-						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
-					}, nil
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					content: defaultContentConfig(),
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusForbidden,
+							Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+						}, nil
+					}),
+					base: &url.URL{},
+				},
+			},
+			Expect: []watch.Event{
+				{
+					Type: watch.Error,
+					Object: &metav1.Status{
+						Status:  "Failure",
+						Code:    500,
+						Reason:  "InternalError",
+						Message: `an error on the server ("unable to decode an event from the watch stream: test error") has prevented the request from succeeding`,
+						Details: &metav1.StatusDetails{
+							Causes: []metav1.StatusCause{
+								{
+									Type:    "UnexpectedServerResponse",
+									Message: "unable to decode an event from the watch stream: test error",
+								},
+								{
+									Type:    "ClientWatchDecoding",
+									Message: "unable to decode an event from the watch stream: test error",
+								},
+							},
+						},
+					},
+				},
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -922,15 +1001,34 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				content:     defaultContentConfig(),
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusUnauthorized,
-						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
-					}, nil
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					content: defaultContentConfig(),
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusForbidden,
+							Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+						}, nil
+					}),
+					base: &url.URL{},
+				},
+			},
+			Err: true,
+			ErrFn: func(err error) bool {
+				return apierrors.IsForbidden(err)
+			},
+		},
+		{
+			Request: &Request{
+				c: &RESTClient{
+					content: defaultContentConfig(),
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusUnauthorized,
+							Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+						}, nil
+					}),
+					base: &url.URL{},
+				},
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -939,18 +1037,19 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				content:     defaultContentConfig(),
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
-							Status: metav1.StatusFailure,
-							Reason: metav1.StatusReasonUnauthorized,
-						})))),
-					}, nil
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					content: defaultContentConfig(),
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusUnauthorized,
+							Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+								Status: metav1.StatusFailure,
+								Reason: metav1.StatusReasonUnauthorized,
+							})))),
+						}, nil
+					}),
+					base: &url.URL{},
+				},
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -959,67 +1058,75 @@ func TestRequestWatch(t *testing.T) {
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, io.EOF
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, io.EOF
+					}),
+					base: &url.URL{},
+				},
 			},
 			Empty: true,
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, &url.Error{Err: io.EOF}
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, errors.New("http: can't write HTTP request on broken connection")
+					}),
+					base: &url.URL{},
+				},
 			},
 			Empty: true,
 		},
 		{
 			Request: &Request{
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, errors.New("http: can't write HTTP request on broken connection")
-				}),
-				baseURL: &url.URL{},
-			},
-			Empty: true,
-		},
-		{
-			Request: &Request{
-				serializers: defaultSerializers(t),
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, errors.New("foo: connection reset by peer")
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, errors.New("foo: connection reset by peer")
+					}),
+					base: &url.URL{},
+				},
 			},
 			Empty: true,
 		},
 	}
-	for i, testCase := range testCases {
-		t.Logf("testcase %v", testCase.Request)
-		testCase.Request.backoffMgr = &NoBackoff{}
-		watch, err := testCase.Request.Watch()
-		hasErr := err != nil
-		if hasErr != testCase.Err {
-			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
-			continue
-		}
-		if testCase.ErrFn != nil && !testCase.ErrFn(err) {
-			t.Errorf("%d: error not valid: %v", i, err)
-		}
-		if hasErr && watch != nil {
-			t.Errorf("%d: watch should be nil when error is returned", i)
-			continue
-		}
-		if testCase.Empty {
-			_, ok := <-watch.ResultChan()
-			if ok {
-				t.Errorf("%d: expected the watch to be empty: %#v", i, watch)
+	for _, testCase := range testCases {
+		t.Run("", func(t *testing.T) {
+			testCase.Request.backoff = &NoBackoff{}
+			testCase.Request.retry = &withRetry{}
+			watch, err := testCase.Request.Watch(context.Background())
+			hasErr := err != nil
+			if hasErr != testCase.Err {
+				t.Fatalf("expected %t, got %t: %v", testCase.Err, hasErr, err)
 			}
-		}
+			if testCase.ErrFn != nil && !testCase.ErrFn(err) {
+				t.Errorf("error not valid: %v", err)
+			}
+			if hasErr && watch != nil {
+				t.Fatalf("watch should be nil when error is returned")
+			}
+			if hasErr {
+				return
+			}
+			defer watch.Stop()
+			if testCase.Empty {
+				evt, ok := <-watch.ResultChan()
+				if ok {
+					t.Errorf("expected the watch to be empty: %#v", evt)
+				}
+			}
+			if testCase.Expect != nil {
+				for i, evt := range testCase.Expect {
+					out, ok := <-watch.ResultChan()
+					if !ok {
+						t.Fatalf("Watch closed early, %d/%d read", i, len(testCase.Expect))
+					}
+					if !reflect.DeepEqual(evt, out) {
+						t.Fatalf("Event %d does not match: %s", i, diff.ObjectReflectDiff(evt, out))
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -1034,46 +1141,50 @@ func TestRequestStream(t *testing.T) {
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{c: &RESTClient{base: &url.URL{}}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
 			Request: &Request{
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, errors.New("err")
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, errors.New("err")
+					}),
+					base: &url.URL{},
+				},
 			},
 			Err: true,
 		},
 		{
 			Request: &Request{
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusUnauthorized,
-						Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
-							Status: metav1.StatusFailure,
-							Reason: metav1.StatusReasonUnauthorized,
-						})))),
-					}, nil
-				}),
-				content:     defaultContentConfig(),
-				serializers: defaultSerializers(t),
-				baseURL:     &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusUnauthorized,
+							Body: ioutil.NopCloser(bytes.NewReader([]byte(runtime.EncodeOrDie(scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion), &metav1.Status{
+								Status: metav1.StatusFailure,
+								Reason: metav1.StatusReasonUnauthorized,
+							})))),
+						}, nil
+					}),
+					content: defaultContentConfig(),
+					base:    &url.URL{},
+				},
 			},
 			Err: true,
 		},
 		{
 			Request: &Request{
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: http.StatusBadRequest,
-						Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
-					}, nil
-				}),
-				content:     defaultContentConfig(),
-				serializers: defaultSerializers(t),
-				baseURL:     &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: http.StatusBadRequest,
+							Body:       ioutil.NopCloser(bytes.NewReader([]byte(`{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"a container name must be specified for pod kube-dns-v20-mz5cv, choose one of: [kubedns dnsmasq healthz]","reason":"BadRequest","code":400}`))),
+						}, nil
+					}),
+					content: defaultContentConfig(),
+					base:    &url.URL{},
+				},
 			},
 			Err: true,
 			ErrFn: func(err error) bool {
@@ -1084,9 +1195,11 @@ func TestRequestStream(t *testing.T) {
 			},
 		},
 	}
+
 	for i, testCase := range testCases {
-		testCase.Request.backoffMgr = &NoBackoff{}
-		body, err := testCase.Request.Stream()
+		testCase.Request.backoff = &NoBackoff{}
+		testCase.Request.retry = &withRetry{maxRetries: 0}
+		body, err := testCase.Request.Stream(context.Background())
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
@@ -1127,7 +1240,7 @@ func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	b := []byte{}
 	body := ioutil.NopCloser(bytes.NewReader(b))
 	resp := &http.Response{
-		StatusCode: 101,
+		StatusCode: http.StatusSwitchingProtocols,
 		Body:       body,
 	}
 	return resp, nil
@@ -1143,26 +1256,29 @@ func TestRequestDo(t *testing.T) {
 		Err     bool
 	}{
 		{
-			Request: &Request{err: errors.New("bail")},
+			Request: &Request{c: &RESTClient{}, err: errors.New("bail")},
 			Err:     true,
 		},
 		{
-			Request: &Request{baseURL: &url.URL{}, pathPrefix: "%"},
+			Request: &Request{c: &RESTClient{base: &url.URL{}}, pathPrefix: "%"},
 			Err:     true,
 		},
 		{
 			Request: &Request{
-				client: clientFunc(func(req *http.Request) (*http.Response, error) {
-					return nil, errors.New("err")
-				}),
-				baseURL: &url.URL{},
+				c: &RESTClient{
+					Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+						return nil, errors.New("err")
+					}),
+					base: &url.URL{},
+				},
 			},
 			Err: true,
 		},
 	}
 	for i, testCase := range testCases {
-		testCase.Request.backoffMgr = &NoBackoff{}
-		body, err := testCase.Request.Do().Raw()
+		testCase.Request.backoff = &NoBackoff{}
+		testCase.Request.retry = &withRetry{}
+		body, err := testCase.Request.Do(context.Background()).Raw()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
@@ -1194,7 +1310,7 @@ func TestDoRequestNewWay(t *testing.T) {
 		Suffix("baz").
 		Timeout(time.Second).
 		Body([]byte(reqBody)).
-		Do().Get()
+		Do(context.Background()).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1230,7 +1346,7 @@ func TestBackoffLifecycle(t *testing.T) {
 	seconds := []int{0, 1, 2, 4, 8, 0, 1, 2, 4, 0}
 	request := c.Verb("POST").Prefix("backofftest").Suffix("abc")
 	clock := clock.FakeClock{}
-	request.backoffMgr = &URLBackoff{
+	request.backoff = &URLBackoff{
 		// Use a fake backoff here to avoid flakes and speed the test up.
 		Backoff: flowcontrol.NewFakeBackOff(
 			time.Duration(1)*time.Second,
@@ -1239,13 +1355,13 @@ func TestBackoffLifecycle(t *testing.T) {
 		)}
 
 	for _, sec := range seconds {
-		thisBackoff := request.backoffMgr.CalculateBackoff(request.URL())
+		thisBackoff := request.backoff.CalculateBackoff(request.URL())
 		t.Logf("Current backoff %v", thisBackoff)
 		if thisBackoff != time.Duration(sec)*time.Second {
 			t.Errorf("Backoff is %v instead of %v", thisBackoff, sec)
 		}
 		now := clock.Now()
-		request.DoRaw()
+		request.DoRaw(context.Background())
 		elapsed := clock.Since(now)
 		if clock.Since(now) != thisBackoff {
 			t.Errorf("CalculatedBackoff not honored by clock: Expected time of %v, but got %v ", thisBackoff, elapsed)
@@ -1284,17 +1400,17 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	backoffMgr := &testBackoffManager{}
+	backoff := &testBackoffManager{}
 	expectedSleeps := []time.Duration{0, time.Second, 0, time.Second, 0, time.Second, 0, time.Second, 0}
 
 	c := testRESTClient(t, testServer)
-	c.createBackoffMgr = func() BackoffManager { return backoffMgr }
+	c.createBackoffMgr = func() BackoffManager { return backoff }
 	_, err := c.Verb("POST").
 		Prefix("foo", "bar").
 		Suffix("baz").
 		Timeout(time.Second).
 		Body([]byte(strings.Repeat("abcd", 1000))).
-		DoRaw()
+		DoRaw(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v %#v", err, err)
 	}
@@ -1302,8 +1418,8 @@ func TestCheckRetryClosesBody(t *testing.T) {
 	if count != 5 {
 		t.Errorf("unexpected retries: %d", count)
 	}
-	if !reflect.DeepEqual(backoffMgr.sleeps, expectedSleeps) {
-		t.Errorf("unexpected sleeps, expected: %v, got: %v", expectedSleeps, backoffMgr.sleeps)
+	if !reflect.DeepEqual(backoff.sleeps, expectedSleeps) {
+		t.Errorf("unexpected sleeps, expected: %v, got: %v", expectedSleeps, backoff.sleeps)
 	}
 }
 
@@ -1312,20 +1428,23 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 	backoff := &testBackoffManager{}
 	req := &Request{
 		verb: "GET",
-		client: clientFunc(func(req *http.Request) (*http.Response, error) {
-			count++
-			if count >= 3 {
-				return &http.Response{
-					StatusCode: 200,
-					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
-				}, nil
-			}
-			return nil, &net.OpError{Err: syscall.ECONNRESET}
-		}),
-		backoffMgr: backoff,
+		c: &RESTClient{
+			Client: clientForFunc(func(req *http.Request) (*http.Response, error) {
+				count++
+				if count >= 3 {
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
+					}, nil
+				}
+				return nil, &net.OpError{Err: syscall.ECONNRESET}
+			}),
+		},
+		backoff: backoff,
+		retry:   &withRetry{maxRetries: 10},
 	}
 	// We expect two retries of "connection reset by peer" and the success.
-	_, err := req.Do().Raw()
+	_, err := req.Do(context.Background()).Raw()
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1365,7 +1484,7 @@ func TestCheckRetryHandles429And5xx(t *testing.T) {
 		Suffix("baz").
 		Timeout(time.Second).
 		Body([]byte(strings.Repeat("abcd", 1000))).
-		DoRaw()
+		DoRaw(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error: %v %#v", err, err)
 	}
@@ -1389,15 +1508,20 @@ func BenchmarkCheckRetryClosesBody(b *testing.B) {
 	defer testServer.Close()
 
 	c := testRESTClient(b, testServer)
-	r := c.Verb("POST").
-		Prefix("foo", "bar").
-		Suffix("baz").
-		Timeout(time.Second).
-		Body([]byte(strings.Repeat("abcd", 1000)))
 
+	requests := make([]*Request, 0, b.N)
 	for i := 0; i < b.N; i++ {
-		if _, err := r.DoRaw(); err != nil {
-			b.Fatalf("Unexpected error: %v %#v", err, err)
+		requests = append(requests, c.Verb("POST").
+			Prefix("foo", "bar").
+			Suffix("baz").
+			Timeout(time.Second).
+			Body([]byte(strings.Repeat("abcd", 1000))))
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := requests[i].DoRaw(context.Background()); err != nil {
+			b.Fatalf("Unexpected error (%d/%d): %v", i, b.N, err)
 		}
 	}
 }
@@ -1425,7 +1549,7 @@ func TestDoRequestNewWayReader(t *testing.T) {
 		Prefix("foo").
 		Timeout(time.Second).
 		Body(bytes.NewBuffer(reqBodyExpected)).
-		Do().Get()
+		Do(context.Background()).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1464,7 +1588,7 @@ func TestDoRequestNewWayObj(t *testing.T) {
 		Resource("foo").
 		Timeout(time.Second).
 		Body(reqObj).
-		Do().Get()
+		Do(context.Background()).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1518,7 +1642,7 @@ func TestDoRequestNewWayFile(t *testing.T) {
 		Prefix("foo/bar", "baz").
 		Timeout(time.Second).
 		Body(file.Name()).
-		Do().WasCreated(&wasCreated).Get()
+		Do(context.Background()).WasCreated(&wasCreated).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1563,7 +1687,7 @@ func TestWasCreated(t *testing.T) {
 		Prefix("foo/bar", "baz").
 		Timeout(time.Second).
 		Body(reqBodyExpected).
-		Do().WasCreated(&wasCreated).Get()
+		Do(context.Background()).WasCreated(&wasCreated).Get()
 	if err != nil {
 		t.Errorf("Unexpected error: %v %#v", err, err)
 		return
@@ -1627,7 +1751,7 @@ func TestAbsPath(t *testing.T) {
 		{"/p1/api/p2", "/api/r1", "/api/", "/p1/api/p2/api/"},
 	} {
 		u, _ := url.Parse("http://localhost:123" + tc.configPrefix)
-		r := NewRequest(nil, "POST", u, "", ContentConfig{GroupVersion: &schema.GroupVersion{Group: "test"}}, Serializers{}, nil, nil, 0).Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
+		r := NewRequestWithClient(u, "", ClientContentConfig{GroupVersion: schema.GroupVersion{Group: "test"}}, nil).Verb("POST").Prefix(tc.resourcePrefix).AbsPath(tc.absPath)
 		if r.pathPrefix != tc.wantsAbsPath {
 			t.Errorf("test case %d failed, unexpected path: %q, expected %q", i, r.pathPrefix, tc.wantsAbsPath)
 		}
@@ -1746,7 +1870,67 @@ func TestWatch(t *testing.T) {
 	defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
-	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
+	watching, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	for _, item := range table {
+		got, ok := <-watching.ResultChan()
+		if !ok {
+			t.Fatalf("Unexpected early close")
+		}
+		if e, a := item.t, got.Type; e != a {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+		if e, a := item.obj, got.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+			t.Errorf("Expected %v, got %v", e, a)
+		}
+	}
+
+	_, ok := <-watching.ResultChan()
+	if ok {
+		t.Fatal("Unexpected non-close")
+	}
+}
+
+func TestWatchNonDefaultContentType(t *testing.T) {
+	var table = []struct {
+		t   watch.EventType
+		obj runtime.Object
+	}{
+		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+
+		w.Header().Set("Transfer-Encoding", "chunked")
+		// manually set the content type here so we get the renegotiation behavior
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+		for _, item := range table {
+			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
+				panic(err)
+			}
+			flusher.Flush()
+		}
+	}))
+	defer testServer.Close()
+
+	// set the default content type to protobuf so that we test falling back to JSON serialization
+	contentConfig := defaultContentConfig()
+	contentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	s := testRESTClientWithConfig(t, testServer, contentConfig)
+	watching, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
 	if err != nil {
 		t.Fatalf("Unexpected error")
 	}
@@ -1770,6 +1954,45 @@ func TestWatch(t *testing.T) {
 	}
 }
 
+func TestWatchUnknownContentType(t *testing.T) {
+	var table = []struct {
+		t   watch.EventType
+		obj runtime.Object
+	}{
+		{watch.Added, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "first"}}},
+		{watch.Modified, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "second"}}},
+		{watch.Deleted, &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "last"}}},
+	}
+
+	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			panic("need flusher!")
+		}
+
+		w.Header().Set("Transfer-Encoding", "chunked")
+		// manually set the content type here so we get the renegotiation behavior
+		w.Header().Set("Content-Type", "foobar")
+		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
+
+		encoder := restclientwatch.NewEncoder(streaming.NewEncoder(w, scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion)), scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion))
+		for _, item := range table {
+			if err := encoder.Encode(&watch.Event{Type: item.t, Object: item.obj}); err != nil {
+				panic(err)
+			}
+			flusher.Flush()
+		}
+	}))
+	defer testServer.Close()
+
+	s := testRESTClient(t, testServer)
+	_, err := s.Get().Prefix("path/to/watch/thing").Watch(context.Background())
+	if err == nil {
+		t.Fatalf("Expected to fail due to lack of known stream serialization for content type")
+	}
+}
+
 func TestStream(t *testing.T) {
 	expectedBody := "expected body"
 
@@ -1786,7 +2009,7 @@ func TestStream(t *testing.T) {
 	defer testServer.Close()
 
 	s := testRESTClient(t, testServer)
-	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream()
+	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream(context.Background())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1800,21 +2023,27 @@ func TestStream(t *testing.T) {
 	}
 }
 
-func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
-	baseURL, _ := url.Parse("http://localhost")
+func testRESTClientWithConfig(t testing.TB, srv *httptest.Server, contentConfig ClientContentConfig) *RESTClient {
+	base, _ := url.Parse("http://localhost")
 	if srv != nil {
 		var err error
-		baseURL, err = url.Parse(srv.URL)
+		base, err = url.Parse(srv.URL)
 		if err != nil {
 			t.Fatalf("failed to parse test URL: %v", err)
 		}
 	}
 	versionedAPIPath := defaultResourcePathWithPrefix("", "", "", "")
-	client, err := NewRESTClient(baseURL, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
+	client, err := NewRESTClient(base, versionedAPIPath, contentConfig, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}
 	return client
+
+}
+
+func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
+	contentConfig := defaultContentConfig()
+	return testRESTClientWithConfig(t, srv, contentConfig)
 }
 
 func TestDoContext(t *testing.T) {
@@ -1838,9 +2067,8 @@ func TestDoContext(t *testing.T) {
 
 	c := testRESTClient(t, testServer)
 	_, err := c.Verb("GET").
-		Context(ctx).
 		Prefix("foo").
-		DoRaw()
+		DoRaw(ctx)
 	if err == nil {
 		t.Fatal("Expected context cancellation error")
 	}
@@ -1937,4 +2165,439 @@ func defaultResourcePathWithPrefix(prefix, resource, namespace, name string) str
 		path = path + "/" + name
 	}
 	return path
+}
+
+func TestRequestPreflightCheck(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		verbs        []string
+		namespace    string
+		resourceName string
+		namespaceSet bool
+		expectsErr   bool
+	}{
+		{
+			name:         "no namespace set",
+			verbs:        []string{"GET", "PUT", "DELETE", "POST"},
+			namespaceSet: false,
+			expectsErr:   false,
+		},
+		{
+			name:         "empty resource name and namespace",
+			verbs:        []string{"GET", "PUT", "DELETE"},
+			namespaceSet: true,
+			expectsErr:   false,
+		},
+		{
+			name:         "resource name with empty namespace",
+			verbs:        []string{"GET", "PUT", "DELETE"},
+			namespaceSet: true,
+			resourceName: "ResourceName",
+			expectsErr:   true,
+		},
+		{
+			name:         "post empty resource name and namespace",
+			verbs:        []string{"POST"},
+			namespaceSet: true,
+			expectsErr:   true,
+		},
+		{
+			name:         "working requests",
+			verbs:        []string{"GET", "PUT", "DELETE", "POST"},
+			namespaceSet: true,
+			resourceName: "ResourceName",
+			namespace:    "Namespace",
+			expectsErr:   false,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, verb := range tt.verbs {
+				r := &Request{
+					verb:         verb,
+					namespace:    tt.namespace,
+					resourceName: tt.resourceName,
+					namespaceSet: tt.namespaceSet,
+				}
+
+				err := r.requestPreflightCheck()
+				hasErr := err != nil
+				if hasErr == tt.expectsErr {
+					return
+				}
+				t.Errorf("%s: expects error: %v, has error: %v", verb, tt.expectsErr, hasErr)
+			}
+		})
+	}
+}
+
+func TestThrottledLogger(t *testing.T) {
+	now := time.Now()
+	oldClock := globalThrottledLogger.clock
+	defer func() {
+		globalThrottledLogger.clock = oldClock
+	}()
+	clock := clock.NewFakeClock(now)
+	globalThrottledLogger.clock = clock
+
+	logMessages := 0
+	for i := 0; i < 1000; i++ {
+		var wg sync.WaitGroup
+		wg.Add(10)
+		for j := 0; j < 10; j++ {
+			go func() {
+				if _, ok := globalThrottledLogger.attemptToLog(); ok {
+					logMessages++
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		now = now.Add(1 * time.Second)
+		clock.SetTime(now)
+	}
+
+	if a, e := logMessages, 100; a != e {
+		t.Fatalf("expected %v log messages, but got %v", e, a)
+	}
+}
+
+func TestRequestMaxRetries(t *testing.T) {
+	successAtNthCalls := 1
+	actualCalls := 0
+	retryOneTimeHandler := func(w http.ResponseWriter, req *http.Request) {
+		defer func() { actualCalls++ }()
+		if actualCalls >= successAtNthCalls {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		w.Header().Set("Retry-After", "1")
+		w.WriteHeader(http.StatusTooManyRequests)
+		actualCalls++
+	}
+	testServer := httptest.NewServer(http.HandlerFunc(retryOneTimeHandler))
+	defer testServer.Close()
+
+	u, err := url.Parse(testServer.URL)
+	if err != nil {
+		t.Error(err)
+	}
+
+	testCases := []struct {
+		name        string
+		maxRetries  int
+		expectError bool
+	}{
+		{
+			name:        "no retrying should fail",
+			maxRetries:  0,
+			expectError: true,
+		},
+		{
+			name:        "1 max-retry should exactly work",
+			maxRetries:  1,
+			expectError: false,
+		},
+		{
+			name:        "5 max-retry should work",
+			maxRetries:  5,
+			expectError: false,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			defer func() { actualCalls = 0 }()
+			_, err := NewRequestWithClient(u, "", defaultContentConfig(), testServer.Client()).
+				Verb("get").
+				MaxRetries(testCase.maxRetries).
+				AbsPath("/foo").
+				DoRaw(context.TODO())
+			hasError := err != nil
+			if testCase.expectError != hasError {
+				t.Error(" failed checking error")
+			}
+		})
+	}
+}
+
+type responseErr struct {
+	response *http.Response
+	err      error
+}
+
+type seek struct {
+	offset int64
+	whence int
+}
+
+type count struct {
+	// keeps track of the number of Seek(offset, whence) calls.
+	seeks []seek
+	// how many times {Request|Response}.Body.Close() has been invoked
+	closes int
+}
+
+// used to track {Request|Response}.Body
+type readTracker struct {
+	count     *count
+	delegated io.Reader
+}
+
+func (r *readTracker) Seek(offset int64, whence int) (int64, error) {
+	if seeker, ok := r.delegated.(io.Seeker); ok {
+		r.count.seeks = append(r.count.seeks, seek{offset: offset, whence: whence})
+		return seeker.Seek(offset, whence)
+	}
+	return 0, io.EOF
+}
+
+func (r *readTracker) Read(p []byte) (n int, err error) {
+	return r.delegated.Read(p)
+}
+
+func (r *readTracker) Close() error {
+	if closer, ok := r.delegated.(io.Closer); ok {
+		r.count.closes++
+		return closer.Close()
+	}
+	return nil
+}
+
+func newReadTracker(count *count) *readTracker {
+	return &readTracker{
+		count: count,
+	}
+}
+
+func newCount() *count {
+	return &count{
+		closes: 0,
+		seeks:  make([]seek, 0),
+	}
+}
+
+type readSeeker struct{ err error }
+
+func (rs readSeeker) Read([]byte) (int, error)       { return 0, rs.err }
+func (rs readSeeker) Seek(int64, int) (int64, error) { return 0, rs.err }
+
+func unWrap(err error) error {
+	if uerr, ok := err.(*url.Error); ok {
+		return uerr.Err
+	}
+	return err
+}
+
+// noSleepBackOff is a NoBackoff except it does not sleep,
+// used for faster execution of the unit tests.
+type noSleepBackOff struct {
+	*NoBackoff
+}
+
+func (n *noSleepBackOff) Sleep(d time.Duration) {}
+
+func TestRequestWithRetry(t *testing.T) {
+	tests := []struct {
+		name                         string
+		body                         io.Reader
+		serverReturns                responseErr
+		errExpected                  error
+		transformFuncInvokedExpected int
+		roundTripInvokedExpected     int
+	}{
+		{
+			name:                         "server returns retry-after response, request body is not io.Seeker, retry goes ahead",
+			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
+			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
+			errExpected:                  nil,
+			transformFuncInvokedExpected: 1,
+			roundTripInvokedExpected:     2,
+		},
+		{
+			name:                         "server returns retry-after response, request body Seek returns error, retry aborted",
+			body:                         &readSeeker{err: io.EOF},
+			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
+			errExpected:                  nil,
+			transformFuncInvokedExpected: 1,
+			roundTripInvokedExpected:     1,
+		},
+		{
+			name:                         "server returns retry-after response, request body Seek returns no error, retry goes ahead",
+			body:                         &readSeeker{err: nil},
+			serverReturns:                responseErr{response: retryAfterResponse(), err: nil},
+			errExpected:                  nil,
+			transformFuncInvokedExpected: 1,
+			roundTripInvokedExpected:     2,
+		},
+		{
+			name:                         "server returns retryable err, request body is not io.Seek, retry goes ahead",
+			body:                         ioutil.NopCloser(bytes.NewReader([]byte{})),
+			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			errExpected:                  io.ErrUnexpectedEOF,
+			transformFuncInvokedExpected: 0,
+			roundTripInvokedExpected:     2,
+		},
+		{
+			name:                         "server returns retryable err, request body Seek returns error, retry aborted",
+			body:                         &readSeeker{err: io.EOF},
+			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			errExpected:                  io.ErrUnexpectedEOF,
+			transformFuncInvokedExpected: 0,
+			roundTripInvokedExpected:     1,
+		},
+		{
+			name:                         "server returns retryable err, request body Seek returns no err, retry goes ahead",
+			body:                         &readSeeker{err: nil},
+			serverReturns:                responseErr{response: nil, err: io.ErrUnexpectedEOF},
+			errExpected:                  io.ErrUnexpectedEOF,
+			transformFuncInvokedExpected: 0,
+			roundTripInvokedExpected:     2,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var roundTripInvoked int
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				roundTripInvoked++
+				return test.serverReturns.response, test.serverReturns.err
+			})
+
+			req := &Request{
+				verb: "GET",
+				body: test.body,
+				c: &RESTClient{
+					Client: client,
+				},
+				backoff: &noSleepBackOff{},
+				retry:   &withRetry{maxRetries: 1},
+			}
+
+			var transformFuncInvoked int
+			err := req.request(context.Background(), func(request *http.Request, response *http.Response) {
+				transformFuncInvoked++
+			})
+
+			if test.roundTripInvokedExpected != roundTripInvoked {
+				t.Errorf("Expected RoundTrip to be invoked %d times, but got: %d", test.roundTripInvokedExpected, roundTripInvoked)
+			}
+			if test.transformFuncInvokedExpected != transformFuncInvoked {
+				t.Errorf("Expected transform func to be invoked %d times, but got: %d", test.transformFuncInvokedExpected, transformFuncInvoked)
+			}
+			if test.errExpected != unWrap(err) {
+				t.Errorf("Expected error: %v, but got: %v", test.errExpected, unWrap(err))
+			}
+		})
+	}
+}
+
+func TestRequestDoWithRetry(t *testing.T) {
+	testRequestWithRetry(t, func(ctx context.Context, r *Request) {
+		r.Do(ctx)
+	})
+}
+
+func TestRequestDORawWithRetry(t *testing.T) {
+	testRequestWithRetry(t, func(ctx context.Context, r *Request) {
+		r.DoRaw(ctx)
+	})
+}
+
+func testRequestWithRetry(t *testing.T, doFunc func(ctx context.Context, r *Request)) {
+	tests := []struct {
+		name              string
+		verb              string
+		body              func() io.Reader
+		maxRetries        int
+		serverReturns     []responseErr
+		reqCountExpected  *count
+		respCountExpected *count
+	}{
+		{
+			name:       "server always returns retry-after response",
+			verb:       "GET",
+			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+				{response: retryAfterResponse(), err: nil},
+			},
+			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
+			respCountExpected: &count{closes: 3, seeks: []seek{}},
+		},
+		{
+			name:       "server always returns retryable error",
+			verb:       "GET",
+			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: nil, err: io.EOF},
+				{response: nil, err: io.EOF},
+				{response: nil, err: io.EOF},
+			},
+			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
+			respCountExpected: &count{closes: 0, seeks: []seek{}},
+		},
+		{
+			name:       "server returns success on the final retry",
+			verb:       "GET",
+			body:       func() io.Reader { return bytes.NewReader([]byte{}) },
+			maxRetries: 2,
+			serverReturns: []responseErr{
+				{response: retryAfterResponse(), err: nil},
+				{response: nil, err: io.EOF},
+				{response: &http.Response{StatusCode: http.StatusOK}, err: nil},
+			},
+			reqCountExpected:  &count{closes: 0, seeks: make([]seek, 2)},
+			respCountExpected: &count{closes: 2, seeks: []seek{}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			respCountGot := newCount()
+			responseRecorder := newReadTracker(respCountGot)
+			var attempts int
+			client := clientForFunc(func(req *http.Request) (*http.Response, error) {
+				defer func() {
+					attempts++
+				}()
+
+				resp := test.serverReturns[attempts].response
+				if resp != nil {
+					responseRecorder.delegated = ioutil.NopCloser(bytes.NewReader([]byte{}))
+					resp.Body = responseRecorder
+				}
+				return resp, test.serverReturns[attempts].err
+			})
+
+			reqCountGot := newCount()
+			reqRecorder := newReadTracker(reqCountGot)
+			reqRecorder.delegated = test.body()
+
+			req := &Request{
+				verb: test.verb,
+				body: reqRecorder,
+				c: &RESTClient{
+					Client: client,
+				},
+				backoff: &noSleepBackOff{},
+				retry:   &withRetry{maxRetries: test.maxRetries},
+			}
+
+			doFunc(context.Background(), req)
+
+			attemptsExpected := test.maxRetries + 1
+			if attemptsExpected != attempts {
+				t.Errorf("Expected retries: %d, but got: %d", attemptsExpected, attempts)
+			}
+			if !reflect.DeepEqual(test.reqCountExpected.seeks, reqCountGot.seeks) {
+				t.Errorf("Expected request body to have seek invocation: %v, but got: %v", test.reqCountExpected.seeks, reqCountGot.seeks)
+			}
+			if test.respCountExpected.closes != respCountGot.closes {
+				t.Errorf("Expected response body Close to be invoked %d times, but got: %d", test.respCountExpected.closes, respCountGot.closes)
+			}
+		})
+	}
 }

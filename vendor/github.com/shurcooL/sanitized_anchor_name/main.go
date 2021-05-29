@@ -5,7 +5,7 @@
 //
 // At this time, it does not try to ensure that generated anchor names
 // are unique, that responsibility falls on the caller.
-package sanitized_anchor_name
+package sanitized_anchor_name // import "github.com/shurcooL/sanitized_anchor_name"
 
 import "unicode"
 
@@ -13,7 +13,7 @@ import "unicode"
 func Create(text string) string {
 	var anchorName []rune
 	var futureDash = false
-	for _, r := range []rune(text) {
+	for _, r := range text {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsNumber(r):
 			if futureDash && len(anchorName) > 0 {

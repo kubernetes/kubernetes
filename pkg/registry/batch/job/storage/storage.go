@@ -29,6 +29,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/batch/job"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // JobStorage includes dummy storage for Job.
@@ -37,13 +38,17 @@ type JobStorage struct {
 	Status *StatusREST
 }
 
-func NewStorage(optsGetter generic.RESTOptionsGetter) JobStorage {
-	jobRest, jobStatusRest := NewREST(optsGetter)
+// NewStorage creates a new JobStorage against etcd.
+func NewStorage(optsGetter generic.RESTOptionsGetter) (JobStorage, error) {
+	jobRest, jobStatusRest, err := NewREST(optsGetter)
+	if err != nil {
+		return JobStorage{}, err
+	}
 
 	return JobStorage{
 		Job:    jobRest,
 		Status: jobStatusRest,
-	}
+	}, nil
 }
 
 // REST implements a RESTStorage for jobs against etcd
@@ -52,28 +57,30 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against Jobs.
-func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &batch.Job{} },
 		NewListFunc:              func() runtime.Object { return &batch.JobList{} },
 		PredicateFunc:            job.MatchJob,
 		DefaultQualifiedResource: batch.Resource("jobs"),
 
-		CreateStrategy: job.Strategy,
-		UpdateStrategy: job.Strategy,
-		DeleteStrategy: job.Strategy,
+		CreateStrategy:      job.Strategy,
+		UpdateStrategy:      job.Strategy,
+		DeleteStrategy:      job.Strategy,
+		ResetFieldsStrategy: job.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter, AttrFunc: job.GetAttrs}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, nil, err
 	}
 
 	statusStore := *store
 	statusStore.UpdateStrategy = job.StatusStrategy
+	statusStore.ResetFieldsStrategy = job.StatusStrategy
 
-	return &REST{store}, &StatusREST{store: &statusStore}
+	return &REST{store}, &StatusREST{store: &statusStore}, nil
 }
 
 // Implement CategoriesProvider
@@ -89,6 +96,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new Job object.
 func (r *StatusREST) New() runtime.Object {
 	return &batch.Job{}
 }
@@ -103,4 +111,9 @@ func (r *StatusREST) Update(ctx context.Context, name string, objInfo rest.Updat
 	// We are explicitly setting forceAllowCreate to false in the call to the underlying storage because
 	// subresources should never allow create on update.
 	return r.store.Update(ctx, name, objInfo, createValidation, updateValidation, false, options)
+}
+
+// GetResetFields implements rest.ResetFieldsStrategy
+func (r *StatusREST) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return r.store.GetResetFields()
 }

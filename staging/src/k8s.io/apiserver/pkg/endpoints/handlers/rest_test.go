@@ -26,16 +26,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
+	fuzz "github.com/google/gofuzz"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	testapigroupv1 "k8s.io/apimachinery/pkg/apis/testapigroup/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/json"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apiserver/pkg/admission"
@@ -43,6 +46,7 @@ import (
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	utiltrace "k8s.io/utils/trace"
 )
 
@@ -119,7 +123,7 @@ func TestStrategicMergePatchInvalid(t *testing.T) {
 	if !apierrors.IsBadRequest(err) {
 		t.Errorf("expected HTTP status: BadRequest, got: %#v", apierrors.ReasonForError(err))
 	}
-	if err.Error() != expectedError {
+	if !strings.Contains(err.Error(), expectedError) {
 		t.Errorf("expected %#v, got %#v", expectedError, err.Error())
 	}
 }
@@ -167,7 +171,7 @@ func TestJSONPatch(t *testing.T) {
 				t.Errorf("%s: expect no error when applying json patch, but got %v", test.name, err)
 				continue
 			}
-			if err.Error() != test.expectedError {
+			if !strings.Contains(err.Error(), test.expectedError) {
 				t.Errorf("%s: expected error %v, but got %v", test.name, test.expectedError, err)
 			}
 			if test.expectedErrorType != apierrors.ReasonForError(err) {
@@ -256,11 +260,11 @@ func (p *testPatcher) Update(ctx context.Context, name string, objInfo rest.Upda
 		}
 
 		if currentPod == nil {
-			if err := createValidation(currentPod); err != nil {
+			if err := createValidation(ctx, currentPod); err != nil {
 				return nil, false, err
 			}
 		} else {
-			if err := updateValidation(currentPod, inPod); err != nil {
+			if err := updateValidation(ctx, currentPod, inPod); err != nil {
 				return nil, false, err
 			}
 		}
@@ -347,13 +351,13 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 	admissionMutation := tc.admissionMutation
 	if admissionMutation == nil {
-		admissionMutation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation = func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
 	admissionValidation := tc.admissionValidation
 	if admissionValidation == nil {
-		admissionValidation = func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionValidation = func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			return nil
 		}
 	}
@@ -365,7 +369,7 @@ func (tc *patchTestCase) Run(t *testing.T) {
 	creater := runtime.ObjectCreater(scheme)
 	defaulter := runtime.ObjectDefaulter(scheme)
 	convertor := runtime.UnsafeObjectConvertor(scheme)
-	objectInterfaces := &admission.SchemeBasedObjectInterfaces{scheme}
+	objectInterfaces := admission.NewObjectInterfacesFromScheme(scheme)
 	kind := examplev1.SchemeGroupVersion.WithKind("Pod")
 	resource := examplev1.SchemeGroupVersion.WithResource("pods")
 	schemaReferenceObj := &examplev1.Pod{}
@@ -452,17 +456,18 @@ func (tc *patchTestCase) Run(t *testing.T) {
 
 			codec: codec,
 
-			timeout: 1 * time.Second,
-
 			restPatcher: testPatcher,
 			name:        name,
 			patchType:   patchType,
 			patchBytes:  patch,
 
-			trace: utiltrace.New("Patch" + name),
+			trace: utiltrace.New("Patch", utiltrace.Field{"name", name}),
 		}
 
-		resultObj, _, err := p.patchResource(ctx, RequestScope{})
+		ctx, cancel := context.WithTimeout(ctx, time.Second)
+		resultObj, _, err := p.patchResource(ctx, &RequestScope{})
+		cancel()
+
 		if len(tc.expectedError) != 0 {
 			if err == nil || err.Error() != tc.expectedError {
 				t.Errorf("%s: expected error %v, but got %v", tc.name, tc.expectedError, err)
@@ -714,7 +719,7 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 	for _, test := range []Test{
 		{
 			name: "TestPatchWithMutatingAdmissionRejection",
-			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("mutating admission failure")
 			},
 			admissionValidation: rest.ValidateAllObjectUpdateFunc,
@@ -723,17 +728,17 @@ func TestPatchWithAdmissionRejection(t *testing.T) {
 		{
 			name:              "TestPatchWithValidatingAdmissionRejection",
 			admissionMutation: rest.ValidateAllObjectUpdateFunc,
-			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionValidation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("validating admission failure")
 			},
 			expectedError: "validating admission failure",
 		},
 		{
 			name: "TestPatchWithBothAdmissionRejections",
-			admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("mutating admission failure")
 			},
-			admissionValidation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+			admissionValidation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 				return errors.New("validating admission failure")
 			},
 			expectedError: "mutating admission failure",
@@ -773,7 +778,7 @@ func TestPatchWithVersionConflictThenAdmissionFailure(t *testing.T) {
 	tc := &patchTestCase{
 		name: "TestPatchWithVersionConflictThenAdmissionFailure",
 
-		admissionMutation: func(updatedObject runtime.Object, currentObject runtime.Object) error {
+		admissionMutation: func(ctx context.Context, updatedObject runtime.Object, currentObject runtime.Object) error {
 			if seen {
 				return errors.New("admission failure")
 			}
@@ -821,112 +826,6 @@ func TestHasUID(t *testing.T) {
 	}
 }
 
-func TestParseTimeout(t *testing.T) {
-	if d := parseTimeout(""); d != 30*time.Second {
-		t.Errorf("blank timeout produces %v", d)
-	}
-	if d := parseTimeout("not a timeout"); d != 30*time.Second {
-		t.Errorf("bad timeout produces %v", d)
-	}
-	if d := parseTimeout("10s"); d != 10*time.Second {
-		t.Errorf("10s timeout produced: %v", d)
-	}
-}
-
-func TestFinishRequest(t *testing.T) {
-	exampleObj := &example.Pod{}
-	exampleErr := fmt.Errorf("error")
-	successStatusObj := &metav1.Status{Status: metav1.StatusSuccess, Message: "success message"}
-	errorStatusObj := &metav1.Status{Status: metav1.StatusFailure, Message: "error message"}
-	testcases := []struct {
-		name          string
-		timeout       time.Duration
-		fn            resultFunc
-		expectedObj   runtime.Object
-		expectedErr   error
-		expectedPanic string
-	}{
-		{
-			name:    "Expected obj is returned",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return exampleObj, nil
-			},
-			expectedObj: exampleObj,
-			expectedErr: nil,
-		},
-		{
-			name:    "Expected error is returned",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return nil, exampleErr
-			},
-			expectedObj: nil,
-			expectedErr: exampleErr,
-		},
-		{
-			name:    "Successful status object is returned as expected",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return successStatusObj, nil
-			},
-			expectedObj: successStatusObj,
-			expectedErr: nil,
-		},
-		{
-			name:    "Error status object is converted to StatusError",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				return errorStatusObj, nil
-			},
-			expectedObj: nil,
-			expectedErr: apierrors.FromObject(errorStatusObj),
-		},
-		{
-			name:    "Panic is propagated up",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				panic("my panic")
-			},
-			expectedObj:   nil,
-			expectedErr:   nil,
-			expectedPanic: "my panic",
-		},
-		{
-			name:    "Panic is propagated with stack",
-			timeout: time.Second,
-			fn: func() (runtime.Object, error) {
-				panic("my panic")
-			},
-			expectedObj:   nil,
-			expectedErr:   nil,
-			expectedPanic: "rest_test.go",
-		},
-	}
-	for i, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			defer func() {
-				r := recover()
-				switch {
-				case r == nil && len(tc.expectedPanic) > 0:
-					t.Errorf("expected panic containing '%s', got none", tc.expectedPanic)
-				case r != nil && len(tc.expectedPanic) == 0:
-					t.Errorf("unexpected panic: %v", r)
-				case r != nil && len(tc.expectedPanic) > 0 && !strings.Contains(fmt.Sprintf("%v", r), tc.expectedPanic):
-					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
-				}
-			}()
-			obj, err := finishRequest(tc.timeout, tc.fn)
-			if (err == nil && tc.expectedErr != nil) || (err != nil && tc.expectedErr == nil) || (err != nil && tc.expectedErr != nil && err.Error() != tc.expectedErr.Error()) {
-				t.Errorf("%d: unexpected err. expected: %v, got: %v", i, tc.expectedErr, err)
-			}
-			if !apiequality.Semantic.DeepEqual(obj, tc.expectedObj) {
-				t.Errorf("%d: unexpected obj. expected %#v, got %#v", i, tc.expectedObj, obj)
-			}
-		})
-	}
-}
-
 func setTcPod(tcPod *example.Pod, name string, namespace string, uid types.UID, resourceVersion string, apiVersion string, activeDeadlineSeconds *int64, nodeName string) {
 	tcPod.Name = name
 	tcPod.Namespace = namespace
@@ -947,6 +846,367 @@ func (f mutateObjectUpdateFunc) Handles(operation admission.Operation) bool {
 	return true
 }
 
-func (f mutateObjectUpdateFunc) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
-	return f(a.GetObject(), a.GetOldObject())
+func (f mutateObjectUpdateFunc) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+	return f(ctx, a.GetObject(), a.GetOldObject())
+}
+
+func TestTransformDecodeErrorEnsuresBadRequestError(t *testing.T) {
+	testCases := []struct {
+		name             string
+		typer            runtime.ObjectTyper
+		decodedGVK       *schema.GroupVersionKind
+		decodeIntoObject runtime.Object
+		baseErr          error
+		expectedErr      error
+	}{
+		{
+			name:  "decoding normal objects fails and returns a bad-request error",
+			typer: clientgoscheme.Scheme,
+			decodedGVK: &schema.GroupVersionKind{
+				Group:   testapigroupv1.GroupName,
+				Version: "v1",
+				Kind:    "Carp",
+			},
+			decodeIntoObject: &testapigroupv1.Carp{}, // which client-go's scheme doesn't recognize
+			baseErr:          fmt.Errorf("plain error"),
+		},
+		{
+			name:             "decoding objects with unknown GVK fails and returns a bad-request error",
+			typer:            alwaysErrorTyper{},
+			decodedGVK:       nil,
+			decodeIntoObject: &testapigroupv1.Carp{}, // which client-go's scheme doesn't recognize
+			baseErr:          nil,
+		},
+	}
+	for _, testCase := range testCases {
+		err := transformDecodeError(testCase.typer, testCase.baseErr, testCase.decodeIntoObject, testCase.decodedGVK, []byte(``))
+		if apiStatus, ok := err.(apierrors.APIStatus); !ok || apiStatus.Status().Code != http.StatusBadRequest {
+			t.Errorf("expected bad request error but got: %v", err)
+		}
+	}
+}
+
+var _ runtime.ObjectTyper = alwaysErrorTyper{}
+
+type alwaysErrorTyper struct{}
+
+func (alwaysErrorTyper) ObjectKinds(runtime.Object) ([]schema.GroupVersionKind, bool, error) {
+	return nil, false, fmt.Errorf("always error")
+}
+
+func (alwaysErrorTyper) Recognizes(gvk schema.GroupVersionKind) bool {
+	return false
+}
+
+func TestUpdateToCreateOptions(t *testing.T) {
+	f := fuzz.New()
+	for i := 0; i < 100; i++ {
+		t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+			update := &metav1.UpdateOptions{}
+			f.Fuzz(update)
+			create := updateToCreateOptions(update)
+
+			b, err := json.Marshal(create)
+			if err != nil {
+				t.Fatalf("failed to marshal CreateOptions (%v): %v", err, create)
+			}
+			got := &metav1.UpdateOptions{}
+			err = json.Unmarshal(b, &got)
+			if err != nil {
+				t.Fatalf("failed to unmarshal UpdateOptions: %v", err)
+			}
+			got.TypeMeta = metav1.TypeMeta{}
+			update.TypeMeta = metav1.TypeMeta{}
+			if !reflect.DeepEqual(*update, *got) {
+				t.Fatalf(`updateToCreateOptions round-trip failed:
+got:  %#+v
+want: %#+v`, got, update)
+			}
+
+		})
+	}
+}
+
+func TestPatchToUpdateOptions(t *testing.T) {
+	tests := []struct {
+		name        string
+		converterFn func(po *metav1.PatchOptions) interface{}
+	}{
+		{
+			name: "patchToUpdateOptions",
+			converterFn: func(patch *metav1.PatchOptions) interface{} {
+				return patchToUpdateOptions(patch)
+			},
+		},
+		{
+			name: "patchToCreateOptions",
+			converterFn: func(patch *metav1.PatchOptions) interface{} {
+				return patchToCreateOptions(patch)
+			},
+		},
+	}
+
+	f := fuzz.New()
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			for i := 0; i < 100; i++ {
+				t.Run(fmt.Sprintf("Run %d/100", i), func(t *testing.T) {
+					patch := &metav1.PatchOptions{}
+					f.Fuzz(patch)
+					converted := test.converterFn(patch)
+
+					b, err := json.Marshal(converted)
+					if err != nil {
+						t.Fatalf("failed to marshal converted object (%v): %v", err, converted)
+					}
+					got := &metav1.PatchOptions{}
+					err = json.Unmarshal(b, &got)
+					if err != nil {
+						t.Fatalf("failed to unmarshal converted object: %v", err)
+					}
+
+					// Clear TypeMeta because we expect it to be different between the original and converted type
+					got.TypeMeta = metav1.TypeMeta{}
+					patch.TypeMeta = metav1.TypeMeta{}
+
+					// clear fields that we know belong in PatchOptions only
+					patch.Force = nil
+
+					if !reflect.DeepEqual(*patch, *got) {
+						t.Fatalf(`round-trip failed:
+got:  %#+v
+want: %#+v`, got, converted)
+					}
+
+				})
+			}
+		})
+	}
+}
+
+func TestDedupOwnerReferences(t *testing.T) {
+	falseA := false
+	falseB := false
+	testCases := []struct {
+		name            string
+		ownerReferences []metav1.OwnerReference
+		expected        []metav1.OwnerReference
+	}{
+		{
+			name: "simple multiple duplicates",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "2",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different name entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name1",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name2",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "don't dedup same uid different API version entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion: "customresourceVersion1",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+				{
+					APIVersion: "customresourceVersion2",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+		{
+			name: "dedup memory-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "dedup semantic-equal entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseB,
+					BlockOwnerDeletion: &falseB,
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+			},
+		},
+		{
+			name: "don't dedup semantic-different entries",
+			ownerReferences: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+			expected: []metav1.OwnerReference{
+				{
+					APIVersion:         "customresourceVersion",
+					Kind:               "customresourceKind",
+					Name:               "name",
+					UID:                "1",
+					Controller:         &falseA,
+					BlockOwnerDeletion: &falseA,
+				},
+				{
+					APIVersion: "customresourceVersion",
+					Kind:       "customresourceKind",
+					Name:       "name",
+					UID:        "1",
+				},
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			deduped, _ := dedupOwnerReferences(tc.ownerReferences)
+			if !apiequality.Semantic.DeepEqual(deduped, tc.expected) {
+				t.Errorf("diff: %v", diff.ObjectReflectDiff(deduped, tc.expected))
+			}
+		})
+	}
 }

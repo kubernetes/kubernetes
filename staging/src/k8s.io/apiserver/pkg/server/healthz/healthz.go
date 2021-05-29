@@ -20,34 +20,27 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/endpoints/metrics"
+	"k8s.io/apiserver/pkg/server/httplog"
+	"k8s.io/klog/v2"
 )
 
-// HealthzChecker is a named healthz checker.
-type HealthzChecker interface {
+// HealthChecker is a named healthz checker.
+type HealthChecker interface {
 	Name() string
 	Check(req *http.Request) error
 }
 
-var defaultHealthz = sync.Once{}
-
-// DefaultHealthz installs the default healthz check to the http.DefaultServeMux.
-func DefaultHealthz(checks ...HealthzChecker) {
-	defaultHealthz.Do(func() {
-		InstallHandler(http.DefaultServeMux, checks...)
-	})
-}
-
 // PingHealthz returns true automatically when checked
-var PingHealthz HealthzChecker = ping{}
+var PingHealthz HealthChecker = ping{}
 
 // ping implements the simplest possible healthz checker.
 type ping struct{}
@@ -62,7 +55,7 @@ func (ping) Check(_ *http.Request) error {
 }
 
 // LogHealthz returns true if logging is not blocked
-var LogHealthz HealthzChecker = &log{}
+var LogHealthz HealthChecker = &log{}
 
 type log struct {
 	startOnce    sync.Once
@@ -89,8 +82,45 @@ func (l *log) Check(_ *http.Request) error {
 	return fmt.Errorf("logging blocked")
 }
 
+type cacheSyncWaiter interface {
+	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
+}
+
+type informerSync struct {
+	cacheSyncWaiter cacheSyncWaiter
+}
+
+var _ HealthChecker = &informerSync{}
+
+// NewInformerSyncHealthz returns a new HealthChecker that will pass only if all informers in the given cacheSyncWaiter sync.
+func NewInformerSyncHealthz(cacheSyncWaiter cacheSyncWaiter) HealthChecker {
+	return &informerSync{
+		cacheSyncWaiter: cacheSyncWaiter,
+	}
+}
+
+func (i *informerSync) Name() string {
+	return "informer-sync"
+}
+
+func (i *informerSync) Check(_ *http.Request) error {
+	stopCh := make(chan struct{})
+	// Close stopCh to force checking if informers are synced now.
+	close(stopCh)
+
+	informersByStarted := make(map[bool][]string)
+	for informerType, started := range i.cacheSyncWaiter.WaitForCacheSync(stopCh) {
+		informersByStarted[started] = append(informersByStarted[started], informerType.String())
+	}
+
+	if notStarted := informersByStarted[false]; len(notStarted) > 0 {
+		return fmt.Errorf("%d informers not started yet: %v", len(notStarted), notStarted)
+	}
+	return nil
+}
+
 // NamedCheck returns a healthz checker for the given name and function.
-func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
+func NamedCheck(name string, check func(r *http.Request) error) HealthChecker {
 	return &healthzCheck{name, check}
 }
 
@@ -98,8 +128,24 @@ func NamedCheck(name string, check func(r *http.Request) error) HealthzChecker {
 // "/healthz" to mux. *All handlers* for mux must be specified in
 // exactly one call to InstallHandler. Calling InstallHandler more
 // than once for the same mux will result in a panic.
-func InstallHandler(mux mux, checks ...HealthzChecker) {
+func InstallHandler(mux mux, checks ...HealthChecker) {
 	InstallPathHandler(mux, "/healthz", checks...)
+}
+
+// InstallReadyzHandler registers handlers for health checking on the path
+// "/readyz" to mux. *All handlers* for mux must be specified in
+// exactly one call to InstallHandler. Calling InstallHandler more
+// than once for the same mux will result in a panic.
+func InstallReadyzHandler(mux mux, checks ...HealthChecker) {
+	InstallPathHandler(mux, "/readyz", checks...)
+}
+
+// InstallLivezHandler registers handlers for liveness checking on the path
+// "/livez" to mux. *All handlers* for mux must be specified in
+// exactly one call to InstallHandler. Calling InstallHandler more
+// than once for the same mux will result in a panic.
+func InstallLivezHandler(mux mux, checks ...HealthChecker) {
+	InstallPathHandler(mux, "/livez", checks...)
 }
 
 // InstallPathHandler registers handlers for health checking on
@@ -107,15 +153,26 @@ func InstallHandler(mux mux, checks ...HealthzChecker) {
 // specified in exactly one call to InstallPathHandler. Calling
 // InstallPathHandler more than once for the same path and mux will
 // result in a panic.
-func InstallPathHandler(mux mux, path string, checks ...HealthzChecker) {
+func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 	if len(checks) == 0 {
 		klog.V(5).Info("No default health checks specified. Installing the ping handler.")
-		checks = []HealthzChecker{PingHealthz}
+		checks = []HealthChecker{PingHealthz}
 	}
 
-	klog.V(5).Info("Installing healthz checkers:", formatQuoted(checkerNames(checks...)...))
+	klog.V(5).Infof("Installing health checkers for (%v): %v", path, formatQuoted(checkerNames(checks...)...))
 
-	mux.Handle(path, handleRootHealthz(checks...))
+	name := strings.Split(strings.TrimPrefix(path, "/"), "/")[0]
+	mux.Handle(path,
+		metrics.InstrumentHandlerFunc("GET",
+			/* group = */ "",
+			/* version = */ "",
+			/* resource = */ "",
+			/* subresource = */ path,
+			/* scope = */ "",
+			/* component = */ "",
+			/* deprecated */ false,
+			/* removedRelease */ "",
+			handleRootHealth(name, checks...)))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
@@ -126,13 +183,13 @@ type mux interface {
 	Handle(pattern string, handler http.Handler)
 }
 
-// healthzCheck implements HealthzChecker on an arbitrary name and check function.
+// healthzCheck implements HealthChecker on an arbitrary name and check function.
 type healthzCheck struct {
 	name  string
 	check func(r *http.Request) error
 }
 
-var _ HealthzChecker = &healthzCheck{}
+var _ HealthChecker = &healthzCheck{}
 
 func (c *healthzCheck) Name() string {
 	return c.name
@@ -151,37 +208,41 @@ func getExcludedChecks(r *http.Request) sets.String {
 	return sets.NewString()
 }
 
-// handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
-func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
+// handleRootHealth returns an http.HandlerFunc that serves the provided checks.
+func handleRootHealth(name string, checks ...HealthChecker) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		failed := false
 		excluded := getExcludedChecks(r)
-		var verboseOut bytes.Buffer
+		// failedVerboseLogOutput is for output to the log.  It indicates detailed failed output information for the log.
+		var failedVerboseLogOutput bytes.Buffer
+		var failedChecks []string
+		var individualCheckOutput bytes.Buffer
 		for _, check := range checks {
 			// no-op the check if we've specified we want to exclude the check
 			if excluded.Has(check.Name()) {
 				excluded.Delete(check.Name())
-				fmt.Fprintf(&verboseOut, "[+]%v excluded: ok\n", check.Name())
+				fmt.Fprintf(&individualCheckOutput, "[+]%s excluded: ok\n", check.Name())
 				continue
 			}
 			if err := check.Check(r); err != nil {
 				// don't include the error since this endpoint is public.  If someone wants more detail
 				// they should have explicit permission to the detailed checks.
-				klog.V(4).Infof("healthz check %v failed: %v", check.Name(), err)
-				fmt.Fprintf(&verboseOut, "[-]%v failed: reason withheld\n", check.Name())
-				failed = true
+				fmt.Fprintf(&individualCheckOutput, "[-]%s failed: reason withheld\n", check.Name())
+				// but we do want detailed information for our log
+				fmt.Fprintf(&failedVerboseLogOutput, "[-]%s failed: %v\n", check.Name(), err)
+				failedChecks = append(failedChecks, check.Name())
 			} else {
-				fmt.Fprintf(&verboseOut, "[+]%v ok\n", check.Name())
+				fmt.Fprintf(&individualCheckOutput, "[+]%s ok\n", check.Name())
 			}
 		}
 		if excluded.Len() > 0 {
-			fmt.Fprintf(&verboseOut, "warn: some health checks cannot be excluded: no matches for %v\n", formatQuoted(excluded.List()...))
-			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %v",
+			fmt.Fprintf(&individualCheckOutput, "warn: some health checks cannot be excluded: no matches for %s\n", formatQuoted(excluded.List()...))
+			klog.Warningf("cannot exclude some health checks, no health checks are installed matching %s",
 				formatQuoted(excluded.List()...))
 		}
 		// always be verbose on failure
-		if failed {
-			http.Error(w, fmt.Sprintf("%vhealthz check failed", verboseOut.String()), http.StatusInternalServerError)
+		if len(failedChecks) > 0 {
+			klog.V(2).Infof("%s check failed: %s\n%v", strings.Join(failedChecks, ","), name, failedVerboseLogOutput.String())
+			http.Error(httplog.Unlogged(r, w), fmt.Sprintf("%s%s check failed", individualCheckOutput.String(), name), http.StatusInternalServerError)
 			return
 		}
 
@@ -192,8 +253,8 @@ func handleRootHealthz(checks ...HealthzChecker) http.HandlerFunc {
 			return
 		}
 
-		verboseOut.WriteTo(w)
-		fmt.Fprint(w, "healthz check passed\n")
+		individualCheckOutput.WriteTo(w)
+		fmt.Fprintf(w, "%s check passed\n", name)
 	})
 }
 
@@ -210,7 +271,7 @@ func adaptCheckToHandler(c func(r *http.Request) error) http.HandlerFunc {
 }
 
 // checkerNames returns the names of the checks in the same order as passed in.
-func checkerNames(checks ...HealthzChecker) []string {
+func checkerNames(checks ...HealthChecker) []string {
 	// accumulate the names of checks for printing them out.
 	checkerNames := make([]string, 0, len(checks))
 	for _, check := range checks {

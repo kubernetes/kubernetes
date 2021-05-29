@@ -18,14 +18,16 @@ package kubelet
 
 import (
 	"reflect"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
@@ -57,7 +59,7 @@ func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
 	}
 }
 
-func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]empty) {}
+func (f *fakePodWorkers) ForgetNonExistingPodWorkers(desiredPods map[types.UID]sets.Empty) {}
 
 func (f *fakePodWorkers) ForgetWorker(uid types.UID) {}
 
@@ -113,7 +115,7 @@ func drainWorkers(podWorkers *podWorkers, numPods int) {
 		stillWorking := false
 		podWorkers.podLock.Lock()
 		for i := 0; i < numPods; i++ {
-			if podWorkers.isWorking[types.UID(string(i))] {
+			if podWorkers.isWorking[types.UID(strconv.Itoa(i))] {
 				stillWorking = true
 			}
 		}
@@ -132,7 +134,7 @@ func TestUpdatePod(t *testing.T) {
 	for i := 0; i < numPods; i++ {
 		for j := i; j < numPods; j++ {
 			podWorkers.UpdatePod(&UpdatePodOptions{
-				Pod:        newPod(string(j), string(i)),
+				Pod:        newPod(strconv.Itoa(j), strconv.Itoa(i)),
 				UpdateType: kubetypes.SyncPodCreate,
 			})
 		}
@@ -144,7 +146,7 @@ func TestUpdatePod(t *testing.T) {
 		return
 	}
 	for i := 0; i < numPods; i++ {
-		uid := types.UID(i)
+		uid := types.UID(strconv.Itoa(i))
 		if len(processed[uid]) < 1 || len(processed[uid]) > i+1 {
 			t.Errorf("Pod %v processed %v times", i, len(processed[uid]))
 			continue
@@ -153,11 +155,11 @@ func TestUpdatePod(t *testing.T) {
 		// PodWorker guarantees the first and the last event will be processed
 		first := 0
 		last := len(processed[uid]) - 1
-		if processed[uid][first].name != string(0) {
+		if processed[uid][first].name != "0" {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, first, processed[uid][first])
 
 		}
-		if processed[uid][last].name != string(i) {
+		if processed[uid][last].name != strconv.Itoa(i) {
 			t.Errorf("Pod %v: incorrect order %v, %v", i, last, processed[uid][last])
 		}
 	}
@@ -167,7 +169,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 	numPods := 20
 	for i := 0; i < numPods; i++ {
-		pod := newPod(string(i), string(i))
+		pod := newPod(strconv.Itoa(i), strconv.Itoa(i))
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        pod,
 			UpdateType: kubetypes.SyncPodCreate,
@@ -187,7 +189,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 		return
 	}
 	for i := 0; i < numPods; i++ {
-		uid := types.UID(i)
+		uid := types.UID(strconv.Itoa(i))
 		// each pod should be processed two times (create, kill, but not update)
 		syncPodRecords := processed[uid]
 		if len(syncPodRecords) < 2 {
@@ -209,7 +211,7 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 	numPods := 20
 	for i := 0; i < numPods; i++ {
 		podWorkers.UpdatePod(&UpdatePodOptions{
-			Pod:        newPod(string(i), "name"),
+			Pod:        newPod(strconv.Itoa(i), "name"),
 			UpdateType: kubetypes.SyncPodUpdate,
 		})
 	}
@@ -219,21 +221,21 @@ func TestForgetNonExistingPodWorkers(t *testing.T) {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
 
-	desiredPods := map[types.UID]empty{}
-	desiredPods[types.UID(2)] = empty{}
-	desiredPods[types.UID(14)] = empty{}
+	desiredPods := map[types.UID]sets.Empty{}
+	desiredPods[types.UID("2")] = sets.Empty{}
+	desiredPods[types.UID("14")] = sets.Empty{}
 	podWorkers.ForgetNonExistingPodWorkers(desiredPods)
 	if len(podWorkers.podUpdates) != 2 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
-	if _, exists := podWorkers.podUpdates[types.UID(2)]; !exists {
+	if _, exists := podWorkers.podUpdates[types.UID("2")]; !exists {
 		t.Errorf("No updates channel for pod 2")
 	}
-	if _, exists := podWorkers.podUpdates[types.UID(14)]; !exists {
+	if _, exists := podWorkers.podUpdates[types.UID("14")]; !exists {
 		t.Errorf("No updates channel for pod 14")
 	}
 
-	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]empty{})
+	podWorkers.ForgetNonExistingPodWorkers(map[types.UID]sets.Empty{})
 	if len(podWorkers.podUpdates) != 0 {
 		t.Errorf("Incorrect number of open channels %v", len(podWorkers.podUpdates))
 	}
@@ -255,19 +257,6 @@ func (kl *simpleFakeKubelet) syncPodWithWaitGroup(options syncPodOptions) error 
 	kl.pod, kl.mirrorPod, kl.podStatus = options.pod, options.mirrorPod, options.podStatus
 	kl.wg.Done()
 	return nil
-}
-
-// byContainerName sort the containers in a running pod by their names.
-type byContainerName kubecontainer.Pod
-
-func (b byContainerName) Len() int { return len(b.Containers) }
-
-func (b byContainerName) Swap(i, j int) {
-	b.Containers[i], b.Containers[j] = b.Containers[j], b.Containers[i]
-}
-
-func (b byContainerName) Less(i, j int) bool {
-	return b.Containers[i].Name < b.Containers[j].Name
 }
 
 // TestFakePodWorkers verifies that the fakePodWorkers behaves the same way as the real podWorkers

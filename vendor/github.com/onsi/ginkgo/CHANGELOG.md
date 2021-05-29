@@ -1,10 +1,194 @@
-## HEAD
+## 1.14.0
+
+### Features
+- Defer running top-level container nodes until RunSpecs is called [d44dedf]
+- [Document Ginkgo lifecycle](http://onsi.github.io/ginkgo/#understanding-ginkgos-lifecycle)
+- Add `extensions/globals` package (#692) [3295c8f] - this can be helpful in contexts where you are test-driving your test-generation code (see [#692](https://github.com/onsi/ginkgo/pull/692))
+- Print Skip reason in JUnit reporter if one was provided [820dfab]
+
+## 1.13.0
+
+### Features
+- Add a version of table.Entry that allows dumping the entry parameters. (#689) [21eaef2]
+
+### Fixes
+- Ensure integration tests pass in an environment sans GOPATH [606fba2]
+- Add books package (#568) [fc0e44e]
+- doc(readme): installation via "tools package" (#677) [83bb20e]
+- Solve the undefined: unix.Dup2 compile error on mips64le (#680) [0624f75]
+- Import package without dot (#687) [6321024]
+- Fix integration tests to stop require GOPATH (#686) [a912ec5]
+
+## 1.12.3
+
+### Fixes
+- Print correct code location of failing table test (#666) [c6d7afb]
+
+## 1.12.2
+
+### Fixes
+- Update dependencies [ea4a036]
+
+## 1.12.1
+
+### Fixes
+- Make unfocus ("blur") much faster (#674) [8b18061]
+- Fix typo (#673) [7fdcbe8]
+- Test against 1.14 and remove 1.12 [d5c2ad6]
+- Test if a coverprofile content is empty before checking its latest character (#670) [14d9fa2]
+- replace tail package with maintained one. this fixes go get errors (#667) [4ba33d4]
+- improve ginkgo performance - makes progress on #644 [a14f98e]
+- fix convert integration tests [1f8ba69]
+- fix typo succesful -> successful (#663) [1ea49cf]
+- Fix invalid link (#658) [b886136]
+- convert utility : Include comments from source (#657) [1077c6d]
+- Explain what BDD means [d79e7fb]
+- skip race detector test on unsupported platform (#642) [f8ab89d]
+- Use Dup2 from golang.org/x/sys/unix instead of syscallDup (#638) [5d53c55]
+- Fix missing newline in combined coverage file (#641) [6a07ea2]
+- check if a spec is run before returning SpecSummary (#645) [8850000]
+
+## 1.12.0
+
+### Features
+- Add module definition (#630) [78916ab]
+
+## 1.11.0
+
+### Features
+- Add syscall for riscv64 architecture [f66e896]
+- teamcity reporter: output location of test failure as well as test definition (#626) [9869142]
+- teamcity reporter: output newline after every service message (#625) [3cfa02d]
+- Add support for go module when running `generate` command (#578) [9c89e3f]
+
+## 1.10.3
+
+### Fixes
+- Set go_import_path in travis.yml to allow internal packages in forks (#607) [3b721db]
+- Add integration test [d90e0dc]
+- Fix coverage files combining [e5dde8c]
+- A new CLI option: -ginkgo.reportFile <file path> (#601) [034fd25]
+
+## 1.10.2
+
+### Fixes
+- speed up table entry generateIt() (#609) [5049dc5]
+- Fix. Write errors to stderr instead of stdout (#610) [7bb3091]
+
+## 1.10.1
+
+### Fixes
+- stack backtrace: fix skipping (#600) [2a4c0bd]
+
+## 1.10.0
+
+### Fixes
+- stack backtrace: fix alignment and skipping [66915d6]
+- fix typo in documentation [8f97b93]
+
+## 1.9.0
+
+### Features
+- Option to print output into report, when tests have passed [0545415]
+
+### Fixes
+- Fixed typos in comments [0ecbc58]
+- gofmt code [a7f8bfb]
+- Simplify code [7454d00]
+- Simplify concatenation, incrementation and function assignment [4825557]
+- Avoid unnecessary conversions [9d9403c]
+- JUnit: include more detailed information about panic [19cca4b]
+- Print help to stdout when the user asks for help [4cb7441]
+
+
+## 1.8.0
+
+### New Features
+- allow config of the vet flag for `go test` (#562) [3cd45fa]
+- Support projects using go modules [d56ee76]
+
+### Fixes and Minor Improvements
+- chore(godoc): fixes typos in Measurement funcs [dbaca8e]
+- Optimize focus to avoid allocations [f493786]
+- Ensure generated test file names are underscored [505cc35]
+
+## 1.7.0
+
+### New Features
+- Add JustAfterEach (#484) [0d4f080]
+
+### Fixes
+- Correctly round suite time in junit reporter [2445fc1]
+- Avoid using -i argument to go test for Golang 1.10+ [46bbc26]
+
+## 1.6.0
+
+### New Features
+- add --debug flag to emit node output to files (#499) [39febac]
+
+### Fixes
+- fix: for `go vet` to pass [69338ec]
+- docs: fix for contributing instructions [7004cb1]
+- consolidate and streamline contribution docs (#494) [d848015]
+- Make generated Junit file compatable with "Maven Surefire" (#488) [e51bee6]
+- all: gofmt [000d317]
+- Increase eventually timeout to 30s [c73579c]
+- Clarify asynchronous test behaviour [294d8f4]
+- Travis badge should only show master [26d2143]
+
+## 1.5.0 5/10/2018
+
+### New Features
+- Supports go v1.10 (#443, #446, #451) [e873237, 468e89e, e37dbfe, a37f4c0, c0b857d, bca5260, 4177ca8]
+- Add a When() synonym for Context() (#386) [747514b, 7484dad, 7354a07, dd826c8]
+- Re-add noisySkippings flag [652e15c]
+- Allow coverage to be displayed for focused specs (#367) [11459a8]
+- Handle -outputdir flag (#364) [228e3a8]
+- Handle -coverprofile flag (#355) [43392d5]
+
+### Fixes
+- When using custom reporters register the custom reporters *before* the default reporter.  This allows users to see the output of any print statements in their customer reporters. (#365) [8382b23]
+- When running a test and calculating the coverage using the `-coverprofile` and `-outputdir` flags, Ginkgo fails with an error if the directory does not exist. This is due to an [issue in go 1.10](https://github.com/golang/go/issues/24588) (#446) [b36a6e0]
+- `unfocus` command ignores vendor folder (#459) [e5e551c, c556e43, a3b6351, 9a820dd]
+- Ignore packages whose tests are all ignored by go (#456) [7430ca7, 6d8be98]
+- Increase the threshold when checking time measuments (#455) [2f714bf, 68f622c]
+- Fix race condition in coverage tests (#423) [a5a8ff7, ab9c08b]
+- Add an extra new line after reporting spec run completion for test2json [874520d]
+- added name name field to junit reported testsuite [ae61c63]
+- Do not set the run time of a spec when the dryRun flag is used (#438) [457e2d9, ba8e856]
+- Process FWhen and FSpecify when unfocusing (#434) [9008c7b, ee65bd, df87dfe]
+- Synchronise the access to the state of specs to avoid race conditions (#430) [7d481bc, ae6829d]
+- Added Duration on GinkgoTestDescription (#383) [5f49dad, 528417e, 0747408, 329d7ed]
+- Fix Ginkgo stack trace on failure for Specify (#415) [b977ede, 65ca40e, 6c46eb8]
+- Update README with Go 1.6+, Golang -> Go (#409) [17f6b97, bc14b66, 20d1598]
+- Use fmt.Errorf instead of errors.New(fmt.Sprintf (#401) [a299f56, 44e2eaa]
+- Imports in generated code should follow conventions (#398) [0bec0b0, e8536d8]
+- Prevent data race error when Recording a benchmark value from multiple go routines (#390) [c0c4881, 7a241e9]
+- Replace GOPATH in Environment [4b883f0]
+
+
+## 1.4.0 7/16/2017
+
+- `ginkgo` now provides a hint if you accidentally forget to run `ginkgo bootstrap` to generate a `*_suite_test.go` file that actually invokes the Ginkgo test runner. [#345](https://github.com/onsi/ginkgo/pull/345)
+- thanks to improvements in `go test -c` `ginkgo` no longer needs to fix Go's compilation output to ensure compilation errors are expressed relative to the CWD. [#357]
+- `ginkgo watch -watchRegExp=...` allows you to specify a custom regular expression to watch.  Only files matching the regular expression are watched for changes (the default is `\.go$`) [#356]
+- `ginkgo` now always emits compilation output.  Previously, only failed compilation output was printed out. [#277]
+- `ginkgo -requireSuite` now fails the test run if there are `*_test.go` files but `go test` fails to detect any tests.  Typically this means you forgot to run `ginkgo bootstrap` to generate a suite file. [#344]
+- `ginkgo -timeout=DURATION` allows you to adjust the timeout for the entire test suite (default is 24 hours) [#248]
+
+## 1.3.0 3/28/2017
 
 Improvements:
 
+- Significantly improved parallel test distribution.  Now instead of pre-sharding test cases across workers (which can result in idle workers and poor test performance) Ginkgo uses a shared queue to keep all workers busy until all tests are complete.  This improves test-time performance and consistency.
 - `Skip(message)` can be used to skip the current test.
 - Added `extensions/table` - a Ginkgo DSL for [Table Driven Tests](http://onsi.github.io/ginkgo/#table-driven-tests)
 - Add `GinkgoRandomSeed()` - shorthand for `config.GinkgoConfig.RandomSeed`
+- Support for retrying flaky tests with `--flakeAttempts`
+- `ginkgo ./...` now recurses as you'd expect
+- Added `Specify` a synonym for `It`
+- Support colorise on Windows
+- Broader support for various go compilation flags in the `ginkgo` CLI
 
 Bug Fixes:
 
@@ -74,7 +258,7 @@ New Features:
 - `ginkgo -tags=TAG_LIST` passes a list of tags down to the `go build` command.
 - `ginkgo --failFast` aborts the test suite after the first failure.
 - `ginkgo generate file_1 file_2` can take multiple file arguments.
-- Ginkgo now summarizes any spec failures that occured at the end of the test run. 
+- Ginkgo now summarizes any spec failures that occurred at the end of the test run. 
 - `ginkgo --randomizeSuites` will run tests *suites* in random order using the generated/passed-in seed.
 
 Improvements:

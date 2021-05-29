@@ -20,9 +20,15 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
+	"go.etcd.io/etcd/clientv3"
+	"go.etcd.io/etcd/pkg/transport"
+	"google.golang.org/grpc"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	serveroptions "k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	servertesting "k8s.io/apiextensions-apiserver/pkg/cmd/server/testing"
@@ -31,9 +37,12 @@ import (
 )
 
 // StartDefaultServer starts a test server.
-func StartDefaultServer(t servertesting.Logger) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
+func StartDefaultServer(t servertesting.Logger, flags ...string) (func(), *rest.Config, *options.CustomResourceDefinitionsServerOptions, error) {
 	// create kubeconfig which will not actually be used. But authz/authn needs it to startup.
 	fakeKubeConfig, err := ioutil.TempFile("", "kubeconfig")
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	fakeKubeConfig.WriteString(`
 apiVersion: v1
 kind: Config
@@ -55,15 +64,16 @@ users:
 `)
 	fakeKubeConfig.Close()
 
-	s, err := servertesting.StartTestServer(t, nil, []string{
-		"--etcd-prefix", uuid.New(),
+	s, err := servertesting.StartTestServer(t, nil, append([]string{
+		"--etcd-prefix", uuid.New().String(),
 		"--etcd-servers", strings.Join(IntegrationEtcdServers(), ","),
 		"--authentication-skip-lookup",
 		"--authentication-kubeconfig", fakeKubeConfig.Name(),
 		"--authorization-kubeconfig", fakeKubeConfig.Name(),
 		"--kubeconfig", fakeKubeConfig.Name(),
-		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook",
-	}, nil)
+		"--disable-admission-plugins", "NamespaceLifecycle,MutatingAdmissionWebhook,ValidatingAdmissionWebhook"},
+		flags...,
+	), nil)
 	if err != nil {
 		os.Remove(fakeKubeConfig.Name())
 		return nil, nil, nil, err
@@ -78,8 +88,8 @@ users:
 }
 
 // StartDefaultServerWithClients starts a test server and returns clients for it.
-func StartDefaultServerWithClients(t servertesting.Logger) (func(), clientset.Interface, dynamic.Interface, error) {
-	tearDown, config, _, err := StartDefaultServer(t)
+func StartDefaultServerWithClients(t servertesting.Logger, extraFlags ...string) (func(), clientset.Interface, dynamic.Interface, error) {
+	tearDown, config, _, err := StartDefaultServer(t, extraFlags...)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -97,6 +107,55 @@ func StartDefaultServerWithClients(t servertesting.Logger) (func(), clientset.In
 	}
 
 	return tearDown, apiExtensionsClient, dynamicClient, nil
+}
+
+// StartDefaultServerWithClientsAndEtcd starts a test server and returns clients for it.
+func StartDefaultServerWithClientsAndEtcd(t servertesting.Logger, extraFlags ...string) (func(), clientset.Interface, dynamic.Interface, *clientv3.Client, string, error) {
+	tearDown, config, options, err := StartDefaultServer(t, extraFlags...)
+	if err != nil {
+		return nil, nil, nil, nil, "", err
+	}
+
+	apiExtensionsClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		return nil, nil, nil, nil, "", err
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		tearDown()
+		return nil, nil, nil, nil, "", err
+	}
+
+	RESTOptionsGetter := serveroptions.NewCRDRESTOptionsGetter(*options.RecommendedOptions.Etcd)
+	restOptions, err := RESTOptionsGetter.GetRESTOptions(schema.GroupResource{Group: "hopefully-ignored-group", Resource: "hopefully-ignored-resources"})
+	if err != nil {
+		return nil, nil, nil, nil, "", err
+	}
+	tlsInfo := transport.TLSInfo{
+		CertFile:      restOptions.StorageConfig.Transport.CertFile,
+		KeyFile:       restOptions.StorageConfig.Transport.KeyFile,
+		TrustedCAFile: restOptions.StorageConfig.Transport.TrustedCAFile,
+	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, nil, nil, nil, "", err
+	}
+	etcdConfig := clientv3.Config{
+		Endpoints:   restOptions.StorageConfig.Transport.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
+	}
+	etcdclient, err := clientv3.New(etcdConfig)
+	if err != nil {
+		return nil, nil, nil, nil, "", err
+	}
+
+	return tearDown, apiExtensionsClient, dynamicClient, etcdclient, restOptions.StorageConfig.Prefix, nil
 }
 
 // IntegrationEtcdServers returns etcd server URLs.

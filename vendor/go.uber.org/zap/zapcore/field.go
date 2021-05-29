@@ -65,8 +65,11 @@ const (
 	Int8Type
 	// StringType indicates that the field carries a string.
 	StringType
-	// TimeType indicates that the field carries a time.Time.
+	// TimeType indicates that the field carries a time.Time that is
+	// representable by a UnixNano() stored as an int64.
 	TimeType
+	// TimeFullType indicates that the field carries a time.Time stored as-is.
+	TimeFullType
 	// Uint64Type indicates that the field carries a uint64.
 	Uint64Type
 	// Uint32Type indicates that the field carries a uint32.
@@ -145,6 +148,8 @@ func (f Field) AddTo(enc ObjectEncoder) {
 			// Fall back to UTC if location is nil.
 			enc.AddTime(f.Key, time.Unix(0, f.Integer))
 		}
+	case TimeFullType:
+		enc.AddTime(f.Key, f.Interface.(time.Time))
 	case Uint64Type:
 		enc.AddUint64(f.Key, uint64(f.Integer))
 	case Uint32Type:
@@ -160,7 +165,7 @@ func (f Field) AddTo(enc ObjectEncoder) {
 	case NamespaceType:
 		enc.OpenNamespace(f.Key)
 	case StringerType:
-		enc.AddString(f.Key, f.Interface.(fmt.Stringer).String())
+		err = encodeStringer(f.Key, f.Interface, enc)
 	case ErrorType:
 		encodeError(f.Key, f.Interface.(error), enc)
 	case SkipType:
@@ -198,4 +203,25 @@ func addFields(enc ObjectEncoder, fields []Field) {
 	for i := range fields {
 		fields[i].AddTo(enc)
 	}
+}
+
+func encodeStringer(key string, stringer interface{}, enc ObjectEncoder) (retErr error) {
+	// Try to capture panics (from nil references or otherwise) when calling
+	// the String() method, similar to https://golang.org/src/fmt/print.go#L540
+	defer func() {
+		if err := recover(); err != nil {
+			// If it's a nil pointer, just say "<nil>". The likeliest causes are a
+			// Stringer that fails to guard against nil or a nil pointer for a
+			// value receiver, and in either case, "<nil>" is a nice result.
+			if v := reflect.ValueOf(stringer); v.Kind() == reflect.Ptr && v.IsNil() {
+				enc.AddString(key, "<nil>")
+				return
+			}
+
+			retErr = fmt.Errorf("PANIC=%v", err)
+		}
+	}()
+
+	enc.AddString(key, stringer.(fmt.Stringer).String())
+	return nil
 }

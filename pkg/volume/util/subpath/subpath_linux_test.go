@@ -29,13 +29,13 @@ import (
 	"syscall"
 	"testing"
 
-	"k8s.io/klog"
-
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 )
 
 func TestSafeMakeDir(t *testing.T) {
 	defaultPerm := os.FileMode(0750) + os.ModeDir
+	maxPerm := os.FileMode(0777) + os.ModeDir
 	tests := []struct {
 		name string
 		// Function that prepares directory structure for the test under given
@@ -54,6 +54,16 @@ func TestSafeMakeDir(t *testing.T) {
 			"test/directory",
 			"test/directory",
 			defaultPerm,
+			false,
+		},
+		{
+			"all-created-subpath-directory-with-permissions",
+			func(base string) error {
+				return nil
+			},
+			"test/directory",
+			"test",
+			maxPerm,
 			false,
 		},
 		{
@@ -409,6 +419,7 @@ func TestCleanSubPaths(t *testing.T) {
 		// Function that validates directory structure after the test
 		validate    func(base string) error
 		expectError bool
+		unmount     func(path string) error
 	}{
 		{
 			name: "not-exists",
@@ -539,6 +550,64 @@ func TestCleanSubPaths(t *testing.T) {
 				return validateDirExists(baseSubdir)
 			},
 		},
+		{
+			name: "subpath-with-files",
+			prepare: func(base string) ([]mount.MountPoint, error) {
+				containerPath := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1")
+				if err := os.MkdirAll(containerPath, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				file0 := filepath.Join(containerPath, "0")
+				if err := ioutil.WriteFile(file0, []byte{}, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				dir1 := filepath.Join(containerPath, "1")
+				if err := os.MkdirAll(filepath.Join(dir1, "my-dir-1"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				dir2 := filepath.Join(containerPath, "2")
+				if err := os.MkdirAll(filepath.Join(dir2, "my-dir-2"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				file3 := filepath.Join(containerPath, "3")
+				if err := ioutil.WriteFile(file3, []byte{}, defaultPerm); err != nil {
+					return nil, err
+				}
+
+				mounts := []mount.MountPoint{
+					{Device: "/dev/sdb", Path: file0},
+					{Device: "/dev/sdc", Path: dir1},
+					{Device: "/dev/sdd", Path: dir2},
+					{Device: "/dev/sde", Path: file3},
+				}
+				return mounts, nil
+			},
+			unmount: func(mountpath string) error {
+				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, _ error) error {
+					if path == mountpath {
+						// Skip top level directory
+						return nil
+					}
+
+					if err := os.Remove(path); err != nil {
+						return err
+					}
+					return filepath.SkipDir
+				})
+				if err != nil {
+					return fmt.Errorf("error processing %s: %s", mountpath, err)
+				}
+
+				return nil
+			},
+			validate: func(base string) error {
+				return validateDirNotExists(filepath.Join(base, containerSubPathDirectoryName))
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -553,7 +622,8 @@ func TestCleanSubPaths(t *testing.T) {
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
-		fm := &mount.FakeMounter{MountPoints: mounts}
+		fm := mount.NewFakeMounter(mounts)
+		fm.UnmountFunc = test.unmount
 
 		err = doCleanSubPaths(fm, base, testVol)
 		if err != nil && !test.expectError {
@@ -582,7 +652,7 @@ func setupFakeMounter(testMounts []string) *mount.FakeMounter {
 	for _, mountPoint := range testMounts {
 		mounts = append(mounts, mount.MountPoint{Device: "/foo", Path: mountPoint})
 	}
-	return &mount.FakeMounter{MountPoints: mounts}
+	return mount.NewFakeMounter(mounts)
 }
 
 func getTestPaths(base string) (string, string) {
@@ -986,7 +1056,7 @@ func TestSafeOpen(t *testing.T) {
 				socketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", socketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", socketFile, socketError)
 				}
 				return nil
 			},
@@ -999,7 +1069,7 @@ func TestSafeOpen(t *testing.T) {
 				testSocketFile, socketError := createSocketFile(base)
 
 				if socketError != nil {
-					return fmt.Errorf("Error preparing socket file %s with %v", testSocketFile, socketError)
+					return fmt.Errorf("error preparing socket file %s with %w", testSocketFile, socketError)
 				}
 				return nil
 			},
@@ -1192,7 +1262,7 @@ func validateDirEmpty(dir string) error {
 	}
 
 	if len(files) != 0 {
-		return fmt.Errorf("Directory %q is not empty", dir)
+		return fmt.Errorf("directory %q is not empty", dir)
 	}
 	return nil
 }

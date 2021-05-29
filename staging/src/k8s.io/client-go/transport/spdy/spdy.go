@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
@@ -38,7 +39,17 @@ func RoundTripperFor(config *restclient.Config) (http.RoundTripper, Upgrader, er
 	if err != nil {
 		return nil, nil, err
 	}
-	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig, true, false)
+	proxy := http.ProxyFromEnvironment
+	if config.Proxy != nil {
+		proxy = config.Proxy
+	}
+	upgradeRoundTripper := spdy.NewRoundTripperWithConfig(spdy.RoundTripperConfig{
+		TLS:                      tlsConfig,
+		FollowRedirects:          true,
+		RequireSameHostRedirects: false,
+		Proxier:                  proxy,
+		PingPeriod:               time.Second * 5,
+	})
 	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
 		return nil, nil, err

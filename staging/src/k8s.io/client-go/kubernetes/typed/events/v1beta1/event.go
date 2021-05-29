@@ -19,12 +19,16 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+	json "encoding/json"
+	"fmt"
 	"time"
 
 	v1beta1 "k8s.io/api/events/v1beta1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
 	watch "k8s.io/apimachinery/pkg/watch"
+	eventsv1beta1 "k8s.io/client-go/applyconfigurations/events/v1beta1"
 	scheme "k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
@@ -37,14 +41,15 @@ type EventsGetter interface {
 
 // EventInterface has methods to work with Event resources.
 type EventInterface interface {
-	Create(*v1beta1.Event) (*v1beta1.Event, error)
-	Update(*v1beta1.Event) (*v1beta1.Event, error)
-	Delete(name string, options *v1.DeleteOptions) error
-	DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error
-	Get(name string, options v1.GetOptions) (*v1beta1.Event, error)
-	List(opts v1.ListOptions) (*v1beta1.EventList, error)
-	Watch(opts v1.ListOptions) (watch.Interface, error)
-	Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Event, err error)
+	Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (*v1beta1.Event, error)
+	Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (*v1beta1.Event, error)
+	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
+	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
+	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1beta1.Event, error)
+	List(ctx context.Context, opts v1.ListOptions) (*v1beta1.EventList, error)
+	Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error)
+	Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error)
+	Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Event, err error)
 	EventExpansion
 }
 
@@ -63,20 +68,20 @@ func newEvents(c *EventsV1beta1Client, namespace string) *events {
 }
 
 // Get takes name of the event, and returns the corresponding event object, and an error if there is any.
-func (c *events) Get(name string, options v1.GetOptions) (result *v1beta1.Event, err error) {
+func (c *events) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Get().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // List takes label and field selectors, and returns the list of Events that match those selectors.
-func (c *events) List(opts v1.ListOptions) (result *v1beta1.EventList, err error) {
+func (c *events) List(ctx context.Context, opts v1.ListOptions) (result *v1beta1.EventList, err error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -87,13 +92,13 @@ func (c *events) List(opts v1.ListOptions) (result *v1beta1.EventList, err error
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Watch returns a watch.Interface that watches the requested events.
-func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
+func (c *events) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	var timeout time.Duration
 	if opts.TimeoutSeconds != nil {
 		timeout = time.Duration(*opts.TimeoutSeconds) * time.Second
@@ -104,71 +109,100 @@ func (c *events) Watch(opts v1.ListOptions) (watch.Interface, error) {
 		Resource("events").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Watch()
+		Watch(ctx)
 }
 
 // Create takes the representation of a event and creates it.  Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Create(event *v1beta1.Event) (result *v1beta1.Event, err error) {
+func (c *events) Create(ctx context.Context, event *v1beta1.Event, opts v1.CreateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Post().
 		Namespace(c.ns).
 		Resource("events").
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(event).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Update takes the representation of a event and updates it. Returns the server's representation of the event, and an error, if there is any.
-func (c *events) Update(event *v1beta1.Event) (result *v1beta1.Event, err error) {
+func (c *events) Update(ctx context.Context, event *v1beta1.Event, opts v1.UpdateOptions) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Put().
 		Namespace(c.ns).
 		Resource("events").
 		Name(event.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(event).
-		Do().
+		Do(ctx).
 		Into(result)
 	return
 }
 
 // Delete takes name of the event and deletes it. Returns an error if one occurs.
-func (c *events) Delete(name string, options *v1.DeleteOptions) error {
+func (c *events) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
 		Name(name).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // DeleteCollection deletes a collection of objects.
-func (c *events) DeleteCollection(options *v1.DeleteOptions, listOptions v1.ListOptions) error {
+func (c *events) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
 	var timeout time.Duration
-	if listOptions.TimeoutSeconds != nil {
-		timeout = time.Duration(*listOptions.TimeoutSeconds) * time.Second
+	if listOpts.TimeoutSeconds != nil {
+		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
 		Namespace(c.ns).
 		Resource("events").
-		VersionedParams(&listOptions, scheme.ParameterCodec).
+		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
-		Body(options).
-		Do().
+		Body(&opts).
+		Do(ctx).
 		Error()
 }
 
 // Patch applies the patch and returns the patched event.
-func (c *events) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1beta1.Event, err error) {
+func (c *events) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1beta1.Event, err error) {
 	result = &v1beta1.Event{}
 	err = c.client.Patch(pt).
 		Namespace(c.ns).
 		Resource("events").
-		SubResource(subresources...).
 		Name(name).
+		SubResource(subresources...).
+		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(data).
-		Do().
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// Apply takes the given apply declarative configuration, applies it and returns the applied event.
+func (c *events) Apply(ctx context.Context, event *eventsv1beta1.EventApplyConfiguration, opts v1.ApplyOptions) (result *v1beta1.Event, err error) {
+	if event == nil {
+		return nil, fmt.Errorf("event provided to Apply must not be nil")
+	}
+	patchOpts := opts.ToPatchOptions()
+	data, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+	name := event.Name
+	if name == nil {
+		return nil, fmt.Errorf("event.Name must be provided to Apply")
+	}
+	result = &v1beta1.Event{}
+	err = c.client.Patch(types.ApplyPatchType).
+		Namespace(c.ns).
+		Resource("events").
+		Name(*name).
+		VersionedParams(&patchOpts, scheme.ParameterCodec).
+		Body(data).
+		Do(ctx).
 		Into(result)
 	return
 }

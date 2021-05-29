@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -29,9 +30,10 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	conversionargs "k8s.io/code-generator/cmd/conversion-gen/args"
+	genutil "k8s.io/code-generator/pkg/util"
 )
 
 // These are the comment tags that carry parameters for conversion generation.
@@ -41,6 +43,9 @@ const (
 	// e.g., "+k8s:conversion-gen=false" in a type's comment will let
 	// conversion-gen skip that type.
 	tagName = "k8s:conversion-gen"
+	// e.g. "+k8s:conversion-gen:explicit-from=net/url.Values" in the type comment
+	// will result in generating conversion from net/url.Values.
+	explicitFromTagName = "k8s:conversion-gen:explicit-from"
 	// e.g., "+k8s:conversion-gen-external-types=<type-pkg>" in doc.go, where
 	// <type-pkg> is the relative path to the package the types are defined in.
 	externalTypesTagName = "k8s:conversion-gen-external-types"
@@ -48,6 +53,10 @@ const (
 
 func extractTag(comments []string) []string {
 	return types.ExtractCommentTags("+", comments)[tagName]
+}
+
+func extractExplicitFromTag(comments []string) []string {
+	return types.ExtractCommentTags("+", comments)[explicitFromTagName]
 }
 
 func extractExternalTypesTag(comments []string) []string {
@@ -124,7 +133,7 @@ type conversionFuncMap map[conversionPair]*types.Type
 // Returns all manually-defined conversion functions in the package.
 func getManualConversionFunctions(context *generator.Context, pkg *types.Package, manualMap conversionFuncMap) {
 	if pkg == nil {
-		klog.Warningf("Skipping nil package passed to getManualConversionFunctions")
+		klog.Warning("Skipping nil package passed to getManualConversionFunctions")
 		return
 	}
 	klog.V(5).Infof("Scanning for conversion functions in %v", pkg.Name)
@@ -240,14 +249,24 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		peerPkgs := extractTag(pkg.Comments)
 		if peerPkgs != nil {
 			klog.V(5).Infof("  tags: %q", peerPkgs)
+			if len(peerPkgs) == 1 && peerPkgs[0] == "false" {
+				// If a single +k8s:conversion-gen=false tag is defined, we still want
+				// the generator to fire for this package for explicit conversions, but
+				// we are clearing the peerPkgs to not generate any standard conversions.
+				peerPkgs = nil
+			}
 		} else {
 			klog.V(5).Infof("  no tag")
 			continue
 		}
 		skipUnsafe := false
+		extraDirs := []string{}
 		if customArgs, ok := arguments.CustomArgs.(*conversionargs.CustomArgs); ok {
-			peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
-			peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
+			if len(peerPkgs) > 0 {
+				peerPkgs = append(peerPkgs, customArgs.BasePeerDirs...)
+				peerPkgs = append(peerPkgs, customArgs.ExtraPeerDirs...)
+			}
+			extraDirs = customArgs.ExtraDirs
 			skipUnsafe = customArgs.SkipUnsafe
 		}
 
@@ -276,18 +295,15 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 		// in the output directory.
 		// TODO: build a more fundamental concept in gengo for dealing with modifications
 		// to vendored packages.
-		vendorless := func(pkg string) string {
-			if pos := strings.LastIndex(pkg, "/vendor/"); pos != -1 {
-				return pkg[pos+len("/vendor/"):]
-			}
-			return pkg
-		}
 		for i := range peerPkgs {
-			peerPkgs[i] = vendorless(peerPkgs[i])
+			peerPkgs[i] = genutil.Vendorless(peerPkgs[i])
+		}
+		for i := range extraDirs {
+			extraDirs[i] = genutil.Vendorless(extraDirs[i])
 		}
 
 		// Make sure our peer-packages are added and fully parsed.
-		for _, pp := range peerPkgs {
+		for _, pp := range append(peerPkgs, extraDirs...) {
 			context.AddDir(pp)
 			p := context.Universe[pp]
 			if nil == p {
@@ -457,12 +473,13 @@ type genConversion struct {
 	// the package that the conversion funcs are going to be output to
 	outputPackage string
 	// packages that contain the peer of types in typesPacakge
-	peerPackages      []string
-	manualConversions conversionFuncMap
-	imports           namer.ImportTracker
-	types             []*types.Type
-	skippedFields     map[*types.Type][]string
-	useUnsafe         TypesEqual
+	peerPackages        []string
+	manualConversions   conversionFuncMap
+	imports             namer.ImportTracker
+	types               []*types.Type
+	explicitConversions []conversionPair
+	skippedFields       map[*types.Type][]string
+	useUnsafe           TypesEqual
 }
 
 func NewGenConversion(sanitizedName, typesPackage, outputPackage string, manualConversions conversionFuncMap, peerPkgs []string, useUnsafe TypesEqual) generator.Generator {
@@ -470,14 +487,15 @@ func NewGenConversion(sanitizedName, typesPackage, outputPackage string, manualC
 		DefaultGen: generator.DefaultGen{
 			OptionalName: sanitizedName,
 		},
-		typesPackage:      typesPackage,
-		outputPackage:     outputPackage,
-		peerPackages:      peerPkgs,
-		manualConversions: manualConversions,
-		imports:           generator.NewImportTracker(),
-		types:             []*types.Type{},
-		skippedFields:     map[*types.Type][]string{},
-		useUnsafe:         useUnsafe,
+		typesPackage:        typesPackage,
+		outputPackage:       outputPackage,
+		peerPackages:        peerPkgs,
+		manualConversions:   manualConversions,
+		imports:             generator.NewImportTracker(),
+		types:               []*types.Type{},
+		explicitConversions: []conversionPair{},
+		skippedFields:       map[*types.Type][]string{},
+		useUnsafe:           useUnsafe,
 	}
 }
 
@@ -534,17 +552,55 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 	return true
 }
 
-func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
-	peerType := getPeerTypeFor(c, t, g.peerPackages)
-	if peerType == nil {
-		return false
+func getExplicitFromTypes(t *types.Type) []types.Name {
+	comments := append(t.SecondClosestCommentLines, t.CommentLines...)
+	paths := extractExplicitFromTag(comments)
+	result := []types.Name{}
+	for _, path := range paths {
+		items := strings.Split(path, ".")
+		if len(items) != 2 {
+			klog.Errorf("Unexpected k8s:conversion-gen:explicit-from tag: %s", path)
+			continue
+		}
+		switch {
+		case items[0] == "net/url" && items[1] == "Values":
+		default:
+			klog.Fatalf("Not supported k8s:conversion-gen:explicit-from tag: %s", path)
+		}
+		result = append(result, types.Name{Package: items[0], Name: items[1]})
 	}
-	if !g.convertibleOnlyWithinPackage(t, peerType) {
-		return false
-	}
+	return result
+}
 
-	g.types = append(g.types, t)
-	return true
+func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
+	convertibleWithPeer := func() bool {
+		peerType := getPeerTypeFor(c, t, g.peerPackages)
+		if peerType == nil {
+			return false
+		}
+		if !g.convertibleOnlyWithinPackage(t, peerType) {
+			return false
+		}
+		g.types = append(g.types, t)
+		return true
+	}()
+
+	explicitlyConvertible := func() bool {
+		inTypes := getExplicitFromTypes(t)
+		if len(inTypes) == 0 {
+			return false
+		}
+		for i := range inTypes {
+			pair := conversionPair{
+				inType:  &types.Type{Name: inTypes[i]},
+				outType: t,
+			}
+			g.explicitConversions = append(g.explicitConversions, pair)
+		}
+		return true
+	}()
+
+	return convertibleWithPeer || explicitlyConvertible
 }
 
 func (g *genConversion) isOtherPackage(pkg string) bool {
@@ -582,10 +638,10 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	if klog.V(5) {
+	if klog.V(5).Enabled() {
 		if m, ok := g.useUnsafe.(equalMemoryTypes); ok {
 			var result []string
-			klog.Infof("All objects without identical memory layout:")
+			klog.Info("All objects without identical memory layout:")
 			for k, v := range m {
 				if v {
 					continue
@@ -613,11 +669,21 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	sw.Do("func RegisterConversions(s $.|raw$) error {\n", schemePtr)
 	for _, t := range g.types {
 		peerType := getPeerTypeFor(c, t, g.peerPackages)
-		args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
-		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
-		args = argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+		if _, found := g.preexists(t, peerType); !found {
+			args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+			sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		}
+		if _, found := g.preexists(peerType, t); !found {
+			args := argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+			sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		}
+	}
+
+	for i := range g.explicitConversions {
+		args := argsFromType(g.explicitConversions[i].inType, g.explicitConversions[i].outType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
 		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
 	}
+
 	var pairs []conversionPair
 	for pair, t := range g.manualConversions {
 		if t.Name.Package != g.outputPackage {
@@ -644,10 +710,32 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 
 func (g *genConversion) GenerateType(c *generator.Context, t *types.Type, w io.Writer) error {
 	klog.V(5).Infof("generating for type %v", t)
-	peerType := getPeerTypeFor(c, t, g.peerPackages)
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
-	g.generateConversion(t, peerType, sw)
-	g.generateConversion(peerType, t, sw)
+
+	if peerType := getPeerTypeFor(c, t, g.peerPackages); peerType != nil {
+		g.generateConversion(t, peerType, sw)
+		g.generateConversion(peerType, t, sw)
+	}
+
+	for _, inTypeName := range getExplicitFromTypes(t) {
+		inPkg, ok := c.Universe[inTypeName.Package]
+		if !ok {
+			klog.Errorf("Unrecognized package: %s", inTypeName.Package)
+			continue
+		}
+		inType, ok := inPkg.Types[inTypeName.Name]
+		if !ok {
+			klog.Errorf("Unrecognized type in package %s: %s", inTypeName.Package, inTypeName.Name)
+			continue
+		}
+		switch {
+		case inType.Name.Package == "net/url" && inType.Name.Name == "Values":
+			g.generateFromUrlValues(inType, t, sw)
+		default:
+			klog.Errorf("Not supported input type: %#v", inType.Name)
+		}
+	}
+
 	return sw.Error()
 }
 
@@ -729,21 +817,27 @@ func (g *genConversion) doMap(inType, outType *types.Type, sw *generator.Snippet
 				sw.Do("$.|raw$(val)\n", outType.Elem)
 			}
 		} else {
-			sw.Do("newVal := new($.|raw$)\n", outType.Elem)
+			conversionExists := true
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
+				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := $.|raw$(&val, newVal, s); err != nil {\n", function)
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
+				sw.Do("newVal := new($.|raw$)\n", outType.Elem)
 				sw.Do("if err := "+nameTmpl+"(&val, newVal, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
-				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-				sw.Do("if err := s.Convert(&val, newVal, 0); err != nil {\n", nil)
+				args := argsFromType(inType.Elem, outType.Elem)
+				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+				sw.Do("compileErrorOnMissingConversion()\n", nil)
+				conversionExists = false
 			}
-			sw.Do("return err\n", nil)
-			sw.Do("}\n", nil)
-			if inType.Key == outType.Key {
-				sw.Do("(*out)[key] = *newVal\n", nil)
-			} else {
-				sw.Do("(*out)[$.|raw$(key)] = *newVal\n", outType.Key)
+			if conversionExists {
+				sw.Do("return err\n", nil)
+				sw.Do("}\n", nil)
+				if inType.Key == outType.Key {
+					sw.Do("(*out)[key] = *newVal\n", nil)
+				} else {
+					sw.Do("(*out)[$.|raw$(key)] = *newVal\n", outType.Key)
+				}
 			}
 		}
 	} else {
@@ -767,21 +861,21 @@ func (g *genConversion) doSlice(inType, outType *types.Type, sw *generator.Snipp
 				sw.Do("(*out)[i] = $.|raw$((*in)[i])\n", outType.Elem)
 			}
 		} else {
+			conversionExists := true
 			if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 				sw.Do("if err := $.|raw$(&(*in)[i], &(*out)[i], s); err != nil {\n", function)
 			} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 				sw.Do("if err := "+nameTmpl+"(&(*in)[i], &(*out)[i], s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 			} else {
-				// TODO: This triggers on metav1.ObjectMeta <-> metav1.ObjectMeta and
-				// similar because neither package is the target package, and
-				// we really don't know which package will have the conversion
-				// function defined.  This fires on basically every object
-				// conversion outside of pkg/api/v1.
-				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-				sw.Do("if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {\n", nil)
+				args := argsFromType(inType.Elem, outType.Elem)
+				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+				sw.Do("compileErrorOnMissingConversion()\n", nil)
+				conversionExists = false
 			}
-			sw.Do("return err\n", nil)
-			sw.Do("}\n", nil)
+			if conversionExists {
+				sw.Do("return err\n", nil)
+				sw.Do("}\n", nil)
+			}
 		}
 		sw.Do("}\n", nil)
 	}
@@ -888,14 +982,19 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 				sw.Do("out.$.name$ = in.$.name$\n", args)
 				continue
 			}
+			conversionExists := true
 			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
-				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-				sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
+				args := argsFromType(inMemberType, outMemberType)
+				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+				sw.Do("compileErrorOnMissingConversion()\n", nil)
+				conversionExists = false
 			}
-			sw.Do("return err\n", nil)
-			sw.Do("}\n", nil)
+			if conversionExists {
+				sw.Do("return err\n", nil)
+				sw.Do("}\n", nil)
+			}
 		case types.Alias:
 			if isDirectlyAssignable(inMemberType, outMemberType) {
 				if inMemberType == outMemberType {
@@ -904,24 +1003,34 @@ func (g *genConversion) doStruct(inType, outType *types.Type, sw *generator.Snip
 					sw.Do("out.$.name$ = $.outType|raw$(in.$.name$)\n", args)
 				}
 			} else {
+				conversionExists := true
 				if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 					sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 				} else {
-					sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-					sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
+					args := argsFromType(inMemberType, outMemberType)
+					sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+					sw.Do("compileErrorOnMissingConversion()\n", nil)
+					conversionExists = false
 				}
-				sw.Do("return err\n", nil)
-				sw.Do("}\n", nil)
+				if conversionExists {
+					sw.Do("return err\n", nil)
+					sw.Do("}\n", nil)
+				}
 			}
 		default:
+			conversionExists := true
 			if g.convertibleOnlyWithinPackage(inMemberType, outMemberType) {
 				sw.Do("if err := "+nameTmpl+"(&in.$.name$, &out.$.name$, s); err != nil {\n", args)
 			} else {
-				sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-				sw.Do("if err := s.Convert(&in.$.name$, &out.$.name$, 0); err != nil {\n", args)
+				args := argsFromType(inMemberType, outMemberType)
+				sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+				sw.Do("compileErrorOnMissingConversion()\n", nil)
+				conversionExists = false
 			}
-			sw.Do("return err\n", nil)
-			sw.Do("}\n", nil)
+			if conversionExists {
+				sw.Do("return err\n", nil)
+				sw.Do("}\n", nil)
+			}
 		}
 	}
 }
@@ -950,16 +1059,21 @@ func (g *genConversion) doPointer(inType, outType *types.Type, sw *generator.Sni
 			sw.Do("**out = $.|raw$(**in)\n", outType.Elem)
 		}
 	} else {
+		conversionExists := true
 		if function, ok := g.preexists(inType.Elem, outType.Elem); ok {
 			sw.Do("if err := $.|raw$(*in, *out, s); err != nil {\n", function)
 		} else if g.convertibleOnlyWithinPackage(inType.Elem, outType.Elem) {
 			sw.Do("if err := "+nameTmpl+"(*in, *out, s); err != nil {\n", argsFromType(inType.Elem, outType.Elem))
 		} else {
-			sw.Do("// TODO: Inefficient conversion - can we improve it?\n", nil)
-			sw.Do("if err := s.Convert(*in, *out, 0); err != nil {\n", nil)
+			args := argsFromType(inType.Elem, outType.Elem)
+			sw.Do("// FIXME: Provide conversion function to convert $.inType|raw$ to $.outType|raw$\n", args)
+			sw.Do("compileErrorOnMissingConversion()\n", nil)
+			conversionExists = false
 		}
-		sw.Do("return err\n", nil)
-		sw.Do("}\n", nil)
+		if conversionExists {
+			sw.Do("return err\n", nil)
+			sw.Do("}\n", nil)
+		}
 	}
 }
 
@@ -970,6 +1084,129 @@ func (g *genConversion) doAlias(inType, outType *types.Type, sw *generator.Snipp
 
 func (g *genConversion) doUnknown(inType, outType *types.Type, sw *generator.SnippetWriter) {
 	sw.Do("// FIXME: Type $.|raw$ is unsupported.\n", inType)
+}
+
+func (g *genConversion) generateFromUrlValues(inType, outType *types.Type, sw *generator.SnippetWriter) {
+	args := generator.Args{
+		"inType":  inType,
+		"outType": outType,
+		"Scope":   types.Ref(conversionPackagePath, "Scope"),
+	}
+	sw.Do("func auto"+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
+	for _, outMember := range outType.Members {
+		if tagvals := extractTag(outMember.CommentLines); tagvals != nil && tagvals[0] == "false" {
+			// This field is excluded from conversion.
+			sw.Do("// INFO: in."+outMember.Name+" opted out of conversion generation\n", nil)
+			continue
+		}
+		jsonTag := reflect.StructTag(outMember.Tags).Get("json")
+		index := strings.Index(jsonTag, ",")
+		if index == -1 {
+			index = len(jsonTag)
+		}
+		if index == 0 {
+			memberArgs := generator.Args{
+				"name": outMember.Name,
+			}
+			sw.Do("// WARNING: Field $.name$ does not have json tag, skipping.\n\n", memberArgs)
+			continue
+		}
+		memberArgs := generator.Args{
+			"name": outMember.Name,
+			"tag":  jsonTag[:index],
+		}
+		sw.Do("if values, ok := map[string][]string(*in)[\"$.tag$\"]; ok && len(values) > 0 {\n", memberArgs)
+		g.fromValuesEntry(inType.Underlying.Elem, outMember, sw)
+		sw.Do("} else {\n", nil)
+		g.setZeroValue(outMember, sw)
+		sw.Do("}\n", nil)
+	}
+	sw.Do("return nil\n", nil)
+	sw.Do("}\n\n", nil)
+
+	if _, found := g.preexists(inType, outType); found {
+		// There is a public manual Conversion method: use it.
+	} else {
+		// Emit a public conversion function.
+		sw.Do("// "+nameTmpl+" is an autogenerated conversion function.\n", args)
+		sw.Do("func "+nameTmpl+"(in *$.inType|raw$, out *$.outType|raw$, s $.Scope|raw$) error {\n", args)
+		sw.Do("return auto"+nameTmpl+"(in, out, s)\n", args)
+		sw.Do("}\n\n", nil)
+	}
+}
+
+func (g *genConversion) fromValuesEntry(inType *types.Type, outMember types.Member, sw *generator.SnippetWriter) {
+	memberArgs := generator.Args{
+		"name": outMember.Name,
+		"type": outMember.Type,
+	}
+	if function, ok := g.preexists(inType, outMember.Type); ok {
+		args := memberArgs.With("function", function)
+		sw.Do("if err := $.function|raw$(&values, &out.$.name$, s); err != nil {\n", args)
+		sw.Do("return err\n", nil)
+		sw.Do("}\n", nil)
+		return
+	}
+	switch {
+	case outMember.Type == types.String:
+		sw.Do("out.$.name$ = values[0]\n", memberArgs)
+	case g.useUnsafe.Equal(inType, outMember.Type):
+		args := memberArgs.With("Pointer", types.Ref("unsafe", "Pointer"))
+		switch inType.Kind {
+		case types.Pointer:
+			sw.Do("out.$.name$ = ($.type|raw$)($.Pointer|raw$(&values))\n", args)
+		case types.Map, types.Slice:
+			sw.Do("out.$.name$ = *(*$.type|raw$)($.Pointer|raw$(&values))\n", args)
+		default:
+			// TODO: Support other types to allow more auto-conversions.
+			sw.Do("// FIXME: out.$.name$ is of not yet supported type and requires manual conversion\n", memberArgs)
+		}
+	default:
+		// TODO: Support other types to allow more auto-conversions.
+		sw.Do("// FIXME: out.$.name$ is of not yet supported type and requires manual conversion\n", memberArgs)
+	}
+}
+
+func (g *genConversion) setZeroValue(outMember types.Member, sw *generator.SnippetWriter) {
+	outMemberType := unwrapAlias(outMember.Type)
+	memberArgs := generator.Args{
+		"name":  outMember.Name,
+		"alias": outMember.Type,
+		"type":  outMemberType,
+	}
+
+	switch outMemberType.Kind {
+	case types.Builtin:
+		switch outMemberType {
+		case types.String:
+			sw.Do("out.$.name$ = \"\"\n", memberArgs)
+		case types.Int64, types.Int32, types.Int16, types.Int, types.Uint64, types.Uint32, types.Uint16, types.Uint:
+			sw.Do("out.$.name$ = 0\n", memberArgs)
+		case types.Uintptr, types.Byte:
+			sw.Do("out.$.name$ = 0\n", memberArgs)
+		case types.Float64, types.Float32, types.Float:
+			sw.Do("out.$.name$ = 0\n", memberArgs)
+		case types.Bool:
+			sw.Do("out.$.name$ = false\n", memberArgs)
+		default:
+			sw.Do("// FIXME: out.$.name$ is of unsupported type and requires manual conversion\n", memberArgs)
+		}
+	case types.Struct:
+		if outMemberType == outMember.Type {
+			sw.Do("out.$.name$ = $.type|raw${}\n", memberArgs)
+		} else {
+			sw.Do("out.$.name$ = $.alias|raw$($.type|raw${})\n", memberArgs)
+		}
+	case types.Map, types.Slice, types.Pointer:
+		sw.Do("out.$.name$ = nil\n", memberArgs)
+	case types.Alias:
+		// outMemberType was already unwrapped from aliases - so that should never happen.
+		sw.Do("// FIXME: unexpected error for out.$.name$\n", memberArgs)
+	case types.Interface, types.Array:
+		sw.Do("out.$.name$ = nil\n", memberArgs)
+	default:
+		sw.Do("// FIXME: out.$.name$ is of unsupported type and requires manual conversion\n", memberArgs)
+	}
 }
 
 func isDirectlyAssignable(inType, outType *types.Type) bool {

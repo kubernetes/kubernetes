@@ -19,7 +19,9 @@ package app
 import (
 	"fmt"
 
-	"k8s.io/klog"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/klog/v2"
+	"k8s.io/kubernetes/pkg/features"
 
 	"k8s.io/client-go/informers"
 	cloudprovider "k8s.io/cloud-provider"
@@ -32,6 +34,14 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 	var cloud cloudprovider.Interface
 	var loopMode ControllerLoopMode
 	var err error
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+		cloudprovider.DisableWarningForProvider(cloudProvider)
+		return nil, ExternalLoops, fmt.Errorf(
+			"cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider",
+			cloudProvider)
+	}
+
 	if cloudprovider.IsExternal(cloudProvider) {
 		loopMode = ExternalLoops
 		if externalCloudVolumePlugin == "" {
@@ -41,6 +51,8 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 		}
 		cloud, err = cloudprovider.InitCloudProvider(externalCloudVolumePlugin, cloudConfigFile)
 	} else {
+		cloudprovider.DeprecationWarningForProvider(cloudProvider)
+
 		loopMode = IncludeCloudLoops
 		cloud, err = cloudprovider.InitCloudProvider(cloudProvider, cloudConfigFile)
 	}
@@ -48,8 +60,8 @@ func createCloudProvider(cloudProvider string, externalCloudVolumePlugin string,
 		return nil, loopMode, fmt.Errorf("cloud provider could not be initialized: %v", err)
 	}
 
-	if cloud != nil && cloud.HasClusterID() == false {
-		if allowUntaggedCloud == true {
+	if cloud != nil && !cloud.HasClusterID() {
+		if allowUntaggedCloud {
 			klog.Warning("detected a cluster without a ClusterID.  A ClusterID will be required in the future.  Please tag your cluster to avoid any future issues")
 		} else {
 			return nil, loopMode, fmt.Errorf("no ClusterID Found.  A ClusterID is required for the cloud provider to function properly.  This check can be bypassed by setting the allow-untagged-cloud option")

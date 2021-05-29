@@ -87,7 +87,7 @@ func OpenRoot(path string) (*os.File, error) {
 
 func ntRelativePath(path string) ([]uint16, error) {
 	path = filepath.Clean(path)
-	if strings.Contains(":", path) {
+	if strings.Contains(path, ":") {
 		// Since alternate data streams must follow the file they
 		// are attached to, finding one here (out of order) is invalid.
 		return nil, errors.New("path contains invalid character `:`")

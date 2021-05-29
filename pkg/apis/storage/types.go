@@ -17,12 +17,11 @@ limitations under the License.
 package storage
 
 import (
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // StorageClass describes a named "class" of storage offered in a cluster.
@@ -86,7 +85,7 @@ type StorageClass struct {
 type StorageClassList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -94,8 +93,6 @@ type StorageClassList struct {
 	Items []StorageClass
 }
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Captures the intent to attach or detach the specified volume to/from
@@ -106,7 +103,7 @@ type VolumeAttachment struct {
 	metav1.TypeMeta
 
 	// Standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
@@ -127,7 +124,7 @@ type VolumeAttachment struct {
 type VolumeAttachmentList struct {
 	metav1.TypeMeta
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -149,15 +146,22 @@ type VolumeAttachmentSpec struct {
 }
 
 // VolumeAttachmentSource represents a volume that should be attached.
-// Right now only PersistenVolumes can be attached via external attacher,
-// in future we may allow also inline volumes in pods.
+// Right now persistent volumes as well as inline volumes (only in
+// CSI Migration scenarios) can be attached via external attacher.
 // Exactly one member can be set.
 type VolumeAttachmentSource struct {
 	// Name of the persistent volume to attach.
 	// +optional
 	PersistentVolumeName *string
 
-	// Placeholder for *VolumeSource to accommodate inline volumes in pods.
+	// inlineVolumeSpec contains all the information necessary to attach
+	// a persistent volume defined by a pod's inline VolumeSource. This field
+	// is populated only for the CSIMigration feature. It contains
+	// translated fields from a pod's inline VolumeSource to a
+	// PersistentVolumeSpec. This field is beta-level and is only
+	// honored by servers that enabled the CSIMigration feature.
+	// +optional
+	InlineVolumeSpec *api.PersistentVolumeSpec
 }
 
 // The status of a VolumeAttachment request.
@@ -216,8 +220,6 @@ const (
 	VolumeBindingWaitForFirstConsumer VolumeBindingMode = "WaitForFirstConsumer"
 )
 
-// +genclient
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSIDriver captures information about a Container Storage Interface (CSI)
@@ -238,7 +240,7 @@ type CSIDriver struct {
 	// The driver name must be 63 characters or less, beginning and ending with
 	// an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and
 	// alphanumerics between.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta
 
 	// Specification of the CSI Driver.
@@ -252,7 +254,7 @@ type CSIDriverList struct {
 	metav1.TypeMeta
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
@@ -272,8 +274,26 @@ type CSIDriverSpec struct {
 	// If the CSIDriverRegistry feature gate is enabled and the value is
 	// specified to false, the attach operation will be skipped.
 	// Otherwise the attach operation will be called.
+	//
+	// This field is immutable.
+	//
 	// +optional
 	AttachRequired *bool
+
+	// Defines if the underlying volume supports changing ownership and
+	// permission of the volume before being mounted.
+	// Refer to the specific FSGroupPolicy values for additional details.
+	// This field is beta, and is only honored by servers
+	// that enable the CSIVolumeFSGroupPolicy feature gate.
+	//
+	// This field is immutable.
+	//
+	// Defaults to ReadWriteOnceWithFSType, which will examine each volume
+	// to determine if Kubernetes should modify ownership and permissions of the volume.
+	// With the default policy the defined fsGroup will only be applied
+	// if a fstype is defined and the volume's access mode contains ReadWriteOnce.
+	// +optional
+	FSGroupPolicy *FSGroupPolicy
 
 	// If set to true, podInfoOnMount indicates this CSI volume driver
 	// requires additional pod information (like podName, podUID, etc.) during
@@ -290,12 +310,169 @@ type CSIDriverSpec struct {
 	// "csi.storage.k8s.io/pod.name": pod.Name
 	// "csi.storage.k8s.io/pod.namespace": pod.Namespace
 	// "csi.storage.k8s.io/pod.uid": string(pod.UID)
+	// "csi.storage.k8s.io/ephemeral": "true" if the volume is an ephemeral inline volume
+	//                                 defined by a CSIVolumeSource, otherwise "false"
+	//
+	// "csi.storage.k8s.io/ephemeral" is a new feature in Kubernetes 1.16. It is only
+	// required for drivers which support both the "Persistent" and "Ephemeral" VolumeLifecycleMode.
+	// Other drivers can leave pod info disabled and/or ignore this field.
+	// As Kubernetes 1.15 doesn't support this field, drivers can only support one mode when
+	// deployed on such a cluster and the deployment determines which mode that is, for example
+	// via a command line parameter of the driver.
+	//
+	// This field is immutable.
+	//
 	// +optional
 	PodInfoOnMount *bool
+
+	// VolumeLifecycleModes defines what kind of volumes this CSI volume driver supports.
+	// The default if the list is empty is "Persistent", which is the usage
+	// defined by the CSI specification and implemented in Kubernetes via the usual
+	// PV/PVC mechanism.
+	// The other mode is "Ephemeral". In this mode, volumes are defined inline
+	// inside the pod spec with CSIVolumeSource and their lifecycle is tied to
+	// the lifecycle of that pod. A driver has to be aware of this
+	// because it is only going to get a NodePublishVolume call for such a volume.
+	// For more information about implementing this mode, see
+	// https://kubernetes-csi.github.io/docs/ephemeral-local-volumes.html
+	// A driver can support one or more of these mode and
+	// more modes may be added in the future.
+	//
+	// This field is immutable.
+	//
+	// +optional
+	VolumeLifecycleModes []VolumeLifecycleMode
+
+	// If set to true, storageCapacity indicates that the CSI
+	// volume driver wants pod scheduling to consider the storage
+	// capacity that the driver deployment will report by creating
+	// CSIStorageCapacity objects with capacity information.
+	//
+	// The check can be enabled immediately when deploying a driver.
+	// In that case, provisioning new volumes with late binding
+	// will pause until the driver deployment has published
+	// some suitable CSIStorageCapacity object.
+	//
+	// Alternatively, the driver can be deployed with the field
+	// unset or false and it can be flipped later when storage
+	// capacity information has been published.
+	//
+	// This field is immutable.
+	//
+	// This is a beta field and only available when the CSIStorageCapacity
+	// feature is enabled. The default is false.
+	//
+	// +optional
+	StorageCapacity *bool
+
+	// TokenRequests indicates the CSI driver needs pods' service account
+	// tokens it is mounting volume for to do necessary authentication. Kubelet
+	// will pass the tokens in VolumeContext in the CSI NodePublishVolume calls.
+	// The CSI driver should parse and validate the following VolumeContext:
+	// "csi.storage.k8s.io/serviceAccount.tokens": {
+	//   "<audience>": {
+	//     "token": <token>,
+	//     "expirationTimestamp": <expiration timestamp in RFC3339>,
+	//   },
+	//   ...
+	// }
+	//
+	// Note: Audience in each TokenRequest should be different and at
+	// most one token is empty string. To receive a new token after expiry,
+	// RequiresRepublish can be used to trigger NodePublishVolume periodically.
+	//
+	// This is a beta feature and only available when the
+	// CSIServiceAccountToken feature is enabled.
+	//
+	// +optional
+	// +listType=atomic
+	TokenRequests []TokenRequest
+
+	// RequiresRepublish indicates the CSI driver wants `NodePublishVolume`
+	// being periodically called to reflect any possible change in the mounted
+	// volume. This field defaults to false.
+	//
+	// Note: After a successful initial NodePublishVolume call, subsequent calls
+	// to NodePublishVolume should only update the contents of the volume. New
+	// mount points will not be seen by a running container.
+	//
+	// This is a beta feature and only available when the
+	// CSIServiceAccountToken feature is enabled.
+	//
+	// +optional
+	RequiresRepublish *bool
 }
 
-// +genclient
-// +genclient:nonNamespaced
+// FSGroupPolicy specifies if a CSI Driver supports modifying
+// volume ownership and permissions of the volume to be mounted.
+// More modes may be added in the future.
+type FSGroupPolicy string
+
+const (
+	// ReadWriteOnceWithFSTypeFSGroupPolicy indicates that each volume will be examined
+	// to determine if the volume ownership and permissions
+	// should be modified. If a fstype is defined and the volume's access mode
+	// contains ReadWriteOnce, then the defined fsGroup will be applied.
+	// This mode should be defined if it's expected that the
+	// fsGroup may need to be modified depending on the pod's SecurityPolicy.
+	// This is the default behavior if no other FSGroupPolicy is defined.
+	ReadWriteOnceWithFSTypeFSGroupPolicy FSGroupPolicy = "ReadWriteOnceWithFSType"
+
+	// FileFSGroupPolicy indicates that CSI driver supports volume ownership
+	// and permission change via fsGroup, and Kubernetes will change the permissions
+	// and ownership of every file in the volume to match the user requested fsGroup in
+	// the pod's SecurityPolicy regardless of fstype or access mode.
+	// Use this mode if Kubernetes should modify the permissions and ownership
+	// of the volume.
+	FileFSGroupPolicy FSGroupPolicy = "File"
+
+	// NoneFSGroupPolicy indicates that volumes will be mounted without performing
+	// any ownership or permission modifications, as the CSIDriver does not support
+	// these operations.
+	// This mode should be selected if the CSIDriver does not support fsGroup modifications,
+	// for example when Kubernetes cannot change ownership and permissions on a volume due
+	// to root-squash settings on a NFS volume.
+	NoneFSGroupPolicy FSGroupPolicy = "None"
+)
+
+// VolumeLifecycleMode specifies how a CSI volume is used in Kubernetes.
+// More modes may be added in the future.
+type VolumeLifecycleMode string
+
+// TokenRequest contains parameters of a service account token.
+type TokenRequest struct {
+	// Audience is the intended audience of the token in "TokenRequestSpec".
+	// It will default to the audiences of kube apiserver.
+	//
+	Audience string
+
+	// ExpirationSeconds is the duration of validity of the token in "TokenRequestSpec".
+	// It has the same default value of "ExpirationSeconds" in "TokenRequestSpec."
+	//
+	// +optional
+	ExpirationSeconds *int64
+}
+
+const (
+	// VolumeLifecyclePersistent explicitly confirms that the driver implements
+	// the full CSI spec. It is the default when CSIDriverSpec.VolumeLifecycleModes is not
+	// set. Such volumes are managed in Kubernetes via the persistent volume
+	// claim mechanism and have a lifecycle that is independent of the pods which
+	// use them.
+	VolumeLifecyclePersistent VolumeLifecycleMode = "Persistent"
+	// VolumeLifecycleEphemeral indicates that the driver can be used for
+	// ephemeral inline volumes. Such volumes are specified inside the pod
+	// spec with a CSIVolumeSource and, as far as Kubernetes is concerned, have
+	// a lifecycle that is tied to the lifecycle of the pod. For example, such
+	// a volume might contain data that gets created specifically for that pod,
+	// like secrets.
+	// But how the volume actually gets created and managed is entirely up to
+	// the driver. It might also use reference counting to share the same volume
+	// instance among different pods if the CSIVolumeSource of those pods is
+	// identical.
+	VolumeLifecycleEphemeral VolumeLifecycleMode = "Ephemeral"
+)
+
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CSINode holds information about all CSI drivers installed on a node.
@@ -356,6 +533,20 @@ type CSINodeDriver struct {
 	// This can be empty if driver does not support topology.
 	// +optional
 	TopologyKeys []string
+
+	// allocatable represents the volume resources of a node that are available for scheduling.
+	// +optional
+	Allocatable *VolumeNodeResources
+}
+
+// VolumeNodeResources is a set of resource limits for scheduling of volumes.
+type VolumeNodeResources struct {
+	// Maximum number of unique volumes managed by the CSI driver that can be used on a node.
+	// A volume that is both attached and mounted on a node is considered to be used once, not twice.
+	// The same rule applies for a unique volume that is shared among multiple pods on the same node.
+	// If this field is not specified, then the supported number of volumes on this node is unbounded.
+	// +optional
+	Count *int32
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -365,10 +556,104 @@ type CSINodeList struct {
 	metav1.TypeMeta
 
 	// Standard list metadata
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ListMeta
 
 	// items is the list of CSINode
 	Items []CSINode
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorageCapacity stores the result of one CSI GetCapacity call.
+// For a given StorageClass, this describes the available capacity in a
+// particular topology segment.  This can be used when considering where to
+// instantiate new PersistentVolumes.
+//
+// For example this can express things like:
+// - StorageClass "standard" has "1234 GiB" available in "topology.kubernetes.io/zone=us-east1"
+// - StorageClass "localssd" has "10 GiB" available in "kubernetes.io/hostname=knode-abc123"
+//
+// The following three cases all imply that no capacity is available for
+// a certain combination:
+// - no object exists with suitable topology and storage class name
+// - such an object exists, but the capacity is unset
+// - such an object exists, but the capacity is zero
+//
+// The producer of these objects can decide which approach is more suitable.
+//
+// They are consumed by the kube-scheduler if the CSIStorageCapacity beta feature gate
+// is enabled there and a CSI driver opts into capacity-aware scheduling with
+// CSIDriver.StorageCapacity.
+type CSIStorageCapacity struct {
+	metav1.TypeMeta
+	// Standard object's metadata. The name has no particular meaning. It must be
+	// be a DNS subdomain (dots allowed, 253 characters). To ensure that
+	// there are no conflicts with other CSI drivers on the cluster, the recommendation
+	// is to use csisc-<uuid>, a generated name, or a reverse-domain name which ends
+	// with the unique CSI driver name.
+	//
+	// Objects are namespaced.
+	//
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ObjectMeta
+
+	// NodeTopology defines which nodes have access to the storage
+	// for which capacity was reported. If not set, the storage is
+	// not accessible from any node in the cluster. If empty, the
+	// storage is accessible from all nodes.  This field is
+	// immutable.
+	//
+	// +optional
+	NodeTopology *metav1.LabelSelector
+
+	// The name of the StorageClass that the reported capacity applies to.
+	// It must meet the same requirements as the name of a StorageClass
+	// object (non-empty, DNS subdomain). If that object no longer exists,
+	// the CSIStorageCapacity object is obsolete and should be removed by its
+	// creator.
+	// This field is immutable.
+	StorageClassName string
+
+	// Capacity is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// The semantic is currently (CSI spec 1.2) defined as:
+	// The available capacity, in bytes, of the storage that can be used
+	// to provision volumes. If not set, that information is currently
+	// unavailable and treated like zero capacity.
+	//
+	// +optional
+	Capacity *resource.Quantity
+
+	// MaximumVolumeSize is the value reported by the CSI driver in its GetCapacityResponse
+	// for a GetCapacityRequest with topology and parameters that match the
+	// previous fields.
+	//
+	// This is defined since CSI spec 1.4.0 as the largest size
+	// that may be used in a
+	// CreateVolumeRequest.capacity_range.required_bytes field to
+	// create a volume with the same parameters as those in
+	// GetCapacityRequest. The corresponding value in the Kubernetes
+	// API is ResourceRequirements.Requests in a volume claim.
+	//
+	// +optional
+	MaximumVolumeSize *resource.Quantity
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// CSIStorageCapacityList is a collection of CSIStorageCapacity objects.
+type CSIStorageCapacityList struct {
+	metav1.TypeMeta
+	// Standard list metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+	// +optional
+	metav1.ListMeta
+
+	// Items is the list of CSIStorageCapacity objects.
+	Items []CSIStorageCapacity
 }

@@ -23,7 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
@@ -38,7 +40,7 @@ type eventStrategy struct {
 	names.NameGenerator
 }
 
-// Strategy is the default logic that pplies when creating and updating
+// Strategy is the default logic that applies when creating and updating
 // Event objects via the REST API.
 var Strategy = eventStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
@@ -57,9 +59,13 @@ func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Obje
 }
 
 func (eventStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
+	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	return validation.ValidateEventCreate(event, groupVersion)
 }
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (eventStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
 
 // Canonicalize normalizes the object after validation.
 func (eventStrategy) Canonicalize(obj runtime.Object) {
@@ -70,8 +76,15 @@ func (eventStrategy) AllowCreateOnUpdate() bool {
 }
 
 func (eventStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	groupVersion := requestGroupVersion(ctx)
 	event := obj.(*api.Event)
-	return validation.ValidateEvent(event)
+	oldEvent := obj.(*api.Event)
+	return validation.ValidateEventUpdate(event, oldEvent, groupVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (eventStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (eventStrategy) AllowUnconditionalUpdate() bool {
@@ -84,10 +97,11 @@ func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("not an event")
 	}
-	return labels.Set(event.Labels), EventToSelectableFields(event), nil
+	return labels.Set(event.Labels), ToSelectableFields(event), nil
 }
 
-func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
+// Matcher returns a selection predicate for a given label and field selector.
+func Matcher(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 	return storage.SelectionPredicate{
 		Label:    label,
 		Field:    field,
@@ -95,9 +109,13 @@ func MatchEvent(label labels.Selector, field fields.Selector) storage.SelectionP
 	}
 }
 
-// EventToSelectableFields returns a field set that represents the object
-func EventToSelectableFields(event *api.Event) fields.Set {
+// ToSelectableFields returns a field set that represents the object.
+func ToSelectableFields(event *api.Event) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&event.ObjectMeta, true)
+	source := event.Source.Component
+	if source == "" {
+		source = event.ReportingController
+	}
 	specificFieldsSet := fields.Set{
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
@@ -107,8 +125,17 @@ func EventToSelectableFields(event *api.Event) fields.Set {
 		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
 		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
 		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
+		"reportingComponent":             event.ReportingController, // use the core/v1 field name
+		"source":                         source,
 		"type":                           event.Type,
 	}
 	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+}
+
+// requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version.
+func requestGroupVersion(ctx context.Context) schema.GroupVersion {
+	if requestInfo, found := genericapirequest.RequestInfoFrom(ctx); found {
+		return schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+	}
+	return schema.GroupVersion{}
 }

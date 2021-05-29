@@ -26,10 +26,13 @@ import (
 )
 
 // CustomResourceDefinitionLister helps list CustomResourceDefinitions.
+// All objects returned here must be treated as read-only.
 type CustomResourceDefinitionLister interface {
 	// List lists all CustomResourceDefinitions in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1beta1.CustomResourceDefinition, err error)
 	// Get retrieves the CustomResourceDefinition from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1beta1.CustomResourceDefinition, error)
 	CustomResourceDefinitionListerExpansion
 }

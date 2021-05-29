@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apiserver/pkg/storage/names"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/controller"
@@ -1274,13 +1275,19 @@ func TestAnnotationUtils(t *testing.T) {
 
 	//Test Case 1: Check if anotations are copied properly from deployment to RS
 	t.Run("SetNewReplicaSetAnnotations", func(t *testing.T) {
-		//Try to set the increment revision from 1 through 20
-		for i := 0; i < 20; i++ {
+		//Try to set the increment revision from 11 through 20
+		for i := 10; i < 20; i++ {
 
 			nextRevision := fmt.Sprintf("%d", i+1)
-			SetNewReplicaSetAnnotations(&tDeployment, &tRS, nextRevision, true)
+			SetNewReplicaSetAnnotations(&tDeployment, &tRS, nextRevision, true, 5)
 			//Now the ReplicaSets Revision Annotation should be i+1
 
+			if i >= 12 {
+				expectedHistoryAnnotation := fmt.Sprintf("%d,%d", i-1, i)
+				if tRS.Annotations[RevisionHistoryAnnotation] != expectedHistoryAnnotation {
+					t.Errorf("Revision History Expected=%s Obtained=%s", expectedHistoryAnnotation, tRS.Annotations[RevisionHistoryAnnotation])
+				}
+			}
 			if tRS.Annotations[RevisionAnnotation] != nextRevision {
 				t.Errorf("Revision Expected=%s Obtained=%s", nextRevision, tRS.Annotations[RevisionAnnotation])
 			}
@@ -1395,4 +1402,85 @@ func TestReplicasAnnotationsNeedUpdate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetDeploymentsForReplicaSet(t *testing.T) {
+	fakeInformerFactory := informers.NewSharedInformerFactory(&fake.Clientset{}, 0*time.Second)
+	var deployments []*apps.Deployment
+	for i := 0; i < 3; i++ {
+		deployment := &apps.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("deployment-%d", i),
+				Namespace: "test",
+			},
+			Spec: apps.DeploymentSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": fmt.Sprintf("test-%d", i),
+					},
+				},
+			},
+		}
+		deployments = append(deployments, deployment)
+		fakeInformerFactory.Apps().V1().Deployments().Informer().GetStore().Add(deployment)
+	}
+	var rss []*apps.ReplicaSet
+	for i := 0; i < 5; i++ {
+		rs := &apps.ReplicaSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "test",
+				Name:      fmt.Sprintf("test-replicaSet-%d", i),
+				Labels: map[string]string{
+					"app":   fmt.Sprintf("test-%d", i),
+					"label": fmt.Sprintf("label-%d", i),
+				},
+			},
+		}
+		rss = append(rss, rs)
+	}
+	tests := []struct {
+		name   string
+		rs     *apps.ReplicaSet
+		err    error
+		expect []*apps.Deployment
+	}{
+		{
+			name:   "GetDeploymentsForReplicaSet for rs-0",
+			rs:     rss[0],
+			expect: []*apps.Deployment{deployments[0]},
+		},
+		{
+			name:   "GetDeploymentsForReplicaSet for rs-1",
+			rs:     rss[1],
+			expect: []*apps.Deployment{deployments[1]},
+		},
+		{
+			name:   "GetDeploymentsForReplicaSet for rs-2",
+			rs:     rss[2],
+			expect: []*apps.Deployment{deployments[2]},
+		},
+		{
+			name: "GetDeploymentsForReplicaSet for rs-3",
+			rs:   rss[3],
+			err:  fmt.Errorf("could not find deployments set for ReplicaSet %s in namespace %s with labels: %v", rss[3].Name, rss[3].Namespace, rss[3].Labels),
+		},
+		{
+			name: "GetDeploymentsForReplicaSet for rs-4",
+			rs:   rss[4],
+			err:  fmt.Errorf("could not find deployments set for ReplicaSet %s in namespace %s with labels: %v", rss[4].Name, rss[4].Namespace, rss[4].Labels),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			get, err := GetDeploymentsForReplicaSet(fakeInformerFactory.Apps().V1().Deployments().Lister(), test.rs)
+			if err != nil {
+				if err.Error() != test.err.Error() {
+					t.Errorf("Error from GetDeploymentsForReplicaSet: %v", err)
+				}
+			} else if !reflect.DeepEqual(get, test.expect) {
+				t.Errorf("Expect deployments %v, but got %v", test.expect, get)
+			}
+		})
+	}
+
 }

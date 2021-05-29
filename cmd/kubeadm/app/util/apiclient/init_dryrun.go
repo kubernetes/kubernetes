@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	utilnet "k8s.io/utils/net"
 )
 
 // InitDryRunGetter implements the DryRunGetter interface and can be used to GET/LIST values in the dryrun fake clientset
@@ -80,7 +80,7 @@ func (idr *InitDryRunGetter) HandleListAction(action core.ListAction) (bool, run
 }
 
 // handleKubernetesService returns a faked Kubernetes service in order to be able to continue running kubeadm init.
-// The kube-dns addon code GETs the Kubernetes service in order to extract the service subnet
+// The CoreDNS addon code GETs the Kubernetes service in order to extract the service subnet
 func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (bool, runtime.Object, error) {
 	if action.GetName() != "kubernetes" || action.GetNamespace() != metav1.NamespaceDefault || action.GetResource().Resource != "services" {
 		// We can't handle this event
@@ -92,12 +92,12 @@ func (idr *InitDryRunGetter) handleKubernetesService(action core.GetAction) (boo
 		return true, nil, errors.Wrapf(err, "error parsing CIDR %q", idr.serviceSubnet)
 	}
 
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := utilnet.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return true, nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}
 
-	// The only used field of this Service object is the ClusterIP, which kube-dns uses to calculate its own IP
+	// The only used field of this Service object is the ClusterIP, which CoreDNS uses to calculate its own IP
 	return true, &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "kubernetes",

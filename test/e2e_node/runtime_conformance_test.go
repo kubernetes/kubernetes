@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -25,20 +25,19 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/test/e2e/common"
+	"k8s.io/kubernetes/test/e2e/common/node"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
 )
 
-var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
+var _ = SIGDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 
-	Describe("container runtime conformance blackbox test", func() {
+	ginkgo.Describe("container runtime conformance blackbox test", func() {
 
-		Context("when running a container with a new image", func() {
+		ginkgo.Context("when running a container with a new image", func() {
 			// The service account only has pull permission
 			auth := `
 {
@@ -49,9 +48,9 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 		}
 	}
 }`
-			// The following images are not added into NodeImageWhiteList, because this test is
+			// The following images are not added into NodePrePullImageList, because this test is
 			// testing image pulling, these images don't need to be prepulled. The ImagePullPolicy
-			// is v1.PullAlways, so it won't be blocked by framework image white list check.
+			// is v1.PullAlways, so it won't be blocked by framework image pre-pull list check.
 			for _, testCase := range []struct {
 				description string
 				image       string
@@ -66,10 +65,10 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 				},
 			} {
 				testCase := testCase
-				It(testCase.description+" [NodeConformance]", func() {
+				ginkgo.It(testCase.description+" [NodeConformance]", func() {
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
-					container := common.ConformanceContainer{
+					container := node.ConformanceContainer{
 						PodClient: f.PodClient(),
 						Container: v1.Container{
 							Name:    name,
@@ -83,7 +82,7 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 
 					configFile := filepath.Join(services.KubeletRootDirectory, "config.json")
 					err := ioutil.WriteFile(configFile, []byte(auth), 0644)
-					Expect(err).NotTo(HaveOccurred())
+					framework.ExpectNoError(err)
 					defer os.Remove(configFile)
 
 					// checkContainerStatus checks whether the container status matches expectation.
@@ -99,13 +98,13 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 						if !testCase.waiting {
 							if status.State.Running == nil {
 								return fmt.Errorf("expected container state: Running, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 						}
 						if testCase.waiting {
 							if status.State.Waiting == nil {
 								return fmt.Errorf("expected container state: Waiting, got: %q",
-									common.GetContainerState(status.State))
+									node.GetContainerState(status.State))
 							}
 							reason := status.State.Waiting.Reason
 							if reason != images.ErrImagePull.Error() &&
@@ -128,15 +127,15 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 					const flakeRetry = 3
 					for i := 1; i <= flakeRetry; i++ {
 						var err error
-						By("create the container")
+						ginkgo.By("create the container")
 						container.Create()
-						By("check the container status")
-						for start := time.Now(); time.Since(start) < common.ContainerStatusRetryTimeout; time.Sleep(common.ContainerStatusPollInterval) {
+						ginkgo.By("check the container status")
+						for start := time.Now(); time.Since(start) < node.ContainerStatusRetryTimeout; time.Sleep(node.ContainerStatusPollInterval) {
 							if err = checkContainerStatus(); err == nil {
 								break
 							}
 						}
-						By("delete the container")
+						ginkgo.By("delete the container")
 						container.Delete()
 						if err == nil {
 							break

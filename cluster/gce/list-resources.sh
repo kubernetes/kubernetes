@@ -49,20 +49,20 @@ function gcloud-list() {
   local attempt=1
   local result=""
   while true; do
-    if result=$(gcloud ${group} ${resource} list --project=${PROJECT} ${filter:+--filter="$filter"} ${@:4}); then
-      if [[ ! -z "${GREP_REGEX}" ]]; then
+    if result=$(gcloud "${group}" "${resource}" list --project="${PROJECT}" ${filter:+--filter="$filter"} "${@:4}"); then
+      if [[ -n "${GREP_REGEX:-}" ]]; then
         result=$(echo "${result}" | grep "${GREP_REGEX}" || true)
       fi
       echo "${result}"
       return
     fi
     echo -e "Attempt ${attempt} failed to list ${resource}. Retrying." >&2
-    attempt=$(($attempt+1))
+    attempt=$((attempt + 1))
     if [[ ${attempt} -gt 5 ]]; then
       echo -e "List ${resource} failed!" >&2
       exit 2
     fi
-    sleep $((5*${attempt}))
+    sleep $((5 * attempt))
   done
 }
 
@@ -75,6 +75,9 @@ echo "Provider: ${KUBERNETES_PROVIDER:-}"
 
 # List resources related to instances, filtering by the instance prefix if
 # provided.
+
+set +e # do not stop on error
+
 gcloud-list compute instance-templates "name ~ '${INSTANCE_PREFIX}.*'"
 gcloud-list compute instance-groups "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
 gcloud-list compute instances "${ZONE:+"zone:(${ZONE}) AND "}name ~ '${INSTANCE_PREFIX}.*'"
@@ -95,3 +98,5 @@ gcloud-list compute forwarding-rules ${REGION:+"region=(${REGION})"}
 gcloud-list compute target-pools ${REGION:+"region=(${REGION})"}
 
 gcloud-list logging sinks
+
+set -e

@@ -18,30 +18,23 @@ package upgrade
 
 import (
 	"fmt"
-	"os"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
+	"k8s.io/kubernetes/cmd/kubeadm/app/preflight"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
-	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
-	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
-)
-
-const (
-	defaultImagePullTimeout = 15 * time.Minute
+	utilsexec "k8s.io/utils/exec"
 )
 
 // applyFlags holds the information about the flags that can be passed to apply
@@ -52,8 +45,8 @@ type applyFlags struct {
 	force              bool
 	dryRun             bool
 	etcdUpgrade        bool
-	criSocket          string
-	imagePullTimeout   time.Duration
+	renewCerts         bool
+	patchesDir         string
 }
 
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -61,25 +54,20 @@ func (f *applyFlags) sessionIsInteractive() bool {
 	return !(f.nonInteractiveMode || f.dryRun || f.force)
 }
 
-// NewCmdApply returns the cobra command for `kubeadm upgrade apply`
-func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
+// newCmdApply returns the cobra command for `kubeadm upgrade apply`
+func newCmdApply(apf *applyPlanFlags) *cobra.Command {
 	flags := &applyFlags{
-		applyPlanFlags:   apf,
-		imagePullTimeout: defaultImagePullTimeout,
-		etcdUpgrade:      true,
-		// Don't set criSocket to a default value here, as this will override the setting in the stored config in RunApply below.
+		applyPlanFlags: apf,
+		etcdUpgrade:    true,
+		renewCerts:     true,
 	}
 
 	cmd := &cobra.Command{
 		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
-		Short:                 "Upgrade your Kubernetes cluster to the specified version.",
-		Run: func(cmd *cobra.Command, args []string) {
-			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
-			kubeadmutil.CheckErr(err)
-
-			err = runApply(flags, userVersion)
-			kubeadmutil.CheckErr(err)
+		Short:                 "Upgrade your Kubernetes cluster to the specified version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runApply(flags, args)
 		},
 	}
 
@@ -88,14 +76,11 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	// Specify the valid flags specific for apply
 	cmd.Flags().BoolVarP(&flags.nonInteractiveMode, "yes", "y", flags.nonInteractiveMode, "Perform the upgrade and do not prompt for confirmation (non-interactive mode).")
 	cmd.Flags().BoolVarP(&flags.force, "force", "f", flags.force, "Force upgrading although some requirements might not be met. This also implies non-interactive mode.")
-	cmd.Flags().BoolVar(&flags.dryRun, "dry-run", flags.dryRun, "Do not change any state, just output what actions would be performed.")
+	cmd.Flags().BoolVar(&flags.dryRun, options.DryRun, flags.dryRun, "Do not change any state, just output what actions would be performed.")
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
-	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
+	cmd.Flags().BoolVar(&flags.renewCerts, options.CertificateRenewal, flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
+	options.AddPatchesFlag(cmd.Flags(), &flags.patchesDir)
 
-	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
-	// node instead of the command line. This prevents errors by the users (such as attempts to use wrong CRI during upgrade).
-	cmdutil.AddCRISocketFlag(cmd.Flags(), &flags.criSocket)
-	cmd.Flags().MarkDeprecated(options.NodeCRISocket, "This flag is deprecated. Please, avoid using it.")
 	return cmd
 }
 
@@ -109,21 +94,16 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 // - Upgrades the control plane components
 // - Applies the other resources that'd be created with kubeadm init as well, like
 //   - Creating the RBAC rules for the bootstrap tokens and the cluster-info ConfigMap
-//   - Applying new kube-dns and kube-proxy manifests
+//   - Applying new CorDNS and kube-proxy manifests
 //   - Uploads the newly used configuration to the cluster ConfigMap
-func runApply(flags *applyFlags, userVersion string) error {
+func runApply(flags *applyFlags, args []string) error {
 
 	// Start with the basics, verify that the cluster is healthy and get the configuration from the cluster (using the ConfigMap)
 	klog.V(1).Infoln("[upgrade/apply] verifying health of cluster")
 	klog.V(1).Infoln("[upgrade/apply] retrieving configuration from cluster")
-	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, flags.dryRun, userVersion)
+	client, versionGetter, cfg, err := enforceRequirements(flags.applyPlanFlags, args, flags.dryRun, true)
 	if err != nil {
 		return err
-	}
-
-	if len(flags.criSocket) != 0 {
-		fmt.Println("[upgrade/apply] Respecting the --cri-socket flag that is set with higher priority than the config file.")
-		cfg.NodeRegistration.CRISocket = flags.criSocket
 	}
 
 	// Validate requested and validate actual version
@@ -155,19 +135,18 @@ func runApply(flags *applyFlags, userVersion string) error {
 		}
 	}
 
-	waiter := getWaiter(flags.dryRun, client)
+	if !flags.dryRun {
+		fmt.Println("[upgrade/prepull] Pulling images required for setting up a Kubernetes cluster")
+		fmt.Println("[upgrade/prepull] This might take a minute or two, depending on the speed of your internet connection")
+		fmt.Println("[upgrade/prepull] You can also perform this action in beforehand using 'kubeadm config images pull'")
+		if err := preflight.RunPullImagesCheck(utilsexec.New(), cfg, sets.NewString(cfg.NodeRegistration.IgnorePreflightErrors...)); err != nil {
+			return err
+		}
+	} else {
+		fmt.Println("[upgrade/prepull] Would pull the required images (like 'kubeadm config images pull')")
+	}
 
-	// Use a prepuller implementation based on creating DaemonSets
-	// and block until all DaemonSets are ready; then we know for sure that all control plane images are cached locally
-	klog.V(1).Infoln("[upgrade/apply] creating prepuller")
-	prepuller := upgrade.NewDaemonSetPrepuller(client, waiter, &cfg.ClusterConfiguration)
-	componentsToPrepull := constants.ControlPlaneComponents
-	if cfg.Etcd.External == nil && flags.etcdUpgrade {
-		componentsToPrepull = append(componentsToPrepull, constants.Etcd)
-	}
-	if err := upgrade.PrepullImagesInParallel(prepuller, flags.imagePullTimeout, componentsToPrepull); err != nil {
-		return errors.Wrap(err, "[upgrade/prepull] Failed prepulled the images for the control plane components error")
-	}
+	waiter := getWaiter(flags.dryRun, client, upgrade.UpgradeManifestTimeout)
 
 	// Now; perform the upgrade procedure
 	klog.V(1).Infoln("[upgrade/apply] performing upgrade")
@@ -175,9 +154,16 @@ func runApply(flags *applyFlags, userVersion string) error {
 		return errors.Wrap(err, "[upgrade/apply] FATAL")
 	}
 
+	// TODO: https://github.com/kubernetes/kubeadm/issues/2200
+	fmt.Printf("[upgrade/postupgrade] Applying label %s='' to Nodes with label %s='' (deprecated)\n",
+		kubeadmconstants.LabelNodeRoleControlPlane, kubeadmconstants.LabelNodeRoleOldControlPlane)
+	if err := upgrade.LabelOldControlPlaneNodes(client); err != nil {
+		return err
+	}
+
 	// Upgrade RBAC rules and addons.
 	klog.V(1).Infoln("[upgrade/postupgrade] upgrading RBAC rules and addons")
-	if err := upgrade.PerformPostUpgradeTasks(client, cfg, newK8sVersion, flags.dryRun); err != nil {
+	if err := upgrade.PerformPostUpgradeTasks(client, cfg, flags.dryRun); err != nil {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
@@ -227,50 +213,8 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return DryRunStaticPodUpgrade(internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.patchesDir, internalcfg)
 	}
 
-	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
-	return PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade)
-}
-
-// GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
-func GetPathManagerForUpgrade(internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (upgrade.StaticPodPathManager, error) {
-	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return upgrade.NewKubeStaticPodPathManagerUsingTempDirs(constants.GetStaticPodDirectory(), true, etcdUpgrade && !isHAEtcd)
-}
-
-// PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
-func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) error {
-	pathManager, err := GetPathManagerForUpgrade(internalcfg, etcdUpgrade)
-	if err != nil {
-		return err
-	}
-
-	// The arguments oldEtcdClient and newEtdClient, are uninitialized because passing in the clients allow for mocking the client during testing
-	return upgrade.StaticPodControlPlane(client, waiter, pathManager, internalcfg, etcdUpgrade, nil, nil)
-}
-
-// DryRunStaticPodUpgrade fakes an upgrade of the control plane
-func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
-
-	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("kubeadm-upgrade-dryrun")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(dryRunManifestDir)
-
-	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg); err != nil {
-		return err
-	}
-
-	// Print the contents of the upgraded manifests and pretend like they were in /etc/kubernetes/manifests
-	files := []dryrunutil.FileToPrint{}
-	for _, component := range constants.ControlPlaneComponents {
-		realPath := constants.GetStaticPodFilepath(component, dryRunManifestDir)
-		outputPath := constants.GetStaticPodFilepath(component, constants.GetStaticPodDirectory())
-		files = append(files, dryrunutil.NewFileToPrint(realPath, outputPath))
-	}
-
-	return dryrunutil.PrintDryRunFiles(files, os.Stdout)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.patchesDir)
 }

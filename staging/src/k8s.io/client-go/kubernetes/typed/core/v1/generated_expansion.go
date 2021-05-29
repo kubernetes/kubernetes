@@ -37,3 +37,5 @@ type ReplicationControllerExpansion interface{}
 type ResourceQuotaExpansion interface{}
 
 type SecretExpansion interface{}
+
+type ServiceAccountExpansion interface{}

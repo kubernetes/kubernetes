@@ -58,13 +58,13 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 		if strings.HasSuffix(s, "*") {
 			prefix := s[:len(s)-1]
 			ns := NamespacedBy(prefix)
-			if ns == UnknownNamespace {
+			if ns == unknownNamespace {
 				return nil, fmt.Errorf("the sysctls %q are not known to be namespaced", s)
 			}
 			w.prefixes[prefix] = ns
 		} else {
 			ns := NamespacedBy(s)
-			if ns == UnknownNamespace {
+			if ns == unknownNamespace {
 				return nil, fmt.Errorf("the sysctl %q are not known to be namespaced", s)
 			}
 			w.sysctls[s] = ns
@@ -83,20 +83,20 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
 	nsErrorFmt := "%q not allowed with host %s enabled"
 	if ns, found := w.sysctls[sysctl]; found {
-		if ns == IpcNamespace && hostIPC {
+		if ns == ipcNamespace && hostIPC {
 			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
-		if ns == NetNamespace && hostNet {
+		if ns == netNamespace && hostNet {
 			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
 		return nil
 	}
 	for p, ns := range w.prefixes {
 		if strings.HasPrefix(sysctl, p) {
-			if ns == IpcNamespace && hostIPC {
+			if ns == ipcNamespace && hostIPC {
 				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
-			if ns == NetNamespace && hostNet {
+			if ns == netNamespace && hostNet {
 				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
 			return nil

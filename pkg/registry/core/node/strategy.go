@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	proxyutil "k8s.io/kubernetes/pkg/proxy/util"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // nodeStrategy implements behavior for nodes
@@ -58,6 +59,18 @@ func (nodeStrategy) NamespaceScoped() bool {
 	return false
 }
 
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
+}
+
 // AllowCreateOnUpdate is false for nodes.
 func (nodeStrategy) AllowCreateOnUpdate() bool {
 	return false
@@ -66,11 +79,7 @@ func (nodeStrategy) AllowCreateOnUpdate() bool {
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	node := obj.(*api.Node)
-	// Nodes allow *all* fields, including status, to be set on create.
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-		node.Spec.ConfigSource = nil
-		node.Status.Config = nil
-	}
+	dropDisabledFields(node, nil)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
@@ -79,9 +88,39 @@ func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Objec
 	oldNode := old.(*api.Node)
 	newNode.Status = oldNode.Status
 
-	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) {
-		newNode.Spec.ConfigSource = nil
+	dropDisabledFields(newNode, oldNode)
+}
+
+func dropDisabledFields(node *api.Node, oldNode *api.Node) {
+	// Nodes allow *all* fields, including status, to be set on create.
+	// for create
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && oldNode == nil {
+		node.Spec.ConfigSource = nil
+		node.Status.Config = nil
 	}
+
+	// for update
+	if !utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) && !nodeConfigSourceInUse(oldNode) && oldNode != nil {
+		node.Spec.ConfigSource = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !multiNodeCIDRsInUse(oldNode) {
+		if len(node.Spec.PodCIDRs) > 1 {
+			node.Spec.PodCIDRs = node.Spec.PodCIDRs[0:1]
+		}
+	}
+}
+
+// multiNodeCIDRsInUse returns true if Node.Spec.PodCIDRs is greater than one
+func multiNodeCIDRsInUse(node *api.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	if len(node.Spec.PodCIDRs) > 1 {
+		return true
+	}
+	return false
 }
 
 // nodeConfigSourceInUse returns true if node's Spec ConfigSource is set(used)
@@ -101,6 +140,9 @@ func (nodeStrategy) Validate(ctx context.Context, obj runtime.Object) field.Erro
 	return validation.ValidateNode(node)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (nodeStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (nodeStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -111,24 +153,13 @@ func (nodeStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object)
 	return append(errorList, validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))...)
 }
 
-func (nodeStrategy) AllowUnconditionalUpdate() bool {
-	return true
+// WarningsOnUpdate returns warnings for the given update.
+func (nodeStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
-func (ns nodeStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) error {
-	n, ok := obj.(*api.Node)
-	if !ok {
-		// unexpected programmer error
-		return fmt.Errorf("unexpected object: %v", obj)
-	}
-	ns.PrepareForCreate(ctx, obj)
-	if exact {
-		return nil
-	}
-	// Nodes are the only resources that allow direct status edits, therefore
-	// we clear that without exact so that the node value can be reused.
-	n.Status = api.NodeStatus{}
-	return nil
+func (nodeStrategy) AllowUnconditionalUpdate() bool {
+	return true
 }
 
 type nodeStatusStrategy struct {
@@ -136,6 +167,18 @@ type nodeStatusStrategy struct {
 }
 
 var StatusStrategy = nodeStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (nodeStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+
+	return fields
+}
 
 func (nodeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)
@@ -160,6 +203,11 @@ func nodeStatusConfigInUse(node *api.Node) bool {
 
 func (nodeStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateNodeUpdate(obj.(*api.Node), old.(*api.Node))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (nodeStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // Canonicalize normalizes the object after validation.
@@ -199,10 +247,9 @@ func MatchNode(label labels.Selector, field fields.Selector) pkgstorage.Selectio
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []pkgstorage.MatchValue {
-	node := obj.(*api.Node)
-	result := pkgstorage.MatchValue{IndexName: "metadata.name", Value: node.ObjectMeta.Name}
-	return []pkgstorage.MatchValue{result}
+// NameTriggerFunc returns value metadata.namespace of given object.
+func NameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Node).ObjectMeta.Name
 }
 
 // ResourceLocation returns a URL and transport which one can use to send traffic for the specified node.

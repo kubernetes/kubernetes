@@ -19,12 +19,12 @@ package options
 import (
 	"github.com/spf13/pflag"
 
-	kubectrlmgrconfig "k8s.io/kubernetes/pkg/controller/apis/config"
+	nodelifecycleconfig "k8s.io/kubernetes/pkg/controller/nodelifecycle/config"
 )
 
 // NodeLifecycleControllerOptions holds the NodeLifecycleController options.
 type NodeLifecycleControllerOptions struct {
-	*kubectrlmgrconfig.NodeLifecycleControllerConfiguration
+	*nodelifecycleconfig.NodeLifecycleControllerConfiguration
 }
 
 // AddFlags adds flags related to NodeLifecycleController for controller manager to the specified FlagSet.
@@ -48,7 +48,7 @@ func (o *NodeLifecycleControllerOptions) AddFlags(fs *pflag.FlagSet) {
 }
 
 // ApplyTo fills up NodeLifecycleController config with options.
-func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *kubectrlmgrconfig.NodeLifecycleControllerConfiguration) error {
+func (o *NodeLifecycleControllerOptions) ApplyTo(cfg *nodelifecycleconfig.NodeLifecycleControllerConfiguration) error {
 	if o == nil {
 		return nil
 	}

@@ -17,25 +17,34 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/admission"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
 	kind     = schema.GroupVersionKind{Group: "kgroup", Version: "kversion", Kind: "kind"}
 	resource = schema.GroupVersionResource{Group: "rgroup", Version: "rversion", Resource: "resource"}
-	attr     = admission.NewAttributesRecord(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, false, nil)
+	attr     = admission.NewAttributesRecord(nil, nil, kind, "ns", "name", resource, "subresource", admission.Create, &metav1.CreateOptions{}, false, nil)
 )
 
 func TestObserveAdmissionStep(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
-	handler.(admission.MutationInterface).Admit(attr, nil)
-	handler.(admission.ValidationInterface).Validate(attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"operation": string(admission.Create),
 		"type":      "admit",
@@ -50,10 +59,15 @@ func TestObserveAdmissionStep(t *testing.T) {
 }
 
 func TestObserveAdmissionController(t *testing.T) {
-	Metrics.reset()
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
-	handler.(admission.MutationInterface).Admit(attr, nil)
-	handler.(admission.ValidationInterface).Validate(attr, nil)
+	if err := handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in admit: %v", err)
+	}
+	if err := handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil); err != nil {
+		t.Errorf("Unexpected error in validate: %v", err)
+	}
 	wantLabels := map[string]string{
 		"name":      "a",
 		"operation": string(admission.Create),
@@ -67,8 +81,9 @@ func TestObserveAdmissionController(t *testing.T) {
 }
 
 func TestObserveWebhook(t *testing.T) {
-	Metrics.reset()
-	Metrics.ObserveWebhook(2*time.Second, false, attr, stepAdmit, "x")
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
+	Metrics.ObserveWebhook(context.TODO(), 2*time.Second, false, attr, stepAdmit, "x")
 	wantLabels := map[string]string{
 		"name":      "x",
 		"operation": string(admission.Create),
@@ -78,13 +93,45 @@ func TestObserveWebhook(t *testing.T) {
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
 }
 
-func TestWithMetrics(t *testing.T) {
+func TestObserveWebhookRejection(t *testing.T) {
 	Metrics.reset()
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
+	Metrics.ObserveWebhookRejection(context.TODO(), "x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	wantLabels := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "500",
+	}
+	wantLabels600 := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "600",
+	}
+	wantLabelsCallingWebhookError := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Update),
+		"type":           "validate",
+		"error_type":     "calling_webhook_error",
+		"rejection_code": "0",
+	}
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsCallingWebhookError, 1)
+}
 
+func TestWithMetrics(t *testing.T) {
+	defer Metrics.reset()
+	defer legacyregistry.Reset()
 	type Test struct {
 		name            string
 		ns              string
 		operation       admission.Operation
+		options         runtime.Object
 		handler         admission.Interface
 		admit, validate bool
 	}
@@ -93,6 +140,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-admit-and-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true, true},
 			true, true,
 		},
@@ -100,6 +148,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-dont-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false, true},
 			false, true,
 		},
@@ -107,6 +156,7 @@ func TestWithMetrics(t *testing.T) {
 			"both-interfaces-admit-dont-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true, false},
 			true, false,
 		},
@@ -114,6 +164,7 @@ func TestWithMetrics(t *testing.T) {
 			"validate-interfaces-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true},
 			true, true,
 		},
@@ -121,6 +172,7 @@ func TestWithMetrics(t *testing.T) {
 			"validate-interfaces-dont-validate",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&validatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
 			true, false,
 		},
@@ -128,6 +180,7 @@ func TestWithMetrics(t *testing.T) {
 			"mutating-interfaces-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), true},
 			true, true,
 		},
@@ -135,6 +188,7 @@ func TestWithMetrics(t *testing.T) {
 			"mutating-interfaces-dont-admit",
 			"some-ns",
 			admission.Create,
+			&metav1.CreateOptions{},
 			&mutatingFakeHandler{admission.NewHandler(admission.Create, admission.Update), false},
 			false, true,
 		},
@@ -144,7 +198,7 @@ func TestWithMetrics(t *testing.T) {
 		h := WithMetrics(test.handler, Metrics.ObserveAdmissionController, test.name)
 
 		// test mutation
-		err := h.(admission.MutationInterface).Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err := h.(admission.MutationInterface).Admit(context.TODO(), admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.admit && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -169,7 +223,7 @@ func TestWithMetrics(t *testing.T) {
 		}
 
 		// test validation
-		err = h.(admission.ValidationInterface).Validate(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, false, nil), nil)
+		err = h.(admission.ValidationInterface).Validate(context.TODO(), admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.validate && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -196,14 +250,14 @@ type mutatingAndValidatingFakeHandler struct {
 	validate bool
 }
 
-func (h *mutatingAndValidatingFakeHandler) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingAndValidatingFakeHandler) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.admit {
 		return nil
 	}
 	return fmt.Errorf("don't admit")
 }
 
-func (h *mutatingAndValidatingFakeHandler) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingAndValidatingFakeHandler) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.validate {
 		return nil
 	}
@@ -215,7 +269,7 @@ type validatingFakeHandler struct {
 	validate bool
 }
 
-func (h *validatingFakeHandler) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *validatingFakeHandler) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.validate {
 		return nil
 	}
@@ -227,7 +281,7 @@ type mutatingFakeHandler struct {
 	admit bool
 }
 
-func (h *mutatingFakeHandler) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingFakeHandler) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.admit {
 		return nil
 	}

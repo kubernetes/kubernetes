@@ -22,15 +22,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 )
 
-var (
-	scheme = runtime.NewScheme()
-	codecs = serializer.NewCodecFactory(scheme)
-)
+var scheme = runtime.NewScheme()
 
 // NewUnstructuredNegotiatedSerializer returns a simple, negotiated serializer
 func NewUnstructuredNegotiatedSerializer() runtime.NegotiatedSerializer {
@@ -51,6 +47,8 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 	return []runtime.SerializerInfo{
 		{
 			MediaType:        "application/json",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "json",
 			EncodesAsText:    true,
 			Serializer:       json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, false),
 			PrettySerializer: json.NewSerializer(json.DefaultMetaFactory, s.creator, s.typer, true),
@@ -61,9 +59,11 @@ func (s unstructuredNegotiatedSerializer) SupportedMediaTypes() []runtime.Serial
 			},
 		},
 		{
-			MediaType:     "application/yaml",
-			EncodesAsText: true,
-			Serializer:    json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
+			MediaType:        "application/yaml",
+			MediaTypeType:    "application",
+			MediaTypeSubType: "yaml",
+			EncodesAsText:    true,
+			Serializer:       json.NewYAMLSerializer(json.DefaultMetaFactory, s.creator, s.typer),
 		},
 	}
 }

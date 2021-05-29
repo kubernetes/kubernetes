@@ -26,10 +26,13 @@ import (
 )
 
 // FischerLister helps list Fischers.
+// All objects returned here must be treated as read-only.
 type FischerLister interface {
 	// List lists all Fischers in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.Fischer, err error)
 	// Get retrieves the Fischer from the index for a given name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.Fischer, error)
 	FischerListerExpansion
 }

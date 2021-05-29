@@ -3,4 +3,4 @@
 // license that can be found in the LICENSE file.
 
 // Package lapack provides interfaces for the LAPACK linear algebra standard.
-package lapack
+package lapack // import "gonum.org/v1/gonum/lapack"

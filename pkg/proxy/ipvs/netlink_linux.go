@@ -135,7 +135,7 @@ func (h *netlinkHandle) ListBindAddress(devName string) ([]string, error) {
 // 172.17.0.1 dev docker0  scope host  src 172.17.0.1
 // 192.168.122.1 dev virbr0  scope host  src 192.168.122.1
 // Then cut the unique src IP fields,
-// --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 192.168.122.1]
+// --> result set: [10.0.0.1, 10.0.0.10, 10.0.0.252, 100.106.89.164, 127.0.0.1, 172.17.0.1, 192.168.122.1]
 
 // If dev is specified, it's equivalent to exec:
 // $ ip route show table local type local proto kernel dev kube-ipvs0
@@ -150,7 +150,7 @@ func (h *netlinkHandle) GetLocalAddresses(dev, filterDev string) (sets.String, e
 	if dev != "" {
 		link, err := h.LinkByName(dev)
 		if err != nil {
-			return nil, fmt.Errorf("error get device %s, err: %v", filterDev, err)
+			return nil, fmt.Errorf("error get device %s, err: %v", dev, err)
 		}
 		chosenLinkIndex = link.Attrs().Index
 	} else if filterDev != "" {

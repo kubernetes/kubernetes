@@ -28,13 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/registry/networking/networkpolicy"
 )
 
-// rest implements a RESTStorage for NetworkPolicies against etcd
+// REST implements a RESTStorage for NetworkPolicies against etcd.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against NetworkPolicies
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+// NewREST returns a RESTStorage object that will work against NetworkPolicies.
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &networkingapi.NetworkPolicy{} },
 		NewListFunc:              func() runtime.Object { return &networkingapi.NetworkPolicyList{} },
@@ -44,14 +44,14 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 		UpdateStrategy: networkpolicy.Strategy,
 		DeleteStrategy: networkpolicy.Strategy,
 
-		TableConvertor: printerstorage.TableConvertor{TablePrinter: printers.NewTablePrinter().With(printersinternal.AddHandlers)},
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }
 
 // Implement ShortNamesProvider

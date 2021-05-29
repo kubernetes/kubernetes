@@ -18,14 +18,14 @@ package deployment
 
 import (
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
 )
 
 // rolloutRecreate implements the logic for recreating a replica set.
-func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID]*v1.PodList) error {
+func (dc *DeploymentController) rolloutRecreate(d *apps.Deployment, rsList []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) error {
 	// Don't create a new RS if not already existed, so that we avoid scaling up before scaling down.
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, rsList, false)
 	if err != nil {
@@ -95,7 +95,7 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRecreate(oldRSs []*app
 }
 
 // oldPodsRunning returns whether there are old pods running or any of the old ReplicaSets thinks that it runs pods.
-func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap map[types.UID]*v1.PodList) bool {
+func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap map[types.UID][]*v1.Pod) bool {
 	if oldPods := util.GetActualReplicaCountForReplicaSets(oldRSs); oldPods > 0 {
 		return true
 	}
@@ -104,13 +104,15 @@ func oldPodsRunning(newRS *apps.ReplicaSet, oldRSs []*apps.ReplicaSet, podMap ma
 		if newRS != nil && newRS.UID == rsUID {
 			continue
 		}
-		for _, pod := range podList.Items {
+		for _, pod := range podList {
 			switch pod.Status.Phase {
 			case v1.PodFailed, v1.PodSucceeded:
 				// Don't count pods in terminal state.
 				continue
 			case v1.PodUnknown:
-				// This happens in situation like when the node is temporarily disconnected from the cluster.
+				// v1.PodUnknown is a deprecated status.
+				// This logic is kept for backward compatibility.
+				// This used to happen in situation like when the node is temporarily disconnected from the cluster.
 				// If we can't be sure that the pod is not running, we have to count it.
 				return true
 			default:

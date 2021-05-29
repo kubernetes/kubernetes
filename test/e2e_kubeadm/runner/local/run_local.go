@@ -25,7 +25,7 @@ import (
 	"runtime"
 	"strings"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/test/utils"
 )
 
@@ -41,7 +41,7 @@ func bazelBuild() error {
 }
 
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to node e2e test.")
+var testFlags = flag.String("test-flags", "", "Space-separated list of arguments to pass to kubeadm e2e test.")
 var build = flag.Bool("build", false, "use Bazel to build binaries before testing")
 
 func main() {
@@ -99,7 +99,8 @@ func getBazelGinkgo() (string, error) {
 
 func execCommand(binary string, args ...string) error {
 	fmt.Printf("Running command: %v %v\n", binary, strings.Join(args, " "))
-	cmd := exec.Command(binary, args...)
+	cmd := exec.Command("sh", "-c", strings.Join(append([]string{binary}, args...), " "))
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

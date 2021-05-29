@@ -19,15 +19,16 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
-	"time"
 
 	"golang.org/x/sys/unix"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -35,6 +36,7 @@ const (
 	unixProtocol = "unix"
 )
 
+// CreateListener creates a listener on the specified endpoint.
 func CreateListener(endpoint string) (net.Listener, error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
@@ -50,10 +52,34 @@ func CreateListener(endpoint string) (net.Listener, error) {
 		return nil, fmt.Errorf("failed to unlink socket file %q: %v", addr, err)
 	}
 
-	return net.Listen(protocol, addr)
+	if err := os.MkdirAll(filepath.Dir(addr), 0750); err != nil {
+		return nil, fmt.Errorf("error creating socket directory %q: %v", filepath.Dir(addr), err)
+	}
+
+	// Create the socket on a tempfile and move it to the destination socket to handle improper cleanup
+	file, err := ioutil.TempFile(filepath.Dir(addr), "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary file: %v", err)
+	}
+
+	if err := os.Remove(file.Name()); err != nil {
+		return nil, fmt.Errorf("failed to remove temporary file: %v", err)
+	}
+
+	l, err := net.Listen(protocol, file.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	if err = os.Rename(file.Name(), addr); err != nil {
+		return nil, fmt.Errorf("failed to move temporary file to addr %q: %v", addr, err)
+	}
+
+	return l, nil
 }
 
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+// GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
+func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
 		return "", nil, err
@@ -65,8 +91,8 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 	return addr, dial, nil
 }
 
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout(unixProtocol, addr, timeout)
+func dial(ctx context.Context, addr string) (net.Conn, error) {
+	return (&net.Dialer{}).DialContext(ctx, unixProtocol, addr)
 }
 
 func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {
@@ -74,7 +100,7 @@ func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string)
 		fallbackEndpoint := fallbackProtocol + "://" + endpoint
 		protocol, addr, err = parseEndpoint(fallbackEndpoint)
 		if err == nil {
-			klog.Warningf("Using %q as endpoint is deprecated, please consider using full url format %q.", endpoint, fallbackEndpoint)
+			klog.InfoS("Using this endpoint is deprecated, please consider using full URL format", "endpoint", endpoint, "URL", fallbackEndpoint)
 		}
 	}
 	return
@@ -94,7 +120,7 @@ func parseEndpoint(endpoint string) (string, string, error) {
 		return "unix", u.Path, nil
 
 	case "":
-		return "", "", fmt.Errorf("Using %q as endpoint is deprecated, please consider using full url format", endpoint)
+		return "", "", fmt.Errorf("using %q as endpoint is deprecated, please consider using full url format", endpoint)
 
 	default:
 		return u.Scheme, "", fmt.Errorf("protocol %q not supported", u.Scheme)
@@ -102,10 +128,27 @@ func parseEndpoint(endpoint string) (string, string, error) {
 }
 
 // LocalEndpoint returns the full path to a unix socket at the given endpoint
-func LocalEndpoint(path, file string) string {
+func LocalEndpoint(path, file string) (string, error) {
 	u := url.URL{
 		Scheme: unixProtocol,
 		Path:   path,
 	}
-	return filepath.Join(u.String(), file+".sock")
+	return filepath.Join(u.String(), file+".sock"), nil
+}
+
+// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
+func IsUnixDomainSocket(filePath string) (bool, error) {
+	fi, err := os.Stat(filePath)
+	if err != nil {
+		return false, fmt.Errorf("stat file %s failed: %v", filePath, err)
+	}
+	if fi.Mode()&os.ModeSocket == 0 {
+		return false, nil
+	}
+	return true, nil
+}
+
+// NormalizePath is a no-op for Linux for now
+func NormalizePath(path string) string {
+	return path
 }

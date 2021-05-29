@@ -267,6 +267,9 @@ func (in *ExecConfig) DeepCopyInto(out *ExecConfig) {
 		*out = make([]ExecEnvVar, len(*in))
 		copy(*out, *in)
 	}
+	if in.Config != nil {
+		out.Config = in.Config.DeepCopyObject()
+	}
 	return
 }
 

@@ -20,6 +20,8 @@ package grpc
 
 import (
 	"bufio"
+	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -27,9 +29,9 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-
-	"golang.org/x/net/context"
 )
+
+const proxyAuthHeaderKey = "Proxy-Authorization"
 
 var (
 	// errDisabled indicates that proxy is disabled for the address.
@@ -38,7 +40,7 @@ var (
 	httpProxyFromEnvironment = http.ProxyFromEnvironment
 )
 
-func mapAddress(ctx context.Context, address string) (string, error) {
+func mapAddress(ctx context.Context, address string) (*url.URL, error) {
 	req := &http.Request{
 		URL: &url.URL{
 			Scheme: "https",
@@ -47,12 +49,12 @@ func mapAddress(ctx context.Context, address string) (string, error) {
 	}
 	url, err := httpProxyFromEnvironment(req)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if url == nil {
-		return "", errDisabled
+		return nil, errDisabled
 	}
-	return url.Host, nil
+	return url, nil
 }
 
 // To read a response from a net.Conn, http.ReadResponse() takes a bufio.Reader.
@@ -69,18 +71,28 @@ func (c *bufConn) Read(b []byte) (int, error) {
 	return c.r.Read(b)
 }
 
-func doHTTPConnectHandshake(ctx context.Context, conn net.Conn, addr string) (_ net.Conn, err error) {
+func basicAuth(username, password string) string {
+	auth := username + ":" + password
+	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
+func doHTTPConnectHandshake(ctx context.Context, conn net.Conn, backendAddr string, proxyURL *url.URL) (_ net.Conn, err error) {
 	defer func() {
 		if err != nil {
 			conn.Close()
 		}
 	}()
 
-	req := (&http.Request{
+	req := &http.Request{
 		Method: http.MethodConnect,
-		URL:    &url.URL{Host: addr},
+		URL:    &url.URL{Host: backendAddr},
 		Header: map[string][]string{"User-Agent": {grpcUA}},
-	})
+	}
+	if t := proxyURL.User; t != nil {
+		u := t.Username()
+		p, _ := t.Password()
+		req.Header.Add(proxyAuthHeaderKey, "Basic "+basicAuth(u, p))
+	}
 
 	if err := sendHTTPRequest(ctx, req, conn); err != nil {
 		return nil, fmt.Errorf("failed to write the HTTP request: %v", err)
@@ -108,23 +120,33 @@ func doHTTPConnectHandshake(ctx context.Context, conn net.Conn, addr string) (_ 
 // provided dialer, does HTTP CONNECT handshake and returns the connection.
 func newProxyDialer(dialer func(context.Context, string) (net.Conn, error)) func(context.Context, string) (net.Conn, error) {
 	return func(ctx context.Context, addr string) (conn net.Conn, err error) {
-		var skipHandshake bool
-		newAddr, err := mapAddress(ctx, addr)
+		var newAddr string
+		proxyURL, err := mapAddress(ctx, addr)
 		if err != nil {
 			if err != errDisabled {
 				return nil, err
 			}
-			skipHandshake = true
 			newAddr = addr
+		} else {
+			newAddr = proxyURL.Host
 		}
 
 		conn, err = dialer(ctx, newAddr)
 		if err != nil {
 			return
 		}
-		if !skipHandshake {
-			conn, err = doHTTPConnectHandshake(ctx, conn, addr)
+		if proxyURL != nil {
+			// proxy is disabled if proxyURL is nil.
+			conn, err = doHTTPConnectHandshake(ctx, conn, addr, proxyURL)
 		}
 		return
 	}
+}
+
+func sendHTTPRequest(ctx context.Context, req *http.Request, conn net.Conn) error {
+	req = req.WithContext(ctx)
+	if err := req.Write(conn); err != nil {
+		return fmt.Errorf("failed to write the HTTP request: %v", err)
+	}
+	return nil
 }

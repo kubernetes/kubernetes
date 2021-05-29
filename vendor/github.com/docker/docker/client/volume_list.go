@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/docker/client"
 
 import (
 	"context"
@@ -15,6 +15,7 @@ func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (volumet
 	query := url.Values{}
 
 	if filter.Len() > 0 {
+		//nolint:staticcheck // ignore SA1019 for old code
 		filterJSON, err := filters.ToParamWithVersion(cli.version, filter)
 		if err != nil {
 			return volumes, err
@@ -22,11 +23,11 @@ func (cli *Client) VolumeList(ctx context.Context, filter filters.Args) (volumet
 		query.Set("filters", filterJSON)
 	}
 	resp, err := cli.get(ctx, "/volumes", query, nil)
+	defer ensureReaderClosed(resp)
 	if err != nil {
 		return volumes, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&volumes)
-	ensureReaderClosed(resp)
 	return volumes, err
 }

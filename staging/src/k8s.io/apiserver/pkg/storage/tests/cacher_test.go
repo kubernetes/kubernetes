@@ -22,6 +22,7 @@ import (
 	"reflect"
 	goruntime "runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -34,24 +35,32 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/clock"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
 	cacherstorage "k8s.io/apiserver/pkg/storage/cacher"
-	etcdstorage "k8s.io/apiserver/pkg/storage/etcd"
-	"k8s.io/apiserver/pkg/storage/etcd/etcdtest"
-	etcdtesting "k8s.io/apiserver/pkg/storage/etcd/testing"
 	"k8s.io/apiserver/pkg/storage/etcd3"
+	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
+	storagetesting "k8s.io/apiserver/pkg/storage/testing"
 	"k8s.io/apiserver/pkg/storage/value"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 )
 
 var (
 	scheme = runtime.NewScheme()
 	codecs = serializer.NewCodecFactory(scheme)
+)
+
+const (
+	// watchCacheDefaultCapacity syncs watch cache defaultLowerBoundCapacity.
+	watchCacheDefaultCapacity = 100
 )
 
 func init() {
@@ -91,34 +100,48 @@ func AddObjectMetaFieldsSet(source fields.Set, objectMeta *metav1.ObjectMeta, ha
 	return source
 }
 
-func newEtcdTestStorage(t *testing.T, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
-	server, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
-	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), prefix, value.IdentityTransformer, true)
+func newPod() runtime.Object     { return &example.Pod{} }
+func newPodList() runtime.Object { return &example.PodList{} }
+
+func newEtcdTestStorage(t *testing.T, prefix string) (*etcd3testing.EtcdTestServer, storage.Interface) {
+	server, _ := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
+	storage := etcd3.New(server.V3Client, apitesting.TestCodec(codecs, examplev1.SchemeGroupVersion), newPod, prefix, value.IdentityTransformer, true, etcd3.NewDefaultLeaseManagerConfig())
 	return server, storage
 }
 
-func newTestCacher(s storage.Interface, cap int) (*cacherstorage.Cacher, storage.Versioner) {
+func newTestCacher(s storage.Interface) (*cacherstorage.Cacher, storage.Versioner, error) {
+	return newTestCacherWithClock(s, clock.RealClock{})
+}
+
+func newTestCacherWithClock(s storage.Interface, clock clock.Clock) (*cacherstorage.Cacher, storage.Versioner, error) {
 	prefix := "pods"
-	v := etcdstorage.APIObjectVersioner{}
+	v := etcd3.APIObjectVersioner{}
 	config := cacherstorage.Config{
-		CacheCapacity:  cap,
 		Storage:        s,
 		Versioner:      v,
-		Type:           &example.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		GetAttrsFunc:   GetAttrs,
-		NewListFunc:    func() runtime.Object { return &example.PodList{} },
+		NewFunc:        newPod,
+		NewListFunc:    newPodList,
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
+		Clock:          clock,
 	}
-	return cacherstorage.NewCacherFromConfig(config), v
+	cacher, err := cacherstorage.NewCacherFromConfig(config)
+	return cacher, v, err
 }
 
 func makeTestPod(name string) *example.Pod {
 	return &example.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "ns", Name: name},
-		Spec:       DeepEqualSafePodSpec(),
+		Spec:       storagetesting.DeepEqualSafePodSpec(),
 	}
+}
+
+func createPod(s storage.Interface, obj *example.Pod) error {
+	key := "pods/" + obj.Namespace + "/" + obj.Name
+	out := &example.Pod{}
+	return s.Create(context.TODO(), key, obj, out, 0)
 }
 
 func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *example.Pod {
@@ -126,21 +149,24 @@ func updatePod(t *testing.T, s storage.Interface, obj, old *example.Pod) *exampl
 		return obj.DeepCopyObject(), nil, nil
 	}
 	key := "pods/" + obj.Namespace + "/" + obj.Name
-	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn); err != nil {
+	if err := s.GuaranteedUpdate(context.TODO(), key, &example.Pod{}, old == nil, nil, updateFn, nil); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	obj.ResourceVersion = ""
 	result := &example.Pod{}
-	if err := s.Get(context.TODO(), key, "", result, false); err != nil {
+	if err := s.Get(context.TODO(), key, storage.GetOptions{}, result); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 	return result
 }
 
 func TestGet(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -148,14 +174,14 @@ func TestGet(t *testing.T) {
 
 	// We pass the ResourceVersion from the above Create() operation.
 	result := &example.Pod{}
-	if err := cacher.Get(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, result, true); err != nil {
+	if err := cacher.Get(context.TODO(), "pods/ns/foo", storage.GetOptions{IgnoreNotFound: true, ResourceVersion: fooCreated.ResourceVersion}, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if e, a := *fooCreated, *result; !reflect.DeepEqual(e, a) {
 		t.Errorf("Expected: %#v, got: %#v", e, a)
 	}
 
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, true); err != nil {
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion, IgnoreNotFound: true}, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	emptyPod := example.Pod{}
@@ -163,15 +189,18 @@ func TestGet(t *testing.T) {
 		t.Errorf("Expected: %#v, got: %#v", e, a)
 	}
 
-	if err := cacher.Get(context.TODO(), "pods/ns/bar", fooCreated.ResourceVersion, result, false); !storage.IsNotFound(err) {
+	if err := cacher.Get(context.TODO(), "pods/ns/bar", storage.GetOptions{ResourceVersion: fooCreated.ResourceVersion}, result); !storage.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
 
 func TestGetToList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	storedObj := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
@@ -204,7 +233,7 @@ func TestGetToList(t *testing.T) {
 
 	for i, tt := range tests {
 		out := &example.PodList{}
-		err := cacher.GetToList(context.TODO(), tt.key, "", tt.pred, out)
+		err := cacher.GetToList(context.TODO(), tt.key, storage.ListOptions{Predicate: tt.pred}, out)
 		if err != nil {
 			t.Fatalf("GetToList failed: %v", err)
 		}
@@ -225,9 +254,12 @@ func TestGetToList(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -250,14 +282,14 @@ func TestList(t *testing.T) {
 	updatePod(t, etcdStorage, podFooNS2, nil)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/bar", &deleted, nil, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
 	// We first List directly from etcd by passing empty resourceVersion,
 	// to get the current etcd resourceVersion.
 	rvResult := &example.PodList{}
-	if err := cacher.List(context.TODO(), "pods/ns", "", storage.Everything, rvResult); err != nil {
+	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{Predicate: storage.Everything}, rvResult); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	deletedPodRV := rvResult.ListMeta.ResourceVersion
@@ -265,7 +297,7 @@ func TestList(t *testing.T) {
 	result := &example.PodList{}
 	// We pass the current etcd ResourceVersion received from the above List() operation,
 	// since there is not easy way to get ResourceVersion of barPod deletion operation.
-	if err := cacher.List(context.TODO(), "pods/ns", deletedPodRV, storage.Everything, result); err != nil {
+	if err := cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: deletedPodRV, Predicate: storage.Everything}, result); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	if result.ListMeta.ResourceVersion != deletedPodRV {
@@ -305,10 +337,15 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestInfiniteList(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+// TestTooLargeResourceVersionList ensures that a list request for a resource version higher than available
+// in the watch cache completes (does not wait indefinitely) and results in a ResourceVersionTooLarge error.
+func TestTooLargeResourceVersionList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -322,9 +359,12 @@ func TestInfiniteList(t *testing.T) {
 	listRV := strconv.Itoa(int(rv + 10))
 
 	result := &example.PodList{}
-	err = cacher.List(context.TODO(), "pods/ns", listRV, storage.Everything, result)
+	err = cacher.List(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: listRV, Predicate: storage.Everything}, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if !storage.IsTooLargeResourceVersion(err) {
+		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 
@@ -336,7 +376,11 @@ func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType
 			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected: %s, got: %s", eventType, event.Type)
 		}
-		if e, a := eventObject, event.Object; !apiequality.Semantic.DeepDerivative(e, a) {
+		object := event.Object
+		if co, ok := object.(runtime.CacheableObject); ok {
+			object = co.GetObject()
+		}
+		if e, a := eventObject, object; !apiequality.Semantic.DeepDerivative(e, a) {
 			t.Logf("(called from line %d)", line)
 			t.Errorf("Expected (%s): %#v, got: %#v", eventType, e, a)
 		}
@@ -351,20 +395,24 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
+func (self *injectListError) List(ctx context.Context, key string, opts storage.ListOptions, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
 	}
-	return self.Interface.List(ctx, key, resourceVersion, p, listObj)
+	return self.Interface.List(ctx, key, opts, listObj)
 }
 
 func TestWatch(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	// Inject one list error to make sure we test the relist case.
 	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 3) // small capacity to trigger "too old version" error
+	fakeClock := clock.NewFakeClock(time.Now())
+	cacher, _, err := newTestCacherWithClock(etcdStorage, fakeClock)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
@@ -388,7 +436,7 @@ func TestWatch(t *testing.T) {
 	startVersion := strconv.Itoa(int(initialVersion))
 
 	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -404,17 +452,7 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, watcher, watch.Added, podFoo)
 	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
 
-	// Check whether we get too-old error via the watch channel
-	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
-	if err != nil {
-		t.Fatalf("Expected no direct error, got %v", err)
-	}
-	defer tooOldWatcher.Stop()
-	// Ensure we get a "Gone" error
-	expectedGoneError := errors.NewGone("").ErrStatus
-	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
-
-	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
+	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: fooCreated.ResourceVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -423,7 +461,7 @@ func TestWatch(t *testing.T) {
 	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
 
 	// Now test watch from "now".
-	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "0", storage.Everything)
+	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -434,12 +472,34 @@ func TestWatch(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooBis, fooUpdated)
 
 	verifyWatchEvent(t, nowWatcher, watch.Modified, podFooBis)
+
+	// Add watchCacheDefaultCapacity events to make current watch cache full.
+	// Make start and last event duration exceed eventFreshDuration(current 75s) to ensure watch cache won't expand.
+	for i := 0; i < watchCacheDefaultCapacity; i++ {
+		fakeClock.SetTime(time.Now().Add(time.Duration(i) * time.Minute))
+		podFoo := makeTestPod(fmt.Sprintf("foo-%d", i))
+		updatePod(t, etcdStorage, podFoo, nil)
+	}
+
+	// Check whether we get too-old error via the watch channel
+	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: "1", Predicate: storage.Everything})
+	if err != nil {
+		t.Fatalf("Expected no direct error, got %v", err)
+	}
+	defer tooOldWatcher.Stop()
+
+	// Ensure we get a "Gone" error.
+	expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
+	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedResourceExpiredError)
 }
 
 func TestWatcherTimeout(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// initialVersion is used to initate the watcher at the beginning of the world,
@@ -453,7 +513,7 @@ func TestWatcherTimeout(t *testing.T) {
 	// Create a number of watchers that will not be reading any result.
 	nonReadingWatchers := 50
 	for i := 0; i < nonReadingWatchers; i++ {
-		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+		watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -461,7 +521,7 @@ func TestWatcherTimeout(t *testing.T) {
 	}
 
 	// Create a second watcher that will be reading result.
-	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -479,14 +539,17 @@ func TestWatcherTimeout(t *testing.T) {
 }
 
 func TestFiltering(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, _ := newTestCacher(etcdStorage, 10)
+	cacher, _, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// Ensure that the cacher is initialized, before creating any pods,
 	// so that we are sure that all events will be present in cacher.
-	syncWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "0", storage.Everything)
+	syncWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: "0", Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -512,7 +575,7 @@ func TestFiltering(t *testing.T) {
 	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
 
 	deleted := example.Pod{}
-	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil); err != nil {
+	if err := etcdStorage.Delete(context.TODO(), "pods/ns/foo", &deleted, nil, storage.ValidateAllObjectFunc, nil); err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
 
@@ -528,7 +591,7 @@ func TestFiltering(t *testing.T) {
 			return labels.Set(metadata.GetLabels()), nil, nil
 		},
 	}
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, pred)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", storage.ListOptions{ResourceVersion: fooCreated.ResourceVersion, Predicate: pred})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -540,56 +603,8 @@ func TestFiltering(t *testing.T) {
 	verifyWatchEvent(t, watcher, watch.Deleted, podFooPrime)
 }
 
-func TestStartingResourceVersion(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
-	defer server.Terminate(t)
-	cacher, v := newTestCacher(etcdStorage, 10)
-	defer cacher.Stop()
-
-	// add 1 object
-	podFoo := makeTestPod("foo")
-	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
-
-	// Set up Watch starting at fooCreated.ResourceVersion + 10
-	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	rv += 10
-	startVersion := strconv.Itoa(int(rv))
-
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	defer watcher.Stop()
-
-	lastFoo := fooCreated
-	for i := 0; i < 11; i++ {
-		podFooForUpdate := makeTestPod("foo")
-		podFooForUpdate.Labels = map[string]string{"foo": strconv.Itoa(i)}
-		lastFoo = updatePod(t, etcdStorage, podFooForUpdate, lastFoo)
-	}
-
-	select {
-	case e := <-watcher.ResultChan():
-		pod := e.Object.(*example.Pod)
-		podRV, err := v.ParseResourceVersion(pod.ResourceVersion)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		// event should have at least rv + 1, since we're starting the watch at rv
-		if podRV <= rv {
-			t.Errorf("expected event with resourceVersion of at least %d, got %d", rv+1, podRV)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("timed out waiting for event")
-	}
-}
-
 func TestEmptyWatchEventCache(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 
 	// add a few objects
@@ -601,7 +616,10 @@ func TestEmptyWatchEventCache(t *testing.T) {
 
 	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
 
-	cacher, v := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	// get rv of last pod created
@@ -614,17 +632,17 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	// It should support establishing watches from rv and higher, but not older.
 
 	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv-1)), storage.Everything)
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv - 1)), Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		defer watcher.Stop()
-		expectedGoneError := errors.NewGone("").ErrStatus
-		verifyWatchEvent(t, watcher, watch.Error, &expectedGoneError)
+		expectedResourceExpiredError := errors.NewResourceExpired("").ErrStatus
+		verifyWatchEvent(t, watcher, watch.Error, &expectedResourceExpiredError)
 	}
 
 	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv+1)), storage.Everything)
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv + 1)), Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -638,7 +656,7 @@ func TestEmptyWatchEventCache(t *testing.T) {
 	}
 
 	{
-		watcher, err := cacher.Watch(context.TODO(), "pods/ns", strconv.Itoa(int(rv)), storage.Everything)
+		watcher, err := cacher.Watch(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: strconv.Itoa(int(rv)), Predicate: storage.Everything})
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -653,9 +671,12 @@ func TestEmptyWatchEventCache(t *testing.T) {
 }
 
 func TestRandomWatchDeliver(t *testing.T) {
-	server, etcdStorage := newEtcdTestStorage(t, etcdtest.PathPrefix())
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
-	cacher, v := newTestCacher(etcdStorage, 10)
+	cacher, v, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
 	defer cacher.Stop()
 
 	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
@@ -665,7 +686,7 @@ func TestRandomWatchDeliver(t *testing.T) {
 	}
 	startVersion := strconv.Itoa(int(rv))
 
-	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", storage.ListOptions{ResourceVersion: startVersion, Predicate: storage.Everything})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -686,9 +707,230 @@ func TestRandomWatchDeliver(t *testing.T) {
 		if !ok {
 			break
 		}
-		if a, e := event.Object.(*example.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
+		object := event.Object
+		if co, ok := object.(runtime.CacheableObject); ok {
+			object = co.GetObject()
+		}
+		if a, e := object.(*example.Pod).Name, fmt.Sprintf("foo-%d", watched); e != a {
 			t.Errorf("Unexpected object watched: %s, expected %s", a, e)
 		}
 		watched++
+	}
+}
+
+func TestCacherListerWatcher(t *testing.T) {
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	podFoo := makeTestPod("foo")
+	podBar := makeTestPod("bar")
+	podBaz := makeTestPod("baz")
+
+	_ = updatePod(t, store, podFoo, nil)
+	_ = updatePod(t, store, podBar, nil)
+	_ = updatePod(t, store, podBaz, nil)
+
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+
+	obj, err := lw.List(metav1.ListOptions{})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	pl, ok := obj.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", pl)
+	}
+	if len(pl.Items) != 3 {
+		t.Errorf("Expected PodList of length 3 but got %d", len(pl.Items))
+	}
+}
+
+func TestCacherListerWatcherPagination(t *testing.T) {
+	prefix := "pods"
+	fn := func() runtime.Object { return &example.PodList{} }
+	server, store := newEtcdTestStorage(t, prefix)
+	defer server.Terminate(t)
+
+	podFoo := makeTestPod("foo")
+	podBar := makeTestPod("bar")
+	podBaz := makeTestPod("baz")
+
+	_ = updatePod(t, store, podFoo, nil)
+	_ = updatePod(t, store, podBar, nil)
+	_ = updatePod(t, store, podBaz, nil)
+
+	lw := cacherstorage.NewCacherListerWatcher(store, prefix, fn)
+
+	obj1, err := lw.List(metav1.ListOptions{Limit: 2})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	limit1, ok := obj1.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", limit1)
+	}
+	if len(limit1.Items) != 2 {
+		t.Errorf("Expected PodList of length 2 but got %d", len(limit1.Items))
+	}
+	if limit1.Continue == "" {
+		t.Errorf("Expected list to have Continue but got none")
+	}
+	obj2, err := lw.List(metav1.ListOptions{Limit: 2, Continue: limit1.Continue})
+	if err != nil {
+		t.Fatalf("List failed: %v", err)
+	}
+	limit2, ok := obj2.(*example.PodList)
+	if !ok {
+		t.Fatalf("Expected PodList but got %v", limit2)
+	}
+	if limit2.Continue != "" {
+		t.Errorf("Expected list not to have Continue, but got %s", limit1.Continue)
+	}
+
+	if limit1.Items[0].Name != podBar.Name {
+		t.Errorf("Expected list1.Items[0] to be %s but got %s", podBar.Name, limit1.Items[0].Name)
+	}
+	if limit1.Items[1].Name != podBaz.Name {
+		t.Errorf("Expected list1.Items[1] to be %s but got %s", podBaz.Name, limit1.Items[1].Name)
+	}
+	if limit2.Items[0].Name != podFoo.Name {
+		t.Errorf("Expected list2.Items[0] to be %s but got %s", podFoo.Name, limit2.Items[0].Name)
+	}
+
+}
+
+func TestWatchDispatchBookmarkEvents(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+	cacher, v, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	fooCreated := updatePod(t, etcdStorage, makeTestPod("foo"), nil)
+	rv, err := v.ParseResourceVersion(fooCreated.ResourceVersion)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(rv))
+
+	tests := []struct {
+		timeout            time.Duration
+		expected           bool
+		allowWatchBookmark bool
+	}{
+		{ // test old client won't get Bookmark event
+			timeout:            3 * time.Second,
+			expected:           false,
+			allowWatchBookmark: false,
+		},
+		{
+			timeout:            3 * time.Second,
+			expected:           true,
+			allowWatchBookmark: true,
+		},
+	}
+
+	for i, c := range tests {
+		pred := storage.Everything
+		pred.AllowWatchBookmarks = c.allowWatchBookmark
+		ctx, _ := context.WithTimeout(context.Background(), c.timeout)
+		watcher, err := cacher.Watch(ctx, "pods/ns/foo", storage.ListOptions{ResourceVersion: startVersion, Predicate: pred})
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// Create events of other pods
+		updatePod(t, etcdStorage, makeTestPod(fmt.Sprintf("foo-whatever-%d", i)), nil)
+
+		// Now wait for Bookmark event
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok && c.expected {
+				t.Errorf("Unexpected object watched (no objects)")
+			}
+			if c.expected && event.Type != watch.Bookmark {
+				t.Errorf("Unexpected object watched %#v", event)
+			}
+		case <-time.After(time.Second * 3):
+			if c.expected {
+				t.Errorf("Unexpected object watched (timeout)")
+			}
+		}
+		watcher.Stop()
+	}
+}
+
+func TestWatchBookmarksWithCorrectResourceVersion(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WatchBookmark, true)()
+
+	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
+	defer server.Terminate(t)
+	cacher, v, err := newTestCacher(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	pred := storage.Everything
+	pred.AllowWatchBookmarks = true
+	ctx, _ := context.WithTimeout(context.Background(), 3*time.Second)
+	watcher, err := cacher.WatchList(ctx, "pods/ns", storage.ListOptions{ResourceVersion: "0", Predicate: pred})
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	defer wg.Wait()   // We must wait for the waitgroup to exit before we terminate the cache or the server in prior defers
+	defer close(done) // call close first, so the goroutine knows to exit
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			select {
+			case <-done:
+				return
+			default:
+				pod := fmt.Sprintf("foo-%d", i)
+				err := createPod(etcdStorage, makeTestPod(pod))
+				if err != nil {
+					t.Fatalf("failed to create pod %v: %v", pod, err)
+				}
+				time.Sleep(time.Second / 100)
+			}
+		}
+	}()
+
+	bookmarkReceived := false
+	lastObservedResourceVersion := uint64(0)
+	for event := range watcher.ResultChan() {
+		rv, err := v.ObjectResourceVersion(event.Object)
+		if err != nil {
+			t.Fatalf("failed to parse resourceVersion from %#v", event)
+		}
+		if event.Type == watch.Bookmark {
+			bookmarkReceived = true
+			// bookmark event has a RV greater than or equal to the before one
+			if rv < lastObservedResourceVersion {
+				t.Fatalf("Unexpected bookmark resourceVersion %v less than observed %v)", rv, lastObservedResourceVersion)
+			}
+		} else {
+			// non-bookmark event has a RV greater than anything before
+			if rv <= lastObservedResourceVersion {
+				t.Fatalf("Unexpected event resourceVersion %v less than or equal to bookmark %v)", rv, lastObservedResourceVersion)
+			}
+		}
+		lastObservedResourceVersion = rv
+	}
+	// Make sure we have received a bookmark event
+	if !bookmarkReceived {
+		t.Fatalf("Unpexected error, we did not received a bookmark event")
 	}
 }

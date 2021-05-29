@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -74,6 +74,7 @@ func (f *RecordFlags) Complete(cmd *cobra.Command) error {
 	return nil
 }
 
+// CompleteWithChangeCause alters changeCause value with a new cause
 func (f *RecordFlags) CompleteWithChangeCause(cause string) error {
 	if f == nil {
 		return nil

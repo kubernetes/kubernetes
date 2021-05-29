@@ -18,8 +18,10 @@ package cpumanager
 
 import (
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
 type nonePolicy struct{}
@@ -29,7 +31,7 @@ var _ Policy = &nonePolicy{}
 // PolicyNone name of none policy
 const PolicyNone policyName = "none"
 
-// NewNonePolicy returns a cupset manager policy that does nothing
+// NewNonePolicy returns a cpuset manager policy that does nothing
 func NewNonePolicy() Policy {
 	return &nonePolicy{}
 }
@@ -38,14 +40,32 @@ func (p *nonePolicy) Name() string {
 	return string(PolicyNone)
 }
 
-func (p *nonePolicy) Start(s state.State) {
-	klog.Info("[cpumanager] none policy: Start")
-}
-
-func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
+func (p *nonePolicy) Start(s state.State) error {
+	klog.InfoS("None policy: Start")
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(s state.State, containerID string) error {
+func (p *nonePolicy) Allocate(s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
+}
+
+func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
+	return nil
+}
+
+func (p *nonePolicy) GetTopologyHints(s state.State, pod *v1.Pod, container *v1.Container) map[string][]topologymanager.TopologyHint {
+	return nil
+}
+
+func (p *nonePolicy) GetPodTopologyHints(s state.State, pod *v1.Pod) map[string][]topologymanager.TopologyHint {
+	return nil
+}
+
+// Assignable CPUs are the ones that can be exclusively allocated to pods that meet the exclusivity requirement
+// (ie guaranteed QoS class and integral CPU request).
+// Assignability of CPUs as a concept is only applicable in case of static policy i.e. scenarios where workloads
+// CAN get exclusive access to core(s).
+// Hence, we return empty set here: no cpus are assignable according to above definition with this policy.
+func (p *nonePolicy) GetAllocatableCPUs(m state.State) cpuset.CPUSet {
+	return cpuset.NewCPUSet()
 }

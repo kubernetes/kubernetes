@@ -20,19 +20,23 @@ package v1alpha1
 
 import (
 	v1alpha1 "k8s.io/api/storage/v1alpha1"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes/scheme"
 	rest "k8s.io/client-go/rest"
 )
 
 type StorageV1alpha1Interface interface {
 	RESTClient() rest.Interface
+	CSIStorageCapacitiesGetter
 	VolumeAttachmentsGetter
 }
 
 // StorageV1alpha1Client is used to interact with features provided by the storage.k8s.io group.
 type StorageV1alpha1Client struct {
 	restClient rest.Interface
+}
+
+func (c *StorageV1alpha1Client) CSIStorageCapacities(namespace string) CSIStorageCapacityInterface {
+	return newCSIStorageCapacities(c, namespace)
 }
 
 func (c *StorageV1alpha1Client) VolumeAttachments() VolumeAttachmentInterface {
@@ -71,7 +75,7 @@ func setConfigDefaults(config *rest.Config) error {
 	gv := v1alpha1.SchemeGroupVersion
 	config.GroupVersion = &gv
 	config.APIPath = "/apis"
-	config.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: scheme.Codecs}
+	config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	if config.UserAgent == "" {
 		config.UserAgent = rest.DefaultKubernetesUserAgent()

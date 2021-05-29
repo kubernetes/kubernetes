@@ -195,3 +195,47 @@ func TestTimeEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestTimeBefore(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name string
+		x    *Time
+		y    *Time
+	}{
+		{"nil <? nil", nil, nil},
+		{"!nil <? !nil", &t1, &t1},
+		{"nil <? !nil", nil, &t1},
+		{"!nil <? nil", &t1, nil},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.Before(c.y)
+			if result {
+				t.Errorf("Failed equality test for '%v', '%v': expected false, got %+v", c.x, c.y, result)
+			}
+		})
+	}
+}
+
+func TestTimeIsZero(t *testing.T) {
+	t1 := NewTime(time.Now())
+	cases := []struct {
+		name   string
+		x      *Time
+		result bool
+	}{
+		{"nil =? 0", nil, true},
+		{"!nil =? 0", &t1, false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			result := c.x.IsZero()
+			if result != c.result {
+				t.Errorf("Failed equality test for '%v': expected %+v, got %+v", c.x, c.result, result)
+			}
+		})
+	}
+}

@@ -10,7 +10,6 @@
 package hcsschema
 
 type HvSocket struct {
-
 	Config *HvSocketSystemConfig `json:"Config,omitempty"`
 
 	EnablePowerShellDirect bool `json:"EnablePowerShellDirect,omitempty"`

@@ -1,5 +1,10 @@
 package configs
 
+import (
+	systemdDbus "github.com/coreos/go-systemd/v22/dbus"
+	"github.com/opencontainers/runc/libcontainer/devices"
+)
+
 type FreezerState string
 
 const (
@@ -29,18 +34,16 @@ type Cgroup struct {
 
 	// Resources contains various cgroups settings to apply
 	*Resources
+
+	// SystemdProps are any additional properties for systemd,
+	// derived from org.systemd.property.xxx annotations.
+	// Ignored unless systemd is used for managing cgroups.
+	SystemdProps []systemdDbus.Property `json:"-"`
 }
 
 type Resources struct {
-	// If this is true allow access to any kind of device within the container.  If false, allow access only to devices explicitly listed in the allowed_devices list.
-	// Deprecated
-	AllowAllDevices *bool `json:"allow_all_devices,omitempty"`
-	// Deprecated
-	AllowedDevices []*Device `json:"allowed_devices,omitempty"`
-	// Deprecated
-	DeniedDevices []*Device `json:"denied_devices,omitempty"`
-
-	Devices []*Device `json:"devices"`
+	// Devices is the set of access rules for devices in the container.
+	Devices []*devices.Rule `json:"devices"`
 
 	// Memory limit (in bytes)
 	Memory int64 `json:"memory"`
@@ -50,12 +53,6 @@ type Resources struct {
 
 	// Total memory usage (memory + swap); set `-1` to enable unlimited swap
 	MemorySwap int64 `json:"memory_swap"`
-
-	// Kernel memory limit (in bytes)
-	KernelMemory int64 `json:"kernel_memory"`
-
-	// Kernel memory limit for TCP use (in bytes)
-	KernelMemoryTCP int64 `json:"kernel_memory_tcp"`
 
 	// CPU shares (relative weight vs. other containers)
 	CpuShares uint64 `json:"cpu_shares"`
@@ -119,4 +116,19 @@ type Resources struct {
 
 	// Set class identifier for container's network packets
 	NetClsClassid uint32 `json:"net_cls_classid_u"`
+
+	// Used on cgroups v2:
+
+	// CpuWeight sets a proportional bandwidth limit.
+	CpuWeight uint64 `json:"cpu_weight"`
+
+	// Unified is cgroupv2-only key-value map.
+	Unified map[string]string `json:"unified"`
+
+	// SkipDevices allows to skip configuring device permissions.
+	// Used by e.g. kubelet while creating a parent cgroup (kubepods)
+	// common for many containers.
+	//
+	// NOTE it is impossible to start a container which has this flag set.
+	SkipDevices bool `json:"skip_devices"`
 }

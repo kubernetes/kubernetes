@@ -22,9 +22,10 @@ have this label but without `addonmanager.kubernetes.io/mode=EnsureExists` will 
 treated as "reconcile class addons" for now.
 - Resources under `$ADDON_PATH` need to have either one of these two labels.
 Otherwise it will be omitted.
-- The above label and namespace rule does not stand for `/opt/namespace.yaml` and
-resources under `/etc/kubernetes/admission-controls/`. addon-manager will attempt to
-create them regardless during startup.
+
+#### Images
+
+addon-manager images are pushed to `k8s.gcr.io`. As addon-manager is built for multiple architectures, there is an image per architecture in the format - `k8s.gcr.io/kube-addon-manager-$(ARCH):$(VERSION)`.
 
 #### How to release
 
@@ -56,6 +57,3 @@ $ make push ARCH=s390x
 ```
 
 If you don't want to push the images, run `make` or `make build` instead
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/addon-manager/README.md?pixel)]()

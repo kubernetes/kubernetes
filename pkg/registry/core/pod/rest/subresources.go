@@ -67,7 +67,7 @@ func (r *ProxyREST) Connect(ctx context.Context, id string, opts runtime.Object,
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ResourceLocation(r.Store, r.ProxyTransport, ctx, id)
+	location, transport, err := pod.ResourceLocation(ctx, r.Store, r.ProxyTransport, id)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	if !ok {
 		return nil, fmt.Errorf("Invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.AttachLocation(r.Store, r.KubeletConn, ctx, name, attachOpts)
+	location, transport, err := pod.AttachLocation(ctx, r.Store, r.KubeletConn, name, attachOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -136,7 +136,7 @@ func (r *ExecREST) Connect(ctx context.Context, name string, opts runtime.Object
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.ExecLocation(r.Store, r.KubeletConn, ctx, name, execOpts)
+	location, transport, err := pod.ExecLocation(ctx, r.Store, r.KubeletConn, name, execOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (r *PortForwardREST) Connect(ctx context.Context, name string, opts runtime
 	if !ok {
 		return nil, fmt.Errorf("invalid options object: %#v", opts)
 	}
-	location, transport, err := pod.PortForwardLocation(r.Store, r.KubeletConn, ctx, name, portForwardOpts)
+	location, transport, err := pod.PortForwardLocation(ctx, r.Store, r.KubeletConn, name, portForwardOpts)
 	if err != nil {
 		return nil, err
 	}

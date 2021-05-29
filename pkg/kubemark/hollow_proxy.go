@@ -18,9 +18,10 @@ package kubemark
 
 import (
 	"fmt"
+	"net"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
@@ -29,20 +30,24 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
+	proxyutiliptables "k8s.io/kubernetes/pkg/proxy/util/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	utilexec "k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type HollowProxy struct {
 	ProxyServer *proxyapp.ProxyServer
 }
 
-type FakeProxier struct{}
+type FakeProxier struct {
+	proxyconfig.NoopEndpointSliceHandler
+	proxyconfig.NoopNodeHandler
+}
 
 func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
@@ -71,14 +76,18 @@ func NewHollowProxyOrDie(
 	proxierMinSyncPeriod time.Duration,
 ) (*HollowProxy, error) {
 	// Create proxier and service/endpoint handlers.
-	var proxier proxy.ProxyProvider
-	var serviceHandler proxyconfig.ServiceHandler
-	var endpointsHandler proxyconfig.EndpointsHandler
+	var proxier proxy.Provider
+	var err error
 
 	if useRealProxier {
+		nodeIP := utilnode.GetNodeIP(client, nodeName)
+		if nodeIP == nil {
+			klog.V(0).Infof("can't determine this node's IP, assuming 127.0.0.1")
+			nodeIP = net.ParseIP("127.0.0.1")
+		}
 		// Real proxier with fake iptables, sysctl, etc underneath it.
 		//var err error
-		proxierIPTables, err := iptables.NewProxier(
+		proxier, err = iptables.NewProxier(
 			iptInterface,
 			sysctl,
 			execer,
@@ -86,9 +95,9 @@ func NewHollowProxyOrDie(
 			proxierMinSyncPeriod,
 			false,
 			0,
-			"10.0.0.0/8",
+			proxyutiliptables.NewNoOpLocalDetector(),
 			nodeName,
-			utilnode.GetNodeIP(client, nodeName),
+			nodeIP,
 			recorder,
 			nil,
 			[]string{},
@@ -96,13 +105,8 @@ func NewHollowProxyOrDie(
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
-		proxier = proxierIPTables
-		serviceHandler = proxierIPTables
-		endpointsHandler = proxierIPTables
 	} else {
 		proxier = &FakeProxier{}
-		serviceHandler = &FakeProxier{}
-		endpointsHandler = &FakeProxier{}
 	}
 
 	// Create a Hollow Proxy instance.
@@ -114,19 +118,16 @@ func NewHollowProxyOrDie(
 	}
 	return &HollowProxy{
 		ProxyServer: &proxyapp.ProxyServer{
-			Client:                client,
-			EventClient:           eventClient,
-			IptInterface:          iptInterface,
-			Proxier:               proxier,
-			Broadcaster:           broadcaster,
-			Recorder:              recorder,
-			ProxyMode:             "fake",
-			NodeRef:               nodeRef,
-			OOMScoreAdj:           utilpointer.Int32Ptr(0),
-			ResourceContainer:     "",
-			ConfigSyncPeriod:      30 * time.Second,
-			ServiceEventHandler:   serviceHandler,
-			EndpointsEventHandler: endpointsHandler,
+			Client:           client,
+			EventClient:      eventClient,
+			IptInterface:     iptInterface,
+			Proxier:          proxier,
+			Broadcaster:      broadcaster,
+			Recorder:         recorder,
+			ProxyMode:        "fake",
+			NodeRef:          nodeRef,
+			OOMScoreAdj:      utilpointer.Int32Ptr(0),
+			ConfigSyncPeriod: 30 * time.Second,
 		},
 	}, nil
 }

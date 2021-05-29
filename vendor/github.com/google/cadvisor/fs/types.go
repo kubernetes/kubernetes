@@ -18,6 +18,22 @@ import (
 	"errors"
 )
 
+type Context struct {
+	// docker root directory.
+	Docker DockerContext
+	Crio   CrioContext
+}
+
+type DockerContext struct {
+	Root         string
+	Driver       string
+	DriverStatus map[string]string
+}
+
+type CrioContext struct {
+	Root string
+}
+
 type DeviceInfo struct {
 	Device string
 	Major  uint
@@ -48,6 +64,8 @@ type Fs struct {
 }
 
 type DiskStats struct {
+	MajorNum        uint64
+	MinorNum        uint64
 	ReadsCompleted  uint64
 	ReadsMerged     uint64
 	SectorsRead     uint64
@@ -59,6 +77,8 @@ type DiskStats struct {
 	IoInProgress    uint64
 	IoTime          uint64
 	WeightedIoTime  uint64
+	Major           uint64
+	Minor           uint64
 }
 
 type UsageInfo struct {

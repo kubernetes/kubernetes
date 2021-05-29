@@ -13,12 +13,21 @@ import "math"
 //
 // Dlasq6 is an internal routine. It is exported for testing purposes.
 func (impl Implementation) Dlasq6(i0, n0 int, z []float64, pp int) (dmin, dmin1, dmin2, dn, dnm1, dnm2 float64) {
-	if len(z) < 4*(n0+1) {
-		panic(badZ)
+	switch {
+	case i0 < 0:
+		panic(i0LT0)
+	case n0 < 0:
+		panic(n0LT0)
+	case len(z) < 4*n0:
+		panic(shortZ)
+	case pp != 0 && pp != 1:
+		panic(badPp)
 	}
+
 	if n0-i0-1 <= 0 {
 		return dmin, dmin1, dmin2, dn, dnm1, dnm2
 	}
+
 	safmin := dlamchS
 	j4 := 4*(i0+1) + pp - 4 // -4 rather than -3 for zero indexing
 	emin := z[j4+4]

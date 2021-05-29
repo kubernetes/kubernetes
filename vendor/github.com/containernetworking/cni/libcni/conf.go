@@ -45,6 +45,9 @@ func ConfFromBytes(bytes []byte) (*NetworkConfig, error) {
 	if err := json.Unmarshal(bytes, &conf.Network); err != nil {
 		return nil, fmt.Errorf("error parsing configuration: %s", err)
 	}
+	if conf.Network.Type == "" {
+		return nil, fmt.Errorf("error parsing configuration: missing 'type'")
+	}
 	return conf, nil
 }
 
@@ -80,10 +83,19 @@ func ConfListFromBytes(bytes []byte) (*NetworkConfigList, error) {
 		}
 	}
 
+	disableCheck := false
+	if rawDisableCheck, ok := rawList["disableCheck"]; ok {
+		disableCheck, ok = rawDisableCheck.(bool)
+		if !ok {
+			return nil, fmt.Errorf("error parsing configuration list: invalid disableCheck type %T", rawDisableCheck)
+		}
+	}
+
 	list := &NetworkConfigList{
-		Name:       name,
-		CNIVersion: cniVersion,
-		Bytes:      bytes,
+		Name:         name,
+		DisableCheck: disableCheck,
+		CNIVersion:   cniVersion,
+		Bytes:        bytes,
 	}
 
 	var plugins []interface{}
@@ -102,11 +114,11 @@ func ConfListFromBytes(bytes []byte) (*NetworkConfigList, error) {
 	for i, conf := range plugins {
 		newBytes, err := json.Marshal(conf)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to marshal plugin config %d: %v", i, err)
+			return nil, fmt.Errorf("failed to marshal plugin config %d: %v", i, err)
 		}
 		netConf, err := ConfFromBytes(newBytes)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to parse plugin config %d: %v", i, err)
+			return nil, fmt.Errorf("failed to parse plugin config %d: %v", i, err)
 		}
 		list.Plugins = append(list.Plugins, netConf)
 	}

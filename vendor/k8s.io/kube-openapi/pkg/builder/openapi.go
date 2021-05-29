@@ -23,16 +23,14 @@ import (
 	"strings"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/go-openapi/spec"
 
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
 	OpenAPIVersion = "2.0"
-	// TODO: Make this configurable.
-	extensionPrefix = "x-kubernetes-"
 )
 
 type openAPI struct {
@@ -154,6 +152,11 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 				schema.Extensions[k] = v
 			}
 		}
+		if v, ok := item.Schema.Extensions[common.ExtensionV2Schema]; ok {
+			if v2Schema, isOpenAPISchema := v.(spec.Schema); isOpenAPISchema {
+				schema = v2Schema
+			}
+		}
 		o.swagger.Definitions[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
@@ -270,7 +273,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		},
 	}
 	for k, v := range route.Metadata {
-		if strings.HasPrefix(k, extensionPrefix) {
+		if strings.HasPrefix(k, common.ExtensionPrefix) {
 			if ret.Extensions == nil {
 				ret.Extensions = spec.Extensions{}
 			}
@@ -366,7 +369,7 @@ func (o *openAPI) findCommonParameters(routes []restful.Route) (map[interface{}]
 }
 
 func (o *openAPI) toSchema(name string) (_ *spec.Schema, err error) {
-	if openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(name); openAPIType != "" {
+	if openAPIType, openAPIFormat := common.OpenAPITypeFormat(name); openAPIType != "" {
 		return &spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Type:   []string{openAPIType},
@@ -420,7 +423,7 @@ func (o *openAPI) buildParameter(restParam restful.ParameterData, bodySample int
 	default:
 		return ret, fmt.Errorf("unknown restful operation kind : %v", restParam.Kind)
 	}
-	openAPIType, openAPIFormat := common.GetOpenAPITypeFormat(restParam.DataType)
+	openAPIType, openAPIFormat := common.OpenAPITypeFormat(restParam.DataType)
 	if openAPIType == "" {
 		return ret, fmt.Errorf("non-body Restful parameter type should be a simple type, but got : %v", restParam.DataType)
 	}

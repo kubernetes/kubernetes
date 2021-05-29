@@ -18,7 +18,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/../..
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
 CLEAN_PATTERNS=(
@@ -26,13 +26,16 @@ CLEAN_PATTERNS=(
   "doc_tmp"
   "((?!staging\/src\/k8s\.io\/apiextensions-apiserver\/pkg\/generated\/openapi).)*/zz_generated.openapi.go"
   "test/e2e/generated/bindata.go"
+  # TODO(bentheelder): remove this pattern after bazel is not in any supported releases
+  # see: https://github.com/kubernetes/enhancements/issues/2420
+  "bazel-.*"
 )
 
-for pattern in ${CLEAN_PATTERNS[@]}; do
-  for match in $(find "${KUBE_ROOT}" -iregex "^${KUBE_ROOT}/${pattern}$"); do
+for pattern in "${CLEAN_PATTERNS[@]}"; do
+  while IFS=$'\n' read -r match; do
     echo "Removing ${match#${KUBE_ROOT}\/} .."
     rm -rf "${match#${KUBE_ROOT}\/}"
-  done
+  done <   <(find "${KUBE_ROOT}" -iregex "^${KUBE_ROOT}/${pattern}$")
 done
 
 # ex: ts=2 sw=2 et filetype=sh

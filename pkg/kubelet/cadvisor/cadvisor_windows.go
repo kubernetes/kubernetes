@@ -33,7 +33,7 @@ type cadvisorClient struct {
 var _ Interface = new(cadvisorClient)
 
 // New creates a cAdvisor and exports its API on the specified port if port > 0.
-func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, usingLegacyStats bool) (Interface, error) {
+func New(imageFsInfoProvider ImageFsInfoProvider, rootPath string, cgroupRoots []string, usingLegacyStats bool) (Interface, error) {
 	client, err := winstats.NewPerfCounterClient()
 	return &cadvisorClient{
 		rootPath:       rootPath,
@@ -53,8 +53,13 @@ func (cu *cadvisorClient) ContainerInfo(name string, req *cadvisorapi.ContainerI
 	return &cadvisorapi.ContainerInfo{}, nil
 }
 
+// ContainerInfoV2 is only expected to be used for the root container. Returns info for all containers in the node.
 func (cu *cadvisorClient) ContainerInfoV2(name string, options cadvisorapiv2.RequestOptions) (map[string]cadvisorapiv2.ContainerInfo, error) {
 	return cu.winStatsClient.WinContainerInfos()
+}
+
+func (cu *cadvisorClient) GetRequestedContainersInfo(containerName string, options cadvisorapiv2.RequestOptions) (map[string]*cadvisorapi.ContainerInfo, error) {
+	return nil, nil
 }
 
 func (cu *cadvisorClient) SubcontainerInfo(name string, req *cadvisorapi.ContainerInfoRequest) (map[string]*cadvisorapi.ContainerInfo, error) {

@@ -119,20 +119,40 @@ func TestExpired(t *testing.T) {
 func TestClientCache(t *testing.T) {
 	cache := newClientCache()
 
-	if _, ok := cache.getClient("issuer1", "id1"); ok {
+	if _, ok := cache.getClient("cluster1", "issuer1", "id1"); ok {
 		t.Fatalf("got client before putting one in the cache")
 	}
+	assertCacheLen(t, cache, 0)
 
 	cli1 := new(oidcAuthProvider)
 	cli2 := new(oidcAuthProvider)
+	cli3 := new(oidcAuthProvider)
 
-	gotcli := cache.setClient("issuer1", "id1", cli1)
+	gotcli := cache.setClient("cluster1", "issuer1", "id1", cli1)
 	if cli1 != gotcli {
 		t.Fatalf("set first client and got a different one")
 	}
+	assertCacheLen(t, cache, 1)
 
-	gotcli = cache.setClient("issuer1", "id1", cli2)
+	gotcli = cache.setClient("cluster1", "issuer1", "id1", cli2)
 	if cli1 != gotcli {
 		t.Fatalf("set a second client and didn't get the first")
+	}
+	assertCacheLen(t, cache, 1)
+
+	gotcli = cache.setClient("cluster2", "issuer1", "id1", cli3)
+	if cli1 == gotcli {
+		t.Fatalf("set a third client and got the first")
+	}
+	if cli3 != gotcli {
+		t.Fatalf("set third client and got a different one")
+	}
+	assertCacheLen(t, cache, 2)
+}
+
+func assertCacheLen(t *testing.T, cache *clientCache, length int) {
+	t.Helper()
+	if len(cache.cache) != length {
+		t.Errorf("expected cache length %d got %d", length, len(cache.cache))
 	}
 }

@@ -2,11 +2,12 @@ package leafnodes
 
 import (
 	"encoding/json"
-	"github.com/onsi/ginkgo/internal/failer"
-	"github.com/onsi/ginkgo/types"
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"github.com/onsi/ginkgo/internal/failer"
+	"github.com/onsi/ginkgo/types"
 )
 
 type synchronizedAfterSuiteNode struct {

@@ -1,3 +1,5 @@
+// +build !dockerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -17,10 +19,10 @@ limitations under the License.
 package dockershim
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	"sync"
 	"testing"
 
 	dockertypes "github.com/docker/docker/api/types"
@@ -28,9 +30,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"k8s.io/api/core/v1"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 )
 
 func TestLabelsAndAnnotationsRoundTrip(t *testing.T) {
@@ -66,7 +68,7 @@ func TestGetApparmorSecurityOpts(t *testing.T) {
 		expectedOpts: []string{},
 	}, {
 		msg:          "AppArmor local profile",
-		config:       makeConfig(apparmor.ProfileNamePrefix + "foo"),
+		config:       makeConfig(v1.AppArmorBetaProfileNamePrefix + "foo"),
 		expectedOpts: []string{"apparmor=foo"},
 	}}
 
@@ -121,25 +123,16 @@ func TestGetUserFromImageUser(t *testing.T) {
 
 func TestParsingCreationConflictError(t *testing.T) {
 	// Expected error message from docker.
-	msg := "Conflict. The name \"/k8s_POD_pfpod_e2e-tests-port-forwarding-dlxt2_81a3469e-99e1-11e6-89f2-42010af00002_0\" is already in use by container 24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e. You have to remove (or rename) that container to be able to reuse that name."
-
-	matches := conflictRE.FindStringSubmatch(msg)
-	require.Len(t, matches, 2)
-	require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
-}
-
-// writeDockerConfig will write a config file into a temporary dir, and return that dir.
-// Caller is responsible for deleting the dir and its contents.
-func writeDockerConfig(cfg string) (string, error) {
-	tmpdir, err := ioutil.TempDir("", "dockershim=helpers_test.go=")
-	if err != nil {
-		return "", err
+	msgs := []string{
+		"Conflict. The name \"/k8s_POD_pfpod_e2e-tests-port-forwarding-dlxt2_81a3469e-99e1-11e6-89f2-42010af00002_0\" is already in use by container 24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e. You have to remove (or rename) that container to be able to reuse that name.",
+		"Conflict. The name \"/k8s_POD_pfpod_e2e-tests-port-forwarding-dlxt2_81a3469e-99e1-11e6-89f2-42010af00002_0\" is already in use by container \"24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e\". You have to remove (or rename) that container to be able to reuse that name.",
 	}
-	dir := filepath.Join(tmpdir, ".docker")
-	if err := os.Mkdir(dir, 0755); err != nil {
-		return "", err
+
+	for _, msg := range msgs {
+		matches := conflictRE.FindStringSubmatch(msg)
+		require.Len(t, matches, 2)
+		require.Equal(t, matches[1], "24666ab8c814d16f986449e504ea0159468ddf8da01897144a770f66dce0e14e")
 	}
-	return tmpdir, ioutil.WriteFile(filepath.Join(dir, "config.json"), []byte(cfg), 0644)
 }
 
 func TestEnsureSandboxImageExists(t *testing.T) {
@@ -343,4 +336,105 @@ func TestGenerateMountBindings(t *testing.T) {
 	result := generateMountBindings(mounts)
 
 	assert.Equal(t, expectedResult, result)
+}
+
+func TestLimitedWriter(t *testing.T) {
+	max := func(x, y int64) int64 {
+		if x > y {
+			return x
+		}
+		return y
+	}
+	for name, tc := range map[string]struct {
+		w        bytes.Buffer
+		toWrite  string
+		limit    int64
+		wants    string
+		wantsErr error
+	}{
+		"nil": {},
+		"neg": {
+			toWrite:  "a",
+			wantsErr: errMaximumWrite,
+			limit:    -1,
+		},
+		"1byte-over": {
+			toWrite:  "a",
+			wantsErr: errMaximumWrite,
+		},
+		"1byte-maxed": {
+			toWrite: "a",
+			wants:   "a",
+			limit:   1,
+		},
+		"1byte-under": {
+			toWrite: "a",
+			wants:   "a",
+			limit:   2,
+		},
+		"6byte-over": {
+			toWrite:  "foobar",
+			wants:    "foo",
+			limit:    3,
+			wantsErr: errMaximumWrite,
+		},
+		"6byte-maxed": {
+			toWrite: "foobar",
+			wants:   "foobar",
+			limit:   6,
+		},
+		"6byte-under": {
+			toWrite: "foobar",
+			wants:   "foobar",
+			limit:   20,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			limit := tc.limit
+			w := sharedLimitWriter(&tc.w, &limit)
+			n, err := w.Write([]byte(tc.toWrite))
+			if int64(n) > max(0, tc.limit) {
+				t.Fatalf("bytes written (%d) exceeds limit (%d)", n, tc.limit)
+			}
+			if (err != nil) != (tc.wantsErr != nil) {
+				if err != nil {
+					t.Fatal("unexpected error:", err)
+				}
+				t.Fatal("expected error:", err)
+			}
+			if err != nil {
+				if !errors.Is(err, tc.wantsErr) {
+					t.Fatal("expected error: ", tc.wantsErr, " instead of: ", err)
+				}
+				if !errors.Is(err, errMaximumWrite) {
+					return
+				}
+				// check contents for errMaximumWrite
+			}
+			if s := tc.w.String(); s != tc.wants {
+				t.Fatalf("expected %q instead of %q", tc.wants, s)
+			}
+		})
+	}
+
+	// test concurrency. run this test a bunch of times to attempt to flush
+	// out any data races or concurrency issues.
+	for i := 0; i < 1000; i++ {
+		var (
+			b1, b2 bytes.Buffer
+			limit  = int64(10)
+			w1     = sharedLimitWriter(&b1, &limit)
+			w2     = sharedLimitWriter(&b2, &limit)
+			ch     = make(chan struct{})
+			wg     sync.WaitGroup
+		)
+		wg.Add(2)
+		go func() { defer wg.Done(); <-ch; w1.Write([]byte("hello")) }()
+		go func() { defer wg.Done(); <-ch; w2.Write([]byte("world")) }()
+		close(ch)
+		wg.Wait()
+		if limit != 0 {
+			t.Fatalf("expected max limit to be reached, instead of %d", limit)
+		}
+	}
 }

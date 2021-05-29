@@ -17,9 +17,8 @@ limitations under the License.
 package net
 
 import (
+	"errors"
 	"net"
-	"net/url"
-	"os"
 	"reflect"
 	"syscall"
 )
@@ -40,17 +39,18 @@ func IPNetEqual(ipnet1, ipnet2 *net.IPNet) bool {
 
 // Returns if the given err is "connection reset by peer" error.
 func IsConnectionReset(err error) bool {
-	if urlErr, ok := err.(*url.Error); ok {
-		err = urlErr.Err
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.ECONNRESET
 	}
-	if opErr, ok := err.(*net.OpError); ok {
-		err = opErr.Err
-	}
-	if osErr, ok := err.(*os.SyscallError); ok {
-		err = osErr.Err
-	}
-	if errno, ok := err.(syscall.Errno); ok && errno == syscall.ECONNRESET {
-		return true
+	return false
+}
+
+// Returns if the given err is "connection refused" error
+func IsConnectionRefused(err error) bool {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.ECONNREFUSED
 	}
 	return false
 }

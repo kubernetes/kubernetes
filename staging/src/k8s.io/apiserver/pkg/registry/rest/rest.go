@@ -24,10 +24,10 @@ import (
 
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 //TODO:
@@ -92,6 +92,13 @@ type GroupVersionKindProvider interface {
 	GroupVersionKind(containingGV schema.GroupVersion) schema.GroupVersionKind
 }
 
+// GroupVersionAcceptor is used to determine if a particular GroupVersion is acceptable to send to an endpoint.
+// This is used for endpoints which accept multiple versions (which is extremely rare).
+// The only known instance is pods/evictions which accepts policy/v1, but also policy/v1beta1 for backwards compatibility.
+type GroupVersionAcceptor interface {
+	AcceptsGroupVersion(gv schema.GroupVersion) bool
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.
@@ -99,16 +106,8 @@ type Lister interface {
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector. 'options' can be nil.
 	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
-}
-
-// Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
-// if export is generally supported for that type. Errors can still be returned during the actual Export when certain
-// instances of the type are not exportable.
-type Exporter interface {
-	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
-	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
-	// retained, otherwise they are stripped also.
-	Export(ctx context.Context, name string, opts metav1.ExportOptions) (runtime.Object, error)
+	// TableConvertor ensures all list implementers also implement table conversion
+	TableConvertor
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -141,13 +140,14 @@ type GetterWithOptions interface {
 }
 
 type TableConvertor interface {
-	ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error)
+	ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1.Table, error)
 }
 
 // GracefulDeleter knows how to pass deletion options to allow delayed deletion of a
 // RESTful object.
 type GracefulDeleter interface {
 	// Delete finds a resource in the storage and deletes it.
+	// The delete attempt is validated by the deleteValidation first.
 	// If options are provided, the resource will attempt to honor them or return an invalid
 	// request error.
 	// Although it can return an arbitrary error value, IsNotFound(err) is true for the
@@ -156,18 +156,24 @@ type GracefulDeleter interface {
 	// information about deletion.
 	// It also returns a boolean which is set to true if the resource was instantly
 	// deleted or false if it will be deleted asynchronously.
-	Delete(ctx context.Context, name string, options *metav1.DeleteOptions) (runtime.Object, bool, error)
+	Delete(ctx context.Context, name string, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions) (runtime.Object, bool, error)
+}
+
+// MayReturnFullObjectDeleter may return deleted object (instead of a simple status) on deletion.
+type MayReturnFullObjectDeleter interface {
+	DeleteReturnsDeletedObject() bool
 }
 
 // CollectionDeleter is an object that can delete a collection
 // of RESTful resources.
 type CollectionDeleter interface {
 	// DeleteCollection selects all resources in the storage matching given 'listOptions'
-	// and deletes them. If 'options' are provided, the resource will attempt to honor
-	// them or return an invalid request error.
+	// and deletes them. The delete attempt is validated by the deleteValidation first.
+	// If 'options' are provided, the resource will attempt to honor them or return an
+	// invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx context.Context, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx context.Context, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.
@@ -206,22 +212,22 @@ type UpdatedObjectInfo interface {
 }
 
 // ValidateObjectFunc is a function to act on a given object. An error may be returned
-// if the hook cannot be completed. An ObjectFunc may NOT transform the provided
+// if the hook cannot be completed. A ValidateObjectFunc may NOT transform the provided
 // object.
-type ValidateObjectFunc func(obj runtime.Object) error
+type ValidateObjectFunc func(ctx context.Context, obj runtime.Object) error
 
 // ValidateAllObjectFunc is a "admit everything" instance of ValidateObjectFunc.
-func ValidateAllObjectFunc(obj runtime.Object) error {
+func ValidateAllObjectFunc(ctx context.Context, obj runtime.Object) error {
 	return nil
 }
 
 // ValidateObjectUpdateFunc is a function to act on a given object and its predecessor.
 // An error may be returned if the hook cannot be completed. An UpdateObjectFunc
 // may NOT transform the provided object.
-type ValidateObjectUpdateFunc func(obj, old runtime.Object) error
+type ValidateObjectUpdateFunc func(ctx context.Context, obj, old runtime.Object) error
 
 // ValidateAllObjectUpdateFunc is a "admit everything" instance of ValidateObjectUpdateFunc.
-func ValidateAllObjectUpdateFunc(obj, old runtime.Object) error {
+func ValidateAllObjectUpdateFunc(ctx context.Context, obj, old runtime.Object) error {
 	return nil
 }
 
@@ -340,4 +346,24 @@ type StorageVersionProvider interface {
 	// an object will be converted to before persisted in etcd, given a
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
+}
+
+// ResetFieldsStrategy is an optional interface that a storage object can
+// implement if it wishes to provide the fields reset by its strategies.
+type ResetFieldsStrategy interface {
+	GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set
+}
+
+// CreateUpdateResetFieldsStrategy is a union of RESTCreateUpdateStrategy
+// and ResetFieldsStrategy.
+type CreateUpdateResetFieldsStrategy interface {
+	RESTCreateUpdateStrategy
+	ResetFieldsStrategy
+}
+
+// UpdateResetFieldsStrategy is a union of RESTUpdateStrategy
+// and ResetFieldsStrategy.
+type UpdateResetFieldsStrategy interface {
+	RESTUpdateStrategy
+	ResetFieldsStrategy
 }

@@ -31,8 +31,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-openapi/spec"
-	openapi "github.com/go-openapi/spec"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/apiserver/pkg/apis/example"
 	examplev1 "k8s.io/apiserver/pkg/apis/example/v1"
@@ -54,6 +53,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
 	kubeopenapi "k8s.io/kube-openapi/pkg/common"
+	"k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 const (
@@ -83,13 +83,13 @@ func init() {
 
 func buildTestOpenAPIDefinition() kubeopenapi.OpenAPIDefinition {
 	return kubeopenapi.OpenAPIDefinition{
-		Schema: openapi.Schema{
-			SchemaProps: openapi.SchemaProps{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
 				Description: "Description",
-				Properties:  map[string]openapi.Schema{},
+				Properties:  map[string]spec.Schema{},
 			},
-			VendorExtensible: openapi.VendorExtensible{
-				Extensions: openapi.Extensions{
+			VendorExtensible: spec.VendorExtensible{
+				Extensions: spec.Extensions{
 					"x-kubernetes-group-version-kind": []interface{}{
 						map[string]interface{}{
 							"group":   "",
@@ -321,6 +321,7 @@ func TestPrepareRun(t *testing.T) {
 	server := httptest.NewServer(s.Handler.Director)
 	defer server.Close()
 	done := make(chan struct{})
+	defer close(done)
 
 	s.PrepareRun()
 	s.RunPostStartHooks(done)
@@ -330,10 +331,19 @@ func TestPrepareRun(t *testing.T) {
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
 
-	// healthz checks are installed in PrepareRun
-	resp, err = http.Get(server.URL + "/healthz")
-	assert.NoError(err)
-	assert.Equal(http.StatusOK, resp.StatusCode)
+	// wait for health (max-in-flight-filter is initialized asynchronously, can take a few milliseconds to initialize)
+	assert.NoError(wait.PollImmediate(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		// healthz checks are installed in PrepareRun
+		resp, err = http.Get(server.URL + "/healthz")
+		assert.NoError(err)
+		data, _ := ioutil.ReadAll(resp.Body)
+		if http.StatusOK != resp.StatusCode {
+			t.Logf("got %d", resp.StatusCode)
+			t.Log(string(data))
+			return false, nil
+		}
+		return true, nil
+	}))
 	resp, err = http.Get(server.URL + "/healthz/ping")
 	assert.NoError(err)
 	assert.Equal(http.StatusOK, resp.StatusCode)
@@ -478,7 +488,7 @@ type mockAuthorizer struct {
 	lastURI string
 }
 
-func (authz *mockAuthorizer) Authorize(a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
+func (authz *mockAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorized authorizer.Decision, reason string, err error) {
 	authz.lastURI = a.GetPath()
 	return authorizer.DecisionAllow, "", nil
 }

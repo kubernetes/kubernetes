@@ -17,6 +17,7 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
@@ -24,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -74,52 +75,52 @@ func TestClusterScopedOwners(t *testing.T) {
 	defer deleteNamespaceOrDie(ns.Name, clientSet, t)
 
 	t.Log("Create a pair of objects")
-	pv, err := clientSet.CoreV1().PersistentVolumes().Create(&v1.PersistentVolume{
+	pv, err := clientSet.CoreV1().PersistentVolumes().Create(context.TODO(), &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "pv-valid"},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{HostPath: &v1.HostPathVolumeSource{Path: "/foo"}},
 			Capacity:               v1.ResourceList{v1.ResourceStorage: resource.MustParse("1Gi")},
 			AccessModes:            []v1.PersistentVolumeAccessMode{v1.ReadWriteMany},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-valid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "PersistentVolume", APIVersion: "v1", Name: pv.Name, UID: pv.UID}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Log("Create a namespaced object with a missing parent")
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-missing",
 			Labels:          map[string]string{"missing": "true"},
 			OwnerReferences: []metav1.OwnerReference{{Kind: "PersistentVolume", APIVersion: "v1", Name: "missing-name", UID: types.UID("missing-uid")}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	t.Log("Create a namespaced object with a missing type parent")
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(&v1.ConfigMap{
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "cm-invalid",
 			OwnerReferences: []metav1.OwnerReference{{Kind: "UnknownType", APIVersion: "unknown.group/v1", Name: "invalid-name", UID: types.UID("invalid-uid")}},
 		},
-	}); err != nil {
+	}, metav1.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
 
 	// wait for deletable children to go away
 	if err := wait.Poll(5*time.Second, 300*time.Second, func() (bool, error) {
-		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-missing", metav1.GetOptions{})
+		_, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-missing", metav1.GetOptions{})
 		switch {
-		case errors.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 			return true, nil
 		case err != nil:
 			return false, err
@@ -136,12 +137,12 @@ func TestClusterScopedOwners(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	// ensure children with unverifiable parents don't get reaped
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-invalid", metav1.GetOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-invalid", metav1.GetOptions{}); err != nil {
 		t.Fatalf("child with invalid ownerRef is unexpectedly missing: %v", err)
 	}
 
 	// ensure children with present parents don't get reaped
-	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get("cm-valid", metav1.GetOptions{}); err != nil {
+	if _, err := clientSet.CoreV1().ConfigMaps(ns.Name).Get(context.TODO(), "cm-valid", metav1.GetOptions{}); err != nil {
 		t.Fatalf("child with valid ownerRef is unexpectedly missing: %v", err)
 	}
 }

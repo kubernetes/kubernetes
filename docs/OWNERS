@@ -5,6 +5,7 @@ reviewers:
   - smarterclayton
   - thockin
 approvers:
+  - sig-docs-approvers
   - brendandburns
   - smarterclayton
   - thockin

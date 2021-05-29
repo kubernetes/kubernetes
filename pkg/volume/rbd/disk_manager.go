@@ -26,10 +26,11 @@ import (
 	"fmt"
 	"os"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -57,7 +58,7 @@ type diskManager interface {
 }
 
 // utility to mount a disk based filesystem
-func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64) error {
+func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.Interface, fsGroup *int64, fsGroupChangePolicy *v1.PodFSGroupChangePolicy) error {
 	globalPDPath := manager.MakeGlobalPDName(*b.rbd)
 	notMnt, err := mounter.IsLikelyNotMountPoint(globalPDPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -95,7 +96,7 @@ func diskSetUp(manager diskManager, b rbdMounter, volPath string, mounter mount.
 	klog.V(3).Infof("rbd: successfully bind mount %s to %s with options %v", globalPDPath, volPath, mountOptions)
 
 	if !b.ReadOnly {
-		volume.SetVolumeOwnership(&b, fsGroup)
+		volume.SetVolumeOwnership(&b, fsGroup, fsGroupChangePolicy, util.FSGroupCompleteHook(b.plugin, nil))
 	}
 
 	return nil
@@ -115,7 +116,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 
 	// Unmount the bind-mount inside this pod.
 	if err := mounter.Unmount(volPath); err != nil {
-		klog.Errorf("failed to umount %s", volPath)
+		klog.Errorf("failed to unmount %s", volPath)
 		return err
 	}
 
@@ -126,7 +127,7 @@ func diskTearDown(manager diskManager, c rbdUnmounter, volPath string, mounter m
 	}
 	if notMnt {
 		if err := os.Remove(volPath); err != nil {
-			klog.V(2).Info("Error removing mountpoint ", volPath, ": ", err)
+			klog.V(2).Infof("Error removing mountpoint %s: %v", volPath, err)
 			return err
 		}
 	}

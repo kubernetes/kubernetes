@@ -25,9 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
-	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
+	"k8s.io/klog/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -41,7 +39,7 @@ type PodConfigNotificationMode int
 const (
 	// PodConfigNotificationUnknown is the default value for
 	// PodConfigNotificationMode when uninitialized.
-	PodConfigNotificationUnknown = iota
+	PodConfigNotificationUnknown PodConfigNotificationMode = iota
 	// PodConfigNotificationSnapshot delivers the full configuration as a SET whenever
 	// any change occurs.
 	PodConfigNotificationSnapshot
@@ -63,9 +61,8 @@ type PodConfig struct {
 	updates chan kubetypes.PodUpdate
 
 	// contains the list of all configured sources
-	sourcesLock       sync.Mutex
-	sources           sets.String
-	checkpointManager checkpointmanager.CheckpointManager
+	sourcesLock sync.Mutex
+	sources     sets.String
 }
 
 // NewPodConfig creates an object that can merge many configuration sources into a stream
@@ -97,7 +94,7 @@ func (c *PodConfig) SeenAllSources(seenSources sets.String) bool {
 	if c.pods == nil {
 		return false
 	}
-	klog.V(5).Infof("Looking for %v, have seen %v", c.sources.List(), seenSources)
+	klog.V(5).InfoS("Looking for sources, have seen", "sources", c.sources.List(), "seenSources", seenSources)
 	return seenSources.HasAll(c.sources.List()...) && c.pods.seenSources(c.sources.List()...)
 }
 
@@ -109,24 +106,6 @@ func (c *PodConfig) Updates() <-chan kubetypes.PodUpdate {
 // Sync requests the full configuration be delivered to the update channel.
 func (c *PodConfig) Sync() {
 	c.pods.Sync()
-}
-
-// Restore restores pods from the checkpoint path, *once*
-func (c *PodConfig) Restore(path string, updates chan<- interface{}) error {
-	if c.checkpointManager != nil {
-		return nil
-	}
-	var err error
-	c.checkpointManager, err = checkpointmanager.NewCheckpointManager(path)
-	if err != nil {
-		return err
-	}
-	pods, err := checkpoint.LoadPods(c.checkpointManager)
-	if err != nil {
-		return err
-	}
-	updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.RESTORE, Source: kubetypes.ApiserverSource}
-	return nil
 }
 
 // podStorage manages the current pod state at any point in time and ensures updates
@@ -173,7 +152,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	defer s.updateLock.Unlock()
 
 	seenBefore := s.sourcesSeen.Has(source)
-	adds, updates, deletes, removes, reconciles, restores := s.merge(source, change)
+	adds, updates, deletes, removes, reconciles := s.merge(source, change)
 	firstSet := !seenBefore && s.sourcesSeen.Has(source)
 
 	// deliver update notifications
@@ -190,9 +169,6 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 		}
 		if len(deletes.Pods) > 0 {
 			s.updates <- *deletes
-		}
-		if len(restores.Pods) > 0 {
-			s.updates <- *restores
 		}
 		if firstSet && len(adds.Pods) == 0 && len(updates.Pods) == 0 && len(deletes.Pods) == 0 {
 			// Send an empty update when first seeing the source and there are
@@ -230,7 +206,7 @@ func (s *podStorage) Merge(source string, change interface{}) error {
 	return nil
 }
 
-func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles, restores *kubetypes.PodUpdate) {
+func (s *podStorage) merge(source string, change interface{}) (adds, updates, deletes, removes, reconciles *kubetypes.PodUpdate) {
 	s.podLock.Lock()
 	defer s.podLock.Unlock()
 
@@ -239,7 +215,6 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	deletePods := []*v1.Pod{}
 	removePods := []*v1.Pod{}
 	reconcilePods := []*v1.Pod{}
-	restorePods := []*v1.Pod{}
 
 	pods := s.pods[source]
 	if pods == nil {
@@ -279,16 +254,16 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	switch update.Op {
 	case kubetypes.ADD, kubetypes.UPDATE, kubetypes.DELETE:
 		if update.Op == kubetypes.ADD {
-			klog.V(4).Infof("Adding new pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Adding new pods from source", "source", source, "pods", format.Pods(update.Pods))
 		} else if update.Op == kubetypes.DELETE {
-			klog.V(4).Infof("Graceful deleting pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Gracefully deleting pods from source", "source", source, "pods", format.Pods(update.Pods))
 		} else {
-			klog.V(4).Infof("Updating pods from source %s : %v", source, update.Pods)
+			klog.V(4).InfoS("Updating pods from source", "source", source, "pods", format.Pods(update.Pods))
 		}
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		klog.V(4).Infof("Removing pods from source %s : %v", source, update.Pods)
+		klog.V(4).InfoS("Removing pods from source", "source", source, "pods", format.Pods(update.Pods))
 		for _, value := range update.Pods {
 			if existing, found := pods[value.UID]; found {
 				// this is a delete
@@ -300,7 +275,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		}
 
 	case kubetypes.SET:
-		klog.V(4).Infof("Setting pods for source %s", source)
+		klog.V(4).InfoS("Setting pods for source", "source", source)
 		s.markSourceSet(source)
 		// Clear the old map entries by just creating a new map
 		oldPods := pods
@@ -312,12 +287,9 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 				removePods = append(removePods, existing)
 			}
 		}
-	case kubetypes.RESTORE:
-		klog.V(4).Infof("Restoring pods for source %s", source)
-		restorePods = append(restorePods, update.Pods...)
 
 	default:
-		klog.Warningf("Received invalid update type: %v", update)
+		klog.InfoS("Received invalid update type", "type", update)
 
 	}
 
@@ -328,9 +300,8 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 	deletes = &kubetypes.PodUpdate{Op: kubetypes.DELETE, Pods: copyPods(deletePods), Source: source}
 	removes = &kubetypes.PodUpdate{Op: kubetypes.REMOVE, Pods: copyPods(removePods), Source: source}
 	reconciles = &kubetypes.PodUpdate{Op: kubetypes.RECONCILE, Pods: copyPods(reconcilePods), Source: source}
-	restores = &kubetypes.PodUpdate{Op: kubetypes.RESTORE, Pods: copyPods(restorePods), Source: source}
 
-	return adds, updates, deletes, removes, reconciles, restores
+	return adds, updates, deletes, removes, reconciles
 }
 
 func (s *podStorage) markSourceSet(source string) {
@@ -352,7 +323,7 @@ func filterInvalidPods(pods []*v1.Pod, source string, recorder record.EventRecor
 		// This function only checks if there is any naming conflict.
 		name := kubecontainer.GetPodFullName(pod)
 		if names.Has(name) {
-			klog.Warningf("Pod[%d] (%s) from %s failed validation due to duplicate pod name %q, ignoring", i+1, format.Pod(pod), source, pod.Name)
+			klog.InfoS("Pod failed validation due to duplicate pod name, ignoring", "index", i, "pod", klog.KObj(pod), "source", source)
 			recorder.Eventf(pod, v1.EventTypeWarning, events.FailedValidation, "Error validating pod %s from %s due to duplicate pod name %q, ignoring", format.Pod(pod), source, pod.Name)
 			continue
 		} else {
@@ -409,7 +380,7 @@ func isAnnotationMapEqual(existingMap, candidateMap map[string]string) bool {
 
 // recordFirstSeenTime records the first seen time of this pod.
 func recordFirstSeenTime(pod *v1.Pod) {
-	klog.V(4).Infof("Receiving a new pod %q", format.Pod(pod))
+	klog.V(4).InfoS("Receiving a new pod", "pod", klog.KObj(pod))
 	pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey] = kubetypes.NewTimestamp().GetString()
 }
 

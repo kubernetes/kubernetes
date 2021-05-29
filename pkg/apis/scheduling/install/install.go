@@ -38,6 +38,5 @@ func Install(scheme *runtime.Scheme) {
 	utilruntime.Must(v1.AddToScheme(scheme))
 	utilruntime.Must(v1beta1.AddToScheme(scheme))
 	utilruntime.Must(v1alpha1.AddToScheme(scheme))
-	// TODO(bsalamat): update this in 1.15 to use v1 API.
-	utilruntime.Must(scheme.SetVersionPriority(v1beta1.SchemeGroupVersion, v1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
+	utilruntime.Must(scheme.SetVersionPriority(v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion, v1alpha1.SchemeGroupVersion))
 }

@@ -21,11 +21,16 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/diff"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 const (
@@ -188,4 +193,208 @@ func newDaemonSetWithSelectorLabels(selectorLabels map[string]string, templateGe
 			},
 		},
 	}
+}
+
+func makeDaemonSetWithSurge(unavailable intstr.IntOrString, surge intstr.IntOrString) *apps.DaemonSet {
+	return &apps.DaemonSet{
+		Spec: apps.DaemonSetSpec{
+			UpdateStrategy: apps.DaemonSetUpdateStrategy{
+				Type: apps.RollingUpdateDaemonSetStrategyType,
+				RollingUpdate: &apps.RollingUpdateDaemonSet{
+					MaxUnavailable: unavailable,
+					MaxSurge:       surge,
+				},
+			},
+		},
+	}
+}
+
+func TestDropDisabledField(t *testing.T) {
+	testCases := []struct {
+		name        string
+		enableSurge bool
+		ds          *apps.DaemonSet
+		old         *apps.DaemonSet
+		expect      *apps.DaemonSet
+	}{
+		{
+			name:        "not surge, no update",
+			enableSurge: false,
+			ds:          &apps.DaemonSet{},
+			old:         nil,
+			expect:      &apps.DaemonSet{},
+		},
+		{
+			name:        "not surge, field not used",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			old:         nil,
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, field not used in old and new",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, field used",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+		},
+		{
+			name:        "not surge, field used, percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+		},
+		{
+			name:        "not surge, field used and cleared",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, field used and cleared, percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+		},
+		{
+			name:        "surge, field not used",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			old:         nil,
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+		},
+		{
+			name:        "surge, field not used in old and new",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+		},
+		{
+			name:        "surge, field used",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			old:         nil,
+			expect:      makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+		},
+		{
+			name:        "surge, field used, percent",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromString("1%")),
+		},
+		{
+			name:        "surge, field used in old and new",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			old:         makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+		},
+		{
+			name:        "surge, allows both fields (validation must catch)",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.FromInt(1)),
+		},
+		{
+			name:        "surge, allows change from unavailable to surge",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+		},
+		{
+			name:        "surge, allows change from surge to unvailable",
+			enableSurge: true,
+			ds:          makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			expect:      makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+		},
+		{
+			name:        "not surge, allows change from unavailable to surge",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, allows change from surge to unvailable",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromInt(1)),
+			old:         makeDaemonSetWithSurge(intstr.FromInt(2), intstr.IntOrString{}),
+			expect:      makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, allows change from unavailable to surge, percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromString("2%"), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromString("2%"), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, allows change from surge to unvailable, percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.FromString("1%")),
+			old:         makeDaemonSetWithSurge(intstr.FromString("2%"), intstr.IntOrString{}),
+			expect:      makeDaemonSetWithSurge(intstr.IntOrString{}, intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, resets zero percent, one percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.FromString("1%")),
+			old:         makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.FromString("1%")),
+		},
+		{
+			name:        "not surge, resets and clears when zero percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.IntOrString{}),
+			old:         makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.FromString("1%")),
+			expect:      makeDaemonSetWithSurge(intstr.FromInt(1), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, sets zero percent, one percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.FromString("1%")),
+			old:         nil,
+			expect:      makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.IntOrString{}),
+		},
+		{
+			name:        "not surge, sets and clears zero percent",
+			enableSurge: false,
+			ds:          makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.IntOrString{}),
+			old:         nil,
+			expect:      makeDaemonSetWithSurge(intstr.FromString("0%"), intstr.IntOrString{}),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.DaemonSetUpdateSurge, tc.enableSurge)()
+			old := tc.old.DeepCopy()
+
+			dropDaemonSetDisabledFields(tc.ds, tc.old)
+
+			// old obj should never be changed
+			if !reflect.DeepEqual(tc.old, old) {
+				t.Fatalf("old ds changed: %v", diff.ObjectReflectDiff(tc.old, old))
+			}
+
+			if !reflect.DeepEqual(tc.ds, tc.expect) {
+				t.Fatalf("unexpected ds spec: %v", diff.ObjectReflectDiff(tc.expect, tc.ds))
+			}
+		})
+	}
+
 }

@@ -16,15 +16,20 @@ Repositories currently staged here:
 - [`k8s.io/cluster-bootstrap`](https://github.com/kubernetes/cluster-bootstrap)
 - [`k8s.io/code-generator`](https://github.com/kubernetes/code-generator)
 - [`k8s.io/component-base`](https://github.com/kubernetes/component-base)
+- [`k8s.io/controller-manager`](https://github.com/kubernetes/controller-manager)
+- [`k8s.io/cri-api`](https://github.com/kubernetes/cri-api)
 - [`k8s.io/csi-api`](https://github.com/kubernetes/csi-api)
 - [`k8s.io/csi-translation-lib`](https://github.com/kubernetes/csi-translation-lib)
 - [`k8s.io/kube-aggregator`](https://github.com/kubernetes/kube-aggregator)
 - [`k8s.io/kube-controller-manager`](https://github.com/kubernetes/kube-controller-manager)
 - [`k8s.io/kube-proxy`](https://github.com/kubernetes/kube-proxy)
 - [`k8s.io/kube-scheduler`](https://github.com/kubernetes/kube-scheduler)
+- [`k8s.io/kubectl`](https://github.com/kubernetes/kubectl)
 - [`k8s.io/kubelet`](https://github.com/kubernetes/kubelet)
+- [`k8s.io/legacy-cloud-providers`](https://github.com/kubernetes/legacy-cloud-providers)
 - [`k8s.io/metrics`](https://github.com/kubernetes/metrics)
-- [`k8s.io/node-api`](https://github.com/kubernetes/node-api)
+- [`k8s.io/mount-utils`](https://github.com/kubernetes/mount-utils)
+- [`k8s.io/pod-security-admission`](https://github.com/kubernetes/pod-security-admission)
 - [`k8s.io/sample-apiserver`](https://github.com/kubernetes/sample-apiserver)
 - [`k8s.io/sample-cli-plugin`](https://github.com/kubernetes/sample-cli-plugin)
 - [`k8s.io/sample-controller`](https://github.com/kubernetes/sample-controller)
@@ -85,7 +90,7 @@ for an example.
 
 2. Setup branch protection and enable access to the `stage-bots` team
 by adding the repo in
-[`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/prow/config.yaml).
+[`prow/config.yaml`](https://github.com/kubernetes/test-infra/blob/master/config/prow/config.yaml).
 See [#kubernetes/test-infra#9292](https://github.com/kubernetes/test-infra/pull/9292)
 for an example.
 

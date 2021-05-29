@@ -3,7 +3,9 @@
 approvers:
 - vishh
 - derekwaynecarr
-- balajismaniam
 - ConnorDoyle
 reviewers:
 - sig-node-reviewers
+
+emeritus_approvers:
+- balajismaniam

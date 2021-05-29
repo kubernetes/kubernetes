@@ -59,6 +59,10 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 
 * [Kubernetes](https://github.com/kubernetes/kubernetes/tree/master/pkg/cloudprovider/providers/vsphere)
 
+* [Kubernetes Cloud Provider](https://github.com/kubernetes/cloud-provider-vsphere)
+
+* [Kubernetes Cluster API](https://github.com/kubernetes-sigs/cluster-api-provider-vsphere)
+
 * [Kubernetes kops](https://github.com/kubernetes/kops/tree/master/upup/pkg/fi/cloudup/vsphere)
 
 * [Terraform](https://github.com/terraform-providers/terraform-provider-vsphere)
@@ -74,6 +78,10 @@ Refer to the [CHANGELOG](CHANGELOG.md) for version to version changes.
 * [Gru](https://github.com/dnaeon/gru)
 
 * [Libretto](https://github.com/apcera/libretto/tree/master/virtualmachine/vsphere)
+
+* [Telegraf](https://github.com/influxdata/telegraf/tree/master/plugins/inputs/vsphere)
+
+* [Open Storage](https://github.com/libopenstorage/openstorage/tree/master/pkg/storageops/vsphere)
 
 ## Related projects
 

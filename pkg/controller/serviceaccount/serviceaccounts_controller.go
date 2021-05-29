@@ -17,11 +17,12 @@ limitations under the License.
 package serviceaccount
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -31,9 +32,8 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/util/metrics"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
+	"k8s.io/klog/v2"
 )
 
 // ServiceAccountsControllerOptions contains options for running a ServiceAccountsController
@@ -52,6 +52,7 @@ type ServiceAccountsControllerOptions struct {
 	NamespaceResync time.Duration
 }
 
+// DefaultServiceAccountsControllerOptions returns the default options for creating a ServiceAccountsController.
 func DefaultServiceAccountsControllerOptions() ServiceAccountsControllerOptions {
 	return ServiceAccountsControllerOptions{
 		ServiceAccounts: []v1.ServiceAccount{
@@ -68,7 +69,7 @@ func NewServiceAccountsController(saInformer coreinformers.ServiceAccountInforme
 		queue:                   workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount"),
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
+		if err := ratelimiter.RegisterMetricAndTrackRateLimiterUsage("serviceaccount_controller", cl.CoreV1().RESTClient().GetRateLimiter()); err != nil {
 			return nil, err
 		}
 	}
@@ -108,6 +109,7 @@ type ServiceAccountsController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// Run runs the ServiceAccountsController blocks until receiving signal from stopCh.
 func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
@@ -115,7 +117,7 @@ func (c *ServiceAccountsController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting service account controller")
 	defer klog.Infof("Shutting down service account controller")
 
-	if !controller.WaitForCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
+	if !cache.WaitForNamedCacheSync("service account", stopCh, c.saListerSynced, c.nsListerSynced) {
 		return
 	}
 
@@ -187,7 +189,7 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 	}()
 
 	ns, err := c.nsLister.Get(key)
-	if apierrs.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
@@ -199,12 +201,11 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 	}
 
 	createFailures := []error{}
-	for i := range c.serviceAccountsToEnsure {
-		sa := c.serviceAccountsToEnsure[i]
+	for _, sa := range c.serviceAccountsToEnsure {
 		switch _, err := c.saLister.ServiceAccounts(ns.Name).Get(sa.Name); {
 		case err == nil:
 			continue
-		case apierrs.IsNotFound(err):
+		case apierrors.IsNotFound(err):
 		case err != nil:
 			return err
 		}
@@ -212,8 +213,11 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		// TODO eliminate this once the fake client can handle creation without NS
 		sa.Namespace = ns.Name
 
-		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
-			createFailures = append(createFailures, err)
+		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(context.TODO(), &sa, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			// we can safely ignore terminating namespace errors
+			if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+				createFailures = append(createFailures, err)
+			}
 		}
 	}
 

@@ -22,7 +22,7 @@ import (
  */
 func rewriteTestsInFile(pathToFile string) {
 	fileSet := token.NewFileSet()
-	rootNode, err := parser.ParseFile(fileSet, pathToFile, nil, 0)
+	rootNode, err := parser.ParseFile(fileSet, pathToFile, nil, parser.ParseComments)
 	if err != nil {
 		panic(fmt.Sprintf("Error parsing test file '%s':\n%s\n", pathToFile, err.Error()))
 	}
@@ -56,12 +56,12 @@ func rewriteTestsInFile(pathToFile string) {
 	}
 
 	fileInfo, err := os.Stat(pathToFile)
+
 	if err != nil {
 		panic(fmt.Sprintf("Error stat'ing file: %s\n", pathToFile))
 	}
 
-	ioutil.WriteFile(pathToFile, buffer.Bytes(), fileInfo.Mode())
-	return
+	err = ioutil.WriteFile(pathToFile, buffer.Bytes(), fileInfo.Mode())
 }
 
 /*
@@ -88,7 +88,6 @@ func rewriteTestFuncAsItStatement(testFunc *ast.FuncDecl, rootNode *ast.File, de
 
 	// remove the old test func from the root node's declarations
 	rootNode.Decls = append(rootNode.Decls[:funcIndex], rootNode.Decls[funcIndex+1:]...)
-	return
 }
 
 /*

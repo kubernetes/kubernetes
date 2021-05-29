@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	. "k8s.io/kubernetes/pkg/apis/apps/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -38,6 +37,7 @@ import (
 func TestSetDefaultDaemonSetSpec(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	maxUnavailable := intstr.FromInt(1)
+	maxSurge := intstr.FromInt(0)
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
 		Spec: v1.PodSpec{
@@ -45,7 +45,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -57,7 +57,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -80,6 +80,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -110,6 +111,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(1),
@@ -146,6 +148,7 @@ func TestSetDefaultDaemonSetSpec(t *testing.T) {
 						Type: appsv1.RollingUpdateDaemonSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateDaemonSet{
 							MaxUnavailable: &maxUnavailable,
+							MaxSurge:       &maxSurge,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -173,6 +176,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 	defaultLabels := map[string]string{"foo": "bar"}
 	var defaultPartition int32 = 0
 	var defaultReplicas int32 = 1
+	var notTheDefaultPartition int32 = 42
 
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
@@ -181,7 +185,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: defaultLabels,
@@ -204,6 +208,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
@@ -231,6 +236,7 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
@@ -253,12 +259,43 @@ func TestSetDefaultStatefulSet(t *testing.T) {
 				},
 				Spec: appsv1.StatefulSetSpec{
 					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
 					Template:            defaultTemplate,
 					PodManagementPolicy: appsv1.ParallelPodManagement,
 					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 						Type: appsv1.RollingUpdateStatefulSetStrategyType,
 						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
 							Partition: &defaultPartition,
+						},
+					},
+					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
+				},
+			},
+		},
+		{ // UpdateStrategy.RollingUpdate.Partition is not lost when UpdateStrategy.Type is not set
+			original: &appsv1.StatefulSet{
+				Spec: appsv1.StatefulSetSpec{
+					Template: defaultTemplate,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &notTheDefaultPartition,
+						},
+					},
+				},
+			},
+			expected: &appsv1.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: defaultLabels,
+				},
+				Spec: appsv1.StatefulSetSpec{
+					Replicas:            &defaultReplicas,
+					MinReadySeconds:     int32(0),
+					Template:            defaultTemplate,
+					PodManagementPolicy: appsv1.OrderedReadyPodManagement,
+					UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+						Type: appsv1.RollingUpdateStatefulSetStrategyType,
+						RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+							Partition: &notTheDefaultPartition,
 						},
 					},
 					RevisionHistoryLimit: utilpointer.Int32Ptr(10),
@@ -292,7 +329,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 			RestartPolicy:                 v1.RestartPolicyAlways,
 			SecurityContext:               &v1.PodSecurityContext{},
 			TerminationGracePeriodSeconds: &period,
-			SchedulerName:                 api.DefaultSchedulerName,
+			SchedulerName:                 v1.DefaultSchedulerName,
 		},
 	}
 	tests := []struct {
@@ -435,7 +472,7 @@ func TestSetDefaultDeployment(t *testing.T) {
 func TestDefaultDeploymentAvailability(t *testing.T) {
 	d := roundTrip(t, runtime.Object(&appsv1.Deployment{})).(*appsv1.Deployment)
 
-	maxUnavailable, err := intstr.GetValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
+	maxUnavailable, err := intstr.GetScaledValueFromIntOrPercent(d.Spec.Strategy.RollingUpdate.MaxUnavailable, int(*(d.Spec.Replicas)), false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

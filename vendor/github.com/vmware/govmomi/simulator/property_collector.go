@@ -337,6 +337,7 @@ func (rr *retrieveResult) collect(ctx *Context, ref types.ManagedObjectReference
 	}
 
 	rtype := rval.Type()
+	match := false
 
 	for _, spec := range rr.req.SpecSet {
 		for _, p := range spec.PropSet {
@@ -348,7 +349,7 @@ func (rr *retrieveResult) collect(ctx *Context, ref types.ManagedObjectReference
 					continue
 				}
 			}
-
+			match = true
 			if isTrue(p.All) {
 				rr.collectAll(ctx, rval, rtype, &content)
 				continue
@@ -358,7 +359,7 @@ func (rr *retrieveResult) collect(ctx *Context, ref types.ManagedObjectReference
 		}
 	}
 
-	if len(content.PropSet) != 0 || len(content.MissingSet) != 0 {
+	if match {
 		rr.Objects = append(rr.Objects, content)
 	}
 
@@ -498,7 +499,12 @@ func (pc *PropertyCollector) RetrievePropertiesEx(ctx *Context, r *types.Retriev
 	res, fault := pc.collect(ctx, r)
 
 	if fault != nil {
-		body.Fault_ = Fault("", fault)
+		switch fault.(type) {
+		case *types.ManagedObjectNotFound:
+			body.Fault_ = Fault("The object has already been deleted or has not been completely created", fault)
+		default:
+			body.Fault_ = Fault("", fault)
+		}
 	} else {
 		objects := res.Objects[:0]
 		for _, o := range res.Objects {
@@ -627,9 +633,14 @@ func (pc *PropertyCollector) apply(ctx *Context, update *types.UpdateSet) types.
 
 func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpdatesEx) soap.HasFault {
 	wait, cancel := context.WithCancel(context.Background())
+	oneUpdate := false
 	if r.Options != nil {
 		if max := r.Options.MaxWaitSeconds; max != nil {
-			wait, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(*max))
+			// A value of 0 causes WaitForUpdatesEx to do one update calculation and return any results.
+			oneUpdate = (*max == 0)
+			if *max > 0 {
+				wait, cancel = context.WithTimeout(context.Background(), time.Second*time.Duration(*max))
+			}
 		}
 	}
 	pc.mu.Lock()
@@ -688,6 +699,10 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 			pc.updates = nil // clear updates collected by the managed object CRUD listeners
 			pc.mu.Unlock()
 			if len(updates) == 0 {
+				if oneUpdate == true {
+					body.Res.Returnval = nil
+					return body
+				}
 				continue
 			}
 
@@ -730,6 +745,10 @@ func (pc *PropertyCollector) WaitForUpdatesEx(ctx *Context, r *types.WaitForUpda
 				}
 			}
 			if len(set.FilterSet) != 0 {
+				return body
+			}
+			if oneUpdate == true {
+				body.Res.Returnval = nil
 				return body
 			}
 		}

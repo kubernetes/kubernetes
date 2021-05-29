@@ -1,9 +1,10 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
+approvers:
+- sig-network-approvers
 reviewers:
-- thockin
+- sig-network-reviewers
 - lavalamp
 - smarterclayton
-- freehan
 labels:
 - sig/network

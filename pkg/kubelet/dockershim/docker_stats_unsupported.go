@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !linux,!windows,!dockerless
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -19,18 +19,11 @@ limitations under the License.
 package dockershim
 
 import (
-	"context"
 	"fmt"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-// ContainerStats returns stats for a container stats request based on container id.
-func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// ListContainerStats returns stats for a list container stats request based on a filter.
-func (ds *dockerService) ListContainerStats(_ context.Context, r *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
+func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
 	return nil, fmt.Errorf("not implemented")
 }

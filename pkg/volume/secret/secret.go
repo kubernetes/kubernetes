@@ -19,15 +19,16 @@ package secret
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
+	utilstrings "k8s.io/utils/strings"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	utilstrings "k8s.io/utils/strings"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -80,11 +81,7 @@ func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
 }
 
-func (plugin *secretPlugin) IsMigratedToCSI() bool {
-	return false
-}
-
-func (plugin *secretPlugin) RequiresRemount() bool {
+func (plugin *secretPlugin) RequiresRemount(spec *volume.Spec) bool {
 	return true
 }
 
@@ -178,11 +175,11 @@ func (b *secretVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (b *secretVolumeMounter) SetUp(fsGroup *int64) error {
-	return b.SetUpAt(b.GetPath(), fsGroup)
+func (b *secretVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
+	return b.SetUpAt(b.GetPath(), mounterArgs)
 }
 
-func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
+func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	klog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
@@ -219,7 +216,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	setupSuccess := false
-	if err := wrapped.SetUpAt(dir, fsGroup); err != nil {
+	if err := wrapped.SetUpAt(dir, mounterArgs); err != nil {
 		return err
 	}
 	if err := volumeutil.MakeNestedMountpoints(b.volName, dir, b.pod); err != nil {
@@ -254,9 +251,9 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	err = volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, mounterArgs.FsGroup, nil /*fsGroupChangePolicy*/, volumeutil.FSGroupCompleteHook(b.plugin, nil))
 	if err != nil {
-		klog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		klog.Errorf("Error applying volume ownership settings for group: %v", mounterArgs.FsGroup)
 		return err
 	}
 	setupSuccess = true
@@ -266,7 +263,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 // MakePayload function is exported so that it can be called from the projection volume driver
 func MakePayload(mappings []v1.KeyToPath, secret *v1.Secret, defaultMode *int32, optional bool) (map[string]volumeutil.FileProjection, error) {
 	if defaultMode == nil {
-		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+		return nil, fmt.Errorf("no defaultMode used, not even the default value for it")
 	}
 
 	payload := make(map[string]volumeutil.FileProjection, len(secret.Data))

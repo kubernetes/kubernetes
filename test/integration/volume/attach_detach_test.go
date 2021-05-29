@@ -17,25 +17,28 @@ limitations under the License.
 package volume
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/informers"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientgoinformers "k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	fakecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
+	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	volumecache "k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	persistentvolumeoptions "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/options"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
@@ -130,8 +133,6 @@ func fakePodWithPVC(name, pvcName, namespace string) (*v1.Pod, *v1.PersistentVol
 	return fakePod, fakePVC
 }
 
-type podCountFunc func(int) bool
-
 var defaultTimerConfig = attachdetach.TimerConfig{
 	ReconcilerLoopPeriod:                              100 * time.Millisecond,
 	ReconcilerMaxWaitForUnmountDuration:               6 * time.Second,
@@ -143,7 +144,7 @@ var defaultTimerConfig = attachdetach.TimerConfig{
 // event is somehow missed by AttachDetach controller - it still
 // gets cleaned up by Desired State of World populator.
 func TestPodDeletionWithDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 	node := &v1.Node{
@@ -162,13 +163,14 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
-	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
+	stopCh := make(chan struct{})
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	go informers.Core().V1().Nodes().Informer().Run(stopCh)
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -176,10 +178,12 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	go podInformer.Run(podStopCh)
 
 	// start controller loop
-	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
+	defer close(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
 	podKey, err := cache.MetaNamespaceKeyFunc(pod)
@@ -204,11 +208,17 @@ func TestPodDeletionWithDswp(t *testing.T) {
 	waitToObservePods(t, podInformer, 0)
 	// the populator loop turns every 1 minute
 	waitForPodFuncInDSWP(t, ctrl.GetDesiredStateOfWorld(), 80*time.Second, "expected 0 pods in dsw after pod delete", 0)
-	close(stopCh)
+}
+
+func initCSIObjects(stopCh chan struct{}, informers clientgoinformers.SharedInformerFactory) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		go informers.Storage().V1().CSINodes().Informer().Run(stopCh)
+	}
+	go informers.Storage().V1().CSIDrivers().Informer().Run(stopCh)
 }
 
 func TestPodUpdateWithWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -229,13 +239,13 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -246,6 +256,8 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -264,7 +276,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -275,7 +287,7 @@ func TestPodUpdateWithWithADC(t *testing.T) {
 }
 
 func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-update"
 
@@ -297,13 +309,13 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -314,6 +326,8 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -332,7 +346,7 @@ func TestPodUpdateWithKeepTerminatedPodVolumes(t *testing.T) {
 
 	pod.Status.Phase = v1.PodSucceeded
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).UpdateStatus(context.TODO(), pod, metav1.UpdateOptions{}); err != nil {
 		t.Errorf("Failed to update pod : %v", err)
 	}
 
@@ -383,7 +397,7 @@ func waitForPodFuncInDSWP(t *testing.T, dswp volumecache.DesiredStateOfWorld, ch
 	}
 }
 
-func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, informers.SharedInformerFactory) {
+func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, syncPeriod time.Duration, timers attachdetach.TimerConfig) (*clientset.Clientset, attachdetach.AttachDetachController, *persistentvolume.PersistentVolumeController, clientgoinformers.SharedInformerFactory) {
 	config := restclient.Config{
 		Host:          server.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}},
@@ -393,7 +407,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 	resyncPeriod := 12 * time.Hour
 	testClient := clientset.NewForConfigOrDie(&config)
 
-	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil)
+	host := volumetest.NewFakeVolumeHost(t, "/tmp/fake", nil, nil)
 	plugin := &volumetest.FakeVolumePlugin{
 		PluginName:             provisionerPluginName,
 		Host:                   host,
@@ -407,21 +421,25 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 		Detachers:              nil,
 	}
 	plugins := []volume.VolumePlugin{plugin}
-	cloud := &fakecloud.FakeCloud{}
-	informers := informers.NewSharedInformerFactory(testClient, resyncPeriod)
+	cloud := &fakecloud.Cloud{}
+	informers := clientgoinformers.NewSharedInformerFactory(testClient, resyncPeriod)
 	ctrl, err := attachdetach.NewAttachDetachController(
 		testClient,
 		informers.Core().V1().Pods(),
 		informers.Core().V1().Nodes(),
 		informers.Core().V1().PersistentVolumeClaims(),
 		informers.Core().V1().PersistentVolumes(),
-		informers.Storage().V1beta1().CSINodes(),
+		informers.Storage().V1().CSINodes(),
+		informers.Storage().V1().CSIDrivers(),
+		informers.Storage().V1().VolumeAttachments(),
 		cloud,
 		plugins,
 		nil, /* prober */
 		false,
 		5*time.Second,
-		timers)
+		timers,
+		nil, /* filteredDialOptions */
+	)
 
 	if err != nil {
 		t.Fatalf("Error creating AttachDetach : %v", err)
@@ -453,7 +471,7 @@ func createAdClients(ns *v1.Namespace, t *testing.T, server *httptest.Server, sy
 // event is somehow missed by AttachDetach controller - it still
 // gets added by Desired State of World populator.
 func TestPodAddedByDswp(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -474,13 +492,13 @@ func TestPodAddedByDswp(t *testing.T) {
 	pod := fakePodWithVol(namespaceName)
 	podStopCh := make(chan struct{})
 
-	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
 	go informers.Core().V1().Nodes().Informer().Run(podStopCh)
 
-	if _, err := testClient.CoreV1().Pods(ns.Name).Create(pod); err != nil {
+	if _, err := testClient.CoreV1().Pods(ns.Name).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -491,6 +509,8 @@ func TestPodAddedByDswp(t *testing.T) {
 	stopCh := make(chan struct{})
 	go informers.Core().V1().PersistentVolumeClaims().Informer().Run(stopCh)
 	go informers.Core().V1().PersistentVolumes().Informer().Run(stopCh)
+	go informers.Storage().V1().VolumeAttachments().Informer().Run(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 
 	waitToObservePods(t, podInformer, 1)
@@ -526,7 +546,7 @@ func TestPodAddedByDswp(t *testing.T) {
 }
 
 func TestPVCBoundWithADC(t *testing.T) {
-	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
+	_, server, closeFn := framework.RunAMaster(framework.NewIntegrationTestControlPlaneConfig())
 	defer closeFn()
 	namespaceName := "test-pod-deletion"
 
@@ -549,7 +569,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 			},
 		},
 	}
-	if _, err := testClient.CoreV1().Nodes().Create(node); err != nil {
+	if _, err := testClient.CoreV1().Nodes().Create(context.TODO(), node, metav1.CreateOptions{}); err != nil {
 		t.Fatalf("Failed to created node : %v", err)
 	}
 
@@ -557,10 +577,10 @@ func TestPVCBoundWithADC(t *testing.T) {
 	pvcs := []*v1.PersistentVolumeClaim{}
 	for i := 0; i < 3; i++ {
 		pod, pvc := fakePodWithPVC(fmt.Sprintf("fakepod-pvcnotbound-%d", i), fmt.Sprintf("fakepvc-%d", i), namespaceName)
-		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(pod); err != nil {
+		if _, err := testClient.CoreV1().Pods(pod.Namespace).Create(context.TODO(), pod, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pod : %v", err)
 		}
-		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc); err != nil {
+		if _, err := testClient.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(context.TODO(), pvc, metav1.CreateOptions{}); err != nil {
 			t.Errorf("Failed to create pvc : %v", err)
 		}
 		pvcs = append(pvcs, pvc)
@@ -568,7 +588,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	// pod with no pvc
 	podNew := fakePodWithVol(namespaceName)
 	podNew.SetName("fakepod")
-	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(podNew); err != nil {
+	if _, err := testClient.CoreV1().Pods(podNew.Namespace).Create(context.TODO(), podNew, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pod : %v", err)
 	}
 
@@ -576,6 +596,7 @@ func TestPVCBoundWithADC(t *testing.T) {
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	informers.WaitForCacheSync(stopCh)
+	initCSIObjects(stopCh, informers)
 	go ctrl.Run(stopCh)
 	go pvCtrl.Run(stopCh)
 
@@ -608,7 +629,7 @@ func createPVForPVC(t *testing.T, testClient *clientset.Clientset, pvc *v1.Persi
 			StorageClassName: *pvc.Spec.StorageClassName,
 		},
 	}
-	if _, err := testClient.CoreV1().PersistentVolumes().Create(pv); err != nil {
+	if _, err := testClient.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{}); err != nil {
 		t.Errorf("Failed to create pv : %v", err)
 	}
 }

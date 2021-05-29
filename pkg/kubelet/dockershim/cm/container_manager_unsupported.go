@@ -1,4 +1,4 @@
-// +build !linux,!windows
+// +build !linux,!windows,!dockerless
 
 /*
 Copyright 2016 The Kubernetes Authors.
@@ -27,6 +27,7 @@ import (
 type unsupportedContainerManager struct {
 }
 
+// NewContainerManager creates a new instance of ContainerManager
 func NewContainerManager(_ string, _ libdocker.Interface) ContainerManager {
 	return &unsupportedContainerManager{}
 }

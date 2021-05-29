@@ -54,14 +54,20 @@ type KubeProxyIPVSConfiguration struct {
 	// strict ARP configure arp_ignore and arp_announce to avoid answering ARP queries
 	// from kube-ipvs0 interface
 	StrictARP bool `json:"strictARP"`
+	// tcpTimeout is the timeout value used for idle IPVS TCP sessions.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPTimeout metav1.Duration `json:"tcpTimeout"`
+	// tcpFinTimeout is the timeout value used for IPVS TCP sessions after receiving a FIN.
+	// The default value is 0, which preserves the current timeout value on the system.
+	TCPFinTimeout metav1.Duration `json:"tcpFinTimeout"`
+	// udpTimeout is the timeout value used for IPVS UDP packets.
+	// The default value is 0, which preserves the current timeout value on the system.
+	UDPTimeout metav1.Duration `json:"udpTimeout"`
 }
 
 // KubeProxyConntrackConfiguration contains conntrack settings for
 // the Kubernetes proxy server.
 type KubeProxyConntrackConfiguration struct {
-	// max is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precedence over maxPerCore and min.
-	Max *int32 `json:"max"`
 	// maxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave the limit as-is and ignore min).
 	MaxPerCore *int32 `json:"maxPerCore"`
@@ -110,6 +116,8 @@ type KubeProxyConfiguration struct {
 	// metricsBindAddress is the IP address and port for the metrics server to serve on,
 	// defaulting to 127.0.0.1:10249 (set to 0.0.0.0 for all interfaces)
 	MetricsBindAddress string `json:"metricsBindAddress"`
+	// bindAddressHardFail, if true, kube-proxy will treat failure to bind to a port as fatal and exit
+	BindAddressHardFail bool `json:"bindAddressHardFail"`
 	// enableProfiling enables profiling via web interface on /debug/pprof handler.
 	// Profiling handlers will be handled by metrics server.
 	EnableProfiling bool `json:"enableProfiling"`
@@ -134,9 +142,6 @@ type KubeProxyConfiguration struct {
 	// portRange is the range of host ports (beginPort-endPort, inclusive) that may be consumed
 	// in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.
 	PortRange string `json:"portRange"`
-	// resourceContainer is the bsolute name of the resource-only container to create and run
-	// the Kube-proxy in (Default: /kube-proxy).
-	ResourceContainer string `json:"resourceContainer"`
 	// udpIdleTimeout is how long an idle UDP connection will be kept open (e.g. '250ms', '2s').
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout metav1.Duration `json:"udpIdleTimeout"`
@@ -155,8 +160,14 @@ type KubeProxyConfiguration struct {
 	NodePortAddresses []string `json:"nodePortAddresses"`
 	// winkernel contains winkernel-related configuration options.
 	Winkernel KubeProxyWinkernelConfiguration `json:"winkernel"`
+	// ShowHiddenMetricsForVersion is the version for which you want to show hidden metrics.
+	ShowHiddenMetricsForVersion string `json:"showHiddenMetricsForVersion"`
+	// DetectLocalMode determines mode to use for detecting local traffic, defaults to LocalModeClusterCIDR
+	DetectLocalMode LocalMode `json:"detectLocalMode"`
 }
 
+// ProxyMode represents modes used by the Kubernetes proxy server.
+//
 // Currently, three modes of proxy are available in Linux platform: 'userspace' (older, going to be EOL), 'iptables'
 // (newer, faster), 'ipvs'(newest, better in performance and scalability).
 //
@@ -166,8 +177,11 @@ type KubeProxyConfiguration struct {
 // future). If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are
 // insufficient, this always falls back to the userspace proxy. IPVS mode will be enabled when proxy mode is set to 'ipvs',
 // and the fall back path is firstly iptables and then userspace.
-
+//
 // In Windows platform, if proxy mode is blank, use the best-available proxy (currently userspace, but may change in the
 // future). If winkernel proxy is selected, regardless of how, but the Windows kernel can't support this mode of proxy,
 // this always falls back to the userspace proxy.
 type ProxyMode string
+
+// LocalMode represents modes to detect local traffic from the node
+type LocalMode string

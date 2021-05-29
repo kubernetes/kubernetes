@@ -20,16 +20,20 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/version"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
+	utilio "k8s.io/utils/io"
+)
+
+const (
+	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
 // New creates Prober that will skip TLS verification while probing.
@@ -66,6 +70,7 @@ type httpProber struct {
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
 func (pr httpProber) Probe(url *url.URL, headers http.Header, timeout time.Duration) (probe.Result, string, error) {
+	pr.transport.DisableCompression = true // removes Accept-Encoding header
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
@@ -89,27 +94,36 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
 	}
+	if headers == nil {
+		headers = http.Header{}
+	}
 	if _, ok := headers["User-Agent"]; !ok {
-		if headers == nil {
-			headers = http.Header{}
-		}
 		// explicitly set User-Agent so it's not set to default Go value
 		v := version.Get()
 		headers.Set("User-Agent", fmt.Sprintf("kube-probe/%s.%s", v.Major, v.Minor))
 	}
-	req.Header = headers
-	if headers.Get("Host") != "" {
-		req.Host = headers.Get("Host")
+	if _, ok := headers["Accept"]; !ok {
+		// Accept header was not defined. accept all
+		headers.Set("Accept", "*/*")
+	} else if headers.Get("Accept") == "" {
+		// Accept header was overridden but is empty. removing
+		headers.Del("Accept")
 	}
+	req.Header = headers
+	req.Host = headers.Get("Host")
 	res, err := client.Do(req)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
 		return probe.Failure, err.Error(), nil
 	}
 	defer res.Body.Close()
-	b, err := ioutil.ReadAll(res.Body)
+	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
 	if err != nil {
-		return probe.Failure, "", err
+		if err == utilio.ErrLimitReached {
+			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
+		} else {
+			return probe.Failure, "", err
+		}
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {

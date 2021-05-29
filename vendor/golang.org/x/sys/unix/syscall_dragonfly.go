@@ -12,8 +12,27 @@
 
 package unix
 
-import "unsafe"
+import (
+	"sync"
+	"unsafe"
+)
 
+// See version list in https://github.com/DragonFlyBSD/DragonFlyBSD/blob/master/sys/sys/param.h
+var (
+	osreldateOnce sync.Once
+	osreldate     uint32
+)
+
+// First __DragonFly_version after September 2019 ABI changes
+// http://lists.dragonflybsd.org/pipermail/users/2019-September/358280.html
+const _dragonflyABIChangeVersion = 500705
+
+func supportsABI(ver uint32) bool {
+	osreldateOnce.Do(func() { osreldate, _ = SysctlUint32("kern.osreldate") })
+	return osreldate >= ver
+}
+
+// SockaddrDatalink implements the Sockaddr interface for AF_LINK type sockets.
 type SockaddrDatalink struct {
 	Len    uint8
 	Family uint8
@@ -26,6 +45,10 @@ type SockaddrDatalink struct {
 	Rcf    uint16
 	Route  [16]uint16
 	raw    RawSockaddrDatalink
+}
+
+func anyToSockaddrGOOS(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
+	return nil, EAFNOSUPPORT
 }
 
 // Translate "kern.hostname" to []_C_int{0,1,2,3}.
@@ -72,7 +95,7 @@ func direntNamlen(buf []byte) (uint64, bool) {
 	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
 }
 
-//sysnb pipe() (r int, w int, err error)
+//sysnb	pipe() (r int, w int, err error)
 
 func Pipe(p []int) (err error) {
 	if len(p) != 2 {
@@ -80,6 +103,19 @@ func Pipe(p []int) (err error) {
 	}
 	p[0], p[1], err = pipe()
 	return
+}
+
+//sysnb	pipe2(p *[2]_C_int, flags int) (r int, w int, err error)
+
+func Pipe2(p []int, flags int) (err error) {
+	if len(p) != 2 {
+		return EINVAL
+	}
+	var pp [2]_C_int
+	// pipe2 on dragonfly takes an fds array as an argument, but still
+	// returns the file descriptors.
+	p[0], p[1], err = pipe2(&pp, flags)
+	return err
 }
 
 //sys	extpread(fd int, p []byte, flags int, offset int64) (n int, err error)
@@ -102,13 +138,15 @@ func Accept4(fd, flags int) (nfd int, sa Sockaddr, err error) {
 	if len > SizeofSockaddrAny {
 		panic("RawSockaddrAny too small")
 	}
-	sa, err = anyToSockaddr(&rsa)
+	sa, err = anyToSockaddr(fd, &rsa)
 	if err != nil {
 		Close(nfd)
 		nfd = 0
 	}
 	return
 }
+
+//sys	Getcwd(buf []byte) (n int, err error) = SYS___GETCWD
 
 func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 	var _p0 unsafe.Pointer
@@ -125,6 +163,85 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 	return
 }
 
+func setattrlistTimes(path string, times []Timespec, flags int) error {
+	// used on Darwin for UtimesNano
+	return ENOSYS
+}
+
+//sys	ioctl(fd int, req uint, arg uintptr) (err error)
+
+//sys	sysctl(mib []_C_int, old *byte, oldlen *uintptr, new *byte, newlen uintptr) (err error) = SYS___SYSCTL
+
+func sysctlUname(mib []_C_int, old *byte, oldlen *uintptr) error {
+	err := sysctl(mib, old, oldlen, nil, 0)
+	if err != nil {
+		// Utsname members on Dragonfly are only 32 bytes and
+		// the syscall returns ENOMEM in case the actual value
+		// is longer.
+		if err == ENOMEM {
+			err = nil
+		}
+	}
+	return err
+}
+
+func Uname(uname *Utsname) error {
+	mib := []_C_int{CTL_KERN, KERN_OSTYPE}
+	n := unsafe.Sizeof(uname.Sysname)
+	if err := sysctlUname(mib, &uname.Sysname[0], &n); err != nil {
+		return err
+	}
+	uname.Sysname[unsafe.Sizeof(uname.Sysname)-1] = 0
+
+	mib = []_C_int{CTL_KERN, KERN_HOSTNAME}
+	n = unsafe.Sizeof(uname.Nodename)
+	if err := sysctlUname(mib, &uname.Nodename[0], &n); err != nil {
+		return err
+	}
+	uname.Nodename[unsafe.Sizeof(uname.Nodename)-1] = 0
+
+	mib = []_C_int{CTL_KERN, KERN_OSRELEASE}
+	n = unsafe.Sizeof(uname.Release)
+	if err := sysctlUname(mib, &uname.Release[0], &n); err != nil {
+		return err
+	}
+	uname.Release[unsafe.Sizeof(uname.Release)-1] = 0
+
+	mib = []_C_int{CTL_KERN, KERN_VERSION}
+	n = unsafe.Sizeof(uname.Version)
+	if err := sysctlUname(mib, &uname.Version[0], &n); err != nil {
+		return err
+	}
+
+	// The version might have newlines or tabs in it, convert them to
+	// spaces.
+	for i, b := range uname.Version {
+		if b == '\n' || b == '\t' {
+			if i == len(uname.Version)-1 {
+				uname.Version[i] = 0
+			} else {
+				uname.Version[i] = ' '
+			}
+		}
+	}
+
+	mib = []_C_int{CTL_HW, HW_MACHINE}
+	n = unsafe.Sizeof(uname.Machine)
+	if err := sysctlUname(mib, &uname.Machine[0], &n); err != nil {
+		return err
+	}
+	uname.Machine[unsafe.Sizeof(uname.Machine)-1] = 0
+
+	return nil
+}
+
+func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err error) {
+	if raceenabled {
+		raceReleaseMerge(unsafe.Pointer(&ioSync))
+	}
+	return sendfile(outfd, infd, offset, count)
+}
+
 /*
  * Exposed directly
  */
@@ -139,16 +256,21 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 //sys	Dup(fd int) (nfd int, err error)
 //sys	Dup2(from int, to int) (err error)
 //sys	Exit(code int)
+//sys	Faccessat(dirfd int, path string, mode uint32, flags int) (err error)
 //sys	Fchdir(fd int) (err error)
 //sys	Fchflags(fd int, flags int) (err error)
 //sys	Fchmod(fd int, mode uint32) (err error)
+//sys	Fchmodat(dirfd int, path string, mode uint32, flags int) (err error)
 //sys	Fchown(fd int, uid int, gid int) (err error)
+//sys	Fchownat(dirfd int, path string, uid int, gid int, flags int) (err error)
 //sys	Flock(fd int, how int) (err error)
 //sys	Fpathconf(fd int, name int) (val int, err error)
 //sys	Fstat(fd int, stat *Stat_t) (err error)
+//sys	Fstatat(fd int, path string, stat *Stat_t, flags int) (err error)
 //sys	Fstatfs(fd int, stat *Statfs_t) (err error)
 //sys	Fsync(fd int) (err error)
 //sys	Ftruncate(fd int, length int64) (err error)
+//sys	Getdents(fd int, buf []byte) (n int, err error)
 //sys	Getdirentries(fd int, buf []byte, basep *uintptr) (n int, err error)
 //sys	Getdtablesize() (size int)
 //sysnb	Getegid() (egid int)
@@ -169,21 +291,26 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 //sys	Kqueue() (fd int, err error)
 //sys	Lchown(path string, uid int, gid int) (err error)
 //sys	Link(path string, link string) (err error)
+//sys	Linkat(pathfd int, path string, linkfd int, link string, flags int) (err error)
 //sys	Listen(s int, backlog int) (err error)
 //sys	Lstat(path string, stat *Stat_t) (err error)
 //sys	Mkdir(path string, mode uint32) (err error)
+//sys	Mkdirat(dirfd int, path string, mode uint32) (err error)
 //sys	Mkfifo(path string, mode uint32) (err error)
 //sys	Mknod(path string, mode uint32, dev int) (err error)
+//sys	Mknodat(fd int, path string, mode uint32, dev int) (err error)
 //sys	Nanosleep(time *Timespec, leftover *Timespec) (err error)
 //sys	Open(path string, mode int, perm uint32) (fd int, err error)
+//sys	Openat(dirfd int, path string, mode int, perm uint32) (fd int, err error)
 //sys	Pathconf(path string, name int) (val int, err error)
 //sys	read(fd int, p []byte) (n int, err error)
 //sys	Readlink(path string, buf []byte) (n int, err error)
 //sys	Rename(from string, to string) (err error)
+//sys	Renameat(fromfd int, from string, tofd int, to string) (err error)
 //sys	Revoke(path string) (err error)
 //sys	Rmdir(path string) (err error)
 //sys	Seek(fd int, offset int64, whence int) (newoffset int64, err error) = SYS_LSEEK
-//sys	Select(n int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (err error)
+//sys	Select(nfd int, r *FdSet, w *FdSet, e *FdSet, timeout *Timeval) (n int, err error)
 //sysnb	Setegid(egid int) (err error)
 //sysnb	Seteuid(euid int) (err error)
 //sysnb	Setgid(gid int) (err error)
@@ -201,15 +328,17 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 //sys	Stat(path string, stat *Stat_t) (err error)
 //sys	Statfs(path string, stat *Statfs_t) (err error)
 //sys	Symlink(path string, link string) (err error)
+//sys	Symlinkat(oldpath string, newdirfd int, newpath string) (err error)
 //sys	Sync() (err error)
 //sys	Truncate(path string, length int64) (err error)
 //sys	Umask(newmask int) (oldmask int)
 //sys	Undelete(path string) (err error)
 //sys	Unlink(path string) (err error)
+//sys	Unlinkat(dirfd int, path string, flags int) (err error)
 //sys	Unmount(path string, flags int) (err error)
 //sys	write(fd int, p []byte) (n int, err error)
-//sys   mmap(addr uintptr, length uintptr, prot int, flag int, fd int, pos int64) (ret uintptr, err error)
-//sys   munmap(addr uintptr, length uintptr) (err error)
+//sys	mmap(addr uintptr, length uintptr, prot int, flag int, fd int, pos int64) (ret uintptr, err error)
+//sys	munmap(addr uintptr, length uintptr) (err error)
 //sys	readlen(fd int, buf *byte, nbuf int) (n int, err error) = SYS_READ
 //sys	writelen(fd int, buf *byte, nbuf int) (n int, err error) = SYS_WRITE
 //sys	accept4(fd int, rsa *RawSockaddrAny, addrlen *_Socklen, flags int) (nfd int, err error)
@@ -225,7 +354,6 @@ func Getfsstat(buf []Statfs_t, flags int) (n int, err error) {
 // Getlogin
 // Sigpending
 // Sigaltstack
-// Ioctl
 // Reboot
 // Execve
 // Vfork

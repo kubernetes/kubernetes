@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -27,9 +28,11 @@ import (
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 	"github.com/karrick/godirwalk"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/pkg/errors"
+	"golang.org/x/sys/unix"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func DebugInfo(watches map[string][]string) map[string][]string {
@@ -47,6 +50,35 @@ func DebugInfo(watches map[string][]string) map[string][]string {
 	return out
 }
 
+// findFileInAncestorDir returns the path to the parent directory that contains the specified file.
+// "" is returned if the lookup reaches the limit.
+func findFileInAncestorDir(current, file, limit string) (string, error) {
+	for {
+		fpath := path.Join(current, file)
+		_, err := os.Stat(fpath)
+		if err == nil {
+			return current, nil
+		}
+		if !os.IsNotExist(err) {
+			return "", err
+		}
+		if current == limit {
+			return "", nil
+		}
+		current = filepath.Dir(current)
+	}
+}
+
+var bootTime = func() time.Time {
+	now := time.Now()
+	var sysinfo unix.Sysinfo_t
+	if err := unix.Sysinfo(&sysinfo); err != nil {
+		return now
+	}
+	sinceBoot := time.Duration(sysinfo.Uptime) * time.Second
+	return now.Add(-1 * sinceBoot).Truncate(time.Minute)
+}()
+
 func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoFactory, hasNetwork, hasFilesystem bool) (info.ContainerSpec, error) {
 	var spec info.ContainerSpec
 
@@ -54,17 +86,28 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	// Get the lowest creation time from all hierarchies as the container creation time.
 	now := time.Now()
 	lowestTime := now
-	for _, cgroupPath := range cgroupPaths {
-		// The modified time of the cgroup directory changes whenever a subcontainer is created.
+	for _, cgroupPathDir := range cgroupPaths {
+		dir, err := os.Stat(cgroupPathDir)
+		if err == nil && dir.ModTime().Before(lowestTime) {
+			lowestTime = dir.ModTime()
+		}
+		// The modified time of the cgroup directory sometimes changes whenever a subcontainer is created.
 		// eg. /docker will have creation time matching the creation of latest docker container.
-		// Use clone_children as a workaround as it isn't usually modified. It is only likely changed
-		// immediately after creating a container.
-		cgroupPath = path.Join(cgroupPath, "cgroup.clone_children")
-		fi, err := os.Stat(cgroupPath)
+		// Use clone_children/events as a workaround as it isn't usually modified. It is only likely changed
+		// immediately after creating a container. If the directory modified time is lower, we use that.
+		cgroupPathFile := path.Join(cgroupPathDir, "cgroup.clone_children")
+		if cgroups.IsCgroup2UnifiedMode() {
+			cgroupPathFile = path.Join(cgroupPathDir, "cgroup.events")
+		}
+		fi, err := os.Stat(cgroupPathFile)
 		if err == nil && fi.ModTime().Before(lowestTime) {
 			lowestTime = fi.ModTime()
 		}
 	}
+	if lowestTime.Before(bootTime) {
+		lowestTime = bootTime
+	}
+
 	if lowestTime != now {
 		spec.CreationTime = lowestTime
 	}
@@ -88,8 +131,9 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 				val, err := strconv.ParseUint(quota, 10, 64)
 				if err != nil {
 					klog.Errorf("GetSpec: Failed to parse CPUQuota from %q: %s", path.Join(cpuRoot, "cpu.cfs_quota_us"), err)
+				} else {
+					spec.Cpu.Quota = val
 				}
-				spec.Cpu.Quota = val
 			}
 		}
 	}
@@ -100,7 +144,12 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	if ok {
 		if utils.FileExists(cpusetRoot) {
 			spec.HasCpu = true
-			mask := readString(cpusetRoot, "cpuset.cpus")
+			mask := ""
+			if cgroups.IsCgroup2UnifiedMode() {
+				mask = readString(cpusetRoot, "cpuset.cpus.effective")
+			} else {
+				mask = readString(cpusetRoot, "cpuset.cpus")
+			}
 			spec.Cpu.Mask = utils.FixCpuMask(mask, mi.NumCores)
 		}
 	}
@@ -108,18 +157,52 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 	// Memory
 	memoryRoot, ok := cgroupPaths["memory"]
 	if ok {
-		if utils.FileExists(memoryRoot) {
-			spec.HasMemory = true
-			spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
-			spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
-			spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
+		if !cgroups.IsCgroup2UnifiedMode() {
+			if utils.FileExists(memoryRoot) {
+				spec.HasMemory = true
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
+			}
+		} else {
+			memoryRoot, err := findFileInAncestorDir(memoryRoot, "memory.max", "/sys/fs/cgroup")
+			if err != nil {
+				return spec, err
+			}
+			if memoryRoot != "" {
+				spec.HasMemory = true
+				spec.Memory.Reservation = readUInt64(memoryRoot, "memory.high")
+				spec.Memory.Limit = readUInt64(memoryRoot, "memory.max")
+				spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.swap.max")
+			}
+		}
+	}
+
+	// Hugepage
+	hugepageRoot, ok := cgroupPaths["hugetlb"]
+	if ok {
+		if utils.FileExists(hugepageRoot) {
+			spec.HasHugetlb = true
+		}
+	}
+
+	// Processes, read it's value from pids path directly
+	pidsRoot, ok := cgroupPaths["pids"]
+	if ok {
+		if utils.FileExists(pidsRoot) {
+			spec.HasProcesses = true
+			spec.Processes.Limit = readUInt64(pidsRoot, "pids.max")
 		}
 	}
 
 	spec.HasNetwork = hasNetwork
 	spec.HasFilesystem = hasFilesystem
 
-	if blkioRoot, ok := cgroupPaths["blkio"]; ok && utils.FileExists(blkioRoot) {
+	ioControllerName := "blkio"
+	if cgroups.IsCgroup2UnifiedMode() {
+		ioControllerName = "io"
+	}
+	if blkioRoot, ok := cgroupPaths[ioControllerName]; ok && utils.FileExists(blkioRoot) {
 		spec.HasDiskIo = true
 	}
 
@@ -143,7 +226,7 @@ func readString(dirpath string, file string) string {
 
 func readUInt64(dirpath string, file string) uint64 {
 	out := readString(dirpath, file)
-	if out == "" {
+	if out == "" || out == "max" {
 		return 0
 	}
 
@@ -158,7 +241,7 @@ func readUInt64(dirpath string, file string) uint64 {
 
 // Lists all directories under "path" and outputs the results as children of "parent".
 func ListDirectories(dirpath string, parent string, recursive bool, output map[string]struct{}) error {
-	buf := make([]byte, godirwalk.DefaultScratchBufferSize)
+	buf := make([]byte, godirwalk.MinimumScratchBufferSize)
 	return listDirectories(dirpath, parent, recursive, output, buf)
 }
 

@@ -26,11 +26,6 @@ const (
 	Uint32       = "uint32"
 	Uint64       = "uint64"
 
-	// HCS
-
-	HCSOperation       = "hcs-op"
-	HCSOperationResult = "hcs-op-result"
-
 	// runhcs
 
 	VMShimOperation = "vmshim-op"

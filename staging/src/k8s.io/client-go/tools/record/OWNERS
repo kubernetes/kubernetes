@@ -1,29 +1,6 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-- lavalamp
-- smarterclayton
-- wojtek-t
-- deads2k
-- derekwaynecarr
-- caesarxuchao
-- vishh
-- mikedanese
-- liggitt
-- nikhiljindal
-- erictune
-- pmorie
-- dchen1107
-- saad-ali
-- luxas
-- yifan-gu
-- eparis
-- mwielgus
-- timothysc
-- jsafrane
-- dims
-- krousey
-- a-robinson
-- aveshagarwal
-- resouer
-- cjcullen
+- sig-instrumentation-reviewers
+approvers:
+- sig-instrumentation-approvers

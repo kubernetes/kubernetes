@@ -23,7 +23,8 @@ import (
 	"github.com/lithammer/dedent"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
@@ -60,14 +61,20 @@ func TestValidateSupportedVersion(t *testing.T) {
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
-				Version: "v1alpha3",
+				Version: "v1beta1",
 			},
-			allowDeprecated: true,
+			expectedErr: true,
 		},
 		{
 			gv: schema.GroupVersion{
 				Group:   KubeadmGroupName,
-				Version: "v1beta1",
+				Version: "v1beta2",
+			},
+		},
+		{
+			gv: schema.GroupVersion{
+				Group:   KubeadmGroupName,
+				Version: "v1beta3",
 			},
 		},
 		{
@@ -118,11 +125,9 @@ func TestLowercaseSANs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			cfg := &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					APIServer: kubeadmapiv1beta1.APIServer{
-						CertSANs: test.in,
-					},
+			cfg := &kubeadmapiv1.ClusterConfiguration{
+				APIServer: kubeadmapiv1.APIServer{
+					CertSANs: test.in,
 				},
 			}
 
@@ -156,13 +161,13 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 			address: "2001:db8:85a3::8a2e:370:7334",
 		},
 		{
-			name:          "invalid address: not a global unicast 0.0.0.0",
-			address:       "0.0.0.0",
-			expectedError: true,
+			name:          "valid address 127.0.0.1",
+			address:       "127.0.0.1",
+			expectedError: false,
 		},
 		{
-			name:          "invalid address: not a global unicast 127.0.0.1",
-			address:       "127.0.0.1",
+			name:          "invalid address: not a global unicast 0.0.0.0",
+			address:       "0.0.0.0",
 			expectedError: true,
 		},
 		{
@@ -205,17 +210,17 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "bad config produces error",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
-			`),
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectErr: true,
 		},
 		{
 			desc: "InitConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -224,10 +229,10 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "ClusterConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -236,14 +241,15 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "JoinConfiguration only gets migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: JoinConfiguration
-			token: abcdef.0123456789abcdef
-			discoveryTokenAPIServers:
-			- kube-apiserver:6443
-			discoveryTokenUnsafeSkipCAVerification: true
-			`),
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
@@ -251,13 +257,13 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Cluster Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -266,17 +272,18 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: JoinConfiguration
-			token: abcdef.0123456789abcdef
-			discoveryTokenAPIServers:
-			- kube-apiserver:6443
-			discoveryTokenUnsafeSkipCAVerification: true
-			`),
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -286,17 +293,18 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: JoinConfiguration
-			token: abcdef.0123456789abcdef
-			discoveryTokenAPIServers:
-			- kube-apiserver:6443
-			discoveryTokenUnsafeSkipCAVerification: true
-			`),
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -306,20 +314,21 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "Init + Cluster + Join Configurations are migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: JoinConfiguration
-			token: abcdef.0123456789abcdef
-			discoveryTokenAPIServers:
-			- kube-apiserver:6443
-			discoveryTokenUnsafeSkipCAVerification: true
-			`),
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,
@@ -329,26 +338,27 @@ func TestMigrateOldConfigFromFile(t *testing.T) {
 		},
 		{
 			desc: "component configs are not migrated",
-			oldCfg: dedent.Dedent(`
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			oldCfg: dedent.Dedent(fmt.Sprintf(`
+			apiVersion: %s
 			kind: InitConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: ClusterConfiguration
 			---
-			apiVersion: kubeadm.k8s.io/v1alpha3
+			apiVersion: %[1]s
 			kind: JoinConfiguration
-			token: abcdef.0123456789abcdef
-			discoveryTokenAPIServers:
-			- kube-apiserver:6443
-			discoveryTokenUnsafeSkipCAVerification: true
+			discovery:
+			  bootstrapToken:
+			    token: abcdef.0123456789abcdef
+			    apiServerEndpoint: kube-apiserver:6443
+			    unsafeSkipCAVerification: true
 			---
 			apiVersion: kubeproxy.config.k8s.io/v1alpha1
 			kind: KubeProxyConfiguration
 			---
 			apiVersion: kubelet.config.k8s.io/v1beta1
 			kind: KubeletConfiguration
-			`),
+			`, kubeadmapiv1old.SchemeGroupVersion.String())),
 			expectedKinds: []string{
 				constants.InitConfigurationKind,
 				constants.ClusterConfigurationKind,

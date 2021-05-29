@@ -16,7 +16,7 @@ func SplitDomainName(s string) (labels []string) {
 	fqdnEnd := 0 // offset of the final '.' or the length of the name
 	idx := Split(s)
 	begin := 0
-	if s[len(s)-1] == '.' {
+	if IsFqdn(s) {
 		fqdnEnd = len(s) - 1
 	} else {
 		fqdnEnd = len(s)
@@ -28,21 +28,18 @@ func SplitDomainName(s string) (labels []string) {
 	case 1:
 		// no-op
 	default:
-		end := 0
-		for i := 1; i < len(idx); i++ {
-			end = idx[i]
+		for _, end := range idx[1:] {
 			labels = append(labels, s[begin:end-1])
 			begin = end
 		}
 	}
 
-	labels = append(labels, s[begin:fqdnEnd])
-	return labels
+	return append(labels, s[begin:fqdnEnd])
 }
 
 // CompareDomainName compares the names s1 and s2 and
 // returns how many labels they have in common starting from the *right*.
-// The comparison stops at the first inequality. The names are not downcased
+// The comparison stops at the first inequality. The names are downcased
 // before the comparison.
 //
 // www.miek.nl. and miek.nl. have two labels in common: miek and nl
@@ -50,15 +47,13 @@ func SplitDomainName(s string) (labels []string) {
 //
 // s1 and s2 must be syntactically valid domain names.
 func CompareDomainName(s1, s2 string) (n int) {
-	s1 = Fqdn(s1)
-	s2 = Fqdn(s2)
+	// the first check: root label
+	if s1 == "." || s2 == "." {
+		return 0
+	}
+
 	l1 := Split(s1)
 	l2 := Split(s2)
-
-	// the first check: root label
-	if l1 == nil || l2 == nil {
-		return
-	}
 
 	j1 := len(l1) - 1 // end
 	i1 := len(l1) - 2 // start
@@ -66,7 +61,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 	i2 := len(l2) - 2
 	// the second check can be done here: last/only label
 	// before we fall through into the for-loop below
-	if s1[l1[j1]:] == s2[l2[j2]:] {
+	if equal(s1[l1[j1]:], s2[l2[j2]:]) {
 		n++
 	} else {
 		return
@@ -75,7 +70,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 		if i1 < 0 || i2 < 0 {
 			break
 		}
-		if s1[l1[i1]:l1[j1]] == s2[l2[i2]:l2[j2]] {
+		if equal(s1[l1[i1]:l1[j1]], s2[l2[i2]:l2[j2]]) {
 			n++
 		} else {
 			break
@@ -88,7 +83,7 @@ func CompareDomainName(s1, s2 string) (n int) {
 	return
 }
 
-// CountLabel counts the the number of labels in the string s.
+// CountLabel counts the number of labels in the string s.
 // s must be a syntactically valid domain name.
 func CountLabel(s string) (labels int) {
 	if s == "." {
@@ -131,20 +126,23 @@ func Split(s string) []int {
 // The bool end is true when the end of the string has been reached.
 // Also see PrevLabel.
 func NextLabel(s string, offset int) (i int, end bool) {
-	quote := false
+	if s == "" {
+		return 0, true
+	}
 	for i = offset; i < len(s)-1; i++ {
-		switch s[i] {
-		case '\\':
-			quote = !quote
-		default:
-			quote = false
-		case '.':
-			if quote {
-				quote = !quote
-				continue
-			}
-			return i + 1, false
+		if s[i] != '.' {
+			continue
 		}
+		j := i - 1
+		for j >= 0 && s[j] == '\\' {
+			j--
+		}
+
+		if (j-i)%2 == 0 {
+			continue
+		}
+
+		return i + 1, false
 	}
 	return i + 1, true
 }
@@ -154,15 +152,61 @@ func NextLabel(s string, offset int) (i int, end bool) {
 // The bool start is true when the start of the string has been overshot.
 // Also see NextLabel.
 func PrevLabel(s string, n int) (i int, start bool) {
+	if s == "" {
+		return 0, true
+	}
 	if n == 0 {
 		return len(s), false
 	}
-	lab := Split(s)
-	if lab == nil {
-		return 0, true
+
+	l := len(s) - 1
+	if s[l] == '.' {
+		l--
 	}
-	if n > len(lab) {
-		return 0, true
+
+	for ; l >= 0 && n > 0; l-- {
+		if s[l] != '.' {
+			continue
+		}
+		j := l - 1
+		for j >= 0 && s[j] == '\\' {
+			j--
+		}
+
+		if (j-l)%2 == 0 {
+			continue
+		}
+
+		n--
+		if n == 0 {
+			return l + 1, false
+		}
 	}
-	return lab[len(lab)-n], false
+
+	return 0, n > 1
+}
+
+// equal compares a and b while ignoring case. It returns true when equal otherwise false.
+func equal(a, b string) bool {
+	// might be lifted into API function.
+	la := len(a)
+	lb := len(b)
+	if la != lb {
+		return false
+	}
+
+	for i := la - 1; i >= 0; i-- {
+		ai := a[i]
+		bi := b[i]
+		if ai >= 'A' && ai <= 'Z' {
+			ai |= 'a' - 'A'
+		}
+		if bi >= 'A' && bi <= 'Z' {
+			bi |= 'a' - 'A'
+		}
+		if ai != bi {
+			return false
+		}
+	}
+	return true
 }

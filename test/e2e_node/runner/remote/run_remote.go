@@ -21,6 +21,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -35,19 +36,20 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
-	"github.com/pborman/uuid"
-	"golang.org/x/oauth2"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
-	"k8s.io/klog"
+	"google.golang.org/api/option"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
-var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|conformance")
+var testSuite = flag.String("test-suite", "default", "Test suite the runner initializes with. Currently support default|cadvisor|conformance")
 var instanceNamePrefix = flag.String("instance-name-prefix", "", "prefix for instance names")
 var zone = flag.String("zone", "", "gce zone the hosts live in")
 var project = flag.String("project", "", "gce project the hosts live in")
@@ -55,6 +57,7 @@ var imageConfigFile = flag.String("image-config-file", "", "yaml file describing
 var imageConfigDir = flag.String("image-config-dir", "", "(optional)path to image config files")
 var imageProject = flag.String("image-project", "", "gce project the hosts live in")
 var images = flag.String("images", "", "images to test")
+var preemptibleInstances = flag.Bool("preemptible-instances", false, "If true, gce instances will be configured to be preemptible")
 var hosts = flag.String("hosts", "", "hosts to test")
 var cleanup = flag.Bool("cleanup", true, "If true remove files from remote hosts and delete temporary instances")
 var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any instances created")
@@ -64,6 +67,7 @@ var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 var systemSpecName = flag.String("system-spec-name", "", fmt.Sprintf("The name of the system spec used for validating the image in the node conformance test. The specs are at %s. If unspecified, the default built-in spec (system.DefaultSpec) will be used.", system.SystemSpecPath))
 var extraEnvs = flag.String("extra-envs", "", "The extra environment variables needed for node e2e tests. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
+var runtimeConfig = flag.String("runtime-config", "", "The runtime configuration for the API server on the node e2e tests.. Format: a list of key=value pairs, e.g., env1=val1,env2=val2")
 
 // envs is the type used to collect all node envs. The key is the env name,
 // and the value is the env value
@@ -78,7 +82,7 @@ func (e *envs) String() string {
 func (e *envs) Set(value string) error {
 	kv := strings.SplitN(value, "=", 2)
 	if len(kv) != 2 {
-		return fmt.Errorf("invalid env string")
+		return fmt.Errorf("invalid env string %s", value)
 	}
 	emap := *e
 	emap[kv[0]] = kv[1]
@@ -103,12 +107,14 @@ var (
 	suite          remote.TestSuite
 )
 
+// Archive contains path info in the archive.
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
 
+// TestResult contains some information about the test results.
 type TestResult struct {
 	output string
 	err    error
@@ -127,34 +133,35 @@ type TestResult struct {
 //         project: gce-image-project
 //         machine: for benchmark only, the machine type (GCE instance) to run test
 //         tests: for benchmark only, a list of ginkgo focus strings to match tests
-
 // TODO(coufon): replace 'image' with 'node' in configurations
 // and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
 
+// Accelerator contains type and count about resource.
 type Accelerator struct {
 	Type  string `json:"type,omitempty"`
 	Count int64  `json:"count,omitempty"`
 }
 
+// Resources contains accelerators array.
 type Resources struct {
 	Accelerators []Accelerator `json:"accelerators,omitempty"`
 }
 
+// GCEImage contains some information about GCE Image.
 type GCEImage struct {
 	Image      string `json:"image,omitempty"`
-	ImageDesc  string `json:"image_description,omitempty"`
-	Project    string `json:"project"`
-	Metadata   string `json:"metadata"`
 	ImageRegex string `json:"image_regex,omitempty"`
-	// Defaults to using only the latest image. Acceptable values are [0, # of images that match the regex).
-	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
-	PreviousImages int `json:"previous_images,omitempty"`
-
-	Machine   string    `json:"machine,omitempty"`
-	Resources Resources `json:"resources,omitempty"`
+	// ImageFamily is the image family to use. The latest image from the image family will be used, e.g cos-81-lts.
+	ImageFamily     string    `json:"image_family,omitempty"`
+	ImageDesc       string    `json:"image_description,omitempty"`
+	KernelArguments []string  `json:"kernel_arguments,omitempty"`
+	Project         string    `json:"project"`
+	Metadata        string    `json:"metadata"`
+	Machine         string    `json:"machine,omitempty"`
+	Resources       Resources `json:"resources,omitempty"`
 	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests,omitempty"`
 }
@@ -163,16 +170,18 @@ type internalImageConfig struct {
 	images map[string]internalGCEImage
 }
 
+// internalGCEImage is an internal GCE image representation for E2E node.
 type internalGCEImage struct {
 	image string
 	// imageDesc is the description of the image. If empty, the value in the
 	// 'image' will be used.
-	imageDesc string
-	project   string
-	resources Resources
-	metadata  *compute.Metadata
-	machine   string
-	tests     []string
+	imageDesc       string
+	kernelArguments []string
+	project         string
+	resources       Resources
+	metadata        *compute.Metadata
+	machine         string
+	tests           []string
 }
 
 func main() {
@@ -188,7 +197,7 @@ func main() {
 		// Use node e2e suite by default if no subcommand is specified.
 		suite = remote.InitNodeE2ERemote()
 	default:
-		klog.Fatalf("--test-suite must be one of default or conformance")
+		klog.Fatalf("--test-suite must be one of default, cadvisor, or conformance")
 	}
 
 	rand.Seed(time.Now().UnixNano())
@@ -210,57 +219,55 @@ func main() {
 	gceImages := &internalImageConfig{
 		images: make(map[string]internalGCEImage),
 	}
+	// Parse images from given config file and convert them to internalGCEImage.
 	if *imageConfigFile != "" {
 		configPath := *imageConfigFile
 		if *imageConfigDir != "" {
 			configPath = filepath.Join(*imageConfigDir, *imageConfigFile)
 		}
 
-		// parse images
 		imageConfigData, err := ioutil.ReadFile(configPath)
 		if err != nil {
 			klog.Fatalf("Could not read image config file provided: %v", err)
 		}
+		// Unmarshal the given image config file. All images for this test run will be organized into a map.
+		// shortName->GCEImage, e.g cos-stable->cos-stable-81-12871-103-0.
 		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
 		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
 		if err != nil {
 			klog.Fatalf("Could not parse image config file: %v", err)
 		}
+
 		for shortName, imageConfig := range externalImageConfig.Images {
-			var images []string
-			isRegex, name := false, shortName
-			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
-				isRegex = true
-				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
+			var image string
+			if (imageConfig.ImageRegex != "" || imageConfig.ImageFamily != "") && imageConfig.Image == "" {
+				image, err = getGCEImage(imageConfig.ImageRegex, imageConfig.ImageFamily, imageConfig.Project)
 				if err != nil {
-					klog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
+					klog.Fatalf("Could not retrieve a image based on image regex %q and family %q: %v",
+						imageConfig.ImageRegex, imageConfig.ImageFamily, err)
 				}
 			} else {
-				images = []string{imageConfig.Image}
+				image = imageConfig.Image
 			}
-			for _, image := range images {
-				metadata := imageConfig.Metadata
-				if len(strings.TrimSpace(*instanceMetadata)) > 0 {
-					metadata += "," + *instanceMetadata
-				}
-				gceImage := internalGCEImage{
-					image:     image,
-					imageDesc: imageConfig.ImageDesc,
-					project:   imageConfig.Project,
-					metadata:  getImageMetadata(metadata),
-					machine:   imageConfig.Machine,
-					tests:     imageConfig.Tests,
-					resources: imageConfig.Resources,
-				}
-				if gceImage.imageDesc == "" {
-					gceImage.imageDesc = gceImage.image
-				}
-				if isRegex && len(images) > 1 {
-					// Use image name when shortName is not unique.
-					name = image
-				}
-				gceImages.images[name] = gceImage
+			// Convert the given image into an internalGCEImage.
+			metadata := imageConfig.Metadata
+			if len(strings.TrimSpace(*instanceMetadata)) > 0 {
+				metadata += "," + *instanceMetadata
 			}
+			gceImage := internalGCEImage{
+				image:           image,
+				imageDesc:       imageConfig.ImageDesc,
+				project:         imageConfig.Project,
+				metadata:        getImageMetadata(metadata),
+				kernelArguments: imageConfig.KernelArguments,
+				machine:         imageConfig.Machine,
+				tests:           imageConfig.Tests,
+				resources:       imageConfig.Resources,
+			}
+			if gceImage.imageDesc == "" {
+				gceImage.imageDesc = gceImage.image
+			}
+			gceImages.images[shortName] = gceImage
 		}
 	}
 
@@ -271,21 +278,22 @@ func main() {
 			klog.Fatal("Must specify --image-project if you specify --images")
 		}
 		cliImages := strings.Split(*images, ",")
-		for _, img := range cliImages {
+		for _, image := range cliImages {
 			gceImage := internalGCEImage{
-				image:    img,
+				image:    image,
 				project:  *imageProject,
 				metadata: getImageMetadata(*instanceMetadata),
 			}
-			gceImages.images[img] = gceImage
+			gceImages.images[image] = gceImage
 		}
 	}
 
 	if len(gceImages.images) != 0 && *zone == "" {
 		klog.Fatal("Must specify --zone flag")
 	}
-	for shortName, image := range gceImages.images {
-		if image.project == "" {
+	// Make sure GCP project is set. Without a project, images can't be retrieved..
+	for shortName, imageConfig := range gceImages.images {
+		if imageConfig.project == "" {
 			klog.Fatalf("Invalid config for %v; must specify a project", shortName)
 		}
 	}
@@ -295,7 +303,7 @@ func main() {
 		}
 	}
 	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
 	}
 
 	// Setup coloring
@@ -315,7 +323,7 @@ func main() {
 	running := 0
 	for shortName := range gceImages.images {
 		imageConfig := gceImages.images[shortName]
-		fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
+		fmt.Printf("Initializing e2e tests using image %s/%s/%s.\n", shortName, imageConfig.project, imageConfig.image)
 		running++
 		go func(image *internalGCEImage, junitFilePrefix string) {
 			results <- testImage(image, junitFilePrefix)
@@ -423,27 +431,27 @@ func testHost(host string, deleteFiles bool, imageDesc, junitFilePrefix, ginkgoF
 		}
 	}
 	if strings.ToUpper(instance.Status) != "RUNNING" {
-		err = fmt.Errorf("instance %s not in state RUNNING, was %s.", host, instance.Status)
+		err = fmt.Errorf("instance %s not in state RUNNING, was %s", host, instance.Status)
 		return &TestResult{
 			err:    err,
 			host:   host,
 			exitOk: false,
 		}
 	}
-	externalIp := getExternalIp(instance)
-	if len(externalIp) > 0 {
-		remote.AddHostnameIp(host, externalIp)
+	externalIP := getExternalIP(instance)
+	if len(externalIP) > 0 {
+		remote.AddHostnameIP(host, externalIP)
 	}
 
 	path, err := arc.getArchive()
 	if err != nil {
 		// Don't log fatal because we need to do any needed cleanup contained in "defer" statements
 		return &TestResult{
-			err: fmt.Errorf("unable to create test archive: %v.", err),
+			err: fmt.Errorf("unable to create test archive: %v", err),
 		}
 	}
 
-	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs)
+	output, exitOk, err := remote.RunRemote(suite, path, host, deleteFiles, imageDesc, junitFilePrefix, *testArgs, ginkgoFlagsStr, *systemSpecName, *extraEnvs, *runtimeConfig)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -457,48 +465,48 @@ type imageObj struct {
 	name         string
 }
 
-func (io imageObj) string() string {
-	return fmt.Sprintf("%q created %q", io.name, io.creationTime.String())
-}
-
 type byCreationTime []imageObj
 
 func (a byCreationTime) Len() int           { return len(a) }
 func (a byCreationTime) Less(i, j int) bool { return a[i].creationTime.After(a[j].creationTime) }
 func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
-// Returns a list of image names based on regex and number of previous images requested.
-func getGCEImages(imageRegex, project string, previousImages int) ([]string, error) {
-	ilc, err := computeService.Images.List(project).Do()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to list images in project %q: %v", project, err)
-	}
+// Returns an image name based on regex and given GCE project.
+func getGCEImage(imageRegex, imageFamily string, project string) (string, error) {
 	imageObjs := []imageObj{}
 	imageRe := regexp.MustCompile(imageRegex)
-	for _, instance := range ilc.Items {
-		if imageRe.MatchString(instance.Name) {
-			creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+	if err := computeService.Images.List(project).Pages(context.Background(),
+		func(ilc *compute.ImageList) error {
+			for _, instance := range ilc.Items {
+				if imageRegex != "" && !imageRe.MatchString(instance.Name) {
+					continue
+				}
+				if imageFamily != "" && instance.Family != imageFamily {
+					continue
+				}
+				creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
+				if err != nil {
+					return fmt.Errorf("failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+				}
+				io := imageObj{
+					creationTime: creationTime,
+					name:         instance.Name,
+				}
+				imageObjs = append(imageObjs, io)
 			}
-			io := imageObj{
-				creationTime: creationTime,
-				name:         instance.Name,
-			}
-			klog.V(4).Infof("Found image %q based on regex %q in project %q", io.string(), imageRegex, project)
-			imageObjs = append(imageObjs, io)
-		}
+			return nil
+		},
+	); err != nil {
+		return "", fmt.Errorf("failed to list images in project %q: %v", project, err)
 	}
+
+	// Pick the latest image after sorting.
 	sort.Sort(byCreationTime(imageObjs))
-	images := []string{}
-	for _, imageObj := range imageObjs {
-		images = append(images, imageObj.name)
-		previousImages--
-		if previousImages < 0 {
-			break
-		}
+	if len(imageObjs) > 0 {
+		klog.V(4).Infof("found images %+v based on regex %q and family %q in project %q", imageObjs, imageRegex, imageFamily, project)
+		return imageObjs[0].name, nil
 	}
-	return images, nil
+	return "", fmt.Errorf("found zero images based on regex %q and family %q in project %q", imageRegex, imageFamily, project)
 }
 
 // Provision a gce instance using image and run the tests in archive against the instance.
@@ -547,7 +555,13 @@ func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResul
 
 // Provision a gce instance using image
 func createInstance(imageConfig *internalGCEImage) (string, error) {
-	klog.V(1).Infof("Creating instance %+v", *imageConfig)
+	p, err := computeService.Projects.Get(*project).Do()
+	if err != nil {
+		return "", fmt.Errorf("failed to get project info %q", *project)
+	}
+	// Use default service account
+	serviceAccount := p.DefaultServiceAccount
+	klog.V(1).Infof("Creating instance %+v with service account %q", *imageConfig, serviceAccount)
 	name := imageToInstanceName(imageConfig)
 	i := &compute.Instance{
 		Name:        name,
@@ -572,16 +586,25 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 				},
 			},
 		},
+		ServiceAccounts: []*compute.ServiceAccount{
+			{
+				Email: serviceAccount,
+				Scopes: []string{
+					"https://www.googleapis.com/auth/cloud-platform",
+				},
+			},
+		},
 	}
 
+	scheduling := compute.Scheduling{
+		Preemptible: *preemptibleInstances,
+	}
 	for _, accelerator := range imageConfig.resources.Accelerators {
 		if i.GuestAccelerators == nil {
 			autoRestart := true
 			i.GuestAccelerators = []*compute.AcceleratorConfig{}
-			i.Scheduling = &compute.Scheduling{
-				OnHostMaintenance: "TERMINATE",
-				AutomaticRestart:  &autoRestart,
-			}
+			scheduling.OnHostMaintenance = "TERMINATE"
+			scheduling.AutomaticRestart = &autoRestart
 		}
 		aType := fmt.Sprintf(acceleratorTypeResourceFormat, *project, *zone, accelerator.Type)
 		ac := &compute.AcceleratorConfig{
@@ -590,11 +613,12 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		i.GuestAccelerators = append(i.GuestAccelerators, ac)
 	}
-
-	var err error
+	i.Scheduling = &scheduling
 	i.Metadata = imageConfig.metadata
+	var insertionOperationName string
 	if _, err := computeService.Instances.Get(*project, *zone, i.Name).Do(); err != nil {
 		op, err := computeService.Instances.Insert(*project, *zone, i).Do()
+
 		if err != nil {
 			ret := fmt.Sprintf("could not create instance %s: API error: %v", name, err)
 			if op != nil {
@@ -602,38 +626,62 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			}
 			return "", fmt.Errorf(ret)
 		} else if op.Error != nil {
-			return "", fmt.Errorf("could not create instance %s: %+v", name, op.Error)
-		}
-	}
+			var errs []string
+			for _, insertErr := range op.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return "", fmt.Errorf("could not create instance %s: %+v", name, errs)
 
+		}
+		insertionOperationName = op.Name
+	}
 	instanceRunning := false
+	var instance *compute.Instance
 	for i := 0; i < 30 && !instanceRunning; i++ {
 		if i > 0 {
 			time.Sleep(time.Second * 20)
 		}
-		var instance *compute.Instance
+		var insertionOperation *compute.Operation
+		insertionOperation, err = computeService.ZoneOperations.Get(*project, *zone, insertionOperationName).Do()
+		if err != nil {
+			continue
+		}
+		if strings.ToUpper(insertionOperation.Status) != "DONE" {
+			err = fmt.Errorf("instance insert operation %s not in state DONE, was %s", name, insertionOperation.Status)
+			continue
+		}
+		if insertionOperation.Error != nil {
+			var errs []string
+			for _, insertErr := range insertionOperation.Error.Errors {
+				errs = append(errs, fmt.Sprintf("%+v", insertErr))
+			}
+			return name, fmt.Errorf("could not create instance %s: %+v", name, errs)
+		}
+
 		instance, err = computeService.Instances.Get(*project, *zone, name).Do()
 		if err != nil {
 			continue
 		}
 		if strings.ToUpper(instance.Status) != "RUNNING" {
-			err = fmt.Errorf("instance %s not in state RUNNING, was %s.", name, instance.Status)
+			err = fmt.Errorf("instance %s not in state RUNNING, was %s", name, instance.Status)
 			continue
 		}
-		externalIp := getExternalIp(instance)
-		if len(externalIp) > 0 {
-			remote.AddHostnameIp(name, externalIp)
+		externalIP := getExternalIP(instance)
+		if len(externalIP) > 0 {
+			remote.AddHostnameIP(name, externalIP)
 		}
-		// TODO(random-liu): Remove the docker version check. Use some other command to check
-		// instance readiness.
+
 		var output string
-		output, err = remote.SSH(name, "docker", "version")
+		output, err = remote.SSH(name, "sh", "-c",
+			"'systemctl list-units  --type=service  --state=running | grep -e docker -e containerd -e crio'")
 		if err != nil {
-			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
+			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon - Command failed: %s", name, output)
 			continue
 		}
-		if !strings.Contains(output, "Server") {
-			err = fmt.Errorf("instance %s not running docker daemon - Server not found: %s", name, output)
+		if !strings.Contains(output, "docker.service") &&
+			!strings.Contains(output, "containerd.service") &&
+			!strings.Contains(output, "crio.service") {
+			err = fmt.Errorf("instance %s not running docker/containerd/crio daemon: %s", name, output)
 			continue
 		}
 		instanceRunning = true
@@ -658,7 +706,82 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 			cloudInitFinished = true
 		}
 	}
+
+	// apply additional kernel arguments to the instance
+	if len(imageConfig.kernelArguments) > 0 {
+		klog.Info("Update kernel arguments")
+		if err := updateKernelArguments(instance, imageConfig.image, imageConfig.kernelArguments); err != nil {
+			return name, err
+		}
+	}
+
 	return name, err
+}
+
+func updateKernelArguments(instance *compute.Instance, image string, kernelArgs []string) error {
+	kernelArgsString := strings.Join(kernelArgs, " ")
+
+	var cmd []string
+	if strings.Contains(image, "cos") {
+		cmd = []string{
+			"dir=$(mktemp -d)",
+			"mount /dev/sda12 ${dir}",
+			fmt.Sprintf("sed -i -e \"s|cros_efi|cros_efi %s|g\" ${dir}/efi/boot/grub.cfg", kernelArgsString),
+			"umount ${dir}",
+			"rmdir ${dir}",
+		}
+	}
+
+	if strings.Contains(image, "ubuntu") {
+		cmd = []string{
+			fmt.Sprintf("echo \"GRUB_CMDLINE_LINUX_DEFAULT=%s ${GRUB_CMDLINE_LINUX_DEFAULT}\" > /etc/default/grub.d/99-additional-arguments.cfg", kernelArgsString),
+			"/usr/sbin/update-grub",
+		}
+	}
+
+	if len(cmd) == 0 {
+		klog.Warningf("The image %s does not support adding an additional kernel arguments", image)
+		return nil
+	}
+
+	out, err := remote.SSH(instance.Name, "sh", "-c", fmt.Sprintf("'%s'", strings.Join(cmd, "&&")))
+	if err != nil {
+		klog.Errorf("failed to run command %s: out: %s, err: %v", cmd, out, err)
+		return err
+	}
+
+	if err := rebootInstance(instance); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func rebootInstance(instance *compute.Instance) error {
+	// wait until the instance will not response to SSH
+	klog.Info("Reboot the node and wait for instance not to be available via SSH")
+	if waitErr := wait.PollImmediate(5*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "reboot"); err != nil {
+			return true, nil
+		}
+
+		return false, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s still response to SSH: %v", instance.Name, waitErr)
+	}
+
+	// wait until the instance will response again to SSH
+	klog.Info("Wait for instance to be available via SSH")
+	if waitErr := wait.PollImmediate(30*time.Second, 5*time.Minute, func() (bool, error) {
+		if _, err := remote.SSH(instance.Name, "sh", "-c", "date"); err != nil {
+			return false, nil
+		}
+		return true, nil
+	}); waitErr != nil {
+		return fmt.Errorf("the instance %s does not response to SSH: %v", instance.Name, waitErr)
+	}
+
+	return nil
 }
 
 func isCloudInitUsed(metadata *compute.Metadata) bool {
@@ -673,7 +796,7 @@ func isCloudInitUsed(metadata *compute.Metadata) bool {
 	return false
 }
 
-func getExternalIp(instance *compute.Instance) string {
+func getExternalIP(instance *compute.Instance) string {
 	for i := range instance.NetworkInterfaces {
 		ni := instance.NetworkInterfaces[i]
 		for j := range ni.AccessConfigs {
@@ -700,12 +823,12 @@ func getComputeClient() (*compute.Service, error) {
 		}
 
 		var client *http.Client
-		client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+		client, err = google.DefaultClient(context.Background(), compute.ComputeScope)
 		if err != nil {
 			continue
 		}
 
-		cs, err = compute.New(client)
+		cs, err = compute.NewService(context.Background(), option.WithHTTPClient(client))
 		if err != nil {
 			continue
 		}
@@ -759,7 +882,7 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	}
 	// For benchmark test, node name has the format 'machine-image-uuid' to run
 	// different machine types with the same image in parallel
-	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
+	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
 }
 
 func sourceImage(image, imageProject string) string {

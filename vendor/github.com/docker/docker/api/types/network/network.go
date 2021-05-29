@@ -1,4 +1,7 @@
-package network
+package network // import "github.com/docker/docker/api/types/network"
+import (
+	"github.com/docker/docker/api/types/filters"
+)
 
 // Address represents an IP address
 type Address struct {
@@ -9,7 +12,7 @@ type Address struct {
 // IPAM represents IP Address Management
 type IPAM struct {
 	Driver  string
-	Options map[string]string //Per network IPAM driver options
+	Options map[string]string // Per network IPAM driver options
 	Config  []IPAMConfig
 }
 
@@ -105,4 +108,19 @@ type NetworkingConfig struct {
 // ConfigReference specifies the source which provides a network's configuration
 type ConfigReference struct {
 	Network string
+}
+
+var acceptedFilters = map[string]bool{
+	"dangling": true,
+	"driver":   true,
+	"id":       true,
+	"label":    true,
+	"name":     true,
+	"scope":    true,
+	"type":     true,
+}
+
+// ValidateFilters validates the list of filter args with the available filters.
+func ValidateFilters(filter filters.Args) error {
+	return filter.Validate(acceptedFilters)
 }

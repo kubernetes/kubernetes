@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM debian:jessie
+# The line below points to distroless/base as of 2019-11-15. The SHA should be
+# kept in sycn with distroless_base definition in the WORKSPACE file.
+FROM gcr.io/distroless/base@sha256:7fa7445dfbebae4f4b7ab0e6ef99276e96075ae42584af6286ba080750d6dfe5
 
 COPY kubemark /kubemark

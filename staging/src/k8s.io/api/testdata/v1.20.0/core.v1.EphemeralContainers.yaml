@@ -1,0 +1,205 @@
+apiVersion: v1
+ephemeralContainers:
+- args:
+  - "22"
+  command:
+  - "21"
+  env:
+  - name: "29"
+    value: "30"
+    valueFrom:
+      configMapKeyRef:
+        key: "36"
+        name: "35"
+        optional: false
+      fieldRef:
+        apiVersion: "31"
+        fieldPath: "32"
+      resourceFieldRef:
+        containerName: "33"
+        divisor: "12"
+        resource: "34"
+      secretKeyRef:
+        key: "38"
+        name: "37"
+        optional: false
+  envFrom:
+  - configMapRef:
+      name: "27"
+      optional: false
+    prefix: "26"
+    secretRef:
+      name: "28"
+      optional: false
+  image: "20"
+  lifecycle:
+    postStart:
+      exec:
+        command:
+        - "66"
+      httpGet:
+        host: "68"
+        httpHeaders:
+        - name: "69"
+          value: "70"
+        path: "67"
+        port: -1293912096
+        scheme: 託仭
+      tcpSocket:
+        host: "72"
+        port: "71"
+    preStop:
+      exec:
+        command:
+        - "73"
+      httpGet:
+        host: "76"
+        httpHeaders:
+        - name: "77"
+          value: "78"
+        path: "74"
+        port: "75"
+        scheme: 鴜Ł%Ũ
+      tcpSocket:
+        host: "80"
+        port: "79"
+  livenessProbe:
+    exec:
+      command:
+      - "45"
+    failureThreshold: -54954325
+    httpGet:
+      host: "48"
+      httpHeaders:
+      - name: "49"
+        value: "50"
+      path: "46"
+      port: "47"
+      scheme: 亞螩B峅x4%a鯿rŎǀ朲^苣fƼ@h
+    initialDelaySeconds: 1392988974
+    periodSeconds: -1771047449
+    successThreshold: -1280107919
+    tcpSocket:
+      host: "51"
+      port: 1366345526
+    timeoutSeconds: 1563658126
+  name: "19"
+  ports:
+  - containerPort: -1300313567
+    hostIP: "25"
+    hostPort: 1305381319
+    name: "24"
+  readinessProbe:
+    exec:
+      command:
+      - "52"
+    failureThreshold: -833209928
+    httpGet:
+      host: "55"
+      httpHeaders:
+      - name: "56"
+        value: "57"
+      path: "53"
+      port: "54"
+      scheme: OŖ樅尷
+    initialDelaySeconds: 819364842
+    periodSeconds: -983896210
+    successThreshold: 552512122
+    tcpSocket:
+      host: "58"
+      port: 2136826132
+    timeoutSeconds: 933484239
+  resources:
+    limits:
+      V夸eɑeʤ: "420"
+    requests:
+      Ƣ6/ʕVŚ(ĿȊ甞: "776"
+  securityContext:
+    allowPrivilegeEscalation: true
+    capabilities:
+      add:
+      - 2Ō¾\ĒP鄸靇杧ž
+      drop:
+      - 娲瘹ɭȊɚɎ(dɅ囥糷磩窮秳ķ蟒苾h^
+    privileged: false
+    procMount: ĭÐl恕ɍȇ廄裭4懙
+    readOnlyRootFilesystem: true
+    runAsGroup: -5441351197948631872
+    runAsNonRoot: true
+    runAsUser: 4491726672505793472
+    seLinuxOptions:
+      level: "85"
+      role: "83"
+      type: "84"
+      user: "82"
+    seccompProfile:
+      localhostProfile: "89"
+      type: 嵒ƫS捕ɷD¡轫n
+    windowsOptions:
+      gmsaCredentialSpec: "87"
+      gmsaCredentialSpecName: "86"
+      runAsUserName: "88"
+  startupProbe:
+    exec:
+      command:
+      - "59"
+    failureThreshold: 13573196
+    httpGet:
+      host: "61"
+      httpHeaders:
+      - name: "62"
+        value: "63"
+      path: "60"
+      port: 180803110
+      scheme: ņ錕?øēƺ
+    initialDelaySeconds: -816398166
+    periodSeconds: -1583208879
+    successThreshold: 1088264954
+    tcpSocket:
+      host: "65"
+      port: "64"
+    timeoutSeconds: 1229400382
+  stdin: true
+  targetContainerName: "90"
+  terminationMessagePath: "81"
+  terminationMessagePolicy: Ņ£
+  volumeDevices:
+  - devicePath: "44"
+    name: "43"
+  volumeMounts:
+  - mountPath: "40"
+    mountPropagation: 憍峕?狱³-Ǐ忄*
+    name: "39"
+    subPath: "41"
+    subPathExpr: "42"
+  workingDir: "23"
+kind: EphemeralContainers
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    fieldsType: "18"
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "11042405498087606203"
+  selfLink: "5"
+  uid: "7"

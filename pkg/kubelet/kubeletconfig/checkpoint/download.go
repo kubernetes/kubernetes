@@ -17,7 +17,9 @@ limitations under the License.
 package checkpoint
 
 import (
+	"context"
 	"fmt"
+	"k8s.io/klog/v2"
 	"math/rand"
 	"time"
 
@@ -26,8 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
-	kuberuntime "k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -35,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/kubelet/kubeletconfig/status"
 	utilcodec "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/codec"
-	utillog "k8s.io/kubernetes/pkg/kubelet/kubeletconfig/util/log"
 )
 
 // Payload represents a local copy of a config source (payload) object
@@ -108,8 +108,9 @@ func NewRemoteConfigSource(source *apiv1.NodeConfigSource) (RemoteConfigSource, 
 // DecodeRemoteConfigSource is a helper for using the apimachinery to decode serialized RemoteConfigSources;
 // e.g. the metadata stored by checkpoint/store/fsstore.go
 func DecodeRemoteConfigSource(data []byte) (RemoteConfigSource, error) {
-	// decode the remote config source
-	_, codecs, err := scheme.NewSchemeAndCodecs()
+	// Decode the remote config source. We want this to be non-strict
+	// so we don't error out on newer API keys.
+	_, codecs, err := scheme.NewSchemeAndCodecs(serializer.DisableStrict)
 	if err != nil {
 		return nil, err
 	}
@@ -177,25 +178,25 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 	)
 	// check the in-memory store for the ConfigMap, so we can skip unnecessary downloads
 	if store != nil {
-		utillog.Infof("checking in-memory store for %s", r.APIPath())
+		klog.InfoS("Kubelet config controller checking in-memory store for remoteConfigMap", "apiPath", r.APIPath())
 		cm, err = getConfigMapFromStore(store, r.source.ConfigMap.Namespace, r.source.ConfigMap.Name)
 		if err != nil {
 			// just log the error, we'll attempt a direct download instead
-			utillog.Errorf("failed to check in-memory store for %s, error: %v", r.APIPath(), err)
+			klog.ErrorS(err, "Kubelet config controller failed to check in-memory store for remoteConfigMap", "apiPath", r.APIPath())
 		} else if cm != nil {
-			utillog.Infof("found %s in in-memory store, UID: %s, ResourceVersion: %s", r.APIPath(), cm.UID, cm.ResourceVersion)
+			klog.InfoS("Kubelet config controller found remoteConfigMap in in-memory store", "apiPath", r.APIPath(), "configMapUID", cm.UID, "resourceVersion", cm.ResourceVersion)
 		} else {
-			utillog.Infof("did not find %s in in-memory store", r.APIPath())
+			klog.InfoS("Kubelet config controller did not find remoteConfigMap in in-memory store", "apiPath", r.APIPath())
 		}
 	}
 	// if we didn't find the ConfigMap in the in-memory store, download it from the API server
 	if cm == nil {
-		utillog.Infof("attempting to download %s", r.APIPath())
-		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(r.source.ConfigMap.Name, metav1.GetOptions{})
+		klog.InfoS("Kubelet config controller attempting to download remoteConfigMap", "apiPath", r.APIPath())
+		cm, err = client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Get(context.TODO(), r.source.ConfigMap.Name, metav1.GetOptions{})
 		if err != nil {
 			return nil, status.DownloadError, fmt.Errorf("%s, error: %v", status.DownloadError, err)
 		}
-		utillog.Infof("successfully downloaded %s, UID: %s, ResourceVersion: %s", r.APIPath(), cm.UID, cm.ResourceVersion)
+		klog.InfoS("Kubelet config controller successfully downloaded remoteConfigMap", "apiPath", r.APIPath(), "configMapUID", cm.UID, "resourceVersion", cm.ResourceVersion)
 	} // Assert: Now we have a non-nil ConfigMap
 	// construct Payload from the ConfigMap
 	payload, err := NewConfigMapPayload(cm)
@@ -213,26 +214,14 @@ func (r *remoteConfigMap) Download(client clientset.Interface, store cache.Store
 
 func (r *remoteConfigMap) Informer(client clientset.Interface, handler cache.ResourceEventHandlerFuncs) cache.SharedInformer {
 	// select ConfigMap by name
-	fieldselector := fields.OneTermEqualSelector("metadata.name", r.source.ConfigMap.Name)
+	fieldSelector := fields.OneTermEqualSelector("metadata.name", r.source.ConfigMap.Name)
 
 	// add some randomness to resync period, which can help avoid controllers falling into lock-step
 	minResyncPeriod := 15 * time.Minute
 	factor := rand.Float64() + 1
 	resyncPeriod := time.Duration(float64(minResyncPeriod.Nanoseconds()) * factor)
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (kuberuntime.Object, error) {
-			return client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).List(metav1.ListOptions{
-				FieldSelector: fieldselector.String(),
-			})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().ConfigMaps(r.source.ConfigMap.Namespace).Watch(metav1.ListOptions{
-				FieldSelector:   fieldselector.String(),
-				ResourceVersion: options.ResourceVersion,
-			})
-		},
-	}
+	lw := cache.NewListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", r.source.ConfigMap.Namespace, fieldSelector)
 
 	informer := cache.NewSharedInformer(lw, &apiv1.ConfigMap{}, resyncPeriod)
 	informer.AddEventHandler(handler)
@@ -266,7 +255,7 @@ func getConfigMapFromStore(store cache.Store, namespace, name string) (*apiv1.Co
 	cm, ok := obj.(*apiv1.ConfigMap)
 	if !ok {
 		err := fmt.Errorf("failed to cast object %s from informer's store to ConfigMap", key)
-		utillog.Errorf(err.Error())
+		klog.ErrorS(err, "Kubelet config controller")
 		return nil, err
 	}
 	return cm, nil

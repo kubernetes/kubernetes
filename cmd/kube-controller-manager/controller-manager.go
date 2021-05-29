@@ -21,31 +21,30 @@ limitations under the License.
 package main
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"time"
 
+	"github.com/spf13/pflag"
+
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/metrics/prometheus/clientgo" // load all the prometheus client-go plugin
+	_ "k8s.io/component-base/metrics/prometheus/version"  // for version metric registration
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
-	_ "k8s.io/kubernetes/pkg/util/prometheusclientgo" // load all the prometheus client-go plugin
-	_ "k8s.io/kubernetes/pkg/version/prometheus"      // for version metric registration
 )
 
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
+	pflag.CommandLine.SetNormalizeFunc(cliflag.WordSepNormalizeFunc)
+
 	command := app.NewControllerManagerCommand()
 
-	// TODO: once we switch everything over to Cobra commands, we can go back to calling
-	// utilflag.InitFlags() (by removing its pflag.Parse() call). For now, we have to set the
-	// normalize func and add the go flag set by hand.
-	// utilflag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
 	if err := command.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 }

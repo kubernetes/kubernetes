@@ -19,4 +19,5 @@ limitations under the License.
 // +k8s:conversion-gen=k8s.io/metrics/pkg/apis/external_metrics
 // +k8s:openapi-gen=true
 
-package v1beta1
+// Package v1beta1 is the v1beta1 version of the external metrics API.
+package v1beta1 // import "k8s.io/metrics/pkg/apis/external_metrics/v1beta1"

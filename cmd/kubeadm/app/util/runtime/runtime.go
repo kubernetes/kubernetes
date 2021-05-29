@@ -17,7 +17,6 @@ limitations under the License.
 package util
 
 import (
-	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"strings"
@@ -109,9 +108,7 @@ func (runtime *CRIRuntime) ListKubeContainers() ([]string, error) {
 		return nil, errors.Wrapf(err, "output: %s, error", string(out))
 	}
 	pods := []string{}
-	for _, pod := range strings.Fields(string(out)) {
-		pods = append(pods, pod)
-	}
+	pods = append(pods, strings.Fields(string(out))...)
 	return pods, nil
 }
 
@@ -143,10 +140,15 @@ func (runtime *CRIRuntime) RemoveContainers(containers []string) error {
 func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
 	errs := []error{}
 	for _, container := range containers {
-		out, err := runtime.exec.Command("docker", "rm", "--force", "--volumes", container).CombinedOutput()
+		out, err := runtime.exec.Command("docker", "stop", container).CombinedOutput()
 		if err != nil {
 			// don't stop on errors, try to remove as many containers as possible
-			errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+			errs = append(errs, errors.Wrapf(err, "failed to stop running container %s: output: %s, error", container, string(out)))
+		} else {
+			out, err = runtime.exec.Command("docker", "rm", "--volumes", container).CombinedOutput()
+			if err != nil {
+				errs = append(errs, errors.Wrapf(err, "failed to remove running container %s: output: %s, error", container, string(out)))
+			}
 		}
 	}
 	return errorsutil.NewAggregate(errs)
@@ -154,20 +156,28 @@ func (runtime *DockerRuntime) RemoveContainers(containers []string) error {
 
 // PullImage pulls the image
 func (runtime *CRIRuntime) PullImage(image string) error {
-	out, err := runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "output: %s, error", string(out))
+	var err error
+	var out []byte
+	for i := 0; i < constants.PullImageRetry; i++ {
+		out, err = runtime.exec.Command("crictl", "-r", runtime.criSocket, "pull", image).CombinedOutput()
+		if err == nil {
+			return nil
+		}
 	}
-	return nil
+	return errors.Wrapf(err, "output: %s, error", out)
 }
 
 // PullImage pulls the image
 func (runtime *DockerRuntime) PullImage(image string) error {
-	out, err := runtime.exec.Command("docker", "pull", image).CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "output: %s, error", string(out))
+	var err error
+	var out []byte
+	for i := 0; i < constants.PullImageRetry; i++ {
+		out, err = runtime.exec.Command("docker", "pull", image).CombinedOutput()
+		if err == nil {
+			return nil
+		}
 	}
-	return nil
+	return errors.Wrapf(err, "output: %s, error", out)
 }
 
 // ImageExists checks to see if the image exists on the system
@@ -182,23 +192,8 @@ func (runtime *DockerRuntime) ImageExists(image string) (bool, error) {
 	return err == nil, nil
 }
 
-// isExistingSocket checks if path exists and is domain socket
-func isExistingSocket(path string) bool {
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-
-	return fileInfo.Mode()&os.ModeSocket != 0
-}
-
 // detectCRISocketImpl is separated out only for test purposes, DON'T call it directly, use DetectCRISocket instead
 func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
-	const (
-		dockerSocket     = "/var/run/docker.sock" // The Docker socket is not CRI compatible
-		containerdSocket = "/run/containerd/containerd.sock"
-	)
-
 	foundCRISockets := []string{}
 	knownCRISockets := []string{
 		// Docker and containerd sockets are special cased below, hence not to be included here
@@ -235,9 +230,5 @@ func detectCRISocketImpl(isSocket func(string) bool) (string, error) {
 
 // DetectCRISocket uses a list of known CRI sockets to detect one. If more than one or none is discovered, an error is returned.
 func DetectCRISocket() (string, error) {
-	if goruntime.GOOS != "linux" {
-		return constants.DefaultDockerCRISocket, nil
-	}
-
 	return detectCRISocketImpl(isExistingSocket)
 }

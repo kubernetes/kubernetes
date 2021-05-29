@@ -20,7 +20,7 @@ import (
 	"flag"
 	"os"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/component-base/logs"

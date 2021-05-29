@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/json"
 )
 
 // CheckCodec makes sure that the codec can encode objects like internalType,
@@ -32,7 +33,14 @@ func CheckCodec(c Codec, internalType Object, externalTypes ...schema.GroupVersi
 		return fmt.Errorf("Internal type not encodable: %v", err)
 	}
 	for _, et := range externalTypes {
-		exBytes := []byte(fmt.Sprintf(`{"kind":"%v","apiVersion":"%v"}`, et.Kind, et.GroupVersion().String()))
+		typeMeta := TypeMeta{
+			Kind:       et.Kind,
+			APIVersion: et.GroupVersion().String(),
+		}
+		exBytes, err := json.Marshal(&typeMeta)
+		if err != nil {
+			return err
+		}
 		obj, err := Decode(c, exBytes)
 		if err != nil {
 			return fmt.Errorf("external type %s not interpretable: %v", et, err)

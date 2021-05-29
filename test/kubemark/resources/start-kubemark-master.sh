@@ -187,6 +187,30 @@ current-context: kube-scheduler
 EOF
 }
 
+function create-addonmanager-kubeconfig {
+  echo "Creating addonmanager kubeconfig file"
+  mkdir -p "${KUBE_ROOT}/k8s_auth_data/addon-manager"
+  cat <<EOF >"${KUBE_ROOT}/k8s_auth_data/addon-manager/kubeconfig"
+apiVersion: v1
+kind: Config
+users:
+- name: addon-manager
+  user:
+    token: ${ADDON_MANAGER_TOKEN}
+clusters:
+- name: local
+  cluster:
+    insecure-skip-tls-verify: true
+    server: https://localhost:443
+contexts:
+- context:
+    cluster: local
+    user: addon-manager
+  name: addon-manager
+current-context: addon-manager
+EOF
+}
+
 function assemble-docker-flags {
 	echo "Assemble docker command line flags"
 	local docker_opts="-p /var/run/docker.pid --iptables=false --ip-masq=false"
@@ -233,7 +257,6 @@ function load-docker-images {
 # Computes command line arguments to be passed to kubelet.
 function compute-kubelet-params {
 	local params="${KUBELET_TEST_ARGS:-}"
-	params+=" --allow-privileged=true"
 	params+=" --cgroup-root=/"
 	params+=" --cloud-provider=gce"
 	params+=" --pod-manifest-path=/etc/kubernetes/manifests"
@@ -345,7 +368,6 @@ function create-master-audit-policy {
       - group: "networking.k8s.io"
       - group: "policy"
       - group: "rbac.authorization.k8s.io"
-      - group: "settings.k8s.io"
       - group: "storage.k8s.io"'
 
   cat <<EOF >"${path}"
@@ -448,7 +470,7 @@ rules:
         resources: ["tokenreviews"]
     omitStages:
       - "RequestReceived"
-  # Get repsonses can be large; skip them.
+  # Get responses can be large; skip them.
   - level: Request
     verbs: ["get", "list", "watch"]
     resources: ${known_apis}
@@ -469,9 +491,17 @@ EOF
 # Computes command line arguments to be passed to etcd.
 function compute-etcd-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2380"
 	params+=" --advertise-client-urls=http://127.0.0.1:2379"
 	params+=" --listen-client-urls=http://0.0.0.0:2379"
+
+	# Enable apiserver->etcd auth.
+	params+=" --client-cert-auth"
+	params+=" --trusted-ca-file /etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --cert-file /etc/srv/kubernetes/etcd-apiserver-server.crt"
+	params+=" --key-file /etc/srv/kubernetes/etcd-apiserver-server.key"
+
 	params+=" --data-dir=/var/etcd/data"
 	params+=" ${ETCD_QUOTA_BYTES}"
 	echo "${params}"
@@ -480,6 +510,7 @@ function compute-etcd-params {
 # Computes command line arguments to be passed to etcd-events.
 function compute-etcd-events-params {
 	local params="${ETCD_TEST_ARGS:-}"
+	params+=" --name=etcd-$(hostname -s)"
 	params+=" --listen-peer-urls=http://127.0.0.1:2381"
 	params+=" --advertise-client-urls=http://127.0.0.1:4002"
 	params+=" --listen-client-urls=http://0.0.0.0:4002"
@@ -497,6 +528,11 @@ function compute-kube-apiserver-params {
 	elif [[ -n "${ETCD_SERVERS_OVERRIDES:-}" ]]; then
 		params+=" --etcd-servers-overrides=${ETCD_SERVERS_OVERRIDES:-}"
 	fi
+	# Enable apiserver->etcd auth.
+	params+=" --etcd-cafile=/etc/srv/kubernetes/etcd-apiserver-ca.crt"
+	params+=" --etcd-certfile=/etc/srv/kubernetes/etcd-apiserver-client.crt"
+	params+=" --etcd-keyfile=/etc/srv/kubernetes/etcd-apiserver-client.key"
+
 	params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
 	params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
 	params+=" --requestheader-client-ca-file=/etc/srv/kubernetes/aggr_ca.crt"
@@ -510,7 +546,6 @@ function compute-kube-apiserver-params {
 	params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
 	params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
 	params+=" --secure-port=443"
-	params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
 	params+=" --target-ram-mb=$((NUM_NODES * 60))"
 	params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 	params+=" --admission-control=${CUSTOM_ADMISSION_PLUGINS}"
@@ -667,6 +702,10 @@ if [[ ! -f "${KUBE_ROOT}/k8s_auth_data/kube-scheduler/kubeconfig" ]]; then
 	create-kubescheduler-kubeconfig
 fi
 
+ADDON_MANAGER_TOKEN=$(dd if=/dev/urandom bs=128 count=1 2>/dev/null | base64 | tr -d "=+/" | dd bs=32 count=1 2>/dev/null)
+echo "${ADDON_MANAGER_TOKEN},system:addon-manager,admin,system:masters" >> "${KUBE_ROOT}/k8s_auth_data/known_tokens.csv"
+create-addonmanager-kubeconfig
+
 # Mount master PD for etcd and create symbolic links to it.
 {
 	main_etcd_mount_point="/mnt/disks/master-pd"
@@ -735,4 +774,4 @@ until [ "$(curl 127.0.0.1:8080/healthz 2> /dev/null)" == "ok" ]; do
 	fi
 done
 
-echo "Done for the configuration for kubermark master"
+echo "Done for the configuration for kubemark master"

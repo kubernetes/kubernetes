@@ -23,12 +23,17 @@ import (
 	"fmt"
 
 	"github.com/Microsoft/hcsshim/hcn"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"strings"
 )
 
 type hnsV2 struct{}
+
+var (
+	// LoadBalancerFlagsIPv6 enables IPV6.
+	LoadBalancerFlagsIPv6 hcn.LoadBalancerFlags = 2
+)
 
 func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 	hnsnetwork, err := hcn.GetNetworkByName(name)
@@ -47,7 +52,7 @@ func (hns hnsV2) getNetworkByName(name string) (*hnsNetworkInfo, error) {
 			}
 			rs := &remoteSubnetInfo{
 				destinationPrefix: policySettings.DestinationPrefix,
-				isolationId:       policySettings.IsolationId,
+				isolationID:       policySettings.IsolationId,
 				providerAddress:   policySettings.ProviderAddress,
 				drMacAddress:      policySettings.DistributedRouterMacAddress,
 			}
@@ -83,14 +88,21 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 	}
 
 	endpoints, err := hcn.ListEndpoints()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list endpoints: %v", err)
+	}
 	for _, endpoint := range endpoints {
 		equal := false
 		if endpoint.IpConfigurations != nil && len(endpoint.IpConfigurations) > 0 {
 			equal = endpoint.IpConfigurations[0].IpAddress == ip
+
+			if !equal && len(endpoint.IpConfigurations) > 1 {
+				equal = endpoint.IpConfigurations[1].IpAddress == ip
+			}
 		}
 		if equal && strings.EqualFold(endpoint.HostComputeNetwork, hnsnetwork.Id) {
 			return &endpointsInfo{
-				ip:         endpoint.IpConfigurations[0].IpAddress,
+				ip:         ip,
 				isLocal:    uint32(endpoint.Flags&hcn.EndpointFlagsRemoteEndpoint) == 0, //TODO: Change isLocal to isRemote
 				macAddress: endpoint.MacAddress,
 				hnsID:      endpoint.Id,
@@ -104,7 +116,7 @@ func (hns hnsV2) getEndpointByIpAddress(ip string, networkName string) (*endpoin
 func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpointsInfo, error) {
 	hnsNetwork, err := hcn.GetNetworkByName(networkName)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find network %s: %v", networkName, err)
+		return nil, err
 	}
 	var flags hcn.EndpointFlags
 	if !ep.isLocal {
@@ -141,12 +153,12 @@ func (hns hnsV2) createEndpoint(ep *endpointsInfo, networkName string) (*endpoin
 		}
 		createdEndpoint, err = hnsNetwork.CreateRemoteEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Remote endpoint creation failed: %v", err)
+			return nil, err
 		}
 	} else {
 		createdEndpoint, err = hnsNetwork.CreateEndpoint(hnsEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("Local endpoint creation failed: %v", err)
+			return nil, err
 		}
 	}
 	return &endpointsInfo{
@@ -169,7 +181,7 @@ func (hns hnsV2) deleteEndpoint(hnsID string) error {
 	}
 	return err
 }
-func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bool, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
+func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, flags loadBalancerFlags, sourceVip string, vip string, protocol uint16, internalPort uint16, externalPort uint16) (*loadBalancerInfo, error) {
 	plists, err := hcn.ListLoadBalancers()
 	if err != nil {
 		return nil, err
@@ -181,13 +193,15 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 		}
 		// Validate if input meets any of the policy lists
 		lbPortMapping := plist.PortMappings[0]
-		if lbPortMapping.Protocol == uint32(protocol) && lbPortMapping.InternalPort == internalPort && lbPortMapping.ExternalPort == externalPort && (lbPortMapping.Flags&1 != 0) == isILB {
+		if lbPortMapping.Protocol == uint32(protocol) && lbPortMapping.InternalPort == internalPort && lbPortMapping.ExternalPort == externalPort && (lbPortMapping.Flags&1 != 0) == flags.isILB {
 			if len(vip) > 0 {
 				if len(plist.FrontendVIPs) == 0 || plist.FrontendVIPs[0] != vip {
 					continue
 				}
+			} else if len(plist.FrontendVIPs) != 0 {
+				continue
 			}
-			LogJson(plist, "Found existing Hns loadbalancer policy resource", 1)
+			LogJson("policyList", plist, "Found existing Hns loadbalancer policy resource", 1)
 			return &loadBalancerInfo{
 				hnsID: plist.Id,
 			}, nil
@@ -207,21 +221,66 @@ func (hns hnsV2) getLoadBalancer(endpoints []endpointsInfo, isILB bool, isDSR bo
 	if len(vip) > 0 {
 		vips = append(vips, vip)
 	}
-	lb, err := hcn.AddLoadBalancer(
-		hnsEndpoints,
-		isILB,
-		isDSR,
-		sourceVip,
-		vips,
-		protocol,
-		internalPort,
-		externalPort,
-	)
+
+	lbPortMappingFlags := hcn.LoadBalancerPortMappingFlagsNone
+	if flags.isILB {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsILB
+	}
+	if flags.useMUX {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsUseMux
+	}
+	if flags.preserveDIP {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsPreserveDIP
+	}
+	if flags.localRoutedVIP {
+		lbPortMappingFlags |= hcn.LoadBalancerPortMappingFlagsLocalRoutedVIP
+	}
+
+	lbFlags := hcn.LoadBalancerFlagsNone
+	if flags.isDSR {
+		lbFlags |= hcn.LoadBalancerFlagsDSR
+	}
+
+	if flags.isIPv6 {
+		lbFlags |= LoadBalancerFlagsIPv6
+	}
+
+	lbDistributionType := hcn.LoadBalancerDistributionNone
+
+	if flags.sessionAffinity {
+		lbDistributionType = hcn.LoadBalancerDistributionSourceIP
+	}
+
+	loadBalancer := &hcn.HostComputeLoadBalancer{
+		SourceVIP: sourceVip,
+		PortMappings: []hcn.LoadBalancerPortMapping{
+			{
+				Protocol:         uint32(protocol),
+				InternalPort:     internalPort,
+				ExternalPort:     externalPort,
+				DistributionType: lbDistributionType,
+				Flags:            lbPortMappingFlags,
+			},
+		},
+		FrontendVIPs: vips,
+		SchemaVersion: hcn.SchemaVersion{
+			Major: 2,
+			Minor: 0,
+		},
+		Flags: lbFlags,
+	}
+
+	for _, endpoint := range hnsEndpoints {
+		loadBalancer.HostComputeEndpoints = append(loadBalancer.HostComputeEndpoints, endpoint.Id)
+	}
+
+	lb, err := loadBalancer.Create()
+
 	if err != nil {
 		return nil, err
 	}
 
-	LogJson(lb, "Hns loadbalancer policy resource", 1)
+	LogJson("hostComputeLoadBalancer", lb, "Hns loadbalancer policy resource", 1)
 
 	return &loadBalancerInfo{
 		hnsID: lb.Id,

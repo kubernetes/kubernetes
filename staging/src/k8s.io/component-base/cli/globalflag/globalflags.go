@@ -19,48 +19,40 @@ package globalflag
 import (
 	"flag"
 	"fmt"
-	"strings"
+	"os"
 
 	"github.com/spf13/pflag"
-
 	"k8s.io/component-base/logs"
+	"k8s.io/klog/v2"
 )
 
 // AddGlobalFlags explicitly registers flags that libraries (klog, verflag, etc.) register
-// against the global flagsets from "flag" and "k8s.io/klog".
+// against the global flagsets from "flag" and "k8s.io/klog/v2".
 // We do this in order to prevent unwanted flags from leaking into the component's flagset.
 func AddGlobalFlags(fs *pflag.FlagSet, name string) {
-	addGlogFlags(fs)
+	addKlogFlags(fs)
 	logs.AddFlags(fs)
 
 	fs.BoolP("help", "h", false, fmt.Sprintf("help for %s", name))
 }
 
-// addGlogFlags explicitly registers flags that klog libraries(k8s.io/klog) register.
-func addGlogFlags(fs *pflag.FlagSet) {
-	// lookup flags of klog libraries in global flag set and re-register the values with our flagset
-	Register(fs, "logtostderr")
-	Register(fs, "alsologtostderr")
-	Register(fs, "v")
-	Register(fs, "skip_headers")
-	Register(fs, "stderrthreshold")
-	Register(fs, "vmodule")
-	Register(fs, "log_backtrace_at")
-	Register(fs, "log_dir")
-	Register(fs, "log_file")
-}
-
-// normalize replaces underscores with hyphens
-// we should always use hyphens instead of underscores when registering component flags
-func normalize(s string) string {
-	return strings.Replace(s, "_", "-", -1)
+// addKlogFlags adds flags from k8s.io/klog
+func addKlogFlags(fs *pflag.FlagSet) {
+	local := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	klog.InitFlags(local)
+	normalizeFunc := fs.GetNormalizeFunc()
+	local.VisitAll(func(fl *flag.Flag) {
+		fl.Name = string(normalizeFunc(fs, fl.Name))
+		fs.AddGoFlag(fl)
+	})
 }
 
 // Register adds a flag to local that targets the Value associated with the Flag named globalName in flag.CommandLine.
 func Register(local *pflag.FlagSet, globalName string) {
 	if f := flag.CommandLine.Lookup(globalName); f != nil {
 		pflagFlag := pflag.PFlagFromGoFlag(f)
-		pflagFlag.Name = normalize(pflagFlag.Name)
+		normalizeFunc := local.GetNormalizeFunc()
+		pflagFlag.Name = string(normalizeFunc(local, pflagFlag.Name))
 		local.AddFlag(pflagFlag)
 	} else {
 		panic(fmt.Sprintf("failed to find flag in global flagset (flag): %s", globalName))

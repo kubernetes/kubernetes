@@ -71,7 +71,7 @@ func defaultResourceAllocationInfo() ResourceAllocationInfo {
 	return ResourceAllocationInfo{
 		Reservation:           NewInt64(0),
 		ExpandableReservation: NewBool(true),
-		Limit: NewInt64(-1),
+		Limit:                 NewInt64(-1),
 		Shares: &SharesInfo{
 			Level: SharesLevelNormal,
 		},

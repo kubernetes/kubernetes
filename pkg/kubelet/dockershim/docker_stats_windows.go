@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!dockerless
 
 /*
 Copyright 2017 The Kubernetes Authors.
@@ -20,48 +20,13 @@ package dockershim
 
 import (
 	"context"
+	"strings"
 	"time"
 
-	runtimeapi "k8s.io/kubernetes/pkg/kubelet/apis/cri/runtime/v1alpha2"
+	"github.com/Microsoft/hcsshim"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/klog/v2"
 )
-
-// ContainerStats returns stats for a container stats request based on container id.
-func (ds *dockerService) ContainerStats(_ context.Context, r *runtimeapi.ContainerStatsRequest) (*runtimeapi.ContainerStatsResponse, error) {
-	stats, err := ds.getContainerStats(r.ContainerId)
-	if err != nil {
-		return nil, err
-	}
-	return &runtimeapi.ContainerStatsResponse{Stats: stats}, nil
-}
-
-// ListContainerStats returns stats for a list container stats request based on a filter.
-func (ds *dockerService) ListContainerStats(ctx context.Context, r *runtimeapi.ListContainerStatsRequest) (*runtimeapi.ListContainerStatsResponse, error) {
-	containerStatsFilter := r.GetFilter()
-	filter := &runtimeapi.ContainerFilter{}
-
-	if containerStatsFilter != nil {
-		filter.Id = containerStatsFilter.Id
-		filter.PodSandboxId = containerStatsFilter.PodSandboxId
-		filter.LabelSelector = containerStatsFilter.LabelSelector
-	}
-
-	listResp, err := ds.ListContainers(ctx, &runtimeapi.ListContainersRequest{Filter: filter})
-	if err != nil {
-		return nil, err
-	}
-
-	var stats []*runtimeapi.ContainerStats
-	for _, container := range listResp.Containers {
-		containerStats, err := ds.getContainerStats(container.Id)
-		if err != nil {
-			return nil, err
-		}
-
-		stats = append(stats, containerStats)
-	}
-
-	return &runtimeapi.ListContainerStatsResponse{Stats: stats}, nil
-}
 
 func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.ContainerStats, error) {
 	info, err := ds.client.Info()
@@ -69,8 +34,35 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		return nil, err
 	}
 
-	statsJSON, err := ds.client.GetContainerStats(containerID)
+	hcsshimContainer, err := hcsshim.OpenContainer(containerID)
 	if err != nil {
+		// As we moved from using Docker stats to hcsshim directly, we may query HCS with already exited container IDs.
+		// That will typically happen with init-containers in Exited state. Docker still knows about them but the HCS does not.
+		// As we don't want to block stats retrieval for other containers, we only log errors.
+		if !hcsshim.IsNotExist(err) && !hcsshim.IsAlreadyStopped(err) {
+			klog.V(4).InfoS("Error opening container (stats will be missing)", "containerID", containerID, "err", err)
+		}
+		return nil, nil
+	}
+	defer func() {
+		closeErr := hcsshimContainer.Close()
+		if closeErr != nil {
+			klog.ErrorS(closeErr, "Error closing container", "containerID", containerID)
+		}
+	}()
+
+	stats, err := hcsshimContainer.Statistics()
+	if err != nil {
+		if strings.Contains(err.Error(), "0x5") || strings.Contains(err.Error(), "0xc0370105") {
+			// When the container is just created, querying for stats causes access errors because it hasn't started yet
+			// This is transient; skip container for now
+			//
+			// These hcs errors do not have helpers exposed in public package so need to query for the known codes
+			// https://github.com/microsoft/hcsshim/blob/master/internal/hcs/errors.go
+			// PR to expose helpers in hcsshim: https://github.com/microsoft/hcsshim/pull/933
+			klog.V(4).InfoS("Container is not in a state that stats can be accessed. This occurs when the container is created but not started.", "containerID", containerID, "err", err)
+			return nil, nil
+		}
 		return nil, err
 	}
 
@@ -85,7 +77,6 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 	}
 	status := statusResp.GetStatus()
 
-	dockerStats := statsJSON.Stats
 	timestamp := time.Now().UnixNano()
 	containerStats := &runtimeapi.ContainerStats{
 		Attributes: &runtimeapi.ContainerAttributes{
@@ -96,13 +87,12 @@ func (ds *dockerService) getContainerStats(containerID string) (*runtimeapi.Cont
 		},
 		Cpu: &runtimeapi.CpuUsage{
 			Timestamp: timestamp,
-			// have to multiply cpu usage by 100 since docker stats units is in 100's of nano seconds for Windows
-			// see https://github.com/moby/moby/blob/v1.13.1/api/types/stats.go#L22
-			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: dockerStats.CPUStats.CPUUsage.TotalUsage * 100},
+			// have to multiply cpu usage by 100 since stats units is in 100's of nano seconds for Windows
+			UsageCoreNanoSeconds: &runtimeapi.UInt64Value{Value: stats.Processor.TotalRuntime100ns * 100},
 		},
 		Memory: &runtimeapi.MemoryUsage{
 			Timestamp:       timestamp,
-			WorkingSetBytes: &runtimeapi.UInt64Value{Value: dockerStats.MemoryStats.PrivateWorkingSet},
+			WorkingSetBytes: &runtimeapi.UInt64Value{Value: stats.Memory.UsagePrivateWorkingSetBytes},
 		},
 		WritableLayer: &runtimeapi.FilesystemUsage{
 			Timestamp: timestamp,

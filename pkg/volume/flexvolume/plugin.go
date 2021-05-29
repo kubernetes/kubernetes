@@ -18,24 +18,23 @@ package flexvolume
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
 
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/mount-utils"
 	"k8s.io/utils/exec"
 	utilstrings "k8s.io/utils/strings"
 )
 
 const (
-	flexVolumePluginName       = "kubernetes.io/flexvolume"
-	flexVolumePluginNamePrefix = "flexvolume-"
+	flexVolumePluginName = "kubernetes.io/flexvolume"
 )
 
 // FlexVolumePlugin object.
@@ -69,7 +68,7 @@ type PluginFactory interface {
 type pluginFactory struct{}
 
 func (pluginFactory) NewFlexVolumePlugin(pluginDir, name string, runner exec.Interface) (volume.VolumePlugin, error) {
-	execPath := path.Join(pluginDir, name)
+	execPath := filepath.Join(pluginDir, name)
 
 	driverName := utilstrings.UnescapeQualifiedName(name)
 
@@ -105,7 +104,7 @@ func (plugin *flexVolumePlugin) Init(host volume.VolumeHost) error {
 func (plugin *flexVolumePlugin) getExecutable() string {
 	parts := strings.Split(plugin.driverName, "/")
 	execName := parts[len(parts)-1]
-	execPath := path.Join(plugin.execPath, execName)
+	execPath := filepath.Join(plugin.execPath, execName)
 	if runtime.GOOS == "windows" {
 		execPath = util.GetWindowsPath(execPath)
 	}
@@ -114,7 +113,7 @@ func (plugin *flexVolumePlugin) getExecutable() string {
 
 // Name is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) GetPluginName() string {
-	return flexVolumePluginNamePrefix + plugin.driverName
+	return plugin.driverName
 }
 
 // GetVolumeName is part of the volume.VolumePlugin interface.
@@ -134,7 +133,7 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 		return "", err
 	}
 
-	klog.Warning(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
+	klog.V(4).Info(logPrefix(plugin), "GetVolumeName is not supported yet. Defaulting to PV or volume name: ", name)
 
 	return name, nil
 }
@@ -148,12 +147,8 @@ func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
 	return sourceDriver == plugin.driverName
 }
 
-func (plugin *flexVolumePlugin) IsMigratedToCSI() bool {
-	return false
-}
-
 // RequiresRemount is part of the volume.VolumePlugin interface.
-func (plugin *flexVolumePlugin) RequiresRemount() bool {
+func (plugin *flexVolumePlugin) RequiresRemount(spec *volume.Spec) bool {
 	return false
 }
 
@@ -256,8 +251,12 @@ func (plugin *flexVolumeAttachablePlugin) NewDeviceUnmounter() (volume.DeviceUnm
 	return plugin.NewDetacher()
 }
 
-func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) bool {
-	return true
+func (plugin *flexVolumeAttachablePlugin) CanAttach(spec *volume.Spec) (bool, error) {
+	return true, nil
+}
+
+func (plugin *flexVolumeAttachablePlugin) CanDeviceMount(spec *volume.Spec) (bool, error) {
+	return true, nil
 }
 
 // ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
@@ -311,8 +310,8 @@ func (plugin *flexVolumePlugin) getDeviceMountPath(spec *volume.Spec) (string, e
 		return "", fmt.Errorf("GetVolumeName failed from getDeviceMountPath: %s", err)
 	}
 
-	mountsDir := path.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
-	return path.Join(mountsDir, volumeName), nil
+	mountsDir := filepath.Join(plugin.host.GetPluginDir(flexVolumePluginName), plugin.driverName, "mounts")
+	return filepath.Join(mountsDir, volumeName), nil
 }
 
 func (plugin *flexVolumePlugin) RequiresFSResize() bool {

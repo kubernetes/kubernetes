@@ -31,8 +31,9 @@ import (
 // this allows a user to specify a template format value
 // as --output=jsonpath=
 var jsonFormats = map[string]bool{
-	"jsonpath":      true,
-	"jsonpath-file": true,
+	"jsonpath":         true,
+	"jsonpath-file":    true,
+	"jsonpath-as-json": true,
 }
 
 // JSONPathPrintFlags provides default flags necessary for template printing.
@@ -45,6 +46,7 @@ type JSONPathPrintFlags struct {
 	TemplateArgument *string
 }
 
+// AllowedFormats returns slice of string of allowed JSONPath printing format
 func (f *JSONPathPrintFlags) AllowedFormats() []string {
 	formats := make([]string, 0, len(jsonFormats))
 	for format := range jsonFormats {
@@ -88,7 +90,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 	if templateFormat == "jsonpath-file" {
 		data, err := ioutil.ReadFile(templateValue)
 		if err != nil {
-			return nil, fmt.Errorf("error reading --template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading --template %s, %v", templateValue, err)
 		}
 
 		templateValue = string(data)
@@ -96,7 +98,7 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 
 	p, err := printers.NewJSONPathPrinter(templateValue)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing jsonpath %s, %v\n", templateValue, err)
+		return nil, fmt.Errorf("error parsing jsonpath %s, %v", templateValue, err)
 	}
 
 	allowMissingKeys := true
@@ -105,6 +107,11 @@ func (f *JSONPathPrintFlags) ToPrinter(templateFormat string) (printers.Resource
 	}
 
 	p.AllowMissingKeys(allowMissingKeys)
+
+	if templateFormat == "jsonpath-as-json" {
+		p.EnableJSONOutput(true)
+	}
+
 	return p, nil
 }
 

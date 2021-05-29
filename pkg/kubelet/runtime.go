@@ -30,6 +30,7 @@ type runtimeState struct {
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
+	runtimeError             error
 	storageError             error
 	cidr                     string
 	healthChecks             []*healthCheck
@@ -62,6 +63,12 @@ func (s *runtimeState) setNetworkState(err error) {
 	s.networkError = err
 }
 
+func (s *runtimeState) setRuntimeState(err error) {
+	s.Lock()
+	defer s.Unlock()
+	s.runtimeError = err
+}
+
 func (s *runtimeState) setStorageState(err error) {
 	s.Lock()
 	defer s.Unlock()
@@ -85,14 +92,17 @@ func (s *runtimeState) runtimeErrors() error {
 	defer s.RUnlock()
 	errs := []error{}
 	if s.lastBaseRuntimeSync.IsZero() {
-		errs = append(errs, errors.New("container runtime status check may not have completed yet."))
+		errs = append(errs, errors.New("container runtime status check may not have completed yet"))
 	} else if !s.lastBaseRuntimeSync.Add(s.baseRuntimeSyncThreshold).After(time.Now()) {
-		errs = append(errs, errors.New("container runtime is down."))
+		errs = append(errs, errors.New("container runtime is down"))
 	}
 	for _, hc := range s.healthChecks {
 		if ok, err := hc.fn(); !ok {
-			errs = append(errs, fmt.Errorf("%s is not healthy: %v.", hc.name, err))
+			errs = append(errs, fmt.Errorf("%s is not healthy: %v", hc.name, err))
 		}
+	}
+	if s.runtimeError != nil {
+		errs = append(errs, s.runtimeError)
 	}
 
 	return utilerrors.NewAggregate(errs)
@@ -118,9 +128,7 @@ func (s *runtimeState) storageErrors() error {
 	return utilerrors.NewAggregate(errs)
 }
 
-func newRuntimeState(
-	runtimeSyncThreshold time.Duration,
-) *runtimeState {
+func newRuntimeState(runtimeSyncThreshold time.Duration) *runtimeState {
 	return &runtimeState{
 		lastBaseRuntimeSync:      time.Time{},
 		baseRuntimeSyncThreshold: runtimeSyncThreshold,

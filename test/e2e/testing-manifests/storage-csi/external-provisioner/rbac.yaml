@@ -1,3 +1,7 @@
+# Do not edit, downloaded from https://github.com/kubernetes-csi/external-provisioner/raw/v2.2.1/deploy/kubernetes//rbac.yaml
+# for csi-driver-host-path v1.7.2
+# by test/e2e/testing-manifests/storage-csi/update-hostpath.sh
+#
 # This YAML file contains all RBAC objects that are necessary to run external
 # CSI provisioner.
 #
@@ -21,9 +25,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: external-provisioner-runner
 rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
+  # The following rule should be uncommented for plugins that require secrets
+  # for provisioning.
+  # - apiGroups: [""]
+  #   resources: ["secrets"]
+  #   verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "delete"]
@@ -47,6 +53,13 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # Access to volumeattachments is only needed when the CSI driver
+  # has the PUBLISH_UNPUBLISH_VOLUME controller capability.
+  # In that case, external-provisioner will watch volumeattachments
+  # to determine when it is safe to delete a volume.
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
     verbs: ["get", "list", "watch"]
 
 ---
@@ -74,9 +87,29 @@ metadata:
   namespace: default
   name: external-provisioner-cfg
 rules:
+# Only one of the following rules for endpoints or leases is required based on
+# what is set for `--leader-election-type`. Endpoints are deprecated in favor of Leases.
 - apiGroups: [""]
   resources: ["endpoints"]
   verbs: ["get", "watch", "list", "delete", "update", "create"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+# Permissions for CSIStorageCapacity are only needed enabling the publishing
+# of storage capacity information.
+- apiGroups: ["storage.k8s.io"]
+  resources: ["csistoragecapacities"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# The GET permissions below are needed for walking up the ownership chain
+# for CSIStorageCapacity. They are sufficient for deployment via
+# StatefulSet (only needs to get Pod) and Deployment (needs to get
+# Pod and then ReplicaSet to find the Deployment).
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get"]
 
 ---
 kind: RoleBinding

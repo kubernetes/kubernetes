@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
-	"sigs.k8s.io/structured-merge-diff/fieldpath"
-	"sigs.k8s.io/structured-merge-diff/merge"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v4/merge"
 )
 
 // TestNewConflictError tests that NewConflictError creates the correct StatusError for a given smd Conflicts
@@ -93,6 +93,31 @@ func TestNewConflictError(t *testing.T) {
 - .metadata.labels.app
 conflicts with "foo" using v1 at 2001-02-03T04:05:06Z:
 - .spec.replicas`,
+				},
+			},
+		},
+		{
+			conflict: merge.Conflicts{
+				merge.Conflict{
+					Manager: `{"manager":"foo","operation":"Update","subresource":"scale","apiVersion":"v1","time":"2001-02-03T04:05:06Z"}`,
+					Path:    fieldpath.MakePathOrDie("spec", "replicas"),
+				},
+			},
+			expected: &errors.StatusError{
+				ErrStatus: metav1.Status{
+					Status: metav1.StatusFailure,
+					Code:   http.StatusConflict,
+					Reason: metav1.StatusReasonConflict,
+					Details: &metav1.StatusDetails{
+						Causes: []metav1.StatusCause{
+							{
+								Type:    metav1.CauseTypeFieldManagerConflict,
+								Message: `conflict with "foo" with subresource "scale" using v1 at 2001-02-03T04:05:06Z`,
+								Field:   ".spec.replicas",
+							},
+						},
+					},
+					Message: `Apply failed with 1 conflict: conflict with "foo" with subresource "scale" using v1 at 2001-02-03T04:05:06Z: .spec.replicas`,
 				},
 			},
 		},

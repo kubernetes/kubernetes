@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 func init() {
@@ -587,11 +587,12 @@ func TestRetryWatcherToFinishWithUnreadEvents(t *testing.T) {
 
 	watcher.Stop()
 
+	maxTime := time.Second
 	select {
 	case <-watcher.Done():
 		break
-	case <-time.After(10 * time.Millisecond):
-		t.Error("Failed to close the watcher")
+	case <-time.After(maxTime):
+		t.Errorf("The watcher failed to be closed in %s", maxTime)
 	}
 
 	// RetryWatcher result channel should be closed

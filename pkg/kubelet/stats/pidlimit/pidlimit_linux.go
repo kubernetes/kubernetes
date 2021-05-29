@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
+	statsapi "k8s.io/kubelet/pkg/apis/stats/v1alpha1"
 )
 
 // Stats provides basic information about max and current process count

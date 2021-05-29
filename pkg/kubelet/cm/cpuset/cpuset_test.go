@@ -170,6 +170,28 @@ func TestCPUSetIsSubsetOf(t *testing.T) {
 	}
 }
 
+func TestCPUSetUnionAll(t *testing.T) {
+	testCases := []struct {
+		s1       CPUSet
+		s2       CPUSet
+		s3       CPUSet
+		expected CPUSet
+	}{
+		{NewCPUSet(), NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(4, 5), NewCPUSet(1, 2, 3, 4, 5)},
+		{NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(), NewCPUSet(4), NewCPUSet(1, 2, 3, 4, 5)},
+		{NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(1, 2, 3, 4, 5), NewCPUSet(1, 5), NewCPUSet(1, 2, 3, 4, 5)},
+	}
+	for _, c := range testCases {
+		s := []CPUSet{}
+		s = append(s, c.s2)
+		s = append(s, c.s3)
+		result := c.s1.UnionAll(s)
+		if !result.Equals(c.expected) {
+			t.Fatalf("expected the union of s1 and s2 to be [%v] (got [%v]), s1: [%v], s2: [%v]", c.expected, result, c.s1, c.s2)
+		}
+	}
+}
+
 func TestCPUSetUnion(t *testing.T) {
 	testCases := []struct {
 		s1       CPUSet
@@ -301,7 +323,7 @@ func TestCPUSetString(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	testCases := []struct {
+	positiveTestCases := []struct {
 		cpusetString string
 		expected     CPUSet
 	}{
@@ -310,15 +332,34 @@ func TestParse(t *testing.T) {
 		{"1,2,3,4,5", NewCPUSet(1, 2, 3, 4, 5)},
 		{"1-5", NewCPUSet(1, 2, 3, 4, 5)},
 		{"1-2,3-5", NewCPUSet(1, 2, 3, 4, 5)},
+		{"5,4,3,2,1", NewCPUSet(1, 2, 3, 4, 5)},  // Range ordering
+		{"3-6,1-5", NewCPUSet(1, 2, 3, 4, 5, 6)}, // Overlapping ranges
+		{"3-3,5-5", NewCPUSet(3, 5)},             // Very short ranges
 	}
 
-	for _, c := range testCases {
+	for _, c := range positiveTestCases {
 		result, err := Parse(c.cpusetString)
 		if err != nil {
 			t.Fatalf("expected error not to have occurred: %v", err)
 		}
 		if !result.Equals(c.expected) {
 			t.Fatalf("expected string \"%s\" to parse as [%v] (got [%v])", c.cpusetString, c.expected, result)
+		}
+	}
+
+	negativeTestCases := []string{
+		// Non-numeric entries
+		"nonnumeric", "non-numeric", "no,numbers", "0-a", "a-0", "0,a", "a,0", "1-2,a,3-5",
+		// Incomplete sequences
+		"0,", "0,,", ",3", ",,3", "0,,3",
+		// Incomplete ranges and/or negative numbers
+		"-1", "1-", "1,2-,3", "1,-2,3", "-1--2", "--1", "1--",
+		// Reversed ranges
+		"3-0", "0--3"}
+	for _, c := range negativeTestCases {
+		result, err := Parse(c)
+		if err == nil {
+			t.Fatalf("expected parse failure of \"%s\", but it succeeded as \"%s\"", c, result.String())
 		}
 	}
 }

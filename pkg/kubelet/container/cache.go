@@ -30,7 +30,7 @@ import (
 // has no states known by the runtime, Cache returns an empty PodStatus object
 // with ID populated.
 //
-// Cache provides two methods to retrive the PodStatus: the non-blocking Get()
+// Cache provides two methods to retrieve the PodStatus: the non-blocking Get()
 // and the blocking GetNewerThan() method. The component responsible for
 // populating the cache is expected to call Delete() to explicitly free the
 // cache entries.

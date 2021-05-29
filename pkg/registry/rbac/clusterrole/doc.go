@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package certificates provides Registry interface and its RESTStorage
+// Package clusterrole provides Registry interface and its RESTStorage
 // implementation for storing ClusterRole objects.
 package clusterrole // import "k8s.io/kubernetes/pkg/registry/rbac/clusterrole"

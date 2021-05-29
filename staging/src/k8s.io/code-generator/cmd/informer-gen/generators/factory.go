@@ -25,7 +25,7 @@ import (
 	"k8s.io/gengo/namer"
 	"k8s.io/gengo/types"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 // factoryGenerator produces a file of listers for a given GroupVersion and

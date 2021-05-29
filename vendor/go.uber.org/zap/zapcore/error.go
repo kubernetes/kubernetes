@@ -66,11 +66,6 @@ type errorGroup interface {
 	Errors() []error
 }
 
-type causer interface {
-	// Provides access to the error that caused this error.
-	Cause() error
-}
-
 // Note that errArry and errArrayElem are very similar to the version
 // implemented in the top-level error.go file. We can't re-use this because
 // that would require exporting errArray as part of the zapcore API.

@@ -38,6 +38,19 @@ func TestTaintToString(t *testing.T) {
 			},
 			expectedString: "foo:NoSchedule",
 		},
+		{
+			taint: &Taint{
+				Key: "foo",
+			},
+			expectedString: "foo",
+		},
+		{
+			taint: &Taint{
+				Key:   "foo",
+				Value: "bar",
+			},
+			expectedString: "foo=bar:",
+		},
 	}
 
 	for i, tc := range testCases {

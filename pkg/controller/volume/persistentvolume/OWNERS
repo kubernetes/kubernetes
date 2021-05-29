@@ -4,10 +4,9 @@ approvers:
 - jsafrane
 - saad-ali
 - thockin
-- msau42 # for volume scheduling
+- msau42
 reviewers:
 - jsafrane
 - saad-ali
 - thockin
-- msau42 # for volume scheduling
-- lichuqiang # for volume scheduling
+- msau42

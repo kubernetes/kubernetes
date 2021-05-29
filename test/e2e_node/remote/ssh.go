@@ -19,12 +19,13 @@ package remote
 import (
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
 	"os/user"
 	"strings"
 	"sync"
 
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
@@ -48,25 +49,31 @@ func init() {
 	}
 }
 
-var hostnameIpOverrides = struct {
+var hostnameIPOverrides = struct {
 	sync.RWMutex
 	m map[string]string
 }{m: make(map[string]string)}
 
-func AddHostnameIp(hostname, ip string) {
-	hostnameIpOverrides.Lock()
-	defer hostnameIpOverrides.Unlock()
-	hostnameIpOverrides.m[hostname] = ip
+// AddHostnameIP adds <hostname,ip> pair into hostnameIPOverrides map.
+func AddHostnameIP(hostname, ip string) {
+	hostnameIPOverrides.Lock()
+	defer hostnameIPOverrides.Unlock()
+	hostnameIPOverrides.m[hostname] = ip
 }
 
-// GetHostnameOrIp converts hostname into ip and apply user if necessary.
-func GetHostnameOrIp(hostname string) string {
-	hostnameIpOverrides.RLock()
-	defer hostnameIpOverrides.RUnlock()
+// GetHostnameOrIP converts hostname into ip and apply user if necessary.
+func GetHostnameOrIP(hostname string) string {
+	hostnameIPOverrides.RLock()
+	defer hostnameIPOverrides.RUnlock()
 	host := hostname
-	if ip, found := hostnameIpOverrides.m[hostname]; found {
+	if ip, found := hostnameIPOverrides.m[hostname]; found {
 		host = ip
 	}
+
+	if *sshUser == "" {
+		*sshUser = os.Getenv("KUBE_SSH_USER")
+	}
+
 	if *sshUser != "" {
 		host = fmt.Sprintf("%s@%s", *sshUser, host)
 	}
@@ -81,13 +88,13 @@ func getSSHCommand(sep string, args ...string) string {
 // SSH executes ssh command with runSSHCommand as root. The `sudo` makes sure that all commands
 // are executed by root, so that there won't be permission mismatch between different commands.
 func SSH(host string, cmd ...string) (string, error) {
-	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--", "sudo"}, cmd...)...)
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIP(host), "--", "sudo"}, cmd...)...)
 }
 
 // SSHNoSudo executes ssh command with runSSHCommand as normal user. Sometimes we need this,
 // for example creating a directory that we'll copy files there with scp.
 func SSHNoSudo(host string, cmd ...string) (string, error) {
-	return runSSHCommand("ssh", append([]string{GetHostnameOrIp(host), "--"}, cmd...)...)
+	return runSSHCommand("ssh", append([]string{GetHostnameOrIP(host), "--"}, cmd...)...)
 }
 
 // runSSHCommand executes the ssh or scp command, adding the flag provided --ssh-options
@@ -103,8 +110,10 @@ func runSSHCommand(cmd string, args ...string) (string, error) {
 	if *sshOptions != "" {
 		args = append(strings.Split(*sshOptions, " "), args...)
 	}
+	klog.Infof("Running the command %s, with args: %v", cmd, args)
 	output, err := exec.Command(cmd, args...).CombinedOutput()
 	if err != nil {
+		klog.Errorf("failed to run SSH command: out: %s, err: %v", output, err)
 		return string(output), fmt.Errorf("command [%s %s] failed with error: %v", cmd, strings.Join(args, " "), err)
 	}
 	return string(output), nil

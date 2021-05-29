@@ -23,13 +23,13 @@ import (
 	"path/filepath"
 	"testing"
 
+	"k8s.io/apimachinery/pkg/util/sets"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
-	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 )
 
-const (
-	testInitConfig = `---
-apiVersion: kubeadm.k8s.io/v1beta1
+var testInitConfig = fmt.Sprintf(`---
+apiVersion: %s
 kind: InitConfiguration
 localAPIEndpoint:
   advertiseAddress: "1.2.3.4"
@@ -38,12 +38,14 @@ bootstrapTokens:
 nodeRegistration:
   criSocket: /run/containerd/containerd.sock
   name: someName
+  ignorePreflightErrors:
+    - c
+    - d
 ---
-apiVersion: kubeadm.k8s.io/v1beta1
+apiVersion: %[1]s
 kind: ClusterConfiguration
 controlPlaneEndpoint: "3.4.5.6"
-`
-)
+`, kubeadmapiv1.SchemeGroupVersion.String())
 
 func TestNewInitData(t *testing.T) {
 	// create temp directory
@@ -79,13 +81,6 @@ func TestNewInitData(t *testing.T) {
 			name: "fail if unknown feature gates flag are passed",
 			flags: map[string]string{
 				options.FeatureGatesString: "unknown=true",
-			},
-			expectError: true,
-		},
-		{
-			name: "fail if deprecetes feature gates are set",
-			flags: map[string]string{
-				options.FeatureGatesString: fmt.Sprintf("%s=true", features.CoreDNS),
 			},
 			expectError: true,
 		},
@@ -129,12 +124,36 @@ func TestNewInitData(t *testing.T) {
 			},
 			expectError: true,
 		},
+
+		// Pre-flight errors:
+		{
+			name: "pre-flights errors from CLI args only",
+			flags: map[string]string{
+				options.IgnorePreflightErrors: "a,b",
+			},
+			validate: expectedInitIgnorePreflightErrors("a", "b"),
+		},
+		{
+			name: "pre-flights errors from InitConfiguration only",
+			flags: map[string]string{
+				options.CfgPath: configFilePath,
+			},
+			validate: expectedInitIgnorePreflightErrors("c", "d"),
+		},
+		{
+			name: "pre-flights errors from both CLI args and InitConfiguration",
+			flags: map[string]string{
+				options.CfgPath:               configFilePath,
+				options.IgnorePreflightErrors: "a,b",
+			},
+			validate: expectedInitIgnorePreflightErrors("a", "b", "c", "d"),
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// initialize an external init option and inject it to the init cmd
 			initOptions := newInitOptions()
-			cmd := NewCmdInit(nil, initOptions)
+			cmd := newCmdInit(nil, initOptions)
 
 			// sets cmd flags (that will be reflected on the init options)
 			for f, v := range tc.flags {
@@ -155,5 +174,17 @@ func TestNewInitData(t *testing.T) {
 				tc.validate(t, data)
 			}
 		})
+	}
+}
+
+func expectedInitIgnorePreflightErrors(expectedItems ...string) func(t *testing.T, data *initData) {
+	expected := sets.NewString(expectedItems...)
+	return func(t *testing.T, data *initData) {
+		if !expected.Equal(data.ignorePreflightErrors) {
+			t.Errorf("Invalid ignore preflight errors. Expected: %v. Actual: %v", expected.List(), data.ignorePreflightErrors.List())
+		}
+		if !expected.HasAll(data.cfg.NodeRegistration.IgnorePreflightErrors...) {
+			t.Errorf("Invalid ignore preflight errors in InitConfiguration. Expected: %v. Actual: %v", expected.List(), data.cfg.NodeRegistration.IgnorePreflightErrors)
+		}
 	}
 }

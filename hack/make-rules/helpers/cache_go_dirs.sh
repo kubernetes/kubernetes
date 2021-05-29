@@ -28,7 +28,7 @@ if [[ -z "${1:-}" ]]; then
 fi
 CACHE="$1"; shift
 
-trap "rm -f '${CACHE}'" HUP INT TERM ERR
+trap 'rm -f "${CACHE}"' HUP INT TERM ERR
 
 # This is a partial 'find' command.  The caller is expected to pass the
 # remaining arguments.
@@ -44,10 +44,9 @@ function kfind() {
         \(                         \
         -not \(                    \
             \(                     \
-                -path ./vendor -o  \
-                -path ./_\* -o     \
-                -path ./.\* -o     \
-                -path ./docs       \
+                -name '_*' -o      \
+                -name '.[^.]*' -o  \
+                -path './vendor'   \
             \) -prune              \
         \)                         \
         \)                         \
@@ -55,19 +54,19 @@ function kfind() {
         | sed 's|^./staging/src|vendor|'
 }
 
-NEED_FIND=true
 # It's *significantly* faster to check whether any directories are newer than
 # the cache than to blindly rebuild it.
-if [[ -f "${CACHE}" ]]; then
+if [[ -f "${CACHE}" && -n "${CACHE}" ]]; then
     N=$(kfind -type d -newer "${CACHE}" -print -quit | wc -l)
-    [[ "${N}" == 0 ]] && NEED_FIND=false
+    if [[ "${N}" == 0 ]]; then
+        cat "${CACHE}"
+        exit
+    fi
 fi
-mkdir -p $(dirname "${CACHE}")
-if $("${NEED_FIND}"); then
-    kfind -type f -name \*.go  \
-        | sed 's|/[^/]*$||'    \
-        | sed 's|^./||'        \
-        | LC_ALL=C sort -u     \
-        > "${CACHE}"
-fi
-cat "${CACHE}"
+
+mkdir -p "$(dirname "${CACHE}")"
+kfind -type f -name \*.go  \
+    | sed 's|/[^/]*$||'    \
+    | sed 's|^./||'        \
+    | LC_ALL=C sort -u     \
+    | tee "${CACHE}"

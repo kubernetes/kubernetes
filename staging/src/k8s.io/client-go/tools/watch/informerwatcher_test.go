@@ -17,8 +17,9 @@ limitations under the License.
 package watch
 
 import (
-	"math/rand"
+	"context"
 	"reflect"
+	goruntime "runtime"
 	"sort"
 	"testing"
 	"time"
@@ -26,14 +27,96 @@ import (
 	"github.com/davecgh/go-spew/spew"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/watch"
 	fakeclientset "k8s.io/client-go/kubernetes/fake"
 	testcore "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 )
+
+// TestEventProcessorExit is expected to timeout if the event processor fails
+// to exit when stopped.
+func TestEventProcessorExit(t *testing.T) {
+	event := watch.Event{}
+
+	tests := []struct {
+		name  string
+		write func(e *eventProcessor)
+	}{
+		{
+			name: "exit on blocked read",
+			write: func(e *eventProcessor) {
+				e.push(event)
+			},
+		},
+		{
+			name: "exit on blocked write",
+			write: func(e *eventProcessor) {
+				e.push(event)
+				e.push(event)
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			out := make(chan watch.Event)
+			e := newEventProcessor(out)
+
+			test.write(e)
+
+			exited := make(chan struct{})
+			go func() {
+				e.run()
+				close(exited)
+			}()
+
+			<-out
+			e.stop()
+			goruntime.Gosched()
+			<-exited
+		})
+	}
+}
+
+type apiInt int
+
+func (apiInt) GetObjectKind() schema.ObjectKind { return nil }
+func (apiInt) DeepCopyObject() runtime.Object   { return nil }
+
+func TestEventProcessorOrdersEvents(t *testing.T) {
+	out := make(chan watch.Event)
+	e := newEventProcessor(out)
+	go e.run()
+
+	numProcessed := 0
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	go func() {
+		for i := 0; i < 1000; i++ {
+			e := <-out
+			if got, want := int(e.Object.(apiInt)), i; got != want {
+				t.Errorf("unexpected event: got=%d, want=%d", got, want)
+			}
+			numProcessed++
+		}
+		cancel()
+	}()
+
+	for i := 0; i < 1000; i++ {
+		e.push(watch.Event{Object: apiInt(i)})
+	}
+
+	<-ctx.Done()
+	e.stop()
+
+	if numProcessed != 1000 {
+		t.Errorf("unexpected number of events processed: %d", numProcessed)
+	}
+
+}
 
 type byEventTypeAndName []watch.Event
 
@@ -49,44 +132,6 @@ func (a byEventTypeAndName) Less(i, j int) bool {
 	}
 
 	return a[i].Object.(*corev1.Secret).Name < a[j].Object.(*corev1.Secret).Name
-}
-
-func TestTicketer(t *testing.T) {
-	tg := newTicketer()
-
-	const numTickets = 100 // current golang limit for race detector is 8192 simultaneously alive goroutines
-	var tickets []uint64
-	for i := 0; i < numTickets; i++ {
-		ticket := tg.GetTicket()
-		tickets = append(tickets, ticket)
-
-		exp, got := uint64(i), ticket
-		if got != exp {
-			t.Fatalf("expected ticket %d, got %d", exp, got)
-		}
-	}
-
-	// shuffle tickets
-	rand.Shuffle(len(tickets), func(i, j int) {
-		tickets[i], tickets[j] = tickets[j], tickets[i]
-	})
-
-	res := make(chan uint64, len(tickets))
-	for _, ticket := range tickets {
-		go func(ticket uint64) {
-			time.Sleep(time.Duration(rand.Intn(50)) * time.Millisecond)
-			tg.WaitForTicket(ticket, func() {
-				res <- ticket
-			})
-		}(ticket)
-	}
-
-	for i := 0; i < numTickets; i++ {
-		exp, got := uint64(i), <-res
-		if got != exp {
-			t.Fatalf("expected ticket %d, got %d", exp, got)
-		}
-	}
 }
 
 func TestNewInformerWatcher(t *testing.T) {
@@ -182,10 +227,10 @@ func TestNewInformerWatcher(t *testing.T) {
 
 			lw := &cache.ListWatch{
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-					return fake.CoreV1().Secrets("").List(options)
+					return fake.CoreV1().Secrets("").List(context.TODO(), options)
 				},
 				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-					return fake.CoreV1().Secrets("").Watch(options)
+					return fake.CoreV1().Secrets("").Watch(context.TODO(), options)
 				},
 			}
 			_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
@@ -231,4 +276,89 @@ func TestNewInformerWatcher(t *testing.T) {
 		})
 	}
 
+}
+
+// TestInformerWatcherDeletedFinalStateUnknown tests the code path when `DeleteFunc`
+// in `NewIndexerInformerWatcher` receives a `cache.DeletedFinalStateUnknown`
+// object from the underlying `DeltaFIFO`. The triggering condition is described
+// at https://github.com/kubernetes/kubernetes/blob/dc39ab2417bfddcec37be4011131c59921fdbe98/staging/src/k8s.io/client-go/tools/cache/delta_fifo.go#L736-L739.
+//
+// Code from @liggitt
+func TestInformerWatcherDeletedFinalStateUnknown(t *testing.T) {
+	listCalls := 0
+	watchCalls := 0
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			retval := &corev1.SecretList{}
+			if listCalls == 0 {
+				// Return a list with items in it
+				retval.ResourceVersion = "1"
+				retval.Items = []corev1.Secret{{ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "ns1", ResourceVersion: "123"}}}
+			} else {
+				// Return empty lists after the first call
+				retval.ResourceVersion = "2"
+			}
+			listCalls++
+			return retval, nil
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			w := watch.NewFake()
+			if options.ResourceVersion == "1" {
+				go func() {
+					// Close with a "Gone" error when trying to start a watch from the first list
+					w.Error(&apierrors.NewGone("gone").ErrStatus)
+					w.Stop()
+				}()
+			}
+			watchCalls++
+			return w, nil
+		},
+	}
+	_, _, w, done := NewIndexerInformerWatcher(lw, &corev1.Secret{})
+
+	// Expect secret add
+	select {
+	case event, ok := <-w.ResultChan():
+		if !ok {
+			t.Fatal("unexpected close")
+		}
+		if event.Type != watch.Added {
+			t.Fatalf("expected Added event, got %#v", event)
+		}
+		if event.Object.(*corev1.Secret).ResourceVersion != "123" {
+			t.Fatalf("expected added Secret with rv=123, got %#v", event.Object)
+		}
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	// Expect secret delete because the relist was missing the secret
+	select {
+	case event, ok := <-w.ResultChan():
+		if !ok {
+			t.Fatal("unexpected close")
+		}
+		if event.Type != watch.Deleted {
+			t.Fatalf("expected Deleted event, got %#v", event)
+		}
+		if event.Object.(*corev1.Secret).ResourceVersion != "123" {
+			t.Fatalf("expected deleted Secret with rv=123, got %#v", event.Object)
+		}
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	w.Stop()
+	select {
+	case <-done:
+	case <-time.After(time.Second * 10):
+		t.Fatal("timeout")
+	}
+
+	if listCalls < 2 {
+		t.Fatalf("expected at least 2 list calls, got %d", listCalls)
+	}
+	if watchCalls < 1 {
+		t.Fatalf("expected at least 1 watch call, got %d", watchCalls)
+	}
 }

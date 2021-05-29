@@ -27,14 +27,17 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"text/template"
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
+	kubeadmapiv1old "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
+	outputapischeme "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/scheme"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
@@ -44,15 +47,20 @@ const (
 	defaultNumberOfImages = 8
 )
 
-// dummyKubernetesVersion is just used for unit testing, in order to not make
-// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
-var dummyKubernetesVersion = constants.MinimumControlPlaneVersion.String()
+var (
+	// dummyKubernetesVersion and dummyKubernetesVersionStr are just used for unit testing, in order to not make
+	// kubeadm lookup dl.k8s.io to resolve what the latest stable release is
+	dummyKubernetesVersion    = constants.MinimumControlPlaneVersion
+	dummyKubernetesVersionStr = dummyKubernetesVersion.String()
+)
 
 func TestNewCmdConfigImagesList(t *testing.T) {
 	var output bytes.Buffer
-	mockK8sVersion := dummyKubernetesVersion
-	images := NewCmdConfigImagesList(&output, &mockK8sVersion)
-	images.Run(nil, nil)
+	mockK8sVersion := dummyKubernetesVersionStr
+	images := newCmdConfigImagesList(&output, &mockK8sVersion)
+	if err := images.RunE(nil, nil); err != nil {
+		t.Fatalf("Error from running the images command: %v", err)
+	}
 	actual := strings.Split(output.String(), "\n")
 	if len(actual) != defaultNumberOfImages {
 		t.Fatalf("Expected %v but found %v images", defaultNumberOfImages, len(actual))
@@ -74,10 +82,10 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.CurrentKubernetesVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.CurrentKubernetesVersion))),
 		},
 		{
 			name:               "use coredns",
@@ -86,11 +94,17 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta1
+				apiVersion: %s
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
-			`, constants.MinimumControlPlaneVersion))),
+			`, kubeadmapiv1.SchemeGroupVersion.String(), constants.MinimumControlPlaneVersion))),
 		},
+	}
+
+	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
+	printer, err := outputFlags.ToPrinter()
+	if err != nil {
+		t.Fatalf("can't create printer for the output format %s: %+v", output.TextOutput, err)
 	}
 
 	for _, tc := range testcases {
@@ -106,16 +120,14 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
 			})
 			if err != nil {
 				t.Fatalf("Failed getting the kubeadm images command: %v", err)
 			}
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+			if err = i.Run(&output, printer); err != nil {
 				t.Fatalf("Error from running the images command: %v", err)
 			}
 			actual := strings.Split(output.String(), "\n")
@@ -135,67 +147,42 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta1.InitConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					Etcd: kubeadmapiv1beta1.Etcd{
-						External: &kubeadmapiv1beta1.ExternalEtcd{
-							Endpoints: []string{"https://some.etcd.com:2379"},
-						},
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				Etcd: kubeadmapiv1.Etcd{
+					External: &kubeadmapiv1.ExternalEtcd{
+						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
-					KubernetesVersion: dummyKubernetesVersion,
 				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages - 1,
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
 			},
 			expectedImages: defaultNumberOfImages,
 		},
-		{
-			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta1.InitConfiguration{
-				ClusterConfiguration: kubeadmapiv1beta1.ClusterConfiguration{
-					KubernetesVersion: dummyKubernetesVersion,
-					DNS: kubeadmapiv1beta1.DNS{
-						Type: kubeadmapiv1beta1.KubeDNS,
-					},
-				},
-				NodeRegistration: kubeadmapiv1beta1.NodeRegistrationOptions{
-					CRISocket: constants.DefaultDockerCRISocket,
-				},
-			},
-			expectedImages: defaultNumberOfImages + 2,
-		},
 	}
 
+	outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(output.TextOutput)
+	printer, err := outputFlags.ToPrinter()
+	if err != nil {
+		t.Fatalf("can't create printer for the output format %s: %+v", output.TextOutput, err)
+	}
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			i, err := NewImagesList("", &tc.cfg)
@@ -204,7 +191,8 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			}
 
 			var output bytes.Buffer
-			if i.Run(&output) != nil {
+
+			if err = i.Run(&output, printer); err != nil {
 				t.Fatalf("did not expect an error running the Images command: %v", err)
 			}
 
@@ -216,14 +204,152 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	}
 }
 
+func TestConfigImagesListOutput(t *testing.T) {
+
+	etcdVersion, ok := constants.SupportedEtcdVersion[uint8(dummyKubernetesVersion.Minor())]
+	if !ok {
+		t.Fatalf("cannot determine etcd version for Kubernetes version %s", dummyKubernetesVersionStr)
+	}
+	versionMapping := struct {
+		EtcdVersion    string
+		KubeVersion    string
+		PauseVersion   string
+		CoreDNSVersion string
+	}{
+		EtcdVersion:    etcdVersion,
+		KubeVersion:    "v" + dummyKubernetesVersionStr,
+		PauseVersion:   constants.PauseVersion,
+		CoreDNSVersion: constants.CoreDNSVersion,
+	}
+
+	testcases := []struct {
+		name           string
+		cfg            kubeadmapiv1.ClusterConfiguration
+		outputFormat   string
+		expectedOutput string
+	}{
+		{
+			name: "text output",
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
+			},
+			outputFormat: "text",
+			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+k8s.gcr.io/pause:{{.PauseVersion}}
+k8s.gcr.io/etcd:{{.EtcdVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+`,
+		},
+		{
+			name: "JSON output",
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
+			},
+			outputFormat: "json",
+			expectedOutput: `{
+    "kind": "Images",
+    "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
+    "images": [
+        "k8s.gcr.io/kube-apiserver:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-scheduler:{{.KubeVersion}}",
+        "k8s.gcr.io/kube-proxy:{{.KubeVersion}}",
+        "k8s.gcr.io/pause:{{.PauseVersion}}",
+        "k8s.gcr.io/etcd:{{.EtcdVersion}}",
+        "k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}"
+    ]
+}
+`,
+		},
+		{
+			name: "YAML output",
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
+			},
+			outputFormat: "yaml",
+			expectedOutput: `apiVersion: output.kubeadm.k8s.io/v1alpha1
+images:
+- k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+- k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+- k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+- k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+- k8s.gcr.io/pause:{{.PauseVersion}}
+- k8s.gcr.io/etcd:{{.EtcdVersion}}
+- k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+kind: Images
+`,
+		},
+		{
+			name: "go-template output",
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
+			},
+			outputFormat: `go-template={{range .images}}{{.}}{{"\n"}}{{end}}`,
+			expectedOutput: `k8s.gcr.io/kube-apiserver:{{.KubeVersion}}
+k8s.gcr.io/kube-controller-manager:{{.KubeVersion}}
+k8s.gcr.io/kube-scheduler:{{.KubeVersion}}
+k8s.gcr.io/kube-proxy:{{.KubeVersion}}
+k8s.gcr.io/pause:{{.PauseVersion}}
+k8s.gcr.io/etcd:{{.EtcdVersion}}
+k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}}
+`,
+		},
+		{
+			name: "JSONPATH output",
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				KubernetesVersion: dummyKubernetesVersionStr,
+			},
+			outputFormat: `jsonpath={range.images[*]}{@} {end}`,
+			expectedOutput: "k8s.gcr.io/kube-apiserver:{{.KubeVersion}} k8s.gcr.io/kube-controller-manager:{{.KubeVersion}} k8s.gcr.io/kube-scheduler:{{.KubeVersion}} " +
+				"k8s.gcr.io/kube-proxy:{{.KubeVersion}} k8s.gcr.io/pause:{{.PauseVersion}} k8s.gcr.io/etcd:{{.EtcdVersion}} k8s.gcr.io/coredns/coredns:{{.CoreDNSVersion}} ",
+		},
+	}
+
+	for _, tc := range testcases {
+		outputFlags := output.NewOutputFlags(&imageTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(tc.outputFormat)
+		printer, err := outputFlags.ToPrinter()
+		if err != nil {
+			t.Fatalf("can't create printer for the output format %s: %+v", tc.outputFormat, err)
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			i, err := NewImagesList("", &tc.cfg)
+			if err != nil {
+				t.Fatalf("did not expect an error while creating the Images command: %v", err)
+			}
+
+			var output, expectedOutput bytes.Buffer
+
+			if err = i.Run(&output, printer); err != nil {
+				t.Fatalf("did not expect an error running the Images command: %v", err)
+			}
+
+			tmpl, err := template.New("test").Parse(tc.expectedOutput)
+			if err != nil {
+				t.Fatalf("could not create template: %v", err)
+			}
+			if err = tmpl.Execute(&expectedOutput, versionMapping); err != nil {
+				t.Fatalf("could not execute template: %v", err)
+			}
+
+			if output.String() != expectedOutput.String() {
+				t.Fatalf("unexpected output:\n|%s|\nexpected:\n|%s|\n", output.String(), tc.expectedOutput)
+			}
+		})
+	}
+}
+
 func TestImagesPull(t *testing.T) {
 	fcmd := fakeexec.FakeCmd{
-		CombinedOutputScript: []fakeexec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
-			func() ([]byte, error) { return nil, nil },
+		CombinedOutputScript: []fakeexec.FakeAction{
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
+			func() ([]byte, []byte, error) { return nil, nil, nil },
 		},
 	}
 
@@ -244,11 +370,11 @@ func TestImagesPull(t *testing.T) {
 	}
 
 	images := []string{"a", "b", "c", "d", "a"}
-	ip := NewImagesPull(containerRuntime, images)
-
-	err = ip.PullAll()
-	if err != nil {
-		t.Fatalf("expected nil but found %v", err)
+	for _, image := range images {
+		if err := containerRuntime.PullImage(image); err != nil {
+			t.Fatalf("expected nil but found %v", err)
+		}
+		fmt.Printf("[config/images] Pulled %s\n", image)
 	}
 
 	if fcmd.CombinedOutputCalls != len(images) {
@@ -257,16 +383,16 @@ func TestImagesPull(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	cfg := []byte(dedent.Dedent(`
-		# This is intentionally testing an old API version and the old kind naming and making sure the output is correct
-		apiVersion: kubeadm.k8s.io/v1alpha3
+	cfg := []byte(dedent.Dedent(fmt.Sprintf(`
+		# This is intentionally testing an old API version. Sometimes this may be the latest version (if no old configs are supported).
+		apiVersion: %s
 		kind: InitConfiguration
-	`))
+	`, kubeadmapiv1old.SchemeGroupVersion.String())))
 	configFile, cleanup := tempConfig(t, cfg)
 	defer cleanup()
 
 	var output bytes.Buffer
-	command := NewCmdConfigMigrate(&output)
+	command := newCmdConfigMigrate(&output)
 	if err := command.Flags().Set("old-config", configFile); err != nil {
 		t.Fatalf("failed to set old-config flag")
 	}
@@ -274,7 +400,9 @@ func TestMigrate(t *testing.T) {
 	if err := command.Flags().Set("new-config", newConfigPath); err != nil {
 		t.Fatalf("failed to set new-config flag")
 	}
-	command.Run(nil, nil)
+	if err := command.RunE(nil, nil); err != nil {
+		t.Fatalf("Error from running the migrate command: %v", err)
+	}
 	if _, err := configutil.LoadInitConfigurationFromFile(newConfigPath); err != nil {
 		t.Fatalf("Could not read output back into internal type: %v", err)
 	}
@@ -310,54 +438,54 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
 			},
-			cmdProc: NewCmdConfigPrintInitDefaults,
+			cmdProc: newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "InitConfiguration: KubeProxyConfiguration",
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
-			cmdProc:          NewCmdConfigPrintInitDefaults,
+			cmdProc:          newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "InitConfiguration: KubeProxyConfiguration and KubeletConfiguration",
 			expectedKinds: []string{
 				constants.ClusterConfigurationKind,
 				constants.InitConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
-			cmdProc:          NewCmdConfigPrintInitDefaults,
+			cmdProc:          newCmdConfigPrintInitDefaults,
 		},
 		{
 			name: "JoinConfiguration: No component configs",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
 			},
-			cmdProc: NewCmdConfigPrintJoinDefaults,
+			cmdProc: newCmdConfigPrintJoinDefaults,
 		},
 		{
 			name: "JoinConfiguration: KubeProxyConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
+				"KubeProxyConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration",
-			cmdProc:          NewCmdConfigPrintJoinDefaults,
+			cmdProc:          newCmdConfigPrintJoinDefaults,
 		},
 		{
 			name: "JoinConfiguration: KubeProxyConfiguration and KubeletConfiguration",
 			expectedKinds: []string{
 				constants.JoinConfigurationKind,
-				string(componentconfigs.KubeProxyConfigurationKind),
-				string(componentconfigs.KubeletConfigurationKind),
+				"KubeProxyConfiguration",
+				"KubeletConfiguration",
 			},
 			componentConfigs: "KubeProxyConfiguration,KubeletConfiguration",
-			cmdProc:          NewCmdConfigPrintJoinDefaults,
+			cmdProc:          newCmdConfigPrintJoinDefaults,
 		},
 	}
 
@@ -369,7 +497,9 @@ func TestNewCmdConfigPrintActionDefaults(t *testing.T) {
 			if err := command.Flags().Set("component-configs", test.componentConfigs); err != nil {
 				t.Fatalf("failed to set component-configs flag")
 			}
-			command.Run(nil, nil)
+			if err := command.RunE(nil, nil); err != nil {
+				t.Fatalf("Error from running the print command: %v", err)
+			}
 
 			gvkmap, err := kubeadmutil.SplitYAMLDocuments(output.Bytes())
 			if err != nil {

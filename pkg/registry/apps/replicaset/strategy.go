@@ -41,7 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 // rsStrategy implements verification logic for ReplicaSets.
@@ -72,6 +72,18 @@ func (rsStrategy) DefaultGarbageCollectionPolicy(ctx context.Context) rest.Garba
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
 func (rsStrategy) NamespaceScoped() bool {
 	return true
+}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rsStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	fields := map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("status"),
+		),
+	}
+
+	return fields
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
@@ -109,9 +121,14 @@ func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object)
 // Validate validates a new ReplicaSet.
 func (rsStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	rs := obj.(*apps.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(rs)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&rs.Spec.Template, nil, field.NewPath("spec.template"))...)
-	return allErrs
+	opts := pod.GetValidationOptionsFromPodTemplate(&rs.Spec.Template, nil)
+	return validation.ValidateReplicaSet(rs, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (rsStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newRS := obj.(*apps.ReplicaSet)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newRS.Spec.Template, nil)
 }
 
 // Canonicalize normalizes the object after validation.
@@ -128,9 +145,10 @@ func (rsStrategy) AllowCreateOnUpdate() bool {
 func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	newReplicaSet := obj.(*apps.ReplicaSet)
 	oldReplicaSet := old.(*apps.ReplicaSet)
-	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet))
-	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet)...)
-	allErrs = append(allErrs, corevalidation.ValidateConditionalPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template, field.NewPath("spec.template"))...)
+
+	opts := pod.GetValidationOptionsFromPodTemplate(&newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
+	allErrs := validation.ValidateReplicaSet(obj.(*apps.ReplicaSet), opts)
+	allErrs = append(allErrs, validation.ValidateReplicaSetUpdate(newReplicaSet, oldReplicaSet, opts)...)
 
 	// Update is not allowed to set Spec.Selector for all groups/versions except extensions/v1beta1.
 	// If RequestInfo is nil, it is better to revert to old behavior (i.e. allow update to set Spec.Selector)
@@ -150,12 +168,23 @@ func (rsStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) f
 	return allErrs
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (rsStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newReplicaSet := obj.(*apps.ReplicaSet)
+	oldReplicaSet := old.(*apps.ReplicaSet)
+	if newReplicaSet.Generation != oldReplicaSet.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newReplicaSet.Spec.Template, &oldReplicaSet.Spec.Template)
+	}
+	return warnings
+}
+
 func (rsStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-// ReplicaSetToSelectableFields returns a field set that represents the object.
-func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
+// ToSelectableFields returns a field set that represents the object.
+func ToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
@@ -167,9 +196,9 @@ func ReplicaSetToSelectableFields(rs *apps.ReplicaSet) fields.Set {
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	rs, ok := obj.(*apps.ReplicaSet)
 	if !ok {
-		return nil, nil, fmt.Errorf("given object is not a ReplicaSet.")
+		return nil, nil, fmt.Errorf("given object is not a ReplicaSet")
 	}
-	return labels.Set(rs.ObjectMeta.Labels), ReplicaSetToSelectableFields(rs), nil
+	return labels.Set(rs.ObjectMeta.Labels), ToSelectableFields(rs), nil
 }
 
 // MatchReplicaSet is the filter used by the generic etcd backend to route
@@ -187,7 +216,18 @@ type rsStatusStrategy struct {
 	rsStrategy
 }
 
+// StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = rsStatusStrategy{Strategy}
+
+// GetResetFields returns the set of fields that get reset by the strategy
+// and should not be modified by the user.
+func (rsStatusStrategy) GetResetFields() map[fieldpath.APIVersion]*fieldpath.Set {
+	return map[fieldpath.APIVersion]*fieldpath.Set{
+		"apps/v1": fieldpath.NewSet(
+			fieldpath.MakePathOrDie("spec"),
+		),
+	}
+}
 
 func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRS := obj.(*apps.ReplicaSet)
@@ -198,4 +238,9 @@ func (rsStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.O
 
 func (rsStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateReplicaSetStatusUpdate(obj.(*apps.ReplicaSet), old.(*apps.ReplicaSet))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (rsStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
