@@ -17,49 +17,50 @@ limitations under the License.
 package logs
 
 import (
-	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
 	"k8s.io/klog/v2"
 
+	"k8s.io/component-base/config"
+	"k8s.io/component-base/config/v1alpha1"
 	"k8s.io/component-base/logs/sanitization"
 )
 
 // Options has klog format parameters
 type Options struct {
-	LogFormat       string
-	LogSanitization bool
+	Config config.LoggingConfiguration
 }
 
 // NewOptions return new klog options
 func NewOptions() *Options {
-	return &Options{
-		LogFormat: DefaultLogFormat,
-	}
+	c := v1alpha1.LoggingConfiguration{}
+	v1alpha1.RecommendedLoggingConfiguration(&c)
+	o := &Options{}
+	v1alpha1.Convert_v1alpha1_LoggingConfiguration_To_config_LoggingConfiguration(&c, &o.Config, nil)
+	return o
 }
 
 // Validate verifies if any unsupported flag is set
 // for non-default logging format
 func (o *Options) Validate() []error {
-	return ValidateLoggingConfiguration(o)
+	errs := ValidateLoggingConfiguration(&o.Config, nil)
+	if len(errs) != 0 {
+		return errs.ToAggregate().Errors()
+	}
+	return nil
 }
 
 // AddFlags add logging-format flag
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	BindLoggingFlags(o, fs)
+	BindLoggingFlags(&o.Config, fs)
 }
 
 // Apply set klog logger from LogFormat type
 func (o *Options) Apply() {
 	// if log format not exists, use nil loggr
-	loggr, _ := o.Get()
+	loggr, _ := LogRegistry.Get(o.Config.Format)
 	klog.SetLogger(loggr)
-	if o.LogSanitization {
+	if o.Config.Sanitization {
 		klog.SetLogFilter(&sanitization.SanitizingFilter{})
 	}
-}
-
-// Get logger with LogFormat field
-func (o *Options) Get() (logr.Logger, error) {
-	return LogRegistry.Get(o.LogFormat)
 }

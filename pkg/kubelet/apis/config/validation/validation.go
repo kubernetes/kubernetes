@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/logs"
 	"k8s.io/component-base/metrics"
@@ -200,11 +201,8 @@ func ValidateKubeletConfiguration(kc *kubeletconfig.KubeletConfiguration) error 
 	}
 	allErrors = append(allErrors, metrics.ValidateShowHiddenMetricsVersion(kc.ShowHiddenMetricsForVersion)...)
 
-	logOption := logs.NewOptions()
-	if kc.Logging.Format != "" {
-		logOption.LogFormat = kc.Logging.Format
+	if errs := logs.ValidateLoggingConfiguration(&kc.Logging, field.NewPath("logging")); len(errs) > 0 {
+		allErrors = append(allErrors, errs.ToAggregate().Errors()...)
 	}
-	allErrors = append(allErrors, logOption.Validate()...)
-
 	return utilerrors.NewAggregate(allErrors)
 }
