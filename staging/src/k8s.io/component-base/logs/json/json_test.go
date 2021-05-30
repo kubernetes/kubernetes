@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -41,22 +42,22 @@ func TestZapLoggerInfo(t *testing.T) {
 	}{
 		{
 			msg:        "test",
-			format:     "{\"ts\":%f,\"msg\":\"test\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2},
 		},
 		{
 			msg:        "test for strongly typed Zap field",
-			format:     "{\"ts\":%f,\"msg\":\"strongly-typed Zap Field passed to logr\",\"v\":0}\n{\"ts\":0.000123,\"msg\":\"test for strongly typed Zap field\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json.go:%d\",\"msg\":\"strongly-typed Zap Field passed to logr\",\"v\":0}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for strongly typed Zap field\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2, zap.Int("attempt", 3), "attempt", "Running", 10},
 		},
 		{
 			msg:        "test for non-string key argument",
-			format:     "{\"ts\":%f,\"msg\":\"non-string key argument passed to logging, ignoring all later arguments\",\"v\":0}\n{\"ts\":0.000123,\"msg\":\"test for non-string key argument\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json.go:%d\",\"msg\":\"non-string key argument passed to logging, ignoring all later arguments\",\"v\":0}\n{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for non-string key argument\",\"v\":0,\"ns\":\"default\",\"podnum\":2}\n",
 			keysValues: []interface{}{"ns", "default", "podnum", 2, 200, "replica", "Running", 10},
 		},
 		{
 			msg:        "test for duration value argument",
-			format:     "{\"ts\":%f,\"msg\":\"test for duration value argument\",\"v\":0,\"duration\":\"5s\"}\n",
+			format:     "{\"ts\":%f,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test for duration value argument\",\"v\":0,\"duration\":\"5s\"}\n",
 			keysValues: []interface{}{"duration", time.Duration(5 * time.Second)},
 		},
 	}
@@ -68,14 +69,27 @@ func TestZapLoggerInfo(t *testing.T) {
 		sampleInfoLogger.Info(data.msg, data.keysValues...)
 		writer.Flush()
 		logStr := buffer.String()
-		var ts float64
-		n, err := fmt.Sscanf(logStr, data.format, &ts)
-		if n != 1 || err != nil {
-			t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
+
+		logStrLines := strings.Split(logStr, "\n")
+		dataFormatLines := strings.Split(data.format, "\n")
+		if !assert.Equal(t, len(logStrLines), len(dataFormatLines)) {
+			t.Errorf("Info has wrong format: no. of lines in log is incorrect \n expect:%d\n got:%d", len(dataFormatLines), len(logStrLines))
 		}
-		expect := fmt.Sprintf(data.format, ts)
-		if !assert.Equal(t, expect, logStr) {
-			t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logStr)
+
+		for i := range logStrLines {
+			if len(logStrLines[i]) == 0 && len(dataFormatLines[i]) == 0 {
+				continue
+			}
+			var ts float64
+			var lineNo int
+			n, err := fmt.Sscanf(logStrLines[i], dataFormatLines[i], &ts, &lineNo)
+			if n != 2 || err != nil {
+				t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStrLines[i])
+			}
+			expect := fmt.Sprintf(dataFormatLines[i], ts, lineNo)
+			if !assert.Equal(t, expect, logStrLines[i]) {
+				t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logStrLines[i])
+			}
 		}
 	}
 }
@@ -103,17 +117,16 @@ func TestZapLoggerV(t *testing.T) {
 		sampleInfoLogger.V(i).Info("test", "ns", "default", "podnum", 2, "time", time.Microsecond)
 		writer.Flush()
 		logStr := buffer.String()
-		var v int
-		var expectFormat string
-		expectFormat = "{\"ts\":0.000123,\"msg\":\"test\",\"v\":%d,\"ns\":\"default\",\"podnum\":2,\"time\":\"1µs\"}\n"
-		n, err := fmt.Sscanf(logStr, expectFormat, &v)
-		if n != 1 || err != nil {
+		var v, lineNo int
+		expectFormat := "{\"ts\":0.000123,\"caller\":\"json/json_test.go:%d\",\"msg\":\"test\",\"v\":%d,\"ns\":\"default\",\"podnum\":2,\"time\":\"1µs\"}\n"
+		n, err := fmt.Sscanf(logStr, expectFormat, &lineNo, &v)
+		if n != 2 || err != nil {
 			t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
 		}
 		if v != i {
 			t.Errorf("V(%d).Info...) returned v=%d. expected v=%d", i, v, i)
 		}
-		expect := fmt.Sprintf(expectFormat, v)
+		expect := fmt.Sprintf(expectFormat, lineNo, v)
 		if !assert.Equal(t, logStr, expect) {
 			t.Errorf("V(%d).Info has wrong format \n expect:%s\n got:%s", i, expect, logStr)
 		}
@@ -129,16 +142,17 @@ func TestZapLoggerError(t *testing.T) {
 		return time.Date(1970, time.January, 1, 0, 0, 0, 123, time.UTC)
 	}
 	var sampleInfoLogger = NewJSONLogger(zapcore.AddSync(writer))
-	sampleInfoLogger.Error(fmt.Errorf("ivailid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
+	sampleInfoLogger.Error(fmt.Errorf("invalid namespace:%s", "default"), "wrong namespace", "ns", "default", "podnum", 2, "time", time.Microsecond)
 	writer.Flush()
 	logStr := buffer.String()
 	var ts float64
-	expectFormat := `{"ts":%f,"msg":"wrong namespace","v":0,"ns":"default","podnum":2,"time":"1µs","err":"ivailid namespace:default"}`
-	n, err := fmt.Sscanf(logStr, expectFormat, &ts)
-	if n != 1 || err != nil {
+	var lineNo int
+	expectFormat := `{"ts":%f,"caller":"json/json_test.go:%d","msg":"wrong namespace","v":0,"ns":"default","podnum":2,"time":"1µs","err":"invalid namespace:default"}`
+	n, err := fmt.Sscanf(logStr, expectFormat, &ts, &lineNo)
+	if n != 2 || err != nil {
 		t.Errorf("log format error: %d elements, error %s:\n%s", n, err, logStr)
 	}
-	expect := fmt.Sprintf(expectFormat, ts)
+	expect := fmt.Sprintf(expectFormat, ts, lineNo)
 	if !assert.JSONEq(t, expect, logStr) {
 		t.Errorf("Info has wrong format \n expect:%s\n got:%s", expect, logStr)
 	}
