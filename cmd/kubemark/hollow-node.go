@@ -35,14 +35,13 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/cluster/ports"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
@@ -274,8 +273,8 @@ func run(cmd *cobra.Command, config *hollowNodeConfig) {
 		execer := &fakeexec.FakeExec{
 			LookPathFunc: func(_ string) (string, error) { return "", errors.New("fake execer") },
 		}
-		eventBroadcaster := record.NewBroadcaster()
-		recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "kube-proxy", Host: config.NodeName})
+		eventBroadcaster := events.NewEventBroadcasterAdapter(client)
+		recorder := eventBroadcaster.NewRecorder("kubemark")
 
 		hollowProxy, err := kubemark.NewHollowProxyOrDie(
 			config.NodeName,
