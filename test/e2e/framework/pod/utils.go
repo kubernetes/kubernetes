@@ -17,24 +17,10 @@ limitations under the License.
 package pod
 
 import (
-	"flag"
-
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
-
-// NodeOSDistroIs returns true if the distro is the same as `--node-os-distro`
-// the package framework/pod can't import the framework package (see #81245)
-// we need to check if the --node-os-distro=windows is set and the framework package
-// is the one that's parsing the flags, as a workaround this method is looking for the same flag again
-// TODO: replace with `framework.NodeOSDistroIs` when #81245 is complete
-func NodeOSDistroIs(distro string) bool {
-	var nodeOsDistro *flag.Flag = flag.Lookup("node-os-distro")
-	if nodeOsDistro != nil && nodeOsDistro.Value.String() == distro {
-		return true
-	}
-	return false
-}
 
 // GenerateScriptCmd generates the corresponding command lines to execute a command.
 // Depending on the Node OS is Windows or linux, the command will use powershell or /bin/sh
@@ -43,7 +29,7 @@ func GenerateScriptCmd(command string) []string {
 	if command == "" {
 		return commands
 	}
-	if !NodeOSDistroIs("windows") {
+	if !framework.NodeOSDistroIs("windows") {
 		commands = []string{"/bin/sh", "-c", command}
 	} else {
 		commands = []string{"powershell", "/c", command}
@@ -71,7 +57,7 @@ func GetDefaultTestImageID() int {
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 func GetTestImage(id int) string {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return imageutils.GetE2EImage(imageutils.Agnhost)
 	}
 	return imageutils.GetE2EImage(id)
@@ -81,7 +67,7 @@ func GetTestImage(id int) string {
 // If the Node OS is windows, currently we return Agnhost image for Windows node
 // due to the issue of #https://github.com/kubernetes-sigs/windows-testing/pull/35.
 func GetTestImageID(id int) int {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return imageutils.Agnhost
 	}
 	return id
@@ -91,7 +77,7 @@ func GetTestImageID(id int) int {
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
 func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOptions) *v1.PodSecurityContext {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
 	return &v1.PodSecurityContext{
@@ -104,7 +90,7 @@ func GeneratePodSecurityContext(fsGroup *int64, seLinuxOptions *v1.SELinuxOption
 // If the Node OS is windows, currently we will ignore the inputs and return nil.
 // TODO: Will modify it after windows has its own security context
 func GenerateContainerSecurityContext(privileged bool) *v1.SecurityContext {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
 	return &v1.SecurityContext{
@@ -115,7 +101,7 @@ func GenerateContainerSecurityContext(privileged bool) *v1.SecurityContext {
 // GetLinuxLabel returns the default SELinuxLabel based on OS.
 // If the node OS is windows, it will return nil
 func GetLinuxLabel() *v1.SELinuxOptions {
-	if NodeOSDistroIs("windows") {
+	if framework.NodeOSDistroIs("windows") {
 		return nil
 	}
 	return &v1.SELinuxOptions{
