@@ -24,12 +24,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/feature"
 )
 
 var _ framework.PreFilterPlugin = &Fit{}
@@ -49,6 +48,7 @@ const (
 type Fit struct {
 	ignoredResources      sets.String
 	ignoredResourceGroups sets.String
+	enablePodOverhead     bool
 }
 
 // preFilterState computed at PreFilter and used at Filter.
@@ -67,7 +67,7 @@ func (f *Fit) Name() string {
 }
 
 // NewFit initializes a new plugin and returns it.
-func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error) {
+func NewFit(plArgs runtime.Object, _ framework.Handle, fts feature.Features) (framework.Plugin, error) {
 	args, ok := plArgs.(*config.NodeResourcesFitArgs)
 	if !ok {
 		return nil, fmt.Errorf("want args to be of type NodeResourcesFitArgs, got %T", plArgs)
@@ -78,6 +78,7 @@ func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error)
 	return &Fit{
 		ignoredResources:      sets.NewString(args.IgnoredResources...),
 		ignoredResourceGroups: sets.NewString(args.IgnoredResourceGroups...),
+		enablePodOverhead:     fts.EnablePodOverhead,
 	}, nil
 }
 
@@ -108,7 +109,7 @@ func NewFit(plArgs runtime.Object, _ framework.Handle) (framework.Plugin, error)
 //       Memory: 1G
 //
 // Result: CPU: 3, Memory: 3G
-func computePodResourceRequest(pod *v1.Pod) *preFilterState {
+func computePodResourceRequest(pod *v1.Pod, enablePodOverhead bool) *preFilterState {
 	result := &preFilterState{}
 	for _, container := range pod.Spec.Containers {
 		result.Add(container.Resources.Requests)
@@ -120,7 +121,7 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 	}
 
 	// If Overhead is being utilized, add to the total requests for the pod
-	if pod.Spec.Overhead != nil && utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if pod.Spec.Overhead != nil && enablePodOverhead {
 		result.Add(pod.Spec.Overhead)
 	}
 
@@ -129,7 +130,7 @@ func computePodResourceRequest(pod *v1.Pod) *preFilterState {
 
 // PreFilter invoked at the prefilter extension point.
 func (f *Fit) PreFilter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod) *framework.Status {
-	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod))
+	cycleState.Write(preFilterStateKey, computePodResourceRequest(pod, f.enablePodOverhead))
 	return nil
 }
 
@@ -198,8 +199,8 @@ type InsufficientResource struct {
 }
 
 // Fits checks if node have enough resources to host the pod.
-func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo) []InsufficientResource {
-	return fitsRequest(computePodResourceRequest(pod), nodeInfo, nil, nil)
+func Fits(pod *v1.Pod, nodeInfo *framework.NodeInfo, enablePodOverhead bool) []InsufficientResource {
+	return fitsRequest(computePodResourceRequest(pod, enablePodOverhead), nodeInfo, nil, nil)
 }
 
 func fitsRequest(podRequest *preFilterState, nodeInfo *framework.NodeInfo, ignoredExtendedResources, ignoredResourceGroups sets.String) []InsufficientResource {

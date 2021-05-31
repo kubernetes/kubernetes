@@ -22,6 +22,7 @@ import (
 	"strconv"
 
 	batchv1 "k8s.io/api/batch/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -89,6 +90,8 @@ func (jobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 
+	job.Generation = 1
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TTLAfterFinished) {
 		job.Spec.TTLSecondsAfterFinished = nil
 	}
@@ -129,6 +132,12 @@ func (jobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	}
 
 	pod.DropDisabledTemplateFields(&newJob.Spec.Template, &oldJob.Spec.Template)
+
+	// Any changes to the spec increment the generation number.
+	// See metav1.ObjectMeta description for more information on Generation.
+	if !apiequality.Semantic.DeepEqual(newJob.Spec, oldJob.Spec) {
+		newJob.Generation = oldJob.Generation + 1
+	}
 }
 
 // Validate validates a new job.
@@ -140,6 +149,12 @@ func (jobStrategy) Validate(ctx context.Context, obj runtime.Object) field.Error
 	}
 	opts := pod.GetValidationOptionsFromPodTemplate(&job.Spec.Template, nil)
 	return validation.ValidateJob(job, opts)
+}
+
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (jobStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	newJob := obj.(*batch.Job)
+	return pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, nil)
 }
 
 // generateSelector adds a selector to a job and labels to its template
@@ -216,6 +231,17 @@ func (jobStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) 
 	return append(validationErrorList, updateErrorList...)
 }
 
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	var warnings []string
+	newJob := obj.(*batch.Job)
+	oldJob := old.(*batch.Job)
+	if newJob.Generation != oldJob.Generation {
+		warnings = pod.GetWarningsForPodTemplate(ctx, field.NewPath("spec", "template"), &newJob.Spec.Template, &oldJob.Spec.Template)
+	}
+	return warnings
+}
+
 type jobStatusStrategy struct {
 	jobStrategy
 }
@@ -240,6 +266,11 @@ func (jobStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.
 
 func (jobStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateJobUpdateStatus(obj.(*batch.Job), old.(*batch.Job))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (jobStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // JobSelectableFields returns a field set that represents the object for matching purposes.

@@ -22,8 +22,8 @@ func (s *HugetlbGroup) Apply(path string, d *cgroupData) error {
 	return join(path, d.pid)
 }
 
-func (s *HugetlbGroup) Set(path string, cgroup *configs.Cgroup) error {
-	for _, hugetlb := range cgroup.Resources.HugetlbLimit {
+func (s *HugetlbGroup) Set(path string, r *configs.Resources) error {
+	for _, hugetlb := range r.HugetlbLimit {
 		if err := fscommon.WriteFile(path, "hugetlb."+hugetlb.Pagesize+".limit_in_bytes", strconv.FormatUint(hugetlb.Limit, 10)); err != nil {
 			return err
 		}

@@ -13,9 +13,9 @@ import (
 	"sigs.k8s.io/kustomize/api/internal/generators"
 	"sigs.k8s.io/kustomize/api/internal/kusterr"
 	"sigs.k8s.io/kustomize/api/konfig"
-	"sigs.k8s.io/kustomize/api/resid"
 	"sigs.k8s.io/kustomize/api/types"
 	"sigs.k8s.io/kustomize/kyaml/kio"
+	"sigs.k8s.io/kustomize/kyaml/resid"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
 )
 
@@ -69,7 +69,7 @@ func (rf *Factory) makeOne(rn *yaml.RNode, o *types.GenArgs) *Resource {
 	if o == nil {
 		o = types.NewGenArgs(nil)
 	}
-	return &Resource{node: rn, options: o}
+	return &Resource{RNode: *rn, options: o}
 }
 
 // SliceFromPatches returns a slice of resources given a patch path

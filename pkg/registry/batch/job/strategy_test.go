@@ -110,6 +110,9 @@ func testJobStrategy(t *testing.T) {
 	if job.Status.Active != 0 {
 		t.Errorf("Job does not allow setting status on create")
 	}
+	if job.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", job.Generation)
+	}
 	errs := Strategy.Validate(ctx, job)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -125,6 +128,15 @@ func testJobStrategy(t *testing.T) {
 	}
 
 	parallelism := int32(10)
+
+	// ensure we do not change generation for non-spec updates
+	updatedLabelJob := job.DeepCopy()
+	updatedLabelJob.Labels = map[string]string{"a": "true"}
+	Strategy.PrepareForUpdate(ctx, updatedLabelJob, job)
+	if updatedLabelJob.Generation != 1 {
+		t.Errorf("expected Generation=1, got %d", updatedLabelJob.Generation)
+	}
+
 	updatedJob := &batch.Job{
 		ObjectMeta: metav1.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.JobSpec{
@@ -143,6 +155,9 @@ func testJobStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, updatedJob, job)
 	if updatedJob.Status.Active != 10 {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
+	}
+	if updatedJob.Generation != 2 {
+		t.Errorf("expected Generation=2, got %d", updatedJob.Generation)
 	}
 	if ttlEnabled != (updatedJob.Spec.TTLSecondsAfterFinished != nil) {
 		t.Errorf("Job should only allow updating .spec.ttlSecondsAfterFinished when %v feature is enabled", features.TTLAfterFinished)

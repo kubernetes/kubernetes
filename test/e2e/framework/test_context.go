@@ -182,6 +182,12 @@ type TestContextType struct {
 
 	// DockerConfigFile is a file that contains credentials which can be used to pull images from certain private registries, needed for a test.
 	DockerConfigFile string
+
+	// SnapshotControllerPodName is the name used for identifying the snapshot controller pod.
+	SnapshotControllerPodName string
+
+	// SnapshotControllerHTTPPort the port used for communicating with the snapshot controller HTTP endpoint.
+	SnapshotControllerHTTPPort int
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -315,6 +321,9 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
 	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
 	flags.StringVar(&TestContext.DockerConfigFile, "docker-config-file", "", "A file that contains credentials which can be used to pull images from certain private registries, needed for a test.")
+
+	flags.StringVar(&TestContext.SnapshotControllerPodName, "snapshot-controller-pod-name", "", "The pod name to use for identifying the snapshot controller in the kube-system namespace.")
+	flags.IntVar(&TestContext.SnapshotControllerHTTPPort, "snapshot-controller-http-port", 0, "The port to use for snapshot controller HTTP communication.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.

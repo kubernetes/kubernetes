@@ -57,6 +57,11 @@ type InitConfiguration struct {
 	// CertificateKey sets the key with which certificates and keys are encrypted prior to being uploaded in
 	// a secret in the cluster during the uploadcerts init phase.
 	CertificateKey string
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm init --help" command.
+	// The flag "--skip-phases" takes precedence over this field.
+	SkipPhases []string
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -177,18 +182,6 @@ type ImageMeta struct {
 	ImageTag string
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterStatus contains the cluster status. The ClusterStatus will be stored in the kubeadm-config
-// ConfigMap in the cluster, and then updated by kubeadm when additional control plane instance joins or leaves the cluster.
-type ClusterStatus struct {
-	metav1.TypeMeta
-
-	// APIEndpoints currently available in the cluster, one for each control plane/api server instance.
-	// The key of the map is the IP of the host's default interface
-	APIEndpoints map[string]APIEndpoint
 }
 
 // APIEndpoint struct contains elements of API server instance deployed on a node.
@@ -325,6 +318,11 @@ type JoinConfiguration struct {
 	// ControlPlane defines the additional control plane instance to be deployed on the joining node.
 	// If nil, no additional control plane instance will be deployed.
 	ControlPlane *JoinControlPlane
+
+	// SkipPhases is a list of phases to skip during command execution.
+	// The list of phases can be obtained with the "kubeadm join --help" command.
+	// The flag "--skip-phases" takes precedence over this field.
+	SkipPhases []string
 }
 
 // JoinControlPlane contains elements describing an additional control plane instance to be deployed on the joining node.

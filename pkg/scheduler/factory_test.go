@@ -648,6 +648,7 @@ func newConfigFactoryWithFrameworkRegistry(
 		},
 		recorderFactory:  recorderFactory,
 		nodeInfoSnapshot: snapshot,
+		clusterEventMap:  make(map[framework.ClusterEvent]sets.String),
 	}
 }
 

@@ -98,6 +98,9 @@ func (ingressStrategy) Validate(ctx context.Context, obj runtime.Object) field.E
 	return validation.ValidateIngressCreate(ingress, requestGV)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (ingressStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (ingressStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -114,6 +117,11 @@ func (ingressStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Obje
 		requestGV = schema.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
 	}
 	return validation.ValidateIngressUpdate(obj.(*networking.Ingress), old.(*networking.Ingress), requestGV)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for Ingress objects.
@@ -157,4 +165,9 @@ func (ingressStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // ValidateUpdate is the default update validation for an end user updating status
 func (ingressStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateIngressStatusUpdate(obj.(*networking.Ingress), old.(*networking.Ingress))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (ingressStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }

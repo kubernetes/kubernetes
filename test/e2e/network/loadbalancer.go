@@ -689,7 +689,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	// This test creates a load balancer, make sure its health check interval
 	// equals to gceHcCheckIntervalSeconds. Then the interval is manipulated
 	// to be something else, see if the interval will be reconciled.
-	ginkgo.It("should reconcile LB health check interval [Slow][Serial]", func() {
+	ginkgo.It("should reconcile LB health check interval [Slow][Serial][Disruptive]", func() {
 		const gceHcCheckIntervalSeconds = int64(8)
 		// This test is for clusters on GCE.
 		// (It restarts kube-controller-manager, which we don't support on GKE)

@@ -1826,12 +1826,13 @@ type EnvVar struct {
 	Name string
 	// Optional: no more than one of the following may be specified.
 	// Optional: Defaults to ""; variable references $(VAR_NAME) are expanded
-	// using the previous defined environment variables in the container and
+	// using the previously defined environment variables in the container and
 	// any service environment variables.  If a variable cannot be resolved,
-	// the reference in the input string will be unchanged.  The $(VAR_NAME)
-	// syntax can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped
-	// references will never be expanded, regardless of whether the variable
-	// exists or not.
+	// the reference in the input string will be unchanged.  Double $$ are
+	// reduced to a single $, which allows for escaping the $(VAR_NAME)
+	// syntax: i.e. "$$(VAR_NAME)" will produce the string literal
+	// "$(VAR_NAME)".  Escaped references will never be expanded,
+	// regardless of whether the variable exists or not.
 	// +optional
 	Value string
 	// Optional: Specifies a source the value of this var should come from.
@@ -2102,16 +2103,18 @@ type Container struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -3079,16 +3082,18 @@ type EphemeralContainerCommon struct {
 	Image string
 	// Optional: The docker image's entrypoint is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Command []string
 	// Optional: The docker image's cmd is used if this is not provided; cannot be updated.
 	// Variable references $(VAR_NAME) are expanded using the container's environment.  If a variable
-	// cannot be resolved, the reference in the input string will be unchanged.  The $(VAR_NAME) syntax
-	// can be escaped with a double $$, ie: $$(VAR_NAME).  Escaped references will never be expanded,
-	// regardless of whether the variable exists or not.
+	// cannot be resolved, the reference in the input string will be unchanged.  Double $$ are reduced
+	// to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e. "$$(VAR_NAME)" will
+	// produce the string literal "$(VAR_NAME)".  Escaped references will never be expanded, regardless
+	// of whether the variable exists or not.
 	// +optional
 	Args []string
 	// Optional: Defaults to Docker's default.
@@ -4201,6 +4206,7 @@ type PodSignature struct {
 // ContainerImage describe a container image
 type ContainerImage struct {
 	// Names by which this image is known.
+	// +optional
 	Names []string
 	// The size of the image in bytes.
 	// +optional
@@ -5351,6 +5357,16 @@ type WindowsSecurityContextOptions struct {
 	// PodSecurityContext, the value specified in SecurityContext takes precedence.
 	// +optional
 	RunAsUserName *string
+
+	// HostProcess determines if a container should be run as a 'Host Process' container.
+	// This field is alpha-level and will only be honored by components that enable the
+	// WindowsHostProcessContainers feature flag. Setting this field without the feature
+	// flag will result in errors when validating the Pod. All of a Pod's containers must
+	// have the same effective HostProcess value (it is not allowed to have a mix of HostProcess
+	// containers and non-HostProcess containers).  In addition, if HostProcess is true
+	// then HostNetwork must also be set to true.
+	// +optional
+	HostProcess *bool
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

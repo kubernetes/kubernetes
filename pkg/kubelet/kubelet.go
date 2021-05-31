@@ -387,6 +387,11 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(features.DisableCloudProviders) && cloudprovider.IsDeprecatedInternal(cloudProvider) {
+		cloudprovider.DisableWarningForProvider(cloudProvider)
+		return nil, fmt.Errorf("cloud provider %q was specified, but built-in cloud providers are disabled. Please set --cloud-provider=external and migrate to an external cloud provider", cloudProvider)
+	}
+
 	var nodeHasSynced cache.InformerSynced
 	var nodeLister corelisters.NodeLister
 
@@ -679,7 +684,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 			klet.runtimeCache,
 			kubeDeps.RemoteRuntimeService,
 			kubeDeps.RemoteImageService,
-			hostStatsProvider)
+			hostStatsProvider,
+			utilfeature.DefaultFeatureGate.Enabled(features.DisableAcceleratorUsageMetrics))
 	}
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
@@ -1421,7 +1427,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 
 	if err := kl.initializeModules(); err != nil {
 		kl.recorder.Eventf(kl.nodeRef, v1.EventTypeWarning, events.KubeletSetupFailed, err.Error())
-		klog.ErrorS(err, "failed to initialize internal modules")
+		klog.ErrorS(err, "Failed to initialize internal modules")
 		os.Exit(1)
 	}
 
@@ -1633,7 +1639,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			if err := kl.killPod(pod, nil, podStatus, nil); err == nil {
 				podKilled = true
 			} else {
-				klog.ErrorS(err, "killPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
+				klog.ErrorS(err, "KillPod failed", "pod", klog.KObj(pod), "podStatus", podStatus)
 			}
 		}
 		// Create and Update pod's Cgroups

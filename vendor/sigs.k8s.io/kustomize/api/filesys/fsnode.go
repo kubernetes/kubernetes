@@ -6,6 +6,7 @@ package filesys
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -37,9 +38,9 @@ type fsNode struct {
 	// if this node is a file, this is the content.
 	content []byte
 
-	// if this node is a file, this tracks whether or
-	// not it is "open".
-	open bool
+	// if offset is not nil the file is open and it tracks
+	// the current file offset.
+	offset *int
 }
 
 // MakeEmptyDirInMemory returns an empty directory.
@@ -119,6 +120,9 @@ func (n *fsNode) addFile(name string, c []byte) (result *fsNode, err error) {
 	result, ok := parent.dir[fileName]
 	if ok {
 		// File already exists; overwrite it.
+		if result.offset != nil {
+			return nil, fmt.Errorf("cannot add already opened file '%s'", n.Path())
+		}
 		result.content = c
 		return result, nil
 	}
@@ -133,7 +137,12 @@ func (n *fsNode) addFile(name string, c []byte) (result *fsNode, err error) {
 // Create implements FileSystem.
 // Create makes an empty file.
 func (n *fsNode) Create(path string) (result File, err error) {
-	return n.AddFile(path, []byte{})
+	f, err := n.AddFile(path, nil)
+	if err != nil {
+		return f, err
+	}
+	f.offset = new(int)
+	return f, nil
 }
 
 // WriteFile implements FileSystem.
@@ -154,6 +163,7 @@ func (n *fsNode) AddFile(
 }
 
 func (n *fsNode) addDir(path string) (result *fsNode, err error) {
+
 	parent := n
 	dName, subDirName := mySplit(path)
 	if dName != "" {
@@ -348,7 +358,17 @@ func (n *fsNode) Size() int64 {
 }
 
 // Open implements FileSystem.
-// Open opens the node for reading (just marks it).
+// Open opens the node in read-write mode and sets the offset its start.
+// Writing right after opening the file will replace the original content
+// and move the offset forward, as with a file opened with O_RDWR | O_CREATE.
+//
+// As an example, let's consider a file with content "content":
+// - open: sets offset to start, content is "content"
+// - write "@": offset increases by one, the content is now "@ontent"
+// - read the rest: since offset is 1, the read operation returns "ontent"
+// - write "$": offset is at EOF, so "$" is appended and content is now "@ontent$"
+// - read the rest: returns 0 bytes and EOF
+// - close: the content is still "@ontent$"
 func (n *fsNode) Open(path string) (File, error) {
 	result, err := n.Find(path)
 	if err != nil {
@@ -357,13 +377,19 @@ func (n *fsNode) Open(path string) (File, error) {
 	if result == nil {
 		return nil, fmt.Errorf("cannot find '%s' to open it", path)
 	}
-	result.open = true
+	if result.offset != nil {
+		return nil, fmt.Errorf("cannot open previously opened file '%s'", path)
+	}
+	result.offset = new(int)
 	return result, nil
 }
 
 // Close marks the node closed.
 func (n *fsNode) Close() error {
-	n.open = false
+	if n.offset == nil {
+		return fmt.Errorf("cannot close already closed file '%s'", n.Path())
+	}
+	n.offset = nil
 	return nil
 }
 
@@ -376,9 +402,12 @@ func (n *fsNode) ReadFile(path string) (c []byte, err error) {
 	if result == nil {
 		return nil, fmt.Errorf("cannot find '%s' to read it", path)
 	}
+	if result.isNodeADir() {
+		return nil, fmt.Errorf("cannot read content from non-file '%s'", n.Path())
+	}
 	c = make([]byte, len(result.content))
-	_, err = result.Read(c)
-	return c, err
+	copy(c, result.content)
+	return c, nil
 }
 
 // Read returns the content of the file node.
@@ -387,7 +416,19 @@ func (n *fsNode) Read(d []byte) (c int, err error) {
 		return 0, fmt.Errorf(
 			"cannot read content from non-file '%s'", n.Path())
 	}
-	return copy(d, n.content), nil
+	if n.offset == nil {
+		return 0, fmt.Errorf("cannot read from closed file '%s'", n.Path())
+	}
+
+	rest := n.content[*n.offset:]
+	if len(d) < len(rest) {
+		rest = rest[:len(d)]
+	} else {
+		err = io.EOF
+	}
+	copy(d, rest)
+	*n.offset += len(rest)
+	return len(rest), err
 }
 
 // Write saves the contents of the argument to the file node.
@@ -396,8 +437,12 @@ func (n *fsNode) Write(p []byte) (c int, err error) {
 		return 0, fmt.Errorf(
 			"cannot write content to non-file '%s'", n.Path())
 	}
-	n.content = make([]byte, len(p))
-	return copy(n.content, p), nil
+	if n.offset == nil {
+		return 0, fmt.Errorf("cannot write to closed file '%s'", n.Path())
+	}
+	n.content = append(n.content[:*n.offset], p...)
+	*n.offset = len(n.content)
+	return len(p), nil
 }
 
 // ContentMatches returns true if v matches fake file's content.

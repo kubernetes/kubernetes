@@ -17,6 +17,7 @@ limitations under the License.
 package util
 
 import (
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"testing"
 )
 
@@ -50,7 +51,7 @@ func TestGetCgroupDriverDocker(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := tc.driver != CgroupDriverCgroupfs && tc.driver != CgroupDriverSystemd
+			result := tc.driver != constants.CgroupDriverCgroupfs && tc.driver != constants.CgroupDriverSystemd
 			if result != tc.expectedError {
 				t.Fatalf("expected error: %v, saw: %v", tc.expectedError, result)
 			}

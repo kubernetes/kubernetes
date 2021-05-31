@@ -83,7 +83,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 	gcs := &clientset.Clientset{}
 
 	// Start the server
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizerfactory.NewAlwaysAllowAuthorizer()
 	masterConfig.GenericConfig.Authentication.APIAudiences = aud
 	masterConfig.GenericConfig.Authentication.Authenticator = bearertoken.New(

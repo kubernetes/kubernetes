@@ -133,6 +133,9 @@ func (strategy svcStrategy) Validate(ctx context.Context, obj runtime.Object) fi
 	return allErrs
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (svcStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string { return nil }
+
 // Canonicalize normalizes the object after validation.
 func (svcStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -145,6 +148,11 @@ func (strategy svcStrategy) ValidateUpdate(ctx context.Context, obj, old runtime
 	allErrs := validation.ValidateServiceUpdate(obj.(*api.Service), old.(*api.Service))
 	allErrs = append(allErrs, validation.ValidateConditionalService(obj.(*api.Service), old.(*api.Service))...)
 	return allErrs
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (svcStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 func (svcStrategy) AllowUnconditionalUpdate() bool {
@@ -300,6 +308,11 @@ func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runt
 // ValidateUpdate is the default update validation for an end user updating status
 func (serviceStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateServiceStatusUpdate(obj.(*api.Service), old.(*api.Service))
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (serviceStatusStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // NormalizeClusterIPs adjust clusterIPs based on ClusterIP.  This must not

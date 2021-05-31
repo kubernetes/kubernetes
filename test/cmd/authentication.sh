@@ -74,7 +74,60 @@ EOF
   fi
   # Post-condition: None
 
+  cat > "${TMPDIR:-/tmp}"/valid_exec_plugin.yaml << EOF
+apiVersion: v1
+clusters:
+- cluster:
+  name: test
+contexts:
+- context:
+    cluster: test
+    user: valid_token_user
+  name: test
+current-context: test
+kind: Config
+preferences: {}
+users:
+- name: valid_token_user
+  user:
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      # Any invalid exec credential plugin will do to demonstrate
+      command: echo
+      args:
+        - '{"apiVersion":"client.authentication.k8s.io/v1beta1","status":{"token":"admin-token"}}'
+EOF
+
+  ### Valid exec plugin should authenticate user properly
+  # Pre-condition: Client certificate authentication enabled on the API server - already checked by positive test above
+
+  # Command
+  output3=$(kubectl "${kube_flags_without_token[@]:?}" --kubeconfig="${TMPDIR:-/tmp}"/valid_exec_plugin.yaml get namespace kube-system -o name 2>&1 || true)
+
+  if [[ "${output3}" == "namespace/kube-system" ]]; then
+    kube::log::status "exec credential plugin triggered and provided valid credentials"
+  else
+    kube::log::status "Unexpected output when using valid exec credential plugin for authentication. Output: ${output3}"
+    exit 1
+  fi
+  # Post-condition: None
+
+  ### Provided --username/--password should take precedence, thus not triggering the (valid) exec credential plugin
+  # Pre-condition: Client certificate authentication enabled on the API server - already checked by positive test above
+
+  # Command
+  output4=$(kubectl "${kube_flags_without_token[@]:?}" --username bad --password wrong --kubeconfig="${TMPDIR:-/tmp}"/valid_exec_plugin.yaml get namespace kube-system -o name 2>&1 || true)
+
+  if [[ "${output4}" =~ "Unauthorized" ]]; then
+    kube::log::status "exec credential plugin not triggered since kubectl was called with provided --username/--password"
+  else
+    kube::log::status "Unexpected output when providing --username/--password for authentication - exec credential plugin likely triggered. Output: ${output4}"
+    exit 1
+  fi
+  # Post-condition: None
+
   rm "${TMPDIR:-/tmp}"/invalid_exec_plugin.yaml
+  rm "${TMPDIR:-/tmp}"/valid_exec_plugin.yaml
 
   set +o nounset
   set +o errexit

@@ -5895,6 +5895,11 @@ func (in *WindowsSecurityContextOptions) DeepCopyInto(out *WindowsSecurityContex
 		*out = new(string)
 		**out = **in
 	}
+	if in.HostProcess != nil {
+		in, out := &in.HostProcess, &out.HostProcess
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

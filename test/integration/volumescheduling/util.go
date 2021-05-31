@@ -71,7 +71,7 @@ func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig := framework.NewIntegrationTestControlPlaneConfig()
 	resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIStorageCapacity) {
 		resourceConfig.EnableVersions(schema.GroupVersion{

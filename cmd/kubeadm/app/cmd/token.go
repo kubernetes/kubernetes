@@ -279,7 +279,7 @@ func RunCreateToken(out io.Writer, client clientset.Interface, cfgPath string, i
 		}
 	} else {
 		if certificateKey != "" {
-			return errors.Wrap(err, "cannot use --certificate-key without --print-join-command")
+			return errors.New("cannot use --certificate-key without --print-join-command")
 		}
 		fmt.Fprintln(out, internalcfg.BootstrapTokens[0].Token.String())
 	}

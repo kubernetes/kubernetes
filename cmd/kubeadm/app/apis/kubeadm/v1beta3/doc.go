@@ -27,6 +27,10 @@ limitations under the License.
 // Kubeadm no longer supports the hyperkube image.
 // - The "ClusterConfiguration.DNS.Type" field has been removed since CoreDNS is the only supported
 // DNS server type by kubeadm.
+// - Include "datapolicy" tags on the fields that hold secrets.
+// This would result in the field values to be omitted when API structures are printed with klog.
+// - Add "InitConfiguration.SkipPhases", "JoinConfiguration.SkipPhases" to allow skipping
+// a list of phases during kubeadm init/join command execution.
 //
 // Migration from old kubeadm config versions
 //
@@ -175,6 +179,8 @@ limitations under the License.
 // 	  advertiseAddress: "10.100.0.1"
 // 	  bindPort: 6443
 //	certificateKey: "e6a2eb8581237ab72a4f494f30285ec12a9694d750b9785706a83bfcbbbd2204"
+//  skipPhases:
+//  - addon/kube-proxy
 // 	---
 // 	apiVersion: kubeadm.k8s.io/v1beta3
 // 	kind: ClusterConfiguration

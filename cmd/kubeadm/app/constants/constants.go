@@ -248,9 +248,6 @@ const (
 	// ClusterConfigurationConfigMapKey specifies in what ConfigMap key the cluster configuration should be stored
 	ClusterConfigurationConfigMapKey = "ClusterConfiguration"
 
-	// ClusterStatusConfigMapKey specifies in what ConfigMap key the cluster status should be stored
-	ClusterStatusConfigMapKey = "ClusterStatus"
-
 	// KubeProxyConfigMap specifies in what ConfigMap in the kube-system namespace the kube-proxy configuration should be stored
 	KubeProxyConfigMap = "kube-proxy"
 
@@ -397,7 +394,12 @@ const (
 	ModeNode string = "Node"
 
 	// PauseVersion indicates the default pause image version for kubeadm
-	PauseVersion = "3.4.1"
+	PauseVersion = "3.5"
+
+	// CgroupDriverSystemd holds the systemd driver type
+	CgroupDriverSystemd = "systemd"
+	// CgroupDriverCgroupfs holds the cgroupfs driver type
+	CgroupDriverCgroupfs = "cgroupfs"
 )
 
 var (

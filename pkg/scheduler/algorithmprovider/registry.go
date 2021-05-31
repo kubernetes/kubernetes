@@ -17,8 +17,6 @@ limitations under the License.
 package algorithmprovider
 
 import (
-	"fmt"
-
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
@@ -43,32 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 )
 
-// ClusterAutoscalerProvider defines the default autoscaler provider
-const ClusterAutoscalerProvider = "ClusterAutoscalerProvider"
-
-// Registry is a collection of all available algorithm providers.
-type Registry map[string]*schedulerapi.Plugins
-
-// NewRegistry returns an algorithm provider registry instance.
-func NewRegistry() Registry {
-	defaultConfig := getDefaultConfig()
-	applyFeatureGates(defaultConfig)
-
-	caConfig := getClusterAutoscalerConfig()
-	applyFeatureGates(caConfig)
-
-	return Registry{
-		schedulerapi.SchedulerDefaultProviderName: defaultConfig,
-		ClusterAutoscalerProvider:                 caConfig,
-	}
-}
-
-// ListAlgorithmProviders lists registered algorithm providers.
-func ListAlgorithmProviders() string {
-	return fmt.Sprintf("%s | %s", ClusterAutoscalerProvider, schedulerapi.SchedulerDefaultProviderName)
-}
-
-func getDefaultConfig() *schedulerapi.Plugins {
+func GetDefaultConfig() *schedulerapi.Plugins {
 	plugins := &schedulerapi.Plugins{
 		QueueSort: schedulerapi.PluginSet{
 			Enabled: []schedulerapi.Plugin{
@@ -148,24 +121,17 @@ func getDefaultConfig() *schedulerapi.Plugins {
 			},
 		},
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
-		plugins.Score.Enabled = append(plugins.Score.Enabled, schedulerapi.Plugin{Name: volumebinding.Name, Weight: 1})
-	}
+
+	applyFeatureGates(plugins)
+
 	return plugins
 }
 
-func getClusterAutoscalerConfig() *schedulerapi.Plugins {
-	caConfig := getDefaultConfig()
-	// Replace least with most requested.
-	for i := range caConfig.Score.Enabled {
-		if caConfig.Score.Enabled[i].Name == noderesources.LeastAllocatedName {
-			caConfig.Score.Enabled[i].Name = noderesources.MostAllocatedName
-		}
-	}
-	return caConfig
-}
-
 func applyFeatureGates(config *schedulerapi.Plugins) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.VolumeCapacityPriority) {
+		config.Score.Enabled = append(config.Score.Enabled, schedulerapi.Plugin{Name: volumebinding.Name, Weight: 1})
+	}
+
 	if !utilfeature.DefaultFeatureGate.Enabled(features.DefaultPodTopologySpread) {
 		// When feature is enabled, the default spreading is done by
 		// PodTopologySpread plugin, which is enabled by default.

@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	flowcontrolbootstrap "k8s.io/apiserver/pkg/apis/flowcontrol/bootstrap"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -153,8 +151,6 @@ func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
 		// We should not attempt creation of mandatory objects if ensuring the suggested
 		// configuration resulted in an error.
 		// This only happens when the stop channel is closed.
-		// We rely on the presence of the "exempt" priority level configuration object in the cluster
-		// to indicate whether we should ensure suggested configuration.
 		return fmt.Errorf("failed ensuring suggested settings - %w", err)
 	}
 
@@ -169,30 +165,13 @@ func ensure(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
 	return nil
 }
 
-// shouldCreateSuggested checks if the exempt priority level exists and returns
-// whether the suggested flow schemas and priority levels should be ensured.
-func shouldCreateSuggested(flowcontrolClientSet flowcontrolclient.FlowcontrolV1beta1Interface) (bool, error) {
-	if _, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(context.TODO(), flowcontrol.PriorityLevelConfigurationNameExempt, metav1.GetOptions{}); err != nil {
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		return false, err
-	}
-	return false, nil
-}
-
 func ensureSuggestedConfiguration(clientset flowcontrolclient.FlowcontrolV1beta1Interface) error {
-	shouldCreateSuggested, err := shouldCreateSuggested(clientset)
-	if err != nil {
-		return fmt.Errorf("failed to determine whether suggested configuration should be created - error: %w", err)
-	}
-
-	fsEnsurer := ensurer.NewSuggestedFlowSchemaEnsurer(clientset.FlowSchemas(), shouldCreateSuggested)
+	fsEnsurer := ensurer.NewSuggestedFlowSchemaEnsurer(clientset.FlowSchemas())
 	if err := fsEnsurer.Ensure(flowcontrolbootstrap.SuggestedFlowSchemas); err != nil {
 		return err
 	}
 
-	plEnsurer := ensurer.NewSuggestedPriorityLevelEnsurerEnsurer(clientset.PriorityLevelConfigurations(), shouldCreateSuggested)
+	plEnsurer := ensurer.NewSuggestedPriorityLevelEnsurerEnsurer(clientset.PriorityLevelConfigurations())
 	return plEnsurer.Ensure(flowcontrolbootstrap.SuggestedPriorityLevelConfigurations)
 }
 

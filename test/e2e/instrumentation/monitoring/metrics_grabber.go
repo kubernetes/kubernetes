@@ -51,7 +51,7 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 			}
 		}
 		gomega.Eventually(func() error {
-			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true)
+			grabber, err = e2emetrics.NewMetricsGrabber(c, ec, true, true, true, true, true, true)
 			if err != nil {
 				return fmt.Errorf("failed to create metrics grabber: %v", err)
 			}

@@ -36,7 +36,7 @@ func (w Writer) WriteIndividualFiles(dirPath string, m resmap.ResMap) error {
 			}
 		}
 	}
-	for _, res := range m.NonNamespaceable() {
+	for _, res := range m.ClusterScoped() {
 		err := w.write(dirPath, fileName(res), res)
 		if err != nil {
 			return err

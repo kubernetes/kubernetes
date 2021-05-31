@@ -42,7 +42,7 @@ type FunctionFilter struct {
 	DeferFailure bool
 
 	// results saves the results emitted from Run
-	results *yaml.RNode
+	Results *yaml.RNode
 
 	// exit saves the error returned from Run
 	exit error
@@ -250,7 +250,7 @@ func (c *FunctionFilter) doResults(r *kio.ByteReader) error {
 	}
 
 	if r.Results != nil {
-		c.results = r.Results
+		c.Results = r.Results
 	}
 	return nil
 }

@@ -22,4 +22,6 @@ package feature
 type Features struct {
 	EnablePodAffinityNamespaceSelector bool
 	EnablePodDisruptionBudget          bool
+	EnablePodOverhead                  bool
+	EnableBalanceAttachedNodeVolumes   bool
 }

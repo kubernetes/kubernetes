@@ -73,6 +73,11 @@ func (validatingWebhookConfigurationStrategy) Validate(ctx context.Context, obj 
 	return validation.ValidateValidatingWebhookConfiguration(obj.(*admissionregistration.ValidatingWebhookConfiguration), groupVersion)
 }
 
+// WarningsOnCreate returns warnings for the creation of the given object.
+func (validatingWebhookConfigurationStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
+
 // Canonicalize normalizes the object after validation.
 func (validatingWebhookConfigurationStrategy) Canonicalize(obj runtime.Object) {
 }
@@ -90,6 +95,11 @@ func (validatingWebhookConfigurationStrategy) ValidateUpdate(ctx context.Context
 	}
 
 	return validation.ValidateValidatingWebhookConfigurationUpdate(obj.(*admissionregistration.ValidatingWebhookConfiguration), old.(*admissionregistration.ValidatingWebhookConfiguration), groupVersion)
+}
+
+// WarningsOnUpdate returns warnings for the given update.
+func (validatingWebhookConfigurationStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
+	return nil
 }
 
 // AllowUnconditionalUpdate is the default update policy for validatingWebhookConfiguration objects. Status update should

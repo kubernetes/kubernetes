@@ -120,7 +120,6 @@ var missingHanlders = sets.NewString(
 	"ResourceQuota",
 	"Role",
 	"PriorityClass",
-	"PodPreset",
 	"AuditSink",
 )
 

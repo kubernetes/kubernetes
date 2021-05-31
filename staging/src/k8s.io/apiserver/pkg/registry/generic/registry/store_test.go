@@ -115,7 +115,13 @@ func (t *testRESTStrategy) PrepareForUpdate(ctx context.Context, obj, old runtim
 func (t *testRESTStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
+func (t *testRESTStrategy) WarningsOnCreate(ctx context.Context, obj runtime.Object) []string {
+	return nil
+}
 func (t *testRESTStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return nil
+}
+func (t *testRESTStrategy) WarningsOnUpdate(ctx context.Context, obj, old runtime.Object) []string {
 	return nil
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}

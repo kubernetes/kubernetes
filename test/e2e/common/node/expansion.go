@@ -267,7 +267,10 @@ var _ = SIGDescribe("Variable Expansion", func() {
 
 		ginkgo.By("updating the pod")
 		podClient.Update(pod.ObjectMeta.Name, func(pod *v1.Pod) {
-			pod.ObjectMeta.Annotations = map[string]string{"mysubpath": "mypath"}
+			if pod.ObjectMeta.Annotations == nil {
+				pod.ObjectMeta.Annotations = make(map[string]string)
+			}
+			pod.ObjectMeta.Annotations["mysubpath"] = "mypath"
 		})
 
 		ginkgo.By("waiting for pod running")

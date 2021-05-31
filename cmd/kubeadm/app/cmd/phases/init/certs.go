@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/pflag"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -48,11 +47,6 @@ var (
 		` + cmdutil.AlphaDisclaimer)
 )
 
-var (
-	csrOnly bool
-	csrDir  string
-)
-
 // NewCertsPhase returns the phase for the certs
 func NewCertsPhase() workflow.Phase {
 	return workflow.Phase{
@@ -62,15 +56,6 @@ func NewCertsPhase() workflow.Phase {
 		Run:    runCerts,
 		Long:   cmdutil.MacroCommandLongDescription,
 	}
-}
-
-func localFlags() *pflag.FlagSet {
-	set := pflag.NewFlagSet("csr", pflag.ExitOnError)
-	options.AddCSRFlag(set, &csrOnly)
-	set.MarkDeprecated(options.CSROnly, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
-	options.AddCSRDirFlag(set, &csrDir)
-	set.MarkDeprecated(options.CSRDir, "This flag will be removed in a future version. Please use kubeadm alpha certs generate-csr instead.")
-	return set
 }
 
 // newCertSubPhases returns sub phases for certs phase
@@ -97,7 +82,6 @@ func newCertSubPhases() []workflow.Phase {
 			lastCACert = cert
 		} else {
 			phase = newCertSubPhase(cert, runCertPhase(cert, lastCACert))
-			phase.LocalFlags = localFlags()
 		}
 		subPhases = append(subPhases, phase)
 	}
@@ -279,15 +263,6 @@ func runCertPhase(cert *certsphase.KubeadmCert, caCert *certsphase.KubeadmCert) 
 
 			fmt.Printf("[certs] Using existing %s certificate and key on disk\n", cert.BaseName)
 			return nil
-		}
-
-		if csrOnly {
-			fmt.Printf("[certs] Generating CSR for %s instead of certificate\n", cert.BaseName)
-			if csrDir == "" {
-				csrDir = data.CertificateWriteDir()
-			}
-
-			return certsphase.CreateCSR(cert, data.Cfg(), csrDir)
 		}
 
 		// if dryrunning, write certificates to a temporary folder (and defer restore to the path originally specified by the user)

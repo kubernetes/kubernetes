@@ -161,17 +161,20 @@ try {
   Setup-ContainerRuntime
   DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
+  DownloadAndInstall-NodeProblemDetector
   DownloadAndInstall-CSIProxyBinaries
   Start-CSIProxy
   Create-NodePki
   Create-KubeletKubeconfig
   Create-KubeproxyKubeconfig
+  Create-NodeProblemDetectorKubeConfig
   Set-PodCidr
   Configure-HostNetworkingService
   Prepare-CniNetworking
   Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
+  Configure-NodeProblemDetector
 
   # Even if Logging agent is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {

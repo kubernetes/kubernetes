@@ -337,17 +337,12 @@ type podControlAdapter struct {
 	controller.PodControlInterface
 }
 
-func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object) error {
-	// This is not used by RSC.
-	return errors.New("CreatePods() is not implemented for podControlAdapter")
-}
-
-func (pc podControlAdapter) CreatePodsWithControllerRef(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
+func (pc podControlAdapter) CreatePods(namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
 	rc, err := convertRStoRC(object.(*apps.ReplicaSet))
 	if err != nil {
 		return err
 	}
-	return pc.PodControlInterface.CreatePodsWithControllerRef(namespace, template, rc, controllerRef)
+	return pc.PodControlInterface.CreatePods(namespace, template, rc, controllerRef)
 }
 
 func (pc podControlAdapter) DeletePod(namespace string, podID string, object runtime.Object) error {

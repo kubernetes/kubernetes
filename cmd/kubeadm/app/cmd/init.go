@@ -37,7 +37,6 @@ import (
 	phases "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/init"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
-	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
@@ -193,7 +192,15 @@ func newCmdInit(out io.Writer, initOptions *initOptions) *cobra.Command {
 	// sets the data builder function, that will be used by the runner
 	// both when running the entire workflow or single phases
 	initRunner.SetDataInitializer(func(cmd *cobra.Command, args []string) (workflow.RunData, error) {
-		return newInitData(cmd, args, initOptions, out)
+		data, err := newInitData(cmd, args, initOptions, out)
+		if err != nil {
+			return nil, err
+		}
+		// If the flag for skipping phases was empty, use the values from config
+		if len(initRunner.Options.SkipPhases) == 0 {
+			initRunner.Options.SkipPhases = data.cfg.SkipPhases
+		}
+		return data, nil
 	})
 
 	// binds the Runner to kubeadm init command by altering
@@ -336,12 +343,6 @@ func newInitData(cmd *cobra.Command, args []string, options *initOptions, out io
 	if err != nil {
 		return nil, err
 	}
-
-	// For new clusters we want to set the kubelet cgroup driver to "systemd" unless the user is explicit about it.
-	// Currently this cannot be as part of the kubelet defaulting (Default()) because the function is called for
-	// upgrades too, which can break existing nodes after a kubelet restart.
-	// TODO: https://github.com/kubernetes/kubeadm/issues/2376
-	componentconfigs.MutateCgroupDriver(&cfg.ClusterConfiguration)
 
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(options.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {

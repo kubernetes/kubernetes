@@ -152,7 +152,7 @@ type KubeGenericRuntime interface {
 
 // LegacyLogProvider gives the ability to use unsupported docker log drivers (e.g. journald)
 type LegacyLogProvider interface {
-	// Get the last few lines of the logs for a specific container.
+	// GetContainerLogTail gets the last few lines of the logs for a specific container.
 	GetContainerLogTail(uid kubetypes.UID, name, namespace string, containerID kubecontainer.ContainerID) (string, error)
 }
 

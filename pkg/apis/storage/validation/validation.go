@@ -26,7 +26,6 @@ import (
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
@@ -91,9 +90,7 @@ func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorLis
 		allErrs = append(allErrs, field.Required(fldPath, provisioner))
 	}
 	if len(provisioner) > 0 {
-		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisioner)) {
-			allErrs = append(allErrs, field.Invalid(fldPath, provisioner, msg))
-		}
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(strings.ToLower(provisioner), fldPath)...)
 	}
 	return allErrs
 }
@@ -401,9 +398,7 @@ func validateCSINodeDriver(driver storage.CSINodeDriver, driverNamesInSpecs sets
 		}
 		topoKeys.Insert(key)
 
-		for _, msg := range validation.IsQualifiedName(key) {
-			allErrs = append(allErrs, field.Invalid(fldPath, driver.TopologyKeys, msg))
-		}
+		allErrs = append(allErrs, apivalidation.ValidateQualifiedName(key, fldPath)...)
 	}
 
 	return allErrs

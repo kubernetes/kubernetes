@@ -57,6 +57,10 @@ struct describing how the container is to be created. A sample would look simila
 
 ```go
 defaultMountFlags := unix.MS_NOEXEC | unix.MS_NOSUID | unix.MS_NODEV
+var devices []*configs.DeviceRule
+for _, device := range specconv.AllowedDevices {
+	devices = append(devices, &device.Rule)
+}
 config := &configs.Config{
 	Rootfs: "/your/path/to/rootfs",
 	Capabilities: &configs.Capabilities{
@@ -155,7 +159,7 @@ config := &configs.Config{
 		Parent: "system",
 		Resources: &configs.Resources{
 			MemorySwappiness: nil,
-			Devices:          specconv.AllowedDevices,
+			Devices:          devices,
 		},
 	},
 	MaskPaths: []string{
@@ -313,7 +317,7 @@ state, err := container.State()
 #### Checkpoint & Restore
 
 libcontainer now integrates [CRIU](http://criu.org/) for checkpointing and restoring containers.
-This let's you save the state of a process running inside a container to disk, and then restore
+This lets you save the state of a process running inside a container to disk, and then restore
 that state into a new process, on the same machine or on another machine.
 
 `criu` version 1.5.2 or higher is required to use checkpoint and restore.

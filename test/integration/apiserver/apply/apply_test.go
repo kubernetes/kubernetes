@@ -52,7 +52,7 @@ import (
 func setup(t testing.TB, groupVersions ...schema.GroupVersion) (*httptest.Server, clientset.Interface, framework.CloseFunc) {
 	opts := framework.MasterConfigOptions{EtcdOptions: framework.DefaultEtcdOptions()}
 	opts.EtcdOptions.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&opts)
+	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&opts)
 	if len(groupVersions) > 0 {
 		resourceConfig := controlplane.DefaultAPIResourceConfigSource()
 		resourceConfig.EnableVersions(groupVersions...)
@@ -2819,7 +2819,7 @@ spec:
 
 func TestStopTrackingManagedFieldsOnFeatureDisabled(t *testing.T) {
 	sharedEtcd := framework.DefaultEtcdOptions()
-	masterConfig := framework.NewIntegrationTestMasterConfigWithOptions(&framework.MasterConfigOptions{
+	masterConfig := framework.NewIntegrationTestControlPlaneConfigWithOptions(&framework.MasterConfigOptions{
 		EtcdOptions: sharedEtcd,
 	})
 	masterConfig.GenericConfig.OpenAPIConfig = framework.DefaultOpenAPIConfig()

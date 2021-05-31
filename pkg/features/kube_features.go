@@ -179,6 +179,7 @@ const (
 	// owner: @mikedanese
 	// alpha: v1.13
 	// beta: v1.21
+	// ga: v1.22
 	//
 	// Migrate ServiceAccount volumes to use a projected volume consisting of a
 	// ServiceAccountTokenVolumeProjection. This feature adds new required flags
@@ -501,7 +502,7 @@ const (
 
 	// owner: @smarterclayton
 	// alpha: v1.21
-	//
+	// beta: v1.22
 	// DaemonSets allow workloads to maintain availability during update per node
 	DaemonSetUpdateSurge featuregate.Feature = "DaemonSetUpdateSurge"
 
@@ -617,6 +618,12 @@ const (
 	// Enable kubelet exec plugins for image pull credentials.
 	KubeletCredentialProviders featuregate.Feature = "KubeletCredentialProviders"
 
+	// owner: @andrewsykim
+	// alpha: v1.22
+	//
+	// Disable any functionality in kube-apiserver, kube-controller-manager and kubelet related to the `--cloud-provider` component flag.
+	DisableCloudProviders featuregate.Feature = "DisableCloudProviders"
+
 	// owner: @zshihang
 	// alpha: v1.20
 	// beta: v1.21
@@ -721,6 +728,24 @@ const (
 	//
 	// Enables kubelet to detect CSI volume condition and send the event of the abnormal volume to the corresponding pod that is using it.
 	CSIVolumeHealth featuregate.Feature = "CSIVolumeHealth"
+
+	// owner: @marosset
+	// alpha: v1.22
+	//
+	// Enables support for 'HostProcess' containers on Windows nodes.
+	WindowsHostProcessContainers featuregate.Feature = "WindowsHostProcessContainers"
+
+	// owner: @ravig
+	// alpha: v1.22
+	//
+	// StatefulSetMinReadySeconds allows minReadySeconds to be respected by StatefulSet controller
+	StatefulSetMinReadySeconds featuregate.Feature = "StatefulSetMinReadySeconds"
+
+	// owner: @gjkim42
+	// alpha: v1.22
+	//
+	// Enables apiserver and kubelet to allow up to 32 DNSSearchPaths and up to 2048 DNSSearchListChars.
+	ExpandedDNSConfig featuregate.Feature = "ExpandedDNSConfig"
 )
 
 func init() {
@@ -752,7 +777,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	StorageObjectInUseProtection:                   {Default: true, PreRelease: featuregate.GA},
 	SupportPodPidsLimit:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	SupportNodePidsLimit:                           {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
-	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.Beta},
+	BoundServiceAccountTokenVolume:                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	ServiceAccountIssuerDiscovery:                  {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.22
 	CSIMigration:                                   {Default: true, PreRelease: featuregate.Beta},
 	CSIMigrationGCE:                                {Default: false, PreRelease: featuregate.Beta}, // Off by default (requires GCE PD CSI Driver)
@@ -796,7 +821,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.23
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.25
 	CronJobControllerV2:                            {Default: true, PreRelease: featuregate.Beta},
-	DaemonSetUpdateSurge:                           {Default: false, PreRelease: featuregate.Alpha},
+	DaemonSetUpdateSurge:                           {Default: true, PreRelease: featuregate.Beta}, // on by default in 1.22
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceAppProtocol:                             {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	ImmutableEphemeralVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
@@ -830,18 +855,22 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResourcesGetAllocatable:              {Default: false, PreRelease: featuregate.Alpha},
 	NamespaceDefaultLabelName:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 	CSIVolumeHealth:                                {Default: false, PreRelease: featuregate.Alpha},
+	WindowsHostProcessContainers:                   {Default: false, PreRelease: featuregate.Alpha},
+	DisableCloudProviders:                          {Default: false, PreRelease: featuregate.Alpha},
+	StatefulSetMinReadySeconds:                     {Default: false, PreRelease: featuregate.Alpha},
+	ExpandedDNSConfig:                              {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Deprecated},
-	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.StreamingProxyRedirects: {Default: false, PreRelease: featuregate.Deprecated}, // remove in 1.24
+	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Deprecated},
 	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.GA},
 	genericfeatures.APIPriorityAndFairness:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.WarningHeaders:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.24
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

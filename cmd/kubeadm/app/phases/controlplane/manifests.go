@@ -133,7 +133,6 @@ func CreateStaticPodFiles(manifestDir, patchesDir string, cfg *kubeadmapi.Cluste
 func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint *kubeadmapi.APIEndpoint) []string {
 	defaultArguments := map[string]string{
 		"advertise-address":                localAPIEndpoint.AdvertiseAddress,
-		"insecure-port":                    "0",
 		"enable-admission-plugins":         "NodeRestriction",
 		"service-cluster-ip-range":         cfg.Networking.ServiceSubnet,
 		"service-account-key-file":         filepath.Join(cfg.CertificatesDir, kubeadmconstants.ServiceAccountPublicKeyName),
