@@ -398,8 +398,6 @@ const (
 
 	// CgroupDriverSystemd holds the systemd driver type
 	CgroupDriverSystemd = "systemd"
-	// CgroupDriverCgroupfs holds the cgroupfs driver type
-	CgroupDriverCgroupfs = "cgroupfs"
 )
 
 var (

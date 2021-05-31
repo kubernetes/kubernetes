@@ -22,27 +22,7 @@ import (
 	"syscall"
 
 	"github.com/pkg/errors"
-	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/utils/exec"
 )
-
-// Check validates if Docker is setup to use systemd as the cgroup driver.
-func (idsc IsDockerSystemdCheck) Check() (warnings, errorList []error) {
-	driver, err := kubeadmutil.GetCgroupDriverDocker(exec.New())
-	if err != nil {
-		return nil, []error{err}
-	}
-	if driver != constants.CgroupDriverSystemd {
-		err = errors.Errorf("detected %q as the Docker cgroup driver. "+
-			"The recommended driver is %q. "+
-			"Please follow the guide at https://kubernetes.io/docs/setup/cri/",
-			driver,
-			constants.CgroupDriverSystemd)
-		return []error{err}, nil
-	}
-	return nil, nil
-}
 
 // Check number of memory required by kubeadm
 func (mc MemCheck) Check() (warnings, errorList []error) {
