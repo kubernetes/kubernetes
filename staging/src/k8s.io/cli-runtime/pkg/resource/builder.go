@@ -256,7 +256,7 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 			}
 			b.URL(defaultHttpGetAttempts, url)
 		default:
-			matches, err := b.expandIfFilePattern(s)
+			matches, err := expandIfFilePattern(s)
 			if err != nil {
 				b.errs = append(b.errs, fmt.Errorf("file pattern %v is not valid: %v", s, err))
 				continue
@@ -283,17 +283,6 @@ func (b *Builder) FilenameParam(enforceNamespace bool, filenameOptions *Filename
 	}
 
 	return b
-}
-
-// expandIfFilePattern returns all the filenames that match the input pattern
-// or the filename if it is a specific filename and not a pattern.
-// If the input is a pattern and it yields no result it will result into an error.
-func (b *Builder) expandIfFilePattern(pattern string) ([]string, error) {
-	matches, err := filepath.Glob(pattern)
-	if err == nil && len(matches) == 0 {
-		return nil, fmt.Errorf("pattern did not yield any results")
-	}
-	return matches, err
 }
 
 // Unstructured updates the builder so that it will request and send unstructured
@@ -1201,6 +1190,39 @@ func HasNames(args []string) (bool, error) {
 		return false, err
 	}
 	return hasCombinedTypes || len(args) > 1, nil
+}
+
+// expandIfFilePattern returns all the filenames that match the input pattern
+// or the filename if it is a specific filename and not a pattern.
+// If the input is a pattern and it yields no result it will result in an error.
+func expandIfFilePattern(pattern string) ([]string, error) {
+	matches, err := filepath.Glob(pattern)
+	if err == nil && len(matches) == 0 {
+		return nil, fmt.Errorf("pattern did not yield any results")
+	}
+	return matches, err
+}
+
+type cachingRESTMapperFunc struct {
+	delegate RESTMapperFunc
+
+	lock   sync.Mutex
+	cached meta.RESTMapper
+}
+
+func (c *cachingRESTMapperFunc) ToRESTMapper() (meta.RESTMapper, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	if c.cached != nil {
+		return c.cached, nil
+	}
+
+	ret, err := c.delegate()
+	if err != nil {
+		return nil, err
+	}
+	c.cached = ret
+	return c.cached, nil
 }
 
 type cachingCategoryExpanderFunc struct {
