@@ -121,7 +121,7 @@ func ToSelectableFields(event *api.Event) fields.Set {
 		"source":                         source,
 		"type":                           event.Type,
 	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+	return generic.MergeFieldsSets(specificFieldsSet, objectMetaFieldsSet)
 }
 
 // requestGroupVersion returns the group/version associated with the given context, or a zero-value group/version.
