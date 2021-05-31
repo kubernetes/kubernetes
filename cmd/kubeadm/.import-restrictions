@@ -16,3 +16,4 @@ rules:
       - gopkg.in/inf.v0
       - gopkg.in/square/go-jose.v2
       - gopkg.in/yaml.v2
+      - gopkg.in/yaml.v3

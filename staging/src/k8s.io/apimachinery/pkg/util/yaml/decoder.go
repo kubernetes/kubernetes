@@ -27,6 +27,7 @@ import (
 
 	jsonutil "k8s.io/apimachinery/pkg/util/json"
 
+	yaml3 "gopkg.in/yaml.v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -98,7 +99,7 @@ func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
 	}
 
 	if len(bytes) != 0 {
-		err := yaml.Unmarshal(bytes, into)
+		err := yaml3.Unmarshal(bytes, into)
 		if err != nil {
 			return YAMLSyntaxError{err}
 		}

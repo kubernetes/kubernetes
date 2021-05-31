@@ -258,6 +258,9 @@ func TestYAMLOrJSONDecoder(t *testing.T) {
 		err    bool
 		out    []generic
 	}{
+		{" \ny: b", 2, false, false, []generic{
+			{"y": "b"},
+		}},
 		{` {"1":2}{"3":4}`, 2, true, false, []generic{
 			{"1": 2},
 			{"3": 4},
