@@ -86,8 +86,15 @@ func ProbePodToPodConnectivity(k8s *kubeManager, model *Model, testCase *TestCas
 func probeWorker(k8s *kubeManager, jobs <-chan *ProbeJob, results chan<- *ProbeJobResults, timeoutSeconds int) {
 	defer ginkgo.GinkgoRecover()
 	for job := range jobs {
-		podFrom := job.PodFrom
-		connected, command, err := k8s.probeConnectivity(podFrom.Namespace, podFrom.Name, podFrom.Containers[0].Name(), job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain), job.Protocol, job.ToPort, timeoutSeconds)
+		connected, command, err := k8s.probeConnectivity(&probeConnArgs{
+			nsFrom:         job.PodFrom.Namespace,
+			podFrom:        job.PodFrom.Name,
+			containerFrom:  job.PodFrom.Containers[0].Name(),
+			addrTo:         job.PodTo.QualifiedServiceAddress(job.ToPodDNSDomain),
+			protocol:       job.Protocol,
+			toPort:         job.ToPort,
+			timeoutSeconds: timeoutSeconds,
+		})
 		result := &ProbeJobResults{
 			Job:         job,
 			IsConnected: connected,

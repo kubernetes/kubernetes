@@ -111,30 +111,42 @@ func (k *kubeManager) getPod(ns string, name string) (*v1.Pod, error) {
 	return kubePod, nil
 }
 
-// probeConnectivity execs into a pod and checks its connectivity to another pod..
-func (k *kubeManager) probeConnectivity(nsFrom string, podFrom string, containerFrom string, addrTo string, protocol v1.Protocol, toPort int, timeoutSeconds int) (bool, string, error) {
-	port := strconv.Itoa(toPort)
-	var cmd []string
-	timeout := fmt.Sprintf("--timeout=%vs", timeoutSeconds)
+// probeConnArgs provides a wrapper
+// for arguments to probeConnectivity
+type probeConnArgs struct {
+	nsFrom         string
+	podFrom        string
+	containerFrom  string
+	addrTo         string
+	protocol       v1.Protocol
+	toPort         int
+	timeoutSeconds int
+}
 
-	switch protocol {
+// probeConnectivity execs into a pod and checks its connectivity to another pod..
+func (k *kubeManager) probeConnectivity(pa *probeConnArgs) (bool, string, error) {
+	port := strconv.Itoa(pa.toPort)
+	var cmd []string
+	timeout := fmt.Sprintf("--timeout=%vs", pa.timeoutSeconds)
+
+	switch pa.protocol {
 	case v1.ProtocolSCTP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=sctp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(pa.addrTo, port), timeout, "--protocol=sctp"}
 	case v1.ProtocolTCP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=tcp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(pa.addrTo, port), timeout, "--protocol=tcp"}
 	case v1.ProtocolUDP:
-		cmd = []string{"/agnhost", "connect", net.JoinHostPort(addrTo, port), timeout, "--protocol=udp"}
+		cmd = []string{"/agnhost", "connect", net.JoinHostPort(pa.addrTo, port), timeout, "--protocol=udp"}
 		if framework.NodeOSDistroIs("windows") {
 			framework.Logf("probing UDP for windows may result in cluster instability for certain windows nodes with low CPU/Memory, depending on CRI version")
 		}
 	default:
-		framework.Failf("protocol %s not supported", protocol)
+		framework.Failf("protocol %s not supported", pa.protocol)
 	}
 
-	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", podFrom, containerFrom, nsFrom, strings.Join(cmd, " "))
-	stdout, stderr, err := k.executeRemoteCommand(nsFrom, podFrom, containerFrom, cmd)
+	commandDebugString := fmt.Sprintf("kubectl exec %s -c %s -n %s -- %s", pa.podFrom, pa.containerFrom, pa.nsFrom, strings.Join(cmd, " "))
+	stdout, stderr, err := k.executeRemoteCommand(pa.nsFrom, pa.podFrom, pa.containerFrom, cmd)
 	if err != nil {
-		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", nsFrom, podFrom, addrTo, err, stdout, stderr)
+		framework.Logf("%s/%s -> %s: error when running command: err - %v /// stdout - %s /// stderr - %s", pa.nsFrom, pa.podFrom, pa.addrTo, err, stdout, stderr)
 		return false, commandDebugString, nil
 	}
 	return true, commandDebugString, nil
