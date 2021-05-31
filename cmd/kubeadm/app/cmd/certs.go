@@ -414,7 +414,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 
 					s := fmt.Sprintf("%s\t%s\t%s\t%s\t%-8v",
 						e.Name,
-						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						e.ExpirationDate.UTC().Format("Jan 02, 2006 15:04 MST"),
 						duration.ShortHumanDuration(e.ResidualTime()),
 						handler.CAName,
 						yesNo(e.ExternallyManaged),
@@ -441,7 +441,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 
 					s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
 						e.Name,
-						e.ExpirationDate.Format("Jan 02, 2006 15:04 MST"),
+						e.ExpirationDate.UTC().Format("Jan 02, 2006 15:04 MST"),
 						duration.ShortHumanDuration(e.ResidualTime()),
 						yesNo(e.ExternallyManaged),
 					)

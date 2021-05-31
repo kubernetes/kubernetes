@@ -621,8 +621,8 @@ func VerifyDatesInOrder(
 				if previousTime.After(currentTime) {
 					t.Errorf(
 						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
-						previousTime.Format(time.RFC1123Z),
-						currentTime.Format(time.RFC1123Z),
+						previousTime.UTC().Format(time.RFC1123Z),
+						currentTime.UTC().Format(time.RFC1123Z),
 						resultToTest)
 				}
 				previousTime = currentTime
@@ -1474,7 +1474,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 	block := corev1.PersistentVolumeBlock
 	file := corev1.PersistentVolumeFilesystem
 	goldClassName := "gold"
-	now := time.Now()
+	now := time.Now().UTC()
 	deletionTimestamp := metav1.Time{Time: time.Now().UTC().AddDate(-10, 0, 0)}
 	snapshotAPIGroup := "snapshot.storage.k8s.io"
 	testCases := []struct {

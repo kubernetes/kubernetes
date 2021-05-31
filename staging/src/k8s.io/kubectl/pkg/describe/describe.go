@@ -752,7 +752,7 @@ func describePod(pod *corev1.Pod, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Node:\t%s\n", pod.Spec.NodeName+"/"+pod.Status.HostIP)
 		}
 		if pod.Status.StartTime != nil {
-			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Start Time:\t%s\n", pod.Status.StartTime.Time.UTC().Format(time.RFC1123Z))
 		}
 		printLabelsMultiline(w, "Labels", pod.Labels)
 		printAnnotationsMultiline(w, "Annotations", pod.Annotations)
@@ -1604,8 +1604,8 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
-					c.LastProbeTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.LastProbeTime.Time.UTC().Format(time.RFC1123Z),
+					c.LastTransitionTime.Time.UTC().Format(time.RFC1123Z),
 					c.Reason,
 					c.Message)
 			}
@@ -1955,7 +1955,7 @@ func describeStatus(stateName string, state corev1.ContainerState, w PrefixWrite
 	switch {
 	case state.Running != nil:
 		w.Write(LEVEL_2, "%s:\tRunning\n", stateName)
-		w.Write(LEVEL_3, "Started:\t%v\n", state.Running.StartedAt.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_3, "Started:\t%v\n", state.Running.StartedAt.Time.UTC().Format(time.RFC1123Z))
 	case state.Waiting != nil:
 		w.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 		if state.Waiting.Reason != "" {
@@ -1973,8 +1973,8 @@ func describeStatus(stateName string, state corev1.ContainerState, w PrefixWrite
 		if state.Terminated.Signal > 0 {
 			w.Write(LEVEL_3, "Signal:\t%d\n", state.Terminated.Signal)
 		}
-		w.Write(LEVEL_3, "Started:\t%s\n", state.Terminated.StartedAt.Time.Format(time.RFC1123Z))
-		w.Write(LEVEL_3, "Finished:\t%s\n", state.Terminated.FinishedAt.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_3, "Started:\t%s\n", state.Terminated.StartedAt.Time.UTC().Format(time.RFC1123Z))
+		w.Write(LEVEL_3, "Finished:\t%s\n", state.Terminated.FinishedAt.Time.UTC().Format(time.RFC1123Z))
 	default:
 		w.Write(LEVEL_2, "%s:\tWaiting\n", stateName)
 	}
@@ -2201,10 +2201,10 @@ func describeJob(job *batchv1.Job, events *corev1.EventList) (string, error) {
 			w.Write(LEVEL_0, "Completion Mode:\t%s\n", *job.Spec.CompletionMode)
 		}
 		if job.Status.StartTime != nil {
-			w.Write(LEVEL_0, "Start Time:\t%s\n", job.Status.StartTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Start Time:\t%s\n", job.Status.StartTime.Time.UTC().Format(time.RFC1123Z))
 		}
 		if job.Status.CompletionTime != nil {
-			w.Write(LEVEL_0, "Completed At:\t%s\n", job.Status.CompletionTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Completed At:\t%s\n", job.Status.CompletionTime.Time.UTC().Format(time.RFC1123Z))
 		}
 		if job.Status.StartTime != nil && job.Status.CompletionTime != nil {
 			w.Write(LEVEL_0, "Duration:\t%s\n", duration.HumanDuration(job.Status.CompletionTime.Sub(job.Status.StartTime.Time)))
@@ -2294,7 +2294,7 @@ func describeCronJob(cronJob *batchv1.CronJob, events *corev1.EventList) (string
 		}
 		describeJobTemplate(cronJob.Spec.JobTemplate, w)
 		if cronJob.Status.LastScheduleTime != nil {
-			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.UTC().Format(time.RFC1123Z))
 		} else {
 			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
 		}
@@ -2359,7 +2359,7 @@ func describeCronJobBeta(cronJob *batchv1beta1.CronJob, events *corev1.EventList
 		}
 		describeJobTemplateBeta(cronJob.Spec.JobTemplate, w)
 		if cronJob.Status.LastScheduleTime != nil {
-			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z))
+			w.Write(LEVEL_0, "Last Schedule Time:\t%s\n", cronJob.Status.LastScheduleTime.Time.UTC().Format(time.RFC1123Z))
 		} else {
 			w.Write(LEVEL_0, "Last Schedule Time:\t<unset>\n")
 		}
@@ -3519,7 +3519,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 		printLabelsMultiline(w, "Labels", node.Labels)
 		printAnnotationsMultiline(w, "Annotations", node.Annotations)
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", node.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		printNodeTaintsMultiline(w, "Taints", node.Spec.Taints)
 		w.Write(LEVEL_0, "Unschedulable:\t%v\n", node.Spec.Unschedulable)
 
@@ -3538,8 +3538,8 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 				w.Write(LEVEL_1, "%v \t%v \t%s \t%s \t%v \t%v\n",
 					c.Type,
 					c.Status,
-					c.LastHeartbeatTime.Time.Format(time.RFC1123Z),
-					c.LastTransitionTime.Time.Format(time.RFC1123Z),
+					c.LastHeartbeatTime.Time.UTC().Format(time.RFC1123Z),
+					c.LastTransitionTime.Time.UTC().Format(time.RFC1123Z),
 					c.Reason,
 					c.Message)
 			}
@@ -3615,12 +3615,12 @@ func describeNodeLease(lease *coordinationv1.Lease, w PrefixWriter) {
 	w.Write(LEVEL_1, "HolderIdentity:\t%s\n", holderIdentity)
 	acquireTime := "<unset>"
 	if lease != nil && lease.Spec.AcquireTime != nil {
-		acquireTime = lease.Spec.AcquireTime.Time.Format(time.RFC1123Z)
+		acquireTime = lease.Spec.AcquireTime.Time.UTC().Format(time.RFC1123Z)
 	}
 	w.Write(LEVEL_1, "AcquireTime:\t%s\n", acquireTime)
 	renewTime := "<unset>"
 	if lease != nil && lease.Spec.RenewTime != nil {
-		renewTime = lease.Spec.RenewTime.Time.Format(time.RFC1123Z)
+		renewTime = lease.Spec.RenewTime.Time.UTC().Format(time.RFC1123Z)
 	}
 	w.Write(LEVEL_1, "RenewTime:\t%s\n", renewTime)
 }
@@ -3659,7 +3659,7 @@ func describeStatefulSet(ps *appsv1.StatefulSet, selector labels.Selector, event
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", ps.ObjectMeta.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", ps.ObjectMeta.Namespace)
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", ps.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
 		printLabelsMultiline(w, "Labels", ps.Labels)
 		printAnnotationsMultiline(w, "Annotations", ps.Annotations)
@@ -3753,7 +3753,7 @@ func describeCertificateSigningRequest(csr metav1.ObjectMeta, signerName string,
 		w.Write(LEVEL_0, "Name:\t%s\n", csr.Name)
 		w.Write(LEVEL_0, "Labels:\t%s\n", labels.FormatLabels(csr.Labels))
 		w.Write(LEVEL_0, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Requesting User:\t%s\n", username)
 		if len(signerName) > 0 {
 			w.Write(LEVEL_0, "Signer:\t%s\n", signerName)
@@ -3832,7 +3832,7 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 		w.Write(LEVEL_0, "Namespace:\t%s\n", hpa.Namespace)
 		printLabelsMultiline(w, "Labels", hpa.Labels)
 		printAnnotationsMultiline(w, "Annotations", hpa.Annotations)
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
@@ -3979,7 +3979,7 @@ func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscale
 		w.Write(LEVEL_0, "Namespace:\t%s\n", hpa.Namespace)
 		printLabelsMultiline(w, "Labels", hpa.Labels)
 		printAnnotationsMultiline(w, "Annotations", hpa.Annotations)
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", hpa.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Reference:\t%s/%s\n",
 			hpa.Spec.ScaleTargetRef.Kind,
 			hpa.Spec.ScaleTargetRef.Name)
@@ -4186,7 +4186,7 @@ func describeDeployment(d *appsv1.Deployment, oldRSs []*appsv1.ReplicaSet, newRS
 		w := NewPrefixWriter(out)
 		w.Write(LEVEL_0, "Name:\t%s\n", d.ObjectMeta.Name)
 		w.Write(LEVEL_0, "Namespace:\t%s\n", d.ObjectMeta.Namespace)
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", d.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		printLabelsMultiline(w, "Labels", d.Labels)
 		printAnnotationsMultiline(w, "Annotations", d.Annotations)
 		w.Write(LEVEL_0, "Selector:\t%s\n", selector)
@@ -4550,7 +4550,7 @@ func describeCSINode(csi *storagev1.CSINode, events *corev1.EventList) (output s
 		w.Write(LEVEL_0, "Name:\t%s\n", csi.GetName())
 		printLabelsMultiline(w, "Labels", csi.GetLabels())
 		printAnnotationsMultiline(w, "Annotations", csi.GetAnnotations())
-		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csi.CreationTimestamp.Time.Format(time.RFC1123Z))
+		w.Write(LEVEL_0, "CreationTimestamp:\t%s\n", csi.CreationTimestamp.Time.UTC().Format(time.RFC1123Z))
 		w.Write(LEVEL_0, "Spec:\n")
 		if csi.Spec.Drivers != nil {
 			w.Write(LEVEL_1, "Drivers:\n")

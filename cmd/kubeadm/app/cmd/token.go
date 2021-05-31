@@ -304,7 +304,7 @@ func formatBootstrapToken(obj *outputapiv1alpha1.BootstrapToken) string {
 	expires := "<never>"
 	if obj.Expires != nil {
 		ttl = duration.ShortHumanDuration(time.Until(obj.Expires.Time))
-		expires = obj.Expires.Format(time.RFC3339)
+		expires = obj.Expires.UTC().Format(time.RFC3339)
 	}
 	ttl = fmt.Sprintf("%-9s", ttl)
 
