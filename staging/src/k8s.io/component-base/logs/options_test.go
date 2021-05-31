@@ -63,14 +63,14 @@ func TestOptions(t *testing.T) {
 			name: "JSON log format",
 			args: []string{"--logging-format=json"},
 			want: &Options{
-				LogFormat: jsonLogFormat,
+				LogFormat: JSONLogFormat,
 			},
 		},
 		{
 			name: "log sanitization",
 			args: []string{"--experimental-logging-sanitization"},
 			want: &Options{
-				LogFormat:       defaultLogFormat,
+				LogFormat:       DefaultLogFormat,
 				LogSanitization: true,
 			},
 		},

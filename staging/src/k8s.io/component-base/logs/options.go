@@ -17,27 +17,13 @@ limitations under the License.
 package logs
 
 import (
-	"flag"
-	"fmt"
-	"strings"
-
 	"github.com/go-logr/logr"
 	"github.com/spf13/pflag"
 
-	"k8s.io/component-base/logs/sanitization"
 	"k8s.io/klog/v2"
-)
 
-const (
-	logFormatFlagName = "logging-format"
-	defaultLogFormat  = "text"
+	"k8s.io/component-base/logs/sanitization"
 )
-
-// List of logs (k8s.io/klog + k8s.io/component-base/logs) flags supported by all logging formats
-var supportedLogsFlags = map[string]struct{}{
-	"v": {},
-	// TODO: support vmodule after 1.19 Alpha
-}
 
 // Options has klog format parameters
 type Options struct {
@@ -48,67 +34,19 @@ type Options struct {
 // NewOptions return new klog options
 func NewOptions() *Options {
 	return &Options{
-		LogFormat: defaultLogFormat,
+		LogFormat: DefaultLogFormat,
 	}
 }
 
 // Validate verifies if any unsupported flag is set
 // for non-default logging format
 func (o *Options) Validate() []error {
-	errs := []error{}
-	if o.LogFormat != defaultLogFormat {
-		allFlags := unsupportedLoggingFlags(hyphensToUnderscores)
-		for _, fname := range allFlags {
-			if flagIsSet(fname, hyphensToUnderscores) {
-				errs = append(errs, fmt.Errorf("non-default logging format doesn't honor flag: %s", fname))
-			}
-		}
-	}
-	if _, err := o.Get(); err != nil {
-		errs = append(errs, fmt.Errorf("unsupported log format: %s", o.LogFormat))
-	}
-	return errs
-}
-
-// hyphensToUnderscores replaces hyphens with underscores
-// we should always use underscores instead of hyphens when validate flags
-func hyphensToUnderscores(s string) string {
-	return strings.Replace(s, "-", "_", -1)
-}
-
-func flagIsSet(name string, normalizeFunc func(name string) string) bool {
-	f := flag.Lookup(name)
-	if f != nil {
-		return f.DefValue != f.Value.String()
-	}
-	if normalizeFunc != nil {
-		f = flag.Lookup(normalizeFunc(name))
-		if f != nil {
-			return f.DefValue != f.Value.String()
-		}
-	}
-	pf := pflag.Lookup(name)
-	if pf != nil {
-		return pf.DefValue != pf.Value.String()
-	}
-	panic("failed to lookup unsupported log flag")
+	return ValidateLoggingConfiguration(o)
 }
 
 // AddFlags add logging-format flag
 func (o *Options) AddFlags(fs *pflag.FlagSet) {
-	normalizeFunc := func(name string) string {
-		f := fs.GetNormalizeFunc()
-		return string(f(fs, name))
-	}
-
-	unsupportedFlags := fmt.Sprintf("--%s", strings.Join(unsupportedLoggingFlags(normalizeFunc), ", --"))
-	formats := fmt.Sprintf(`"%s"`, strings.Join(logRegistry.List(), `", "`))
-	fs.StringVar(&o.LogFormat, logFormatFlagName, defaultLogFormat, fmt.Sprintf("Sets the log format. Permitted formats: %s.\nNon-default formats don't honor these flags: %s.\nNon-default choices are currently alpha and subject to change without warning.", formats, unsupportedFlags))
-
-	// No new log formats should be added after generation is of flag options
-	logRegistry.Freeze()
-	fs.BoolVar(&o.LogSanitization, "experimental-logging-sanitization", o.LogSanitization, `[Experimental] When enabled prevents logging of fields tagged as sensitive (passwords, keys, tokens).
-Runtime log sanitization may introduce significant computation overhead and therefore should not be enabled in production.`)
+	BindLoggingFlags(o, fs)
 }
 
 // Apply set klog logger from LogFormat type
@@ -123,32 +61,5 @@ func (o *Options) Apply() {
 
 // Get logger with LogFormat field
 func (o *Options) Get() (logr.Logger, error) {
-	return logRegistry.Get(o.LogFormat)
-}
-
-func unsupportedLoggingFlags(normalizeFunc func(name string) string) []string {
-	allFlags := []string{}
-
-	// k8s.io/klog flags
-	fs := &flag.FlagSet{}
-	klog.InitFlags(fs)
-	fs.VisitAll(func(flag *flag.Flag) {
-		if _, found := supportedLogsFlags[flag.Name]; !found {
-			name := flag.Name
-			if normalizeFunc != nil {
-				name = normalizeFunc(name)
-			}
-			allFlags = append(allFlags, name)
-		}
-	})
-
-	// k8s.io/component-base/logs flags
-	pfs := &pflag.FlagSet{}
-	AddFlags(pfs)
-	pfs.VisitAll(func(flag *pflag.Flag) {
-		if _, found := supportedLogsFlags[flag.Name]; !found {
-			allFlags = append(allFlags, flag.Name)
-		}
-	})
-	return allFlags
+	return LogRegistry.Get(o.LogFormat)
 }
