@@ -50,7 +50,7 @@ func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace
 	}
 	for name, data := range secrets {
 		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString([]byte(data))
-		klog.V(1).Infof("found flex volume secret info: %s", name)
+		klog.V(1).InfoS("Found flex volume secret info", "secretName", name)
 	}
 
 	return nil
@@ -142,7 +142,7 @@ func prepareForMount(mounter mount.Interface, deviceMountPath string) (bool, err
 func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string, options []string) error {
 	err := mounter.MountSensitiveWithoutSystemd(devicePath, deviceMountPath, fsType, options, nil)
 	if err != nil {
-		klog.Errorf("Failed to mount the volume at %s, device: %s, error: %s", deviceMountPath, devicePath, err.Error())
+		klog.ErrorS(err, "Failed to mount the volume at device", "deviceMountPath", deviceMountPath, "devicePath", devicePath)
 		return err
 	}
 	return nil
@@ -151,7 +151,7 @@ func doMount(mounter mount.Interface, devicePath, deviceMountPath, fsType string
 func isNotMounted(mounter mount.Interface, deviceMountPath string) (bool, error) {
 	notmnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
-		klog.Errorf("Error checking mount point %s, error: %v", deviceMountPath, err)
+		klog.ErrorS(err, "Error checking mount point", "deviceMountPath", deviceMountPath)
 		return false, err
 	}
 	return notmnt, nil
