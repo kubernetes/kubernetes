@@ -241,18 +241,14 @@ func WritePublicKey(pkiPath, name string, key crypto.PublicKey) error {
 }
 
 // CertOrKeyExist returns a boolean whether the cert or the key exists
+//False: The cert and the key do not exist. True: Both files exist or one of them
 func CertOrKeyExist(pkiPath, name string) bool {
 	certificatePath, privateKeyPath := PathsForCertAndKey(pkiPath, name)
 
 	_, certErr := os.Stat(certificatePath)
 	_, keyErr := os.Stat(privateKeyPath)
-	if os.IsNotExist(certErr) && os.IsNotExist(keyErr) {
-		// The cert and the key do not exist
-		return false
-	}
 
-	// Both files exist or one of them
-	return true
+	return !(os.IsNotExist(certErr) && os.IsNotExist(keyErr))
 }
 
 // CSROrKeyExist returns true if one of the CSR or key exists
