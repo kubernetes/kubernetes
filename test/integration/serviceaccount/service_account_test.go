@@ -400,7 +400,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	serviceAccountAdmission.SetExternalKubeClientSet(externalRootClientset)
 	serviceAccountAdmission.SetExternalKubeInformerFactory(externalInformers)
 
-	masterConfig := framework.NewMasterConfig()
+	masterConfig := framework.NewControlPlaneConfig()
 	masterConfig.GenericConfig.EnableIndex = true
 	masterConfig.GenericConfig.Authentication.Authenticator = authenticator
 	masterConfig.GenericConfig.Authorization.Authorizer = authorizer

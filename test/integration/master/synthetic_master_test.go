@@ -94,7 +94,7 @@ func TestAppsPrefix(t *testing.T) {
 }
 
 func TestKubernetesService(t *testing.T) {
-	config := framework.NewMasterConfig()
+	config := framework.NewControlPlaneConfig()
 	_, _, closeFn := framework.RunAMaster(config)
 	defer closeFn()
 	coreClient := clientset.NewForConfigOrDie(config.GenericConfig.LoopbackClientConfig)

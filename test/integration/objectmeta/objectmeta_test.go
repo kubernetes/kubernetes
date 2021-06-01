@@ -31,7 +31,7 @@ import (
 )
 
 func TestIgnoreClusterName(t *testing.T) {
-	config := framework.NewMasterConfig()
+	config := framework.NewControlPlaneConfig()
 	_, s, closeFn := framework.RunAMaster(config)
 	defer closeFn()
 
