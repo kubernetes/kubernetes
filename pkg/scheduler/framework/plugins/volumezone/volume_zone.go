@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -112,8 +113,8 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			return framework.NewStatus(framework.UnschedulableAndUnresolvable, "PersistentVolumeClaim had no name")
 		}
 		pvc, err := pl.pvcLister.PersistentVolumeClaims(pod.Namespace).Get(pvcName)
-		if err != nil {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return s
 		}
 
 		pvName := pvc.Spec.VolumeName
@@ -124,9 +125,8 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 			}
 
 			class, err := pl.scLister.Get(scName)
-			if err != nil {
-				return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
-
+			if s := getErrorAsStatus(err); !s.IsSuccess() {
+				return s
 			}
 			if class.VolumeBindingMode == nil {
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, fmt.Sprintf("VolumeBindingMode not set for StorageClass %q", scName))
@@ -140,8 +140,8 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 		}
 
 		pv, err := pl.pvLister.Get(pvName)
-		if err != nil {
-			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		if s := getErrorAsStatus(err); !s.IsSuccess() {
+			return s
 		}
 
 		for k, v := range pv.ObjectMeta.Labels {
@@ -160,6 +160,16 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 				return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonConflict)
 			}
 		}
+	}
+	return nil
+}
+
+func getErrorAsStatus(err error) *framework.Status {
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return framework.NewStatus(framework.UnschedulableAndUnresolvable, err.Error())
+		}
+		return framework.AsStatus(err)
 	}
 	return nil
 }
