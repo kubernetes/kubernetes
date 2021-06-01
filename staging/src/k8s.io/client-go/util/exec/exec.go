@@ -24,6 +24,7 @@ type ExitError interface {
 	Error() string
 	Exited() bool
 	ExitStatus() int
+	Unwrap() error
 }
 
 // CodeExitError is an implementation of ExitError consisting of an error object
@@ -49,4 +50,8 @@ func (e CodeExitError) Exited() bool {
 
 func (e CodeExitError) ExitStatus() int {
 	return e.Code
+}
+
+func (e CodeExitError) Unwrap() error {
+	return e.Err
 }
