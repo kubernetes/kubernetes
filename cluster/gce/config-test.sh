@@ -42,6 +42,9 @@ NODE_LOCAL_SSDS=${NODE_LOCAL_SSDS:-0}
 NODE_LABELS=${KUBE_NODE_LABELS:-}
 WINDOWS_NODE_LABELS=${WINDOWS_NODE_LABELS:-}
 NODE_LOCAL_SSDS_EPHEMERAL=${NODE_LOCAL_SSDS_EPHEMERAL:-}
+# Turning GRPC based Konnectivity testing on id advance of
+# removing the SSHTunnel code.
+export KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE=true
 
 # KUBE_CREATE_NODES can be used to avoid creating nodes, while master will be sized for NUM_NODES nodes.
 # Firewalls and node templates are still created.
