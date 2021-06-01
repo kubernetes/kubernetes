@@ -17,8 +17,9 @@ limitations under the License.
 package v2beta2
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 )
@@ -69,6 +70,14 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 }
 
 func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAutoscaler) {
+	if obj.Spec.ScaleTargetRef.APIVersion == "" {
+		// set the preferred APIVersion for the scale target if it is missing
+		switch obj.Spec.ScaleTargetRef.Kind {
+		case "Deployment", "StatefulSet", "ReplicaSet":
+			obj.Spec.ScaleTargetRef.APIVersion = appsv1.SchemeGroupVersion.String()
+		}
+	}
+
 	if obj.Spec.MinReplicas == nil {
 		minReplicas := int32(1)
 		obj.Spec.MinReplicas = &minReplicas
@@ -80,7 +89,7 @@ func SetDefaults_HorizontalPodAutoscaler(obj *autoscalingv2beta2.HorizontalPodAu
 			{
 				Type: autoscalingv2beta2.ResourceMetricSourceType,
 				Resource: &autoscalingv2beta2.ResourceMetricSource{
-					Name: v1.ResourceCPU,
+					Name: corev1.ResourceCPU,
 					Target: autoscalingv2beta2.MetricTarget{
 						Type:               autoscalingv2beta2.UtilizationMetricType,
 						AverageUtilization: &utilizationDefaultVal,
