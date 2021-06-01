@@ -42,7 +42,7 @@ import (
 )
 
 // Tests for ipv4-ipv6 dual-stack feature
-var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
+var _ = common.SIGDescribe("[Feature:IPv6DualStack]", func() {
 	f := framework.NewDefaultFramework("dualstack")
 
 	var cs clientset.Interface
@@ -68,7 +68,9 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 		}
 	})
 
-	ginkgo.It("should have ipv4 and ipv6 node podCIDRs", func() {
+	// Marking this as LinuxOnly because windows tests run against Azure CNI which doesn't publish
+	// a podCIDR for each family.
+	ginkgo.It("should have ipv4 and ipv6 node podCIDRs [LinuxOnly]", func() {
 		// TODO (aramase) can switch to new function to get all nodes
 		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
@@ -440,7 +442,7 @@ var _ = common.SIGDescribe("[Feature:IPv6DualStack] [LinuxOnly]", func() {
 
 	// Service Granular Checks as in k8s.io/kubernetes/test/e2e/network/networking.go
 	// but using the secondary IP, so we run the same tests for each ClusterIP family
-	ginkgo.Describe("Granular Checks: Services Secondary IP Family", func() {
+	ginkgo.Describe("Granular Checks: Services Secondary IP Family [LinuxOnly]", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := e2enetwork.NewNetworkingTestConfig(f, e2enetwork.EnableDualStack)
