@@ -421,7 +421,7 @@ func TestWithBinding(t *testing.T) {
 			Pod:  createPodWithVolume("pod_1", "vol_1", "PVC_NoSC"),
 			Node: testNode,
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable,
-				"Unable to find storage class: Class_0"),
+				"unable to find storage class: Class_0"),
 		},
 		{
 			name:       "unbound volume immediate binding mode",
