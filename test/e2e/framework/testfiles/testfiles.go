@@ -33,7 +33,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 )
 
@@ -146,36 +145,6 @@ func (r RootFileSource) DescribeFiles() string {
 		}
 	}
 	description += "."
-	return description
-}
-
-// BindataFileSource handles files stored in a package generated with bindata.
-type BindataFileSource struct {
-	Asset      func(string) ([]byte, error)
-	AssetNames func() []string
-}
-
-// ReadTestFile looks for an asset with the given path.
-func (b BindataFileSource) ReadTestFile(filePath string) ([]byte, error) {
-	fileBytes, err := b.Asset(filePath)
-	if err != nil {
-		// It would be nice to have a better way to detect
-		// "not found" errors :-/
-		if strings.HasSuffix(err.Error(), "not found") {
-			return nil, nil
-		}
-	}
-	return fileBytes, nil
-}
-
-// DescribeFiles explains about gobindata and then lists all available files.
-func (b BindataFileSource) DescribeFiles() string {
-	var lines []string
-	lines = append(lines, "The following files are built into the test executable via gobindata. For questions on maintaining gobindata, contact the sig-testing group.")
-	assets := b.AssetNames()
-	sort.Strings(assets)
-	lines = append(lines, assets...)
-	description := strings.Join(lines, "\n   ")
 	return description
 }
 
