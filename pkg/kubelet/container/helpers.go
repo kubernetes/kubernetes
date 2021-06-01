@@ -120,7 +120,7 @@ func envVarsToMap(envs []EnvVar) map[string]string {
 // v1EnvVarsToMap constructs a map of environment name to value from a slice
 // of env vars.
 func v1EnvVarsToMap(envs []v1.EnvVar) map[string]string {
-	result := map[string]string{}
+	result := make(map[string]string, len(envs))
 	for _, env := range envs {
 		result[env.Name] = env.Value
 	}
