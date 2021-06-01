@@ -289,10 +289,6 @@ github.com/form3tech-oss/jwt-go
 github.com/fsnotify/fsnotify
 # github.com/fvbommel/sortorder v1.0.1 => github.com/fvbommel/sortorder v1.0.1
 github.com/fvbommel/sortorder
-# github.com/go-bindata/go-bindata v3.1.1+incompatible => github.com/go-bindata/go-bindata v3.1.1+incompatible
-## explicit
-github.com/go-bindata/go-bindata
-github.com/go-bindata/go-bindata/go-bindata
 # github.com/go-errors/errors v1.0.1 => github.com/go-errors/errors v1.0.1
 github.com/go-errors/errors
 # github.com/go-logr/logr v0.4.0 => github.com/go-logr/logr v0.4.0
@@ -2481,7 +2477,6 @@ sigs.k8s.io/yaml
 # github.com/fvbommel/sortorder => github.com/fvbommel/sortorder v1.0.1
 # github.com/getsentry/raven-go => github.com/getsentry/raven-go v0.2.0
 # github.com/ghodss/yaml => github.com/ghodss/yaml v1.0.0
-# github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
 # github.com/go-errors/errors => github.com/go-errors/errors v1.0.1
 # github.com/go-gl/glfw/v3.3/glfw => github.com/go-gl/glfw/v3.3/glfw v0.0.0-20200222043503-6f7a984d4dc4
 # github.com/go-kit/kit => github.com/go-kit/kit v0.9.0
