@@ -322,7 +322,7 @@ const (
 	CoreDNSDeploymentName = "coredns"
 
 	// CoreDNSImageName specifies the name of the image for CoreDNS add-on
-	CoreDNSImageName = "coredns/coredns"
+	CoreDNSImageName = "coredns"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
 	CoreDNSVersion = "v1.8.0"
