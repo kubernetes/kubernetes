@@ -44,8 +44,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	e2etestfiles "k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/generated"
+	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	"k8s.io/kubernetes/test/e2e_node/services"
+	e2enodetestingmanifests "k8s.io/kubernetes/test/e2e_node/testing-manifests"
+	testfixtures "k8s.io/kubernetes/test/fixtures"
+	testimages "k8s.io/kubernetes/test/images"
 	system "k8s.io/system-validators/validators"
 
 	"github.com/onsi/ginkgo"
@@ -90,12 +93,13 @@ func registerNodeFlags(flags *flag.FlagSet) {
 }
 
 func init() {
-	// Enable bindata file lookup as fallback.
-	e2etestfiles.AddFileSource(e2etestfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
-
+	// Enable embedded FS file lookup as fallback
+	// TODO: This needs to be cleaned up later to include only file sources which are necessary.
+	e2etestfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
+	e2etestfiles.AddFileSource(e2enodetestingmanifests.GetE2ENodeTestingManifestsFS())
+	e2etestfiles.AddFileSource(testimages.GetTestImagesFS())
+	e2etestfiles.AddFileSource(testfixtures.GetTestFixturesFS())
+	e2etestfiles.AddFileSource(conformancetestdata.GetConformanceTestdataFS())
 }
 
 func TestMain(m *testing.M) {
