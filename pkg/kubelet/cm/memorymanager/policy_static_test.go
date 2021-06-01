@@ -28,8 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/memorymanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
 
 const (
@@ -65,44 +63,6 @@ var (
 		},
 	}
 )
-
-type fakeTopologyManagerWithHint struct {
-	t    *testing.T
-	hint *topologymanager.TopologyHint
-}
-
-// NewFakeTopologyManagerWithHint returns an instance of fake topology manager with specified topology hints
-func NewFakeTopologyManagerWithHint(t *testing.T, hint *topologymanager.TopologyHint) topologymanager.Manager {
-	return &fakeTopologyManagerWithHint{
-		t:    t,
-		hint: hint,
-	}
-}
-
-func (m *fakeTopologyManagerWithHint) AddHintProvider(h topologymanager.HintProvider) {
-	m.t.Logf("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
-}
-
-func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container name: %v container id:  %v", format.Pod(pod), container.Name, containerID)
-}
-
-func (m *fakeTopologyManagerWithHint) RemoveContainer(containerID string) error {
-	m.t.Logf("[fake topologymanager] RemoveContainer container id:  %v", containerID)
-	return nil
-}
-
-func (m *fakeTopologyManagerWithHint) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	m.t.Logf("[fake topologymanager] Topology Admit Handler")
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
-}
-
-func (m *fakeTopologyManagerWithHint) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
-	m.t.Logf("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
-	return *m.hint
-}
 
 func areMemoryBlocksEqual(mb1, mb2 []state.Block) bool {
 	if len(mb1) != len(mb2) {
@@ -171,7 +131,7 @@ type testStaticPolicy struct {
 func initTests(t *testing.T, testCase *testStaticPolicy, hint *topologymanager.TopologyHint) (Policy, state.State, error) {
 	manager := topologymanager.NewFakeManager()
 	if hint != nil {
-		manager = NewFakeTopologyManagerWithHint(t, hint)
+		manager = topologymanager.NewFakeManagerWithHint(hint)
 	}
 
 	p, err := NewPolicyStatic(testCase.machineInfo, testCase.systemReserved, manager)
