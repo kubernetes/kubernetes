@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
-	"k8s.io/kubernetes/test/e2e/generated"
 	e2etestingmanifests "k8s.io/kubernetes/test/e2e/testing-manifests"
 	testfixtures "k8s.io/kubernetes/test/fixtures"
 	"k8s.io/kubernetes/test/utils/image"
@@ -87,13 +86,6 @@ func TestMain(m *testing.M) {
 		fmt.Printf("%s\n", version.Get())
 		os.Exit(0)
 	}
-
-	// Enable bindata file lookup as fallback.
-	// TODO: To be removed once all data sources have been moved to embeds.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
 
 	// Enable embedded FS file lookup as fallback
 	testfiles.AddFileSource(e2etestingmanifests.GetE2ETestingManifestsFS())
