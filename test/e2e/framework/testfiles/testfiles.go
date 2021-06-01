@@ -25,8 +25,10 @@ limitations under the License.
 package testfiles
 
 import (
+	"embed"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path"
@@ -175,4 +177,49 @@ func (b BindataFileSource) DescribeFiles() string {
 	lines = append(lines, assets...)
 	description := strings.Join(lines, "\n   ")
 	return description
+}
+
+// EmbeddedFileSource handles files stored in a package generated with bindata.
+type EmbeddedFileSource struct {
+	EmbeddedFS embed.FS
+	Root       string
+	fileList   []string
+}
+
+// ReadTestFile looks for an embedded file with the given path.
+func (e EmbeddedFileSource) ReadTestFile(filepath string) ([]byte, error) {
+	relativePath := strings.TrimPrefix(filepath, fmt.Sprintf("%s/", e.Root))
+
+	b, err := e.EmbeddedFS.ReadFile(relativePath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// DescribeFiles explains that it is looking inside an embedded filesystem
+func (e EmbeddedFileSource) DescribeFiles() string {
+	var lines []string
+	lines = append(lines, "The following files are embedded into the test executable:")
+
+	if len(e.fileList) == 0 {
+		e.populateFileList()
+	}
+	lines = append(lines, e.fileList...)
+
+	return strings.Join(lines, "\n\t")
+}
+
+func (e *EmbeddedFileSource) populateFileList() {
+	fs.WalkDir(e.EmbeddedFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if !d.IsDir() {
+			e.fileList = append(e.fileList, filepath.Join(e.Root, path))
+		}
+
+		return nil
+	})
 }
