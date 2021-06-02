@@ -536,6 +536,81 @@ func TestProxyUpgrade(t *testing.T) {
 	}
 }
 
+func TestProxyUpgradePreservesRequestQuery(t *testing.T) {
+	serverPath := "/server/path"
+
+	backend := http.NewServeMux()
+	backend.Handle(serverPath, websocket.Handler(func(ws *websocket.Conn) {
+		defer ws.Close()
+		ws.Write([]byte(ws.Request().URL.String()))
+	}))
+	backendServer := httptest.NewServer(backend)
+	defer backendServer.Close()
+
+	testCases := map[string]struct {
+		locationQuery string
+		requestQuery  string
+		expectedQuery string
+	}{
+		"Neither has query": {
+			locationQuery: "",
+			requestQuery:  "",
+			expectedQuery: "",
+		},
+		"Only request has query": {
+			locationQuery: "",
+			requestQuery:  "x=baz&y=something",
+			expectedQuery: "x=baz&y=something",
+		},
+		"Only location has query": {
+			locationQuery: "a=foo&b=bar",
+			requestQuery:  "",
+			expectedQuery: "a=foo&b=bar",
+		},
+		"Both request and location have query, only location's should be used": {
+			locationQuery: "a=foo&b=bar",
+			requestQuery:  "x=baz&y=something",
+			expectedQuery: "a=foo&b=bar",
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			serverURL, _ := url.Parse(backendServer.URL)
+			serverURL.Path = serverPath
+			serverURL.RawQuery = tc.locationQuery
+
+			proxyHandler := NewUpgradeAwareHandler(serverURL, nil, false, false, &noErrorsAllowed{t: t})
+			proxy := httptest.NewServer(proxyHandler)
+			defer proxy.Close()
+
+			requestURL, _ := url.Parse("ws://" + proxy.Listener.Addr().String() + "/request/path")
+			requestURL.RawQuery = tc.requestQuery
+
+			expectedURL, _ := url.Parse(serverPath)
+			expectedURL.RawQuery = tc.expectedQuery
+
+			ws, err := websocket.Dial(requestURL.String(), "", "http://127.0.0.1/")
+			if err != nil {
+				t.Fatalf("websocket dial err: %s", err)
+			}
+			defer ws.Close()
+
+			if _, err := ws.Write([]byte("world")); err != nil {
+				t.Fatalf("write err: %s", err)
+			}
+
+			response := make([]byte, 100)
+			n, err := ws.Read(response)
+			if err != nil {
+				t.Fatalf("read err: %s", err)
+			}
+			if actualURL := string(response[0:n]); expectedURL.String() != actualURL {
+				t.Fatalf("url mismatch: expected %s, got %s", expectedURL, actualURL)
+			}
+		})
+	}
+}
+
 type noErrorsAllowed struct {
 	t *testing.T
 }
