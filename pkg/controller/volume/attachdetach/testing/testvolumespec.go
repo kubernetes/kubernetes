@@ -60,7 +60,10 @@ func GetTestVolumeSpec(volumeName string, diskName v1.UniqueVolumeName) *volume.
 }
 
 var extraPods *v1.PodList
-var volumeAttachments *storagev1.VolumeAttachmentList
+var testList struct {
+	sync.Mutex
+	volumeAttachments storagev1.VolumeAttachmentList
+}
 var pvs *v1.PersistentVolumeList
 var nodes *v1.NodeList
 
@@ -173,16 +176,20 @@ func CreateTestClient() *fake.Clientset {
 		obj.Items = append(obj.Items, nodes.Items...)
 		return true, obj, nil
 	})
-	volumeAttachments = &storagev1.VolumeAttachmentList{}
+	testList.volumeAttachments = storagev1.VolumeAttachmentList{}
 	fakeClient.AddReactor("list", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		testList.Lock()
+		defer testList.Unlock()
 		obj := &storagev1.VolumeAttachmentList{}
-		obj.Items = append(obj.Items, volumeAttachments.Items...)
+		obj.Items = append(obj.Items, testList.volumeAttachments.Items...)
 		return true, obj, nil
 	})
 	fakeClient.AddReactor("create", "volumeattachments", func(action core.Action) (handled bool, ret runtime.Object, err error) {
+		testList.Lock()
+		defer testList.Unlock()
 		createAction := action.(core.CreateAction)
 		va := createAction.GetObject().(*storagev1.VolumeAttachment)
-		volumeAttachments.Items = append(volumeAttachments.Items, *va)
+		testList.volumeAttachments.Items = append(testList.volumeAttachments.Items, *va)
 		return true, createAction.GetObject(), nil
 	})
 
