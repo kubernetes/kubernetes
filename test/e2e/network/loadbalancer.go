@@ -848,7 +848,7 @@ var _ = common.SIGDescribe("LoadBalancers", func() {
 	})
 })
 
-var _ = common.SIGDescribe("ESIPP [Slow]", func() {
+var _ = common.SIGDescribe("LoadBalancers ESIPP [Slow]", func() {
 	f := framework.NewDefaultFramework("esipp")
 	var loadBalancerCreateTimeout time.Duration
 
