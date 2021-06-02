@@ -104,7 +104,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 				trace.Step("Decoded delete options")
 
 				ae := request.AuditEventFrom(ctx)
-				objGV := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+				objGV := gvk.GroupVersion()
 				audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 				trace.Step("Recorded the audit event")
 			} else {
