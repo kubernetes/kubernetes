@@ -58,7 +58,7 @@ type UpgradeAwareHandler struct {
 	// UpgradeRequired will reject non-upgrade connections if true.
 	UpgradeRequired bool
 	// Location is the location of the upstream proxy. It is used as the location to Dial on the upstream server
-	// for upgrade requests unless UseRequestLocationOnUpgrade is true.
+	// for upgrade requests unless UseRequestLocation is true.
 	Location *url.URL
 	// Transport provides an optional round tripper to use to proxy. If nil, the default proxy transport is used
 	Transport http.RoundTripper

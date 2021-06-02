@@ -93,7 +93,7 @@ func (r *AttachREST) New() runtime.Object {
 	return &api.PodAttachOptions{}
 }
 
-// Connect returns a handler for the pod exec proxy
+// Connect returns a handler for the pod attach proxy
 func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Object, responder rest.Responder) (http.Handler, error) {
 	attachOpts, ok := opts.(*api.PodAttachOptions)
 	if !ok {
@@ -106,12 +106,12 @@ func (r *AttachREST) Connect(ctx context.Context, name string, opts runtime.Obje
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, true, responder), nil
 }
 
-// NewConnectOptions returns the versioned object that represents exec parameters
+// NewConnectOptions returns the versioned object that represents attach parameters
 func (r *AttachREST) NewConnectOptions() (runtime.Object, bool, string) {
 	return &api.PodAttachOptions{}, false, ""
 }
 
-// ConnectMethods returns the methods supported by exec
+// ConnectMethods returns the methods supported by attach
 func (r *AttachREST) ConnectMethods() []string {
 	return upgradeableMethods
 }
