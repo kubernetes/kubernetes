@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -109,19 +110,7 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *re
 			break
 		}
 	}
-	if kubeScheduler == "" {
-		scheduler = false
-		klog.Warningf("Can't find kube-scheduler pod. Grabbing metrics from kube-scheduler is disabled.")
-	}
-	if kubeControllerManager == "" {
-		controllers = false
-		klog.Warningf("Can't find kube-controller-manager pod. Grabbing metrics from kube-controller-manager is disabled.")
-	}
-	if snapshotControllerManager == "" {
-		snapshotController = false
-		klog.Warningf("Can't find snapshot-controller pod. Grabbing metrics from snapshot-controller is disabled.")
-	}
-	if ec == nil {
+	if clusterAutoscaler && ec == nil {
 		klog.Warningf("Did not receive an external client interface. Grabbing metrics from ClusterAutoscaler is disabled.")
 	}
 
@@ -130,15 +119,37 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, config *re
 		externalClient:             ec,
 		config:                     config,
 		grabFromAPIServer:          apiServer,
-		grabFromControllerManager:  controllers,
+		grabFromControllerManager:  checkPodDebugHandlers(c, controllers, "kube-controller-manager", kubeControllerManager),
 		grabFromKubelets:           kubelets,
-		grabFromScheduler:          scheduler,
+		grabFromScheduler:          checkPodDebugHandlers(c, scheduler, "kube-scheduler", kubeScheduler),
 		grabFromClusterAutoscaler:  clusterAutoscaler,
-		grabFromSnapshotController: snapshotController,
+		grabFromSnapshotController: checkPodDebugHandlers(c, snapshotController, "snapshot-controller", snapshotControllerManager),
 		kubeScheduler:              kubeScheduler,
 		kubeControllerManager:      kubeControllerManager,
 		snapshotController:         snapshotControllerManager,
 	}, nil
+}
+
+func checkPodDebugHandlers(c clientset.Interface, requested bool, component, podName string) bool {
+	if !requested {
+		return false
+	}
+	if podName == "" {
+		klog.Warningf("Can't find %s pod. Grabbing metrics from %s is disabled.", component, component)
+		return false
+	}
+
+	// The debug handlers on the host where the pod runs might be disabled.
+	// We can check that indirectly by trying to retrieve log output.
+	limit := int64(1)
+	if _, err := c.CoreV1().Pods(metav1.NamespaceSystem).GetLogs(podName, &v1.PodLogOptions{LimitBytes: &limit}).DoRaw(context.TODO()); err != nil {
+		klog.Warningf("Can't retrieve log output of %s (%q). Debug handlers might be disabled in kubelet. Grabbing metrics from %s is disabled.",
+			podName, err, component)
+		return false
+	}
+
+	// Metrics gathering enabled.
+	return true
 }
 
 // HasControlPlanePods returns true if metrics grabber was able to find control-plane pods
