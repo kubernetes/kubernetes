@@ -112,6 +112,9 @@ func WithPriorityAndFairness(
 			}
 		}
 		var resultCh chan interface{}
+		if isWatchRequest {
+			resultCh = make(chan interface{})
+		}
 		execute := func() {
 			noteExecutingDelta(1)
 			defer noteExecutingDelta(-1)
@@ -129,7 +132,6 @@ func WithPriorityAndFairness(
 			setResponseHeaders(classification, w)
 
 			if isWatchRequest {
-				resultCh = make(chan interface{})
 				go func() {
 					defer func() {
 						err := recover()
@@ -179,7 +181,12 @@ func WithPriorityAndFairness(
 			}
 			tooManyRequests(r, w)
 		}
-		// In case of watch, from P&F POV it already finished, but we need to wait until the request itself finishes.
+
+		// For watch requests, from the APF point of view the request is already
+		// finished at this point. However, that doesn't mean it is already finished
+		// from the non-APF point of view. So we need to wait here until the request is:
+		// 1) finished being processed or
+		// 2) rejected
 		if isWatchRequest {
 			err := <-resultCh
 			if err != nil {
