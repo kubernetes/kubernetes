@@ -118,7 +118,7 @@ func UpdateResource(r rest.Updater, scope *RequestScope, admit admission.Interfa
 		trace.Step("Conversion done")
 
 		ae := request.AuditEventFrom(ctx)
-		objGV := schema.GroupVersion{Group: gvk.Group, Version: gvk.Version}
+		objGV := gvk.GroupVersion()
 		audit.LogRequestObject(ae, obj, objGV, scope.Resource, scope.Subresource, scope.Serializer)
 		admit = admission.WithAudit(admit, ae)
 
