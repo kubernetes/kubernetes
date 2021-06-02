@@ -160,7 +160,7 @@ var _ = SIGDescribe("Kubelet", func() {
 					},
 					HostAliases: []v1.HostAlias{
 						{
-							IP:        "123.45.67.89",
+							IP:        "192.0.2.89",
 							Hostnames: []string{"foo", "bar"},
 						},
 					},
@@ -177,7 +177,7 @@ var _ = SIGDescribe("Kubelet", func() {
 				buf.ReadFrom(rc)
 				hostsFileContent := buf.String()
 
-				if !strings.Contains(hostsFileContent, "123.45.67.89\tfoo\tbar") {
+				if !strings.Contains(hostsFileContent, "192.0.2.89\tfoo\tbar") {
 					return fmt.Errorf("expected hosts file to contain entries from HostAliases. Got:\n%+v", hostsFileContent)
 				}
 

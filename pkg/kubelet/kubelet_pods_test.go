@@ -127,7 +127,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-123.45.67.89	some.domain
+192.0.2.89	some.domain
 `,
 			`# Kubernetes-managed hosts file (host network).
 # hosts file for testing.
@@ -137,7 +137,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-123.45.67.89	some.domain
+192.0.2.89	some.domain
 `,
 		},
 		{
@@ -150,7 +150,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-12.34.56.78	another.domain
+192.0.2.78	another.domain
 `,
 			`# Kubernetes-managed hosts file (host network).
 # another hosts file for testing.
@@ -160,13 +160,13 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-12.34.56.78	another.domain
+192.0.2.78	another.domain
 `,
 		},
 		{
 			"hosts_test_file1_with_host_aliases",
 			[]v1.HostAlias{
-				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
 			},
 			`# hosts file for testing.
 127.0.0.1	localhost
@@ -175,7 +175,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-123.45.67.89	some.domain
+192.0.2.89	some.domain
 `,
 			`# Kubernetes-managed hosts file (host network).
 # hosts file for testing.
@@ -185,16 +185,16 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-123.45.67.89	some.domain
+192.0.2.89	some.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
+192.0.2.89	foo	bar	baz
 `,
 		},
 		{
 			"hosts_test_file2_with_host_aliases",
 			[]v1.HostAlias{
-				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
 				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			`# another hosts file for testing.
@@ -204,7 +204,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-12.34.56.78	another.domain
+192.0.2.78	another.domain
 `,
 			`# Kubernetes-managed hosts file (host network).
 # another hosts file for testing.
@@ -214,11 +214,11 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-12.34.56.78	another.domain
+192.0.2.78	another.domain
 
 # Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
-456.78.90.123	park	doo	boo
+192.0.2.89	foo	bar	baz
+192.0.2.123	park	doo	boo
 `,
 		},
 	}
@@ -253,7 +253,7 @@ func TestManagedHostsFileContent(t *testing.T) {
 		expectedContent string
 	}{
 		{
-			[]string{"123.45.67.89"},
+			[]string{"192.0.2.89"},
 			"podFoo",
 			"",
 			[]v1.HostAlias{},
@@ -264,7 +264,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-123.45.67.89	podFoo
+192.0.2.89	podFoo
 `,
 		},
 		{
@@ -279,7 +279,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+192.0.2.1	podFoo.domainFoo	podFoo
 `,
 		},
 		{
@@ -287,7 +287,7 @@ fe00::2	ip6-allrouters
 			"podFoo",
 			"domainFoo",
 			[]v1.HostAlias{
-				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
 			},
 			`# Kubernetes-managed hosts file.
 127.0.0.1	localhost
@@ -296,10 +296,10 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+1.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
+192.0.2.89	foo	bar	baz
 `,
 		},
 		{
@@ -307,7 +307,7 @@ fe00::2	ip6-allrouters
 			"podFoo",
 			"domainFoo",
 			[]v1.HostAlias{
-				{IP: "123.45.67.89", Hostnames: []string{"foo", "bar", "baz"}},
+				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
 				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			`# Kubernetes-managed hosts file.
@@ -317,11 +317,11 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+192.0.2.1	podFoo.domainFoo	podFoo
 
 # Entries added by HostAliases.
-123.45.67.89	foo	bar	baz
-456.78.90.123	park	doo	boo
+192.0.2.89	foo	bar	baz
+192.0.2.123	park	doo	boo
 `,
 		},
 		{
@@ -336,7 +336,7 @@ fe00::0	ip6-localnet
 fe00::0	ip6-mcastprefix
 fe00::1	ip6-allnodes
 fe00::2	ip6-allrouters
-203.0.113.1	podFoo.domainFoo	podFoo
+192.0.2.1	podFoo.domainFoo	podFoo
 fd00::6	podFoo.domainFoo	podFoo
 `,
 		},
