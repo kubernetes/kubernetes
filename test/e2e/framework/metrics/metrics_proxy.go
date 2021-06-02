@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -39,8 +40,9 @@ type componentInfo struct {
 	IP   string
 }
 
-// SetupMetricsProxy creates a nginx Pod to expose metrics from the secure port of kube-scheduler and kube-controller-manager in tests.
-func SetupMetricsProxy(c clientset.Interface) error {
+// setupMetricsProxy creates a nginx Pod to expose metrics from the secure port of kube-scheduler and kube-controller-manager in tests.
+func setupMetricsProxy(c clientset.Interface, components []string) error {
+	const name = metricsProxyPod
 	var infos []componentInfo
 	// The component pods might take some time to show up.
 	err := wait.PollImmediate(time.Second*5, time.Minute*5, func() (bool, error) {
@@ -53,22 +55,18 @@ func SetupMetricsProxy(c clientset.Interface) error {
 			if len(pod.Status.PodIP) == 0 {
 				continue
 			}
-			switch {
-			case strings.HasPrefix(pod.Name, "kube-scheduler-"):
-				foundComponents = append(foundComponents, componentInfo{
-					Name: pod.Name,
-					Port: kubeSchedulerPort,
-					IP:   pod.Status.PodIP,
-				})
-			case strings.HasPrefix(pod.Name, "kube-controller-manager-"):
-				foundComponents = append(foundComponents, componentInfo{
-					Name: pod.Name,
-					Port: kubeControllerManagerPort,
-					IP:   pod.Status.PodIP,
-				})
+
+			for _, component := range components {
+				if strings.HasPrefix(pod.Name, component) {
+					foundComponents = append(foundComponents, componentInfo{
+						Name: pod.Name,
+						Port: kubeSchedulerPort,
+						IP:   pod.Status.PodIP,
+					})
+				}
 			}
 		}
-		if len(foundComponents) != 2 {
+		if len(foundComponents) != len(components) {
 			klog.Infof("Only %d components found. Will retry.", len(foundComponents))
 			klog.Infof("Found components: %v", foundComponents)
 			return false, nil
@@ -82,10 +80,14 @@ func SetupMetricsProxy(c clientset.Interface) error {
 
 	klog.Infof("Found components: %v", infos)
 
-	const name = metricsProxyPod
+	// use the service account as lock, if it already exist bail out
 	_, err = c.CoreV1().ServiceAccounts(metav1.NamespaceSystem).Create(context.TODO(), &v1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}, metav1.CreateOptions{})
+	if err != nil && apierrors.IsAlreadyExists(err) {
+		klog.Infof("Metric-proxy already configured, exiting ...")
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("create serviceAccount: %w", err)
 	}

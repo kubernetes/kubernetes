@@ -76,6 +76,7 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 	kubeScheduler := ""
 	kubeControllerManager := ""
 	snapshotControllerManager := ""
+	components := []string{}
 
 	regKubeScheduler := regexp.MustCompile("kube-scheduler-.*")
 	regKubeControllerManager := regexp.MustCompile("kube-controller-manager-.*")
@@ -116,6 +117,17 @@ func NewMetricsGrabber(c clientset.Interface, ec clientset.Interface, kubelets b
 	}
 	if ec == nil {
 		klog.Warningf("Did not receive an external client interface. Grabbing metrics from ClusterAutoscaler is disabled.")
+	}
+
+	if !scheduler {
+		components = append(components, "kube-scheduler")
+	}
+	if !controllers {
+		components = append(components, "kube-controller-manager")
+	}
+	err = setupMetricsProxy(c, components)
+	if err != nil {
+		return &Grabber{}, err
 	}
 
 	return &Grabber{
