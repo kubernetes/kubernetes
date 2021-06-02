@@ -44,7 +44,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
-	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -727,7 +726,7 @@ func TestFilterByAffinity(t *testing.T) {
 		Preferred:        true,
 	}
 	testManager := ManagerImpl{
-		topologyAffinityStore: NewFakeTopologyManagerWithHint(t, &fakeHint),
+		topologyAffinityStore: topologymanager.NewFakeManagerWithHint(&fakeHint),
 		allDevices:            allDevices,
 	}
 
@@ -757,44 +756,6 @@ func TestFilterByAffinity(t *testing.T) {
 		as.Truef(notFromAffinity.Equal(testCase.notFromAffinityExpected), "expect devices not from affinity to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
 		as.Truef(withoutTopology.Equal(testCase.withoutTopologyExpected), "expect devices without topology to be %v but got %v", testCase.notFromAffinityExpected, notFromAffinity)
 	}
-}
-
-type fakeTopologyManagerWithHint struct {
-	t    *testing.T
-	hint *topologymanager.TopologyHint
-}
-
-// NewFakeTopologyManagerWithHint returns an instance of fake topology manager with specified topology hints
-func NewFakeTopologyManagerWithHint(t *testing.T, hint *topologymanager.TopologyHint) topologymanager.Manager {
-	return &fakeTopologyManagerWithHint{
-		t:    t,
-		hint: hint,
-	}
-}
-
-func (m *fakeTopologyManagerWithHint) AddHintProvider(h topologymanager.HintProvider) {
-	m.t.Logf("[fake topologymanager] AddHintProvider HintProvider:  %v", h)
-}
-
-func (m *fakeTopologyManagerWithHint) AddContainer(pod *v1.Pod, container *v1.Container, containerID string) {
-	m.t.Logf("[fake topologymanager] AddContainer  pod: %v container name: %v container id:  %v", format.Pod(pod), container.Name, containerID)
-}
-
-func (m *fakeTopologyManagerWithHint) RemoveContainer(containerID string) error {
-	m.t.Logf("[fake topologymanager] RemoveContainer container id:  %v", containerID)
-	return nil
-}
-
-func (m *fakeTopologyManagerWithHint) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
-	m.t.Logf("[fake topologymanager] Topology Admit Handler")
-	return lifecycle.PodAdmitResult{
-		Admit: true,
-	}
-}
-
-func (m *fakeTopologyManagerWithHint) GetAffinity(podUID string, containerName string) topologymanager.TopologyHint {
-	m.t.Logf("[fake topologymanager] GetAffinity podUID: %v container name:  %v", podUID, containerName)
-	return *m.hint
 }
 
 func TestPodContainerDeviceAllocation(t *testing.T) {
