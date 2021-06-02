@@ -758,11 +758,6 @@ func TestFilterByAffinity(t *testing.T) {
 	}
 }
 
-type fakeTopologyManagerWithHint struct {
-	t    *testing.T
-	hint *topologymanager.TopologyHint
-}
-
 func TestPodContainerDeviceAllocation(t *testing.T) {
 	res1 := TestResource{
 		resourceName:     "domain1.com/resource1",
