@@ -1059,22 +1059,46 @@ var _ = common.SIGDescribe("Netpol", func() {
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 80, Protocol: v1.ProtocolTCP, Reachability: denyIngressToXReachability})
 		})
 
-		ginkgo.It("should not allow access by TCP when a policy specifies only SCTP [Feature:NetworkPolicy] [Feature:SCTP]", func() {
-			ingressRule := networkingv1.NetworkPolicyIngressRule{}
-			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 81}, Protocol: &protocolSCTP})
-			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-sctp-ingress-on-port-81", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
+		// This test *does* apply to plugins that do not implement SCTP. It is a
+		// security hole if you fail this test, because you are allowing TCP
+		// traffic that is supposed to be blocked.
+		ginkgo.It("should not mistakenly treat 'protocol: SCTP' as 'protocol: TCP', even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func() {
 			nsX, _, _, model, k8s := getK8SModel(f)
+
+			ginkgo.By("Creating a default-deny ingress policy.")
+			policy := GenNetworkPolicyWithNameAndPodSelector("deny-ingress", metav1.LabelSelector{}, SetSpecIngressRules())
 			CreatePolicy(k8s, policy, nsX)
 
 			ginkgo.By("Creating a network policy for the server which allows traffic only via SCTP on port 81.")
+			ingressRule := networkingv1.NetworkPolicyIngressRule{}
+			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 81}, Protocol: &protocolSCTP})
+			policy = GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-sctp-ingress-on-port-81", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
+			CreatePolicy(k8s, policy, nsX)
 
-			// Probing with TCP, so all traffic should be dropped.
+			ginkgo.By("Trying to connect to TCP port 81, which should be blocked by the deny-ingress policy.")
 			reachability := NewReachability(model.AllPods(), true)
 			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
 			ValidateOrFail(k8s, model, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
 		})
 
-		ginkgo.It("should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy] [Feature:UDP]", func() {
+		// This test *does* apply to plugins that do not implement SCTP. It is a
+		// security hole if you fail this test, because you are allowing TCP
+		// traffic that is supposed to be blocked.
+		ginkgo.It("should properly isolate pods that are selected by a policy allowing SCTP, even if the plugin doesn't support SCTP [Feature:NetworkPolicy]", func() {
+			ginkgo.By("Creating a network policy for the server which allows traffic only via SCTP on port 80.")
+			ingressRule := networkingv1.NetworkPolicyIngressRule{}
+			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 80}, Protocol: &protocolSCTP})
+			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-sctp-ingress-on-port-80", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
+			nsX, _, _, model, k8s := getK8SModel(f)
+			CreatePolicy(k8s, policy, nsX)
+
+			ginkgo.By("Trying to connect to TCP port 81, which should be blocked by implicit isolation.")
+			reachability := NewReachability(model.AllPods(), true)
+			reachability.ExpectAllIngress(NewPodString(nsX, "a"), false)
+			ValidateOrFail(k8s, model, &TestCase{ToPort: 81, Protocol: v1.ProtocolTCP, Reachability: reachability})
+		})
+
+		ginkgo.It("should not allow access by TCP when a policy specifies only UDP [Feature:NetworkPolicy]", func() {
 			ingressRule := networkingv1.NetworkPolicyIngressRule{}
 			ingressRule.Ports = append(ingressRule.Ports, networkingv1.NetworkPolicyPort{Port: &intstr.IntOrString{IntVal: 81}, Protocol: &protocolUDP})
 			policy := GenNetworkPolicyWithNameAndPodMatchLabel("allow-only-udp-ingress-on-port-81", map[string]string{"pod": "a"}, SetSpecIngressRules(ingressRule))
@@ -1091,7 +1115,7 @@ var _ = common.SIGDescribe("Netpol", func() {
 	})
 })
 
-var _ = common.SIGDescribe("Netpol [Feature:UDPConnectivity][LinuxOnly]", func() {
+var _ = common.SIGDescribe("Netpol [LinuxOnly]", func() {
 	f := framework.NewDefaultFramework("udp-network-policy")
 
 	ginkgo.BeforeEach(func() {
