@@ -1226,7 +1226,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 				return nil, err
 			}
 			if e.Decorator != nil {
-				return newDecoratedWatcher(w, e.Decorator), nil
+				return newDecoratedWatcher(ctx, w, e.Decorator), nil
 			}
 			return w, nil
 		}
@@ -1239,7 +1239,7 @@ func (e *Store) WatchPredicate(ctx context.Context, p storage.SelectionPredicate
 		return nil, err
 	}
 	if e.Decorator != nil {
-		return newDecoratedWatcher(w, e.Decorator), nil
+		return newDecoratedWatcher(ctx, w, e.Decorator), nil
 	}
 	return w, nil
 }
