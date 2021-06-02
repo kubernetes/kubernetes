@@ -2222,6 +2222,7 @@ k8s.io/system-validators/validators
 ## explicit
 k8s.io/utils/buffer
 k8s.io/utils/clock
+k8s.io/utils/env
 k8s.io/utils/exec
 k8s.io/utils/exec/testing
 k8s.io/utils/inotify

@@ -25,11 +25,11 @@ import (
 	flockerapi "github.com/clusterhq/flocker-go"
 	"k8s.io/klog/v2"
 	"k8s.io/mount-utils"
+	utilenv "k8s.io/utils/env"
 	utilstrings "k8s.io/utils/strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 )
@@ -239,15 +239,15 @@ func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 // newFlockerClient uses environment variables and pod attributes to return a
 // flocker client capable of talking with the Flocker control service.
 func (p *flockerPlugin) newFlockerClient(hostIP string) (*flockerapi.Client, error) {
-	host := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
-	port, err := env.GetEnvAsIntOrFallback("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
+	host := utilenv.GetString("FLOCKER_CONTROL_SERVICE_HOST", defaultHost)
+	port, err := utilenv.GetInt("FLOCKER_CONTROL_SERVICE_PORT", defaultPort)
 
 	if err != nil {
 		return nil, err
 	}
-	caCertPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
-	keyPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
-	certPath := env.GetEnvAsStringOrFallback("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
+	caCertPath := utilenv.GetString("FLOCKER_CONTROL_SERVICE_CA_FILE", defaultCACertFile)
+	keyPath := utilenv.GetString("FLOCKER_CONTROL_SERVICE_CLIENT_KEY_FILE", defaultClientKeyFile)
+	certPath := utilenv.GetString("FLOCKER_CONTROL_SERVICE_CLIENT_CERT_FILE", defaultClientCertFile)
 
 	c, err := flockerapi.NewClient(host, port, hostIP, caCertPath, keyPath, certPath)
 	return c, err
