@@ -195,7 +195,7 @@ fe00::2	ip6-allrouters
 			"hosts_test_file2_with_host_aliases",
 			[]v1.HostAlias{
 				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
-				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+				{IP: "192.0.2.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			`# another hosts file for testing.
 127.0.0.1	localhost
@@ -308,7 +308,7 @@ fe00::2	ip6-allrouters
 			"domainFoo",
 			[]v1.HostAlias{
 				{IP: "192.0.2.89", Hostnames: []string{"foo", "bar", "baz"}},
-				{IP: "456.78.90.123", Hostnames: []string{"park", "doo", "boo"}},
+				{IP: "192.0.2.123", Hostnames: []string{"park", "doo", "boo"}},
 			},
 			`# Kubernetes-managed hosts file.
 127.0.0.1	localhost
