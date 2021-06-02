@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
@@ -34,8 +34,6 @@ const (
 
 	// ErrReasonExistingAntiAffinityRulesNotMatch is used for ExistingPodsAntiAffinityRulesNotMatch predicate error.
 	ErrReasonExistingAntiAffinityRulesNotMatch = "node(s) didn't satisfy existing pods anti-affinity rules"
-	// ErrReasonAffinityNotMatch is used for MatchInterPodAffinity predicate error.
-	ErrReasonAffinityNotMatch = "node(s) didn't match pod affinity/anti-affinity rules"
 	// ErrReasonAffinityRulesNotMatch is used for PodAffinityRulesNotMatch predicate error.
 	ErrReasonAffinityRulesNotMatch = "node(s) didn't match pod affinity rules"
 	// ErrReasonAntiAffinityRulesNotMatch is used for PodAntiAffinityRulesNotMatch predicate error.
@@ -384,15 +382,15 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	}
 
 	if !satisfyPodAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonAffinityNotMatch, ErrReasonAffinityRulesNotMatch)
+		return framework.NewStatus(framework.UnschedulableAndUnresolvable, ErrReasonAffinityRulesNotMatch)
 	}
 
 	if !satisfyPodAntiAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonAffinityNotMatch, ErrReasonAntiAffinityRulesNotMatch)
+		return framework.NewStatus(framework.Unschedulable, ErrReasonAntiAffinityRulesNotMatch)
 	}
 
 	if !satisfyExistingPodsAntiAffinity(state, nodeInfo) {
-		return framework.NewStatus(framework.Unschedulable, ErrReasonAffinityNotMatch, ErrReasonExistingAntiAffinityRulesNotMatch)
+		return framework.NewStatus(framework.Unschedulable, ErrReasonExistingAntiAffinityRulesNotMatch)
 	}
 
 	return nil
